@@ -1,12 +1,15 @@
 import { afterEach, describe, expect } from 'bun:test';
 import http2 from 'node:http2';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { NotFoundException, Stream } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { api, endpoint } from '../../src/api';
 import { type Application, application } from '../../src/application';
 import { grpc } from '../../src/grpc/grpc.plugin';
 import { http, type HttpPlugin } from '../../src/http/http.plugin';
-import { proto } from '../../src/proto';
+import { ProtoPlugin, proto } from '../../src/proto';
+import { decodeProto } from '../../src/grpc/proto-decode';
+import { encodeProto } from '../../src/grpc/proto-codec';
 import type { DiscoveredRoute } from '../../src/api';
 import type { StreamEndpointDefinition } from '../../src/api/route/stream-endpoint';
 import { ConnectRequestStream } from '../../src/grpc/connect-request-stream';
@@ -67,6 +70,7 @@ function openH2Stream(
 ): {
   write: (value: unknown) => void;
   end: () => void;
+  cancel: () => void;
   frames: Array<Frame & { afterWrites: number }>;
   status: Promise<number>;
   next: () => Promise<Frame & { afterWrites: number }>;
@@ -98,6 +102,7 @@ function openH2Stream(
   });
   const done = new Promise<void>((resolve, reject) => {
     stream.on('end', () => resolve());
+    stream.on('close', () => resolve());
     stream.on('error', reject);
   });
   return {
@@ -106,6 +111,7 @@ function openH2Stream(
       stream.write(envelope(value));
     },
     end: () => stream.end(),
+    cancel: () => stream.close(http2.constants.NGHTTP2_CANCEL),
     frames,
     status,
     next: () =>
@@ -119,6 +125,9 @@ function openH2Stream(
     done,
   };
 }
+
+/** What the ledger route did with each stream: committed with its total, or failed. */
+const ledger: string[] = [];
 
 describe('Connect client and bidirectional streams', () => {
   let app: Application | undefined;
@@ -204,6 +213,27 @@ describe('Connect client and bidirectional streams', () => {
             let count = 0;
             for await (const _ of ctx.messages()) count++;
             return { count };
+          }),
+      },
+      'GET',
+    );
+    apiPlugin.register(
+      '/ledger/[id]/commit',
+      {
+        GET: endpoint()
+          .params({ id: String })
+          .body(Stream({ delta: Number }))
+          .returns({ total: Number })
+          .handle(async (ctx) => {
+            let total = 0;
+            try {
+              for await (const message of ctx.messages()) total += message.delta;
+            } catch (error) {
+              ledger.push(`failed ${ctx.params.id}`);
+              throw error;
+            }
+            ledger.push(ctx.signal.aborted ? `aborted ${ctx.params.id}` : `committed ${ctx.params.id} ${total}`);
+            return { total };
           }),
       },
       'GET',
@@ -426,6 +456,88 @@ describe('Connect client and bidirectional streams', () => {
       expect(call.frames).toHaveLength(1);
       expect(call.frames[0]?.flags).toBe(2);
       expect(call.frames[0]?.value).toMatchObject({ error: { code: 'unauthenticated' } });
+    },
+  );
+
+  specTest(
+    'never commits a client stream its caller canceled',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'duplex-streams-over-http2',
+      check: 'a-connect-client-stream-over-http2-answers-its-declared-result',
+    },
+    async () => {
+      const port = await start();
+      session = http2.connect(`http://localhost:${port}`);
+      const canceled = openH2Stream(session, '/test.v1.LedgerService/ListLedgerByIdCommit');
+      canceled.write({ params: { id: 'partial' }, body: { delta: 1 } });
+      canceled.write({ body: { delta: 2 } });
+      await Bun.sleep(50);
+      canceled.cancel();
+      const ended = openH2Stream(session, '/test.v1.LedgerService/ListLedgerByIdCommit');
+      ended.write({ params: { id: 'whole' }, body: { delta: 1 } });
+      ended.write({ body: { delta: 2 } });
+      ended.end();
+      await ended.done;
+      await Bun.sleep(100);
+
+      // The reset stream is never read as an end: the part it delivered is not
+      // committed as if it were whole.
+      expect(ledger).toContain('committed whole 3');
+      expect(ledger.some((entry) => entry.startsWith('committed partial'))).toBe(false);
+      expect(ledger.some((entry) => entry.endsWith(' partial'))).toBe(true);
+    },
+  );
+
+  specTest(
+    'carries binary protobuf and gzip-compressed messages',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'duplex-streams-over-http2',
+      check: 'a-connect-client-stream-over-http2-answers-its-declared-result',
+    },
+    async () => {
+      const port = await start();
+      const meta = app?.getPlugin(ProtoPlugin).proto()?.messageMeta ?? {};
+      const encode = (message: Record<string, unknown>) =>
+        encodeProto(message, meta['ListTalliesByIdSumRequest'] ?? [], meta);
+      const frame = (payload: Uint8Array, flags = 0) => {
+        const bytes = new Uint8Array(5 + payload.length);
+        bytes[0] = flags;
+        new DataView(bytes.buffer).setUint32(1, payload.length);
+        bytes.set(payload, 5);
+        return bytes;
+      };
+      session = http2.connect(`http://localhost:${port}`);
+      const stream = session.request({
+        ':method': 'POST',
+        ':path': CLIENT_PATH,
+        'content-type': 'application/connect+proto',
+        'connect-protocol-version': '1',
+        'connect-content-encoding': 'gzip',
+        'connect-accept-encoding': 'gzip',
+      });
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      const ended = new Promise<void>((resolve) => stream.on('end', () => resolve()));
+      stream.write(frame(encode({ params: { id: 'p' }, body: { delta: 4 } })));
+      stream.write(frame(new Uint8Array(gzipSync(encode({ body: { delta: 5 } }))), 0x01));
+      stream.end();
+      await ended;
+
+      const bytes = new Uint8Array(Buffer.concat(chunks));
+      const flags = bytes[0] ?? 0;
+      const length = new DataView(bytes.buffer, bytes.byteOffset).getUint32(1);
+      let payload = bytes.subarray(5, 5 + length);
+      // The caller named gzip in Connect-Accept-Encoding, so the answer is compressed per message.
+      expect(flags).toBe(0x01);
+      payload = new Uint8Array(gunzipSync(payload));
+      expect(decodeProto(payload, meta['ListTalliesByIdSumResponse'] ?? [], meta)).toEqual({
+        id: 'p',
+        count: 2,
+        total: 9,
+      });
+      expect(bytes[5 + length]).toBe(0x02);
     },
   );
 

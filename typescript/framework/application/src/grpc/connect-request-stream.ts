@@ -29,6 +29,7 @@ export class ConnectRequestStream {
     body: ReadableStream<Uint8Array> | null,
     private readonly streamEncoding: string | null,
     private readonly maxMessageBytes: number = MAX_GRPC_MESSAGE_BYTES,
+    private readonly signal?: AbortSignal,
   ) {
     this.reader = body?.getReader();
     if (!this.reader) this.ended = true;
@@ -70,6 +71,7 @@ export class ConnectRequestStream {
         const read = await this.reader?.read();
         if (!read || read.done) {
           this.ended = true;
+          await this.refuseCancellation();
           return filled;
         }
         // The runtime may reuse a chunk's memory once the next read starts, so
@@ -83,6 +85,21 @@ export class ConnectRequestStream {
       filled += take;
     }
     return filled;
+  }
+
+  /**
+   * A caller that resets its stream ends the body exactly as a caller that
+   * ended its side does, and the request signal says which one only a
+   * macrotask later. Reading a cancellation as the end would let a client
+   * stream commit the part it received as if it were whole, so the end is
+   * confirmed once that turn has passed.
+   */
+  private async refuseCancellation(): Promise<void> {
+    if (!this.signal) return;
+    if (!this.signal.aborted) await new Promise<void>((resolve) => setImmediate(resolve));
+    if (this.signal.aborted) {
+      throw new HttpException('Client Closed Request: the caller canceled the stream', 499);
+    }
   }
 
   private decode(flags: number, payload: Uint8Array): Uint8Array {

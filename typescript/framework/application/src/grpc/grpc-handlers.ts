@@ -507,6 +507,7 @@ export function buildDuplexRpcHandler(
       ctx.req.body,
       ctx.headers.get(CONNECT_CONTENT_ENCODING_HEADER),
       limits.maxFrameBytes ?? MAX_GRPC_MESSAGE_BYTES,
+      ctx.req.signal,
     );
     const decodeMessage = (payload: Uint8Array): Record<string, unknown> => {
       if (useBinaryRequest && requestMeta) {

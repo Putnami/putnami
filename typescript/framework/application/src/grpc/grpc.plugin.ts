@@ -1,6 +1,7 @@
 import type { Type } from '@putnami/runtime';
 import { useLogger } from '@putnami/runtime';
 import { ApiPlugin } from '../api';
+import { isExternalClientPolicy } from '../api/client-contract';
 import { resolveStreamBudgets } from '../api/stream/first-party-stream-dispatcher';
 import type { Module, Plugin } from '../application';
 import { HttpPlugin } from '../http/http.plugin';
@@ -159,7 +160,10 @@ export class GrpcPlugin implements Plugin {
         } else if (streamDef?.mode === 'client' || streamDef?.mode === 'bidirectional') {
           // The budgets the endpoint declares bound it on Connect exactly as
           // they bound it on WebSocket.
-          const budgets = resolveStreamBudgets(apiPlugin.clientContract, streamDef);
+          // The contract's defaults apply only to a first-party route, as on
+          // WebSocket; an external authority's route reads its own declaration.
+          const contract = isExternalClientPolicy(streamDef.meta?.client) ? undefined : apiPlugin.clientContract;
+          const budgets = resolveStreamBudgets(contract, streamDef);
           handler = buildDuplexRpcHandler(streamDef, route, proto.messageMeta, enums, useCompression, {
             maxFrameBytes: budgets.maxFrameBytes,
             idleTimeoutMs: budgets.idleTimeoutMs,

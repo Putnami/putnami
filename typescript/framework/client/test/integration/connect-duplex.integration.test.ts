@@ -1,4 +1,5 @@
 import { afterEach, describe, expect } from 'bun:test';
+import http2 from 'node:http2';
 import { api, type Application, application, endpoint, grpc, http, type HttpPlugin, proto } from '@putnami/application';
 import { NotFoundException, Stream } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
@@ -19,6 +20,9 @@ interface Tally {
 
 const SUM_PATH = '/test.v1.TalliesService/ListTalliesByIdSum';
 const RUNNING_PATH = '/test.v1.TalliesService/ListTalliesByIdRunning';
+
+/** What the ledger route did with each stream. */
+const ledger: string[] = [];
 
 describe('ConnectTransport.duplex', () => {
   let app: Application | undefined;
@@ -67,6 +71,27 @@ describe('ConnectTransport.duplex', () => {
               ctx.send({ id: ctx.params.id, count, total });
             }
             return { id: ctx.params.id, count, total };
+          }),
+      },
+      'GET',
+    );
+    apiPlugin.register(
+      '/ledger/[id]/commit',
+      {
+        GET: endpoint()
+          .params({ id: String })
+          .body(Stream({ delta: Number }))
+          .returns({ total: Number })
+          .handle(async (ctx) => {
+            let total = 0;
+            try {
+              for await (const message of ctx.messages()) total += message.delta;
+            } catch (error) {
+              ledger.push(`failed ${ctx.params.id}`);
+              throw error;
+            }
+            ledger.push(ctx.signal.aborted ? `aborted ${ctx.params.id}` : `committed ${ctx.params.id} ${total}`);
+            return { total };
           }),
       },
       'GET',
@@ -205,6 +230,63 @@ describe('ConnectTransport.duplex', () => {
       stream.cancel();
     },
   );
+
+  specTest(
+    'a canceled client stream is never committed by the provider',
+    {
+      feature: 'typescript/service-clients',
+      requirement: 'connect-duplex-streams',
+      check: 'a-connect-duplex-stream-failure-is-the-typed-stream-error',
+    },
+    async () => {
+      const transport = new ConnectTransport(await start(), 'test.v1');
+      const stream = transport.duplex<{ delta: number }, { total: number }>(
+        '/test.v1.LedgerService/ListLedgerByIdCommit',
+        { params: { id: 'canceled' } },
+      );
+      stream.onError(() => undefined);
+      stream.send({ delta: 1 });
+      stream.send({ delta: 2 });
+      await Bun.sleep(50);
+      stream.cancel();
+      await Bun.sleep(100);
+      expect(ledger.some((entry) => entry.startsWith('committed canceled'))).toBe(false);
+      expect(ledger.some((entry) => entry.endsWith(' canceled'))).toBe(true);
+    },
+  );
+
+  for (const [scene, act] of [
+    ['resets the stream', (stream: http2.Http2Stream) => stream.close(http2.constants.NGHTTP2_CANCEL)],
+    ['destroys the session', (stream: http2.Http2Stream) => stream.session?.destroy()],
+  ] as const) {
+    specTest(
+      `fails when the provider ${scene} before it answers`,
+      {
+        feature: 'typescript/service-clients',
+        requirement: 'connect-duplex-streams',
+        check: 'a-connect-duplex-stream-failure-is-the-typed-stream-error',
+      },
+      async () => {
+        const server = http2.createServer();
+        server.on('stream', (stream) => act(stream));
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const port = (server.address() as { port: number }).port;
+        try {
+          const transport = new ConnectTransport(`http://127.0.0.1:${port}`, 'test.v1');
+          const stream = transport.duplex<{ delta: number }, Tally>(SUM_PATH);
+          stream.send({ delta: 1 });
+          const error = await collect(stream as DuplexStream<unknown, Tally>, 3000).then(
+            () => undefined,
+            (failure: unknown) => failure,
+          );
+          expect(error).toBeInstanceOf(ClientStreamError);
+          expect(['CANCELLED', 'UNAVAILABLE']).toContain(String((error as ClientStreamError).grpcStatus));
+        } finally {
+          server.close();
+        }
+      },
+    );
+  }
 
   specTest(
     'surfaces a failure in the end-of-stream message as the typed stream error',
