@@ -102,9 +102,9 @@ func TestBuildInfra_EmitsTypeScriptRuntimeCompatibility(t *testing.T) {
 	}
 }
 
-// End to end through the registered task: an authored infra/runtime.json that
-// states http2 keeps its value in the manifest, and one that states nothing
-// gets the default off.
+// End to end through the registered tasks: an authored infra/runtime.json that
+// states http2 keeps its value in the manifest and in the deployment
+// declaration, and one that states nothing gets the default off in both.
 func TestBuildInfra_KeepsAnAuthoredHTTP2(t *testing.T) {
 	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-workload-always-has-a-runtime", "the-typescript-extension-keeps-an-authored-http2")
 	cases := []struct {
@@ -146,6 +146,22 @@ func TestBuildInfra_KeepsAnAuthoredHTTP2(t *testing.T) {
 			manifest := readRuntimeBlock(t, filepath.Join(appRoot, ".gen", "requirements.json"))
 			if manifest.Protocols == nil || manifest.Protocols.HTTP2 == nil || *manifest.Protocols.HTTP2 != tc.want {
 				t.Errorf("aggregated runtime.protocols.http2 = %+v, want %v", manifest.Protocols, tc.want)
+			}
+
+			status, data, err = packageDeployment()(ctx, jsonl.NewForVersion(1), nil)
+			if err != nil || status != "OK" || data["outcome"] != string(infraagg.OutcomeEmitted) {
+				t.Fatalf("package-deployment = %q %v %v, want OK and emitted", status, data, err)
+			}
+			declaration, err := os.ReadFile(infraagg.DeploymentPath(appRoot))
+			if err != nil {
+				t.Fatal(err)
+			}
+			parsed, diagnostics := infra.ParseDeployment(declaration)
+			if parsed == nil {
+				t.Fatalf("the declaration is not canonical: %v", diagnostics)
+			}
+			if rt := parsed.Runtime; rt == nil || rt.Protocols == nil || rt.Protocols.HTTP2 == nil || *rt.Protocols.HTTP2 != tc.want {
+				t.Errorf("declared runtime = %+v, want http2 %v", parsed.Runtime, tc.want)
 			}
 		})
 	}

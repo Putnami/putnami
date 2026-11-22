@@ -666,16 +666,29 @@ same HTTP/2 hook, as the workload's deployment declaration (see
 A TypeScript server accepts cleartext HTTP/2 with prior knowledge on the same
 port as HTTP/1.1, and serves Connect client and bidirectional streams only over
 HTTP/2. Deployment still defaults to HTTP/1.1 between the deploy target and the
-container. A workload turns HTTP/2 on in its own `infra/runtime.json`:
+container. A workload turns HTTP/2 on in its own `infra/runtime.json`.
+
+An authored `infra/runtime.json` replaces the framework runtime defaults
+entirely; nothing merges it with them. A workload that has none starts from the
+generated `.gen/infra/runtime.json`: copy it to `infra/runtime.json` and set
+`protocols.http2` to `true`, so the scaling ceiling and the ingress visibility
+stay stated:
 
 ```json
 {
+  "ingress": { "public": false },
+  "scaling": { "max": 1, "concurrency": 500 },
   "protocols": { "http2": true }
 }
 ```
 
 The value reaches `.gen/requirements.json` and the deployment declaration as
 written; `"http2": false` is kept the same way.
+
+The server must accept HTTP/2: the workload runs an `@putnami/application`
+release whose `http()` accepts cleartext HTTP/2 (its ADR 0008), and does not
+call `http({ http2: false })`. Otherwise the deploy target sends HTTP/2 with
+prior knowledge to a server that speaks HTTP/1.1 only, and every request fails.
 
 With HTTP/2 on, Connect client and bidirectional streams reach the workload
 from callers that open Connect over HTTP/2, such as `ConnectTransport.duplex()`
@@ -693,11 +706,14 @@ To run that test:
 
 1. Take a sample workload that serves a unary RPC, a bidirectional Connect
    stream and a WebSocket stream, such as
-   `typescript/samples/10-service-to-service`, and add
-   `"protocols": { "http2": true }` to its `infra/runtime.json`.
-2. Build it and check that `.gen/requirements.json` carries
-   `"runtime": {"protocols": {"http2": true}}`, then deploy it to a
-   non-production environment.
+   `typescript/samples/10-service-to-service`, which has no
+   `infra/runtime.json`. Build it once, copy its `.gen/infra/runtime.json` to
+   `infra/runtime.json`, then set `"ingress": {"public": true}` (or the access
+   the test needs) and `"protocols": {"http2": true}`.
+2. Build it again and check that the runtime block of `.gen/requirements.json`
+   is the whole authored block, with `ingress`, `scaling` and
+   `"protocols": {"http2": true}`, then deploy it to a non-production
+   environment.
 3. Through the public ingress, call the unary RPC, open the bidirectional
    Connect stream and exchange a few messages, and open the WebSocket stream
    and exchange a few messages.
