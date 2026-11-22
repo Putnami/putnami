@@ -126,6 +126,31 @@ Bun strips types when it runs a test, and `build~types` reads only `src/`, `bin/
 - It caches like the test run: an unchanged project replays its verdict.
 - `--types false` skips it. An import from Nx, Turborepo, Rush or moon writes `types: false` in `options["@putnami/typescript:test"]` of each project whose test script it moves: that script type-checked nothing, so the moved test does not either.
 
+### Checking with `bun check`
+
+The step runs `tsc` unless the project chooses Bun's own checker, `bun check`, in the `type-checker` parameter:
+
+```json
+{
+  "options": {
+    "@putnami/typescript:test": {
+      "type-checker": "bun"
+    }
+  }
+}
+```
+
+`--type-checker bun` does the same for one run. Nothing else sets it: an import, a dependency or a script never switches a project to `bun check`.
+
+- `bun check` reads the same scratch tsconfig and the same compiler options as `tsc`, with `--no-pretty --all`: one line per error, every error shown. Its diagnostics are reported the way `tsc`'s are, and a type error or an unused `@ts-expect-error` fails `putnami test` the same way.
+- `--no-script` keeps a `check` script of the project's `package.json` from running in its place.
+- It keeps no incremental build info: a cache miss checks the whole project again, which `bun check` does in a fraction of the time `tsc` takes.
+- It checks with the TypeScript version Bun embeds, TypeScript 7 in Bun 1.4, not the `typescript` package the workspace installs. A project whose code relies on a behavior TypeScript 7 changed can get different diagnostics.
+- TypeScript 7 removed some tsconfig options that `tsc` 6 with `--ignoreDeprecations 6.0` still accepts. A `baseUrl` in the tsconfig chain stops `bun check` with TS5102 before it checks anything, on every project. `moduleResolution` `node` or `node10` and `target` `es5` stop it with TS5108 only when the runner is Vitest or Jest, whose check keeps the project's own compiler options; otherwise the step's own flags override them. Remove those options, or keep `tsc` for that project.
+- It uses one thread per CPU core, and Putnami runs several projects at once, so many projects that opt in can compete for the CPU.
+- It needs Bun 1.4.4 or later: the step reads the version of the Bun that runs it, which is not always the pinned one, and fails on an older Bun, whose `bun check` would run a `check` script instead of type-checking.
+- Any value other than `tsc` and `bun` fails the step and names the choices.
+
 ## Test File Conventions
 
 Test files must match one of these patterns:
@@ -292,6 +317,7 @@ Unhandled errors between tests (module-level crashes) are extracted and reported
 | `--concurrent` | `string` | — | Treat all tests as concurrent |
 | `--pass-with-no-tests` | `boolean` | `true` | Pass if no test files are found |
 | `--types` | `boolean` | `true` | Type-check every TypeScript file of the project, tests included, in the `types` step |
+| `--type-checker` | `string` | `tsc` | Checker of the `types` step: `tsc`, or `bun` for `bun check` (see [Checking with `bun check`](#checking-with-bun-check)) |
 | `--test-verbose` | `boolean` | `false` | Show the complete Bun transcript at info level; changes visibility only, never the invocation or verdict |
 | `--require-test-db` | `boolean` | `false` | Put the `require` mode on the database test binding `test-env-up` provisions, so a suite whose test database does not answer fails instead of skipping. A binding provisioned on CI carries it already. The run still starts the local test database it may start: a Docker container, or the PostgreSQL installed on the machine when no Docker daemon answers |
 

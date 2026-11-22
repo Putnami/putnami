@@ -14,7 +14,8 @@ import (
 // types phase reads only src, bin and .gen, so this step is the one that
 // fails on a type error, or an unused @ts-expect-error, in a test. A project
 // whose test runner is Vitest or Jest is checked with its own tsconfig's
-// compiler options, where the runner's globals are declared.
+// compiler options, where the runner's globals are declared. The
+// type-checker parameter chooses tsc, the default, or bun check.
 func runTestTypes(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	projectPath := filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)
 	bunBin, err := resolveBunBin()
@@ -27,8 +28,13 @@ func runTestTypes(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string
 		return "FAILED", nil, err
 	}
 
+	checker, err := build.ResolveTypeChecker(ctx.Params.String("type-checker"))
+	if err != nil {
+		return "FAILED", nil, err
+	}
+
 	emit.PhaseStart("typecheck")
-	result, err := build.RunTypeCheck(bunBin, projectPath, typesBuildInfoDir(ctx.CacheRoot, "test-types", ctx.Project.Path), runner != testjob.RunnerBun)
+	result, err := build.RunTypeCheck(bunBin, projectPath, typesBuildInfoDir(ctx.CacheRoot, "test-types", ctx.Project.Path), runner != testjob.RunnerBun, checker)
 	if err != nil {
 		emit.PhaseEnd("typecheck", "failed")
 		return "FAILED", nil, err

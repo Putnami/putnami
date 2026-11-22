@@ -56,6 +56,7 @@
     "typescript/typescript-project-toolchain#test-rerun-each",
     "typescript/typescript-project-toolchain#test-runner-choice",
     "typescript/typescript-project-toolchain#test-runner-reports",
+    "typescript/typescript-project-toolchain#test-type-checker-choice",
     "typescript/typescript-project-toolchain#the-lockfile-in-use-keys-the-cache",
     "typescript/typescript-project-toolchain#the-packager-refuses-a-nameless-manifest",
     "typescript/typescript-project-toolchain#tsc-build-runs-the-installed-tsc",

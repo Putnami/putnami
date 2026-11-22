@@ -427,6 +427,15 @@
           "default": true,
           "description": "Type-check every TypeScript file of the project, tests included. An import sets it false for a test script it moves, which type-checked nothing."
         },
+        "type-checker": {
+          "type": "string",
+          "default": "tsc",
+          "choices": [
+            "tsc",
+            "bun"
+          ],
+          "description": "Checker of the types step, set in options[\"@putnami/typescript:test\"][\"type-checker\"]: tsc runs the TypeScript compiler; bun runs bun check, Bun's checker, on the same tsconfig and compiler options. Never inferred"
+        },
         "test-verbose": {
           "type": "boolean",
           "default": false,
@@ -2454,6 +2463,9 @@
           ]
         },
         "runner": {
+          "from": "params"
+        },
+        "type-checker": {
           "from": "params"
         },
         "extensionVersion": {

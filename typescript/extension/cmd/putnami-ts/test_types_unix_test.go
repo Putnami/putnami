@@ -3,9 +3,12 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -42,13 +45,13 @@ func typeCheckStarter(t *testing.T, files map[string]string) *pctx.Context {
 
 // typeCheckDiagnostics runs the type-check the step runs and returns the
 // project-relative file of each diagnostic with its code.
-func typeCheckDiagnostics(t *testing.T, ctx *pctx.Context) []string {
+func typeCheckDiagnostics(t *testing.T, ctx *pctx.Context, checker string) []string {
 	t.Helper()
 	bun, err := resolveBunBin()
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := build.RunTypeCheck(bun, filepath.Join(ctx.WorkspaceRoot, "webapp"), t.TempDir(), false)
+	result, err := build.RunTypeCheck(bun, filepath.Join(ctx.WorkspaceRoot, "webapp"), t.TempDir(), false, checker)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +78,7 @@ func TestTestTypesFailsOnATypeErrorInATestFile(t *testing.T) {
 	if status != "FAILED" {
 		t.Fatalf("test~types ended %s, want FAILED", status)
 	}
-	if got := typeCheckDiagnostics(t, ctx); strings.Join(got, ",") != "test/wrong.test.ts TS2322" {
+	if got := typeCheckDiagnostics(t, ctx, build.TypeCheckerTsc); strings.Join(got, ",") != "test/wrong.test.ts TS2322" {
 		t.Errorf("diagnostics %v, want the type error of test/wrong.test.ts", got)
 	}
 }
@@ -93,7 +96,7 @@ func TestTestTypesFailsOnAnUnusedExpectErrorInATestFile(t *testing.T) {
 	if status != "FAILED" {
 		t.Fatalf("test~types ended %s, want FAILED", status)
 	}
-	if got := typeCheckDiagnostics(t, ctx); strings.Join(got, ",") != "test/unused.test.ts TS2578" {
+	if got := typeCheckDiagnostics(t, ctx, build.TypeCheckerTsc); strings.Join(got, ",") != "test/unused.test.ts TS2578" {
 		t.Errorf("diagnostics %v, want the unused directive of test/unused.test.ts", got)
 	}
 }
@@ -110,7 +113,7 @@ func TestTestTypesFailsOnATypeErrorUnderADotDirectory(t *testing.T) {
 	if status != "FAILED" {
 		t.Fatalf("test~types ended %s, want FAILED", status)
 	}
-	if got := typeCheckDiagnostics(t, ctx); strings.Join(got, ",") != ".gen/src/gen.ts TS2322" {
+	if got := typeCheckDiagnostics(t, ctx, build.TypeCheckerTsc); strings.Join(got, ",") != ".gen/src/gen.ts TS2322" {
 		t.Errorf("diagnostics %v, want the type error of .gen/src/gen.ts", got)
 	}
 }
@@ -137,6 +140,78 @@ func TestTestTypesReadsTheDeclarationsOfADotDirectory(t *testing.T) {
 
 	status, _, err := runTestTypes(ctx, jsonl.New(), nil)
 	expectJobOK(t, "test~types", status, err)
+}
+
+// typeCheckFindings runs the type-check with checker and returns each
+// diagnostic whole: file, position, code and message.
+func typeCheckFindings(t *testing.T, ctx *pctx.Context, checker string) []string {
+	t.Helper()
+	bun, err := resolveBunBin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := build.RunTypeCheck(bun, filepath.Join(ctx.WorkspaceRoot, "webapp"), t.TempDir(), false, checker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Success || len(result.Diagnostics) == 0 {
+		t.Fatalf("%s found nothing, want every error of the project:\n%s", checker, result.RawOutput)
+	}
+	got := make([]string, 0, len(result.Diagnostics))
+	for _, d := range result.Diagnostics {
+		got = append(got, fmt.Sprintf("%s(%d,%d) %s %s %s", filepath.ToSlash(d.File), d.Line, d.Column, d.Category, d.Code, d.Message))
+	}
+	sort.Strings(got)
+	return got
+}
+
+func TestTestTypesBunCheckReportsTheFindingsTscReports(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-type-checker-choice", "bun-check-reports-the-findings-tsc-reports")
+	ctx := typeCheckStarter(t, map[string]string{
+		"package.json":        `{"name":"webapp","private":true,"main":"src/main.ts","scripts":{"check":"exit 0"}}` + "\n",
+		"test/wrong.test.ts":  "import { handle } from '../src/main';\n\nexport const status: string = handle(new Request('http://localhost/')).status;\n",
+		"test/unused.test.ts": "// @ts-expect-error unused\nexport const ok: number = 1;\n",
+		".gen/src/gen.ts":     "export const n: number = 'not a number';\n",
+		"bench/missing.ts":    "import { absent } from '../src/main';\n\nexport const value = absent;\n",
+		"src/implicit.ts":     "export function twice(value) {\n  return value * 2;\n}\n",
+		"fixtures/repeat.ts":  strings.Repeat("export const r: number = 'x';\n", 60),
+	})
+
+	tsc := typeCheckFindings(t, ctx, build.TypeCheckerTsc)
+	bun := typeCheckFindings(t, ctx, build.TypeCheckerBun)
+	if strings.Join(bun, "\n") != strings.Join(tsc, "\n") {
+		t.Errorf("bun check and tsc disagree:\nbun check %d:\n%s\ntsc %d:\n%s", len(bun), strings.Join(bun, "\n"), len(tsc), strings.Join(tsc, "\n"))
+	}
+	if len(tsc) < 65 {
+		t.Errorf("tsc found %d errors, want the 65 the fixture holds:\n%s", len(tsc), strings.Join(tsc, "\n"))
+	}
+
+	ctx.Params = pctx.Params{"type-checker": json.RawMessage(`"bun"`)}
+	status, _, err := runTestTypes(ctx, jsonl.New(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status != "FAILED" {
+		t.Errorf("test~types with bun check ended %s, want FAILED", status)
+	}
+}
+
+func TestTestTypesWithBunCheckPassesACleanProject(t *testing.T) {
+	ctx := typeCheckStarter(t, nil)
+	ctx.Params = pctx.Params{"type-checker": json.RawMessage(`"bun"`)}
+
+	status, _, err := runTestTypes(ctx, jsonl.New(), nil)
+	expectJobOK(t, "test~types", status, err)
+}
+
+func TestTestTypesFailsOnAnUnknownTypeChecker(t *testing.T) {
+	ctx := typeCheckStarter(t, nil)
+	ctx.Params = pctx.Params{"type-checker": json.RawMessage(`"tsgo"`)}
+
+	status, _, err := runTestTypes(ctx, jsonl.New(), nil)
+	if status != "FAILED" || err == nil || !strings.Contains(err.Error(), "tsgo") {
+		t.Errorf("test~types ended %s, %v, want FAILED naming tsgo", status, err)
+	}
 }
 
 func TestTestTypesEmitsNothing(t *testing.T) {

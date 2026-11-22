@@ -1,6 +1,7 @@
 package build
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,6 +27,25 @@ var typeCheckPatterns = []string{"**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"}
 // directories tsc itself never globs.
 var typeCheckSkippedDirectories = []string{"node_modules", ".git", ".putnami", "out", "dist", "vendor", "bower_components", "jspm_packages"}
 
+// The type-checker parameter's values.
+const (
+	TypeCheckerTsc = "tsc"
+	TypeCheckerBun = "bun"
+)
+
+// ResolveTypeChecker returns the type-checker the parameter names: tsc when it
+// is unset, else tsc or bun as given. The choice is explicit: nothing in the
+// project's sources or scripts changes it.
+func ResolveTypeChecker(param string) (string, error) {
+	switch param {
+	case "":
+		return TypeCheckerTsc, nil
+	case TypeCheckerTsc, TypeCheckerBun:
+		return param, nil
+	}
+	return "", fmt.Errorf("type-checker %q is neither tsc nor bun", param)
+}
+
 // TypeCheckResult holds the outcome of a test type-check.
 type TypeCheckResult struct {
 	Diagnostics []parse.TscDiagnostic
@@ -47,7 +67,12 @@ type TypeCheckResult struct {
 // tsconfig, strictness, module system and types included, so the globals of a
 // Vitest or Jest suite resolve and the check judges the code as the project's
 // own tsc does. Without it the check applies the types phase's Bun defaults.
-func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool) (*TypeCheckResult, error) {
+//
+// checker is the resolved type-checker: tsc runs `bun x tsc`, bun runs
+// `bun check` on the same scratch tsconfig with the same compiler options.
+// bun check keeps no build info, so buildInfoDir only holds its scratch
+// tsconfig.
+func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool, checker string) (*TypeCheckResult, error) {
 	scope, err := typeCheckScope(projectPath)
 	if err != nil {
 		return nil, err
@@ -84,11 +109,19 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool) (
 	if projectTypes {
 		flags = projectCompilerFlags(ignoreDeprecations)
 	}
-	args := append([]string{"x", "tsc", "--noEmit", "--rootDir", fsRoot}, flags...)
-	if buildInfoDir != "" {
-		args = append(args, "--incremental", "--tsBuildInfoFile", filepath.Join(buildInfoDir, "typecheck.tsbuildinfo"))
+	var args []string
+	if checker == TypeCheckerBun {
+		if err := requireBunCheck(bunBin, projectPath); err != nil {
+			return nil, err
+		}
+		args = bunCheckArgs(fsRoot, flags, scratch)
+	} else {
+		args = append([]string{"x", "tsc", "--noEmit", "--rootDir", fsRoot}, flags...)
+		if buildInfoDir != "" {
+			args = append(args, "--incremental", "--tsBuildInfoFile", filepath.Join(buildInfoDir, "typecheck.tsbuildinfo"))
+		}
+		args = append(args, "--project", scratch)
 	}
-	args = append(args, "--project", scratch)
 
 	result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Timeout(5*time.Minute))
 	if err != nil {
@@ -100,6 +133,42 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool) (
 		Success:     result.Success,
 		RawOutput:   rawOutput,
 	}, nil
+}
+
+// bunCheckBun is the earliest Bun release known to ship bun check with
+// --no-pretty, --all and --no-script. An earlier Bun reads `bun check` as
+// `bun run check`, which would run the project's check script or file instead
+// of a type-check.
+var bunCheckBun = [3]int{1, 4, 4}
+
+// requireBunCheck fails unless the bun at bunBin is bunCheckBun or later.
+func requireBunCheck(bunBin, workDir string) error {
+	version, err := readBunVersion(bunBin, workDir)
+	if err != nil {
+		return err
+	}
+	if slices.Compare(version[:], bunCheckBun[:]) < 0 {
+		return fmt.Errorf("type-checker bun needs Bun %d.%d.%d or later for bun check, and %s is %d.%d.%d; set type-checker to tsc or upgrade Bun",
+			bunCheckBun[0], bunCheckBun[1], bunCheckBun[2], bunBin, version[0], version[1], version[2])
+	}
+	return nil
+}
+
+// bunCheckArgs are the arguments of a bun check run on the scratch tsconfig
+// with the compiler flags of a tsc run. bun check emits nothing; --no-pretty
+// prints tsc's one-line diagnostics, which replaces --pretty false, --all
+// shows every error instead of grouping repeated ones, and --no-script keeps a
+// check script of the project's package.json from replacing the checker.
+func bunCheckArgs(fsRoot string, flags []string, scratch string) []string {
+	args := []string{"check", "--no-pretty", "--all", "--no-script", "--rootDir", fsRoot}
+	for i := 0; i < len(flags); i++ {
+		if flags[i] == "--pretty" {
+			i++
+			continue
+		}
+		args = append(args, flags[i])
+	}
+	return append(args, "-p", scratch)
 }
 
 // typeCheckScopeResult is what typeCheckScope finds in a project.
