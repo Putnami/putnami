@@ -24,6 +24,7 @@
               "close-hooks-run-in-reverse-registration-order",
               "close-runs-children-before-parent",
               "close-skips-never-built-singleton",
+              "closed-child-leaves-parent",
               "scoped-close-hooks-run-per-scope"
             ]
           }
