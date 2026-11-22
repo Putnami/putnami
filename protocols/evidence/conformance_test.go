@@ -110,6 +110,7 @@ func TestConformance_VocabulariesAreClosed(t *testing.T) {
 		"severities":   {Severities, {"critical", "high", "medium", "low", "info", "none", "unknown"}},
 		"decisions":    {DecisionStatuses, {"proposed", "accepted", "rejected", "deprecated", "superseded", "unknown"}},
 		"architecture": {ArchitectureStatuses, {"kept", "broken"}},
+		"outcomes":     {TestOutcomes, {"passed", "failed", "skipped"}},
 	}
 	for name, pin := range pins {
 		if !slices.Equal(pin[0], pin[1]) {
@@ -272,6 +273,7 @@ func TestConformance_SchemaEnumsAreTheGoVocabularies(t *testing.T) {
 		"decision.change":        {root.Defs["decision"].Properties["change"].Enum, FileStatuses},
 		"declaration.status":     {root.Defs["declaration"].Properties["status"].Enum, FileStatuses},
 		"architecture.status":    {root.Defs["architectureRule"].Properties["status"].Enum, ArchitectureStatuses},
+		"testCase.outcome":       {root.Defs["testCase"].Properties["outcome"].Enum, TestOutcomes},
 	}
 	for name, pair := range enums {
 		if !slices.Equal(pair[0], pair[1]) {
@@ -1150,4 +1152,123 @@ func TestConformance_TheSpecVerificationRecordIsOneBoundedObject(t *testing.T) {
 	if diag.HasErrors(diags) || doc == nil || !strings.Contains(string(doc.SpecVerification), "futureMember") {
 		t.Errorf("a record member the document does not know: diags = %v", diags)
 	}
+}
+
+func TestConformance_EachTestCaseDefectGetsItsCode(t *testing.T) {
+	spectest.Proves(t, feature, "test-cases-are-named", "each-test-case-defect-gets-its-code")
+	const fixture = "test-cases-pull-request.json"
+	for label, want := range map[string]struct {
+		mutate func(*Document)
+		code   string
+	}{
+		"no name":         {func(d *Document) { d.Tests[0].Cases[1].Name = " " }, ErrorCodeRequired},
+		"id twice":        {func(d *Document) { d.Tests[0].Cases[4].Name = d.Tests[0].Cases[3].Name }, ErrorCodeDuplicate},
+		"unknown outcome": {func(d *Document) { d.Tests[0].Cases[2].Outcome = "flaky" }, ErrorCodeInvalidTestCase},
+		"no outcome":      {func(d *Document) { d.Tests[0].Cases[2].Outcome = "" }, ErrorCodeInvalidTestCase},
+	} {
+		expectCodes(t, label, codesOf(t, fixture, want.mutate), want.code)
+	}
+	// One name in two suites is two cases, and a case without a suite keeps
+	// its name as its id.
+	expectCodes(t, "same name, other suite", codesOf(t, fixture, func(d *Document) {
+		d.Tests[0].Cases[4].Name = d.Tests[0].Cases[1].Name
+	}))
+	expectCodes(t, "no suite", codesOf(t, fixture, func(d *Document) {
+		d.Tests[1].Cases[0].Suite = ""
+	}))
+	_, diags := ParseAndValidate([]byte(strings.Replace(mustRead(t, "valid", fixture), `"outcome": "skipped"`, `"outcome": "skipped", "durationMs": 3`, 1)))
+	if len(diags) != 1 || diags[0].Code != ErrorCodeUnknownField || diags[0].Field != "tests[0].cases[2].durationMs" {
+		t.Errorf("an undeclared case member: diags = %v, want one unknown_field at tests[0].cases[2].durationMs", diags)
+	}
+}
+
+func TestConformance_ADocumentWithoutCasesValidatesAsBefore(t *testing.T) {
+	spectest.Proves(t, feature, "test-cases-are-named", "a-document-without-cases-validates-as-before")
+	for _, name := range []string{"generic-minimal.json", "turbo-pull-request.json", "symfony-merge-request.json", "architecture-pull-request.json"} {
+		document := readValid(t, name)
+		for _, entry := range document.Tests {
+			if entry.Cases != nil || entry.OmittedCases != 0 {
+				t.Fatalf("%s: fixture already lists cases", name)
+			}
+		}
+		for _, entry := range document.Tests {
+			if entry.ListsEveryCase() {
+				t.Errorf("%s: an entry without cases lists every case", name)
+			}
+		}
+		data, err := json.Marshal(document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), `"cases"`) || strings.Contains(string(data), `"omittedCases"`) {
+			t.Errorf("%s: a document without cases writes neither member: %s", name, data)
+		}
+	}
+	// The members are optional together: a producer drops both and the
+	// document still validates.
+	expectCodes(t, "cases dropped", codesOf(t, "test-cases-pull-request.json", func(d *Document) {
+		for index := range d.Tests {
+			d.Tests[index].Cases, d.Tests[index].OmittedCases = nil, 0
+		}
+	}))
+}
+
+// manyCases returns n distinct passed cases.
+func manyCases(n int) []TestCase {
+	cases := make([]TestCase, n)
+	for index := range cases {
+		cases[index] = TestCase{Suite: "suite", Name: fmt.Sprintf("case %d", index), Outcome: OutcomePassed}
+	}
+	return cases
+}
+
+func TestConformance_EachTestCaseBoundIsEnforced(t *testing.T) {
+	spectest.Proves(t, feature, "test-cases-are-bounded", "each-test-case-bound-is-enforced")
+	const fixture = "test-cases-pull-request.json"
+	expectCodes(t, "at the entry bound", codesOf(t, fixture, func(d *Document) {
+		d.Tests[1].Passed, d.Tests[1].OmittedCases = MaxTestCases, 0
+		d.Tests[1].Cases = manyCases(MaxTestCases)
+	}))
+	expectCodes(t, "over the entry bound", codesOf(t, fixture, func(d *Document) {
+		d.Tests[1].Passed, d.Tests[1].OmittedCases = MaxTestCases+1, 0
+		d.Tests[1].Cases = manyCases(MaxTestCases + 1)
+	}), ErrorCodeTooLarge)
+	spread := func(entries int) func(*Document) {
+		return func(d *Document) {
+			d.Tests = nil
+			d.Components = nil
+			d.ChangedFiles, d.ChangedLineCoverage, d.Coverage, d.DependencyChanges = nil, nil, nil, nil
+			d.Subject.BaseSHA = ""
+			for index := range entries {
+				id := fmt.Sprintf("c%d", index)
+				d.Components = append(d.Components, Component{ID: id, Ecosystem: "go", Source: SourceWorkspace, Impact: ImpactUnaffected})
+				d.Tests = append(d.Tests, ComponentTests{Component: id, Passed: MaxTestCases, Cases: manyCases(MaxTestCases)})
+			}
+		}
+	}
+	expectCodes(t, "at the document bound", codesOf(t, fixture, spread(MaxDocumentTestCases/MaxTestCases)))
+	expectCodes(t, "over the document bound", codesOf(t, fixture, spread(MaxDocumentTestCases/MaxTestCases+1)), ErrorCodeTooLarge)
+}
+
+func TestConformance_TheListedCasesAddUp(t *testing.T) {
+	spectest.Proves(t, feature, "test-cases-are-bounded", "the-listed-cases-add-up")
+	const fixture = "test-cases-pull-request.json"
+	for label, mutate := range map[string]func(*Document){
+		"more passed than passes":   func(d *Document) { d.Tests[0].Passed = 1 },
+		"more skipped than skips":   func(d *Document) { d.Tests[0].Skipped = 0 },
+		"more failed than failures": func(d *Document) { d.Tests[0].Cases[1].Outcome = OutcomeFailed },
+		"too many omitted":          func(d *Document) { d.Tests[1].OmittedCases = 117 },
+		"omitted without counts":    func(d *Document) { d.Tests[0].OmittedCases = 1 },
+		"negative omitted":          func(d *Document) { d.Tests[1].OmittedCases = -1 },
+	} {
+		expectCodes(t, label, codesOf(t, fixture, mutate), ErrorCodeInvalidCount)
+	}
+	// Only an entry that carries cases and omits none lists every case.
+	if tests := readValid(t, fixture).Tests; !tests[0].ListsEveryCase() || tests[1].ListsEveryCase() {
+		t.Errorf("ListsEveryCase = %v, %v, want true for the entry that omits none", tests[0].ListsEveryCase(), tests[1].ListsEveryCase())
+	}
+	// An entry may omit every case: its counts still cover them.
+	expectCodes(t, "every case omitted", codesOf(t, fixture, func(d *Document) {
+		d.Tests[1].Cases, d.Tests[1].OmittedCases = nil, d.Tests[1].Passed
+	}))
 }

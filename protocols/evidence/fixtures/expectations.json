@@ -7,7 +7,8 @@
     "symfony-merge-request.json",
     "turbo-pull-request.json",
     "architecture-pull-request.json",
-    "declared-pull-request.json"
+    "declared-pull-request.json",
+    "test-cases-pull-request.json"
   ],
   "invalid": {
     "added-with-a-from-version.json": [
@@ -142,6 +143,15 @@
     ],
     "spec-verification-not-an-object.json": [
       "evidence.invalid_spec_verification"
+    ],
+    "duplicate-test-case.json": [
+      "evidence.duplicate"
+    ],
+    "more-failed-cases-than-failures.json": [
+      "evidence.invalid_count"
+    ],
+    "unknown-test-outcome.json": [
+      "evidence.invalid_test_case"
     ]
   }
 }

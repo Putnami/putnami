@@ -28,6 +28,7 @@
     "tooling/observe-analyses#fallback-split",
     "tooling/observe-analyses#sbom-documents",
     "tooling/observe-analyses#summary",
+    "tooling/observe-analyses#test-cases",
     "tooling/observe-analyses#tests-and-coverage",
     "tooling/observe-architecture#architecture-change-analysis",
     "tooling/observe-architecture#architecture-report-discovery",

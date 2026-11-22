@@ -28,8 +28,14 @@ import (
 const (
 	CodeReportUnread      = "observe.report_unread"
 	CodeTestsUnattributed = "observe.tests_unattributed"
-	CodeCoverageUnmapped  = "observe.coverage_unmapped"
-	CodeLockfileUnread    = "observe.lockfile_unreadable"
+	// CodeTestCasesBounded counts the test cases the evidence bounds leave
+	// out of the tests entries' cases.
+	CodeTestCasesBounded = "observe.test_cases_bounded"
+	// CodeTestCasesAmbiguous counts the test cases of one report that share
+	// their suite and name with another of its cases.
+	CodeTestCasesAmbiguous = "observe.test_cases_ambiguous"
+	CodeCoverageUnmapped   = "observe.coverage_unmapped"
+	CodeLockfileUnread     = "observe.lockfile_unreadable"
 )
 
 // Revision names one side of the change.

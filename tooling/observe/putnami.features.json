@@ -380,6 +380,20 @@
           }
         },
         {
+          "id": "test-cases",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-case-is-listed-once-with-its-outcome",
+              "the-cases-are-bounded-with-a-diagnostic"
+            ]
+          }
+        },
+        {
           "id": "changed-line-coverage",
           "stage": "coded",
           "evidenceKinds": [

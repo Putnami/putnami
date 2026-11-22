@@ -126,6 +126,22 @@ A JUnit or TRX case goes to the first of:
 
 A case that none of them places is counted in `observe.tests_unattributed`.
 
+The evidence document lists each case a component ran in its tests entry's
+`cases`: its suite (its class name, else its innermost suite), its name and
+its outcome. The suite and name are the case's stable id, so a reader compares
+two changes case by case and tells a test that vanished from one that still
+passes. A case read twice under one id, such as a rerun, is listed once:
+failed when any run failed, else passed when any passed, else skipped. Two
+cases of one report under one id are a rerun in the report, or two tests it
+does not tell apart, such as top-level node:test tests of two files: the id is
+listed once, and the other cases count in the entry's `omittedCases` and in
+`observe.test_cases_ambiguous`, so a reader does not take the entry as listing
+every case. A
+component lists at most 10000 cases and the document at most 50000; the
+failed cases of every component come first, then the others, in component
+order. The rest are counted in the entry's `omittedCases` and in an
+`observe.test_cases_bounded` warning.
+
 A coverage report names files. A JaCoCo file, a package path, is first read
 under the `src/main/java` or `src/main/kotlin` of a component; see
 [Gradle and Maven](/docs/tooling-&-workspace/observe/jvm#reports). A path is read in this order: absolute under
@@ -327,6 +343,8 @@ Another repository carries neither member and gets no diagnostic.
 |---|---|
 | `observe.report_unread` | A reader refused a report or an SBOM: it is malformed, too large or of an unsupported version. Its side is unknown. |
 | `observe.tests_unattributed` | Test cases of a report belong to no component. |
+| `observe.test_cases_ambiguous` | Test cases of a report share their suite and name with another of its cases, a rerun or a test it does not tell apart: each id is listed once and the others count as omitted. |
+| `observe.test_cases_bounded` | Test cases over the evidence bounds are left out of the tests entries' cases and counted in their `omittedCases`. |
 | `observe.coverage_unmapped` | Files of a coverage report are not files of the repository. |
 | `observe.lockfile_unreadable` | A changed lockfile cannot be read at the base or the head. |
 | `observe.changed_lines_unread` | The diff's changed lines cannot be read. |

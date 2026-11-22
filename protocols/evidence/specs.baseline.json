@@ -19,6 +19,8 @@
     "evidence/change-evidence-document#paths-stay-in-the-repository",
     "evidence/change-evidence-document#references-resolve",
     "evidence/change-evidence-document#sbom-sources-are-named",
+    "evidence/change-evidence-document#test-cases-are-bounded",
+    "evidence/change-evidence-document#test-cases-are-named",
     "evidence/change-evidence-document#the-ci-run-is-identified",
     "evidence/change-evidence-document#the-ci-system-is-recognized-by-its-marker",
     "evidence/change-evidence-document#the-document-is-bounded",

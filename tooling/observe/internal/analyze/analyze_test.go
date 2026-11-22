@@ -2,12 +2,14 @@ package analyze
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/observe/internal/components"
@@ -758,5 +760,162 @@ func TestAJestSuiteNamedLikeACrateStaysWithItsReport(t *testing.T) {
 	got := tests(r)
 	if got["web"].Passed != 1 || got["crates/pricing"].Passed != 0 {
 		t.Errorf("tests %+v", got)
+	}
+}
+
+func TestEachCaseIsListedOnceWithItsOutcome(t *testing.T) {
+	spectest.Proves(t, feature, "test-cases", "each-case-is-listed-once-with-its-outcome")
+	root, set := repository(t)
+	write(t, root, map[string]string{
+		// A first attempt fails and a rerun passes: the case stays failed. A
+		// case read in two reports is listed once.
+		"packages/pricing/reports/junit.xml": `<testsuites><testsuite name="src/index.test.ts">
+			<testcase classname="src/index.test.ts" name="sums"/>
+			<testcase classname="src/index.test.ts" name="rejects"><failure message="no"/></testcase>
+			<testcase classname="src/index.test.ts" name="later"><skipped/></testcase>
+			<testcase classname="src/index.test.ts" name="flaky"><failure message="timeout"/></testcase>
+		</testsuite></testsuites>`,
+		"packages/pricing/reports/rerun.xml": `<testsuites><testsuite name="src/index.test.ts">
+			<testcase classname="src/index.test.ts" name="flaky"/>
+			<testcase classname="src/index.test.ts" name="later"/>
+		</testsuite></testsuites>`,
+		// The class name tells apart the tests one suite gathers, as pytest
+		// writes them; a case without a class name takes its innermost suite,
+		// and a blank name reads as (unnamed). One id twice in one report is
+		// ambiguous.
+		"apps/api/reports/junit.xml": `<testsuites><testsuite name="pytest">
+			<testcase classname="tests.test_a" name="test_create"/>
+			<testcase classname="tests.test_b" name="test_create"/>
+			<testcase name="  "/>
+			<testcase classname="tests.test_b" name="test_create"><failure message="no"/></testcase>
+		</testsuite></testsuites>`,
+	})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "packages/pricing/reports/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+		{Path: "packages/pricing/reports/rerun.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+		{Path: "apps/api/reports/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	got := tests(r)
+	suite := "src/index.test.ts"
+	want := []evidence.TestCase{
+		{Suite: suite, Name: "flaky", Outcome: evidence.OutcomeFailed},
+		{Suite: suite, Name: "rejects", Outcome: evidence.OutcomeFailed},
+		{Suite: suite, Name: "later", Outcome: evidence.OutcomePassed},
+		{Suite: suite, Name: "sums", Outcome: evidence.OutcomePassed},
+	}
+	if pricing := got["packages/pricing"]; !slices.Equal(pricing.Cases, want) || pricing.OmittedCases != 0 {
+		t.Errorf("pricing cases %+v, want %+v", pricing.Cases, want)
+	}
+	wantAPI := []evidence.TestCase{
+		{Suite: "tests.test_b", Name: "test_create", Outcome: evidence.OutcomeFailed},
+		{Suite: "pytest", Name: "(unnamed)", Outcome: evidence.OutcomePassed},
+		{Suite: "tests.test_a", Name: "test_create", Outcome: evidence.OutcomePassed},
+	}
+	if api := got["apps/api"]; !slices.Equal(api.Cases, wantAPI) || api.OmittedCases != 1 || api.ListsEveryCase() {
+		t.Errorf("api cases %+v omitting %d, want %+v omitting the case its report gave twice", api.Cases, api.OmittedCases, wantAPI)
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeTestCasesAmbiguous || r.Diagnostics[0].Field != "apps/api/reports/junit.xml" {
+		t.Errorf("diagnostics %v, want one ambiguous id in the api report", r.Diagnostics)
+	}
+	document := evidence.Document{Components: r.Components, Tests: r.Tests}
+	if diags := evidence.ValidateDocument(&document); len(diagnosticsAt(diags, "tests")) != 0 {
+		t.Errorf("JUnit tests entries: %v", diags)
+	}
+
+	// TRX and JUnit reports of one .NET test project list its cases.
+	root = t.TempDir()
+	write(t, root, map[string]string{
+		"src/Calc/Calc.csproj": `<Project Sdk="Microsoft.NET.Sdk"/>`,
+		"tests/Calc.Tests.xunit/Calc.Tests.xunit.csproj": `<Project Sdk="Microsoft.NET.Sdk"><ItemGroup>` +
+			`<ProjectReference Include="..\..\src\Calc\Calc.csproj" /></ItemGroup></Project>`,
+	})
+	data, err := os.ReadFile(filepath.Join("testdata", "xunit.trx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, root, map[string]string{"TestResults/xunit.trx": string(data)})
+	r = Run(Input{Root: root, Set: components.Detect(root, components.Default(components.Options{})), Reports: []reports.Report{
+		{Path: "TestResults/xunit.trx", Kind: reports.KindJUnit, Format: reports.FormatTRX},
+	}})
+	project := tests(r)["tests/Calc.Tests.xunit"]
+	outcomes := map[string]int{}
+	for _, c := range project.Cases {
+		if c.Name == "" || c.Suite == "" {
+			t.Errorf("TRX case without its id: %+v", c)
+		}
+		outcomes[c.Outcome]++
+	}
+	if outcomes[evidence.OutcomePassed] != project.Passed || outcomes[evidence.OutcomeFailed] != project.Failed || outcomes[evidence.OutcomeSkipped] != project.Skipped {
+		t.Errorf("TRX cases %+v, want one per counted case of %+v", project.Cases, project)
+	}
+	document = evidence.Document{Components: r.Components, Tests: r.Tests}
+	if diags := evidence.ValidateDocument(&document); len(diagnosticsAt(diags, "tests")) != 0 {
+		t.Errorf("TRX tests entry: %v", diags)
+	}
+}
+
+// diagnosticsAt returns the diagnostics whose field lies under prefix.
+func diagnosticsAt(diags []diag.Diagnostic, prefix string) []diag.Diagnostic {
+	var out []diag.Diagnostic
+	for _, d := range diags {
+		if strings.HasPrefix(d.Field, prefix) {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func TestTheCasesAreBoundedWithADiagnostic(t *testing.T) {
+	spectest.Proves(t, feature, "test-cases", "the-cases-are-bounded-with-a-diagnostic")
+	root, set := repository(t)
+	var report strings.Builder
+	report.WriteString(`<testsuites><testsuite name="src/index.test.ts">`)
+	for index := range evidence.MaxTestCases + 2 {
+		report.WriteString(fmt.Sprintf(`<testcase classname="src/index.test.ts" name="case %05d"/>`, index))
+	}
+	report.WriteString(`<testcase classname="src/index.test.ts" name="zz breaks"><failure message="no"/></testcase>`)
+	report.WriteString(`</testsuite></testsuites>`)
+	write(t, root, map[string]string{"packages/pricing/reports/junit.xml": report.String()})
+	r := Run(Input{Root: root, Set: set, Reports: []reports.Report{
+		{Path: "packages/pricing/reports/junit.xml", Kind: reports.KindJUnit, Format: reports.FormatJUnit},
+	}})
+	pricing := tests(r)["packages/pricing"]
+	if len(pricing.Cases) != evidence.MaxTestCases || pricing.OmittedCases != 3 || pricing.Passed != evidence.MaxTestCases+2 {
+		t.Fatalf("pricing lists %d cases and omits %d, want %d and 3", len(pricing.Cases), pricing.OmittedCases, evidence.MaxTestCases)
+	}
+	// The failed case comes first, then the cases by suite and name.
+	if first, second := pricing.Cases[0], pricing.Cases[1]; first.Name != "zz breaks" || first.Outcome != evidence.OutcomeFailed || second.Name != "case 00000" {
+		t.Errorf("first cases %+v, %+v", first, second)
+	}
+	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeTestCasesBounded || !strings.HasPrefix(r.Diagnostics[0].Message, "3 test cases") {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+
+	// The failed cases of every component take the document bound first,
+	// then the other cases, in component id order.
+	owners := evidence.MaxDocumentTestCases/evidence.MaxTestCases + 1
+	entries := map[string]*evidence.ComponentTests{}
+	cases := map[string]map[evidence.TestCaseID]string{}
+	for owner := range owners {
+		id := fmt.Sprintf("c%d", owner)
+		entries[id] = &evidence.ComponentTests{Component: id, Passed: evidence.MaxTestCases}
+		cases[id] = map[evidence.TestCaseID]string{}
+		for index := range evidence.MaxTestCases {
+			cases[id][evidence.TestCaseID{Suite: "s", Name: fmt.Sprint(index)}] = evidence.OutcomePassed
+		}
+	}
+	lastID := fmt.Sprintf("c%d", owners-1)
+	cases[lastID][evidence.TestCaseID{Suite: "s", Name: "0"}] = evidence.OutcomeFailed
+	var bounded Result
+	bounded.listCases(entries, cases)
+	last, before := entries[lastID], entries[fmt.Sprintf("c%d", owners-2)]
+	if len(entries["c0"].Cases) != evidence.MaxTestCases || len(before.Cases) != evidence.MaxTestCases-1 {
+		t.Errorf("the first components list %d and %d cases, want %d and %d", len(entries["c0"].Cases), len(before.Cases), evidence.MaxTestCases, evidence.MaxTestCases-1)
+	}
+	if len(last.Cases) != 1 || last.Cases[0].Outcome != evidence.OutcomeFailed || last.OmittedCases != evidence.MaxTestCases-1 {
+		t.Errorf("the last component lists %+v and omits %d, want its failed case and %d", last.Cases, last.OmittedCases, evidence.MaxTestCases-1)
+	}
+	if len(bounded.Diagnostics) != 1 || bounded.Diagnostics[0].Code != CodeTestCasesBounded {
+		t.Errorf("diagnostics %v", bounded.Diagnostics)
 	}
 }

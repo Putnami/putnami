@@ -47,6 +47,14 @@
       ]
     },
     {
+      "id": "test-cases",
+      "text": [
+        "Each JUnit or TRX case a tests entry counts is listed in its cases: its suite, its class name else its innermost suite, its name, and its outcome.",
+        "An id read twice is listed once: failed when any run failed, else passed when any passed, else skipped; twice in one report, its extra cases count in omittedCases and observe.test_cases_ambiguous.",
+        "An entry lists at most 10000 cases and the document 50000, failed ones first; the rest are its omittedCases, which observe.test_cases_bounded counts."
+      ]
+    },
+    {
       "id": "changed-line-coverage",
       "text": [
         "The lines a change added or modified are the added lines of the diff from the merge base to the head, with no context.",
@@ -92,6 +100,7 @@
   ],
   "decisions": [
     "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
-    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md",
+    "protocols/evidence/doc/adr/0004-test-cases-are-an-optional-member-of-version-1.md"
   ]
 }
