@@ -42,13 +42,13 @@
           "path": "typescript/framework/client/src/runtime/connect-transport.ts",
           "transport": "http",
           "symbol": "fetch",
-          "fingerprint": "96bb9d4f02deb274b2896219c430bb1001a7e576fafe47d362ae5b98e1014be0"
+          "fingerprint": "243fa7b593f8d6488340345e5dc7114b7d04569a4859087eb54078a62c7cb10b"
         },
         {
           "path": "typescript/framework/client/src/runtime/connect-transport.ts",
           "transport": "http",
           "symbol": "fetch",
-          "fingerprint": "e3ae41b5957d2a611909bd96cef4b5f651f1168c8f90143a5a720440f4f23387"
+          "fingerprint": "96bb9d4f02deb274b2896219c430bb1001a7e576fafe47d362ae5b98e1014be0"
         },
         {
           "path": "typescript/framework/client/src/runtime/connect-transport.ts",
