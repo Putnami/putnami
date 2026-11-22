@@ -201,6 +201,11 @@ const (
 	ChannelGoModule          = "go"
 )
 
+// DefaultServicePort is the port a Go service gets when nothing names one:
+// `putnami serve` exports it as PORT, and the image sets and
+// exposes it, so the service listens on the same port in both (decision D-G3).
+const DefaultServicePort = 8080
+
 // DefaultDockerPlatform is the image platform assumed when none is named. It
 // mirrors the `platform` flag default of the `package` command, so the platform
 // the image is assembled for and the platform its binary is compiled for cannot

@@ -37,13 +37,32 @@ to the container, see
 
 ### The image port
 
-The image sets `PORT=3000` unless you pass `--port` or set
-`options.package.port`. The Go HTTP server listens on `PORT` when it is set,
-whatever `http.ServerConfig.Port` says. So a service that listens on 8080
-outside the image listens on 3000 inside it. Do one of these:
+The image sets `PORT` and exposes it. The port is the first of:
 
-- Set `options.package.port` to the port you publish, as above.
-- Override it at run time: `docker run -e PORT=8080 -p 8080:8080 ...`.
+1. `--port`, or `options.package.port`;
+2. `options.serve.port` in the project's `putnami.json`, the port
+   `putnami serve` gives the service through `PORT`;
+3. 8080, the port `putnami serve` uses when neither `--port` nor `PORT` is
+   set.
+
+A value that is not an integer between 1 and 65535 is skipped, with a warning.
+
+So with no port configured, `putnami serve` and the image both use 8080. The
+image used 3000 before; a deployment that routes to container port 3000 keeps
+it with `options.package.port: 3000`.
+
+The Go HTTP server listens on `PORT` when it is set, whatever
+`http.ServerConfig.Port` says, so the service listens on the image port. A
+`conf/.env.yaml` port does not count: the image ships the binary alone, and
+`PORT` outranks the configuration files anyway. To change it at run time:
+`docker run -e PORT=9000 -p 9000:9000 ...`.
+
+### The image tag
+
+The image is always tagged `<project>:c-<content hash>`. `--docker-tag` adds
+one alias: a bare tag tags the project's image (`--docker-tag v1.0.0` gives
+`api:v1.0.0`), and a reference holding `:` or `/` is used as given
+(`--docker-tag tasks-api:local`, `--docker-tag registry.example.com/team/api:1.0`).
 
 The complete flag list is in the
 [package reference](../../../extension/doc/package.md#flags).
@@ -66,7 +85,7 @@ putnami publish api
 Options include:
 
 - `--docker-registry <registry>` — an **override**; the declared target is `registries.oci.publish` in `putnami.workspace.json`
-- `--docker-tag <tag>`
+- `--docker-tag <tag>`: a bare tag or a full reference, as [the image tag](#the-image-tag) says
 - `--platform <platform>`
 
 The publisher pushes by digest and tags the version only. Channel tags are written by the release projection, never by the publisher, so a repeated publish of the same content is idempotent.

@@ -108,9 +108,10 @@ To enable package channels:
 ```
 
 Without a channel on, `putnami package --projects <name>` fails and names the
-option to set; under `--all` or `--impacted` it warns. The image sets
-`PORT=3000` unless `port` names another value, and the Go HTTP server listens
-on `PORT`. See [Package & Docker](../doc/framework/00-extension/04-package-and-docker.md).
+option to set; under `--all` or `--impacted` it warns. The image sets and
+exposes `PORT`: `port`, else the project's `options.serve.port`, else 8080, as
+for `putnami serve`. The Go HTTP server listens on `PORT`. See
+[Package & Docker](../doc/framework/00-extension/04-package-and-docker.md).
 
 ## Support and contract
 

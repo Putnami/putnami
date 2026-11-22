@@ -33,6 +33,7 @@
     "go/go-project-toolchain#hosted-run-dependencies",
     "go/go-project-toolchain#image-input-producers",
     "go/go-project-toolchain#image-packager-route",
+    "go/go-project-toolchain#image-tag-and-port",
     "go/go-project-toolchain#included-members-are-go-projects",
     "go/go-project-toolchain#included-members-join-go-work",
     "go/go-project-toolchain#install-without-go",

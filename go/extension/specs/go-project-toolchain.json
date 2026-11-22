@@ -245,6 +245,13 @@
       ]
     },
     {
+      "id": "image-tag-and-port",
+      "text": [
+        "A --docker-tag that holds a ':' or a '/' is the whole alias reference; a bare tag tags the project's image.",
+        "The image sets and exposes PORT: --port or options.package.port, else the project's options.serve.port, else 8080, the port putnami serve falls back to; a value that is not an integer between 1 and 65535 is skipped with a warning."
+      ]
+    },
+    {
       "id": "image-packager-route",
       "text": [
         "When a project's publish route names another extension as the producer of its OCI image, publication plans no Go image step, and no cross-compile step unless the archives channel consumes it;",

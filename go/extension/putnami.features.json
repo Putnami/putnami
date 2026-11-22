@@ -388,6 +388,18 @@
           }
         },
         {
+          "id": "image-tag-and-port",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-docker-tag-with-a-repository-is-the-whole-reference",
+              "the-image-port-is-the-project-port"
+            ]
+          }
+        },
+        {
           "id": "image-packager-route",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	pctx "go.putnami.dev/sdk/extension/context"
@@ -44,17 +45,18 @@ type dockerParams struct {
 }
 
 // dockerSpec describes the COPY-only Go service image: the binary at /app,
-// PORT in the environment, and nothing git-derived anywhere. User and base
+// PORT in the environment and exposed, and nothing git-derived anywhere. User and base
 // env are inherited from the distroless :nonroot base. The binary
 // self-reports its version via version-var ldflags / runtime/debug.ReadBuildInfo;
 // the release id is injected as environment at deploy time.
 func dockerSpec(baseRef, dockerPlatform, binaryAbsPath, port string) oci.Spec {
 	return oci.Spec{
-		BaseRef:    baseRef,
-		Platform:   dockerPlatform,
-		Layers:     []oci.Layer{{Files: []oci.File{{Source: binaryAbsPath, Path: "/app", Mode: 0o755}}}},
-		Env:        []string{"PORT=" + port},
-		Entrypoint: []string{"/app"},
+		BaseRef:      baseRef,
+		Platform:     dockerPlatform,
+		Layers:       []oci.Layer{{Files: []oci.File{{Source: binaryAbsPath, Path: "/app", Mode: 0o755}}}},
+		Env:          []string{"PORT=" + port},
+		ExposedPorts: []string{port + "/tcp"},
+		Entrypoint:   []string{"/app"},
 	}
 }
 
@@ -158,7 +160,7 @@ func buildDockerImage(ctx *pctx.Context, emit *jsonl.Emitter, params dockerParam
 
 	manifestTags := []string{fullImage}
 	if params.Tag != "" {
-		manifestTags = append(manifestTags, qualifiedImage+":"+params.Tag)
+		manifestTags = append(manifestTags, localAlias(qualifiedImage, params.Tag))
 	}
 	if params.Load {
 		if !loadIntoDaemon(emit, layoutDir, fullImage, manifestTags[1:]) {
@@ -182,6 +184,76 @@ func buildDockerImage(ctx *pctx.Context, emit *jsonl.Emitter, params dockerParam
 	emit.Log("info", fmt.Sprintf("Assembled Docker image %s (%s)", fullImage, digest))
 	emit.PhaseEnd("package-docker", "success")
 	return true
+}
+
+// localAlias is the local reference an explicit --docker-tag names. A tag
+// that holds a ':' or a '/' is a whole reference (tasks-api:local,
+// registry.example.com/team/api:1.0) and is used as given; a bare tag (v1.0.0)
+// tags the project's image.
+func localAlias(imageName, tag string) string {
+	if strings.ContainsAny(tag, ":/") {
+		return tag
+	}
+	return imageName + ":" + tag
+}
+
+// imagePort is the port the image sets as PORT and exposes: paramPort, which
+// --port or options.package.port sets; else the project's options.serve.port,
+// the port `putnami serve` gives the service through PORT; else
+// platform.DefaultServicePort, the port `putnami serve` falls back to. A value that is not an integer between 1 and 65535 counts
+// as unset, and skipped names each such value so the caller can warn.
+func imagePort(paramPort string, projectOptions map[string]json.RawMessage) (port string, skipped []string) {
+	if paramPort != "" {
+		if n := parsePort(paramPort); n > 0 {
+			return strconv.Itoa(n), nil
+		}
+		skipped = append(skipped, fmt.Sprintf("port %q", paramPort))
+	}
+	var serve struct {
+		Port any `json:"port"`
+	}
+	if raw, ok := projectOptions["serve"]; ok && json.Unmarshal(raw, &serve) == nil && serve.Port != nil {
+		if n := parsePort(serve.Port); n > 0 {
+			return strconv.Itoa(n), skipped
+		}
+		skipped = append(skipped, fmt.Sprintf("options.serve.port %v", serve.Port))
+	}
+	return strconv.Itoa(platform.DefaultServicePort), skipped
+}
+
+// resolveImagePort is imagePort with a warning for each value it skipped.
+func resolveImagePort(emit *jsonl.Emitter, paramPort string, projectOptions map[string]json.RawMessage) string {
+	port, skipped := imagePort(paramPort, projectOptions)
+	for _, value := range skipped {
+		emit.Diagnostic("warning", "Ignored "+value+" for the image port: a port is an integer between 1 and 65535", "", 0)
+	}
+	return port
+}
+
+// parsePort reads a TCP port from a flag or a decoded configuration value: an
+// integer between 1 and 65535, as a number or a numeric string. Anything else
+// is 0.
+func parsePort(value any) int {
+	var port int
+	switch v := value.(type) {
+	case float64:
+		if v != float64(int(v)) {
+			return 0
+		}
+		port = int(v)
+	case string:
+		n, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil {
+			return 0
+		}
+		port = n
+	default:
+		return 0
+	}
+	if port < 1 || port > 65535 {
+		return 0
+	}
+	return port
 }
 
 func validateDockerComposition(params dockerParams) error {
@@ -238,7 +310,7 @@ func buildDockerImageWithBuilder(ctx *pctx.Context, emit *jsonl.Emitter, params 
 	buildArgs := []string{"build", "-t", fullImage}
 	manifestTags := []string{fullImage}
 	if params.Tag != "" {
-		aliasTag := qualifiedImage + ":" + params.Tag
+		aliasTag := localAlias(qualifiedImage, params.Tag)
 		buildArgs = append(buildArgs, "-t", aliasTag)
 		manifestTags = append(manifestTags, aliasTag)
 	}
@@ -359,10 +431,10 @@ func loadIntoDaemon(emit *jsonl.Emitter, layoutDir, contentRef string, aliases [
 func dockerfileFor(workspaceBuilderImage, binaryRelPath, port string) string {
 	if workspaceBuilderImage != "" {
 		workspaceBinaryPath := "/app/" + binaryRelPath
-		return fmt.Sprintf("ARG WORKSPACE_BUILDER_IMAGE=%s\nFROM ${WORKSPACE_BUILDER_IMAGE} AS builder\nFROM %s\nENV PORT=%s\nCOPY --from=builder %s /app\nUSER nonroot:nonroot\nENTRYPOINT [\"/app\"]\n",
+		return fmt.Sprintf("ARG WORKSPACE_BUILDER_IMAGE=%s\nFROM ${WORKSPACE_BUILDER_IMAGE} AS builder\nFROM %s\nENV PORT=%[3]s\nEXPOSE %[3]s\nCOPY --from=builder %s /app\nUSER nonroot:nonroot\nENTRYPOINT [\"/app\"]\n",
 			workspaceBuilderImage, dockerBuilderBaseImage, port, workspaceBinaryPath)
 	}
-	return fmt.Sprintf("FROM %s\nENV PORT=%s\nCOPY %s /app\nUSER nonroot:nonroot\nENTRYPOINT [\"/app\"]\n",
+	return fmt.Sprintf("FROM %s\nENV PORT=%[2]s\nEXPOSE %[2]s\nCOPY %s /app\nUSER nonroot:nonroot\nENTRYPOINT [\"/app\"]\n",
 		dockerBuilderBaseImage, port, binaryRelPath)
 }
 

@@ -63,7 +63,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 		port = os.Getenv("PORT")
 	}
 	if port == "" {
-		port = "8080"
+		port = strconv.Itoa(platform.DefaultServicePort)
 	}
 	os.Setenv("PORT", port)
 

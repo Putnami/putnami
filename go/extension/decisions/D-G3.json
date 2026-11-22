@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-G3",
+  "statement": "with no port configured, a Go image sets and exposes the port putnami serve falls back to, 8080; the order is --port or options.package.port, then options.serve.port, then 8080",
+  "settled": "2026-11-22",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

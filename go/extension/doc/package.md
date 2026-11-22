@@ -110,11 +110,23 @@ putnami package . --archives --dry-run
 putnami package . --docker
 ```
 
-Override image tag:
+Add a local alias next to the content-addressed tag. A bare tag tags the
+project's image (`my-api:v1.2.3`); a reference holding `:` or `/` is used as
+given:
 
 ```bash
 putnami package . --docker --docker-tag v1.2.3
+putnami package . --docker --docker-tag my-api:local --docker-load
 ```
+
+The image sets `PORT` and exposes it. The port is the first of `--port` or
+`options.package.port`, then `options.serve.port` in the project's `putnami.json`
+(the port `putnami serve` gives the service), then 8080, the port `putnami
+serve` uses when neither `--port` nor `PORT` is set. A value that is not an integer
+between 1 and 65535 is skipped, with a warning. The Go HTTP server listens on
+`PORT`, so the service listens on the image port. The image used 3000 when `--port` and
+`options.package.port` were unset; a deployment that routes to container port
+3000 keeps it with `options.package.port: 3000`.
 
 Multi-stage build from CI workspace image:
 
@@ -207,7 +219,8 @@ ldflags injection or `runtime/debug.ReadBuildInfo` (a `version-var` build
 embeds the release id in the binary, so such projects trade digest travel for
 self-reporting binaries).
 
-An explicit `--docker-tag` is recorded as an extra alias; `--docker-load`
+An explicit `--docker-tag` is recorded as an extra alias: a bare tag tags the
+project's image, a reference holding `:` or `/` is used as given; `--docker-load`
 additionally loads the assembled image into the local docker daemon for
 immediate `docker run`.
 
@@ -533,7 +546,8 @@ timestamps and explicit modes, so the digest is reproducible:
 
 ```dockerfile
 FROM gcr.io/distroless/static@sha256:<pinned>
-ENV PORT=3000
+ENV PORT={port}     # --port, else options.serve.port, else 8080
+EXPOSE {port}
 COPY {binary} /app          # mode 0755, mtime epoch
 ENTRYPOINT ["/app"]
 # user nonroot inherited from the base; no labels, no version stamp
@@ -547,7 +561,8 @@ With `--workspace-builder-image` (multi-stage CI build), the legacy
 ARG WORKSPACE_BUILDER_IMAGE=...
 FROM ${WORKSPACE_BUILDER_IMAGE} AS builder
 FROM gcr.io/distroless/static:nonroot
-ENV PORT=3000
+ENV PORT={port}
+EXPOSE {port}
 COPY --from=builder /app/.putnami/.../bin/{binary} /app
 USER nonroot:nonroot
 ENTRYPOINT ["/app"]
@@ -565,14 +580,14 @@ ENTRYPOINT ["/app"]
 | `--deployment` | `false` | Activate the deployment channel (`<project>/.gen/deployment.json`) |
 | `--dry-run` | `false` | Show what would be created without producing any artifacts |
 | `--docker-registry <url>` | — | **Override** of the publish target; the declared one is `registries.oci.publish`. Ignored by local packaging either way |
-| `--docker-tag <tag>` | — | Extra alias tag next to the content-addressed tag |
+| `--docker-tag <tag>` | — | Extra alias next to the content-addressed tag: a bare tag tags the project's image, a reference holding `:` or `/` is used as given |
 | `--docker-base-image <ref>` | pinned distroless | Override the digest-pinned base image (must include `@sha256:...`) |
 | `--docker-base-project <id>` | — | Use a first-class image dependency's typed local OCI candidate as the base |
 | `--docker-load` | `false` | Also load the assembled image into the local docker daemon |
 | `--platform <os/arch>` | `linux/amd64` | Docker image target platform — and the only platform the docker channel compiles |
 | `--platforms <list>` | 4 archive platforms | Release matrix for the archive channels (`all`, or `linux/amd64,darwin/arm64`) |
 | `--workspace-builder-image <img>` | — | Multi-stage `docker build` from a CI workspace image (legacy path, non-reproducible digests) |
-| `--port <n>` | `3000` | `PORT` env variable baked into the Docker image. The Go HTTP server listens on `PORT`, so set it (or `options.package.port`) to the port the service publishes |
+| `--port <n>` | the project's `options.serve.port`, else `8080` | Container port the image sets as `PORT` and exposes. The Go HTTP server listens on `PORT`, so set it (or `options.package.port`) to the port the service publishes |
 
 ## Boundaries
 
