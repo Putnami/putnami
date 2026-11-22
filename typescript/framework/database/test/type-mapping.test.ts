@@ -40,7 +40,7 @@ function useTimeZone(zone: string): void {
  */
 const TIMESTAMPS = [
   { instant: '2026-11-22T10:30:00.123Z', text: '2026-11-22 10:30:00.123' },
-  // Summer time, and a clock that is on another day in every zone above.
+  // Summer time, a millisecond before a midnight that Paris and Kolkata have passed.
   { instant: '2026-07-14T23:59:59.999Z', text: '2026-07-14 23:59:59.999' },
   // Wall clocks Paris and Los Angeles skip when they move to summer time.
   { instant: '2026-03-29T02:30:00.000Z', text: '2026-03-29 02:30:00' },
