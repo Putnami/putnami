@@ -255,9 +255,14 @@ describe('ConnectTransport.duplex', () => {
     },
   );
 
-  for (const [scene, act] of [
-    ['resets the stream', (stream: http2.Http2Stream) => stream.close(http2.constants.NGHTTP2_CANCEL)],
-    ['destroys the session', (stream: http2.Http2Stream) => stream.session?.destroy()],
+  for (const [scene, act, expected] of [
+    ['resets the stream', (stream: http2.Http2Stream) => stream.close(http2.constants.NGHTTP2_CANCEL), 'CANCELLED'],
+    ['destroys the session', (stream: http2.Http2Stream) => stream.session?.destroy(), 'UNAVAILABLE'],
+    [
+      'refuses the stream',
+      (stream: http2.Http2Stream) => stream.close(http2.constants.NGHTTP2_REFUSED_STREAM),
+      'UNAVAILABLE',
+    ],
   ] as const) {
     specTest(
       `fails when the provider ${scene} before it answers`,
@@ -268,7 +273,11 @@ describe('ConnectTransport.duplex', () => {
       },
       async () => {
         const server = http2.createServer();
-        server.on('stream', (stream) => act(stream));
+        server.on('stream', (stream) => {
+          // The test server's own side of a closed stream reports the close too.
+          stream.on('error', () => undefined);
+          act(stream);
+        });
         await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
         const port = (server.address() as { port: number }).port;
         try {
@@ -280,13 +289,38 @@ describe('ConnectTransport.duplex', () => {
             (failure: unknown) => failure,
           );
           expect(error).toBeInstanceOf(ClientStreamError);
-          expect(['CANCELLED', 'UNAVAILABLE']).toContain(String((error as ClientStreamError).grpcStatus));
+          expect((error as ClientStreamError).grpcStatus).toBe(expected);
         } finally {
           server.close();
         }
       },
     );
   }
+
+  specTest(
+    'keeps a client stream open longer than the per-call timeout',
+    {
+      feature: 'typescript/service-clients',
+      requirement: 'connect-duplex-streams',
+      check: 'a-connect-client-stream-delivers-its-one-result',
+    },
+    async () => {
+      const transport = new ConnectTransport(await start(), 'test.v1', undefined, undefined, undefined, {
+        timeoutMs: 150,
+      });
+      const stream = transport.duplex<{ delta: number }, Tally>(SUM_PATH, { params: { id: 'slow' } });
+      const result = collect(stream);
+      for (const delta of [1, 2, 3]) {
+        stream.send({ delta });
+        // biome-ignore lint/performance/noAwaitInLoops: the caller is slow on purpose
+        await Bun.sleep(100);
+      }
+      stream.end();
+      // The answer comes 300 ms after opening, past the 150 ms per-call timeout,
+      // which bounds connecting only.
+      expect(await result).toEqual([{ id: 'slow', count: 3, total: 6 }]);
+    },
+  );
 
   specTest(
     'surfaces a failure in the end-of-stream message as the typed stream error',

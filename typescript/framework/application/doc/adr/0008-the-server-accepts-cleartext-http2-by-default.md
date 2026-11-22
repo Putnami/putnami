@@ -31,9 +31,10 @@ tell them apart only from their headers.
 3. **Only a Connect streaming request over HTTP/2 opens a duplex stream.** Over
    HTTP/1.1, or with another media type, a client or bidirectional RPC keeps
    answering `unimplemented`.
-4. **A duplex stream runs under the endpoint's declared stream budgets**, the
-   ones its WebSocket transport enforces, and a caller that resets the stream
-   is read as a cancellation, never as the end of its messages.
+4. **A duplex stream runs under the endpoint's declared stream budgets**, by
+   the same resolution as a first-party WebSocket stream; a route without a
+   contract gets the framework floors. A caller that resets the stream is read
+   as a cancellation as far as Bun lets the server tell: see Consequences.
 5. **Deployment is a separate decision.** The TypeScript extension still states
    `runtime.protocols.http2: false` for every workload, so the platform keeps
    speaking HTTP/1.1 to the container.
@@ -45,5 +46,13 @@ tell them apart only from their headers.
   admission and request limits as HTTP/1.1.
 - The protocol is inferred, not stated. A Bun release that states it per
   request would replace the header rule in `http-version.ts`.
-- A cancellation is confirmed one macrotask after the request body ends,
-  because Bun aborts the request signal only then.
+- Bun 1.4.5 ends the body of a reset HTTP/2 request exactly as it ends a
+  completed one, and aborts the request signal only one or more event-loop
+  turns later — about 6 ms later when hundreds of resets arrive together on
+  one connection. The server therefore reads the end of a body as the caller's
+  end only after the signal had 10 ms to abort. This is a bounded heuristic
+  over that Bun limitation, not a guarantee: a reset reported later still
+  reads as an end. The limitation is worth reporting to Bun.
+- A stream stopped by its idle budget or its deadline ends `ctx.messages()`
+  normally with `ctx.signal` aborted, as on WebSocket: a handler that commits
+  must check `ctx.signal` after its loop.

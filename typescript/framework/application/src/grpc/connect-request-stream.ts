@@ -8,6 +8,12 @@ import {
 import { MAX_GRPC_MESSAGE_BYTES, decompressGzip } from './grpc-protocol';
 
 /**
+ * How long the end of a request body waits for the request signal to abort
+ * before it is read as the caller's end rather than its reset.
+ */
+export const CANCELLATION_GRACE_MS = 10;
+
+/**
  * The request side of a Connect client or bidirectional stream, read as it
  * arrives.
  *
@@ -89,15 +95,29 @@ export class ConnectRequestStream {
 
   /**
    * A caller that resets its stream ends the body exactly as a caller that
-   * ended its side does, and the request signal says which one only a
-   * macrotask later. Reading a cancellation as the end would let a client
+   * ended its side does, and Bun aborts the request signal only one or more
+   * event-loop turns later — later still when many resets arrive together on
+   * one connection. Reading a cancellation as the end would let a client
    * stream commit the part it received as if it were whole, so the end is
-   * confirmed once that turn has passed.
+   * confirmed only after the signal had {@link CANCELLATION_GRACE_MS} to
+   * abort. This is a bounded heuristic over that Bun limitation, not a
+   * guarantee: a reset the runtime reports later still reads as an end.
    */
   private async refuseCancellation(): Promise<void> {
-    if (!this.signal) return;
-    if (!this.signal.aborted) await new Promise<void>((resolve) => setImmediate(resolve));
-    if (this.signal.aborted) {
+    const signal = this.signal;
+    if (!signal) return;
+    if (!signal.aborted) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(done, CANCELLATION_GRACE_MS);
+        function done() {
+          clearTimeout(timer);
+          signal?.removeEventListener('abort', done);
+          resolve();
+        }
+        signal.addEventListener('abort', done, { once: true });
+      });
+    }
+    if (signal.aborted) {
       throw new HttpException('Client Closed Request: the caller canceled the stream', 499);
     }
   }

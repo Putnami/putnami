@@ -204,7 +204,7 @@ export class ConnectTransport implements Transport {
   /** `Connect-Timeout-Ms` value derived from the per-call timeout, when configured. */
   private readonly connectTimeout?: string;
   private readonly compressRequests: boolean;
-  /** The per-call timeout, when configured: it bounds a duplex stream's wait for the provider's answer. */
+  /** The per-call timeout, when configured: it bounds a duplex stream's connection setup, never its answer. */
   private readonly timeoutMs?: number;
 
   constructor(
@@ -585,41 +585,53 @@ export class ConnectTransport implements Transport {
         }
         resolve(new Response(body, { status: Number(received[':status']), headers: responseHeaders }));
       });
-      stream.once('error', reject);
-      session.once('error', reject);
-      // The node:http2 client reports a reset or a destroyed session before
-      // the response with `close` alone, never `error`: without this, a stream
-      // that never answered would leave the caller waiting for ever.
-      const closedBeforeResponse = () =>
+      // The provider closed the stream before it answered. Only a reset the
+      // provider sent on a live session is its cancellation; a session torn
+      // down or going away, a refused stream or a transport error is the
+      // provider being unavailable.
+      let sessionGone = false;
+      session.once('goaway', () => {
+        sessionGone = true;
+      });
+      const closedBeforeResponse = (cause?: unknown) => {
+        const code = stream.rstCode;
+        const canceled = !sessionGone && !session.destroyed && code === http2.constants.NGHTTP2_CANCEL;
         reject(
           new ClientStreamError({
             service: this.packageName,
             method: path,
-            message: `Connect stream closed before the provider answered (HTTP/2 code ${stream.rstCode ?? 'none'})`,
-            grpcCode: stream.rstCode === http2.constants.NGHTTP2_CANCEL ? GrpcStatus.CANCELLED : GrpcStatus.UNAVAILABLE,
-            grpcStatus: stream.rstCode === http2.constants.NGHTTP2_CANCEL ? 'CANCELLED' : 'UNAVAILABLE',
+            message: `Connect stream closed before the provider answered (HTTP/2 code ${code ?? 'none'}${cause instanceof Error ? `: ${cause.message}` : ''})`,
+            grpcCode: canceled ? GrpcStatus.CANCELLED : GrpcStatus.UNAVAILABLE,
+            grpcStatus: canceled ? 'CANCELLED' : 'UNAVAILABLE',
           }),
         );
-      stream.once('close', closedBeforeResponse);
-      session.once('close', closedBeforeResponse);
-      // A configured per-call timeout bounds the wait for the provider's
-      // answer; once admitted, a stream is long-lived and has no deadline.
-      if (this.timeoutMs !== undefined) {
-        const admission = setTimeout(
+      };
+      // The node:http2 client reports a reset or a destroyed session before
+      // the response with `close` alone, never `error`: without this, a stream
+      // that never answered would leave the caller waiting for ever.
+      stream.once('error', closedBeforeResponse);
+      session.once('error', closedBeforeResponse);
+      stream.once('close', () => closedBeforeResponse());
+      session.once('close', () => closedBeforeResponse());
+      // A configured per-call timeout bounds connecting to the provider. It
+      // never bounds the answer: a client stream is answered only after the
+      // caller ends it, and a stream is long-lived by definition.
+      if (this.timeoutMs !== undefined && session.connecting) {
+        const connecting = setTimeout(
           () =>
             reject(
               new ClientStreamError({
                 service: this.packageName,
                 method: path,
-                message: `Connect stream not answered within ${this.timeoutMs} ms`,
+                message: `Connect session not established within ${this.timeoutMs} ms`,
                 grpcCode: GrpcStatus.DEADLINE_EXCEEDED,
                 grpcStatus: 'DEADLINE_EXCEEDED',
               }),
             ),
           this.timeoutMs,
         );
-        stream.once('response', () => clearTimeout(admission));
-        stream.once('close', () => clearTimeout(admission));
+        session.once('connect', () => clearTimeout(connecting));
+        session.once('close', () => clearTimeout(connecting));
       }
     });
     onOpen({

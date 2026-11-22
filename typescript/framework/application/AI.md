@@ -265,9 +265,12 @@ provider is held to it by a corpus transcribed from that text
 - On such a stream the first request envelope carries `params` and `query`, validated against the
   declared schemas; each envelope's `body` is one `ctx.messages()` value. A client stream answers its
   returned value; a bidirectional stream answers each `ctx.send()`, then its returned value if any.
-- The endpoint's declared `resilience.stream` budgets apply as on WebSocket: past `maxFrameBytes` →
-  `resource_exhausted`, no message either way for `idleTimeoutMs` → `deadline_exceeded`, 16 MiB of
-  unread answers → `resource_exhausted`.
+- The endpoint's declared `resilience.stream` budgets apply, resolved as for a first-party WebSocket
+  stream (floors 30 s idle / 1 MiB without a contract): past `maxFrameBytes` → `resource_exhausted`,
+  no message either way for `idleTimeoutMs` → `deadline_exceeded`, 16 MiB of unread answers →
+  `resource_exhausted`. A caller reset makes `ctx.messages()` throw `canceled` (a bounded 10 ms
+  heuristic over Bun). An idle or deadline stop ends the loop with `ctx.signal` aborted: check it
+  before committing.
 
 ## File-Based Routing
 

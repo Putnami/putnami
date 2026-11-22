@@ -490,6 +490,40 @@ describe('Connect client and bidirectional streams', () => {
   );
 
   specTest(
+    'never commits a burst of streams reset together on one connection',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'duplex-streams-over-http2',
+      check: 'a-connect-client-stream-over-http2-answers-its-declared-result',
+    },
+    async () => {
+      const port = await start();
+      session = http2.connect(`http://localhost:${port}`);
+      const calls = Array.from({ length: 120 }, (_, index) => {
+        const call = openH2Stream(session as http2.ClientHttp2Session, '/test.v1.LedgerService/ListLedgerByIdCommit');
+        call.write({ params: { id: `burst-${index}` }, body: { delta: 1 } });
+        call.write({ body: { delta: 2 } });
+        return call;
+      });
+      await Bun.sleep(100);
+      // Half are reset and half ended, all in the same turn, so the resets
+      // reach the server together.
+      for (const [index, call] of calls.entries()) {
+        if (index % 2 === 0) call.cancel();
+        else call.end();
+      }
+      await Promise.all(calls.filter((_, index) => index % 2 === 1).map((call) => call.done));
+      await Bun.sleep(200);
+
+      const committed = (index: number) => ledger.includes(`committed burst-${index} 3`);
+      const resetCommitted = calls.filter((_, index) => index % 2 === 0 && committed(index)).length;
+      const endedCommitted = calls.filter((_, index) => index % 2 === 1 && committed(index)).length;
+      expect(resetCommitted).toBe(0);
+      expect(endedCommitted).toBe(60);
+    },
+  );
+
+  specTest(
     'carries binary protobuf and gzip-compressed messages',
     {
       feature: 'typescript/grpc-services',

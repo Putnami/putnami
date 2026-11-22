@@ -42,7 +42,7 @@
       "id": "duplex-streams-over-http2",
       "text": [
         "Over HTTP/2 the gRPC plugin serves a client or bidirectional RPC as a Connect stream: each request envelope's body section is one stream message, the first envelope carries the params and query, and the response ends with exactly one end-of-stream message.",
-        "A client stream answers its declared result as its one message, and a bidirectional stream answers each message as the handler sends it, while the caller still sends. A caller that resets the stream cancels it, never ends it."
+        "A client stream answers its declared result as its one message, and a bidirectional stream answers each message as the handler sends it, while the caller still sends. A caller reset is read as canceled within a bounded grace, not as an end."
       ]
     },
     {
