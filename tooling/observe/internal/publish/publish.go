@@ -21,6 +21,7 @@ import (
 
 	"go.putnami.dev/protocol/codehost"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/tooling/observe/internal/ci"
 	"go.putnami.dev/tooling/observe/internal/observe"
 )
@@ -121,6 +122,11 @@ func Run(ctx context.Context, req Request) []diag.Diagnostic {
 		return skipped("the upload failed, so --publish has no report to link and published nothing")
 	}
 	cr := o.Subject.ChangeRequest
+	// A CI other than GitHub Actions and GitLab CI names no pull or merge
+	// request observe reads, even when the origin remote keys the subject.
+	if _, inCI := evidence.DetectCISystem(req.Getenv); inCI && o.CI.System != ci.SystemGitHubActions && o.CI.System != ci.SystemGitLabCI {
+		return skipped("this CI is neither GitHub Actions nor GitLab CI, so --publish has no pull or merge request to publish on")
+	}
 	var tokenEnv string
 	switch o.Subject.Provider {
 	case ci.ProviderGitHub:

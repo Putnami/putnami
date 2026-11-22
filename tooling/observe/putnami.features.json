@@ -163,6 +163,21 @@
           }
         },
         {
+          "id": "ci-repository-key",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "another-ci-keys-its-origin-by-the-numeric-project-id",
+              "another-ci-without-an-id-is-a-diagnostic-naming-the-token",
+              "another-ci-without-upload-asks-the-code-host-nothing"
+            ]
+          }
+        },
+        {
           "id": "laptop-base",
           "stage": "coded",
           "evidenceKinds": [

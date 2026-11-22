@@ -38,13 +38,13 @@ directories.
 |---|---|---|---|
 | GitHub Actions | `GITHUB_ACTIONS=true` | `GITHUB_SERVER_URL` host, `GITHUB_REPOSITORY_ID` | `GITHUB_REF` `refs/pull/<n>/merge`, or the event payload |
 | GitLab CI | `GITLAB_CI=true` | `CI_SERVER_HOST`, `CI_PROJECT_ID` | `CI_MERGE_REQUEST_IID` |
-| Jenkins | `JENKINS_URL` | none | none |
-| CircleCI | `CIRCLECI=true` | none | none |
-| Buildkite | `BUILDKITE=true` | none | none |
-| Azure Pipelines | `TF_BUILD=true` | none | none |
-| Bitbucket Pipelines | `BITBUCKET_BUILD_NUMBER` | none | none |
-| TeamCity | `TEAMCITY_VERSION` | none | none |
-| Any other | `CI=true` or none of the above | none | none |
+| Jenkins | `JENKINS_URL` | the `origin` remote, with `--upload` or `--open` | none |
+| CircleCI | `CIRCLECI=true` | the `origin` remote, with `--upload` or `--open` | none |
+| Buildkite | `BUILDKITE=true` | the `origin` remote, with `--upload` or `--open` | none |
+| Azure Pipelines | `TF_BUILD=true` | the `origin` remote, with `--upload` or `--open` | none |
+| Bitbucket Pipelines | `BITBUCKET_BUILD_NUMBER` | the `origin` remote, with `--upload` or `--open` | none |
+| TeamCity | `TEAMCITY_VERSION` | the `origin` remote, with `--upload` or `--open` | none |
+| Any other | `CI=true` or none of the above | the `origin` remote, with `--upload` or `--open` | none |
 
 The first marker that matches names the CI, in the order of this table, and
 `ci.system` carries its name (`jenkins`, `circleci`, `buildkite`,
@@ -53,9 +53,14 @@ The first marker that matches names the CI, in the order of this table, and
 table matches any non-empty value. The evidence protocol owns this table.
 
 Only GitHub Actions and GitLab CI fill the code host, the project id, the
-branch, the change request and the run ids: the document of another CI names
-no numeric project id, and `@putnami/cloud` refuses to
-upload a document without one.
+branch, the change request and the run ids from their own variables. In
+another CI, a run with `--upload` or `--open` reads the repository from the
+`origin` remote as a laptop run does, below, and asks the code host API for its
+numeric project id; the CI system stays as detected. Without `--upload` or
+`--open`, the document of another CI names no numeric project id, and
+`@putnami/cloud` refuses to upload a document without one. A Bitbucket
+Pipelines checkout has its `origin` on `bitbucket.org`, so its repository has
+no key.
 
 The repository path (`GITHUB_REPOSITORY`, `CI_PROJECT_PATH`, or the path of
 the `origin` remote) is for display only. A GitHub or GitLab job without a
@@ -65,7 +70,8 @@ The commit is the one the job checked out and measured, `HEAD` or `--head`. On
 a GitHub pull request that is the merge commit `refs/pull/<n>/merge`, not the
 pull request's head, so the changed files are the pull request's own changes.
 
-Outside a CI, on a laptop, the repository is read from the `origin` remote. On
+Outside a CI, on a laptop, and in another CI with `--upload` or `--open`, the
+repository is read from the `origin` remote. On
 `github.com`, `gitlab.com` or a host whose name starts with `gitlab.`, and only
 with `--upload` or `--open`, observe asks the code host API for the numeric
 project id (GitHub
@@ -74,7 +80,7 @@ project id (GitHub
 a CI job of the same repository sends. A remote on another host, or one the API
 does not answer, such as a private repository without a token, keeps the
 provider `generic` and gets `observe.project_id_missing`, which names the token
-to set. The branch is the current one.
+to set. The branch is the current one, none on a detached checkout.
 
 GitHub Actions exposes no numeric job id, so the run's job is the job key
 `GITHUB_JOB`, which every leg of a matrix shares.

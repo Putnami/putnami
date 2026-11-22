@@ -48,8 +48,9 @@ putnami observe
 ```
 
 See [Observe a change in your CI](https://putnami.dev/docs/how-to/observe-a-change-in-your-ci)
-for the GitHub Actions step and the GitLab CI job that install the CLI and the
-extension, run `putnami observe`, and keep the evidence document as an
+for the GitHub Actions step, the GitLab CI job and the steps of Jenkins,
+CircleCI, Buildkite, Azure Pipelines and Bitbucket Pipelines that install the
+CLI and the extension, run `putnami observe`, and keep the evidence document as an
 artifact. The release of the action is the workflow
 `.github/workflows/observe-action-release.yml`.
 
