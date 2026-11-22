@@ -23,6 +23,7 @@
     "cloud/agent-content#names-only-agency-commands",
     "cloud/agent-content#routine-build-attaches-from-its-branch",
     "cloud/agent-content#ships-the-agency-skills-and-workers",
+    "cloud/agent-session#a-delegated-session-mints-no-registry-token",
     "cloud/agent-session#a-delegated-session-reads-the-cache-with-its-own-token",
     "cloud/agent-session#a-delegated-session-says-what-it-reaches",
     "cloud/agent-session#a-read-only-cache-credential-is-declared",

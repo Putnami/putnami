@@ -181,7 +181,10 @@ When the person's MCP connection approves the code, the session is delegated
 to the agent for one workspace: `putnami cloud whoami` reports it as signed in
 through an MCP connection, on delegated routes only. A command whose route the
 delegated session does not admit says so and names the MCP read tool that
-reads the same data, such as `query_logs` or `list_runs`.
+reads the same data, such as `query_logs` or `list_runs`. A delegated session
+mints no registry token: package installs keep the machine's existing registry
+credentials, and `putnami cloud token --for npm|go|oci|put` says why it prints
+none.
 
 ## Polyglot workspaces
 

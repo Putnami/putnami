@@ -870,6 +870,21 @@
           }
         },
         {
+          "id": "a-delegated-session-mints-no-registry-token",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-credential-provider-answers-absence",
+              "the-registry-token-mint-sends-no-api-key-request",
+              "an-own-session-still-mints-one-api-key"
+            ]
+          }
+        },
+        {
           "id": "a-read-only-cache-credential-is-declared",
           "stage": "coded",
           "evidenceKinds": [
