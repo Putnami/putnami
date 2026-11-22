@@ -1,6 +1,6 @@
 // Package lockdiff compares the packages a lockfile pins at two commits:
-// package-lock.json, pnpm-lock.yaml, yarn.lock, composer.lock, go.mod, uv.lock,
-// poetry.lock, the PEX JSON lock of a Pants resolve, gradle.lockfile, the
+// package-lock.json, pnpm-lock.yaml, yarn.lock, bun.lock, composer.lock, go.mod,
+// uv.lock, poetry.lock, the PEX JSON lock of a Pants resolve, gradle.lockfile, the
 // Gradle version catalog, Package.resolved, Podfile.lock, pubspec.lock,
 // NuGet's packages.lock.json, the central package versions of
 // Directory.Packages.props, Gemfile.lock and Cargo.lock.
@@ -88,6 +88,8 @@ func KindOf(file string) (Kind, bool) {
 		return Kind{EcosystemNPM, ReadPNPMLock}, true
 	case YarnLock:
 		return Kind{EcosystemNPM, ReadYarnLock}, true
+	case BunLock:
+		return Kind{EcosystemNPM, ReadBunLock}, true
 	case ComposerLock:
 		return Kind{EcosystemComposer, ReadComposerLock}, true
 	case UVLock:
@@ -113,6 +115,12 @@ func KindOf(file string) (Kind, bool) {
 		return Kind{EcosystemMaven, ReadVersionCatalog}, true
 	}
 	return Kind{}, false
+}
+
+// Declared reports whether a dependency change was read from a Maven POM,
+// whose versions are the ones it declares, not the ones Maven resolves.
+func Declared(ecosystem, file string) bool {
+	return ecosystem == EcosystemMaven && strings.HasSuffix(file, ".xml")
 }
 
 // Diff returns the changes from base to head, sorted by name. Either side may

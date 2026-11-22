@@ -35,9 +35,10 @@ const (
 	CodeTestCasesBounded = "observe.test_cases_bounded"
 	// CodeTestCasesAmbiguous counts the test cases of one report that share
 	// their suite and name with another of its cases.
-	CodeTestCasesAmbiguous = "observe.test_cases_ambiguous"
-	CodeCoverageUnmapped   = "observe.coverage_unmapped"
-	CodeLockfileUnread     = "observe.lockfile_unreadable"
+	CodeTestCasesAmbiguous  = "observe.test_cases_ambiguous"
+	CodeCoverageUnmapped    = "observe.coverage_unmapped"
+	CodeLockfileUnread      = "observe.lockfile_unreadable"
+	CodeLockfileUnsupported = "observe.lockfile_unsupported"
 )
 
 // Revision names one side of the change.

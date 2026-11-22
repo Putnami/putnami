@@ -1,4 +1,4 @@
-The maven demo: a Maven 3.9.11 build whose aggregator pom.xml lists the modules pricing and api, where api depends on pricing through ${project.groupId}. The change adds a method to pricing. The reports are the output of mvn verify with maven-surefire-plugin 3.5.2, jacoco-maven-plugin 0.8.13, OpenJDK 21 and JUnit 5.11.4: the Surefire reports of each module, with their properties block, which lists the Java system properties of the machine, emptied, and the jacoco.xml of each module.
+The maven demo: a Maven 3.9.11 build whose aggregator pom.xml lists the modules pricing and api, where api depends on pricing through ${project.groupId}. The change adds a method to pricing and bumps the junit.version property of the root POM from 5.11.3 to 5.11.4. The reports are the output of mvn verify with maven-surefire-plugin 3.5.2, jacoco-maven-plugin 0.8.13, OpenJDK 21 and JUnit 5.11.4: the Surefire reports of each module, with their properties block, which lists the Java system properties of the machine, emptied, and the jacoco.xml of each module.
 -- base/api/pom.xml --
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -72,6 +72,7 @@ class QuotesTest {
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <junit.version>5.11.3</junit.version>
   </properties>
 
   <dependencyManagement>
@@ -79,7 +80,7 @@ class QuotesTest {
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
-        <version>5.11.4</version>
+        <version>${junit.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -166,6 +167,57 @@ class PricingTest {
         assertEquals("12.05 EUR", Pricing.label(1205));
     }
 }
+-- head/pom.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.acme</groupId>
+  <artifactId>shop</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>pricing</module>
+    <module>api</module>
+  </modules>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <junit.version>5.11.4</junit.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.2</version>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.13</version>
+        <executions>
+          <execution><goals><goal>prepare-agent</goal></goals></execution>
+          <execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals></execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
 -- head/pricing/src/main/java/com/acme/pricing/Pricing.java --
 package com.acme.pricing;
 

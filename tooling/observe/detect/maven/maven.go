@@ -6,7 +6,11 @@
 // are the build; each POM that packages code, any packaging but pom, is a
 // component. A dependency whose groupId and artifactId name another module is
 // an edge. Parent POMs outside the repository, BOMs and inherited properties
-// are not resolved.
+// are not resolved for the edges.
+//
+// Each POM read is also a lockfile of declared versions: Detection.ReadDeclared
+// lists the versions its dependencies and its parent state, through the
+// properties of its parent POMs in the repository.
 package maven
 
 import (
@@ -18,6 +22,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -57,13 +62,37 @@ type Component struct {
 // Detection is what the detector found in one repository.
 type Detection struct {
 	// Components are sorted by ID; empty outside a Maven build.
-	Components  []Component
+	Components []Component
+	// POMs are the repository paths of the POMs read, aggregators included,
+	// sorted.
+	POMs []string
+	// Modules are the groupId:artifactId of the POMs read, sorted.
+	Modules     []string
 	Diagnostics []diag.Diagnostic
+	// poms are the POMs read, by repository path; byCoordinates the path of
+	// the first POM of each groupId:artifactId.
+	poms          map[string]pom
+	byCoordinates map[string]string
+	// root is the repository's top directory.
+	root string
+}
+
+// IsPOM reports whether a repository path is a POM of the build.
+func (d Detection) IsPOM(file string) bool {
+	_, found := slices.BinarySearch(d.POMs, file)
+	return found
+}
+
+// IsModule reports whether groupId:artifactId names a POM of the build.
+func (d Detection) IsModule(coordinates string) bool {
+	_, found := slices.BinarySearch(d.Modules, coordinates)
+	return found
 }
 
 type dependency struct {
 	GroupID    string `xml:"groupId"`
 	ArtifactID string `xml:"artifactId"`
+	Version    string `xml:"version"`
 }
 
 type modules struct {
@@ -75,22 +104,31 @@ type project struct {
 	XMLName    xml.Name
 	GroupID    string `xml:"groupId"`
 	ArtifactID string `xml:"artifactId"`
+	Version    string `xml:"version"`
 	Packaging  string `xml:"packaging"`
 	Parent     struct {
-		GroupID string `xml:"groupId"`
+		GroupID    string `xml:"groupId"`
+		ArtifactID string `xml:"artifactId"`
+		Version    string `xml:"version"`
 	} `xml:"parent"`
-	Properties struct {
-		Entries []struct {
-			XMLName xml.Name
-			Value   string `xml:",chardata"`
-		} `xml:",any"`
-	} `xml:"properties"`
+	Properties properties `xml:"properties"`
 	modules
 	Dependencies []dependency `xml:"dependencies>dependency"`
+	Managed      []dependency `xml:"dependencyManagement>dependencies>dependency"`
 	Profiles     []struct {
 		modules
 		Dependencies []dependency `xml:"dependencies>dependency"`
+		Managed      []dependency `xml:"dependencyManagement>dependencies>dependency"`
+		Properties   properties   `xml:"properties"`
 	} `xml:"profiles>profile"`
+}
+
+// properties are the entries of a properties element.
+type properties struct {
+	Entries []struct {
+		XMLName xml.Name
+		Value   string `xml:",chardata"`
+	} `xml:",any"`
 }
 
 // pom is one POM read.
@@ -104,7 +142,7 @@ type pom struct {
 // Detect reads the Maven build at root. A root without pom.xml is no Maven
 // build and gets an empty detection.
 func Detect(root string) Detection {
-	var out Detection
+	out := Detection{root: root}
 	if info, err := os.Stat(filepath.Join(root, POM)); err != nil || !info.Mode().IsRegular() {
 		return out
 	}
@@ -124,6 +162,15 @@ func Detect(root string) Detection {
 			continue
 		}
 		poms = append(poms, p)
+		out.POMs = append(out.POMs, file)
+		if out.poms == nil {
+			out.poms, out.byCoordinates = map[string]pom{}, map[string]string{}
+		}
+		out.poms[file] = p
+		if coordinates := p.coordinates(); !slices.Contains(out.Modules, coordinates) {
+			out.Modules = append(out.Modules, coordinates)
+			out.byCoordinates[coordinates] = file
+		}
 		listed := append(append([]string(nil), p.project.Modules...), p.project.Subprojects...)
 		for _, profile := range p.project.Profiles {
 			listed = append(append(listed, profile.Modules...), profile.Subprojects...)
@@ -187,6 +234,8 @@ func Detect(root string) Detection {
 		out.Components = append(out.Components, *c)
 	}
 	sort.Slice(out.Components, func(i, j int) bool { return out.Components[i].ID < out.Components[j].ID })
+	sort.Strings(out.POMs)
+	sort.Strings(out.Modules)
 	return out
 }
 
@@ -220,6 +269,11 @@ func readPOM(root, file string) (pom, error) {
 	if len(data) > MaxPOMBytes {
 		return pom{}, errors.New("the POM is larger than 16 MiB")
 	}
+	return parsePOM(file, data)
+}
+
+// parsePOM reads the content of the POM at a repository path.
+func parsePOM(file string, data []byte) (pom, error) {
 	var p project
 	if err := xml.NewDecoder(bytes.NewReader(data)).Decode(&p); err != nil {
 		return pom{}, err
@@ -238,6 +292,11 @@ func readPOM(root, file string) (pom, error) {
 	}
 	out.groupID = out.resolve(out.groupID)
 	return out, nil
+}
+
+// coordinates is the POM's groupId:artifactId.
+func (p pom) coordinates() string {
+	return p.groupID + ":" + strings.TrimSpace(p.project.ArtifactID)
 }
 
 func (p pom) packaging() string {

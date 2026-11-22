@@ -391,6 +391,42 @@ func TestChangedLockfilesGiveDependencyChanges(t *testing.T) {
 	}
 }
 
+func TestABunLockbIsADiagnostic(t *testing.T) {
+	spectest.Proves(t, feature, "bun-lockfiles", "a-bun-lockb-is-a-diagnostic")
+	root, set := repository(t)
+	sides := map[Revision]map[string]string{
+		Base: {"packages/pricing/bun.lock": `{"lockfileVersion": 1, "packages": {"zod": ["zod@3.23.8", "", {}, "sha512-a"],},}`},
+		Head: {"packages/pricing/bun.lock": `{"lockfileVersion": 1, "packages": {"zod": ["zod@3.24.1", "", {}, "sha512-b"],},}`},
+	}
+	in := Input{Root: root, Set: set,
+		ChangedFiles: []gitbase.ChangedFile{
+			{Path: "apps/api/bun.lockb", Status: gitbase.StatusModified},
+			{Path: "old/bun.lockb", Status: gitbase.StatusDeleted},
+			{Path: "packages/pricing/bun.lock", Status: gitbase.StatusModified},
+		},
+		Show: func(side Revision, file string) ([]byte, bool, error) {
+			content, ok := sides[side][file]
+			return []byte(content), ok, nil
+		},
+	}
+	r := Run(in)
+	want := []evidence.DependencyChange{
+		{Ecosystem: "npm", Lockfile: "packages/pricing/bun.lock", Name: "zod", Change: evidence.DependencyUpgraded, From: "3.23.8", To: "3.24.1", Component: "packages/pricing"},
+	}
+	if !slices.Equal(r.DependencyChanges, want) {
+		t.Errorf("dependency changes\n got %+v\nwant %+v", r.DependencyChanges, want)
+	}
+	var unsupported []string
+	for _, d := range r.Diagnostics {
+		if d.Code == CodeLockfileUnsupported {
+			unsupported = append(unsupported, d.Field)
+		}
+	}
+	if !slices.Equal(unsupported, []string{"apps/api/bun.lockb"}) {
+		t.Errorf("diagnostics %v", r.Diagnostics)
+	}
+}
+
 func TestADotnetCaseGoesToTheProjectOfItsTestAssembly(t *testing.T) {
 	spectest.Proves(t, "tooling/observe-dotnet", "dotnet-test-assemblies", "a-case-goes-to-the-project-of-its-test-assembly")
 	root := t.TempDir()
@@ -588,6 +624,44 @@ func TestAMavenPackageURLMatchesAGradleChange(t *testing.T) {
 	}
 	change := r.DependencyChanges[0]
 	if change.Ecosystem != "maven" || change.Name != "com.google.guava:guava" || change.Component != "pricing" || change.Change != evidence.DependencyUpgraded {
+		t.Errorf("change %+v", change)
+	}
+	if change.After == nil || !slices.Equal(change.After.Licenses, []string{"Apache-2.0"}) {
+		t.Errorf("after %+v, want the SBOM's license", change.After)
+	}
+}
+
+func TestAMavenPackageURLMatchesAPOMChange(t *testing.T) {
+	spectest.Proves(t, jvmFeature, "maven-declared-versions", "a-maven-package-url-matches-a-pom-change")
+	root := t.TempDir()
+	pom := func(guava string) string {
+		return `<project><groupId>com.acme</groupId><artifactId>pricing</artifactId><version>1.0.0</version>
+  <properties><guava.version>` + guava + `</guava.version></properties>
+  <dependencies><dependency><groupId>com.google.guava</groupId><artifactId>guava</artifactId><version>${guava.version}</version></dependency></dependencies>
+</project>`
+	}
+	write(t, root, map[string]string{
+		"pom.xml": pom("33.4.0-jre"),
+		"src/main/java/com/acme/pricing/Price.java": "package com.acme.pricing;\n",
+		"bom.cdx.json": `{"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1,
+			"components": [{"bom-ref": "g", "type": "library", "group": "com.google.guava", "name": "guava", "version": "33.4.0-jre",
+				"purl": "pkg:maven/com.google.guava/guava@33.4.0-jre", "licenses": [{"license": {"id": "Apache-2.0"}}]}]}`,
+	})
+	set := components.Detect(root, []components.Detector{components.MavenDetector{}})
+	sides := map[Revision]string{Base: pom("33.3.1-jre"), Head: pom("33.4.0-jre")}
+	r := Run(Input{Root: root, Set: set,
+		ChangedFiles: []gitbase.ChangedFile{{Path: "pom.xml", Status: gitbase.StatusModified}},
+		Reports:      []reports.Report{{Path: "bom.cdx.json", Kind: reports.KindSBOM, Format: reports.FormatCycloneDX}},
+		Show: func(side Revision, file string) ([]byte, bool, error) {
+			return []byte(sides[side]), true, nil
+		},
+	})
+	if len(r.DependencyChanges) != 1 {
+		t.Fatalf("dependency changes %+v, diagnostics %v", r.DependencyChanges, r.Diagnostics)
+	}
+	change := r.DependencyChanges[0]
+	if change.Ecosystem != "maven" || change.Lockfile != "pom.xml" || change.Name != "com.google.guava:guava" || change.Component != "." ||
+		change.Change != evidence.DependencyUpgraded || change.From != "33.3.1-jre" || change.To != "33.4.0-jre" {
 		t.Errorf("change %+v", change)
 	}
 	if change.After == nil || !slices.Equal(change.After.Licenses, []string{"Apache-2.0"}) {

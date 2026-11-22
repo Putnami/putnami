@@ -420,6 +420,20 @@
           }
         },
         {
+          "id": "bun-lockfiles",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bun-lock-lists-its-packages",
+              "a-bun-lockb-is-a-diagnostic"
+            ]
+          }
+        },
+        {
           "id": "summary",
           "stage": "coded",
           "evidenceKinds": [
@@ -1297,7 +1311,7 @@
       "id": "tooling/observe-jvm",
       "type": "feature",
       "name": "Find the components of a Gradle or Maven repository that keeps its own CI",
-      "outcome": "putnami observe, in a Java or Kotlin repository built with Gradle or Maven, Android included, and without a Putnami workspace, knows one component per Gradle project or Maven module and the edges between them, without running the build, so a change to a shared library marks the projects that use it, the JUnit and JaCoCo reports land on the right component, and a Gradle lockfile or version catalog bump is a dependency change",
+      "outcome": "putnami observe, in a Java or Kotlin repository built with Gradle or Maven, Android included, and without a Putnami workspace, knows one component per Gradle project or Maven module and the edges between them, without running the build, so a change to a shared library marks the projects that use it, the JUnit and JaCoCo reports land on the right component, and a Gradle lockfile or version catalog bump, or a version a POM declares, is a dependency change",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -1408,6 +1422,33 @@
               "a-gradle-lockfile-lists-its-dependencies",
               "a-version-catalog-lists-its-libraries-and-plugins",
               "a-maven-package-url-matches-a-gradle-change"
+            ]
+          }
+        },
+        {
+          "id": "maven-dependency-changes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pom-lists-its-declared-versions"
+            ]
+          }
+        },
+        {
+          "id": "maven-declared-versions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pom-change-is-marked-declared",
+              "a-maven-package-url-matches-a-pom-change"
             ]
           }
         },

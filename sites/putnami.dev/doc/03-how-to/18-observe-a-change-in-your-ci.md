@@ -91,7 +91,7 @@ With Jest, add `jest-junit` to the dev dependencies, then run:
 npx jest --ci --coverage --reporters=default --reporters=jest-junit
 ```
 
-Each member of the workspace that `package.json` `workspaces` or `pnpm-workspace.yaml` lists is a component. A `workspace:`, `file:`, `link:` or `portal:` dependency on another member is an edge, and so is a version range another member satisfies. A `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock` change is a dependency change of ecosystem `npm`. A `bun.lock` change is not read.
+Each member of the workspace that `package.json` `workspaces` or `pnpm-workspace.yaml` lists is a component. A `workspace:`, `file:`, `link:` or `portal:` dependency on another member is an edge, and so is a version range another member satisfies. A `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock` or `bun.lock` change is a dependency change of ecosystem `npm`. Bun's binary `bun.lockb` is not read, and a change to it says so in a diagnostic.
 
 #### Nx
 
@@ -206,7 +206,7 @@ In a Maven repository, add the `prepare-agent` and `report` goals of `jacoco-mav
 </plugin>
 ```
 
-Each module the POMs list is a component, and a dependency on another module is an edge. The reports under `target/surefire-reports`, `target/failsafe-reports` and `target/site/jacoco` land on the modules. Maven has no lockfile, so a Maven repository has no dependency change. To read only some reports, name them, for example `--junit '**/target/surefire-reports/*.xml' --coverage '**/target/site/jacoco/jacoco.xml'`.
+Each module the POMs list is a component, and a dependency on another module is an edge. The reports under `target/surefire-reports`, `target/failsafe-reports` and `target/site/jacoco` land on the modules. Maven has no lockfile: a change to a version a POM declares, in `dependencies`, `dependencyManagement`, a property or the parent, is a dependency change of ecosystem `maven`, marked declared, since Maven may resolve another version. To read only some reports, name them, for example `--junit '**/target/surefire-reports/*.xml' --coverage '**/target/site/jacoco/jacoco.xml'`.
 
 #### iOS and Swift
 

@@ -7,6 +7,7 @@ import (
 
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/tooling/observe/internal/analyze"
+	"go.putnami.dev/tooling/observe/internal/lockdiff"
 )
 
 // maxListedComponents caps the components and dependency changes the text
@@ -32,11 +33,20 @@ func writeAnalysis(b *strings.Builder, a analyze.Result) {
 			fmt.Fprintf(b, "    ... and %d more\n", len(a.DependencyChanges)-i)
 			break
 		}
-		fmt.Fprintf(b, "    %-10s %s %s, in %s\n", d.Change, d.Name, versions(d), d.Lockfile)
+		fmt.Fprintf(b, "    %-10s %s %s, in %s%s\n", d.Change, d.Name, versions(d), d.Lockfile, declared(d))
 		if facts := dependencyFacts(d, a.SBOM); facts != "" {
 			fmt.Fprintf(b, "               %s\n", facts)
 		}
 	}
+}
+
+// declared marks a dependency change read from a Maven POM: its versions
+// are the ones the POM declares, not the ones Maven resolves.
+func declared(d evidence.DependencyChange) string {
+	if lockdiff.Declared(d.Ecosystem, d.Lockfile) {
+		return ", declared"
+	}
+	return ""
 }
 
 // maxShortComponents caps the components the short summary lists.

@@ -104,16 +104,54 @@ such as Kotlin Multiplatform's `src/commonMain/kotlin`, are not read.
 |---|---|
 | `gradle.lockfile`, `settings-gradle.lockfile` | each `group:artifact:version=…` line, as `group:artifact` |
 | a version catalog, `gradle/libs.versions.toml` or another `.versions.toml` file of a `gradle` directory | each library as `group:artifact`, each plugin as its id |
+| each POM of a Maven build | the versions it declares, as `group:artifact`, marked declared |
 
-Both are dependency changes of ecosystem `maven`. A catalog entry takes the
+All are dependency changes of ecosystem `maven`. A catalog entry takes the
 version it states, the one its `version.ref` names in `[versions]`, or the
 `strictly`, `require` or `prefer` member of a rich version. An entry without a
 version, such as a library a platform manages, is no package. A `pkg:maven`
 package URL of an SBOM matches a change by `group:artifact`.
 
-A Maven build has no lockfile, so it has no dependency change. An SBOM the CI
-writes, with `cyclonedx-maven-plugin`, gives the licences and known
-vulnerabilities of a lockfile change, not the change itself.
+Maven has no lockfile, so a Maven build's dependency changes are the versions
+its POMs declare. Each POM the detector reads, the root `pom.xml` and the
+modules it lists, and a module `pom.xml` the change deletes, is read at the
+merge base and at the head. Its parent and each dependency of `dependencies`
+and `dependencyManagement`, in the project and in its profiles, give their
+`groupId:artifactId` at the version they state. `${project.version}`,
+`${project.parent.version}`, `${project.groupId}`, `${project.parent.groupId}`
+and the properties of the POM, of its profiles and of its parent POMs in the
+repository are resolved, a property that names another one included; the
+project's version and groupId default to its parent's. A BOM a
+`dependencyManagement` entry imports is a package at its version.
+
+A version property a parent POM defines and its modules use is a change of the
+parent: when `guava.version` moves in the root `pom.xml`, each module
+dependency whose version resolves only through it, such as `${guava.version}`,
+is a package of the root `pom.xml`, at the root's value on each side. The
+module's own POM lists the same dependency when the module changes. The other
+POMs are read from the head checkout: when a change bumps a parent's property
+and also edits how a module uses it, the module's dependency resolves at the
+head's value on both sides. A project property wins over a profile property of
+the same name, since which profile is active is not known.
+
+Left out:
+
+- a dependency without a version, such as one a parent or a BOM manages: the
+  change shows on the POM that states the version, when the repository holds
+  it;
+- a dependency whose name or version keeps a reference that neither the POM
+  nor its parent POMs in the repository resolve, such as a property of a
+  parent POM published elsewhere;
+- a dependency on, or a parent that is, a module of the repository;
+- the plugins and their dependencies.
+
+These versions are the ones the POM declares, not the ones Maven resolves: a
+version range stays as it is written, and a version a parent or a BOM changes
+without a POM of the repository changing does not show. The summary ends each
+such change with `declared`, and the pull request note marks its POM
+`(declared)`. An SBOM the CI writes, with `cyclonedx-maven-plugin`, lists the
+resolved versions and gives the licences and known vulnerabilities of a change
+it matches by `group:artifact`.
 
 ## Diagnostics
 

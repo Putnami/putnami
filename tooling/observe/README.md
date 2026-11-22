@@ -87,8 +87,8 @@ Bazel repository and their edges, from a `bazel query` export.
 See [doc/11-rush.md](doc/11-rush.md) for how it reads the projects, edges and
 lockfiles of a Rush monorepo.
 See [doc/12-jvm.md](doc/12-jvm.md) for how it reads the projects, modules and
-edges of a Gradle or Maven repository, Android included, and its JaCoCo
-coverage.
+edges of a Gradle or Maven repository, Android included, its JaCoCo
+coverage, and the versions its Gradle lockfiles and Maven POMs pin or declare.
 See [doc/13-swift.md](doc/13-swift.md) for how it reads the Swift packages,
 their targets and the Xcode projects of an iOS or Swift repository.
 See [doc/14-dart.md](doc/14-dart.md) for how it reads the packages and

@@ -74,6 +74,13 @@
       ]
     },
     {
+      "id": "bun-lockfiles",
+      "text": [
+        "A changed bun.lock, the text lockfile of Bun 1.2 and later, is a lockfile of ecosystem npm: each entry of packages gives the name and version its first member names, and workspace, link, file and root entries are left out.",
+        "A bun.lockb, Bun's binary lockfile, that the change adds or edits is not read and is the observe.lockfile_unsupported warning."
+      ]
+    },
+    {
       "id": "summary",
       "text": [
         "The detailed text summary (--details) lists the changed and dependent components: a dependent one names the components it depends on, a changed one the other changed components it reaches, directly or not.",

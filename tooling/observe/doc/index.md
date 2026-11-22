@@ -142,12 +142,13 @@ gives.
 
 | Lockfile | Ecosystem |
 |---|---|
-| `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock` | `npm` |
+| `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock` | `npm` |
 | Rush's `common/config/rush/pnpm-lock.yaml`, `npm-shrinkwrap.json` and `yarn.lock`, and subspace lockfiles | `npm` |
 | `composer.lock` | `composer` |
 | `go.mod` | `go` |
 | `uv.lock`, `poetry.lock`, and the Pants lockfiles `[python.resolves]` names | `pypi` |
 | `gradle.lockfile`, `settings-gradle.lockfile`, `gradle/libs.versions.toml` | `maven` |
+| `pom.xml`, the versions a Maven POM declares, marked declared | `maven` |
 | `Package.resolved` | `swift` |
 | `Podfile.lock` | `cocoapods` |
 | `pubspec.lock` | `pub` |
@@ -155,10 +156,11 @@ gives.
 | `Gemfile.lock` | `gem` |
 | `Cargo.lock` | `cargo` |
 
-Maven has no lockfile, and `bun.lock` is not read, so their dependency
-changes do not show. A dependency ecosystem can differ from the component's:
-a Gradle project is a `gradle` component whose dependencies are `maven`
-packages.
+Maven has no lockfile: its dependency changes are the versions its POMs
+declare, not the ones Maven resolves. `bun.lockb`, the binary lockfile of Bun
+before 1.2, is not read and says so in a diagnostic. A dependency ecosystem
+can differ from the component's: a Gradle project is a `gradle` component
+whose dependencies are `maven` packages.
 
 ### Software bills of materials
 
