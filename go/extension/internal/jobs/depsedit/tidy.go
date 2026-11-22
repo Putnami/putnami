@@ -37,12 +37,19 @@ func goWorkEnv(dir string) []string {
 // (withGoWorkReplaces). go.mod and go.sum take the tidied copy, without those
 // directives, only when tidy succeeds. It returns one line per go.work pin
 // the tidy read for a version no proxy serves, which the job reports.
-func tidyModule(j *workspacejob.Job, dir, goModPath string) ([]string, error) {
+//
+// keep names the modules an add required. tidy drops a requirement no package
+// of the module imports, so a module added before the code that imports it
+// would be gone from go.mod when the add reports success; keepDropped states
+// each one tidy dropped again, and tidyModule returns one line per module kept
+// that way.
+func tidyModule(j *workspacejob.Job, dir, goModPath string, keep []string) ([]string, error) {
 	goSumPath := filepath.Join(filepath.Dir(goModPath), "go.sum")
 	goMod, err := os.ReadFile(goModPath)
 	if err != nil {
 		return nil, err
 	}
+	kept := requiredVersionsOf(goModPath, goMod, keep)
 	unserved := func(candidates []module.Version) ([]module.Version, error) {
 		return unservedVersions(j, dir, candidates)
 	}
@@ -73,6 +80,17 @@ func tidyModule(j *workspacejob.Job, dir, goModPath string) ([]string, error) {
 		return nil, fmt.Errorf("go mod tidy: %w%s", err, workspacejob.OutputExcerpt(out))
 	}
 
+	kept, err = keepDropped(j, copyMod, copySum, kept)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range kept {
+		pins = append(pins, fmt.Sprintf("nothing imports %s yet: go.mod keeps %s as an indirect requirement; "+
+			"import one of its packages before the next putnami build, whose tidy drops a module nothing imports "+
+			"(and whose tidy check, the default under CI, fails on one)",
+			m.Path, m.Version))
+	}
+
 	tidied, err := os.ReadFile(copyMod)
 	if err != nil {
 		return nil, err
@@ -91,6 +109,162 @@ func tidyModule(j *workspacejob.Job, dir, goModPath string) ([]string, error) {
 		return nil, err
 	}
 	return pins, writeFileKeepingMode(goSumPath, sum)
+}
+
+// requiredVersionsOf returns the requirement goMod, read from goModPath,
+// states for each module of paths, in the order of paths. A module goMod does
+// not require, or a goMod that does not parse, gives none.
+func requiredVersionsOf(goModPath string, goMod []byte, paths []string) []module.Version {
+	if len(paths) == 0 {
+		return nil
+	}
+	file, err := modfile.Parse(goModPath, goMod, nil)
+	if err != nil {
+		return nil
+	}
+	var versions []module.Version
+	for _, path := range paths {
+		for _, require := range file.Require {
+			if require.Mod.Path == path {
+				versions = append(versions, require.Mod)
+				break
+			}
+		}
+	}
+	return versions
+}
+
+// keepDropped states again in copyMod, the tidied copy of the go.mod of the
+// module in dir, each module of added the tidy dropped, as an indirect
+// requirement, and returns those modules. It writes to copySum, the go.sum
+// beside copyMod, the checksums of the module's content and of its go.mod
+// (moduleSums), which a build of the code that later imports it reads.
+//
+// It runs no go get. go get loads the module graph and selects versions in
+// it: it raises the go directive, and a requested version below the one the
+// graph selects downgrades or drops the requirements that select it, which
+// the code may import. A requirement stated as it was asked changes no other
+// one: when the graph selects a newer version, the build uses that one.
+func keepDropped(j *workspacejob.Job, copyMod, copySum string, added []module.Version) ([]module.Version, error) {
+	if len(added) == 0 {
+		return nil, nil
+	}
+	tidied, err := os.ReadFile(copyMod)
+	if err != nil {
+		return nil, err
+	}
+	file, err := modfile.Parse(copyMod, tidied, nil)
+	if err != nil {
+		return nil, err
+	}
+	required := map[string]bool{}
+	for _, require := range file.Require {
+		required[require.Mod.Path] = true
+	}
+	var dropped, downloads []module.Version
+	for _, m := range added {
+		if required[m.Path] {
+			continue
+		}
+		dropped = append(dropped, m)
+		file.AddNewRequire(m.Path, m.Version, true)
+		// A directory replace has no checksum; a module version replace has
+		// the checksums of the version that replaces it.
+		source := m
+		for _, replace := range file.Replace {
+			if replace.Old.Path == m.Path && (replace.Old.Version == "" || replace.Old.Version == m.Version) {
+				source = replace.New
+				break
+			}
+		}
+		if source.Version != "" {
+			downloads = append(downloads, source)
+		}
+	}
+	if len(dropped) == 0 {
+		return nil, nil
+	}
+	sums, err := moduleSums(j, downloads)
+	if err != nil {
+		return nil, err
+	}
+	file.Cleanup()
+	formatted, err := file.Format()
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(copyMod, formatted, 0o600); err != nil {
+		return nil, err
+	}
+	if len(sums) == 0 {
+		return dropped, nil
+	}
+	existing, err := os.ReadFile(copySum)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	// The lines go.sum holds keep their order; each missing one is appended.
+	have := map[string]bool{}
+	for line := range strings.Lines(string(existing)) {
+		have[strings.TrimRight(line, "\r\n")] = true
+	}
+	content := string(existing)
+	if content != "" && !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+	for _, line := range sums {
+		if !have[line] {
+			have[line] = true
+			content += line + "\n"
+		}
+	}
+	return dropped, os.WriteFile(copySum, []byte(content), 0o600)
+}
+
+// moduleSums returns the go.sum lines of each module version of versions: the
+// checksum of its content and of its go.mod, from one `go mod download -json`.
+// It runs in an empty directory with GOWORK=off, outside any module, so it
+// reads no go.mod and writes no go.sum, and fetches what the module proxy
+// serves for those exact versions.
+func moduleSums(j *workspacejob.Job, versions []module.Version) ([]string, error) {
+	if len(versions) == 0 {
+		return nil, nil
+	}
+	empty, err := os.MkdirTemp("", "putnami-sums-")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = os.RemoveAll(empty) }()
+	args := []string{"-C", empty, "mod", "download", "-json"}
+	for _, v := range versions {
+		args = append(args, v.Path+"@"+v.Version)
+	}
+	out, errOut, err := j.Split([]string{"GOWORK=off"}, j.GoBinary, args...)
+	if err != nil && strings.TrimSpace(out) == "" {
+		return nil, fmt.Errorf("go mod download: %w%s", err, workspacejob.OutputExcerpt(errOut))
+	}
+	var sums []string
+	for decoder := json.NewDecoder(strings.NewReader(out)); decoder.More(); {
+		var downloaded struct {
+			Path, Version, Sum, GoModSum, Error string
+		}
+		if err := decoder.Decode(&downloaded); err != nil {
+			return nil, fmt.Errorf("go mod download: read the go output: %w", err)
+		}
+		if downloaded.Error != "" {
+			return nil, fmt.Errorf("go mod download: %s@%s: %s", downloaded.Path, downloaded.Version, downloaded.Error)
+		}
+		if downloaded.Sum == "" || downloaded.GoModSum == "" {
+			return nil, fmt.Errorf("go mod download: no checksum for %s@%s", downloaded.Path, downloaded.Version)
+		}
+		sums = append(sums,
+			downloaded.Path+" "+downloaded.Version+" "+downloaded.Sum,
+			downloaded.Path+" "+downloaded.Version+"/go.mod "+downloaded.GoModSum)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("go mod download: %w%s", err, workspacejob.OutputExcerpt(errOut))
+	}
+	return sums, nil
 }
 
 // withGoWorkReplaces returns goMod, the go.mod of the module in dir read from

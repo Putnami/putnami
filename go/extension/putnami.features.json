@@ -1198,6 +1198,19 @@
           }
         },
         {
+          "id": "deps-add-keeps-a-module-nothing-imports-yet",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "add-keeps-a-module-nothing-imports-yet-and-says-so"
+            ]
+          }
+        },
+        {
           "id": "deps-tidy-resolves-as-the-workspace-does",
           "stage": "coded",
           "evidenceKinds": [

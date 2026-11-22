@@ -5,7 +5,8 @@
   "outcomes": [
     "putnami deps add, deps remove and deps prune edit a Go module's requirements through the Go extension, so the core CLI runs no go command for them",
     "An edit succeeds on a module that requires a version no proxy serves, and tidies the module as the workspace build resolves it",
-    "A module of the workspace is added before it is published, from its source in the tree"
+    "A module of the workspace is added before it is published, from its source in the tree",
+    "A module is added before any code imports it, and stays in go.mod until a later tidy finds no import of it"
   ],
   "nonGoals": [
     "Editing putnami.json or choosing the projects prune drops, which the core CLI does",
@@ -38,6 +39,15 @@
         "It installs none.",
         "With no go, it edits nothing and emits one error naming putnami install.",
         "A hosted run, whose dependencies are offline, is refused."
+      ]
+    },
+    {
+      "id": "deps-add-keeps-a-module-nothing-imports-yet",
+      "text": [
+        "When the tidy of an add drops a module the add required because nothing imports it yet, deps-edit states it again as indirect in the tidied go.mod and writes its go mod download checksums to go.sum.",
+        "No other requirement and no go directive changes.",
+        "The summary the CLI always prints names each module kept that way and says that a tidy drops it until code imports it.",
+        "A dry run reports the same requirement and the same line."
       ]
     },
     {

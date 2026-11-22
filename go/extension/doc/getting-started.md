@@ -481,6 +481,25 @@ steps in this extension, as two lifecycle jobs
   requirement and `replace` directive that would be added, dropped or changed,
   and the number of `go.sum` lines, and writes no file.
 
+#### Adding a module before the code that imports it
+
+The usual order is to add a module, then write the code that imports it.
+`go mod tidy` drops a requirement no package of the module imports, so after
+the tidy, `deps add` states each module it added and the tidy dropped again,
+as `// indirect`, and writes its checksums from `go mod download` to `go.sum`.
+It runs no `go get`, so no other requirement and no `go` directive changes.
+The command says so:
+
+```text
+nothing imports go.putnami.dev/database yet: go.mod keeps v0.4.0 as an indirect requirement; import one of its packages before the next putnami build, whose tidy drops a module nothing imports (and whose tidy check, the default under CI, fails on one)
+```
+
+Write the import before the next `putnami build`, and commit `go.mod` with
+that code: the build's tidy then keeps the module and marks it direct. A local
+build that runs first drops the module, and `putnami deps add` adds it again;
+a build with `--tidy=false`, the default when `CI` is set, fails its tidy
+check on it.
+
 #### Adding a workspace module
 
 A module of the workspace does not need to be published before another one

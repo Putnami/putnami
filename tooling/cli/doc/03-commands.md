@@ -1064,7 +1064,9 @@ whose extensions declare no `deps-edit` job is refused, and the error names its
 extensions. `add <module>@none` is a usage error before any job runs, and the
 error names `putnami deps remove <module>`. With `--dry-run`, they hand the job
 the param `dry-run`, and the job prints the planned edit and writes no file. `@putnami/go` declares the job: it edits `go.mod` and tidies the
-module, without `go get`, with the Go the workspace lock pins. Under `--dry-run`
+module, without `go get`, with the Go the workspace lock pins. A module the add
+required that nothing imports yet stays in `go.mod` as `// indirect`, and the
+command says so; the next tidy drops it unless code imports it by then. Under `--dry-run`
 it makes the edit and the tidy on a copy of `go.mod` and `go.sum`, and prints
 each requirement that would change. When that Go is
 missing, the error names `putnami install`. See
