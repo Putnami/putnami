@@ -1,5 +1,37 @@
 import postgres from 'postgres';
 
+/**
+ * The text PostgreSQL sends for a finite `timestamp` (without time zone) under
+ * its default ISO DateStyle: `YYYY-MM-DD HH:MM:SS[.ffffff][ BC]`, the year
+ * four digits or more.
+ */
+const TIMESTAMP_TEXT = /^(\d{4,})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?( BC)?$/;
+
+/**
+ * Reads a `timestamp` (without time zone) value as a UTC wall clock.
+ *
+ * `serialize` writes the UTC wall clock, so the read takes the stored clock as
+ * UTC too. `new Date(text)` would take the space-separated form as the local
+ * time of the process and shift every value by the host's offset whenever TZ
+ * is not UTC. The Go adapter (pgx) reads `timestamp` as UTC the same way.
+ *
+ * The date is built from its fields rather than from a rewritten string, so a
+ * five-digit year and a BC year (year 1 BC is year 0) read as well. Fractional
+ * seconds are truncated to the millisecond a `Date` holds. `infinity` and
+ * `-infinity` have no `Date` and read as an Invalid Date, as they do for
+ * `date` and `timestamptz`.
+ */
+function parseTimestamp(text: string): Date {
+  const match = TIMESTAMP_TEXT.exec(text);
+  if (!match) return new Date(Number.NaN);
+  const [, year, month, day, hours, minutes, seconds, fraction = '', bc] = match;
+  const date = new Date(0);
+  // setUTCFullYear, unlike Date.UTC, does not read years 0 to 99 as 1900 to 1999.
+  date.setUTCFullYear(bc ? 1 - Number(year) : Number(year), Number(month) - 1, Number(day));
+  date.setUTCHours(Number(hours), Number(minutes), Number(seconds), Number(fraction.padEnd(3, '0').slice(0, 3)));
+  return date;
+}
+
 export const TYPES = {
   bigint: postgres.BigInt,
   numeric: {
@@ -26,7 +58,7 @@ export const TYPES = {
   timestamp: {
     to: 1114,
     from: [1114],
-    parse: (x: string) => new Date(x),
+    parse: parseTimestamp,
     serialize: (x: Date | number) => {
       const date = x instanceof Date ? x : new Date(x);
       return date?.toISOString().replace('Z', '');
