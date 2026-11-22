@@ -55,7 +55,7 @@ The install needs the network: when the installer or the registry cannot be reac
 
 `putnami observe` reads the checkout and the reports on the machine that runs it. Without `--upload` or `--open`, nothing about the change leaves that machine: it prints the summary and writes the evidence document where `--evidence` names it, and your CI keeps that file as an artifact. Its only other network use is Git, which fetches from your `origin` remote the history the base of the change needs, deepening a shallow clone.
 
-`--open` uploads too. With either flag, `putnami observe` first asks the GitHub or GitLab API for the repository's numeric id when it runs outside a CI, with `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` when one is set; GitHub Actions and GitLab CI state that id themselves. It then hands the evidence document to the `@putnami/cloud` extension, which sends Putnami Cloud these fields, with `PUTNAMI_CLOUD_TOKEN`, the short-lived token a GitHub Actions job gets for its own ID token, or your signed-in session as the credential. That GitHub Actions job first sends its ID token, signed by GitHub and naming the repository, its owner, the workflow, the ref and the actor that started the run, with your organization's id to `auth.putnami.cloud`. The evidence then carries:
+`--open` uploads too. With either flag, `putnami observe` first asks the GitHub or GitLab API for the repository's numeric id when it runs outside a CI or in a CI other than GitHub Actions and GitLab CI, with `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` when one is set; GitHub Actions and GitLab CI state that id themselves. It then hands the evidence document to the `@putnami/cloud` extension, which sends Putnami Cloud these fields, with `PUTNAMI_CLOUD_TOKEN`, the short-lived token a GitHub Actions job gets for its own ID token, or your signed-in session as the credential. That GitHub Actions job first sends its ID token, signed by GitHub and naming the repository, its owner, the workflow, the ref and the actor that started the run, with your organization's id to `auth.putnami.cloud`. The evidence then carries:
 
 | Part | Fields |
 |---|---|
@@ -347,9 +347,9 @@ Rename `test` in `needs` if your test job has another name. The image holds Bash
 
 #### Another CI
 
-Jenkins, CircleCI, Buildkite, Azure Pipelines and Bitbucket Pipelines run the same lines at the end of the job that runs your tests, so the reports are still in the checkout. Each snippet runs them when a test fails too. These CIs name no base, so each passes `--base`: the target branch of the pull request when the CI names it, else `main`; put your default branch in its place.
+Jenkins, CircleCI, Buildkite, Azure Pipelines and Bitbucket Pipelines run the same lines at the end of the job that runs your tests, so the reports are still in the checkout. Each snippet runs them when a test fails too. These CIs name no base, so each passes `--base`: on Jenkins, Buildkite and Bitbucket Pipelines the target branch of the pull request the CI names, else `main`; on CircleCI and Azure Pipelines, `main`. Put your default branch in its place. `putnami observe` fetches that branch from `origin` when the checkout lacks it, so the checkout must keep its Git credentials for a private repository: on Azure Pipelines, set `persistCredentials: true` on the `checkout` step; on Jenkins, check out over SSH or with a credential the workspace keeps.
 
-With `--upload`, `putnami observe` reads the repository from the `origin` remote, as on a laptop, and asks GitHub or GitLab for its numeric id: the key a GitHub Actions or GitLab CI job of the same repository sends. For a private repository, also give the job `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN`, a token that reads the repository; without one, the summary names the token to set and nothing is uploaded. Store `PUTNAMI_CLOUD_TOKEN`, from [step 6](#6-upload-the-evidence-to-putnami-cloud), as a secret of the CI. Without it, drop `--upload`: the job prints the summary and writes the evidence document.
+With `--upload`, `putnami observe` reads the repository from the `origin` remote, as on a laptop, and asks GitHub or GitLab for its numeric id: the key a GitHub Actions or GitLab CI job of the same repository sends. Also give the job `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN`, a token that reads the repository: a private repository needs it, and a public one avoids the GitHub limit on calls without a token, which shared CI runners reach. Without an answer, the summary names the token to set and nothing is uploaded. Store `PUTNAMI_CLOUD_TOKEN`, from [step 6](#6-upload-the-evidence-to-putnami-cloud), as a secret of the CI. Without it, drop `--upload`: the job prints the summary and writes the evidence document.
 
 Jenkins, in the `post` section of the stage that runs your tests, with the token stored as the secret text credential `putnami-cloud-token`:
 
@@ -386,19 +386,19 @@ CircleCI, as the last steps of the job that runs your tests, with `PUTNAMI_CLOUD
           path: observe-evidence.json
 ```
 
-Buildkite, at the end of the `command` of the step that runs your tests, with `PUTNAMI_CLOUD_TOKEN` exposed to the step by your secrets plugin or agent hook. Your test command records its exit status in `status` instead of stopping the step, so the lines run when a test fails, and the step ends with that status:
+Buildkite, at the end of the `command` of the step that runs your tests, with `PUTNAMI_CLOUD_TOKEN` exposed to the step by your secrets plugin or agent hook. Your test command records its exit status in `status` instead of stopping the step, so the lines run when a test fails, and the step ends with that status. `buildkite-agent pipeline upload` replaces each `$VAR` when it uploads the pipeline, so each variable the step reads when it runs is written `$$VAR`:
 
 ```yaml
 steps:
   - label: ":test_tube: Test"
     command: |
-      your-test-command && status=0 || status=$?
+      your-test-command && status=0 || status=$$?
       curl -fsSL https://putnami.dev/install.sh | bash
-      export PATH="$HOME/.putnami/bin:$PATH"
+      export PATH="$$HOME/.putnami/bin:$$PATH"
       putnami extensions install --user @putnami/observe
       putnami extensions install --user @putnami/cloud
-      putnami observe --base "${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-main}" --evidence observe-evidence.json --upload
-      exit "$status"
+      putnami observe --base "$${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-main}" --evidence observe-evidence.json --upload
+      exit "$$status"
     artifact_paths:
       - observe-evidence.json
 ```

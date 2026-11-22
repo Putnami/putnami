@@ -59,7 +59,7 @@ Every tool below is read from files. A tool that is not listed is not read.
 |---|---|---|
 | GitHub Actions | `GITHUB_*` variables and the event payload | `GITHUB_TOKEN`, with `statuses: write` and `pull-requests: write` |
 | GitLab CI, GitLab.com and self-managed | `CI_*` variables | `PUTNAMI_GITLAB_TOKEN`, a project access token with the `api` scope and the Developer role |
-| Any other CI | Nothing: name the base with `--base` | Nothing |
+| Any other CI | Nothing: name the base with `--base`; with `--upload` or `--open`, the `origin` remote keys the repository | Nothing |
 
 Git 2.29 or later is required.
 

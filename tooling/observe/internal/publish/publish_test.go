@@ -431,6 +431,19 @@ func TestOutsideAChangeRequestNothingIsPublished(t *testing.T) {
 			}
 		})
 	}
+	// Another CI keyed by its origin remote reads no pull request: the
+	// reason names the CI, not a missing pull request.
+	jenkins := pullRequest()
+	jenkins.CI = ci.Run{System: evidence.CISystemJenkins}
+	jenkins.Subject.ChangeRequest = nil
+	env := map[string]string{"JENKINS_URL": "https://jenkins.example.com/"}
+	for k, v := range githubEnv {
+		env[k] = v
+	}
+	diags, _, _ := publish(t, "none.json", jenkins, env)
+	if len(diags) != 1 || diags[0].Code != CodeSkipped || !strings.Contains(diags[0].Message, "neither GitHub Actions nor GitLab CI") {
+		t.Fatalf("another CI: diagnostics %v", diags)
+	}
 }
 
 func TestARefusedCallIsADiagnostic(t *testing.T) {
