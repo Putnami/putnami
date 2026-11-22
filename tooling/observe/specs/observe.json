@@ -101,9 +101,9 @@
     {
       "id": "ci-repository-key",
       "text": [
-        "In a CI other than GitHub Actions and GitLab CI (Jenkins, CircleCI, Buildkite, Azure Pipelines, Bitbucket Pipelines, TeamCity or a generic CI), a run with --upload or --open reads the subject from the origin remote as a laptop run does, and asks the code host API for the numeric project id with GITHUB_TOKEN or PUTNAMI_GITLAB_TOKEN when set;",
-        "an id the API does not answer is a diagnostic that names the token.",
-        "The CI system and its run stay as detected. A run without --upload or --open asks the code host nothing."
+        "In a CI other than GitHub Actions and GitLab CI (Jenkins, CircleCI, Buildkite, Azure Pipelines, Bitbucket Pipelines, TeamCity or generic), a run with --upload or --open reads the subject from the origin remote as a laptop run does,",
+        "with the numeric project id from the code host API and GITHUB_TOKEN or PUTNAMI_GITLAB_TOKEN when set; an id the API does not answer is a diagnostic that names the token.",
+        "The CI run stays as detected. Without --upload or --open, nothing is asked."
       ]
     },
     {
