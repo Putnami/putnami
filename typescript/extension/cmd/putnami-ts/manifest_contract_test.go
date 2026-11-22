@@ -572,7 +572,8 @@ const typeScriptFeatureEvidencePath = ".gen/schema/feature-evidence/typescript-f
 // TestGenerateIsSourceBound pins the cache policy of the task that writes the
 // TypeScript feature evidence. The evidence names the project's source
 // binding, which covers every project file, while the task's key reads
-// source and hook implementations, public assets and package configuration.
+// source and hook implementations, the public/ folders of its dependency
+// closure and package configuration.
 // The policy declares sourceBound (CLI ADR
 // 0069): the CLI stores and looks up the entry at a key that also binds the
 // binding, and an entry serves only at the binding its evidence names. The
@@ -632,6 +633,34 @@ func TestGenerateKeysHookImplementationAndPropagatesIt(t *testing.T) {
 	}
 	if pipelines == 0 {
 		t.Fatal("no pipeline runs build-generate")
+	}
+}
+
+// TestGenerateKeysPublicAcrossTheDependencyClosure pins where the generate key
+// reads the files a staticFiles scan stages. The @putnami/application hook
+// copies a scan root into .gen/public/, and a library may hold that root, so
+// the key reads public/ in every project of the dependency closure, the
+// generated project included, not in the generated project alone. A
+// library's other files reach the key through no input: a dependency's key
+// carries its code, not its folders, so a scan root elsewhere is refused by
+// the plugin instead (typescript/http-services#static-scan-root).
+func TestGenerateKeysPublicAcrossTheDependencyClosure(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "generate-keys-closure-public", "the-generate-key-reads-public-across-the-dependency-closure")
+	m := loadExtensionManifest(t)
+	generate, ok := m.Tasks["build-generate"]
+	if !ok {
+		t.Fatal("manifest task \"build-generate\" is missing")
+	}
+	const publicTree = "public/**/*"
+	key := proto.DeriveTaskCacheKey(generate.Inputs)
+	if !slices.Contains(key.ClosureFiles, publicTree) {
+		t.Errorf("generate closure key files = %v, want %q so a library's public/ moves the key", key.ClosureFiles, publicTree)
+	}
+	if slices.Contains(key.Files, publicTree) {
+		t.Errorf("generate key files = %v also name %q; the closure input already reads the project's own public/", key.Files, publicTree)
+	}
+	if got := proto.RequiredCLIContract(m); got > m.CLIContract {
+		t.Errorf("the manifest is stamped %d and requires %d", m.CLIContract, got)
 	}
 }
 
