@@ -21,7 +21,9 @@ putnami deploy putnami.dev
 The committed `infra/runtime.json` declares the Putnami Cloud runtime and
 public custom domain access used by `putnami deploy` planning. During build,
 TypeScript/Bun runtime compatibility adds `runtime.protocols.http2: false` to
-the aggregated deploy manifest because Bun does not serve h2c today.
+the aggregated deploy manifest, so the platform keeps speaking HTTP/1.1 to the
+container. The server also accepts cleartext HTTP/2 with prior knowledge, but
+turning end-to-end HTTP/2 on for TypeScript workloads is a separate decision.
 The project package options set the Docker container port to 8080, which the
 runtime receives as `PORT`.
 

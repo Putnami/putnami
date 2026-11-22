@@ -436,7 +436,10 @@ export function buildDuplexRpcHandler(
     const useBinaryRequest = streamMediaType === CT_CONNECT_STREAM_PROTO;
     const acceptHeader = ctx.headers.get('accept') ?? contentType;
     const useBinaryResponse = acceptContains(acceptHeader, CT_PROTO, CT_CONNECT_STREAM_PROTO);
-    const useGzip = compressionEnabled && clientAcceptsGzip(ctx.headers);
+    // A stream compresses per message, and only for a caller that names gzip
+    // in Connect-Accept-Encoding: Accept-Encoding speaks for the whole body,
+    // which a stream never compresses.
+    const useGzip = compressionEnabled && /\bgzip\b/.test(ctx.headers.get(CONNECT_ACCEPT_ENCODING_HEADER) ?? '');
     const responseHeaders: Record<string, string> = {
       'Content-Type': useBinaryResponse ? CT_CONNECT_STREAM_PROTO : CT_CONNECT_STREAM_JSON,
       ...connectResponseHeaders(),

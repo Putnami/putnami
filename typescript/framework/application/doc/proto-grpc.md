@@ -125,17 +125,19 @@ Routes are grouped into services by their first path segment:
 
 Stream endpoints map directly to gRPC streaming RPCs in the generated proto:
 
-| Stream mode | gRPC equivalent | Connect (HTTP/1.1) | WebSocket |
-|---|---|---|---|
-| `server` | `returns (stream Response)` | **Supported** — Connect envelope framing | Supported |
-| `client` | `stream Request returns (Response)` | `UNIMPLEMENTED` (status 12) | **Supported** |
-| `bidirectional` | `stream Request returns (stream Response)` | `UNIMPLEMENTED` (status 12) | **Supported** |
+| Stream mode | gRPC equivalent | Connect (HTTP/1.1) | Connect (HTTP/2) | WebSocket |
+|---|---|---|---|---|
+| `server` | `returns (stream Response)` | **Supported** — Connect envelope framing | **Supported** | Supported |
+| `client` | `stream Request returns (Response)` | `UNIMPLEMENTED` (status 12) | **Supported** | **Supported** |
+| `bidirectional` | `stream Request returns (stream Response)` | `UNIMPLEMENTED` (status 12) | **Supported** | **Supported** |
 
-**Why client/bidirectional streaming doesn't work over Connect:** The Connect protocol runs on HTTP/1.1. Server streaming works because the server can send a chunked response with multiple envelope frames. But client streaming requires the client to send multiple messages in a single request body, which HTTP/1.1 POST does not support — it expects a single, complete request body. HTTP/2 framing would solve this, but `Bun.serve` — the framework's transport — still operates on HTTP/1.1 as of Bun 1.4 (Bun does not yet serve HTTP/2; Bun 1.4 fixed the `node:http2` *server*, which the framework does not use). Calling a client/bidi RPC on the Connect route answers a clean gRPC status 12 `UNIMPLEMENTED` pointing at the WebSocket transport.
+**Client and bidirectional streaming over Connect need HTTP/2.** The HTTP server accepts cleartext HTTP/2 from a client that opens with the HTTP/2 preface (h2c, prior knowledge), on the same port as HTTP/1.1 and WebSocket upgrades. Over HTTP/2 the request body is read as it arrives: each request envelope's `body` section is one message for `ctx.messages()`, the first envelope carries `params` and `query`, and the response is written as the handler sends, ending with one end-of-stream message. A bidirectional stream answers while the caller still sends; a client stream answers its returned value as its one message.
+
+Over HTTP/1.1 a POST carries a single, complete request body, so the same RPC answers a clean gRPC status 12 `UNIMPLEMENTED` naming HTTP/2 and the WebSocket transport. The server reads a request as HTTP/1.1 when it carries `Content-Length`, `Transfer-Encoding` or a connection-specific header HTTP/2 forbids; a streaming HTTP/2 caller sends none of them. `fetch` speaks only HTTP/1.1 in cleartext: a TypeScript caller uses `ConnectTransport.duplex()` from `@putnami/client`, which opens a `node:http2` session.
 
 **The WebSocket bridge:** All three streaming modes work over WebSocket using the same `endpoint()` + `Stream()` definition. The framework automatically serves the endpoint over the right transport:
 
-- **gRPC clients** connect via `POST /{package}.{Service}/{Method}` (server streaming only)
+- **Connect clients** connect via `POST /{package}.{Service}/{Method}` (server streaming on HTTP/1.1, all streaming modes on HTTP/2)
 - **WebSocket clients** connect via `ws://host/{path}` (all streaming modes)
 - **SSE clients** connect via `GET /{path}` with `Accept: text/event-stream` (server streaming only)
 
@@ -333,9 +335,9 @@ The gRPC plugin wraps each `ctx.send()` call in a Connect envelope frame:
 The six most significant bits are reserved: a conforming peer never sets them,
 and this provider refuses a request frame that does.
 
-#### Client streaming — WebSocket only
+#### Client streaming — Connect over HTTP/2, or WebSocket
 
-Client streaming requires the client to send multiple messages in a single connection. HTTP/1.1 POST expects a single request body, so **Connect cannot carry client streams**. Use WebSocket directly:
+Client streaming requires the client to send multiple messages in a single request. Connect carries it over HTTP/2; HTTP/1.1 POST expects a single request body, so over HTTP/1.1 use WebSocket:
 
 ```typescript
 // src/api/upload/ws.ts
@@ -376,9 +378,9 @@ ws.onmessage = (e) => {
 };
 ```
 
-**What happens on the gRPC side:** The proto file still declares `rpc SendUpload(stream ...)` so external gRPC clients generated from your proto know the method exists and its types. However, calling it over Connect HTTP/1.1 answers gRPC status 12 `UNIMPLEMENTED`. The proto serves as documentation of the interface — the actual transport is WebSocket.
+**What happens on the Connect side:** The proto file declares `rpc SendUpload(stream ...)`, and a Connect client over HTTP/2 calls it with the same handler. Over HTTP/1.1 it answers gRPC status 12 `UNIMPLEMENTED`.
 
-#### Bidirectional streaming — WebSocket only
+#### Bidirectional streaming — Connect over HTTP/2, or WebSocket
 
 Bidirectional streaming is the same pattern but with `Stream()` on both body and returns:
 
@@ -438,10 +440,10 @@ Schema validation happens on every incoming message. Invalid messages are reject
 | Question | Answer |
 |---|---|
 | **Server pushes data, client just listens?** | Use `returns(Stream(...))`. Works on gRPC, SSE, and WebSocket. |
-| **Client sends a stream, server responds once?** | Use `body(Stream(...))`. WebSocket only. |
-| **Both sides send messages?** | Use `body(Stream(...))` + `returns(Stream(...))`. WebSocket only. |
-| **Need cross-language gRPC clients?** | Server streaming works. For client/bidi, share the `.proto` for type documentation and use WebSocket for the actual transport. |
-| **Will HTTP/2 fix this?** | Yes. When `Bun.serve` gains HTTP/2 (still pending as of Bun 1.4), the Connect protocol can carry all streaming modes natively. The same handlers will work without changes. Bun 1.4 did make the `node:http2` server solid enough for `@grpc/grpc-js`/ConnectRPC, so a native-gRPC sidecar server on a dedicated port is now feasible as a separate feature. |
+| **Client sends a stream, server responds once?** | Use `body(Stream(...))`. Connect over HTTP/2, or WebSocket. |
+| **Both sides send messages?** | Use `body(Stream(...))` + `returns(Stream(...))`. Connect over HTTP/2, or WebSocket. |
+| **Need cross-language Connect clients?** | Every streaming mode works over HTTP/2 (h2c with prior knowledge in cleartext); server streaming also works over HTTP/1.1. |
+| **Native gRPC (`application/grpc`)?** | Not served: Connect ends a stream with an end-of-stream message in the body, while native gRPC needs HTTP trailers. |
 
 ### Health check
 
