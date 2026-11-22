@@ -3,6 +3,8 @@ package inject
 import (
 	"context"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func childCount(c *Container) int {
@@ -11,9 +13,27 @@ func childCount(c *Container) int {
 	return len(c.children)
 }
 
+// registerClosing registers a value in c whose close hook appends name to
+// closed, and builds it so the hook runs.
+func registerClosing(t *testing.T, c *Container, name string, closed *[]string) {
+	t.Helper()
+	token := Named[string](name)
+	if err := c.Register(Provide(token, func(Resolver) (any, error) { return name, nil }, WithOnClose(func() error {
+		*closed = append(*closed, name)
+		return nil
+	}))); err != nil {
+		t.Fatalf("register %s: %v", name, err)
+	}
+	if _, err := c.Get(token); err != nil {
+		t.Fatalf("resolve %s: %v", name, err)
+	}
+}
+
 // A closed child leaves its parent, so a parent that outlives many short-lived
 // children (one scope per request) does not retain them.
 func TestClosedChildLeavesParent(t *testing.T) {
+	spectest.Proves(t, "go/dependency-injection", "cleanup", "closed-child-leaves-parent")
+
 	root := NewContainer("root", nil)
 	first := root.CreateChild("first")
 	second := root.CreateChild("second")
@@ -40,25 +60,19 @@ func TestClosedChildLeavesParent(t *testing.T) {
 	}
 }
 
-// A parent that closes still closes the children that are open, and ends with
-// none.
-func TestParentCloseClosesOpenChildren(t *testing.T) {
+// A parent that closes closes the children still open, once each, and a child
+// closed earlier is not closed again.
+func TestParentCloseClosesOpenChildrenOnly(t *testing.T) {
 	root := NewContainer("root", nil)
 	var closed []string
-	for _, name := range []string{"a", "b"} {
-		child := root.CreateChild(name)
-		token := Named[string](name)
-		if err := child.Register(Provide(token, func(Resolver) (any, error) { return name, nil }, WithOnClose(func() error {
-			closed = append(closed, name)
-			return nil
-		}))); err != nil {
-			t.Fatalf("register %s: %v", name, err)
-		}
-		if _, err := child.Get(token); err != nil {
-			t.Fatalf("resolve %s: %v", name, err)
-		}
-	}
+	a := root.CreateChild("a")
+	registerClosing(t, a, "a", &closed)
+	b := root.CreateChild("b")
+	registerClosing(t, b, "b", &closed)
 
+	if err := a.Close(); err != nil {
+		t.Fatalf("close a: %v", err)
+	}
 	if err := root.Close(); err != nil {
 		t.Fatalf("close root: %v", err)
 	}
@@ -70,8 +84,33 @@ func TestParentCloseClosesOpenChildren(t *testing.T) {
 	}
 }
 
+// A child whose close hook panics still leaves its parent.
+func TestChildLeavesParentWhenCloseHookPanics(t *testing.T) {
+	root := NewContainer("root", nil)
+	child := root.CreateChild("child")
+	token := Named[string]("boom")
+	if err := child.Register(Provide(token, func(Resolver) (any, error) { return "boom", nil }, WithOnClose(func() error {
+		panic("close hook failed")
+	}))); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if _, err := child.Get(token); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = child.Close()
+	}()
+	if got := childCount(root); got != 0 {
+		t.Fatalf("children after a panicking close = %d, want 0", got)
+	}
+}
+
 // Every scope a started context creates is gone from its root once closed.
 func TestScopesDoNotAccumulateOnRoot(t *testing.T) {
+	spectest.Proves(t, "go/dependency-injection", "cleanup", "closed-child-leaves-parent")
+
 	cc := NewContainerContext("app")
 	if err := cc.Start(); err != nil {
 		t.Fatalf("start: %v", err)

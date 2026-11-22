@@ -275,6 +275,10 @@ func (c *Container) Close() error {
 	built := c.builtKeysLocked()
 	c.mu.Unlock()
 
+	// Leave the parent even when a close hook panics: the container is already
+	// marked closed, so the parent would otherwise skip it and keep it forever.
+	defer c.detachFromParent()
+
 	// Close children first
 	var errs []error
 	for _, child := range children {
@@ -285,8 +289,6 @@ func (c *Container) Close() error {
 
 	errs = append(errs, runCloseHooks(hooks, built)...)
 
-	c.detachFromParent()
-
 	if len(errs) > 0 {
 		return newValidationError(errs)
 	}
@@ -296,7 +298,7 @@ func (c *Container) Close() error {
 // detachFromParent removes a closed container from its parent's children, so
 // a parent that outlives its children, such as a root that opens one scope per
 // request, does not retain them. The remaining children keep their creation
-// order. The caller must not hold c.mu.
+// order. The caller must not hold the parent's lock.
 func (c *Container) detachFromParent() {
 	p := c.parent
 	if p == nil {
