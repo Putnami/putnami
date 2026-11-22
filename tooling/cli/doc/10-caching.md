@@ -172,9 +172,9 @@ configuration file or an executable bit, moves the digest and misses the cache.
 
 The digest does not decide which files a task reads, so documentation counts
 like any other file. Any byte of the installed archive moves the digest,
-including `README.md`, `AI.md` and the framework docs the Go extension bundles
-under `framework-docs/`. A build that changes only documentation misses the
-cache for every task of the extension.
+including `README.md`, `AI.md`, the `doc/` and `specs/` trees, and the
+framework docs the Go extension bundles under `framework-docs/`. A build that
+changes only documentation misses the cache for every task of the extension.
 
 A runtime binary that embeds its version or its commit moves the digest at
 every build. The Go and TypeScript extension runtimes are built without a

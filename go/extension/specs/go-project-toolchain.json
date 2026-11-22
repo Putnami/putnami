@@ -280,6 +280,14 @@
       ]
     },
     {
+      "id": "archive-guidance-is-self-contained",
+      "text": [
+        "An extension archive ships the project's doc and specs trees beside its README.md and AI.md, so a relative link of the archive's root README.md or AI.md names a file the installed archive carries.",
+        "Packaging warns, naming the file and the target, for each relative link of the archive's root README.md or AI.md that does not resolve inside the staged archive.",
+        "Only the @putnami/go archive bundles the Go framework guidance under framework-docs; no other extension archive carries it."
+      ]
+    },
+    {
       "id": "go-ecosystem-profile",
       "text": [
         "The extension owns go and uses oci.",

@@ -1,18 +1,21 @@
-// Package testprovider is the first slice of the Putnami cross-language test
+// Package testprovider is the Go half of the Putnami cross-language test
 // database provider. It turns a canonical test binding
 // (go.putnami.dev/protocol/database TestBinding) into ready-to-use, isolated,
-// migrated databases for one or more named datasources — the Go half of the
-// uniform Go/TS test-DB contract.
+// migrated databases for one or more named datasources — the uniform Go/TS
+// test-DB contract.
 //
-// The slice targets an externally provided Postgres (CI's service container or
-// a developer's local server) selected by mode=require: the deploy/test
-// environment injects a TestBinding via DATABASE_TEST_BINDINGS, the provider
-// creates an isolated database (or schema) per datasource, applies the
-// workload's published migration bundle with the existing machinery
-// (database.ApplyBundle), sets the owning schema as the search_path, and hands
-// back a runtime Binding the framework adapter consumes through
-// database.PoolConfigFromBinding. Docker auto-provisioning (mode=auto) and
-// migrated-template reuse are later slices.
+// The provider connects to the Postgres server the binding names; it starts
+// none itself. `putnami test` hands it the binding through
+// DATABASE_TEST_BINDINGS: an externally set one always wins, such as CI's
+// service container. Otherwise, when the project declares a database in
+// infra/requirements.json, the test-env-up step of a local run (--infra auto,
+// the default off CI) starts a throwaway Postgres (a Docker container when a
+// Docker daemon answers, the PostgreSQL installed on the machine otherwise)
+// and injects its binding; on CI (require) it starts nothing. The provider creates an isolated
+// database (or schema) per datasource, applies the workload's published
+// migration bundle with the existing machinery (database.ApplyBundle), sets
+// the owning schema as the search_path, and hands back a runtime Binding the
+// framework adapter consumes through database.PoolConfigFromBinding.
 //
 // It is multi-datasource by construction: the binding is a map keyed by logical
 // datasource name, so a workload can provision auth, billing, etc. at once with
@@ -107,8 +110,8 @@ func ResolveTestBinding(raw string) (*pdb.TestBinding, error) {
 }
 
 // effectiveMode is the binding's mode, defaulting to require — the safest
-// default for the first slice: a test that asks for a database fails loudly
-// when none is available rather than silently passing.
+// default: a test that asks for a database fails loudly when none is
+// available rather than silently passing.
 func effectiveMode(tb *pdb.TestBinding) pdb.TestMode {
 	if tb == nil || tb.Mode == "" {
 		return pdb.TestModeRequire
@@ -120,10 +123,12 @@ func effectiveMode(tb *pdb.TestBinding) pdb.TestMode {
 // test binding, or only for those opts.Datasources names, and returns their
 // runtime bindings plus a cleanup.
 //
-// With no usable binding it honors the mode: skip → ErrSkip, require → a loud
-// error, auto → a loud error for now (Docker auto-provisioning is a later
-// slice). On any partial failure it tears down whatever it already created
-// before returning, so a failed run leaves no orphaned databases.
+// With no usable binding it honors the mode: skip → ErrSkip, require and auto
+// → a loud error. The provider starts no server in auto mode: in a local run
+// the test-env-up step of `putnami test` does, before the suite runs, and
+// injects the binding.
+// On any partial failure it tears down whatever it already created before
+// returning, so a failed run leaves no orphaned databases.
 //
 // A test process that is killed never runs Cleanup. With database isolation
 // and without keepDatabases, Provision therefore first reclaims the per-suite

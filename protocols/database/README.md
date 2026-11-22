@@ -325,5 +325,7 @@ keyed by the migration-bundle digest and clones per-suite databases from it
 (`@putnami/database` `provision`) consumes the same `TestBinding` with matching
 semantics — isolation, per-datasource migration apply, `search_path`, and
 `bundle-template` reuse — and injects the resolved runtime `Binding` so the
-workload's `database(name)` reaches the isolated databases. Still planned: Docker
-auto-provisioning (`mode: auto`).
+workload's `database(name)` reaches the isolated databases. Neither provider
+starts a server: in a local `putnami test` run (`--infra auto`), the language
+extension's `test-env-up` step starts a throwaway Postgres (Docker, or the
+PostgreSQL installed on the machine) and injects its `TestBinding`.

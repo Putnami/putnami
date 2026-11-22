@@ -702,9 +702,9 @@ See `doc/getting-started.md` and the worked example at
 `go.putnami.dev/database/testprovider` turns a canonical **test binding**
 (`go.putnami.dev/protocol/database` `TestBinding`) into isolated, migrated
 databases for one or more named datasources — the Go half of the uniform Go/TS
-test-DB contract. It targets an externally provided Postgres (CI service
-container or a local server): the environment injects the binding via
-`DATABASE_TEST_BINDINGS`, and the provider creates an isolated database (or
+test-DB contract. It targets the Postgres server the binding names (a CI
+service container, or the server a local `putnami test` run starts): the
+binding arrives via `DATABASE_TEST_BINDINGS`, and the provider creates an isolated database (or
 schema) per datasource, applies the published migration bundle, and returns a
 runtime `Binding` the adapter consumes through `database.PoolConfigFromBinding`.
 
@@ -775,7 +775,16 @@ connection and are older than one hour — at most 16 per call, without `FORCE`,
 under a try-advisory-lock so concurrent suites never reclaim the same base at
 once. A live suite's database is never dropped. Names without a creation time
 (written before this format) are never reclaimed. The TypeScript provider uses
-the same format and rule. Docker `mode: auto` is currently unsupported.
+the same format and rule.
+
+The provider starts no server, in any mode. `putnami test` hands it the
+binding through `DATABASE_TEST_BINDINGS`: an externally set one always wins,
+such as a CI service container. Otherwise, when the project declares a
+database in `infra/requirements.json`, the `test-env-up` step of a local run
+(`--infra auto`, the default off CI) starts a throwaway Postgres (a Docker
+container when a Docker daemon answers, the PostgreSQL installed on the
+machine otherwise) and injects its binding. On CI the mode is `require`: the
+step starts nothing, and the job must provide the database.
 
 ## Contract invariants
 

@@ -13,6 +13,7 @@
     "go/go-project-toolchain#api-compatibility-marker",
     "go/go-project-toolchain#api-verdict-names-no-commit",
     "go/go-project-toolchain#archive-agent-content",
+    "go/go-project-toolchain#archive-guidance-is-self-contained",
     "go/go-project-toolchain#archive-matrix-honesty",
     "go/go-project-toolchain#bounded-test-output",
     "go/go-project-toolchain#channel-query-credentials",

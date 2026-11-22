@@ -15,6 +15,7 @@ import (
 
 	"go.putnami.dev/sdk/extension/agentartifact"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/docslinks"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/scratch"
@@ -78,17 +79,17 @@ func createExtensionArchives(ctx *pctx.Context, emit *jsonl.Emitter, packageName
 	baseStageDir := filepath.Join(tmpDir, "base-stage")
 	os.MkdirAll(baseStageDir, 0o755)
 
-	// Stage common files (include whatever exists)
-	for _, rel := range []string{"putnami.extension.json", "package.json", "bin", "templates", "tools", "README.md", "AI.md", "LICENSE.md", "config"} {
-		if err := copyRel(projectRoot, baseStageDir, rel); err != nil && !os.IsNotExist(err) {
-			emit.Diagnostic("warning", "Failed to stage "+rel+": "+err.Error(), "", 0)
-		}
-	}
+	stageCommonFiles(projectRoot, baseStageDir, emit)
 
 	// Bundle Go framework AI.md files into framework-docs/ so they travel
-	// with the extension archive. Agents in consumer workspaces can then find
-	// API references without needing access to the original framework source.
-	stageFrameworkDocs(ctx.WorkspaceRoot, baseStageDir, emit)
+	// with the Go extension's archive. Agents in consumer workspaces can then
+	// find API references without needing access to the original framework
+	// source. They are the Go extension's guidance only: any other extension
+	// this packager archives carries its own.
+	if stagedManifestName(baseStageDir) == goExtensionName {
+		stageFrameworkDocs(ctx.WorkspaceRoot, baseStageDir, emit)
+	}
+	warnLinksLeavingArchive(baseStageDir, emit)
 
 	_, statErr := os.Stat(filepath.Join(baseStageDir, "putnami.extension.json"))
 	isExtension := statErr == nil
@@ -596,6 +597,84 @@ func stampManifestVersion(stageDir, version string) {
 	rewritten, _ := json.MarshalIndent(manifest, "", "  ")
 	if err := os.WriteFile(manifestPath, append(rewritten, '\n'), 0o644); err != nil {
 		slog.Warn("failed to stamp manifest version", slog.String("path", manifestPath), slog.Any("error", err))
+	}
+}
+
+// goExtensionName is the registry name of the Go extension, the one archive
+// that bundles the Go framework guidance.
+const goExtensionName = "@putnami/go"
+
+// archiveCommonFiles are the project entries every extension archive carries
+// when the project has them. doc and specs travel with README.md and AI.md
+// because those link them: an installed archive is where an agent reads the
+// guidance, and a link it follows must name a file that is there.
+var archiveCommonFiles = []string{"putnami.extension.json", "package.json", "bin", "templates", "tools", "README.md", "AI.md", "LICENSE.md", "config", "doc", "specs"}
+
+// archiveGuidanceFiles are the shipped documents whose relative links must
+// resolve inside the archive.
+var archiveGuidanceFiles = []string{"README.md", "AI.md"}
+
+// stageCommonFiles copies each of archiveCommonFiles the project has into
+// stageDir, byte for byte.
+func stageCommonFiles(projectRoot, stageDir string, emit *jsonl.Emitter) {
+	for _, rel := range archiveCommonFiles {
+		if err := copyRel(projectRoot, stageDir, rel); err != nil && !os.IsNotExist(err) {
+			emit.Diagnostic("warning", "Failed to stage "+rel+": "+err.Error(), "", 0)
+		}
+	}
+}
+
+// stagedManifestName is the name the staged putnami.extension.json declares,
+// or "" when it is absent or unreadable.
+func stagedManifestName(stageDir string) string {
+	data, err := os.ReadFile(filepath.Join(stageDir, "putnami.extension.json"))
+	if err != nil {
+		return ""
+	}
+	var manifest struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal(data, &manifest) != nil {
+		return ""
+	}
+	return manifest.Name
+}
+
+// archiveLinkFindings returns the broken relative links of the guidance files
+// staged in stageDir, read with the staged archive as the whole tree: a link
+// to a file the archive does not carry, or one that climbs out of it, is
+// broken. Links with a scheme, such as a putnami.dev page, are not checked.
+func archiveLinkFindings(stageDir string) ([]docslinks.Finding, error) {
+	var files []string
+	for _, rel := range archiveGuidanceFiles {
+		path := filepath.Join(stageDir, rel)
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+			files = append(files, path)
+		}
+	}
+	if len(files) == 0 {
+		return nil, nil
+	}
+	return docslinks.Check(stageDir, files)
+}
+
+// warnLinksLeavingArchive warns once for each broken link archiveLinkFindings
+// reports, naming the shipped file and the target. Packaging goes on: the
+// archive is still usable, and the warning names the link to fix. The
+// message is the shared link check's, so "the workspace" it names is the
+// archive.
+func warnLinksLeavingArchive(stageDir string, emit *jsonl.Emitter) {
+	findings, err := archiveLinkFindings(stageDir)
+	if err != nil {
+		emit.Diagnostic("warning", "Could not check the links of the archived guidance: "+err.Error(), "", 0)
+		return
+	}
+	for _, finding := range findings {
+		rel, relErr := filepath.Rel(stageDir, finding.File)
+		if relErr != nil {
+			rel = finding.File
+		}
+		emit.Diagnostic("warning", fmt.Sprintf("archived %s, read inside the archive as its whole tree: %s; ship the target with the extension or link a putnami.dev page", filepath.ToSlash(rel), finding.Message), "", 0)
 	}
 }
 

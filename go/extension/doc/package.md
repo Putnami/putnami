@@ -161,16 +161,21 @@ putnami package . --deployment
 
 ### archives channel
 
-1. Stage common files: `putnami.extension.json`, `package.json`, `bin/`, `templates/`, `tools/`, `README.md`, `AI.md`, `LICENSE.md`, `config/`
-   — each one only when the project has it, byte for byte, with no substitute for an absent file; `AI.md` is the only guidance file staged
-2. Stage each `go/framework/{module}/AI.md` from the workspace as `framework-docs/{module}/AI.md`
-3. Stamp version into `putnami.extension.json` (if present)
-4. Cross-compile the Go binary for each platform of the declared release matrix (if a Go entrypoint is found), plus every executable declared in `options["@putnami/go"].executables`. Each declared executable is staged in `compiled/` beside the runtime and must be an executable regular file there, or packaging fails
-5. Build the pinned development tools for each platform into `compiled/tools/` — only for the project that owns `tools/versions.json` (the Go extension itself). Each binary's embedded build information must report the pinned version or packaging fails
-6. Create a `.tar.gz` archive per platform in `.putnami/out/{project}/~package/archives/`.
+1. Stage common files: `putnami.extension.json`, `package.json`, `bin/`, `templates/`, `tools/`, `README.md`, `AI.md`, `LICENSE.md`, `config/`, `doc/`, `specs/`
+   — each one only when the project has it, byte for byte, with no substitute for an absent file; `AI.md` is the only agent guidance file staged
+   at the root. `doc/` and `specs/` travel because `README.md` and `AI.md` link them
+2. For `@putnami/go` only, stage each `go/framework/{module}/AI.md` from the workspace as `framework-docs/{module}/AI.md`; no other extension archive carries the Go framework guidance
+3. Check the links of the staged `README.md` and `AI.md` with the staged archive as their whole tree, by the
+   [documentation link rule](lint.md#documentation-links) `lint` applies: a relative link to a file the archive
+   does not carry, or one that climbs out of it, is a `warning` that names the file and the target. Link a putnami.dev page for
+   what lives outside the extension. Packaging goes on
+4. Stamp version into `putnami.extension.json` (if present)
+5. Cross-compile the Go binary for each platform of the declared release matrix (if a Go entrypoint is found), plus every executable declared in `options["@putnami/go"].executables`. Each declared executable is staged in `compiled/` beside the runtime and must be an executable regular file there, or packaging fails
+6. Build the pinned development tools for each platform into `compiled/tools/` — only for the project that owns `tools/versions.json` (the Go extension itself). Each binary's embedded build information must report the pinned version or packaging fails
+7. Create a `.tar.gz` archive per platform in `.putnami/out/{project}/~package/archives/`.
    A windows-x64 archive is refused when its stage holds a symbolic link, or when the project builds no Go binary and ships no
    `<runtime.executable>.exe`: a Windows CLI creates no link from an archive and runs only the `.exe` runtime
-7. Write `archives/channel.json` (the channel record, inside the directory this task owns) and `metadata.json` (the archive publication manifest: version, artifact name, channels packaged)
+8. Write `archives/channel.json` (the channel record, inside the directory this task owns) and `metadata.json` (the archive publication manifest: version, artifact name, channels packaged)
 
 ### template-archives channel
 

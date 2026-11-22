@@ -45,6 +45,22 @@
           }
         },
         {
+          "id": "archive-guidance-is-self-contained",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-extension-archive-ships-its-doc-and-specs-trees",
+              "a-shipped-link-that-leaves-the-archive-warns",
+              "only-the-go-extension-bundles-go-framework-guidance",
+              "the-go-and-typescript-extension-guidance-resolves-inside-their-archives"
+            ]
+          }
+        },
+        {
           "id": "bounded-test-output",
           "stage": "coded",
           "evidenceKinds": [
