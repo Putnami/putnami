@@ -19,7 +19,7 @@ export const app = () =>
 
 ```ts
 staticFiles({
-  publicFolder: 'public',   // Folder containing static files (default: 'public')
+  publicFolder: 'public',   // Folder scanned when no scanPath is given (default: 'public')
   prefix: '/',              // URL prefix for static files (optional)
   cacheMaxAge: 86400,       // Cache duration in seconds (default: 86400 / 1 day)
   compress: 1024,           // Min file size in bytes to gzip (default: 1024)
@@ -146,7 +146,10 @@ The plugin automatically detects content types based on file extensions:
 
 ## Multiple static folders
 
-Serve files from multiple locations:
+Serve files from several folders. Each scanned folder lies under the `public/`
+folder of the workload or of a project it depends on, the folders the build's
+cache key reads; a scan root anywhere else fails the build and names where to
+move it.
 
 ```ts
 import { application, http, staticFiles } from '@putnami/application';
@@ -154,9 +157,14 @@ import { application, http, staticFiles } from '@putnami/application';
 export const app = () =>
   application()
     .use(http({ port: 3000 }))
-    .use(staticFiles({ publicFolder: 'public' }))
-    .use(staticFiles({ publicFolder: 'uploads', prefix: '/uploads' }));
+    .use(staticFiles({ scanPath: 'public/site' }))
+    .use(staticFiles({ scanPath: 'public/uploads', prefix: '/uploads' }));
 ```
+
+A library can ship a folder the same way, from its own `public/`. A folder
+copied into `.gen/public/` by `options.generate.assets`, and a folder inside an
+installed package, are read by the key too. See
+[where a static folder lives](../../framework/application/doc/static-files.md#where-a-static-folder-lives).
 
 ## Build-time assets
 

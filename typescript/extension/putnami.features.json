@@ -920,6 +920,19 @@
           }
         },
         {
+          "id": "generate-keys-closure-public",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-generate-key-reads-public-across-the-dependency-closure"
+            ]
+          }
+        },
+        {
           "id": "api-compatibility-marker",
           "stage": "coded",
           "evidenceKinds": [

@@ -145,7 +145,12 @@ project maps a native feature to a proof. The evidence names the project's
 source binding: the `source-v1` digest the scheduler stamps into
 `.gen/version.json`. The binding covers every project file, test files, specs
 and `putnami.features.json` included. The generate key reads `src/`, `bin/`,
-`putnami.extension.json`, `public/`, `package.json` and the workspace configuration.
+`putnami.extension.json`, `package.json` and the workspace configuration of the
+project, and the `public/` folder of every project in its dependency closure,
+the project itself included. A `staticFiles` scan root in a library's
+`public/` therefore moves the key of every workload that stages it, and the
+plugin refuses a scan root outside every project's `public/` (see
+[static files](../../framework/application/doc/static-files.md#where-a-static-folder-lives)).
 Hook code and manifest edits move the producer's generate key, and the
 `^generate` dependencies carry that change to each consumer. A custom hook
 whose implementation lives elsewhere declares those paths through the existing
