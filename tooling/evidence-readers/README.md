@@ -7,8 +7,30 @@ import-linter results into architecture rules. The observe extension builds the 
 evidence document (`protocols/evidence`) from them, and the TypeScript
 extension reads its bun reports through it.
 
-`@putnami/evidence-readers` is an unpublished internal module. It is not in
-`putnami.support.json` and is not a supported public API.
+Outside this repository, require the module at a released version:
+
+```bash
+go get go.putnami.dev/evidence/readers@latest
+```
+
+## Support status
+
+- **Status**: `preview`, recorded in the workspace-root
+  [`putnami.support.json`](../../putnami.support.json).
+- **Owner**: `go.putnami.dev/evidence/readers` (`tooling/evidence-readers`).
+- **Consumers**: the observe extension, the TypeScript extension and the stack
+  core read their reports through it. Putnami Cloud is to read the reports of
+  the CIs it onboards with it.
+- **What may still change**: a change to a `preview` module, a breaking one
+  included, ships in a patch release, whose release notes name the change to
+  make. Pin an exact version. Stable support needs a consumer that ships
+  outside this repository's own tooling and a documented surface on the site.
+- **Evidence**: `api_test.go` compares the exported surface with its record,
+  `testdata/api/surface.txt`, and checks that every report under a reader's
+  fixture directory has a golden output beside it; the reader tests compare
+  each report with its golden output. A change to the surface or to a
+  reader's output updates its record in the same change: run the tests with
+  `-update` and review the diff.
 
 ## Readers
 

@@ -1,0 +1,185 @@
+func ArchUnitRule(c TestCase) (ArchitectureRule, bool)
+
+type ArchitectureReport struct {
+	Rules []ArchitectureRule `json:"rules"`
+}
+
+type ArchitectureRule struct {
+	Name       string      `json:"name"`
+	Status     string      `json:"status"`
+	Count      int         `json:"count"`
+	Violations []Violation `json:"violations,omitempty"`
+}
+
+const CodeMalformed = "readers.malformed"
+
+const CodeMissing = "readers.missing"
+
+const CodeTooLarge = "readers.too_large"
+
+const CodeUnreadable = "readers.unreadable"
+
+type Counts struct {
+	Total   int `json:"total"`
+	Covered int `json:"covered"`
+}
+
+type CoverageReport struct {
+	Sources []string       `json:"sources,omitempty"`
+	Files   []FileCoverage `json:"files"`
+}
+
+func CycloneDXVersions() []string
+
+type Failure struct {
+	Error   bool   `json:"error,omitempty"`
+	Type    string `json:"type,omitempty"`
+	Message string `json:"message,omitempty"`
+	Body    string `json:"body,omitempty"`
+}
+
+type FileCoverage struct {
+	Path       string `json:"path"`
+	Lines      []Line `json:"lines,omitempty"`
+	LineCounts Counts `json:"lineCounts"`
+	Functions  Counts `json:"functions"`
+}
+
+const FormatCycloneDX = "cyclonedx"
+
+const FormatSPDX = "spdx"
+
+type Line struct {
+	Number int   `json:"number"`
+	Hits   int64 `json:"hits"`
+}
+
+const MaxLineMarks = 4_000_000
+
+const MaxReportBytes = 256 << 20
+
+const MaxSuiteDepth = 100
+
+func MoreSevere(a, b string) bool
+
+type PURL struct {
+	Type    string
+	Name    string
+	Version string
+}
+
+type Package struct {
+	Name            string          `json:"name"`
+	Version         string          `json:"version,omitempty"`
+	PURL            string          `json:"purl,omitempty"`
+	Licenses        []string        `json:"licenses,omitempty"`
+	Vulnerabilities []Vulnerability `json:"vulnerabilities,omitempty"`
+}
+
+func ParsePURL(raw string) (PURL, error)
+
+func ReadClover(data []byte) (CoverageReport, []diag.Diagnostic)
+
+func ReadCobertura(data []byte) (CoverageReport, []diag.Diagnostic)
+
+func ReadDeptrac(data []byte) (ArchitectureReport, []diag.Diagnostic)
+
+func ReadFile[T any](path string, read func([]byte) (T, []diag.Diagnostic)) (T, []diag.Diagnostic)
+
+func ReadGoCover(data []byte) (CoverageReport, []diag.Diagnostic)
+
+func ReadImportLinter(data []byte) (ArchitectureReport, []diag.Diagnostic)
+
+func ReadJUnit(data []byte) (TestReport, []diag.Diagnostic)
+
+func ReadJaCoCo(data []byte) (CoverageReport, []diag.Diagnostic)
+
+func ReadLCOV(data []byte) (CoverageReport, []diag.Diagnostic)
+
+func ReadSBOM(data []byte) (SBOM, []diag.Diagnostic)
+
+func ReadTRX(data []byte) (TestReport, []diag.Diagnostic)
+
+const RuleBroken = "broken"
+
+const RuleKept = "kept"
+
+type SBOM struct {
+	Format      string    `json:"format"`
+	SpecVersion string    `json:"specVersion"`
+	Packages    []Package `json:"packages"`
+}
+
+func SPDXVersions() []string
+
+func Severities() []string
+
+const SeverityCritical = "critical"
+
+const SeverityHigh = "high"
+
+const SeverityInfo = "info"
+
+const SeverityLow = "low"
+
+const SeverityMedium = "medium"
+
+const SeverityNone = "none"
+
+const SeverityUnknown = "unknown"
+
+type Skipped struct {
+	Message string `json:"message,omitempty"`
+	Body    string `json:"body,omitempty"`
+}
+
+const StatusFailed = "failed"
+
+const StatusPassed = "passed"
+
+const StatusSkipped = "skipped"
+
+type Suite struct {
+	Name string `json:"name,omitempty"`
+	File string `json:"file,omitempty"`
+}
+
+type TestCase struct {
+	Name       string   `json:"name"`
+	Classname  string   `json:"classname,omitempty"`
+	Suites     []Suite  `json:"suites,omitempty"`
+	File       string   `json:"file,omitempty"`
+	Line       int      `json:"line,omitempty"`
+	Status     string   `json:"status"`
+	DurationMs int64    `json:"durationMs"`
+	Failure    *Failure `json:"failure,omitempty"`
+	Skipped    *Skipped `json:"skipped,omitempty"`
+}
+
+type TestReport struct {
+	Totals Totals     `json:"totals"`
+	Cases  []TestCase `json:"cases"`
+}
+
+type Totals struct {
+	Tests      int     `json:"tests"`
+	Failures   int     `json:"failures"`
+	Errors     int     `json:"errors"`
+	Skipped    int     `json:"skipped"`
+	Assertions int     `json:"assertions"`
+	Time       float64 `json:"time"`
+}
+
+func UsesArchUnit(source []byte) bool
+
+type Violation struct {
+	Message string `json:"message"`
+	Subject string `json:"subject,omitempty"`
+	File    string `json:"file,omitempty"`
+	Line    int    `json:"line,omitempty"`
+}
+
+type Vulnerability struct {
+	ID       string `json:"id"`
+	Severity string `json:"severity"`
+}

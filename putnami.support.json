@@ -338,6 +338,11 @@
       "status": "stable"
     },
     {
+      "id": "go.putnami.dev/evidence/readers",
+      "kind": "package",
+      "status": "preview"
+    },
+    {
       "id": "go.putnami.dev/grpc",
       "kind": "package",
       "status": "stable"

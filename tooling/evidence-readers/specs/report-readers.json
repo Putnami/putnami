@@ -8,7 +8,8 @@
     "A missing, malformed or oversized report is one diagnostic with a stable code, and the reader never panics.",
     "CycloneDX and SPDX documents that osv-scanner, Trivy or Syft wrote read into the same packages, each with its package URL, licences and known vulnerabilities.",
     "The TRX report dotnet test writes for xUnit, NUnit and MSTest reads into the same test cases as a JUnit report, with the test assembly as suite.",
-    "The architecture rules ArchUnit, deptrac and import-linter checked read into the same rules, each kept or broken, with its violations and the class or module, file and line each one names."
+    "The architecture rules ArchUnit, deptrac and import-linter checked read into the same rules, each kept or broken, with its violations and the class or module, file and line each one names.",
+    "A consumer outside this repository requires go.putnami.dev/evidence/readers at a released version, and a change to its exported surface or to what a fixture reads fails a test until its record is updated in the same change."
   ],
   "nonGoals": [
     "Finding the report files in a CI workspace, which the observe extension owns.",
@@ -115,6 +116,13 @@
         "Under Broken contracts, each import chain of a contract, a line - importer -> imported (l.N) and its indented continuation, is one violation of the first importer at the first N;",
         "a broken contract without a chain counts one.",
         "Output without its Analyzed N files, M dependencies line or a contract line is readers.malformed."
+      ]
+    },
+    {
+      "id": "exported-surface-is-pinned",
+      "text": [
+        "Every exported declaration of the package, with its signature, its fields and its tags, matches the recorded surface in testdata/api/surface.txt, so a change to the public API is a reviewed edit of that record.",
+        "Every report under a reader's fixture directory has its golden output beside it, and no golden output lacks its report."
       ]
     }
   ]

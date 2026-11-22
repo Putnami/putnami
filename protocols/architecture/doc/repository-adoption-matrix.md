@@ -351,7 +351,7 @@ protocols and the extension SDK need.
 
 ### Evidence report readers
 
-**Why excluded:** `@putnami/evidence-readers` is a new project. It reads the
+**Why excluded:** `go.putnami.dev/evidence/readers` is a new project. It reads the
 JUnit, LCOV, Cobertura, Clover and Go cover reports a CI already wrote into
 test cases and line coverage. Unlike the other excluded libraries, it already
 has a workspace consumer: `/typescript/extension` reads its own reports

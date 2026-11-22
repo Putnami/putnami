@@ -1,10 +1,12 @@
-// Package readers reads the test and coverage reports a CI writes: JUnit XML,
-// LCOV, Cobertura XML, Clover XML, JaCoCo XML and Go cover profiles, and the
-// results of the ArchUnit, deptrac and import-linter architecture checkers.
+// Package readers reads the reports a CI writes: JUnit XML and TRX test
+// reports, LCOV, Cobertura XML, Clover XML, JaCoCo XML and Go cover profiles,
+// CycloneDX and SPDX software bills of materials, and the results of the
+// ArchUnit, deptrac and import-linter architecture checkers.
 //
 // A reader turns one report into typed facts and nothing more. A test report
 // becomes one TestCase per test case, a coverage report one FileCoverage per
-// source file with its instrumented lines and their hit counts. Paths stay as
+// source file with its instrumented lines and their hit counts, a bill of
+// materials one Package per component. Paths stay as
 // the report states them, in slash form, a JaCoCo file as its package path
 // and source file name: mapping a case or a file to a
 // component, or an absolute path or a Go import path to a repository path, is

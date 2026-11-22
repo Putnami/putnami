@@ -1,7 +1,7 @@
 # Reports
 
 `putnami observe` reads test reports, coverage reports, software bills of
-materials (SBOM) and architecture results with one set of readers, `@putnami/evidence-readers`. The
+materials (SBOM) and architecture results with one set of readers, `go.putnami.dev/evidence/readers`. The
 TypeScript extension reads bun's test and coverage reports with the same
 readers. This page says what each reader keeps from a report and when it
 rejects one.

@@ -152,6 +152,17 @@
       "reversal": "Same as the framework step: release a superseding patch version and retract the bad version. The Cloud runtime publishes after the framework modules it imports, so a retracted version never leaves a workload without the framework version it needs."
     },
     {
+      "id": "evidence-readers",
+      "channels": [
+        "go"
+      ],
+      "artifacts": [
+        "go.putnami.dev/evidence/*"
+      ],
+      "rollbackPoint": "the previously released evidence readers module versions on the Go module proxy",
+      "reversal": "Same as the protocol step: release a superseding patch version and retract the bad version. The readers publish after the protocol modules they import, so a retracted version never leaves a consumer without the protocol version it needs."
+    },
+    {
       "id": "typescript-framework",
       "channels": [
         "npm"

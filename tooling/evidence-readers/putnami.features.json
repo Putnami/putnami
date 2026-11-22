@@ -179,6 +179,20 @@
               "an-output-without-contracts-is-malformed"
             ]
           }
+        },
+        {
+          "id": "exported-surface-is-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-exported-surface-matches-its-record",
+              "every-fixture-has-its-golden-output"
+            ]
+          }
         }
       ]
     }

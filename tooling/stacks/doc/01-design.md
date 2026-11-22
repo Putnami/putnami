@@ -16,7 +16,7 @@ Two parts of that work already exist:
   without running the build: the detectors under
   `tooling/observe/internal/detect` (Cargo, Composer, Gradle, Maven, Swift,
   Dart, .NET, Ruby).
-- `@putnami/evidence-readers` (`go.putnami.dev/evidence/readers`) reads the
+- `go.putnami.dev/evidence/readers` (`tooling/evidence-readers`) reads the
   reports those builds write: JUnit, TRX, JaCoCo, Cobertura, Clover, LCOV.
 
 ## The shape
