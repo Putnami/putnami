@@ -26,6 +26,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--upload` | Hand the change evidence document to the evidence reporter. See [Uploading the evidence](#uploading-the-evidence). |
 | `--open` | Upload as `--upload` does, letting the reporter sign you in first, and open the report in the browser outside a CI. See [Opening the report](#opening-the-report). |
 | `--details` | Print the detailed summary instead of the short one. See [Output](#output). |
+| `--history [<duration>]` | Observe the recent history of the default branch instead of one change. See [The recent history](#the-recent-history). |
 | `--publish` | Post a commit status and one summary note that link to the report on the pull or merge request. Needs `--upload`. See [Publishing on the pull or merge request](#publishing-on-the-pull-or-merge-request). |
 | `--from-evidence <path>` | Relay the evidence document another run kept instead of observing, in a GitHub Actions `workflow_run` job: `--upload` and `--publish` then use this job's credentials. Takes no other flag but `--upload` and `--publish`. See [Pull requests from a fork](#pull-requests-from-a-fork). |
 
@@ -296,6 +297,59 @@ of 2. Observe prints the report URL the reporter answers, ends the summary with
 it and, outside a CI, opens it in the browser. Without `--open` or `--upload`,
 observe runs no reporter and calls no code host API: nothing leaves the
 machine.
+
+## The recent history
+
+A CI deletes its logs and artifacts after a retention period, 90 days by
+default on GitHub Actions, so a repository set aside has no CI report left.
+`putnami observe --history` analyzes its recent past on your laptop instead:
+
+```bash
+putnami observe --history          # the last 14 days
+putnami observe --history 30d --open
+```
+
+It reads the first-parent commits of the `origin` remote's default branch,
+`refs/remotes/origin/HEAD`, whose commit date falls in the window: 14 days by
+default, or the `<n>h`, `<n>d` or `<n>w` you give it, at most `365d`. The
+window ends now, or at the branch's last commit when the branch had no commit
+since the window began, so an idle repository shows its last 14 days of
+activity. A clone that records no default branch reads the current branch
+instead and warns with `observe.history_default_branch_missing`; `git remote
+set-head origin --auto` records it. Fetch first to read the latest history:
+`--history` reads the local clone only.
+
+It observes at most 100 commits, sampled evenly over the window and observed
+newest first. Each commit is checked out, detached, in a temporary worktree
+that runs no hook of the repository, fetches no Git LFS file and checks out
+no submodule, and is measured against its first parent: the components, the dependency changes,
+the decisions, the declarations and the specs, without test, coverage, SBOM
+or architecture reports, which a commit's checkout does not hold. A root
+commit, or one on the edge of a shallow clone, has no parent and is skipped.
+The run spends at most 10 minutes, not counting the wait for a sign-in; the
+oldest commits left after that are skipped with the
+`observe.history_budget_spent` warning, which counts them. An interrupt stops
+the run with `observe.history_interrupted` and keeps what was already
+observed and uploaded.
+
+Each commit gives one evidence document whose run id is
+`history-<commit SHA>`. `--evidence <directory>` writes them to
+`<directory>/<commit SHA>.json`. `--upload` and `--open` hand each to the
+evidence reporter as soon as the commit is observed: `--open` signs you in
+once and opens the report of the newest commit. The reporter derives the
+submission id from the run id, so a second run uploads the same commits again
+and Putnami Cloud keeps one run per commit; `@putnami/cloud` also puts in the
+submission id whether it ran on a laptop or in a CI, so the same commit
+uploaded from both is kept twice. The first failed upload stops the others
+and says how many were left. `--history` takes none of the flags that name a
+base, a head, a report or an export of one commit, nor `--publish`,
+`--details` or `--fetch`.
+
+The summary names the repository, the branch and the window, then one line
+per commit: its date, its changed files, its changed components and its
+dependency changes. With `--output=json` it prints one document with the
+window and each commit's observation. The worktree is removed when the run
+ends; your working tree, index and `HEAD` stay as they were.
 
 ## Publishing on the pull or merge request
 

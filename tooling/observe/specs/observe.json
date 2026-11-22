@@ -8,7 +8,8 @@
     "The change is measured against the commit its pull or merge request targets, found even when the CI cloned one commit deep",
     "The job lists the test and coverage reports it can read, found by their content or named by the team, and says which ones it could not read without failing",
     "The job can keep what it observed as a change evidence document, a CI artifact that a reporter uploads and that a third party can read",
-    "A person who runs putnami observe on a laptop or in a CI job reads a short summary in the log and one line that names the command that keeps the full report"
+    "A person who runs putnami observe on a laptop or in a CI job reads a short summary in the log and one line that names the command that keeps the full report",
+    "A person trying Putnami on a repository whose CI kept nothing sees its recent history: putnami observe --history analyzes the last days of commits on a laptop and can upload them"
   ],
   "nonGoals": [
     "Running a build or tests, or asking the team to change how it builds or tests",
@@ -119,6 +120,22 @@
         "In a repository that holds putnami.workspace.json, the evidence document carries the declaration files the change touches, each with its document at the base and at the head, an empty list when it touches none and the whole diff was read, and the newest spec verification record a `putnami test` run wrote under .putnami/sessions.",
         "A workspace without a record gets the observe.spec_verification_missing warning, which names the step to add.",
         "Another repository's document carries neither member."
+      ]
+    },
+    {
+      "id": "recent-history",
+      "text": [
+        "putnami observe --history [<duration>] observes the first-parent commits of the default branch dated in the window, 14 days by default (<n>h, <n>d or <n>w, at most 365 days), ending now or at the last commit when none is newer than the window.",
+        "It observes at most 100 commits sampled evenly, newest first, each against its first parent, without reports.",
+        "Once the time budget is spent, the oldest commits left are skipped with the observe.history_budget_spent warning."
+      ]
+    },
+    {
+      "id": "history-evidence",
+      "text": [
+        "Each commit --history observes gives one change evidence document whose run id is history-<commit SHA>, from which the reporter derives the same submission id on every run, so Putnami Cloud keeps one run per commit.",
+        "--evidence <directory> writes <directory>/<commit SHA>.json; --upload or --open hands each to the reporter once observed, and the first failure stops the uploads.",
+        "The caller's working tree, index and HEAD stay as they were, and no repository hook runs."
       ]
     }
   ],

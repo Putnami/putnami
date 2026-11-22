@@ -34,6 +34,10 @@ Next: run `putnami observe --open` to sign in and open the full report
 
 `putnami observe --open` runs the same analysis, keys the repository by the numeric id GitHub or GitLab gives it, signs you in to Putnami Cloud in your browser when you are not signed in yet, uploads the evidence and opens the full report. The next runs reuse the session. For a private repository, set `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` to a token that reads it; without one, the summary says which to set. `putnami observe --details` prints the whole analysis in the log instead of the short summary.
 
+### A repository whose CI kept nothing
+
+A CI deletes its logs and artifacts after a retention period, so an old repository set aside has no report left to read. Run `putnami observe --history --open` in its checkout instead: it analyzes the last 14 days of the default branch on your laptop, or the last 14 days of activity when the branch has been idle since, one commit at a time, and uploads them. It samples at most 100 commits, newest first, reads no test or coverage report, and stops after 10 minutes. Running it again keeps one run per commit in Putnami Cloud. `putnami observe --history 30d` observes a longer window; [The recent history](/docs/tooling-&-workspace/observe/observe#the-recent-history) gives the details.
+
 ## What the step installs
 
 On GitHub Actions, the step is the action `Putnami/observe-action@v1`, from the GitHub Marketplace. On GitLab CI, the job runs the same lines itself:

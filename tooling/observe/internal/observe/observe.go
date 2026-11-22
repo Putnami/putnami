@@ -75,6 +75,8 @@ type Options struct {
 	Architecture    []string
 	ArchUnitClasses []string
 	Fetch           bool
+	// NoReports reads no report, named or discovered.
+	NoReports bool
 	// Resolve turns a named report path into an absolute one.
 	Resolve  func(string) string
 	Producer Producer
@@ -136,8 +138,10 @@ func Run(ctx context.Context, opts Options) Observation {
 	if o.Subject.Repository == "" {
 		o.Subject.Repository = repositoryName(ctx, root)
 	}
-	found, reportDiags := reports.Collect(reports.Request{Root: root, JUnit: opts.JUnit, Coverage: opts.Coverage, SBOM: opts.SBOM, BaseSBOM: opts.BaseSBOM, Architecture: opts.Architecture, Resolve: opts.Resolve})
-	o.Reports = found
+	var reportDiags []diag.Diagnostic
+	if !opts.NoReports {
+		o.Reports, reportDiags = reports.Collect(reports.Request{Root: root, JUnit: opts.JUnit, Coverage: opts.Coverage, SBOM: opts.SBOM, BaseSBOM: opts.BaseSBOM, Architecture: opts.Architecture, Resolve: opts.Resolve})
+	}
 	if o.Reports == nil {
 		o.Reports = []reports.Report{}
 	}

@@ -54,7 +54,7 @@ const contextFlag = "--putnamiContext"
 var runtimeVersion string
 
 // knownFlags are the flags `putnami observe` takes.
-var knownFlags = []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "moon-graph", "fetch", "evidence", "upload", "publish", "pants-graph", "bazel-graph", "decisions", "details", "open", "from-evidence"}
+var knownFlags = []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "moon-graph", "fetch", "evidence", "upload", "publish", "pants-graph", "bazel-graph", "decisions", "details", "open", "from-evidence", "history"}
 
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	handled, err := runtimeinfo.Handle(args, stdout, extensionName, runtimeVersion)
@@ -96,6 +96,9 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		opts.ProjectID = func(ctx context.Context, provider, host, path string) (string, error) {
 			return publish.ProjectID(ctx, publishClient, getenv, provider, host, path)
 		}
+	}
+	if out.history > 0 {
+		return runHistory(ctx, opts, out, getenv, stdout, stderr)
 	}
 	o := observe.Run(ctx, opts)
 	uploaded, reportURL, diags := writeAndUpload(ctx, o, out, getenv, stderr)
@@ -152,6 +155,8 @@ type outputs struct {
 	// fromEvidence is the absolute path of a kept evidence document to relay
 	// instead of observing, "" for none.
 	fromEvidence string
+	// history is the window --history observes, 0 for a run on one change.
+	history time.Duration
 }
 
 // relayExclusive are the flags --from-evidence refuses: it observes nothing,
@@ -304,6 +309,20 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 			}
 		}
 	}
+	history, err := historyFlag(flags)
+	if err != nil {
+		return observe.Options{}, outputs{}, err
+	}
+	if history > 0 {
+		if flags["fetch"] == "true" {
+			return observe.Options{}, outputs{}, fmt.Errorf("--history reads the local clone and fetches nothing: run git fetch first instead of --fetch")
+		}
+		for _, name := range historyConflicts {
+			if _, ok := flags[name]; ok {
+				return observe.Options{}, outputs{}, fmt.Errorf("--history observes each commit against its parent without reports: it does not take --%s", name)
+			}
+		}
+	}
 	for _, name := range []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "evidence", "moon-graph", "pants-graph", "bazel-graph", "decisions", "from-evidence"} {
 		if value, ok := flags[name]; ok && (value == "" || value == "true") {
 			return observe.Options{}, outputs{}, fmt.Errorf("--%s needs a value", name)
@@ -337,7 +356,7 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 	}
 	opts.Overrides.Base = flags["base"]
 	opts.Overrides.Head = flags["head"]
-	out := outputs{upload: uploadFlag || openFlag, publish: publishFlag, details: details, open: openFlag}
+	out := outputs{upload: uploadFlag || openFlag, publish: publishFlag, details: details, open: openFlag, history: history}
 	if launch != nil {
 		switch launch.Params.String("output") {
 		case "json", "jsonl", "cloud-logging":
@@ -351,6 +370,23 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 		out.fromEvidence = opts.Resolve(flags["from-evidence"])
 	}
 	return opts, out, nil
+}
+
+// historyConflicts are the flags a --history run refuses: each names a base,
+// a head, a report or an export of one commit, or posts on a change request.
+var historyConflicts = []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "moon-graph", "pants-graph", "bazel-graph", "publish", "details", "from-evidence"}
+
+// historyFlag reads --history: absent or --no-history is 0, a bare
+// --history the default window, else the duration it names.
+func historyFlag(flags map[string]string) (time.Duration, error) {
+	value, ok := flags["history"]
+	switch {
+	case !ok, value == "false":
+		return 0, nil
+	case value == "true":
+		value = ""
+	}
+	return observe.ParseHistoryWindow(value)
 }
 
 // boolFlag reads a boolean flag: absent is fallback, --name is true and

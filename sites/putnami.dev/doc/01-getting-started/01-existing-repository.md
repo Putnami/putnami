@@ -21,7 +21,7 @@ putnami extensions install --user @putnami/cloud
 putnami observe
 ```
 
-It measures the change against the default branch of your `origin` remote, prints a short summary, and sends nothing off your machine. Then add the step to the job that runs your tests, so every pull or merge request gets the same answer from the reports your tests already write.
+It measures the change against the default branch of your `origin` remote, prints a short summary, and sends nothing off your machine. In a repository whose CI kept nothing, `putnami observe --history` analyzes its last 14 days of commits instead. Then add the step to the job that runs your tests, so every pull or merge request gets the same answer from the reports your tests already write.
 
 **What it asks:** one person, a few minutes on a laptop, and one CI change: the step `Putnami/observe-action@v1` on GitHub Actions, or one job on GitLab CI. Your build and test commands stay as they are; some stacks add a flag that writes a test or coverage report. Whatever the change holds, a failed test included, the step passes; a failed install fails it.
 
