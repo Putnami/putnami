@@ -320,7 +320,7 @@ harvests plugin metadata without reaching external systems.
 
 ### Shutdown
 
-`Close()` disposes resources in reverse registration order. Children are closed before parents.
+`Close()` disposes resources in reverse registration order. Children are closed before parents. A closed child leaves its parent, so a long-lived parent, such as an application root that opens one scope per request, does not keep the scopes it has closed.
 
 ```go
 c.Register(inject.AutoProvide(NewDatabase,
