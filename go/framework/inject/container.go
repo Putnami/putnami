@@ -1,6 +1,7 @@
 package inject
 
 import (
+	"slices"
 	"sync"
 
 	"go.putnami.dev/errors"
@@ -248,8 +249,9 @@ func (c *Container) ResolveAll() error {
 	return nil
 }
 
-// Close disposes of all resources in this container and its children.
-// Close hooks are called in reverse registration order.
+// Close disposes of all resources in this container and its children, then
+// removes the container from its parent's children. Close hooks are called
+// in reverse registration order.
 //
 // A singleton's close hook runs only if its instance was actually built: a
 // registered-but-never-resolved singleton (for example a lazy DB pool that no
@@ -283,10 +285,28 @@ func (c *Container) Close() error {
 
 	errs = append(errs, runCloseHooks(hooks, built)...)
 
+	c.detachFromParent()
+
 	if len(errs) > 0 {
 		return newValidationError(errs)
 	}
 	return nil
+}
+
+// detachFromParent removes a closed container from its parent's children, so
+// a parent that outlives its children, such as a root that opens one scope per
+// request, does not retain them. The remaining children keep their creation
+// order. The caller must not hold c.mu.
+func (c *Container) detachFromParent() {
+	p := c.parent
+	if p == nil {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if i := slices.Index(p.children, c); i >= 0 {
+		p.children = slices.Delete(p.children, i, i+1)
+	}
 }
 
 // builtKeysLocked returns the set of token keys with a cached instance. The
