@@ -458,7 +458,9 @@ export class ConnectTransport implements Transport {
     let ended = false;
 
     const frame = (message: Record<string, unknown>): Uint8Array => {
-      const payload = inputName ? this.encodeProtoMessage(message, inputName) : textEncoder.encode(JSON.stringify(message));
+      const payload = inputName
+        ? this.encodeProtoMessage(message, inputName)
+        : textEncoder.encode(JSON.stringify(message));
       return writeEnvelope(0x00, payload);
     };
     // The opening message carries params and query and no body, and leaves
