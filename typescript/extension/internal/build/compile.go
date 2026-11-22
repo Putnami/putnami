@@ -144,8 +144,9 @@ func buildCompileArgs(config, entrypoint, outputFile, target string, bytecode bo
 	// --env=disable keeps every process.env read, NODE_ENV included, a run-time
 	// read, as the transpile and the Node bundle do. Without it Bun inlines the
 	// builder's NODE_ENV ("development" by default), so an executable an image
-	// runs with NODE_ENV=production would read the local config environment,
-	// serve development error pages and run JSX through jsxDEV.
+	// runs with NODE_ENV=production would read the local config environment
+	// and serve development error pages. The JSX runtime is the one choice
+	// --env=disable leaves to the builder: see compileEnv.
 	args = append(args, "--compile", "--env=disable")
 	if bytecode {
 		args = append(args, "--bytecode", "--format=esm")
@@ -155,6 +156,20 @@ func buildCompileArgs(config, entrypoint, outputFile, target string, bytecode bo
 		"--outfile", outputFile,
 		"--target", target,
 	)
+}
+
+// compileEnv is the environment bun build --compile runs with.
+//
+// A compile picks its JSX runtime from the builder's NODE_ENV, even with
+// --env=disable: unless it is "production", every JSX element becomes a
+// jsxDEV call from react/jsx-dev-runtime. That module resolves at run time,
+// and under NODE_ENV=production, the environment an image runs with, it
+// exports no jsxDEV, so the executable exits at its first JSX element. With
+// NODE_ENV=production the compile emits jsx and jsxs from react/jsx-runtime,
+// which every NODE_ENV provides; --env=disable still leaves process.env reads,
+// NODE_ENV included, to run time.
+func compileEnv() map[string]string {
+	return map[string]string{"NODE_ENV": "production"}
 }
 
 // reproducibleBytecodeBun is the earliest Bun release measured to write
@@ -273,7 +288,7 @@ func RunCompile(bunBin, projectPath, outputPath string, entrypoint string, targe
 
 		args := buildCompileArgs(config, entry, outputFile, target, bytecode)
 
-		result, err := execRunFunc(bunBin, args, exec.Dir(workDir), exec.Timeout(5*time.Minute))
+		result, err := execRunFunc(bunBin, args, exec.Dir(workDir), exec.Env(compileEnv()), exec.Timeout(5*time.Minute))
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("Compile failed for %s [%s]: %v", entrypoint, target, err))
 			continue

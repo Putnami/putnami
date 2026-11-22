@@ -614,7 +614,12 @@ still wins. The compile reads `NODE_ENV` and `APP_ENV` when the binary runs
 `conf/.env.production.yaml` and runs the framework in production mode, with no
 development error pages, no response validation and the disk-backed cache,
 which falls back to memory when the working directory is not writable. The conf files are inputs of `build-generate`, so
-an edit to one rebuilds the binary.
+an edit to one rebuilds the binary. Bun runs the compile with
+`NODE_ENV=production` whatever the builder's environment, so JSX compiles to
+`jsx` and `jsxs` from `react/jsx-runtime`, which every `NODE_ENV` provides,
+while `process.env` reads stay run-time reads: a compile in development would
+emit `jsxDEV` calls, which `react/jsx-dev-runtime` does not provide under
+`NODE_ENV=production`.
 
 **Default targets** — the distribution matrix an unbound compile produces:
 
