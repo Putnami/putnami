@@ -94,6 +94,7 @@
       "id": "server-data-boundary",
       "text": [
         "Loader and action builders validate and coerce declared input, resolve declared dependencies from the active request scope, and execute their handlers only on the server;",
+        "an action that returns nothing answers 204 No Content, on the HTTP route as in the router;",
         "browser builder middleware methods cannot import or execute server middleware."
       ]
     },

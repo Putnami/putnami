@@ -317,7 +317,8 @@
               "a-loader-without-schemas-is-not-wrapped",
               "an-action-resolves-its-dependencies-from-the-request-scope",
               "an-action-validates-and-coerces-its-declared-input",
-              "an-action-without-schemas-is-not-wrapped"
+              "an-action-without-schemas-is-not-wrapped",
+              "an-action-that-returns-nothing-answers-204"
             ]
           }
         },

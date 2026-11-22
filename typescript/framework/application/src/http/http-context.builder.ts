@@ -1,4 +1,4 @@
-import type { ContainerContext, DetachedScope, ScopeContext } from '@putnami/runtime';
+import { BadRequestException, type ContainerContext, type DetachedScope, type ScopeContext } from '@putnami/runtime';
 import { SCOPE_CONTAINER_KEY } from '@putnami/runtime/inject';
 import { parseQueryString } from '@putnami/utils';
 import { HttpAbortException } from './http.exception';
@@ -182,7 +182,15 @@ const parseBody =
       return data as T;
     }
     if (contentType === 'application/json') {
-      return (await req.json()) as T;
+      // The text is read first so that only a parse failure, the caller's
+      // fault, answers 400; a failed read keeps its own error.
+      const text = await req.text();
+      if (text.trim() === '') return undefined;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        throw new BadRequestException('Malformed JSON body');
+      }
     }
     return undefined;
   };

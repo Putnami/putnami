@@ -88,6 +88,8 @@ Content-Type: application/json
 -> 400 { "message": "body.name must have length >= 1", ... }
 ```
 
+A body that is not valid JSON also answers `400`, with `"message": "Malformed JSON body"`.
+
 ### 6) Add a route with path parameter validation
 
 Create `packages/api/src/api/items/[id]/get.ts`:
@@ -100,6 +102,20 @@ export default endpoint()
   .handle((ctx) => {
     // ctx.params.id is typed as string and validated as UUID
     return { item: { id: ctx.params.id } };
+  });
+```
+
+### 7) Add a route that answers no content
+
+Create `packages/api/src/api/items/[id]/delete.ts`. A handler that returns nothing answers `204 No Content`:
+
+```ts
+import { endpoint, Uuid } from '@putnami/application';
+
+export default endpoint()
+  .params({ id: Uuid })
+  .handle((ctx) => {
+    console.log(`deleting ${ctx.params.id}`);
   });
 ```
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type { HttpPlugin, RouteHandler } from '@putnami/application';
 import { type HttpRequestContext, HttpResponse, redirect } from '@putnami/application';
 import { HttpException } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import type { RouteObject } from 'react-router';
 import { runInContext } from '../../runtime/src/context/context.utils';
 import { actionHandler } from '../src/ssr/handlers/action.handler';
@@ -188,6 +189,26 @@ describe('action outcome slot — the HTTP form route', () => {
     expect(result).toEqual({ task: { id: 7 } });
     expect(outcomeOf(ctx)).toEqual({ route: '/tasks/[id]', outcome: 'ok' });
   });
+
+  specTest(
+    'answers 204 No Content when the action returns nothing',
+    {
+      feature: 'typescript/web-application-delivery',
+      requirement: 'server-data-boundary',
+      check: 'an-action-that-returns-nothing-answers-204',
+    },
+    async () => {
+      const ctx = createContext(ROUTE);
+      const route = registerAction(() => undefined);
+
+      const result = await route(ctx);
+
+      // Left undefined, the dispatcher would fall through and answer 404.
+      expect(result).toBeInstanceOf(HttpResponse);
+      expect((result as HttpResponse).status).toBe(204);
+      expect(outcomeOf(ctx)?.outcome).toBe('ok');
+    },
+  );
 
   it('publishes validation_error for a returned 422', async () => {
     const ctx = createContext(ROUTE);

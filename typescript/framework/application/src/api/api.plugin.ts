@@ -33,7 +33,7 @@ import { registerWsHandlers, upgradeToWebSocket } from './api-ws.utils';
 import type { DiscoveredRoute } from './discovered-route.type';
 import { normalizeGeneratedHttpRoutePath, type GeneratedHttpRoute } from '../http-routes/generation';
 import { isEndpointDefinition } from './route';
-import { buildAotValidatedHandler, buildDefinition } from './route/endpoint-helpers';
+import { buildDefinition, buildHttpEndpointHandler } from './route/endpoint-helpers';
 import type { EndpointMeta, ResponseDeclarations, ResponseMeta } from './route/response-meta';
 import type { StreamEndpointDefinition } from './route/stream-endpoint';
 import { isStreamEndpointDefinition } from './route/stream-endpoint';
@@ -228,8 +228,8 @@ export class ApiPlugin implements Plugin {
         this.assertExternalContract(method, prefixedPath, endpointTarget.meta?.client);
         // Build-time AOT: swap the generic validation for compiled validators when
         // the codegen emitted them and the route has no middleware to preserve.
-        const routeHandler =
-          aot && !endpointTarget.middleware ? buildAotValidatedHandler(endpointTarget, aot) : endpointTarget.handler;
+        // An empty result answers 204 here, inside the endpoint's middleware.
+        const routeHandler = buildHttpEndpointHandler(endpointTarget, aot);
         this.httpPlugin.route(method, prefixedPath, routeHandler, {
           accept: API_ACCEPT,
           // Per-endpoint `.csrfExempt()` opts this single route out of CSRF;
@@ -246,7 +246,7 @@ export class ApiPlugin implements Plugin {
         const ep = exports[m];
         if (isEndpointDefinition(ep)) {
           this.assertExternalContract(m, prefixedPath, ep.meta?.client);
-          this.httpPlugin.route(m, prefixedPath, ep.handler, {
+          this.httpPlugin.route(m, prefixedPath, buildHttpEndpointHandler(ep), {
             accept: API_ACCEPT,
             // Per-endpoint `.csrfExempt()` opts this single route out of CSRF;
             // otherwise fall back to the api-level default. Never widens siblings.

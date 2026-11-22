@@ -86,6 +86,22 @@ With `.inject()`: `handle((deps, ctx) => ...)`
 - `ctx.json(data, options?)` — JSON response helper
 - `ctx.redirect(url, status?)` — redirect helper
 
+### What an endpoint answers
+
+- An object or array: 200, serialized for the `Accept` header (JSON by default).
+- A string: 200 `text/plain`. An `HttpResponse`: sent as is.
+- `undefined`: 204 No Content with no body, or the status set on
+  `ctx.statusCode` when it is not 200. Use it for a delete or an update that
+  returns nothing. Its Connect or gRPC call answers the empty message.
+- A JSON body that does not parse: 400 Bad Request
+  (`{"statusCode":400,"message":"Malformed JSON body","error":"Bad Request"}`,
+  or the `{code,error,message}` envelope under a first-party client contract),
+  as soon as the handler or `.body()` validation reads it.
+- An `Accept` type the endpoint cannot serialize: 406 Not Acceptable.
+
+A raw `http()` route (`httpPlugin.get(...)`) differs: `undefined` lets the next
+matching route answer, and 404 when none does.
+
 ### Schema Types
 
 Primitives: `String`, `Number`, `Boolean`

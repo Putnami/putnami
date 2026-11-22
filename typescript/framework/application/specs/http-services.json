@@ -26,6 +26,14 @@
       ]
     },
     {
+      "id": "wildcard-accept",
+      "text": "A route that declares */* among its accept types matches a request whatever its Accept header; a match through that */* alone runs after every other route that matches the request."
+    },
+    {
+      "id": "malformed-json-body",
+      "text": "A request whose JSON body does not parse answers 400 Bad Request in the route's error body, never 500, as soon as the handler reads the body."
+    },
+    {
       "id": "method-fallbacks",
       "text": [
         "A HEAD request to a GET route answers the GET response's status and headers with no body, or the route's headMeta answer without running the handler.",

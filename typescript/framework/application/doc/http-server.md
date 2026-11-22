@@ -211,7 +211,7 @@ httpPlugin.get('/example', async (ctx: HttpRequestContext) => {
 | `params` | `Record<string, string>` | Path parameters |
 | `headers` | `Headers` | Request headers |
 | `user` | `Record<string, unknown> \| undefined` | Authenticated user claims (when set by auth middleware) |
-| `body<T>()` | `Promise<T>` | Parse JSON body |
+| `body<T>()` | `Promise<T>` | Parse the JSON, form or multipart body; a JSON body that does not parse throws a 400 Bad Request |
 | `formData()` | `Promise<FormData>` | Parse form data |
 | `queryParams()` | `URLSearchParams` | Query parameters |
 | `path()` | `string` | URL path |
@@ -254,6 +254,8 @@ httpPlugin.get('/health', () => 'OK');
 // Numbers → text response (200)
 httpPlugin.get('/count', () => 42);
 ```
+
+A raw route that returns `undefined` has not answered: the next route that matches the request runs, and the request answers 404 when none does. An [`endpoint()`](./endpoint-builder.md) served by `api()` is the operation its path names, so its `undefined` answers 204 No Content instead.
 
 ### HttpResponse
 
@@ -445,10 +447,21 @@ httpPlugin.use(errorMiddleware);
 Routes can have additional options:
 
 ```typescript
-httpPlugin.get('/protected', handler, {
-  // Route-specific options
+httpPlugin.get('/page', handler, {
+  // Media types this route answers. A request matches when it accepts one of
+  // them, accepts anything (`*/*` or no Accept), or the route lists `*/*`
+  // (that match runs after every other route that matches the request).
+  accept: ['text/html', '*/*'],
 });
 ```
+
+| Option | Meaning |
+|--------|---------|
+| `accept` | Media types the route answers. Without it the route answers any `Accept`. A route that lists `*/*` answers any `Accept` too, but a match through its `*/*` alone runs after every other route that matches the request: a route with `accept: ['text/markdown']` answers `Accept: text/markdown` first, and the `['text/html', '*/*']` route answers everything else. |
+| `statusCode` | Set on `ctx.statusCode` before the handler runs |
+| `csrfExempt` | Skip CSRF token validation (set for `api()` routes) |
+| `minimal` | Skip the always-on security middleware for a trusted hot path |
+| `securityHeaders` | `false` skips only the secure response headers |
 
 ## Server Access
 
