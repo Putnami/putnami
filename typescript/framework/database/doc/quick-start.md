@@ -10,26 +10,30 @@ bun add @putnami/database
 
 ## Step 1: Configure Database Connection
 
-Create a configuration file (`.env.local.yaml` or similar) with your PostgreSQL connection details:
+Create `conf/.env.local.yaml` with your PostgreSQL connection details. Each
+datasource has its own key under `database`; `default` is the one
+`database()` and repositories use when you name none:
 
 ```yaml
 database:
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: your_password
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
+    user: postgres
+    password: your_password
 ```
 
-For production or named datasources:
+For named datasources:
 
 ```yaml
 database:
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: your_password
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
+    user: postgres
+    password: your_password
 
   # Named datasources
   auth:
@@ -80,8 +84,8 @@ const CreateUsersTable = {
 };
 ```
 
-> For larger projects, author migrations as paired `.up.sql` / `.down.sql`
-> files and let the generate phase of `putnami build` emit them. See [Migrations](./migrations.md).
+> To keep the SQL in `.sql` files, import each file's text with
+> `with { type: 'text' }`; the build generates nothing for you. See [Migrations](./migrations.md).
 
 ## Step 4: Create a Repository
 

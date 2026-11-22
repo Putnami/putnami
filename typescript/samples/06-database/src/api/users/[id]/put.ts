@@ -1,4 +1,4 @@
-import { endpoint } from '@putnami/application';
+import { endpoint, notFound } from '@putnami/application';
 import { Optional, Uuid } from '@putnami/runtime';
 import { Repository } from '@putnami/database';
 import { Users } from '../../../tables/users';
@@ -16,7 +16,7 @@ export const PUT = endpoint()
     const existing = await repo.get({ id: ctx.params.id });
 
     if (!existing) {
-      return new Response('User not found', { status: 404 });
+      return notFound({ error: 'User not found' });
     }
 
     const body = await ctx.body();

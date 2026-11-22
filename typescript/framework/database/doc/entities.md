@@ -72,23 +72,8 @@ const UsersTable = Table("users", {
 });
 ```
 
-#### `migrations` (optional)
-
-Associates migrations with the table. These migrations will be registered and can be executed automatically.
-
-```typescript
-const CreateUsersTable = {
-  name: "20250101000000-create-users-table",
-  sql: `CREATE TABLE users (...)`,
-};
-
-const UsersTable = Table("users", {
-  id:    Key(String),
-  email: Column(String),
-}, {
-  migrations: [CreateUsersTable],
-});
-```
+A table definition creates no SQL and carries no migration. Declare the table
+in a migration source; see [Migrations](./migrations.md).
 
 ## Key Builder
 
@@ -132,17 +117,21 @@ const UsersTable = Table("users", {
 
 #### `autoGenerate` (optional)
 
-When `true`, the key will be auto-generated if not provided during save operations. This is typically used with UUID or serial columns.
+When `true`, the key may be absent when `save(..., { strict: true })` validates
+an entity. The framework generates no value: `save()` without a key throws
+`MISSING_PRIMARY_KEY`. Generate the id in code (`crypto.randomUUID()`), or
+insert with SQL and let the column default (`DEFAULT gen_random_uuid()`) fill it.
 
 ```typescript
 const UsersTable = Table("users", {
-  id: Key(Uuid, { autoGenerate: true }), // Auto-generated if not provided
+  id: Key(Uuid, { autoGenerate: true }), // the migration declares DEFAULT gen_random_uuid()
 });
 ```
 
 #### `columnType` (optional)
 
-Explicit PostgreSQL column type override.
+Documents the PostgreSQL type. The framework never reads it and generates no
+DDL: the migration declares the type.
 
 ```typescript
 const UsersTable = Table("users", {
@@ -208,7 +197,8 @@ const UsersTable = Table("users", {
 
 #### `columnType` (optional)
 
-Explicit PostgreSQL column type. Useful for custom types or when automatic type inference is not sufficient.
+Documents the PostgreSQL type. The framework never reads it and generates no
+DDL: the migration declares the type.
 
 ```typescript
 const UsersTable = Table("users", {
@@ -220,13 +210,15 @@ const UsersTable = Table("users", {
 
 #### `default` (optional)
 
-Default value for the column. Can be a literal value or a SQL expression.
+Marks the field as optional when `save(..., { strict: true })` validates an
+entity. The value is never sent to SQL: declare the default in the migration
+(`status TEXT NOT NULL DEFAULT 'active'`, `created_at TIMESTAMPTZ DEFAULT now()`).
 
 ```typescript
 const UsersTable = Table("users", {
   id:        Key(Uuid, { autoGenerate: true }),
   status:    Column(String, { default: "active" }),
-  createdAt: Column(DateIso, { default: "NOW()" }),
+  createdAt: Column(DateIso, { columnName: "created_at", default: "now()" }),
 });
 ```
 
@@ -321,20 +313,16 @@ Here is a complete example showcasing all features:
 import { Table, Column, Key, Uuid, Email, Optional, DateIso } from "@putnami/database";
 import type { InferTable } from "@putnami/database";
 
-const CreateUsersTable = {
-  name: "20250101000000-create-users-table",
-  sql: `
-    CREATE TABLE users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      email VARCHAR(255) UNIQUE NOT NULL,
-      full_name VARCHAR(255) NOT NULL,
-      bio TEXT,
-      tags JSONB DEFAULT '[]',
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    );
-  `,
-};
+// The migration that creates the table:
+//   CREATE TABLE users (
+//     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+//     email VARCHAR(255) UNIQUE NOT NULL,
+//     full_name VARCHAR(255) NOT NULL,
+//     bio TEXT,
+//     tags JSONB DEFAULT '[]',
+//     created_at TIMESTAMPTZ DEFAULT NOW(),
+//     updated_at TIMESTAMPTZ DEFAULT NOW()
+//   );
 
 const UsersTable = Table("users", {
   id:        Key(Uuid, { autoGenerate: true }),
@@ -349,7 +337,6 @@ const UsersTable = Table("users", {
   updatedAt: Column(DateIso, { columnName: "updated_at" }),
 }, {
   db: "main",
-  migrations: [CreateUsersTable],
 });
 
 type User = InferTable<typeof UsersTable>;
@@ -360,6 +347,6 @@ type User = InferTable<typeof UsersTable>;
 1. **Always define at least one `Key`** - Primary keys are required for repository operations
 2. **Use descriptive table names** - Pass an explicit table name as the first argument to `Table`
 3. **Use `Optional()` for nullable fields** - Wrap the schema primitive with `Optional()` instead of separate nullable options
-4. **Group related configuration** - Use table-level options for `db`, `schema`, and `migrations`
+4. **Group related configuration** - Use table-level options for `db` and `schema`
 5. **Document complex transformations** - Add comments for custom `toDatabase`/`fromDatabase` functions
 6. **Leverage `InferTable`** - Derive entity types from the table definition instead of maintaining separate type declarations

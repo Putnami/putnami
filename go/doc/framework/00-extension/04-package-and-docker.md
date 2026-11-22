@@ -2,6 +2,51 @@
 
 The Go extension can produce release artifacts for Go projects, including Docker images. It owns the `go` ecosystem profile — the module-path and version rules, the shape of the workspace's `registries.go` entry, and the job that reports each published member — and publishes to the `oci` ecosystem the extension SDK owns.
 
+## Package a service as an image
+
+`putnami package` builds only the channels you turn on. With no channel, it
+builds nothing and still succeeds. Turn the image channel on in the project's
+`putnami.json`:
+
+```json
+{
+  "name": "api",
+  "options": {
+    "package": {
+      "docker": true,
+      "port": 8080
+    }
+  }
+}
+```
+
+Each key under `options.package` is the default of the `putnami package` flag
+with the same name, so `"docker": true` is `--docker` and `"port": 8080` is
+`--port 8080`.
+
+```bash
+putnami package --projects api --docker-load --docker-tag local
+docker run --rm -p 8080:8080 api:local
+```
+
+Add `--platform linux/arm64` on Apple silicon. `package` compiles its own
+binary, so it needs no prior `putnami build`. To pass the database connection
+to the container, see
+[Connect at run time](/docs/frameworks/go/persistence#connect-at-run-time).
+
+### The image port
+
+The image sets `PORT=3000` unless you pass `--port` or set
+`options.package.port`. The Go HTTP server listens on `PORT` when it is set,
+whatever `http.ServerConfig.Port` says. So a service that listens on 8080
+outside the image listens on 3000 inside it. Do one of these:
+
+- Set `options.package.port` to the port you publish, as above.
+- Override it at run time: `docker run -e PORT=8080 -p 8080:8080 ...`.
+
+The complete flag list is in the
+[package reference](../../../extension/doc/package.md#flags).
+
 ## Docker
 
 When the `docker` publish channel is enabled, the Go extension assembles a digest-pinned `gcr.io/distroless/static:nonroot` image around the statically linked binary.

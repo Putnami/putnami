@@ -64,11 +64,16 @@ my-api/
 ├── test/
 │   └── api.test.ts           # API integration test
 ├── tsconfig.json
-├── .putnamirc.json
+├── putnami.json
 └── package.json
 ```
 
 **package.json:** Exports `./serve` pointing to `src/serve.ts`. Depends on `@putnami/application`.
+`putnami serve` runs `src/serve.ts`; the compiled binary imports `app` from
+`src/main.ts` instead, so keep startup code in `app`.
+
+`putnami init --project <name>` creates a `typescript-web` project. To start a
+workspace with an API, run `putnami init`, then `putnami projects create my-api --template typescript-server`.
 
 **Use case:** JSON APIs, backend services, microservices.
 
@@ -102,7 +107,7 @@ my-app/
 ├── test/
 │   └── app.test.ts           # Application test
 ├── tsconfig.json
-├── .putnamirc.json
+├── putnami.json
 └── package.json
 ```
 

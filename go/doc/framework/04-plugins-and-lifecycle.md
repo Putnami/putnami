@@ -47,6 +47,44 @@ func main() {
 }
 ```
 
+### `main` runs at build time
+
+`putnami build` runs the service's `main` once, with `PUTNAMI_DESCRIBE` set,
+to write the generated contracts: OpenAPI, configuration schema, migration
+bundle and infrastructure requirements. In that run, `ListenAndServe` runs
+`Configure` on every plugin, writes the artifacts, and exits. It never starts
+the application, so no database pool opens and no server listens.
+
+Everything `main` does before `ListenAndServe` still runs. Keep `main` to
+loading configuration, composing plugins and calling `ListenAndServe`:
+
+- Do not resolve `*database.Pool` from the container in `main`, open a pool,
+  or ping the database there. No database is reachable at build time, so the
+  build fails.
+- Resolve dependencies where they are used: in a handler through
+  `http.Inject`, in a provider factory, or in a plugin's `Start`.
+
+```go
+func main() {
+    cfg, err := config.Load(serverDef) // a ServerConfig with Port and DatabaseURL
+    if err != nil {
+        log.Fatal(err)
+    }
+    server := http.NewServerPlugin(http.ServerConfig{Port: cfg.Port})
+    server.GET("/users/{id}", http.Inject(getUser)) // getUser takes *database.Pool
+
+    a := app.New("my-service")
+    a.Use(server)
+    a.Use(database.NewPlugin(database.PluginConfig{
+        Datasource: "default",
+        Pool:       database.PoolConfig{DSN: cfg.DatabaseURL},
+    }))
+    if err := a.ListenAndServe(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
 ### Custom runner
 
 For applications that need a main loop:

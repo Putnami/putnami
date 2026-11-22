@@ -32,7 +32,7 @@ between the warmup and migrate phases of the application lifecycle.
 ```ts
 import type { MigrationContributor, MigrationSource } from '@putnami/migration';
 import { sqlSourceInline } from '@putnami/database';
-import { iamMigrations } from './.gen/migrations.gen';
+import { iamMigrations } from './migrations'; // an array of SQLDefinition you write
 
 class IamPlugin implements Plugin, MigrationContributor {
   name = 'iam';
@@ -50,7 +50,7 @@ class IamPlugin implements Plugin, MigrationContributor {
 ```
 
 Returning multiple sources is the supported stacking pattern: a single feature
-can mix codegen-backed SQL sources with inline definitions, and can contribute
+can mix several SQL sources, and can contribute
 to several kinds in the same plugin.
 
 `isMigrationContributor(value)` is the runtime type guard the lifecycle uses to

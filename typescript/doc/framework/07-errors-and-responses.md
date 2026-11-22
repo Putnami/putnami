@@ -346,7 +346,7 @@ export default endpoint(async (ctx) => {
 ### Success codes
 
 ```ts
-import { endpoint, HttpResponse, json } from '@putnami/application';
+import { endpoint, json, noContent } from '@putnami/application';
 
 // 200 OK (default)
 return { data: 'value' };
@@ -354,10 +354,10 @@ return { data: 'value' };
 // 201 Created
 return json({ id: newId }, { status: 201 });
 
-// 204 No Content
+// 204 No Content: return noContent(). Returning undefined answers 404.
 export default endpoint(async () => {
   await deleteResource();
-  return undefined;
+  return noContent();
 });
 ```
 

@@ -32,11 +32,12 @@ Create `.env.local.yaml`:
 
 ```yaml
 database:
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: your_password
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
+    user: postgres
+    password: your_password
 ```
 
 #### Cloud SQL on GCP
@@ -337,8 +338,9 @@ const found = await userRepo.findByEmail("john@example.com");
 
 ```yaml
 database:
-  host: localhost
-  database: main_db
+  default:
+    host: localhost
+    database: main_db
 
   auth:
     host: auth-db.example.com
@@ -391,14 +393,15 @@ await sql.begin(async (sql) => {
 
 ```yaml
 database:
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: your_password
-  ssl: false
-  poolSize: 10
-  debug: false
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
+    user: postgres
+    password: your_password
+    ssl: false
+    poolSize: 10
+    debug: false
 ```
 
 ### Session Store Configuration

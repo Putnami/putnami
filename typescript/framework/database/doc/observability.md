@@ -151,9 +151,10 @@ Enable slow-query warnings by setting a threshold in your database configuration
 
 ```yaml
 database:
-  host: localhost
-  database: myapp
-  slowQueryThresholdMs: 200   # Warn on queries taking >= 200ms
+  default:
+    host: localhost
+    database: myapp
+    slowQueryThresholdMs: 200   # Warn on queries taking >= 200ms
 ```
 
 When a query exceeds the threshold:
@@ -178,16 +179,17 @@ These metrics help monitor connection pool churn and ensure pools are being reus
 
 ```yaml
 database:
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: secret
-  ssl: false
-  poolSize: 10
-  debug: false                 # Log raw SQL queries with parameters
-  queryProfiling: false        # Legacy profiling flag (superseded by observability)
-  slowQueryThresholdMs: 200    # Warn on slow queries (0 = disabled)
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
+    user: postgres
+    password: secret
+    ssl: false
+    poolSize: 10
+    debug: false                 # Log raw SQL queries with parameters
+    queryProfiling: false        # Legacy profiling flag (superseded by observability)
+    slowQueryThresholdMs: 200    # Warn on slow queries (0 = disabled)
 ```
 
 | Option | Type | Default | Description |
@@ -225,9 +227,7 @@ const OrdersTable = Table('orders', {
   id:     Key(Uuid),
   status: Column(String),
   total:  Column(Number),
-}, {
-  migrations: [{ name: '001-create-orders', sql: `CREATE TABLE IF NOT EXISTS orders (...)` }],
-});
+}); // a migration creates the orders table: see migrations.md
 
 // 2. Create repository
 class OrderRepository extends Repository<typeof OrdersTable> {

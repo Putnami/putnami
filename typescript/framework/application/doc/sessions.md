@@ -127,10 +127,11 @@ import '@putnami/database';
 session:
   store: 'database'
 database:
-  host: 'localhost'
-  database: 'myapp'
-  user: 'postgres'
-  password: 'password'
+  default:
+    host: 'localhost'
+    database: 'myapp'
+    user: 'postgres'
+    password: 'password'
 ```
 
 ## Session API

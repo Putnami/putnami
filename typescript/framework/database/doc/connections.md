@@ -18,29 +18,35 @@ This guide covers how to configure and manage database connections, including mu
 
 ### YAML Configuration
 
-Configure your database connection in `.env.local.yaml` or similar:
+Configure your database connection in `conf/.env.local.yaml`, under the
+datasource name (`default` unless you name another):
 
 ```yaml
 database:
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: your_password
-  ssl: false
-  poolSize: 10
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
+    user: postgres
+    password: your_password
+    ssl: false
+    poolSize: 10
 ```
 
 ### Environment Variables
 
-You can also use environment variables:
+No `DATABASE_HOST`-style variable is read. Use one of these:
 
-```bash
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_DATABASE=myapp
-DATABASE_USER=postgres
-DATABASE_PASSWORD=your_password
+- `DATABASE_BINDINGS`: a binding document, such as
+  `{"protocolVersion":1,"databases":{"default":{"engine":"postgres","schema":"public","connection":{"dsn":"postgres://user:pass@localhost:5432/myapp"}}}}`.
+  It wins over the `database.default` configuration.
+- A `${VAR}` reference in a config file, which expands from the environment:
+
+```yaml
+database:
+  default:
+    host: ${DB_HOST}
+    password: ${DB_PASSWORD}
 ```
 
 ### Programmatic Configuration
@@ -49,8 +55,9 @@ Configure connections programmatically:
 
 ```typescript
 import { database, PostgresConfig } from "@putnami/database";
+import type { InferConfig } from "@putnami/runtime";
 
-const config: PostgresConfig = {
+const config: InferConfig<typeof PostgresConfig> = {
   host: "localhost",
   port: 5432,
   database: "myapp",
@@ -72,11 +79,12 @@ Configure multiple database connections for different purposes:
 ```yaml
 database:
   # Default connection
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: password
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
+    user: postgres
+    password: password
 
   # Named datasources
   auth:
@@ -226,12 +234,13 @@ Enable SSL for secure connections:
 
 ```yaml
 database:
-  host: db.example.com
-  port: 5432
-  database: myapp
-  user: postgres
-  password: password
-  ssl: true
+  default:
+    host: db.example.com
+    port: 5432
+    database: myapp
+    user: postgres
+    password: password
+    ssl: true
 ```
 
 ### Unix Socket
@@ -240,9 +249,10 @@ Set `host` to the socket directory (the part before `.s.PGSQL.5432`):
 
 ```yaml
 database:
-  host: /var/run/postgresql
-  database: myapp
-  user: postgres
+  default:
+    host: /var/run/postgresql
+    database: myapp
+    user: postgres
 ```
 
 **Note:** When `host` starts with `/`, it is treated as a Unix socket
@@ -254,9 +264,10 @@ Enable query debugging:
 
 ```yaml
 database:
-  host: localhost
-  database: myapp
-  debug: true
+  default:
+    host: localhost
+    database: myapp
+    debug: true
 ```
 
 When enabled, all SQL queries are logged with parameters and types.
@@ -267,11 +278,12 @@ Enable query performance profiling:
 
 ```yaml
 database:
-  host: localhost
-  database: myapp
-  queryProfiling: true  # Enable query profiling
-  # OR
-  debug: true  # Also enables query profiling
+  default:
+    host: localhost
+    database: myapp
+    queryProfiling: true  # Enable query profiling
+    # OR
+    debug: true  # Also enables query profiling
 ```
 
 When enabled, repository operations log:
@@ -287,9 +299,10 @@ Enable warnings for queries that exceed a duration threshold:
 
 ```yaml
 database:
-  host: localhost
-  database: myapp
-  slowQueryThresholdMs: 200  # Warn on queries >= 200ms
+  default:
+    host: localhost
+    database: myapp
+    slowQueryThresholdMs: 200  # Warn on queries >= 200ms
 ```
 
 When a query exceeds the threshold, a `warn`-level log is emitted and the `sql.query.slow` telemetry counter is incremented. Set to `0` (default) to disable.
@@ -304,9 +317,10 @@ Configure the connection pool size:
 
 ```yaml
 database:
-  host: localhost
-  database: myapp
-  poolSize: 20  # Maximum number of connections in the pool
+  default:
+    host: localhost
+    database: myapp
+    poolSize: 20  # Maximum number of connections in the pool
 ```
 
 **Default:** 10 connections
@@ -462,8 +476,9 @@ socket directory:
 
 ```yaml
 database:
-  host: /cloudsql/PROJECT:REGION:INSTANCE
-  database: myapp
+  default:
+    host: /cloudsql/PROJECT:REGION:INSTANCE
+    database: myapp
 ```
 
 Because `host` is a Unix socket and no `password` is set, every connection
@@ -478,9 +493,10 @@ application-default login` credentials, so no password is needed:
 
 ```yaml
 database:
-  host: localhost
-  port: 6543
-  database: myapp
+  default:
+    host: localhost
+    port: 6543
+    database: myapp
 ```
 
 ### User auto-resolution
@@ -536,11 +552,13 @@ Match pool size to your application's needs:
 ```yaml
 # Development
 database:
-  poolSize: 5
+  default:
+    poolSize: 5
 
 # Production
 database:
-  poolSize: 20
+  default:
+    poolSize: 20
 ```
 
 ### 4. Use Named Datasources for Separation
@@ -566,8 +584,9 @@ Always use SSL for production databases:
 
 ```yaml
 database:
-  host: db.example.com
-  ssl: true  # Required for production
+  default:
+    host: db.example.com
+    ssl: true  # Required for production
 ```
 
 ### 6. Use Environment-Specific Configs
@@ -577,14 +596,16 @@ Different configurations for different environments:
 ```yaml
 # .env.local.yaml (development)
 database:
-  host: localhost
-  database: myapp_dev
+  default:
+    host: localhost
+    database: myapp_dev
 
 # .env.production.yaml (production)
 database:
-  host: db.example.com
-  database: myapp_prod
-  ssl: true
+  default:
+    host: db.example.com
+    database: myapp_prod
+    ssl: true
 ```
 
 ### 7. Monitor Connection Usage

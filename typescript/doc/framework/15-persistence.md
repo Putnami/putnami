@@ -15,42 +15,88 @@ bunx putnami deps add @putnami/database
 ### Enable the SQL plugin
 
 ```ts
-import { application } from '@putnami/application';
+import { application, http } from '@putnami/application';
 import { sql } from '@putnami/database';
 
-export const app = () => application().use(sql());
+export const app = () =>
+  application()
+    .use(http())
+    .use(sql({ autoApply: true }))
+    .use(usersMigrations); // see Migrations below
 ```
+
+`autoApply: true` applies pending migrations at startup, before the server
+listens. Without it, `sql()` applies none.
 
 ### Database configuration
 
-Configure your database in `.env.local.yaml`:
+The connection of the datasource `default` comes from the first of these that
+is present:
+
+1. A database binding: the `database.databases` section of the configuration,
+   or the `DATABASE_BINDINGS` environment variable. A deploy target injects one
+   of them.
+2. The `database.default` section of the configuration.
+
+For local development, put the connection in `conf/.env.local.yaml`:
 
 ```yaml
 database:
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: your_password
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
+    user: postgres
+    password: your_password
 ```
+
+The framework reads no `DATABASE_URL` or `DATABASE_HOST` variable. To pass a
+plain Postgres URL at run time, set `DATABASE_BINDINGS` to a binding document:
+
+```bash
+DATABASE_BINDINGS='{"protocolVersion":1,"databases":{"default":{"engine":"postgres","schema":"public","connection":{"dsn":"postgres://user:pass@127.0.0.1:5432/myapp"}}}}'
+```
+
+Or reference the variable from a config file: string values expand `${VAR}`
+from the environment.
+
+```yaml
+database:
+  protocolVersion: 1
+  databases:
+    default:
+      engine: postgres
+      schema: public
+      connection:
+        dsn: ${DATABASE_URL}
+```
+
+A compiled binary or container image ships no `conf/` directory. There, use
+`DATABASE_BINDINGS` or `CONFIG_DATA`; see
+[Publish & Docker](/docs/frameworks/typescript/extension/publish-and-docker).
 
 ### Configuration options
 
 ```yaml
 database:
-  host: localhost           # Database host
-  port: 5432                # Database port
-  socket: '/tmp/.s.PGSQL.5432'  # Unix socket (alternative to host)
-  database: myapp           # Database name
-  user: postgres            # Username
-  password: secret          # Password
-  ssl: false                # Enable SSL (or SSL config object)
-  queryProfiling: false     # Log all queries
-  debug: false              # Debug mode
-  slowQueryThresholdMs: 0   # Warn on slow queries (ms, 0 = disabled)
+  default:
+    host: localhost           # Database host; a path starting with / is a Unix socket directory
+    port: 5432                # Database port
+    database: myapp           # Database name
+    user: postgres            # Username
+    password: secret          # Password
+    ssl: false                # true or false; on by default for remote TCP hosts
+    poolSize: 10              # Maximum connections
+    queryProfiling: false     # Log all queries
+    debug: false              # Debug mode
+    slowQueryThresholdMs: 0   # Warn on slow queries (ms, 0 = disabled)
+    statementTimeoutMs: 30000 # statement_timeout (ms, 0 = disabled)
 ```
 
 ## Defining tables
+
+A table definition maps a TypeScript shape to an existing table. It creates no
+table: a migration owns the table, its SQL types and its defaults.
 
 ### Basic table
 
@@ -70,13 +116,13 @@ export type User = InferTable<typeof UsersTable>;
 ### Table with column options
 
 ```ts
-import { Table, Column, Key, Uuid, Optional, Int, DateIso } from '@putnami/database';
+import { Table, Column, Key, Uuid, Optional, DateIso } from '@putnami/database';
 import type { InferTable } from '@putnami/database';
 
 const ProductsTable = Table('products', {
   id:          Key(Uuid),
   name:        Column(String, { columnName: 'product_name' }),
-  price:       Column(Number, { columnType: 'decimal(10,2)' }),
+  price:       Column(Number),
   description: Column(Optional(String)),
   active:      Column(Boolean, { default: true }),
   createdAt:   Column(DateIso, { columnName: 'created_at' }),
@@ -87,16 +133,15 @@ export type Product = InferTable<typeof ProductsTable>;
 
 ### Column options
 
-- **columnName** - Database column name (defaults to property name)
-- **columnType** - SQL type (auto-detected if not specified)
-- **default** - Default value for new records
+- **columnName** - Database column name. The default is the property name in snake_case: the connection turns `createdAt` into `created_at`. Set it when the column has another name.
+- **default** - Makes the field optional when `save(..., { strict: true })` validates it. It is never sent to SQL: declare the default in the migration.
 - **toDatabase** - Transform value before saving
 - **fromDatabase** - Transform value after loading
 
 ### Key options
 
 - **columnName** - Database column name for the primary key
-- **autoGenerate** - Auto-generate key values (default: false)
+- **autoGenerate** - Makes the key optional under strict validation. `save()` still needs a key value: generate the id in code (`crypto.randomUUID()`), or insert with SQL and `RETURNING` (see [Direct database access](#direct-database-access)).
 
 ### Optional columns
 
@@ -111,23 +156,31 @@ const UsersTable = Table('users', {
 });
 ```
 
+### Raw rows are camelCase
+
+Queries through `this.conn()` return rows with camelCase keys: the column
+`created_at` comes back as `createdAt`. Filters and `orderBy` take property
+names (`'createdAt DESC'`), not column names.
+
 ## Migrations
 
 ### Inline migrations
 
-Attach migrations directly to table definitions:
+A migration is a name, its SQL, and an optional `down`. Group migrations in a
+source with `sqlSourceInline`, and contribute the source from a plugin's
+`migrationSources`:
 
 ```ts
-import { Table, Column, Key, Uuid, Email, Optional, DateIso } from '@putnami/database';
+import { sqlSourceInline } from '@putnami/database';
 
 const CreateUsersTable = {
   name: '20250101000000-create-users-table',
   sql: `
     CREATE TABLE IF NOT EXISTS users (
-      id UUID PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       email VARCHAR(255) UNIQUE NOT NULL,
       name VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `,
   down: `DROP TABLE IF EXISTS users;`,
@@ -139,20 +192,26 @@ const AddUserAvatar = {
   down: `ALTER TABLE users DROP COLUMN IF EXISTS avatar_url;`,
 };
 
-const UsersTable = Table('users', {
-  id:        Key(Uuid),
-  email:     Column(Email),
-  name:      Column(String),
-  avatarUrl: Column(Optional(String), { columnName: 'avatar_url' }),
-  createdAt: Column(DateIso, { columnName: 'created_at' }),
-}, {
-  migrations: [CreateUsersTable, AddUserAvatar],
+export const usersMigrationSource = sqlSourceInline({
+  namespace: 'users',
+  datasource: { name: 'default', schema: 'public' },
+  definitions: [CreateUsersTable, AddUserAvatar],
 });
+
+export const usersMigrations = {
+  name: 'users-migrations',
+  migrationSources: () => [usersMigrationSource],
+};
 ```
+
+Register the plugin next to `sql({ autoApply: true })`, as in
+[Enable the SQL plugin](#enable-the-sql-plugin). TypeScript has no loader for
+`.up.sql` files: declare each migration inline.
 
 ### Migration naming convention
 
-Use timestamp prefixes for ordering:
+Use timestamp prefixes for ordering. Migrations run in name order, per
+datasource; the namespace becomes a prefix (`users/20250101000000-create-users-table`).
 
 ```text
 YYYYMMDDHHMMSS-description
@@ -163,24 +222,70 @@ YYYYMMDDHHMMSS-description
 
 ### Running migrations
 
-Migrations run automatically when the application starts. The `sql()` plugin tracks executed migrations in a `migrations` table.
+With `sql({ autoApply: true })`, the application applies pending migrations
+when it starts, before the server listens, and records each one in the
+`migration.migrations` table. A restart skips the applied ones. The Go runner
+shares this table and its lock, so both languages can target one database.
 
 ### Rollback
 
-Add a `down` property to make migrations reversible:
+Add a `down` property to make migrations reversible. Run the migration command
+against the same application builder the server uses:
 
 ```ts
-import { get } from '@putnami/runtime';
-import { MigrationService } from '@putnami/database';
+// src/migrate.ts
+import { runMigrateAndExit } from '@putnami/migration/cli';
+import { app } from './main';
 
-const service = get(MigrationService);
-
-// Roll back the last migration on the default database
-await service.rollback('default');
-
-// Roll back to a specific migration (everything after it is undone)
-await service.rollbackTo('20250101000000-create-users-table', 'default');
+await runMigrateAndExit(app);
 ```
+
+```bash
+bun src/migrate.ts down     # roll back the latest migration
+bun src/migrate.ts status   # list known and applied migrations
+```
+
+### Test against Postgres
+
+`putnami test` starts a throwaway Postgres and passes it to the tests in
+`DATABASE_TEST_BINDINGS`. `provision()` creates an empty, isolated database
+for the suite. Start the application on it with `createTestApp`, and let
+`sql({ autoApply: true })` apply the migrations:
+
+```ts
+import { afterAll, beforeAll, expect, it } from 'bun:test';
+import { createTestApp, type TestApp } from '@putnami/application/testing';
+import { api } from '@putnami/application';
+import { provision, sql } from '@putnami/database';
+import { usersMigrations } from '../src/db/users';
+
+let db: Awaited<ReturnType<typeof provision>>;
+let testApp: TestApp;
+
+beforeAll(async () => {
+  db = await provision();
+  testApp = await createTestApp({
+    plugins: [sql({ autoApply: true }), usersMigrations, api({ scanPath: 'src/api' })],
+  });
+});
+
+afterAll(async () => {
+  await testApp?.stop();
+  await db?.cleanup();
+});
+
+it('lists users', async () => {
+  const res = await testApp.fetch('/users');
+  expect(res.status).toBe(200);
+});
+```
+
+`provision({ sources })` applies those sources only when the test binding sets
+`applyMigrations`; the binding `putnami test` passes does not.
+
+`putnami test` starts the database only for a project that commits an
+`infra/requirements.json` declaring one. The build writes that file when the
+project uses `sql()`. See [Testing](/docs/frameworks/typescript/testing).
 
 ## Repository pattern
 
@@ -468,14 +573,14 @@ For comprehensive patterns (JOINs, subqueries, CTEs, aggregations, window functi
 ### Named connections
 
 ```yaml
-# .env.local.yaml
+# conf/.env.local.yaml
 database:
-  host: localhost
-  database: main_db
-
-database.analytics:
-  host: analytics-host
-  database: analytics_db
+  default:
+    host: localhost
+    database: main_db
+  analytics:
+    host: analytics-host
+    database: analytics_db
 ```
 
 ```ts
@@ -620,7 +725,8 @@ All repository operations emit structured logs and telemetry metrics automatical
 
 ```yaml
 database:
-  slowQueryThresholdMs: 200   # Warn on queries >= 200ms
+  default:
+    slowQueryThresholdMs: 200   # Warn on queries >= 200ms
 ```
 
 ```text

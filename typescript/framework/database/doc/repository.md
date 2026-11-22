@@ -514,9 +514,10 @@ try {
 
 ```yaml
 database:
-  host: localhost
-  database: myapp
-  slowQueryThresholdMs: 200  # Warn on queries >= 200ms (0 = disabled)
+  default:
+    host: localhost
+    database: myapp
+    slowQueryThresholdMs: 200  # Warn on queries >= 200ms (0 = disabled)
 ```
 
 ### How It Works

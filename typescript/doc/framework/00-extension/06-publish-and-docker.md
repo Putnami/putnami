@@ -2,6 +2,72 @@
 
 The TypeScript extension contributes TypeScript-specific release artifacts. It owns the `npm` ecosystem profile — the coordinate and version rules, the shape of the workspace's `registries.npm` entry, and the job that reports each published member — and publishes to the `oci` ecosystem the extension SDK owns.
 
+## Package a service as an image
+
+`putnami package` builds only the channels you turn on. With no channel, it
+builds nothing and still succeeds. Turn the image channel on in the project's
+`putnami.json`:
+
+```json
+{
+  "name": "api",
+  "options": {
+    "package": {
+      "docker": true,
+      "port": 8080
+    }
+  }
+}
+```
+
+Each key under `options.package` is the default of the `putnami package` flag
+with the same name, so `"docker": true` is `--docker` and `"port": 8080` is
+`--port 8080`.
+
+```bash
+putnami package --projects api --docker-load --docker-tag local
+docker run --rm -p 8080:8080 -e DATABASE_BINDINGS='<binding JSON>' api:local
+```
+
+Add `--platform linux/arm64` on Apple silicon. The image holds the compiled
+binary and the project's `.gen/public` assets, on a distroless base.
+
+### The image port
+
+The image sets `PORT` and exposes that port: 3000 unless you pass `--port` or
+set `options.package.port`. `http()` listens on its `port` option when you pass
+one, then on `PORT`, then on the `putnami.port` config value (3000). Leave the
+port out of `http()` so the service follows `PORT`, and set
+`options.package.port` to the port you publish. To change it at run time, pass
+`-e PORT=8080`.
+
+### What the compiled binary runs
+
+`putnami build --compile` and the image compile one entry point. For an
+application built on `@putnami/application`, it is a generated file,
+`.gen/src/serve.bundled.ts`. That file imports `app` from the module that
+`package.json#main` names (`src/main.ts` by default) and calls
+`bootstrapServe(app)`. So:
+
+- The binary never runs `src/serve.ts`. Code there runs only under
+  `putnami serve`. Put startup code in the `app` builder that `main` exports.
+- `main` must export `app`, a function that returns the application.
+
+The binary embeds no `conf/` directory. It reads `conf/.env*.yaml` from its
+working directory (or `PUTNAMI_PROJECT_ROOT`) when it finds one there, and the
+image ships none. In a container, configure the service with environment
+variables: fields declared with `Env(...)`, `CONFIG_DATA` (a YAML document),
+and `DATABASE_BINDINGS` for the database. See
+[Configuration](/docs/frameworks/typescript/configuration) and
+[Persistence](/docs/frameworks/typescript/persistence#database-configuration).
+
+To run the binary without Docker:
+
+```bash
+putnami build --projects api --compile
+PORT=8080 .putnami/out/api/~build/compile/serve.bundled-darwin-arm64
+```
+
 ## Publish channels
 
 Enable channels in project config:

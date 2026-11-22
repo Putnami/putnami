@@ -100,11 +100,16 @@ To enable package channels:
   "options": {
     "package": {
       "archives": true,
-      "docker": true
+      "docker": true,
+      "port": 8080
     }
   }
 }
 ```
+
+Without a channel, `putnami package` builds nothing. The image sets
+`PORT=3000` unless `port` names another value, and the Go HTTP server listens
+on `PORT`. See [Package & Docker](../doc/framework/00-extension/04-package-and-docker.md).
 
 ## Support and contract
 

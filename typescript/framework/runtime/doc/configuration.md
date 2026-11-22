@@ -195,10 +195,11 @@ Example `conf/.env.local.yaml`:
 
 ```yaml
 database:
-  host: localhost
-  port: 5432
-  name: myapp_db
-  password: secret123
+  default:
+    host: localhost
+    port: 5432
+    database: myapp_db
+    password: secret123
 ```
 
 ## Schema Primitives

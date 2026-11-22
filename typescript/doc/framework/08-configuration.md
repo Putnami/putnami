@@ -30,9 +30,10 @@ putnami:
     ssrTimeout: 5000
 
 database:
-  host: localhost
-  port: 5432
-  database: myapp
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
 
 logger:
   level: info
@@ -43,7 +44,8 @@ logger:
 ```yaml
 # .env.local.yaml (gitignored)
 database:
-  password: my-local-password
+  default:
+    password: my-local-password
 
 oauth:
   clientSecret: my-dev-secret
@@ -57,8 +59,9 @@ putnami:
   port: 8080
 
 database:
-  host: prod-db.example.com
-  ssl: true
+  default:
+    host: prod-db.example.com
+    ssl: true
 
 logger:
   level: warn
@@ -225,7 +228,8 @@ Reference environment variables using `${VAR_NAME}`:
 
 ```yaml
 database:
-  password: ${DATABASE_PASSWORD}
+  default:
+    password: ${DATABASE_PASSWORD}
 
 oauth:
   clientSecret: ${OAUTH_CLIENT_SECRET}
@@ -313,13 +317,14 @@ putnami:
 
 ```yaml
 database:
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: secret
-  ssl: false
-  queryProfiling: false
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
+    user: postgres
+    password: secret
+    ssl: false
+    queryProfiling: false
 ```
 
 ### Sessions
@@ -480,8 +485,9 @@ Create `.env.test.yaml` for test-specific values:
 
 ```yaml
 database:
-  host: localhost
-  database: myapp_test
+  default:
+    host: localhost
+    database: myapp_test
 
 logging:
   level: error

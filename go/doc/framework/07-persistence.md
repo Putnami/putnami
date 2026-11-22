@@ -324,45 +324,6 @@ query, args := database.Delete("users").
 // query: DELETE FROM "users" WHERE active = $1 RETURNING "id"
 ```
 
-## Migrations
-
-Migrations are Go values registered against a `*database.Registry`. The Go
-and TypeScript runners share the canonical `migration.migrations` state store
-and a per-datasource Postgres advisory lock, so both languages can target the
-same database safely.
-
-```go
-import "go.putnami.dev/database"
-
-// Register migrations (typically in package init)
-_ = database.DefaultRegistry.Register("default", database.Definition{
-    Name: "20260512120000-create-users",
-    SQL:  "CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT NOT NULL);",
-    Down: "DROP TABLE users;",
-})
-
-migrator := database.NewMigrator(stdDB, database.MigrationConfig{})
-
-// Run pending migrations for this datasource
-applied, err := migrator.Up(ctx)
-
-// Roll back the most recent migration
-last, err := migrator.Rollback(ctx)
-
-// Roll back every migration applied after the named target
-rolledBack, err := migrator.RollbackTo(ctx, "20260512120000-create-users")
-
-// Read every recorded migration row
-status, err := migrator.Status(ctx)
-
-// Roll back every applied migration
-all, err := migrator.Reset(ctx)
-```
-
-Each operation runs inside one transaction per migration, and `down_sql` is
-persisted alongside its hash so rollbacks remain available after the code
-that registered the migration is removed.
-
 ## Plugin
 
 The SQL plugin integrates the connection pool with the application lifecycle:
@@ -374,18 +335,142 @@ import (
 )
 
 a := app.New("my-service")
-a.Module.Use(database.NewPlugin(database.PluginConfig{
-    Pool: database.PoolConfig{
-        DSN:      "postgres://localhost/mydb",
-        MaxConns: 10,
-    },
+a.Use(database.NewPlugin(database.PluginConfig{
+    Datasource: "default",
+    Pool:       database.PoolConfig{DSN: cfg.DatabaseURL},
+    Migration:  &database.MigrationConfig{AutoApply: true},
 }))
 ```
 
 The plugin:
-- Creates the connection pool during warmup
-- Registers `*database.Pool` in the DI container
+- Registers `*database.Pool` (and the `*database.Pools` registry) in the DI container
+- Opens the pool when the application starts
+- Applies the contributed migrations before the server listens, when `Migration.AutoApply` is true
 - Closes the pool on application shutdown
+
+### Get the pool in a handler
+
+Let the container hand the pool to the code that queries. `http.Inject` resolves
+each parameter of a handler before it runs:
+
+```go
+server.GET("/users/{id}", http.Inject(func(pool *database.Pool, ctx *http.Context) *http.Response {
+    var name string
+    err := pool.QueryRow(ctx.Context(), "SELECT name FROM users WHERE id = $1", ctx.Param("id")).Scan(&name)
+    if err != nil {
+        return http.ErrorResponse(err)
+    }
+    return http.JSON(map[string]string{"name": name})
+}))
+```
+
+A provider factory that resolves the pool works the same way: the container
+calls it after the pool exists. See [Dependency Injection](/docs/frameworks/go/dependency-injection).
+
+Do not resolve the pool, open a pool, or ping the database in `main`. The
+build runs `main` to describe the application, with no database, and the
+build fails. See
+[Plugins & Lifecycle](/docs/frameworks/go/plugins-and-lifecycle#main-runs-at-build-time).
+
+## Connect at run time
+
+When `PluginConfig.Datasource` names a datasource, the plugin takes its
+connection from the first of these that is present:
+
+1. The `database` section of the application config, or the
+   `DATABASE_BINDINGS` environment variable. A deploy target injects one of
+   them: a binding document keyed by datasource name.
+2. `PluginConfig.Pool`: the `DSN` (or `Connection`) your code passes.
+
+Without `Datasource`, the plugin uses `PluginConfig.Pool` as it is and reads
+no binding. Name the datasource so the same binary runs locally with a DSN
+and in a deploy target with a binding.
+
+The framework reads no `DATABASE_URL` variable. To run the service against a
+plain Postgres URL, read it from your configuration and pass it as the `DSN`:
+
+```go
+type ServerConfig struct {
+    DatabaseURL string `json:"databaseUrl" env:"DATABASE_URL"`
+}
+```
+
+```bash
+DATABASE_URL='postgres://user:pass@127.0.0.1:5432/app?sslmode=disable' ./api
+```
+
+A binding document for the default datasource looks like this:
+
+```json
+{
+  "protocolVersion": 1,
+  "databases": {
+    "default": { "engine": "postgres", "schema": "public", "connection": { "dsn": "postgres://user:pass@127.0.0.1:5432/app" } }
+  }
+}
+```
+
+## Migrations
+
+A migration is a pair of plain SQL files. A plugin embeds them and contributes
+them by implementing `app.MigrationContributor`:
+
+```text
+api/migrations/
+├── 20260520120000_create_users.up.sql
+└── 20260520120000_create_users.down.sql   # optional; without it the migration is not reversible
+```
+
+```go
+import (
+    "embed"
+
+    "go.putnami.dev/database"
+    "go.putnami.dev/migration"
+)
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
+
+type usersPlugin struct{}
+
+func (usersPlugin) Name() string { return "users" }
+
+func (usersPlugin) MigrationSources() []migration.Source {
+    return []migration.Source{
+        database.NewSQLSource("users", database.Datasource{Name: "default", Schema: "public"}, migrationsFS),
+    }
+}
+```
+
+Register the plugin with `a.Use(usersPlugin{})`. Migrations run in name order.
+With `Migration.AutoApply`, the application applies pending migrations at
+startup, before the server listens. Without it, run them with a migration
+command; see [Migrations](/docs/frameworks/go/migrations).
+
+The Go and TypeScript runners share the `migration.migrations` state table and
+one Postgres advisory lock per datasource, so both languages can target the
+same database. Each migration runs in its own transaction, and its down SQL is
+stored with it, so a rollback works after the code that registered it is gone.
+
+To test against the database `putnami test` provides, start the application
+with `AutoApply`; see
+[Test against Postgres](/docs/frameworks/go/testing#test-against-postgres).
+
+### Run migrations from code
+
+`database.NewMigrator` drives one datasource directly:
+
+```go
+migrator := database.NewMigrator(stdDB, database.MigrationConfig{
+    Definitions: definitions,
+})
+
+applied, err := migrator.Up(ctx)                       // apply pending migrations
+last, err := migrator.Rollback(ctx)                    // roll back the latest one
+rolledBack, err := migrator.RollbackTo(ctx, "users/20260520120000_create_users")
+status, err := migrator.Status(ctx)                    // every recorded migration
+```
 
 ## Error codes
 

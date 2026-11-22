@@ -17,7 +17,7 @@ modifying this package.
 
 ## When NOT to touch
 
-- Adding SQL-specific behavior (file loaders, postgres-js bits, drift
+- Adding SQL-specific behavior (SQL sources, postgres-js bits, drift
   detection): lives in `@putnami/database`.
 - Wiring the registry into DI: that is the `@putnami/application`
   package's job (the Application class creates the registry in its

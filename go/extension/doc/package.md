@@ -28,7 +28,10 @@ publication.
 - **go**: prepares Go module source for publishing by stripping `replace` directives and stamping the version
 - **deployment**: writes the workload's deployment declaration, the payload of a release-set member of kind `deployment`, to `<project>/.gen/deployment.json`
 
-Channels are activated by passing the corresponding flag to `putnami package`.
+Channels are activated by passing the corresponding flag to `putnami package`,
+or by setting the flag's default under `options.package` in the project's
+`putnami.json`, such as `"options": { "package": { "docker": true } }`. With no
+active channel, `package` builds nothing.
 
 `package` is the **distribution intent**: it schedules its own cross-compile
 step, so it needs no prior `putnami build`. Ordinary [`build`](./build.md)
@@ -566,7 +569,7 @@ ENTRYPOINT ["/app"]
 | `--platform <os/arch>` | `linux/amd64` | Docker image target platform — and the only platform the docker channel compiles |
 | `--platforms <list>` | 4 archive platforms | Release matrix for the archive channels (`all`, or `linux/amd64,darwin/arm64`) |
 | `--workspace-builder-image <img>` | — | Multi-stage `docker build` from a CI workspace image (legacy path, non-reproducible digests) |
-| `--port <n>` | `3000` | `PORT` env variable baked into the Docker image |
+| `--port <n>` | `3000` | `PORT` env variable baked into the Docker image. The Go HTTP server listens on `PORT`, so set it (or `options.package.port`) to the port the service publishes |
 
 ## Boundaries
 

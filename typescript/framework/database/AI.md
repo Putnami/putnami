@@ -10,7 +10,7 @@ import { sql } from '@putnami/database';
 
 export const app = () =>
   application()
-    .use(sql());  // Registers database plugin, runs migrations on startup
+    .use(sql({ autoApply: true }));  // Registers the database plugin; autoApply applies migrations at startup
 ```
 
 Configuration in `conf/.env.local.yaml` (the `default` datasource):
@@ -40,11 +40,11 @@ import type { InferTable } from '@putnami/database';
 
 const UsersTable = Table('users', {
   id:        Key(Uuid),
-  email:     Column(Email).unique(),
+  email:     Column(Email),
   name:      Column(String),
   age:       Column(Optional(Int)),
   role:      Column(Default(String, 'user')),
-  createdAt: Column(DateIso).name('created_at'),
+  createdAt: Column(DateIso, { columnName: 'created_at' }),
 });
 
 type User = InferTable<typeof UsersTable>;
@@ -55,11 +55,15 @@ type User = InferTable<typeof UsersTable>;
 
 | Builder | Purpose |
 |---------|---------|
-| `Key(type)` | Primary key column |
-| `Column(type)` | Regular column |
-| `.unique()` | Add unique constraint |
-| `.name('sql_name')` | Map to different SQL column name |
-| `.nullable()` | Allow NULL |
+| `Key(type, options?)` | Primary key column |
+| `Column(type, options?)` | Regular column |
+| `{ columnName: 'sql_name' }` | Map to a different SQL column name. Not needed for snake_case: the connection turns `createdAt` into `created_at` |
+| `Optional(T)` | Allow NULL |
+
+A table definition creates no SQL: the migration owns the table, its types,
+its constraints and its defaults. `default` and `autoGenerate` only relax
+`save(..., { strict: true })` validation; `save()` still needs a key value.
+Rows from `this.conn()` come back camelCase (`created_at` as `createdAt`).
 
 ### Schema Types
 
@@ -126,12 +130,12 @@ externally provided Postgres (`mode: require`).
 
 ```ts
 import { provision, TestProviderSkip } from '@putnami/database';
-import * as sqlModule from '../src/.gen/src/.sql.gen'; // generated SQLSources
+import { usersMigrationSource } from '../src/db/users'; // your SQLSource values
 
 let db: Awaited<ReturnType<typeof provision>>;
 beforeAll(async () => {
   try {
-    db = await provision({ sources: Object.values(sqlModule) });
+    db = await provision({ sources: [usersMigrationSource] });
   } catch (e) {
     if (e instanceof TestProviderSkip) return; // mode: skip
     throw e;
@@ -143,7 +147,9 @@ afterAll(() => db?.cleanup());
 ```
 
 `provision` creates an isolated database (or schema) per datasource, applies the
-workload's migration sources with the existing machinery (a one-off
+workload's migration sources when the test binding sets `applyMigrations`
+(the binding `putnami test` passes does not: there, start the application with
+`sql({ autoApply: true })`) with the existing machinery (a one-off
 `MigrationRegistry` + `SQLRunner`, which routes each datasource to its own
 database), sets the owning schema as the session `search_path`, and injects the
 resolved runtime binding into `DATABASE_BINDINGS` — pinning it as the
@@ -179,7 +185,7 @@ behaves the same; both run the shared corpus in
 `protocols/database/conformance/test-provider-datasources.json`.
 
 ```ts
-db = await provision({ sources: Object.values(sqlModule), datasources: ['auth'] });
+db = await provision({ sources: [usersMigrationSource], datasources: ['auth'] });
 ```
 
 ## Repository
@@ -209,15 +215,15 @@ class UserRepository extends Repository<typeof UsersTable> {
 | `find(filters, opts?)` | `T[]` | Find all matching (limit, offset, orderBy) |
 | `exists(keys)` | `boolean` | Check existence by key |
 | `save(entity)` | `T` | Insert or update (upsert) |
-| `saveAll(entities)` | `T[]` | Batch upsert |
-| `delete(keys)` | `void` | Delete by primary key |
+| `saveMany(entities)` | `T[]` | Batch upsert |
+| `delete(filters)` | `{ success, item? }` | Delete the matching row |
 
 ### Find Options
 
 ```ts
 const users = await userRepo.find(
   { role: 'admin' },
-  { limit: 10, offset: 0, orderBy: 'created_at DESC' }
+  { limit: 10, offset: 0, orderBy: 'createdAt DESC' } // property names, not column names
 );
 ```
 
@@ -287,7 +293,8 @@ application()
   .use(migrations);
 ```
 
-For the file-based `.up.sql` / `.down.sql` flow, see `doc/migrations.md`.
+TypeScript declares migrations inline. The file-based `.up.sql` / `.down.sql`
+flow is Go only (`go.putnami.dev/database`).
 
 ### Migration Naming
 

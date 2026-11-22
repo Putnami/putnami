@@ -26,6 +26,11 @@ If you are starting from an empty directory:
 putnami init
 ```
 
+`putnami init --project <name>` also creates a first project, and that project
+is always a `typescript-web` React application. For an API service, run
+`putnami init` without `--project`, then create the project from the
+`typescript-server` template as shown below.
+
 ## Create the project
 
 For a web app:
@@ -61,6 +66,8 @@ Start with the project shape, then add framework depth only when the app needs i
 3. [Configuration](/docs/frameworks/typescript/configuration) when the first environment variable appears.
 4. [Dependency injection](/docs/frameworks/typescript/dependency-injection) before runtime wiring becomes implicit.
 5. [Testing](/docs/frameworks/typescript/testing) before the project becomes a dependency for another project.
+6. [Persistence](/docs/frameworks/typescript/persistence) when the service needs Postgres: the connection, migrations, and tests against the database `putnami test` provides.
+7. [Publish & Docker](/docs/frameworks/typescript/extension/publish-and-docker) to build the binary or the container image.
 
 ## Daily loop
 

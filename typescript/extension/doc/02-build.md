@@ -581,10 +581,18 @@ before it compiles, and fails when it cannot read it.
 
 **Entrypoint resolution** (in order):
 
-1. `bundled-serve` from generate result (if loaders were registered)
+1. `bundled-serve` from generate result (when the build reported a capability manifest)
 2. `./serve` export from `package.json`
 3. `bin` field from `package.json`
 4. `main` field from `package.json`
+
+For an application built on `@putnami/application`, the build loads
+`package.json#main`, calls `Application.build()` and records the capability
+manifest, so its binary runs `.gen/src/serve.bundled.ts`. That file imports `app` from
+`package.json#main` (`src/main.ts` by default) and calls `bootstrapServe(app)`:
+the `./serve` export never runs in the binary. The binary embeds no `conf/`
+directory; it reads `conf/` from its working directory or
+`PUTNAMI_PROJECT_ROOT`, and a container image ships none.
 
 **Default targets** — the distribution matrix an unbound compile produces:
 

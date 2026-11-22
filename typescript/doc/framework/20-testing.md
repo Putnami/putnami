@@ -30,54 +30,40 @@ Tests are discovered by these patterns:
 
 ## Unit testing
 
-### Testing services with `app.fork()`
+### Testing services with a forked context
 
-The recommended approach is to fork your production application and override specific providers with test doubles:
+Register the production providers in a `ContainerContext` once. In each test,
+fork it and override the providers you replace with test doubles. The fork
+leaves the original untouched:
 
 ```ts
 // src/services/user.service.test.ts
 import { describe, test, expect, mock } from 'bun:test';
-import { app } from '../app'; // your production application
+import { ContainerContext, provide } from '@putnami/runtime';
 import { UserService } from './user.service';
 import { UserRepository } from '../repositories/user.repository';
 
+const base = new ContainerContext('test');
+base.register(provide(UserRepository));
+base.register(provide(UserService, { deps: [UserRepository] }));
+
 describe('UserService', () => {
   test('getUser returns user by id', async () => {
-    await using testApp = app.fork()
-      .override(UserRepository, () => ({
-        findOne: mock(() => Promise.resolve({ id: '1', name: 'Test' })),
-        save: mock((data) => Promise.resolve({ id: '1', ...data })),
-        delete: mock(() => Promise.resolve()),
-      }));
+    await using ctx = base.fork().override(UserRepository, () => ({
+      findOne: mock(() => Promise.resolve({ id: '1', name: 'Test' })),
+    }));
+    await ctx.start();
 
-    await testApp.start();
-
-    const service = testApp.get(UserService);
-    const user = await service.getUser('1');
+    const user = await ctx.get(UserService).getUser('1');
 
     expect(user).toEqual({ id: '1', name: 'Test' });
   });
-
-  test('createUser saves and returns user', async () => {
-    await using testApp = app.fork()
-      .override(UserRepository, () => ({
-        findOne: mock(() => Promise.resolve(null)),
-        save: mock((data) => Promise.resolve({ id: '1', ...data })),
-      }));
-
-    await testApp.start();
-
-    const service = testApp.get(UserService);
-    const user = await service.createUser({
-      name: 'New User',
-      email: 'new@example.com',
-    });
-
-    expect(user.name).toBe('New User');
-    expect(user.email).toBe('new@example.com');
-  });
 });
 ```
+
+To test through HTTP with a test double, start the application with
+`createTestApp` from `@putnami/application/testing`, and register the double
+in its `configure` callback: `configure: (app) => app.provide(...)`.
 
 ### Testing services with a standalone context
 
@@ -179,93 +165,67 @@ describe('GET /api/users', () => {
 
 ## Testing with database
 
-### Test database setup
-
-```ts
-// test/setup.ts
-import { database, closeAllDatabases } from '@putnami/database';
-
-export async function setupTestDb() {
-  const db = database('test');
-
-  // Run migrations
-  await db`CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    email TEXT UNIQUE,
-    name TEXT
-  )`;
-
-  return db;
-}
-
-export async function cleanupTestDb() {
-  const db = database('test');
-  await db`TRUNCATE users CASCADE`;
-}
-
-export async function teardownTestDb() {
-  await closeAllDatabases();
-}
-```
+`putnami test` starts a throwaway Postgres for a project that uses `sql()` and
+passes it to the tests in `DATABASE_TEST_BINDINGS`. `provision()` creates an
+empty, isolated database for the suite and points `DATABASE_BINDINGS` at it.
+`cleanup()` drops it. Apply the migrations by starting the application with
+`sql({ autoApply: true })`: `provision()` applies the `sources` you pass only
+when the test binding sets `applyMigrations`, and the binding `putnami test`
+passes does not set it.
 
 ### Integration tests
 
-```ts
-// src/services/user.service.integration.test.ts
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
-import { setupTestDb, cleanupTestDb, teardownTestDb } from '../../test/setup';
-import { app } from '../app';
-import { UserService } from './user.service';
+Start the application on the provisioned database with `createTestApp`, and
+test it through HTTP:
 
-describe('UserService (integration)', () => {
-  let testApp: Awaited<ReturnType<typeof app.fork>>;
+```ts
+// test/users.integration.test.ts
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import { api } from '@putnami/application';
+import { createTestApp, type TestApp } from '@putnami/application/testing';
+import { closeAllDatabases, database, provision, sql } from '@putnami/database';
+import { usersMigrations } from '../src/db/users';
+
+describe('users (integration)', () => {
+  let db: Awaited<ReturnType<typeof provision>>;
+  let testApp: TestApp;
 
   beforeAll(async () => {
-    await setupTestDb();
-    testApp = app.fork();
-    await testApp.start();
+    db = await provision();
+    testApp = await createTestApp({
+      plugins: [sql({ autoApply: true }), usersMigrations, api({ scanPath: 'src/api' })],
+    });
   });
 
   afterAll(async () => {
-    await testApp.close();
-    await teardownTestDb();
+    await testApp?.stop();
+    await closeAllDatabases();
+    await db?.cleanup();
   });
 
   beforeEach(async () => {
-    await cleanupTestDb();
+    const client = await database();
+    await client`TRUNCATE users CASCADE`;
   });
 
-  test('creates and retrieves user', async () => {
-    const service = testApp.get(UserService);
-
-    const created = await service.createUser({
-      name: 'Test User',
-      email: 'test@example.com',
+  test('creates and retrieves a user', async () => {
+    const created = await testApp.fetch('/users', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Test User', email: 'test@example.com' }),
     });
+    expect(created.status).toBe(200);
+    const { id } = await created.json();
 
-    const retrieved = await service.getUser(created.id);
-
-    expect(retrieved.name).toBe('Test User');
-    expect(retrieved.email).toBe('test@example.com');
-  });
-
-  test('prevents duplicate emails', async () => {
-    const service = testApp.get(UserService);
-
-    await service.createUser({
-      name: 'User 1',
-      email: 'same@example.com',
-    });
-
-    await expect(
-      service.createUser({
-        name: 'User 2',
-        email: 'same@example.com',
-      })
-    ).rejects.toThrow();
+    const res = await testApp.fetch(`/users/${id}`);
+    expect((await res.json()).email).toBe('test@example.com');
   });
 });
 ```
+
+`database()` is async: await it before you run a query. The migration source
+and plugin come from your project; see
+[Persistence](/docs/frameworks/typescript/persistence#migrations).
 
 ## Testing React components
 

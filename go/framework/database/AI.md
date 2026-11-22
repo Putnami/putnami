@@ -16,6 +16,12 @@ a.Use(plugin)
 a.ListenAndServe()
 ```
 
+Get the pool where you query: a handler parameter (`http.Inject(func(pool
+*database.Pool, ctx *http.Context) ...)`), a provider factory, or a plugin's
+`Start`. Never resolve `*database.Pool`, open a pool, or ping in `main`:
+`putnami build` runs `main` in describe mode (`PUTNAMI_DESCRIBE`), where the
+application never starts and no database is reachable, so the build fails.
+
 `database.Plugin` implements `app.HealthChecker` — when mounted alongside
 `go.putnami.dev/platform` (or the legacy `http.HealthPlugin`), pool
 connectivity is reported under the `"database"` key on `/healthz` without

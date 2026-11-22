@@ -291,7 +291,12 @@ before invoking the compiled binary:
 | `PUTNAMI_DESCRIBE_OUT` | Absolute output directory (defaults to `<cwd>/.gen`) |
 
 When `PUTNAMI_DESCRIBE` is set, `Application.ListenAndServe` runs `Describe` and
-exits with the describer error (or zero on success). Direct callers can also use
+exits with the describer error (or zero on success). Code in `main` before
+`ListenAndServe` still runs during describe: keep it to loading config and
+composing plugins. Resolving a runtime dependency there, such as
+`*database.Pool`, fails the build: describe builds a lazy container that
+starts no plugin, and no database is reachable. Resolve dependencies in handlers, provider factories or
+a plugin's `Start`. Direct callers can also use
 `a.Describe(outputDir, targets)` to run the phase programmatically (used by tests).
 
 During build-triggered describe mode, migration bundles use the authored

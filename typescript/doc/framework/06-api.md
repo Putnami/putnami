@@ -610,7 +610,8 @@ Handlers can return different types:
 | Object / Array | JSON response |
 | String | Text response |
 | `HttpResponse` | Full control over status, headers, body |
-| `undefined` | 204 No Content |
+| `noContent()` | 204 No Content |
+| `undefined` or `null` | No response: the router answers 404. Return `noContent()` for 204 |
 
 ### HttpResponse
 

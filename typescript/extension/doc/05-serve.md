@@ -59,6 +59,12 @@ The entrypoint is resolved in this order:
 
 If no entrypoint is found, the command fails with an error.
 
+Only `putnami serve` runs the `./serve` export. The compiled binary and the
+image run the [compile entrypoint](02-build.md#phase-4-compile). For an
+application built on `@putnami/application`, it is a generated file that
+imports `app` from `main`.
+Code placed in `src/serve.ts` does not run there.
+
 ### On the Node runtime
 
 A project that declares `"runtime": "node"` under

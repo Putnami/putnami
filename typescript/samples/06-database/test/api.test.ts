@@ -4,10 +4,9 @@ import { createTestApp, type TestApp } from '@putnami/application/testing';
 import { closeAllDatabases, database, sql } from '@putnami/database';
 import '../src/tables/users';
 
-// Skip tests when the `default` datasource is not reachable. Resolve it through
-// the framework — a provisioned test binding (injected by `putnami test` from the
-// declared infra/requirements.json) wins, conf/.env.test.yaml is the fallback —
-// so the suite has no hardcoded connection of its own.
+// Skip tests when the `default` datasource is not reachable. `database()` reads
+// DATABASE_BINDINGS, then conf/.env.test.yaml. It never reads the
+// DATABASE_TEST_BINDINGS that `putnami test` provides: only `provision()` does.
 const dbAvailable = await (async () => {
   try {
     const probe = await database('default');

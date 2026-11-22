@@ -8,7 +8,7 @@ Migrate lifecycle phase applies them.
 
 ## Contents
 
-- [Authoring](#authoring) — paired `.up.sql` / `.down.sql` files.
+- [Authoring](#authoring) — migration definitions, inline or imported from `.sql` files.
 - [Feature plugin wiring](#feature-plugin-wiring) — one method on your plugin.
 - [Inline definitions](#inline-definitions) — when SQL files are overkill.
 - [Running migrations](#running-migrations) — auto on startup vs. the CLI.
@@ -19,24 +19,40 @@ Migrate lifecycle phase applies them.
 
 ## Authoring
 
-Migrations are paired SQL files inside a feature package's `migrations/`
-directory:
+A migration is a `SQLDefinition`: a `name`, its `sql`, and an optional `down`.
+Declare the definitions in TypeScript:
 
+```ts
+import type { SQLDefinition } from '@putnami/database';
+
+export const iamMigrations: SQLDefinition[] = [
+  {
+    name: '20260520120000_create_users',
+    sql: 'CREATE TABLE users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT NOT NULL UNIQUE);',
+    down: 'DROP TABLE users;', // optional; without it the migration is not reversible
+  },
+];
 ```
-typescript/framework/iam/
-├── src/
-│   └── plugin.ts
-└── migrations/
-    ├── 20260520120000_create_users.up.sql
-    ├── 20260520120000_create_users.down.sql   ← optional, absence = non-reversible
-    └── 20260601150000_add_email_index.up.sql
+
+To keep the SQL in `.sql` files, import their text yourself. Bun inlines a
+text import into the bundle, so it survives `bun build --compile` and container
+images:
+
+```ts
+import createUsers from '../migrations/20260520120000_create_users.up.sql' with { type: 'text' };
+import dropUsers from '../migrations/20260520120000_create_users.down.sql' with { type: 'text' };
+
+export const iamMigrations: SQLDefinition[] = [
+  { name: '20260520120000_create_users', sql: createUsers, down: dropUsers },
+];
 ```
 
-Files are plain Postgres SQL — drag them into psql or DataGrip and they
-run as-is. No `goose` markers, no `StatementBegin/End`.
+The build generates no migration module and loads no `migrations/` directory
+for you: each file needs its import. (Go loads `*.up.sql` files from an
+`embed.FS`; TypeScript does not.)
 
-Naming: `YYYYMMDDHHmmss_short_description`. Basename ordering is the
-apply order within the feature's namespace.
+Naming: `YYYYMMDDHHmmss_short_description`. Names sort in byte order, which is
+the apply order within the feature's namespace.
 
 ## Feature plugin wiring
 
@@ -45,7 +61,7 @@ import type { Plugin } from '@putnami/application';
 import { sqlSourceInline } from '@putnami/database';
 import type { MigrationContributor, MigrationSource } from '@putnami/migration';
 
-import { iamMigrations } from './.gen/migrations.gen'; // emitted by the generate phase of `putnami build`
+import { iamMigrations } from './migrations';
 
 export class IamPlugin implements Plugin, MigrationContributor {
   name = 'iam';
@@ -62,16 +78,12 @@ export class IamPlugin implements Plugin, MigrationContributor {
 }
 ```
 
-`iamMigrations` is a `SQLDefinition[]` array produced by the build-time
-generator. Each entry has `name`, `sql`, and optional `down`. Because
-the bundler inlines the `.sql` text via `with { type: 'text' }`, the
-generated module survives `bun build`, container images, and any
-filesystem-stripping deploy path.
+A plain object works too: `{ name: 'iam', migrationSources: () => [source] }`.
 
 ## Inline definitions
 
-For one-off boot data (rare; mostly tests), stack inline definitions
-alongside the codegen-emitted ones:
+For one-off boot data (rare; mostly tests), add definitions next to the
+imported ones:
 
 ```ts
 sqlSourceInline({

@@ -142,10 +142,11 @@ session:
   cookieSecret: 'your-32-character-secret-key!!!'
 
 database:
-  host: localhost
-  database: myapp
-  user: postgres
-  password: secret
+  default:
+    host: localhost
+    database: myapp
+    user: postgres
+    password: secret
 ```
 
 **Pros:**

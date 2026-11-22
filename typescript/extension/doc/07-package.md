@@ -32,6 +32,15 @@ putnami package . --deployment
 putnami package . --npm --dry-run
 ```
 
+A channel is on when its flag is passed or when the project's `putnami.json`
+sets the flag's default under `options.package`, such as
+`"options": { "package": { "docker": true, "port": 8080 } }`. With no channel
+on, `package` builds nothing.
+
+The image sets `PORT` and exposes it: 3000 unless `--port` or
+`options.package.port` names another port. `http()` listens on `PORT` unless
+the code passes a `port` option, so leave that option out.
+
 ### Common Patterns
 
 ```bash

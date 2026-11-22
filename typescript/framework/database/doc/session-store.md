@@ -53,11 +53,12 @@ session:
   ttl: 604800  # 1 week in seconds
 
 database:
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: password
+  default:
+    host: localhost
+    port: 5432
+    database: myapp
+    user: postgres
+    password: password
 ```
 
 ### 2. Use in Your Application

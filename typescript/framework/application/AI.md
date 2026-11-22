@@ -351,8 +351,15 @@ YAML-based with environment overlays:
 putnami:
   port: 3000
 database:
-  url: postgres://localhost/mydb
+  default:
+    host: localhost
+    database: mydb
 ```
+
+A compiled binary and its image ship no `conf/`: there, configure with
+environment variables (`Env(...)` fields, `CONFIG_DATA`, `DATABASE_BINDINGS`).
+The binary runs a generated entry that imports `app` from `main`, never
+`src/serve.ts`.
 
 Define typed config schemas:
 

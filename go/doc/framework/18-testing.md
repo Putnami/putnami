@@ -166,6 +166,105 @@ func TestProtectedRoute(t *testing.T) {
 }
 ```
 
+## Test against Postgres
+
+`putnami test` gives each test run a real Postgres. You do not start one or
+write a connection string:
+
+1. The build writes `infra/requirements.json` when the service uses
+   `database.NewPlugin`. Commit it: it tells `putnami test` that the project
+   needs a database.
+2. `putnami test` starts a throwaway Postgres (a Docker container, or the
+   Postgres installed on the machine) and passes its address to the tests in
+   `DATABASE_TEST_BINDINGS`.
+3. `go.putnami.dev/database/testprovider` creates an empty, isolated database
+   for the suite and drops it when the suite ends.
+4. Your test applies the migrations: start the application with
+   `Migration.AutoApply`, the way production starts it.
+
+Build the application on the provisioned database in `TestMain`, then test
+the repositories with a pool and the service through HTTP:
+
+```go
+import (
+    "context"
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "os"
+    "testing"
+
+    "go.putnami.dev/database"
+    "go.putnami.dev/database/testprovider"
+)
+
+var (
+    handler http.Handler
+    pool    *database.Pool
+)
+
+func TestMain(m *testing.M) {
+    os.Exit(run(m))
+}
+
+func run(m *testing.M) int {
+    ctx := context.Background()
+    res, err := testprovider.Provision(ctx, testprovider.Options{})
+    if err != nil {
+        fmt.Fprintln(os.Stderr, err)
+        return 1
+    }
+    defer func() { _ = res.Cleanup() }()
+
+    binding, err := json.Marshal(res.Binding)
+    if err != nil {
+        fmt.Fprintln(os.Stderr, err)
+        return 1
+    }
+    _ = os.Setenv(database.EnvBinding, string(binding)) // the plugin connects to the test database
+    _ = os.Setenv("PORT", "0")                          // the server listens on a free port
+
+    a, server := newApp() // the composition main uses: Datasource "default", AutoApply true
+    if err := a.Start(ctx); err != nil { // applies the migrations
+        fmt.Fprintln(os.Stderr, err)
+        return 1
+    }
+    defer func() { _ = a.Stop(ctx) }()
+    handler = server.Handler()
+
+    poolCfg, err := database.PoolConfigFromBinding(res.Binding, "default")
+    if err != nil {
+        fmt.Fprintln(os.Stderr, err)
+        return 1
+    }
+    if pool, err = database.NewPool(ctx, poolCfg); err != nil {
+        fmt.Fprintln(os.Stderr, err)
+        return 1
+    }
+    defer pool.Close()
+    return m.Run()
+}
+
+func TestUserRepository(t *testing.T) {
+    repo := NewUserRepository(pool)
+    // ...
+}
+```
+
+Call `handler.ServeHTTP` with an `httptest.NewRecorder()` to test an endpoint.
+The plugin reads the binding only when it names a datasource; see
+[Connect at run time](/docs/frameworks/go/persistence#connect-at-run-time).
+
+`testprovider.ForTest(t, opts)` provisions for one test and registers the
+cleanup. When no database answers, it skips the test on a developer run, and
+`putnami test` names the skipped suites. It fails the test under
+`putnami test --require-test-db` and on CI. `Provision` returns the error and
+leaves the decision to you.
+
+`Options.Bundle` applies a migration bundle, such as the
+`.gen/migration-bundle/` the build writes, only when the test binding sets
+`applyMigrations`. The binding `putnami test` passes does not set it.
+
 ## Testing events
 
 ### In-memory broker

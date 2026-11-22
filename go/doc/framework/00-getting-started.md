@@ -42,7 +42,9 @@ Start with the service skeleton, then add capabilities in this order:
 2. [HTTP & Middleware](/docs/frameworks/go/http) for routing, middleware, handlers, and responses.
 3. [Plugins & Lifecycle](/docs/frameworks/go/plugins-and-lifecycle) for startup, shutdown, and capability ownership.
 4. [Configuration](/docs/frameworks/go/configuration) and [Dependency Injection](/docs/frameworks/go/dependency-injection) before wiring spreads across package globals.
-5. [Platform endpoints](/docs/frameworks/go/platform-endpoints), [Logging](/docs/frameworks/go/logging), and [Telemetry](/docs/frameworks/go/telemetry) before production.
+5. [Persistence](/docs/frameworks/go/persistence) and [Testing](/docs/frameworks/go/testing#test-against-postgres) when the service needs Postgres: the connection, SQL migrations, and tests against the database `putnami test` provides.
+6. [Package & Docker](/docs/frameworks/go/extension/package-and-docker) to build the container image.
+7. [Platform endpoints](/docs/frameworks/go/platform-endpoints), [Logging](/docs/frameworks/go/logging), and [Telemetry](/docs/frameworks/go/telemetry) before production.
 
 ## Daily loop
 
