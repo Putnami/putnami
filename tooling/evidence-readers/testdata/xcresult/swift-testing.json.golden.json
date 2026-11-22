@@ -1,0 +1,81 @@
+{
+  "totals": {
+    "tests": 0,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "assertions": 0,
+    "time": 0
+  },
+  "cases": [
+    {
+      "name": "addition()",
+      "classname": "CalcTests",
+      "suites": [
+        {
+          "name": "Calc"
+        },
+        {
+          "name": "CalcTests"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 1
+    },
+    {
+      "name": "positive()",
+      "classname": "CalcTests.SignTests",
+      "suites": [
+        {
+          "name": "Calc"
+        },
+        {
+          "name": "CalcTests"
+        },
+        {
+          "name": "SignTests"
+        },
+        {
+          "name": "NonNegative"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 0
+    },
+    {
+      "name": "addWrongOnPurpose()",
+      "classname": "CalcTests",
+      "suites": [
+        {
+          "name": "Calc"
+        },
+        {
+          "name": "CalcTests"
+        }
+      ],
+      "status": "failed",
+      "durationMs": 2,
+      "failure": {
+        "message": "SignTests.swift:17: Expectation failed: (add(2, 2) → 4) == 5: two plus two should be five",
+        "body": "SignTests.swift:17: Expectation failed: (add(2, 2) → 4) == 5: two plus two should be five\nSignTests.swift:17: Expectation failed: (add(2, 2) → 4) == 5: two plus two should be five"
+      }
+    },
+    {
+      "name": "skipped()",
+      "classname": "CalcTests",
+      "suites": [
+        {
+          "name": "Calc"
+        },
+        {
+          "name": "CalcTests"
+        }
+      ],
+      "status": "skipped",
+      "durationMs": 0,
+      "skipped": {
+        "message": "Test skipped: not ready"
+      }
+    }
+  ]
+}

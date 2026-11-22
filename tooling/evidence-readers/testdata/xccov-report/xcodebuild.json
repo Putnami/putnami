@@ -1,0 +1,99 @@
+{
+  "coveredLines" : 20,
+  "executableLines" : 26,
+  "lineCoverage" : 0.7692307692307693,
+  "targets" : [
+    {
+      "buildProductPath" : "/Users/runner/Library/Developer/Xcode/DerivedData/Calc-bxzwhkfwcfrqvjgzjvqpqnvqcjsd/Build/Products/Debug/Calc.o",
+      "coveredLines" : 8,
+      "executableLines" : 14,
+      "files" : [
+        {
+          "coveredLines" : 8,
+          "executableLines" : 14,
+          "functions" : [
+            {
+              "coveredLines" : 3,
+              "executableLines" : 3,
+              "executionCount" : 2,
+              "lineCoverage" : 1.0,
+              "lineNumber" : 1,
+              "name" : "add(_:_:)"
+            },
+            {
+              "coveredLines" : 5,
+              "executableLines" : 7,
+              "executionCount" : 1,
+              "lineCoverage" : 0.7142857142857143,
+              "lineNumber" : 5,
+              "name" : "sign(_:)"
+            },
+            {
+              "coveredLines" : 0,
+              "executableLines" : 4,
+              "executionCount" : 0,
+              "lineCoverage" : 0.0,
+              "lineNumber" : 13,
+              "name" : "neverCalled(_:)"
+            }
+          ],
+          "lineCoverage" : 0.5714285714285714,
+          "name" : "Calc.swift",
+          "path" : "/Users/runner/work/calc/calc/Sources/Calc/Calc.swift"
+        }
+      ],
+      "lineCoverage" : 0.5714285714285714,
+      "name" : "Calc.o"
+    },
+    {
+      "buildProductPath" : "/Users/runner/Library/Developer/Xcode/DerivedData/Calc-bxzwhkfwcfrqvjgzjvqpqnvqcjsd/Build/Products/Debug/CalcTests.xctest/Contents/MacOS/CalcTests",
+      "coveredLines" : 12,
+      "executableLines" : 12,
+      "files" : [
+        {
+          "coveredLines" : 12,
+          "executableLines" : 12,
+          "functions" : [
+            {
+              "coveredLines" : 3,
+              "executableLines" : 3,
+              "executionCount" : 1,
+              "lineCoverage" : 1.0,
+              "lineNumber" : 5,
+              "name" : "CalcTests.testAdd()"
+            },
+            {
+              "coveredLines" : 3,
+              "executableLines" : 3,
+              "executionCount" : 1,
+              "lineCoverage" : 1.0,
+              "lineNumber" : 9,
+              "name" : "CalcTests.testSignOfNonNegativeInput()"
+            },
+            {
+              "coveredLines" : 3,
+              "executableLines" : 3,
+              "executionCount" : 1,
+              "lineCoverage" : 1.0,
+              "lineNumber" : 13,
+              "name" : "CalcTests.testAddWrongOnPurpose()"
+            },
+            {
+              "coveredLines" : 3,
+              "executableLines" : 3,
+              "executionCount" : 1,
+              "lineCoverage" : 1.0,
+              "lineNumber" : 17,
+              "name" : "CalcTests.testSkipped()"
+            }
+          ],
+          "lineCoverage" : 1.0,
+          "name" : "CalcTests.swift",
+          "path" : "/Users/runner/work/calc/calc/Tests/CalcTests/CalcTests.swift"
+        }
+      ],
+      "lineCoverage" : 1.0,
+      "name" : "CalcTests.xctest"
+    }
+  ]
+}

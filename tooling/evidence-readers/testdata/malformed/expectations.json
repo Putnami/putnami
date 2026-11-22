@@ -36,5 +36,13 @@
   "trx-truncated.trx": {"reader": "trx", "code": "readers.malformed"},
   "import-linter-could-not-run.txt": {"reader": "import-linter", "code": "readers.malformed"},
   "import-linter-no-contract.txt": {"reader": "import-linter", "code": "readers.malformed"},
-  "deptrac-wrong-root.xml": {"reader": "deptrac", "code": "readers.malformed"}
+  "deptrac-wrong-root.xml": {"reader": "deptrac", "code": "readers.malformed"},
+  "xcresult-no-test-nodes.json": {"reader": "xcresult", "code": "readers.malformed"},
+  "xcresult-negative-duration.json": {"reader": "xcresult", "code": "readers.malformed"},
+  "xcresult-truncated.json": {"reader": "xcresult", "code": "readers.malformed"},
+  "xccov-report-no-targets.json": {"reader": "xccov-report", "code": "readers.malformed"},
+  "xccov-report-negative-lines.json": {"reader": "xccov-report", "code": "readers.malformed"},
+  "xccov-archive-line-zero.json": {"reader": "xccov-archive", "code": "readers.malformed"},
+  "xccov-archive-negative-count.json": {"reader": "xccov-archive", "code": "readers.malformed"},
+  "xccov-archive-not-an-object.json": {"reader": "xccov-archive", "code": "readers.malformed"}
 }

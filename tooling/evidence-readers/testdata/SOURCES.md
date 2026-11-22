@@ -1,7 +1,9 @@
 # Fixture sources
 
 Every report under `junit/`, `trx/`, `lcov/`, `cobertura/`, `clover/`, `jacoco/` and `gocover/` is
-the unmodified output of a real tool run, renamed only. Each `.golden.json` is
+the unmodified output of a real tool run, renamed only; the Xcode outputs
+under `xcresult/`, `xccov-report/` and `xccov-archive/` are the exception
+described below. Each `.golden.json` is
 what the reader returns for it: regenerate them with `go test -update` and
 review the diff. `malformed/` holds small hand-written reports, each listed in
 `malformed/expectations.json` with the diagnostic code it must return.
@@ -50,3 +52,32 @@ unmodified. osv-scanner writes no vulnerability into SPDX, so
 `head-advisories.spdx.json` is `head.spdx.json` with three `externalRefs`
 added by hand: a `SECURITY` `advisory` reference on each package and a
 `cpe23Type` one on lodash, the shape SPDX 2.3 gives a known vulnerability.
+
+## Xcode
+
+`xcresult/`, `xccov-report/` and `xccov-archive/` are written by hand: no
+macOS runner recorded them. They stand for what `xcrun` would print for the
+`.xcresult` bundle of `xcodebuild test -enableCodeCoverage YES` on the Swift
+package kept under `sources/swift/` (its `Package.swift` kept as
+`Package.swift.txt`), run at `/Users/runner/work/calc/calc`:
+
+```bash
+xcrun xcresulttool get test-results tests --path Test.xcresult
+xcrun xccov view --report --json Test.xcresult
+xcrun xccov view --archive --json Test.xcresult
+```
+
+Their shape follows outputs of these commands that public repositories keep
+as test fixtures, read on 2026-11-22: `tests/models/xctests/mocks/test_results_tests.json`
+of codemagic-ci-cd/cli-tools (Xcode 16, iOS 18), `Tests/SiftLibTests/Fixtures/test-results-swift-testing.json`
+of engenious-inc/sift-ios (Swift Testing, iOS 26), `scripts/fixtures/benchmark_report/retry-after-failure/tests.json`
+of meganz/iOS (repetitions), and `captures/field/coverage.report.json` and
+`captures/coverage/Pricing.json` of breferrari/xcrew-testbed (xccov). They keep
+that formatting: the decimal comma of a
+runner whose locale uses one (`"0,0011s"`), `durationInSeconds` beside
+`duration` in a newer Xcode, the `Repetition` nodes of a retried Swift Testing
+case, the escaped slashes of the archive. `xcresult/xctest.json` holds the
+XCTest cases of `CalcTests.swift`, `xcresult/swift-testing.json` the Swift
+Testing ones of `SignTests.swift`, with a nested suite, run with retries.
+Replace them with recorded outputs, renamed only, once a macOS runner can
+record them.

@@ -104,6 +104,7 @@ summary names the command that writes the export.
 |---|---|
 | JUnit XML | Jest with jest-junit, Vitest, `node:test`, PHPUnit `--log-junit`, gotestsum, go-junit-report, pytest `--junitxml`, `pants test --test-report`, `bazel test`, Gradle, Android, Maven Surefire and Failsafe, cargo-nextest, xcbeautify `--report junit`, fastlane `scan`, `swift test --xunit-output`, junitreport's `tojunit` for Dart and Flutter, rspec_junit_formatter, minitest-reporters, `dotnet test --logger junit` |
 | TRX | `dotnet test --logger trx`, with xUnit, NUnit or MSTest |
+| `.xcresult` bundle | `xcodebuild test -resultBundlePath`, read through `xcrun` on a macOS runner |
 
 ### Coverage reports
 
@@ -114,11 +115,13 @@ summary names the command that writes the export.
 | Clover XML | PHPUnit `--coverage-clover`, Jest, Vitest |
 | JaCoCo XML | The JaCoCo Maven plugin, the Gradle `jacoco` plugin, Kover, Android unit test coverage |
 | Go cover profile | `go test -coverprofile` |
+| `.xcresult` bundle | `xcodebuild test -enableCodeCoverage YES`, read through `xcrun xccov` on a macOS runner |
 
 `putnami observe` finds the reports by their content, anywhere in the
 checkout except `.git`, `node_modules`, `vendor` and build outputs that hold
-no report. `--junit` and `--coverage` name them instead. It reads no
-`.xcresult` bundle: convert it to JUnit and Cobertura first. See
+no report. `--junit` and `--coverage` name them instead. It reads an
+`.xcresult` bundle through `xcrun` on a macOS runner; elsewhere, convert it
+to JUnit and Cobertura first. See
 [Reports](/docs/tooling-&-workspace/observe/reports) for what each format
 gives.
 

@@ -11,8 +11,8 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 |---|---|
 | `--base <commit or branch>` | The commit the change is measured against. It overrides the CI. A CI other than GitHub Actions or GitLab CI needs it; outside a CI it defaults to the remote default branch. |
 | `--head <revision>` | The commit that was built. Default `HEAD`. |
-| `--junit <paths>` | Comma-separated JUnit XML or TRX paths or glob patterns, resolved against the directory you run in. Replaces JUnit discovery. |
-| `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
+| `--junit <paths>` | Comma-separated JUnit XML or TRX paths, `.xcresult` bundles, or glob patterns, resolved against the directory you run in. Replaces JUnit discovery. |
+| `--coverage <paths>` | The same for coverage reports and `.xcresult` bundles. Replaces coverage discovery. |
 | `--sbom <path>` | The software bill of materials (SBOM) of the commit, a path or glob pattern. Replaces SBOM discovery. |
 | `--base-sbom <path>` | The SBOM of the base. Without it, the base state of each dependency is unknown. |
 | `--architecture <paths>` | The deptrac `--formatter=junit` report and the `lint-imports` output, comma-separated paths or glob patterns. Replaces their discovery. See [Architecture rules](/docs/tooling-&-workspace/observe/architecture). |
@@ -140,6 +140,7 @@ keeps a file by its content:
 | LCOV | a first `TN:` or `SF:` record (`bazel coverage --combined_report=lcov`, cargo-llvm-cov `--lcov`) |
 | Go cover profile | a first `mode: set`, `mode: count` or `mode: atomic` line |
 | TRX | a `TestRun` root (`dotnet test --logger trx`), read as test cases |
+| `.xcresult` bundle | a `*.xcresult` directory that holds an `Info.plist`, which the walk does not enter, read as test cases and coverage through `xcrun`; when the walk also finds a JUnit report anywhere in the repository, only as coverage (see [iOS and Swift](/docs/tooling-&-workspace/observe/swift#reports)) |
 
 The walk does not follow links. It also reads, through the links Bazel leaves
 at the root, the `test.xml` of each test target, shard and run under

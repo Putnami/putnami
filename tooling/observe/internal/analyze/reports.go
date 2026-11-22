@@ -27,6 +27,18 @@ func (r *Result) readReports(in Input, m *mapper) map[string]lineHits {
 		if !filepath.IsAbs(abs) {
 			abs = filepath.Join(in.Root, filepath.FromSlash(report.Path))
 		}
+		switch {
+		case report.Format == reports.FormatXCResult && report.Kind == reports.KindJUnit:
+			if result, ok := r.xcresultTests(in, report, abs); ok {
+				r.attributeTests(in, report, result, m, tests, cases, arch)
+			}
+			continue
+		case report.Format == reports.FormatXCResult && report.Kind == reports.KindCoverage:
+			for _, result := range r.xcresultCoverage(in, report, abs) {
+				r.mapCoverage(report, result, m, lines, stated)
+			}
+			continue
+		}
 		switch report.Kind {
 		case reports.KindJUnit:
 			read := readers.ReadJUnit

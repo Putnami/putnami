@@ -14,6 +14,8 @@
     "evidence-readers/report-readers#malformed-reports-are-diagnostics",
     "evidence-readers/report-readers#paths-as-the-report-states",
     "evidence-readers/report-readers#spdx-reads-packages",
-    "evidence-readers/report-readers#trx-reads-every-result"
+    "evidence-readers/report-readers#trx-reads-every-result",
+    "evidence-readers/report-readers#xccov-reads-file-totals-and-lines",
+    "evidence-readers/report-readers#xcresult-tests-read-every-case"
   ]
 }

@@ -100,6 +100,12 @@ func ReadSBOM(data []byte) (SBOM, []diag.Diagnostic)
 
 func ReadTRX(data []byte) (TestReport, []diag.Diagnostic)
 
+func ReadXCResultTests(data []byte) (TestReport, []diag.Diagnostic)
+
+func ReadXccovArchive(data []byte) (CoverageReport, []diag.Diagnostic)
+
+func ReadXccovReport(data []byte) (CoverageReport, []diag.Diagnostic)
+
 const RuleBroken = "broken"
 
 const RuleKept = "kept"

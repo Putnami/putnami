@@ -1,5 +1,7 @@
 // Package readers reads the reports a CI writes: JUnit XML and TRX test
 // reports, LCOV, Cobertura XML, Clover XML, JaCoCo XML and Go cover profiles,
+// the test results and coverage xcresulttool and xccov print for an Xcode
+// .xcresult bundle,
 // CycloneDX and SPDX software bills of materials, and the results of the
 // ArchUnit, deptrac and import-linter architecture checkers.
 //

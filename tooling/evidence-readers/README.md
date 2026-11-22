@@ -1,8 +1,9 @@
 # go.putnami.dev/evidence/readers
 
 Reads the test and coverage reports a CI already wrote into typed facts: JUnit
-XML and TRX into test cases, LCOV, Cobertura XML, Clover XML, JaCoCo XML and Go
-cover profiles into line-level file coverage, and ArchUnit, deptrac and
+XML, TRX and the test results of an Xcode `.xcresult` bundle into test cases,
+LCOV, Cobertura XML, Clover XML, JaCoCo XML, Go cover profiles and the
+coverage of an `.xcresult` bundle into file coverage, and ArchUnit, deptrac and
 import-linter results into architecture rules. The observe extension builds the change
 evidence document (`protocols/evidence`) from them, and the TypeScript
 extension reads its bun reports through it.
@@ -41,11 +42,14 @@ Every reader takes the report's bytes and returns its result and diagnostics.
 | --- | --- | --- |
 | `ReadJUnit` | JUnit XML, root `testsuites` or `testsuite` | `TestReport`: the root's stated totals, and one `TestCase` per `testcase` element in document order |
 | `ReadTRX` | TRX, the report of `dotnet test --logger trx`, root `TestRun` | `TestReport`: the `ResultSummary` counters, and one `TestCase` per top-level `UnitTestResult` in document order |
+| `ReadXCResultTests` | The JSON `xcrun xcresulttool get test-results tests --path Test.xcresult` prints, Xcode 16 and later, root object with `testNodes` | `TestReport`: no totals, and one `TestCase` per `Test Case` node in document order |
 | `ReadLCOV` | LCOV tracefile | `CoverageReport` |
 | `ReadCobertura` | Cobertura XML | `CoverageReport`, with the report's source roots |
 | `ReadClover` | Clover XML | `CoverageReport` |
 | `ReadJaCoCo` | JaCoCo XML, root `report`, as the JaCoCo Maven plugin, the Gradle `jacoco` plugin and Kover write it | `CoverageReport` |
 | `ReadGoCover` | `go test -coverprofile`, mode `set`, `count` or `atomic` | `CoverageReport` |
+| `ReadXccovReport` | The JSON `xcrun xccov view --report --json Test.xcresult` prints, root object with `targets` | `CoverageReport`: each file's stated totals, no line |
+| `ReadXccovArchive` | The JSON `xcrun xccov view --archive --json Test.xcresult` prints, an object of file paths | `CoverageReport`: each file's executable lines |
 | `ReadSBOM` | CycloneDX 1.4, 1.5 or 1.6 JSON (`bomFormat: CycloneDX`), SPDX 2.3 JSON (`spdxVersion: SPDX-2.3`) | `SBOM`: the format, its spec version and one `Package` per component or package |
 
 A `TestCase` keeps its name, classname, enclosing suites (outermost first),
@@ -67,6 +71,19 @@ their parent stands for them. The errors total counts the `error`, `timeout`
 and `aborted` counters, and the skipped total is `total` less `executed`: the
 VSTest logger leaves `notExecuted` at 0 for a skipped test.
 
+An `.xcresult` test case's name is its node's name, such as `testAdd()`, its
+suites the `Test Plan`, test bundle and `Test Suite` nodes that enclose it,
+outermost first, and its classname the bundle's name joined with a dot to the
+outermost suite's, `CalcTests.CalcTests`, as xcbeautify names an XCTest case;
+a Swift Testing function outside a suite takes the bundle's name alone. Any
+other node, such as a device, a configuration, an argument or a repetition,
+is read through. `Passed` and `Expected Failure` pass, `Failed` fails and any
+other result skips. The first `Failure Message` below the case is its failure
+or skip message, and all of them, one per line, the failure's body when there
+are several, as a retried case has. The duration is `durationInSeconds`, else
+the `duration` string, whose decimal separator follows the runner's locale
+(`0,25s`). The output states no test file.
+
 A `FileCoverage` holds the file's instrumented lines, in increasing order,
 with their hit counts, and its line and function totals counted from them. A
 line stated twice keeps its largest count. A file whose report lists no line
@@ -80,6 +97,13 @@ covered instruction (`ci`) has one hit, a line with missed instructions only
 (`mi`) none, and a line with neither is no line. A source file's `LINE` and
 `METHOD` counters are its stated totals. The packages of every `group`, as
 `report-aggregate` writes them per module, are read.
+
+xccov prints a bundle's coverage two ways: `--report` states each file's
+`executableLines` and `coveredLines` and its functions, a function covered
+when it ran, and `--archive` each line of each file, a line with
+`isExecutable` false being no line. A file two targets list keeps the largest
+totals. Read the archive for the lines, and the report for the files the
+archive leaves out.
 
 ## Software bills of materials
 
@@ -126,7 +150,8 @@ resolves none: a Clover file's `path` attribute wins over its `name`, a
 Cobertura file is relative to one of the report's `Sources`, a JaCoCo file is
 its package path and source file name (`com/acme/pricing/Price.kt`, the
 source file name alone in the default package), and a Go profile
-names import paths (`example.com/calc/calc.go`). Mapping a path to the
+names import paths (`example.com/calc/calc.go`). xccov names absolute paths
+on the machine that ran the tests (`/Users/runner/work/calc/calc/Sources/Calc/Calc.swift`). Mapping a path to the
 repository, and a case or a file to a component, is the caller's.
 
 ## Diagnostics
@@ -136,7 +161,7 @@ read returns an empty result and one error diagnostic:
 
 | Code | Meaning |
 | --- | --- |
-| `readers.malformed` | The report does not decode, its root is not its format's, or it states an impossible value: a line below 1, a negative count, an unknown TRX outcome, an LCOV record without `end_of_record`, JUnit suites or JaCoCo groups nested deeper than `MaxSuiteDepth` (100). |
+| `readers.malformed` | The report does not decode, its root is not its format's, or it states an impossible value: a line below 1, a negative count, an unknown TRX outcome, an LCOV record without `end_of_record`, JUnit suites, `.xcresult` test nodes or JaCoCo groups nested deeper than `MaxSuiteDepth` (100). |
 | `readers.too_large` | The report is larger than `MaxReportBytes` (256 MiB), or its files mark more than `MaxLineMarks` (4,000,000) lines; a Go block marks every line of its span. |
 | `readers.missing` | `ReadFile`: the file does not exist, or the path is empty. |
 | `readers.unreadable` | `ReadFile`: the file exists but cannot be read. |
@@ -146,6 +171,6 @@ read returns an empty result and one error diagnostic:
 ## Fixtures
 
 `testdata/` holds real reports from Jest, Vitest, node:test, c8, PHPUnit,
-gotestsum, `go test`, JaCoCo under Maven and Gradle, and `dotnet test` with xUnit, NUnit and MSTest, each with the golden output of its reader, and the
+gotestsum, `go test`, JaCoCo under Maven and Gradle, and `dotnet test` with xUnit, NUnit and MSTest, each with the golden output of its reader, hand-written `xcresulttool` and `xccov` outputs in the shape Xcode 16 prints them (no macOS runner recorded them yet), and the
 malformed reports with the code each returns. `testdata/SOURCES.md` names
 the tool versions and commands.

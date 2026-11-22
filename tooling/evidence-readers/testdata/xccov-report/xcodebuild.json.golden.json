@@ -1,0 +1,26 @@
+{
+  "files": [
+    {
+      "path": "/Users/runner/work/calc/calc/Sources/Calc/Calc.swift",
+      "lineCounts": {
+        "total": 14,
+        "covered": 8
+      },
+      "functions": {
+        "total": 3,
+        "covered": 2
+      }
+    },
+    {
+      "path": "/Users/runner/work/calc/calc/Tests/CalcTests/CalcTests.swift",
+      "lineCounts": {
+        "total": 12,
+        "covered": 12
+      },
+      "functions": {
+        "total": 4,
+        "covered": 4
+      }
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "5B0E4F0C-4E8B-4C7F-9C3A-3F0A2A9C1D11",
+      "deviceName" : "iPhone 16",
+      "modelName" : "iPhone 16",
+      "osVersion" : "18.1",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "duration" : "0.002s",
+                  "name" : "testURLAppendsThePath()",
+                  "nodeIdentifier" : "ClientTests/testURLAppendsThePath()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.004s",
+                  "name" : "testURLCarriesTheQuery()",
+                  "nodeIdentifier" : "ClientTests/testURLCarriesTheQuery()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ClientTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            }
+          ],
+          "name" : "NetworkingTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Passed"
+        },
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "duration" : "0.001s",
+                  "name" : "testQuoteURLNamesTheSKU()",
+                  "nodeIdentifier" : "PriceCalculatorTests/testQuoteURLNamesTheSKU()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.001s",
+                  "name" : "testTotalAddsTax()",
+                  "nodeIdentifier" : "PriceCalculatorTests/testTotalAddsTax()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00031s",
+                  "name" : "testTotalOfNothingIsZero()",
+                  "nodeIdentifier" : "PriceCalculatorTests/testTotalOfNothingIsZero()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "PriceCalculatorTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            }
+          ],
+          "name" : "PricingTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Passed"
+        },
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "duration" : "0.001s",
+                  "name" : "testEmptyCartIsFree()",
+                  "nodeIdentifier" : "CheckoutTests/testEmptyCartIsFree()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.002s",
+                  "name" : "testTotalAddsTax()",
+                  "nodeIdentifier" : "CheckoutTests/testTotalAddsTax()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "CheckoutTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            }
+          ],
+          "name" : "ShopTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Passed"
+        }
+      ],
+      "name" : "Shop",
+      "nodeType" : "Test Plan",
+      "result" : "Passed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Test Scheme Action"
+    }
+  ]
+}

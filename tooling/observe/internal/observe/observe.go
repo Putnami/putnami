@@ -95,6 +95,9 @@ type Options struct {
 	// ProjectID asks the code host API for the numeric project id of the
 	// repository at path on host, for a run outside a CI; nil asks nothing.
 	ProjectID func(ctx context.Context, provider, host, path string) (string, error)
+	// XCRun runs xcrun to read an .xcresult bundle; nil runs the xcrun of the
+	// PATH, when it has one.
+	XCRun analyze.XCRun
 }
 
 // Run observes the job.
@@ -139,6 +142,9 @@ func Run(ctx context.Context, opts Options) Observation {
 	}
 	set := components.Detect(root, opts.detectors())
 	input := analyze.Input{Root: root, Set: set, ChangedFiles: o.ChangedFiles, DiffRead: diffRead(resolved), Reports: o.Reports, DecisionDirs: opts.Decisions, ArchUnitClasses: opts.ArchUnitClasses}
+	if input.XCRun = opts.XCRun; input.XCRun == nil && slices.ContainsFunc(o.Reports, func(r reports.Report) bool { return r.Format == reports.FormatXCResult }) {
+		input.XCRun = systemXCRun(ctx)
+	}
 	var analysisDiags []diag.Diagnostic
 	if resolved.BaseSHA != "" && resolved.HeadSHA != "" {
 		added, err := gitbase.AddedLines(ctx, root, resolved.BaseSHA, resolved.HeadSHA)

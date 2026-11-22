@@ -210,17 +210,15 @@ Each module the POMs list is a component, and a dependency on another module is 
 
 #### iOS and Swift
 
-In an iOS or Swift repository, write each package's description and convert the `.xcresult` bundle to JUnit and Cobertura, before the observe step. The same lines run in a GitHub Actions job on `runs-on: macos-15` and in a GitLab job on a macOS runner (`tags: [saas-macos-medium-m1]`), with xcbeautify and xcresultparser installed (`brew install xcbeautify xcresultparser`):
+In an iOS or Swift repository, write each package's description and keep the `.xcresult` bundle, before the observe step, in the same macOS job. The same lines run in a GitHub Actions job on `runs-on: macos-15` and in a GitLab job on a macOS runner (`tags: [saas-macos-medium-m1]`):
 
 ```bash
 (cd Packages/Pricing && swift package describe --type json > swiftpm.json)
-set -o pipefail
 xcodebuild test -workspace Shop.xcworkspace -scheme Shop -destination 'platform=iOS Simulator,name=iPhone 16' \
-  -enableCodeCoverage YES -resultBundlePath build/Test.xcresult | xcbeautify --report junit --report-path build/reports
-xcresultparser --output-format cobertura --project-root . build/Test.xcresult > build/reports/coverage.xml
+  -enableCodeCoverage YES -resultBundlePath build/Test.xcresult
 ```
 
-For a package on its own, `swift test --enable-code-coverage --xunit-output build/reports/xunit.xml` writes the JUnit report, and `llvm-cov export -format=lcov` the coverage. `putnami observe` reads no `.xcresult` itself. Each Swift package, each of its targets and each Xcode project is a component; the export gives the targets' dependencies, and a local package the Xcode project references is an edge, so a change to a package marks the packages and the app that use it. Without the export, the summary says how to write it. A test case named `PricingTests.PriceCalculatorTests` lands on the test target `PricingTests`, and a change to `Package.resolved` or `Podfile.lock` is a dependency change of ecosystem `swift` or `cocoapods`.
+`putnami observe` finds `build/Test.xcresult` and reads its tests and coverage with `xcrun xcresulttool` (Xcode 16 and later) and `xcrun xccov`. When the repository holds other JUnit reports, it reads only the bundle's coverage, so a converted copy is not counted twice: name the bundle and those reports with `--junit` to read its tests too. To observe on a runner without `xcrun`, such as a Linux job, convert the bundle to JUnit and Cobertura on the macOS runner (`brew install xcresultparser`, then `xcresultparser --output-format junit` and `--output-format cobertura`); otherwise the summary names that conversion and the job still exits 0. For a package on its own, `swift test --enable-code-coverage --xunit-output build/reports/xunit.xml` writes the JUnit report, and `llvm-cov export -format=lcov` the coverage. Each Swift package, each of its targets and each Xcode project is a component; the export gives the targets' dependencies, and a local package the Xcode project references is an edge, so a change to a package marks the packages and the app that use it. Without the export, the summary says how to write it. A test case named `PricingTests.PriceCalculatorTests` lands on the test target `PricingTests`, and a change to `Package.resolved` or `Podfile.lock` is a dependency change of ecosystem `swift` or `cocoapods`.
 
 #### Dart and Flutter
 

@@ -3,7 +3,8 @@
 `putnami observe` reads the repository's manifests, the git diff, the test and
 coverage reports, the lockfiles and the software bills of materials (SBOM).
 It runs no package manager, no orchestrator, no test and no SBOM tool, and
-queries no vulnerability database.
+queries no vulnerability database; it runs `xcrun` only to read an Xcode
+`.xcresult` bundle (see [iOS and Swift](/docs/tooling-&-workspace/observe/swift#reports)).
 
 ## Components
 

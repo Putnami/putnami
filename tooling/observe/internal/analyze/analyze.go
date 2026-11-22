@@ -6,7 +6,9 @@
 // decision records the change concerns.
 //
 // It reads the components the detectors found, the reports the CI wrote, the
-// decision records and the git diff; it runs nothing. Every finding is a diagnostic.
+// decision records and the git diff. It runs nothing but xcrun, through
+// Input.XCRun, to read an Xcode .xcresult bundle. Every finding is a
+// diagnostic.
 package analyze
 
 import (
@@ -73,6 +75,9 @@ type Input struct {
 	// DecisionDirs are the repository directories that hold decision records;
 	// empty reads the default ones.
 	DecisionDirs []string
+	// XCRun runs xcrun to read an .xcresult bundle; nil on a runner without
+	// it.
+	XCRun XCRun
 }
 
 // Result is what the analysis found.
@@ -102,6 +107,9 @@ type Result struct {
 	// it touches no declaration.
 	Declarations []evidence.Declaration `json:"declarations,omitzero"`
 	Diagnostics  []diag.Diagnostic      `json:"-"`
+	// xcresultWarned holds the bundles already reported unread for want of
+	// xcrun.
+	xcresultWarned map[string]bool
 }
 
 // Run analyzes one change.

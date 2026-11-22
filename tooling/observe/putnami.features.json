@@ -1443,7 +1443,7 @@
       "id": "tooling/observe-swift",
       "type": "feature",
       "name": "Find the components of an iOS or Swift repository that keeps its own CI",
-      "outcome": "putnami observe, in an iOS or Swift repository without a Putnami workspace, knows one component per Swift package, package target and Xcode project, and the edges between them, from the describe export the CI wrote or from Package.swift and project.pbxproj, without running any Apple tool, so a change to a local package marks the packages and the app that use it, its tests and coverage land on the right component, and a Package.resolved or Podfile.lock bump is a dependency change",
+      "outcome": "putnami observe, in an iOS or Swift repository without a Putnami workspace, knows one component per Swift package, package target and Xcode project, and the edges between them, from the describe export or from Package.swift and project.pbxproj, running no Apple tool but xcrun on a kept .xcresult bundle, so a change to a local package marks the packages and the app that use it, its tests and coverage land on the right component, and a Package.resolved or Podfile.lock bump is a dependency change",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -1566,6 +1566,49 @@
             "kind": "acceptance",
             "checks": [
               "a-placed-case-names-its-test-file"
+            ]
+          }
+        },
+        {
+          "id": "xcresult-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-xcresult-bundle-is-a-test-and-coverage-report",
+              "a-named-bundle-replaces-discovery",
+              "a-discovered-bundle-beside-junit-reports-gives-no-tests"
+            ]
+          }
+        },
+        {
+          "id": "xcresult-read",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bundle-reads-through-xcrun",
+              "a-failed-xcrun-command-is-a-diagnostic",
+              "each-xcrun-command-is-bounded"
+            ]
+          }
+        },
+        {
+          "id": "xcresult-tools-missing",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-xcrun-names-the-conversion"
             ]
           }
         },

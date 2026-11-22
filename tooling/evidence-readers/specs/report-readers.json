@@ -8,6 +8,7 @@
     "A missing, malformed or oversized report is one diagnostic with a stable code, and the reader never panics.",
     "CycloneDX and SPDX documents that osv-scanner, Trivy or Syft wrote read into the same packages, each with its package URL, licences and known vulnerabilities.",
     "The TRX report dotnet test writes for xUnit, NUnit and MSTest reads into the same test cases as a JUnit report, with the test assembly as suite.",
+    "The tests and coverage of an Xcode .xcresult bundle, as xcrun xcresulttool and xcrun xccov print them, read into the same test cases and file coverage as a JUnit and an LCOV report.",
     "The architecture rules ArchUnit, deptrac and import-linter checked read into the same rules, each kept or broken, with its violations and the class or module, file and line each one names.",
     "A consumer outside this repository requires go.putnami.dev/evidence/readers at a released version, and a change to its exported surface or to what a fixture reads fails a test until its record is updated in the same change."
   ],
@@ -17,7 +18,8 @@
     "Writing the change evidence document, which protocol/evidence specifies.",
     "SARIF, which a later slice adds.",
     "Querying a vulnerability database, or matching a software bill of materials to the lockfile changes, which the observe extension owns.",
-    "Running ArchUnit, deptrac or import-linter, or mapping a class or a module to its source file, which the observe extension owns."
+    "Running ArchUnit, deptrac or import-linter, or mapping a class or a module to its source file, which the observe extension owns.",
+    "Running xcresulttool or xccov, or finding an .xcresult bundle, which the observe extension owns."
   ],
   "requirements": [
     {
@@ -52,6 +54,13 @@
         "A line element with covered instructions (ci) is a covered line, with hits 1, since JaCoCo records no execution count;",
         "one with missed instructions only is uncovered, and one with neither is no line.",
         "Kover writes the same format."
+      ]
+    },
+    {
+      "id": "xccov-reads-file-totals-and-lines",
+      "text": [
+        "ReadXccovReport reads the JSON of xcrun xccov view --report --json, root targets, into one file per path with no line: its line totals are its executableLines and coveredLines, its functions those it lists.",
+        "ReadXccovArchive reads the JSON of xcrun xccov view --archive --json, a map of path to lines, into one file per path in path order whose lines are those with isExecutable true, with their executionCount."
       ]
     },
     {
@@ -90,6 +99,13 @@
         "Error, Timeout and Aborted fail as an error;",
         "NotExecuted, Inconclusive, NotRunnable, Pending, Disconnected and InProgress skip.",
         "Totals are the ResultSummary counters, skipped being total less executed; other outcomes are malformed."
+      ]
+    },
+    {
+      "id": "xcresult-tests-read-every-case",
+      "text": [
+        "ReadXCResultTests reads the JSON of xcrun xcresulttool get test-results tests (Xcode 16 and later), root testNodes, into one case per Test Case node in document order: its suites are the enclosing plan, bundle and suite nodes, its classname Bundle.Suite of the outermost suite, else the bundle.",
+        "Passed and Expected Failure pass, Failed fails, any other result skips, with the first Failure Message below as message; the duration is durationInSeconds, else the duration string with a dot or comma decimal."
       ]
     },
     {
