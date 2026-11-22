@@ -38,6 +38,7 @@
         "../../go/samples/recipes.json",
         "../../python/samples/recipes.json",
         "../../.agents/constraints.md",
+        "../../sites/putnami.dev/doc/03-how-to/*-build-a-postgres-api-in-*.md",
         "../../putnami.support.json",
         "../../putnami.workspace.json",
         "../../putnami.lock.json",

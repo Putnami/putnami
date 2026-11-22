@@ -43,7 +43,7 @@ func withoutBlock(t *testing.T, content string) string {
 }
 
 func TestGuidanceBlockRoundTrips(t *testing.T) {
-	block := guidanceBlock("lint,test --impacted --enforce-coverage", "")
+	block := guidanceBlock("lint,test --impacted --enforce-coverage", "", "")
 	start, end, intact, found := findGuidanceBlock(block)
 	if !found || !intact || start != 0 || end != len(block) {
 		t.Fatalf("find(block) = %d, %d, %v, %v", start, end, intact, found)
@@ -60,14 +60,14 @@ func TestGuidanceBlockRoundTrips(t *testing.T) {
 			t.Errorf("block missing %q", line)
 		}
 	}
-	body := guidanceBody("lint,test", "")
+	body := guidanceBody("lint,test", "", "")
 	if lines := strings.Count(body, "\n"); lines != 6 {
 		t.Fatalf("block body has %d lines, want exactly 6", lines)
 	}
 }
 
 func TestFindGuidanceBlockRejectsEditsAndMalformedMarkers(t *testing.T) {
-	block := guidanceBlock("lint", "")
+	block := guidanceBlock("lint", "", "")
 	edited := strings.Replace(block, "This is a Putnami workspace.", "This is my workspace.", 1)
 	if _, _, intact, found := findGuidanceBlock(edited); !found || intact {
 		t.Fatalf("an edited block must be found and not intact (found=%v intact=%v)", found, intact)
@@ -85,7 +85,7 @@ func TestFindGuidanceBlockRejectsEditsAndMalformedMarkers(t *testing.T) {
 }
 
 func TestUpsertGuidanceBlockPreservesEveryOtherByte(t *testing.T) {
-	block := guidanceBlock("lint", "")
+	block := guidanceBlock("lint", "", "")
 	for name, original := range map[string]string{
 		"heading and blank line": "# My project\n\nOur own rules.\n",
 		"heading without blank":  "# My project\nOur own rules.\n",
@@ -109,9 +109,9 @@ func TestUpsertGuidanceBlockPreservesEveryOtherByte(t *testing.T) {
 	}
 
 	// A new block replaces an intact one in place.
-	withOld := "# P\n\n" + guidanceBlock("lint", "") + "tail\n"
-	out, changed, _ := upsertGuidanceBlock(withOld, guidanceBlock("lint,test", ""), false)
-	if !changed || out != "# P\n\n"+guidanceBlock("lint,test", "")+"tail\n" {
+	withOld := "# P\n\n" + guidanceBlock("lint", "", "") + "tail\n"
+	out, changed, _ := upsertGuidanceBlock(withOld, guidanceBlock("lint,test", "", ""), false)
+	if !changed || out != "# P\n\n"+guidanceBlock("lint,test", "", "")+"tail\n" {
 		t.Fatalf("intact block not replaced in place:\n%s", out)
 	}
 
@@ -173,7 +173,7 @@ func TestWriteAgentEntrypointsClaudeEntrypointForms(t *testing.T) {
 	if got := readGuidance(t, dir, ClaudeEntrypointPath); got != "# CLAUDE.md\n\n@AGENTS.md\n" {
 		t.Fatalf("absent CLAUDE.md became %q", got)
 	}
-	if got := readGuidance(t, dir, agentEntrypointPath); got != generateAgentEntrypoint(gateCommandForWorkspace(dir), decisionsGuidanceForWorkspace(dir)) {
+	if got := readGuidance(t, dir, agentEntrypointPath); got != generateAgentEntrypoint(gateCommandForWorkspace(dir), decisionsGuidanceForWorkspace(dir), recipeGuidanceForWorkspace(dir)) {
 		t.Fatalf("absent AGENTS.md became %q", got)
 	}
 

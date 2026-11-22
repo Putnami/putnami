@@ -1715,6 +1715,36 @@
     },
     {
       "match": "exact",
+      "path": "/docs/how-to/build-a-postgres-api-in-go",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/how-to/build-a-postgres-api-in-typescript",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/how-to/build-a-web-app",
       "methods": [
         "GET",
@@ -4744,6 +4774,36 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/how-to/build-a-postgres-api-in-go",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/how-to/build-a-postgres-api-in-typescript",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/how-to/build-a-web-app",
       "methods": [
         "GET",
@@ -6386,5 +6446,5 @@
       }
     }
   ],
-  "digest": "sha256:e9ef55dd0d7338be666006e5a18bc1187db5d09900edd0c2dd9f7c43766b7d50"
+  "digest": "sha256:354399d40128b9931540f017d3b0d39c60cc356660dd59fda4b4eb1fe6339a16"
 }

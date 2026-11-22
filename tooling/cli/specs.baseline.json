@@ -28,6 +28,7 @@
     "cli/canonical-workspace-guidance#experimental-python",
     "cli/canonical-workspace-guidance#generated-agent-guidance",
     "cli/canonical-workspace-guidance#generated-help",
+    "cli/canonical-workspace-guidance#generated-service-recipe",
     "cli/canonical-workspace-guidance#internal-model-boundary",
     "cli/canonical-workspace-guidance#onboarding-path",
     "cli/canonical-workspace-guidance#support-maturity-separation",

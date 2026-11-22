@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
@@ -45,16 +46,18 @@ func writeAgentEntrypoints(wsRoot string, force bool) (guidanceWriteReport, erro
 	// One read of the workspace's CI document serves both entrypoints. Putnami
 	// owns one delimited block inside each; every other byte belongs to whoever
 	// wrote it.
-	gate := gateCommandForWorkspace(wsRoot)
-	// The line that names where the decisions are travels with the gate: both
-	// are derived from committed documents, both are read once, and both are
-	// guidance about THIS workspace rather than a hardcoded sentence.
+	// The gate, the decisions line and the recipe line are guidance about
+	// THIS workspace rather than hardcoded sentences, each read once. The gate
+	// and the recipe line come from one discovery of the loaded extensions.
+	extensions := loadedExtensions(wsRoot)
+	gate := gateCommand(wsRoot, extension.BuildJobMap(extensions))
 	decisions := decisionsGuidanceForWorkspace(wsRoot)
+	recipe := recipeGuidance(extensions)
 
 	files := make([]managedGuidanceFile, 0, 2)
 	for _, entrypoint := range []struct {
 		path string
-		plan func(current string, exists bool, gate, decisions string, force bool) (string, bool, bool)
+		plan func(current string, exists bool, gate, decisions, recipe string, force bool) (string, bool, bool)
 	}{
 		{agentEntrypointPath, planAgentsEntrypoint},
 		{ClaudeEntrypointPath, planClaudeEntrypoint},
@@ -71,7 +74,7 @@ func writeAgentEntrypoints(wsRoot string, force bool) (guidanceWriteReport, erro
 		if err != nil {
 			return report, err
 		}
-		target, write, preserved := entrypoint.plan(current, exists, gate, decisions, force)
+		target, write, preserved := entrypoint.plan(current, exists, gate, decisions, recipe, force)
 		files = append(files, managedGuidanceFile{Path: entrypoint.path, Target: target, Write: write})
 		if preserved {
 			report.Preserved = append(report.Preserved, entrypoint.path)
@@ -123,6 +126,9 @@ const guidanceBlockTemplate = "This is a Putnami workspace.\n" +
 	"- Build, test, lint, install, add dependencies, and generate with `./putnamiw` when present, otherwise `putnami`. Never call npm, bun, go, pip, or cargo directly for those.\n" +
 	"- While iterating, select the projects you changed with `--projects <a>,<b>`; unlike `--impacted`, it skips every project that depends on them. Before declaring work complete, run `putnami {{GATE_COMMAND}}` once, when feasible.\n" +
 	"- Discover code through the CLI, then grep: `putnami projects list|describe|owner|deps|why` for the project graph, `putnami context map|pack` to orient on the workspace or a project, and `putnami <verb> --impacted --dry-run` for what a change affects. Use grep for literal text.\n" +
+	// One line that names the service recipe of the languages THIS workspace
+	// loads, or nothing at all (recipe_guidance.go).
+	recipePlaceholder +
 	"- Skills and agents that an extension's agent content installs under `.agents/`, `.claude/` and `.codex/` are managed by Putnami. To customize one, copy it under another name; edited managed files are preserved and reported, never overwritten.\n" +
 	"- Read `.agents/constraints.md` when it exists.\n" +
 	// One line that names where THIS workspace records its decisions, or
@@ -132,16 +138,17 @@ const guidanceBlockTemplate = "This is a Putnami workspace.\n" +
 	// files hold them.
 	decisionsPlaceholder
 
-// guidanceBlock is the delimited block for a workspace's gate and decisions.
-func guidanceBlock(gate, decisions string) string {
-	return wrapGuidanceBlock(guidanceBody(gate, decisions))
+// guidanceBlock is the delimited block for a workspace's gate, decisions and
+// service recipe.
+func guidanceBlock(gate, decisions, recipe string) string {
+	return wrapGuidanceBlock(guidanceBody(gate, decisions, recipe))
 }
 
-// guidanceBody fills both workspace-derived placeholders. It is the one place
+// guidanceBody fills the workspace-derived placeholders. It is the one place
 // the substitutions happen, so the digest in the begin marker and every
 // comparison against a committed block are taken over the same bytes.
-func guidanceBody(gate, decisions string) string {
-	return applyDecisions(applyGate(guidanceBlockTemplate, gate), decisions)
+func guidanceBody(gate, decisions, recipe string) string {
+	return applyDecisions(applyRecipe(applyGate(guidanceBlockTemplate, gate), recipe), decisions)
 }
 
 // wrapGuidanceBlock delimits body and stamps the begin marker with the digest
@@ -216,19 +223,19 @@ func upsertGuidanceBlock(content, block string, force bool) (out string, changed
 	return block + "\n" + content, true, false
 }
 
-func planAgentsEntrypoint(current string, exists bool, gate, decisions string, force bool) (string, bool, bool) {
-	fresh := generateAgentEntrypoint(gate, decisions)
+func planAgentsEntrypoint(current string, exists bool, gate, decisions, recipe string, force bool) (string, bool, bool) {
+	fresh := generateAgentEntrypoint(gate, decisions, recipe)
 	if !exists {
 		return fresh, current != fresh, false
 	}
-	return upsertGuidanceBlock(current, guidanceBlock(gate, decisions), force)
+	return upsertGuidanceBlock(current, guidanceBlock(gate, decisions, recipe), force)
 }
 
 // planClaudeEntrypoint writes the import form when Putnami owns the file, and
 // otherwise places the block inside the user's file. A user CLAUDE.md that
 // already imports AGENTS.md already receives the block, so it is left alone
 // rather than given a second copy.
-func planClaudeEntrypoint(current string, exists bool, gate, decisions string, force bool) (string, bool, bool) {
+func planClaudeEntrypoint(current string, exists bool, gate, decisions, recipe string, force bool) (string, bool, bool) {
 	fresh := generateClaudeEntrypoint(gate)
 	if !exists || current == fresh {
 		return fresh, current != fresh, false
@@ -236,7 +243,7 @@ func planClaudeEntrypoint(current string, exists bool, gate, decisions string, f
 	if _, _, _, found := findGuidanceBlock(current); !found && importsAgentsEntrypoint(current) {
 		return current, false, false
 	}
-	return upsertGuidanceBlock(current, guidanceBlock(gate, decisions), force)
+	return upsertGuidanceBlock(current, guidanceBlock(gate, decisions, recipe), force)
 }
 
 func importsAgentsEntrypoint(content string) bool {
@@ -265,6 +272,6 @@ func generateClaudeEntrypoint(string) string {
 }
 
 // generateAgentEntrypoint is the AGENTS.md Putnami writes when none exists.
-func generateAgentEntrypoint(gate, decisions string) string {
-	return agentsEntrypointHead + guidanceBlock(gate, decisions)
+func generateAgentEntrypoint(gate, decisions, recipe string) string {
+	return agentsEntrypointHead + guidanceBlock(gate, decisions, recipe)
 }

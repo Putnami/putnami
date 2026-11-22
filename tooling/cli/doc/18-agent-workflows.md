@@ -28,7 +28,7 @@ installed.
 
 | Layer | What it supplies | Ownership |
 |---|---|---|
-| The guidance block in `AGENTS.md` and `CLAUDE.md` | the workflow bootstrap: the pinned command, the selection rules, the discovery rule, and a pointer to `.agents/constraints.md` when the workspace writes one | Putnami owns the block; every other byte, and `.agents/constraints.md` itself, belongs to the workspace |
+| The guidance block in `AGENTS.md` and `CLAUDE.md` | the workflow bootstrap: the pinned command, the selection rules, the discovery rule, a link to the Postgres API recipe of each loaded Go or TypeScript extension, and a pointer to `.agents/constraints.md` when the workspace writes one | Putnami owns the block; every other byte, and `.agents/constraints.md` itself, belongs to the workspace |
 | Agent content | versioned repeatable workflow files | the extension that ships them, through its lock pin and content manifest |
 
 The layers are independent. An agent uses `./putnamiw`, or `putnami` when no

@@ -12,6 +12,7 @@ The block is short on purpose. It states:
 - **CLI commands** — use `./putnamiw` when present, otherwise `putnami`; never npm, bun, go, pip, or cargo for build, test, lint, install, dependency, or generation work
 - **Selection** — iterate with `--projects <a>,<b>`, and run the gate once with `--impacted` before declaring work complete, plus `--enforce-coverage` when the workspace's extensions declare it
 - **Discovery** — discover code through the CLI first: `putnami projects list|describe|owner|deps|why` for the project graph, `putnami context map|pack` to orient, and `putnami <verb> --impacted --dry-run` for what a change affects; file search is for literal text
+- **Service recipe** — in a workspace that loads the Go or TypeScript extension, a link to [Build a Postgres API in Go](/docs/how-to/build-a-postgres-api-in-go) or [in TypeScript](/docs/how-to/build-a-postgres-api-in-typescript), from the template to a running image
 - **Skills** — the skills and agents an extension's agent content installs under `.agents/`, `.claude/` and `.codex/` are managed by Putnami
 - **Your rules** — read `.agents/constraints.md` when it exists
 

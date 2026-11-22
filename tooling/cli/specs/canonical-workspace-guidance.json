@@ -33,6 +33,10 @@
       "text": "Generated context routes workspace discovery to the CLI commands that print it, names the CLI gate for verification, and names no tool a workspace does not serve."
     },
     {
+      "id": "generated-service-recipe",
+      "text": "The generated guidance of a workspace that loads the Go or TypeScript extension links the public recipe that takes that language from a template to a running image of an HTTP API with Postgres; a workspace that loads neither renders no such line."
+    },
+    {
       "id": "support-maturity-separation",
       "text": "Documentation identifies the CLI package as stable under the pre-1.0 migration policy while keeping feature maturity dependent on generated evidence."
     },
