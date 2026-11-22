@@ -20,19 +20,21 @@ func packageDeployment() cli.JobFunc {
 	return infraagg.DeploymentJob(infraagg.Options{RuntimeCompatibility: disableHTTP2})
 }
 
-// disableHTTP2 turns HTTP/2 off for every TypeScript workload's runtime block.
+// disableHTTP2 turns HTTP/2 off for a TypeScript workload's runtime block
+// unless the block already states it (ADR 0013).
 //
 // A Bun-backed service accepts cleartext HTTP/2 with prior knowledge beside
-// HTTP/1.1 and its WebSocket upgrades, but end-to-end HTTP/2 from the platform
-// has not been turned on for TypeScript workloads, and Putnami Cloud may
-// default a service to HTTP/2, so a TS workload must opt out EXPLICITLY — a
-// missing statement would be read as "take the platform default", which is the
-// wrong one here until that decision is made.
+// HTTP/1.1 and its WebSocket upgrades, and serves Connect client and
+// bidirectional streams only over HTTP/2. But Bun does not carry WebSockets
+// over HTTP/2, and end-to-end HTTP/2 from the platform has not been tested on
+// a real deployment, so the default stays off. Putnami Cloud may default a
+// service to HTTP/2, so the default is stated EXPLICITLY: a missing statement
+// would be read as "take the platform default".
 //
-// It is applied to a developer-authored infra/runtime.json as well as to the
-// synthesized defaults: until that decision is made for every TypeScript
-// workload, `"protocols": {"http2": true}` in a project's own runtime file
-// must not survive into the manifest a deployer acts on.
+// A developer-authored infra/runtime.json that states protocols.http2, true or
+// false, keeps its value: that is the workload's own opt-in, taken knowing its
+// WebSocket transport may not survive an ingress that speaks HTTP/2 for every
+// request. The synthesized defaults state nothing, so they always get false.
 //
 // This lived in the CLI until an earlier migration, where core recognized a
 // TypeScript application by matching its tags ("ts", "typescript") and its
@@ -42,9 +44,12 @@ func disableHTTP2(rt *infra.Runtime) {
 	if rt == nil {
 		return
 	}
-	http2 := false
 	if rt.Protocols == nil {
 		rt.Protocols = &infra.RuntimeProtocols{}
 	}
+	if rt.Protocols.HTTP2 != nil {
+		return
+	}
+	http2 := false
 	rt.Protocols.HTTP2 = &http2
 }
