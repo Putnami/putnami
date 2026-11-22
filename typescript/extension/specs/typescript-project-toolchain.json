@@ -203,7 +203,7 @@
     },
     {
       "id": "test-type-checker-choice",
-      "text": "The type-check of the test command runs tsc unless the type-checker parameter, set by --type-checker or options[\"@putnami/typescript:test\"][\"type-checker\"], chooses bun; nothing infers it. With bun it runs bun check, never a package.json check script, on the same scratch tsconfig and compiler options, every error shown, and fails on the diagnostics tsc reports. Another value fails the task naming the choices."
+      "text": "The type-check of the test command runs tsc unless the type-checker parameter, set by --type-checker or options[\"@putnami/typescript:test\"][\"type-checker\"], chooses bun; nothing infers it. With bun it runs bun check, never a package.json check script, on the same scratch tsconfig and compiler options with every error shown, and reports its diagnostics as tsc's. A Bun older than 1.4.4, or another value, fails the task naming the version or the choices."
     },
     {
       "id": "runtime-manifest-parity",

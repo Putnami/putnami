@@ -111,6 +111,9 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool, c
 	}
 	var args []string
 	if checker == TypeCheckerBun {
+		if err := requireBunCheck(bunBin, projectPath); err != nil {
+			return nil, err
+		}
 		args = bunCheckArgs(fsRoot, flags, scratch)
 	} else {
 		args = append([]string{"x", "tsc", "--noEmit", "--rootDir", fsRoot}, flags...)
@@ -130,6 +133,25 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool, c
 		Success:     result.Success,
 		RawOutput:   rawOutput,
 	}, nil
+}
+
+// bunCheckBun is the earliest Bun release known to ship bun check with
+// --no-pretty, --all and --no-script. An earlier Bun reads `bun check` as
+// `bun run check`, which would run the project's check script or file instead
+// of a type-check.
+var bunCheckBun = [3]int{1, 4, 4}
+
+// requireBunCheck fails unless the bun at bunBin is bunCheckBun or later.
+func requireBunCheck(bunBin, workDir string) error {
+	version, err := readBunVersion(bunBin, workDir)
+	if err != nil {
+		return err
+	}
+	if slices.Compare(version[:], bunCheckBun[:]) < 0 {
+		return fmt.Errorf("type-checker bun needs Bun %d.%d.%d or later for bun check, and %s is %d.%d.%d; set type-checker to tsc or upgrade Bun",
+			bunCheckBun[0], bunCheckBun[1], bunCheckBun[2], bunBin, version[0], version[1], version[2])
+	}
+	return nil
 }
 
 // bunCheckArgs are the arguments of a bun check run on the scratch tsconfig

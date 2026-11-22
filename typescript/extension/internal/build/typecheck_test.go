@@ -245,6 +245,9 @@ func TestRunTypeCheck_BunRunsBunCheckOnTheScratchTsconfig(t *testing.T) {
 	scratch := t.TempDir()
 	var args []string
 	withMockExec(t, func(_ string, a []string, _ ...exec.Option) (*exec.Result, error) {
+		if slices.Equal(a, []string{"--version"}) {
+			return &exec.Result{Success: true, Stdout: "1.4.5\n"}, nil
+		}
 		args = a
 		if _, err := os.Stat(a[len(a)-1]); err != nil {
 			t.Errorf("the scratch tsconfig is missing during the check: %v", err)
@@ -267,9 +270,53 @@ func TestRunTypeCheck_BunRunsBunCheckOnTheScratchTsconfig(t *testing.T) {
 			t.Errorf("bun check args %v lack %s", args, want)
 		}
 	}
-	for _, unwanted := range []string{"x", "tsc", "--noEmit", "--pretty", "--incremental", "--tsBuildInfoFile"} {
+	for _, unwanted := range []string{"x", "tsc", "--noEmit", "--pretty", "false", "--incremental", "--tsBuildInfoFile"} {
 		if slices.Contains(args, unwanted) {
 			t.Errorf("bun check args %v hold %s", args, unwanted)
+		}
+	}
+}
+
+func TestRunTypeCheck_BunKeepsTheProjectsCompilerOptions(t *testing.T) {
+	dir := t.TempDir()
+	writeProjectFiles(t, dir, "tsconfig.json", "src/sum.test.ts")
+	var args []string
+	withMockExec(t, func(_ string, a []string, _ ...exec.Option) (*exec.Result, error) {
+		if slices.Equal(a, []string{"--version"}) {
+			return &exec.Result{Success: true, Stdout: "1.4.5\n"}, nil
+		}
+		args = a
+		return &exec.Result{Success: true}, nil
+	})
+
+	if _, err := RunTypeCheck("bun", dir, "", true, TypeCheckerBun); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"check", "--no-pretty", "--all", "--no-script", "--rootDir", string(filepath.Separator), "--skipLibCheck", "true", "-p"}
+	if len(args) != len(want)+1 || !slices.Equal(args[:len(want)], want) {
+		t.Errorf("args %v, want %v and the scratch tsconfig", args, want)
+	}
+}
+
+func TestRunTypeCheck_BunRefusesABunWithoutBunCheck(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-type-checker-choice", "a-bun-without-bun-check-fails-the-task-naming-the-version")
+	dir := t.TempDir()
+	writeProjectFiles(t, dir, "tsconfig.json", "src/index.ts")
+	withMockExec(t, func(_ string, a []string, _ ...exec.Option) (*exec.Result, error) {
+		if slices.Equal(a, []string{"--version"}) {
+			return &exec.Result{Success: true, Stdout: "1.3.9\n"}, nil
+		}
+		t.Errorf("a Bun without bun check ran %v", a)
+		return &exec.Result{Success: true}, nil
+	})
+
+	_, err := RunTypeCheck("bun", dir, "", false, TypeCheckerBun)
+	if err == nil {
+		t.Fatal("a Bun without bun check type-checked")
+	}
+	for _, want := range []string{"1.4.4", "1.3.9", "tsc"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %s", err, want)
 		}
 	}
 }

@@ -164,22 +164,33 @@ var reproducibleBytecodeBun = [3]int{1, 4, 5}
 // or prints a version this does not read, fails the compile, so one cache key
 // always holds the executable of one Bun release.
 func bunCompilesReproducibleBytecode(bunBin, workDir string) (bool, error) {
+	version, err := readBunVersion(bunBin, workDir)
+	if err != nil {
+		return false, err
+	}
+	return slices.Compare(version[:], reproducibleBytecodeBun[:]) >= 0, nil
+}
+
+// readBunVersion returns the version the bun at bunBin prints for --version.
+// A probe that fails, or prints a version parseBunVersion does not read, is an
+// error.
+func readBunVersion(bunBin, workDir string) ([3]int, error) {
 	result, err := execRunFunc(bunBin, []string{"--version"}, exec.Dir(workDir), exec.Timeout(30*time.Second))
 	if err != nil {
-		return false, fmt.Errorf("read the version of %s: %w", bunBin, err)
+		return [3]int{}, fmt.Errorf("read the version of %s: %w", bunBin, err)
 	}
 	if result == nil || !result.Success {
 		detail := ""
 		if result != nil {
 			detail = strings.TrimSpace(result.Stderr)
 		}
-		return false, fmt.Errorf("read the version of %s: bun --version failed%s", bunBin, cond(detail != "", ": "+detail, ""))
+		return [3]int{}, fmt.Errorf("read the version of %s: bun --version failed%s", bunBin, cond(detail != "", ": "+detail, ""))
 	}
 	version, ok := parseBunVersion(result.Stdout)
 	if !ok {
-		return false, fmt.Errorf("read the version of %s: bun --version printed %q", bunBin, strings.TrimSpace(result.Stdout))
+		return [3]int{}, fmt.Errorf("read the version of %s: bun --version printed %q", bunBin, strings.TrimSpace(result.Stdout))
 	}
-	return slices.Compare(version[:], reproducibleBytecodeBun[:]) >= 0, nil
+	return version, nil
 }
 
 // parseBunVersion reads the major, minor and patch numbers of what bun prints
