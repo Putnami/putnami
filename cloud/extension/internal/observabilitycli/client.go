@@ -228,6 +228,10 @@ type listSurface[T any] struct {
 	decode func(body []byte) ([]T, string, error)
 	// render formats one decoded item as a human line.
 	render func(item T) string
+	// note, when set, follows a non-empty result: on the human surface as a
+	// line after the items, in structured mode on stderr so stdout stays one
+	// object per item. Traces use it to say each item is the root span only.
+	note string
 }
 
 // streamList fetches and renders pages from an observability list endpoint. It
@@ -279,6 +283,9 @@ func streamList[T any](reqCtx context.Context, ctx *queryCtx, params map[string]
 	}
 
 	if structured {
+		if s.note != "" && total > 0 && ioctx.Stderr != nil {
+			ioctx.Stderr(s.note)
+		}
 		if nextCursor != "" && !followAll && ioctx.Stderr != nil {
 			ioctx.Stderr("more " + s.noun + " available; re-run with --cursor " + nextCursor + cursorHintTail(s.follow))
 		}
@@ -287,6 +294,9 @@ func streamList[T any](reqCtx context.Context, ctx *queryCtx, params map[string]
 	if total == 0 {
 		ioctx.Stdout("No " + s.noun + " found for " + s.scope(ctx) + ".")
 		return nil
+	}
+	if s.note != "" {
+		ioctx.Stdout(s.note)
 	}
 	if nextCursor != "" && !followAll {
 		ioctx.Stdout(fmt.Sprintf("More %s available — re-run with --cursor %s%s for the next page.", s.noun, nextCursor, humanCursorHintTail(s.follow)))

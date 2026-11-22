@@ -49,8 +49,24 @@ type traceSpan struct {
 	Attributes   map[string]string `json:"attributes,omitempty"`
 }
 
-// traceSummary is one trace as the traces command prints it.
+// traceSummary is one trace of the listing as the traces command prints it.
+// observability-api's listing reads Cloud Trace's ROOTSPAN view, so Spans
+// holds the trace's root span alone and the listing's spanCount is always 1
+// whatever the trace holds. The summary therefore carries no span count: a
+// count that reads as the whole trace would be wrong. `traces --trace <id>`
+// prints the whole trace as a traceDetail.
 type traceSummary struct {
+	TraceID    string            `json:"traceId"`
+	Name       string            `json:"name"`
+	Start      time.Time         `json:"start"`
+	Duration   time.Duration     `json:"duration"`
+	Attributes map[string]string `json:"attributes,omitempty"`
+	Spans      []traceSpan       `json:"spans,omitempty"`
+}
+
+// traceDetail is one whole trace as `traces --trace <id>` prints it: every span
+// observability-api's trace read returns, and their count.
+type traceDetail struct {
 	TraceID    string            `json:"traceId"`
 	Name       string            `json:"name"`
 	Start      time.Time         `json:"start"`
@@ -91,32 +107,49 @@ func metricSeriesFrom(in observabilityapiclient.MetricSeries) metricSeries {
 	return out
 }
 
-// traceSummaryFrom converts a generated trace summary into the printed shape.
-// The server writes duration as int64 nanoseconds, which is time.Duration.
+// traceSummaryFrom converts a generated listing item into the printed shape,
+// dropping the listing's root-span-only spanCount (see traceSummary). The
+// server writes duration as int64 nanoseconds, which is time.Duration.
 func traceSummaryFrom(in observabilityapiclient.TraceSummary) traceSummary {
-	out := traceSummary{
+	return traceSummary{
 		TraceID:    deref(in.TraceId),
 		Name:       deref(in.Name),
 		Start:      deref(in.Start),
 		Duration:   time.Duration(deref(in.Duration)),
-		SpanCount:  int(deref(in.SpanCount)),
 		Attributes: deref(in.Attributes),
+		Spans:      traceSpansFrom(in.Spans),
 	}
-	if in.Spans != nil {
-		out.Spans = make([]traceSpan, 0, len(*in.Spans))
-		for _, s := range *in.Spans {
-			out.Spans = append(out.Spans, traceSpan{
-				TraceID:      deref(s.TraceId),
-				SpanID:       deref(s.SpanId),
-				ParentSpanID: deref(s.ParentSpanId),
-				Name:         deref(s.Name),
-				Start:        deref(s.Start),
-				Duration:     time.Duration(deref(s.Duration)),
-				Attributes:   deref(s.Attributes),
-			})
+}
+
+// traceDetailFrom converts the generated answer of the trace read into the
+// printed shape. SpanCount is the number of spans printed, so it can never
+// disagree with Spans.
+func traceDetailFrom(in observabilityapiclient.TraceSummary) traceDetail {
+	spans := traceSpansFrom(in.Spans)
+	return traceDetail{
+		TraceID:    deref(in.TraceId),
+		Name:       deref(in.Name),
+		Start:      deref(in.Start),
+		Duration:   time.Duration(deref(in.Duration)),
+		SpanCount:  len(spans),
+		Attributes: deref(in.Attributes),
+		Spans:      spans,
+	}
+}
+
+// traceSpansFrom converts a generated span list, absent or not.
+func traceSpansFrom(in *[]observabilityapiclient.Span) []traceSpan {
+	return convertAll(in, func(s observabilityapiclient.Span) traceSpan {
+		return traceSpan{
+			TraceID:      deref(s.TraceId),
+			SpanID:       deref(s.SpanId),
+			ParentSpanID: deref(s.ParentSpanId),
+			Name:         deref(s.Name),
+			Start:        deref(s.Start),
+			Duration:     time.Duration(deref(s.Duration)),
+			Attributes:   deref(s.Attributes),
 		}
-	}
-	return out
+	})
 }
 
 // convertAll converts a generated item list, absent or not, with convert.

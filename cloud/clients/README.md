@@ -28,7 +28,7 @@ oci-server, put-server, runtime-api and source-api.
 | File layout | `docs/cloud-cli-schema/services/<service>/openapi.json` |
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
-file. `delivery-api` comes from the later version
+file, except the ones named below. `delivery-api` comes from the later version
 `0.0.0-20261110144910-13ece114a`, published on 2026-11-10, archive digest
 `sha256:082572ded5b2acb20382e546b27da1694abc630ff83b6530988a5568052a3fed`. It
 adds the merge queue setting (`getV1_Workspaces_Workspace_Ci_Queue`,
@@ -44,7 +44,8 @@ adds the collaboration routes under `source/proposals`, `source/tasks` and
 `source/collaboration/capabilities`, which `@putnami/cloud` calls to serve the
 tasks and proposals contracts.
 
-Two schemas come from the putnami-cloud repository instead of the package.
+Two schemas come from the putnami-cloud repository instead of the package, and
+`observability-api` adds one path from it, as the next paragraphs say.
 `agency-api/schema/openapi.json` is a byte-for-byte copy of
 `agency/workloads/agency-api/schema/openapi.json` at commit
 `5efd5633f16582a222f63a7e47280c08fe975abe` (branch `epic-5143/gateway-routine`),
@@ -56,6 +57,18 @@ agent trigger and organization model credential routes of
 `putnami agency trigger` and `putnami agency model-key`, and the parent policy
 and expiry of the telemetry settings `putnami cloud telemetry` writes. Refresh either one
 the same way, from the service's committed `schema/openapi.json`.
+
+`observability-api/schema/openapi.json` is the package file above plus one
+path, `/v1/workspaces/{workspace}/traces/{traceId}`
+(`getV1_Workspaces_Workspace_Traces_TraceId`), copied byte-for-byte from
+`observability/workloads/observability-api/schema/openapi.json` at
+putnami-cloud commit `d0b960608af2cd8406741f0bb1ef54dc4b962883` of `main`. The
+trace read references only `TraceSummary` and `Span`, which match the package
+file. `putnami cloud traces --trace` calls it. The rest of the file stays at the
+package version on purpose: the provider's current schema also gives
+`logs/tail` a WebSocket transport, which changes how the generated tail client
+connects, and that move belongs to its own change. The next refresh from a
+package version whose selection carries the trace read replaces this copy whole.
 
 ## Update the schemas
 

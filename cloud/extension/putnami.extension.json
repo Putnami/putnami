@@ -568,13 +568,17 @@
           ]
         },
         "traces": {
-          "description": "Query a workspace app's traces, with --slow to filter by latency (supports --output=jsonl).",
+          "description": "Query a workspace app's traces, with --slow to filter by latency; the listing shows each trace's root span, --trace <id> prints one trace with all its spans (supports --output=jsonl).",
           "command": "cloud-traces",
           "interactive": true,
           "examples": [
             {
               "command": "putnami cloud traces my-app --slow 500ms",
               "description": "Traces slower than a threshold"
+            },
+            {
+              "command": "putnami cloud traces my-app --trace 0197b20ade976f39996f99d576977e6d",
+              "description": "One trace with all its spans, as a span tree"
             },
             {
               "command": "putnami cloud traces my-app --output=jsonl",
@@ -2079,7 +2083,7 @@
       "activationFiles": [
         "putnami.extension.json"
       ],
-      "description": "Query a workspace app's traces (supports --output=jsonl).",
+      "description": "Query a workspace app's traces, each with its root span, or print one trace with all its spans with --trace (supports --output=jsonl).",
       "flags": {
         "app": {
           "type": "string",
@@ -2127,6 +2131,10 @@
           "type": "boolean",
           "default": false,
           "description": "Follow pagination and print every page instead of one page plus the next cursor."
+        },
+        "trace": {
+          "type": "string",
+          "description": "Print this one trace, 32 hexadecimal digits, with all its spans instead of listing traces; needs no app and takes no --slow, --from, --to, --limit, --cursor or --all."
         }
       },
       "run": [

@@ -1134,7 +1134,8 @@ putnami cloud deploy publish-v2 --request-file ./publish-v2-deploy.json [--env p
 putnami cloud deploy status <release-id>           # one release as a status node; exits 1 when it failed, or ended partial or skipped
 putnami cloud logs [<app>] [--env <env>] [--since <t>] [--level <sev>] [--follow] [--output=jsonl]
 putnami cloud logs [<app>] --cursor <c> | --all     # cursor pagination / follow all pages
-putnami cloud traces [<app>] [--env <env>] [--slow <dur>] [--from <t>] [--to <t>] [--output=jsonl]
+putnami cloud traces [<app>] [--env <env>] [--slow <dur>] [--from <t>] [--to <t>] [--output=jsonl]  # each trace's root span
+putnami cloud traces --trace <trace-id> [--output=jsonl]  # one trace with all its spans; needs no app
 putnami cloud metrics [<app>] [--env <env>] [--window <dur>] [--output=jsonl]
 putnami cloud telemetry show [--app <app>] [--output=json]  # the workspace row, each service row, and what each service ends with
 putnami cloud telemetry set [--app <app>] [--budget <n>] [--ratio <0..1>] [--floor <n>] [--parent follow|decide] [--log-level <level>] [--for <duration>]
@@ -1161,6 +1162,27 @@ no `type` (a CLI older than the job context change), is refused with a message
 that says to upgrade the CLI; the command never reads a missing type as
 `application`. A workspace with no projects prints `No workloads found.`, as the
 core does.
+
+`putnami cloud traces` lists the traces of an app over a window
+(`GET /v1/workspaces/{workspace}/traces`). On Putnami Cloud, observability-api
+builds that listing from Cloud Trace's root-span view, so each listed trace
+carries its root span alone, whatever the trace holds, and the listing's
+`spanCount` is always 1. The command therefore prints no span count for a
+listed trace and says after the list, on stdout, or on stderr with
+`--output=jsonl`, that a listed trace may show its root span only. Each
+`--output=jsonl` line is `{traceId, name, start, duration, attributes, spans}`.
+`--trace <trace-id>` reads one trace by id
+(`GET /v1/workspaces/{workspace}/traces/{traceId}`, the read the Putnami MCP
+`query_traces` tool makes with `trace`) and prints all its spans: a headline
+with the span count, then the span tree, each span as its offset from the
+trace's earliest span, its duration, its name and its `service`. It resolves
+the workspace only, so it needs no app. With
+`--output=jsonl` it prints one object, `{traceId, name, start, duration,
+spanCount, attributes, spans}`, where `spanCount` is the number of spans in
+`spans`. The id is 32 hexadecimal digits, sent lowercased; another value exits 2.
+`--trace` takes no `--slow`, `--from`, `--to`, `--limit`, `--cursor`
+or `--all`, and a trace the workspace does not hold exits 4 with
+`trace <id> not found in workspace <workspace>`.
 
 `putnami cloud telemetry` reads and writes the telemetry settings config-api
 keeps for the workspace (`GET|PUT /v1/workspaces/{workspace}/config/telemetry`):
@@ -1269,8 +1291,10 @@ Both carry the shared exit-code taxonomy (`0` success, `1` failure, `2` usage,
 `3` auth, `4` api, `130` signal).
 
 Streaming commands emit one object per item: `logs` one log entry per line,
-`traces` one trace summary per line, `metrics` one series per line (fields as
-returned by the workspace `/logs`, `/traces`, `/metrics` endpoints). One-shot
+`traces` one trace summary per line (with its root span, and
+`traces --trace <id>` one object with every span), `metrics` one series per
+line (fields as returned by the workspace `/logs`, `/traces`, `/metrics`
+endpoints). One-shot
 commands place their command-specific payload under `data`. For example,
 `cloud ci report` sets `data` to `{run_id, subject_id, status, conclusion,
 provenance, verified, idempotent, workspace_id, repo, sha, submission_id,
@@ -1958,7 +1982,7 @@ and exposes them.
 | [`internal/runtimecli`](internal/runtimecli) | `env`, `deploy` |
 | [`internal/identitycli`](internal/identitycli) | `login` (OAuth device flow), `whoami` |
 | [`internal/infracli`](internal/infracli) | `infra plan`, read from the workspace projects of the job context |
-| [`internal/observabilitycli`](internal/observabilitycli) | `logs` (query and `--follow` SSE live tail), `traces` (`--slow`), `metrics` (`--window`), all with `--output=jsonl` as the agent surface |
+| [`internal/observabilitycli`](internal/observabilitycli) | `logs` (query and `--follow` SSE live tail), `traces` (`--slow`, `--trace`), `metrics` (`--window`), all with `--output=jsonl` as the agent surface |
 | [`internal/cloudcli`](internal/cloudcli) | The aggregator: `RunMain`/`RunCommand` dispatch, the `putnami.extension.json` manifest and the extension binary, and the cross-cutting commands that orchestrate several domains (`login`/`logout`/`setup`/`install`/`status`/`token`) plus workspace-link and CLI-runtime plumbing. |
 
 SSE means server-sent events.

@@ -1,7 +1,10 @@
 package observabilitycli
 
 import (
+	"encoding/json"
 	"testing"
+
+	observabilityapiclient "go.putnami.dev/cloud/clients/observability-api/go"
 )
 
 // TestDecodedItemsKeepTheJSONLBytes pins the --output=jsonl bytes of the three
@@ -29,10 +32,27 @@ func TestDecodedItemsKeepTheJSONLBytes(t *testing.T) {
 	if err != nil || cursor != "" {
 		t.Fatalf("decodeTracesPage cursor=%q err=%v", cursor, err)
 	}
+	// A listed trace carries its root span only, so it prints no spanCount
+	// (see traceSummary).
 	assertJSONL(t, "traces", traces, []string{
-		`{"traceId":"t1","name":"GET /a","start":"2026-07-03T12:00:00Z","duration":523000000,"spanCount":2,"attributes":{"k":"v"},` +
+		`{"traceId":"t1","name":"GET /a","start":"2026-07-03T12:00:00Z","duration":523000000,"attributes":{"k":"v"},` +
 			`"spans":[{"traceId":"t1","spanId":"s1","parentSpanId":"p0","name":"root","start":"2026-07-03T12:00:00Z","duration":5}]}`,
-		`{"traceId":"t2","name":"","start":"0001-01-01T00:00:00Z","duration":0,"spanCount":0}`,
+		`{"traceId":"t2","name":"","start":"0001-01-01T00:00:00Z","duration":0}`,
+	})
+
+	// A trace read by id prints every span and counts what it prints, even
+	// when the server's spanCount disagrees.
+	var whole observabilityapiclient.TraceSummary
+	if err := json.Unmarshal([]byte(`{"spanCount":9,"traceId":"t1","name":"GET /a","start":"2026-07-03T12:00:00Z","duration":7,"spans":[
+		{"traceId":"t1","spanId":"s1","name":"GET /a","start":"2026-07-03T12:00:00Z","duration":7},
+		{"traceId":"t1","spanId":"s2","parentSpanId":"s1","name":"read","start":"2026-07-03T12:00:00Z","duration":3}
+	]}`), &whole); err != nil {
+		t.Fatalf("decode trace: %v", err)
+	}
+	assertJSONL(t, "trace", []traceDetail{traceDetailFrom(whole)}, []string{
+		`{"traceId":"t1","name":"GET /a","start":"2026-07-03T12:00:00Z","duration":7,"spanCount":2,"spans":[` +
+			`{"traceId":"t1","spanId":"s1","name":"GET /a","start":"2026-07-03T12:00:00Z","duration":7},` +
+			`{"traceId":"t1","spanId":"s2","parentSpanId":"s1","name":"read","start":"2026-07-03T12:00:00Z","duration":3}]}`,
 	})
 
 	series, _, err := decodeMetricsPage([]byte(`{"series":[
