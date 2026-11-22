@@ -56,6 +56,18 @@ func activeAuth(params map[string]any, env map[string]string, ioctx IO) (*Stored
 	if AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, ioctxNow(ioctx)) {
 		return auth, nil
 	}
+	// Refresh under the lock, from the file as it stands once the lock is
+	// held: a process that refreshed while this one waited left a fresh token
+	// and a rotated refresh token, and refreshing the one read before the
+	// lock would only lose that race again.
+	defer lockAuthRefresh(env)()
+	auth, err = ReadAuth(env, true)
+	if err != nil {
+		return nil, err
+	}
+	if AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, ioctxNow(ioctx)) {
+		return auth, nil
+	}
 	if auth.RefreshToken == "" {
 		return nil, NewError("session expired; run putnami cloud login", ExitAuth)
 	}
@@ -157,11 +169,19 @@ func workspaceAuth(params map[string]any, env map[string]string, ioctx IO, works
 		return nil, err
 	}
 	*session = auth
-	if cached := cachedWorkspaceAuth(auth, workspaceID, ioctxNow(ioctx)); cached != nil {
-		return cached, nil
+	if reusable := reusableWorkspaceAuth(auth, workspaceID, ioctxNow(ioctx)); reusable != nil {
+		return reusable, nil
 	}
-	if AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, ioctxNow(ioctx)) && ClaimedWorkspaceID(DecodeJWT(auth.AccessToken)) == workspaceID {
-		return auth, nil
+	// Refresh under the lock, from the file as it stands once the lock is
+	// held (see activeAuth): the token is written before the lock is released.
+	defer lockAuthRefresh(env)()
+	auth, err = ReadAuth(env, true)
+	if err != nil {
+		return nil, err
+	}
+	*session = auth
+	if reusable := reusableWorkspaceAuth(auth, workspaceID, ioctxNow(ioctx)); reusable != nil {
+		return reusable, nil
 	}
 	if auth.RefreshToken == "" {
 		return nil, NewError("session is not refreshable; run putnami cloud login", ExitAuth)
@@ -441,13 +461,7 @@ func reusableAuthAfterRefreshRace(auth *StoredToken, workspaceID string, now tim
 		return nil
 	}
 	if workspaceID != "" {
-		if cached := cachedWorkspaceAuth(auth, workspaceID, now); cached != nil {
-			return cached
-		}
-		if AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, now) && ClaimedWorkspaceID(DecodeJWT(auth.AccessToken)) == workspaceID {
-			return auth
-		}
-		return nil
+		return reusableWorkspaceAuth(auth, workspaceID, now)
 	}
 	if AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, now) {
 		return auth
@@ -521,6 +535,19 @@ func NewOAuthTokenError(oauthError, description string, code int) error {
 func IsOAuthTokenError(err error, oauthError string) bool {
 	var tokenErr *oauthTokenError
 	return errors.As(err, &tokenErr) && tokenErr.oauthError == oauthError
+}
+
+// reusableWorkspaceAuth is the token for workspaceID that auth already holds
+// without a refresh: its fresh cached workspace token, or its base token when
+// that is fresh and scoped to workspaceID. nil when none is.
+func reusableWorkspaceAuth(auth *StoredToken, workspaceID string, now time.Time) *StoredToken {
+	if cached := cachedWorkspaceAuth(auth, workspaceID, now); cached != nil {
+		return cached
+	}
+	if AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, now) && ClaimedWorkspaceID(DecodeJWT(auth.AccessToken)) == workspaceID {
+		return auth
+	}
+	return nil
 }
 
 func cachedWorkspaceAuth(auth *StoredToken, workspaceID string, now time.Time) *StoredToken {

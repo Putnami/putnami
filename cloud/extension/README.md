@@ -216,8 +216,13 @@ Workspace-scoped API calls (`deploy`, `config publish`, `secrets`, and
 `token`) mint a short-lived access token from the global refresh
 token. The scoped access token is cached in `~/.putnami/auth.json` until it is
 near expiry, so repeated cloud commands do not rotate the refresh token on
-every invocation. If another process rotates the refresh token first, the CLI
-reloads the credential file and retries once.
+every invocation. Processes that refresh at once take turns on
+`~/.putnami/auth.json.lock`: the first refreshes and writes the new session
+before it lets the next one in, and the next one reads that session instead of
+refreshing again. A process that dies releases the lock with it; a holder that
+keeps it past 30 seconds lets the waiter refresh unlocked. If another process
+rotates the refresh token first anyway, the CLI reloads the credential file
+and retries.
 
 The auth server stamps the selected workspace into the JWT as
 `scope_ref.workspace_id`. That claim is a target selector, not a membership

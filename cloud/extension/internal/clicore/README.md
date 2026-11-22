@@ -19,7 +19,7 @@ neutral package instead of on the aggregator.
 The package has one sub-package, a test helper. Files group by concern:
 
 - **Contract:** `clicore.go` (default endpoints, the `.putnami/auth.json` and `.putnami/cloud-link.json` paths, and `ExitError` with its exit codes) and `io.go` (the `IO` struct: output and event callbacks, HTTP client, environment, clock, and prompts).
-- **Credentials and sessions:** `auth.go` (active auth, workspace-scoped token minting, refresh with retry), `credentials.go` (reads and writes the stored token under the Putnami home directory), `oauth_token.go`, `oidc.go` (auth and control-plane base URLs), `jwt.go`, `browser.go`, and `apikeys.go` (auth-server's generated client, bound to the issuer of the signed-in session, for API key calls).
+- **Credentials and sessions:** `auth.go` (active auth, workspace-scoped token minting, refresh with retry), `authlock.go` (the `auth.json.lock` file next to the stored token: one process refreshes the session at a time, and a process that waited reuses the token the holder wrote), `credentials.go` (reads and writes the stored token under the Putnami home directory), `oauth_token.go`, `oidc.go` (auth and control-plane base URLs), `jwt.go`, `browser.go`, and `apikeys.go` (auth-server's generated client, bound to the issuer of the signed-in session, for API key calls).
 - **Workspace resolution:** `workspace.go` (`WorkspaceContext`, the per-invocation seam with the workspace id, base URL, and bearer), `resolve.go` (the cloud link, workspace config, and app lookup), and `project_id.go` (the project ID the framework derives from a project's workspace-relative path).
 - **Root manifest edits:** `manifestjson.go`. `ManifestPath` finds the root manifest a setup command edits, and `UpsertJSONField` sets one field and leaves every other byte as written.
 - **Generated clients:** `services.go`. `NewServiceClient` resolves a provider's generated client over any `client.ServiceBinding`. `WorkspaceContext.ServiceBinding` binds the control-plane host through `ServiceBindingFor`, which takes any base URL and forwards the signed-in user's bearer per call under the `user` profile. `ForwardedServiceBinding` also takes a base URL and forwards the bearer under another profile, such as put-server's `reader`. `CallWithSession` re-mints the bearer once on a 401. Every client that `NewServiceClient` builds refuses HTTP redirects. `context_client.go` makes a client's requests end when a context ends.
@@ -32,7 +32,8 @@ The package has one sub-package, a test helper. Files group by concern:
 
 ## Dependencies
 
-It builds on the framework `app`, `client`, `errors`, and `inject` modules.
+It builds on the framework `app`, `client`, `errors`, and `inject` modules,
+and on the SDK's `filelock` for the cross-process refresh lock.
 `workspace.go` also calls identity-api's generated client
 ([`cloud/clients/identity-api`](../../../clients/identity-api)) to look up a workspace
 id from its slug, and `apikeys.go` calls auth-server's generated client
