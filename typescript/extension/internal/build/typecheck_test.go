@@ -292,7 +292,12 @@ func TestRunTypeCheck_BunKeepsTheProjectsCompilerOptions(t *testing.T) {
 	if _, err := RunTypeCheck("bun", dir, "", true, TypeCheckerBun); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"check", "--no-pretty", "--all", "--no-script", "--rootDir", string(filepath.Separator), "--skipLibCheck", "true", "-p"}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fsRoot := filepath.VolumeName(abs) + string(filepath.Separator)
+	want := []string{"check", "--no-pretty", "--all", "--no-script", "--rootDir", fsRoot, "--skipLibCheck", "true", "-p"}
 	if len(args) != len(want)+1 || !slices.Equal(args[:len(want)], want) {
 		t.Errorf("args %v, want %v and the scratch tsconfig", args, want)
 	}
@@ -318,5 +323,31 @@ func TestRunTypeCheck_BunRefusesABunWithoutBunCheck(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not name %s", err, want)
 		}
+	}
+}
+
+func TestRunTypeCheck_ACheckScriptNeverChoosesBunCheck(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-type-checker-choice", "the-type-checker-is-tsc-unless-the-project-chooses-bun")
+	dir := t.TempDir()
+	writeProjectFiles(t, dir, "tsconfig.json", "src/index.ts")
+	manifest := `{"name":"app","scripts":{"check":"bun check","typecheck":"bun check","test":"bun check && bun test"}}`
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var args []string
+	withMockExec(t, func(_ string, a []string, _ ...exec.Option) (*exec.Result, error) {
+		args = a
+		return &exec.Result{Success: true}, nil
+	})
+
+	checker, err := ResolveTypeChecker("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RunTypeCheck("bun", dir, "", false, checker); err != nil {
+		t.Fatal(err)
+	}
+	if len(args) < 2 || args[0] != "x" || args[1] != "tsc" {
+		t.Errorf("args %v, want x tsc: a script that runs bun check does not choose the checker", args)
 	}
 }

@@ -47,7 +47,7 @@ Behavior:
 - can produce LCOV coverage
 - type-checks every TypeScript file of the project, tests included
 
-Bun strips types when it runs a test, so the `test~types` step runs `tsc --noEmit` over the project, dot-directories such as `.gen` included. It uses the tsconfig and the compiler options of `build~types`. A type error in a test fails `putnami test`. `node_modules`, `dist`, `.putnami` and nested projects stay out.
+Bun strips types when it runs a test, so the `test~types` step runs `tsc --noEmit` over the project, dot-directories such as `.gen` included, unless the project sets `type-checker` to `bun` in `options["@putnami/typescript:test"]`: the step then runs `bun check` on the same tsconfig and compiler options. Only that parameter chooses `bun check`, never an import or a script. `bun check` checks with the TypeScript 7 that Bun embeds and needs Bun 1.4.4 or later; a tsconfig that keeps an option TypeScript 7 removed, such as `baseUrl` or `moduleResolution` `node`, stops it before it checks, so keep `tsc` there. It uses the tsconfig and the compiler options of `build~types`. A type error in a test fails `putnami test`. `node_modules`, `dist`, `.putnami` and nested projects stay out.
 
 Useful options:
 
@@ -57,6 +57,7 @@ Useful options:
 - `--test-name-pattern <regex>`
 - `--update-snapshots`
 - `--pass-with-no-tests <boolean>`
+- `--type-checker <tsc|bun>`
 
 ## Lint
 

@@ -145,7 +145,8 @@ The step runs `tsc` unless the project chooses Bun's own checker, `bun check`, i
 - `bun check` reads the same scratch tsconfig and the same compiler options as `tsc`, with `--no-pretty --all`: one line per error, every error shown. Its diagnostics are reported the way `tsc`'s are, and a type error or an unused `@ts-expect-error` fails `putnami test` the same way.
 - `--no-script` keeps a `check` script of the project's `package.json` from running in its place.
 - It keeps no incremental build info: a cache miss checks the whole project again, which `bun check` does in a fraction of the time `tsc` takes.
-- It checks with the TypeScript version Bun embeds, not the `typescript` package the workspace installs. A project whose code relies on a behavior that version changed can get different diagnostics: keep `tsc` there.
+- It checks with the TypeScript version Bun embeds, TypeScript 7 in Bun 1.4, not the `typescript` package the workspace installs. A project whose code relies on a behavior TypeScript 7 changed can get different diagnostics.
+- TypeScript 7 removed options such as `baseUrl`, `moduleResolution` `node` or `node10`, and `target` `es5`. With one of them in its tsconfig chain, `bun check` stops with TS5102 or TS5108 before it checks anything, where `tsc` 6 with `--ignoreDeprecations 6.0` only warns. Remove those options, or keep `tsc` for that project.
 - It uses one thread per CPU core, and Putnami runs several projects at once, so many projects that opt in can compete for the CPU.
 - It needs Bun 1.4.4 or later: the step reads the version of the Bun that runs it, which is not always the pinned one, and fails on an older Bun, whose `bun check` would run a `check` script instead of type-checking.
 - Any value other than `tsc` and `bun` fails the step and names the choices.
