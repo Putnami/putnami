@@ -1,6 +1,6 @@
 import { file, Glob, gzipSync, write } from 'bun';
 import { copyFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { useConfig, useLogger, type InferConfig } from '@putnami/runtime';
 import {
   fileExists,
@@ -314,7 +314,10 @@ export class StaticPlugin implements Plugin {
     const generatedPublicPath = joinPath(projectRoot, genPublicDir);
 
     const source = discoverStaticSource(sourcePath);
-    if (source.exists && sourcePath !== generatedPublicPath && !sourcePath.startsWith(generatedPublicPath)) {
+    const stagesSource =
+      source.exists && sourcePath !== generatedPublicPath && !sourcePath.startsWith(generatedPublicPath);
+    if (stagesSource) {
+      assertKeyedScanRoot(sourcePath, projectRoot);
       const sourceStat = statSync(sourcePath);
       if (sourceStat.isDirectory()) {
         copyDirRecursive(sourcePath, generatedPublicPath);
@@ -419,6 +422,44 @@ export class StaticPlugin implements Plugin {
       },
     };
   }
+}
+
+/** The folder of a project whose files the build-generate key reads, in every project of the dependency closure. */
+const KEYED_PUBLIC_FOLDER = 'public';
+
+/**
+ * Refuses a scan root the build-generate cache key does not read.
+ *
+ * The key of the task that runs this hook reads the `public/` folder of every
+ * project in the workload's dependency closure, the workload included, so a
+ * change to a file staged from one of them rebuilds the workload. A scan root
+ * anywhere else, such as a library's `fonts/` folder or a workload's `assets/`,
+ * would stage new bytes only when something else moved the key, and a cache
+ * hit would ship the old ones. So the scan root must lie under a `public/`
+ * folder whose parent is the workload's root or holds a `putnami.json`.
+ */
+function assertKeyedScanRoot(scanRoot: string, projectRoot: string): void {
+  const root = resolve(scanRoot);
+  const workloadRoot = resolve(projectRoot);
+  let owner: string | undefined;
+  for (let current = root; ; current = dirname(current)) {
+    const parent = dirname(current);
+    const isProject = (dir: string) => dir === workloadRoot || fileExists(joinPath(dir, 'putnami.json'));
+    if (basename(current) === KEYED_PUBLIC_FOLDER && isProject(parent)) {
+      return;
+    }
+    if (owner === undefined && isProject(current)) {
+      owner = current;
+    }
+    if (parent === current) break;
+  }
+  const relativeToWorkload = (path: string) => toPosixPath(relativePath(workloadRoot, path)) || '.';
+  const target = joinPath(owner ?? workloadRoot, KEYED_PUBLIC_FOLDER);
+  throw new Error(
+    `StaticPlugin: the scan root '${relativeToWorkload(root)}' lies outside every project's ${KEYED_PUBLIC_FOLDER}/ folder, ` +
+      `the only folders the build-generate cache key reads, so a change to its files would not rebuild the workload. ` +
+      `Move it under '${relativeToWorkload(target)}'.`,
+  );
 }
 
 function discoverStaticSource(sourcePath: string): {

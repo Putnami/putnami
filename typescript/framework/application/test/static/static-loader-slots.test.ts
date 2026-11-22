@@ -43,8 +43,9 @@ export const app = () =>
     .use(new StaticPlugin({ skipLoading: true }))
     // The default public folder at the project root.
     .use(staticFiles())
-    // A second folder, mounted under /docs.
-    .use(staticFiles({ scanPath: resolve(import.meta.dir, '..', 'docs'), prefix: '/docs' }));
+    // A second folder, mounted under /docs: the public/ folder of a library
+    // project, the only kind of folder besides its own the generate key reads.
+    .use(staticFiles({ scanPath: resolve(import.meta.dir, '..', 'docs', 'public'), prefix: '/docs' }));
 `;
 
 const PATHS = ['/index.html', '/app.css', '/guide.html', '/docs/index.html', '/docs/guide.html', '/docs/app.css'];
@@ -93,12 +94,13 @@ function builtWorkload(): Promise<BuiltWorkload> {
     symlinkSync(PACKAGE_ROOT, join(projectRoot, 'node_modules', '@putnami', 'application'), 'dir');
     mkdirSync(join(projectRoot, 'src'), { recursive: true });
     mkdirSync(join(projectRoot, 'public'), { recursive: true });
-    mkdirSync(join(projectRoot, 'docs'), { recursive: true });
+    mkdirSync(join(projectRoot, 'docs', 'public'), { recursive: true });
+    writeFileSync(join(projectRoot, 'docs', 'putnami.json'), '{}');
     writeFileSync(mainPath, MAIN);
     writeFileSync(join(projectRoot, 'public', 'index.html'), 'public home');
     writeFileSync(join(projectRoot, 'public', 'app.css'), 'body{}');
-    writeFileSync(join(projectRoot, 'docs', 'index.html'), 'docs home');
-    writeFileSync(join(projectRoot, 'docs', 'guide.html'), 'docs guide');
+    writeFileSync(join(projectRoot, 'docs', 'public', 'index.html'), 'docs home');
+    writeFileSync(join(projectRoot, 'docs', 'public', 'guide.html'), 'docs guide');
 
     process.env['PUTNAMI_PROJECT_ROOT'] = projectRoot;
     type Buildable = () => { build(options?: object): Promise<GenerateResult> };

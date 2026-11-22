@@ -40,6 +40,25 @@ Files are served at their relative paths:
 - `public/styles.css` → `/styles.css`
 - `public/images/logo.png` → `/images/logo.png`
 
+## Where a static folder lives
+
+The build stages a static folder into `.gen/public/` and caches the result. The
+cache key of that step reads the `public/` folder of the workload and of every
+project it depends on, and no other folder a scan could name. So a folder the
+plugin scans lies under one of those `public/` folders: the workload's own, or a
+library's, whose root holds a `putnami.json`. A change to any file there
+rebuilds every workload that stages it.
+
+A scan root anywhere else, such as a library's `fonts/` folder or a workload's
+`assets/`, fails the build:
+
+```
+StaticPlugin: the scan root '../libs/fonts/fonts' lies outside every project's public/ folder, the only folders the build-generate cache key reads, so a change to its files would not rebuild the workload. Move it under '../libs/fonts/public'.
+```
+
+Move the folder under the `public/` the message names. A scan root that does
+not exist stages nothing and fails nothing.
+
 During `putnami build`, these routes are also included in
 `.gen/schema/http-routes.json`. Root files are emitted as exact matches;
 top-level asset directories and explicit non-root prefixes are emitted as
@@ -83,11 +102,30 @@ staticFiles({
 **Type:** `string`
 **Default:** `'public'`
 
-Source folder for static files.
+Folder the plugin scans when no `scanPath` is given, relative to the project,
+and the name of the staged folder under `.gen/` and in the packaged workload.
+A scanned folder must lie under a project's `public/` (see
+[where a static folder lives](#where-a-static-folder-lives)), so keep the default
+for a scanned folder.
 
 ```typescript
 staticFiles({
-  publicFolder: 'assets', // Serve from assets/ folder
+  publicFolder: 'public', // Scan public/ and stage it into .gen/public/
+})
+```
+
+#### `scanPath`
+
+**Type:** `string`
+**Default:** the project's `publicFolder`
+
+Folder, or single file, the plugin stages at build time: absolute, or relative
+to the project. It must lie under the `public/` folder of the workload or of a
+workspace project (see [where a static folder lives](#where-a-static-folder-lives)).
+
+```typescript
+staticFiles({
+  scanPath: 'public/site', // Serve only public/site/
 })
 ```
 
@@ -316,14 +354,21 @@ const app = application()
 
 ## Several Static Folders
 
-A workload can use several StaticPlugins, each serving its own folder:
+A workload can use several StaticPlugins, each serving its own folder. A library
+can ship one: it keeps its files in its own `public/` and exports the plugin.
 
 ```typescript
+// libs/docs/src/server.ts, in a library whose root holds putnami.json
 import { resolve } from 'node:path';
+import { staticFiles } from '@putnami/application';
 
+export const docsFiles = () =>
+  staticFiles({ scanPath: resolve(import.meta.dir, '..', 'public'), prefix: '/docs' });
+
+// the workload
 application()
   .use(staticFiles()) // serves public/
-  .use(staticFiles({ scanPath: resolve(import.meta.dir, '..', 'docs'), prefix: '/docs' }));
+  .use(docsFiles()); // serves libs/docs/public/ under /docs
 ```
 
 Each plugin gets its own generated route loader and its own staging folder, so the packaged
