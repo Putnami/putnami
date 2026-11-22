@@ -133,7 +133,7 @@ are held to is in
 | lint | `./putnamiw lint .` | golangci-lint + staticcheck + the skip guard |
 | validate | `./putnamiw validate .` | Exported API of a stable project against its line's last tag |
 | serve | `./putnamiw serve .` | Generate → describe → hot-reload development server |
-| package | `./putnamiw package .` | Build pipeline + archives / Docker / Go module artifacts |
+| package | `./putnamiw package .` | Build pipeline + archives / Docker / Go module artifacts. A channel must be on (`--docker`, or `options.package.docker` in `putnami.json`): with none, a named project fails and any other one warns |
 
 ### Skip guard
 

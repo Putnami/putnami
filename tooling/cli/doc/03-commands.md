@@ -57,6 +57,31 @@ putnami lint,test,build --impacted
 
 All commands share the same project selection and execution flags. They run sequentially in the order specified. If a command fails and `--continue-on-error` is not set, subsequent commands are skipped.
 
+### Package with no channel on
+
+A packaging command, one whose traits inject the publish channels and declare
+no registry side effect, such as `package`, offers channels: the boolean flags
+its steps are planned on (`--docker`, `--npm`, `--archives`, `--go`,
+`--deployment`, `--crates`, by extension). A channel is on when its flag is
+passed, when the project's `putnami.json` sets it under `options.package`
+(`"options": {"package": {"docker": true}}`), or when its `publish` list names
+it. An image project's `options.package.image` turns its image step on the
+same way. With every such step off, the command packages nothing:
+
+- A project that a `--projects` entry or the positional target spells (its
+  name, ID or path, or `.` inside it) fails the run with exit 2, before
+  anything runs, and the message names `options.package.<channel>` and the
+  flags.
+- A project another selection reached (`--all`, `--impacted`, a glob, an
+  alias, a watch iteration) gets a `plan.package_channels_off` warning with the
+  same hint, on stderr and in the envelope's `workspaceWarnings`, repeated
+  after the run unless `--quiet`. The exit code is the run's own, so a
+  workspace-wide gate keeps passing.
+
+A packaging job that offers no channel, such as one that always writes its
+release-set member, packages whatever its steps make, so a project it matches
+is never refused.
+
 ### Publish and `--dry-run`
 
 `putnami publish` pushes packaged artifacts to registries (`sideEffects: "registry"`); a project's declared `publish` channels auto-activate the matching steps, so `--npm`/`--go`/`--docker` flags are rarely needed.

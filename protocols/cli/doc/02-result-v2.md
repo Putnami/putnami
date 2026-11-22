@@ -267,10 +267,11 @@ warnings the command writes to stderr as `putnami: warning: <message>` lines:
 - The code set is open. A reader ignores a code it does not know. The current
   codes are `workspace.provider_view_unavailable`, `workspace.probe_view_rejected`,
   `workspace.index_unreadable`, `workspace.name_divergence` and
-  `workspace.jobs_ignored`, which a load records, and
-  `plan.shared_executions_dropped`, which the plan of a run records when it
-  cannot order the tasks several commands would run once, so it runs each of
-  them on its own.
+  `workspace.jobs_ignored`, which a load records, and two codes the plan of a
+  run records: `plan.shared_executions_dropped`, when it cannot order the tasks
+  several commands would run once, so it runs each of them on its own, and
+  `plan.package_channels_off`, when a packaging command packages nothing for a
+  project the run selected without naming it, because every channel is off.
 - The member is absent when the load recorded no warning or the command loads
   no workspace. An empty array is invalid.
 - It is allowed beside any status, because a load that warned can still end in

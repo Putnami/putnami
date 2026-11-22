@@ -107,6 +107,32 @@ func buildPlan(
 	// executions it had to drop. The run reports them with the warnings of its
 	// load, on the same stream and in the same envelope member.
 	req.workspaceWarnings.Report(ws)
+	// A packaging command that packages nothing for a selected project fails
+	// for a project the caller named and warns for any other, before the
+	// empty-plan notice below, whose hint would name no channel.
+	// A refusal fails the run before anything runs; a warning is written now,
+	// kept in the envelope and repeated after the run for a reader of the end.
+	refusals, warnings := planner.ChannelGapMessages(
+		planner.InactiveChannels(ws, req.Commands, selectedProjects, extensions, req.CommandParams, disabledJobs, disabledExts),
+		req.selectionEvidence.namedProjects)
+	for _, refusal := range refusals {
+		iox.Fprintf(os.Stderr, "putnami: %s\n", refusal)
+	}
+	if len(refusals) > 0 {
+		return nil, ExitUsage
+	}
+	for _, warning := range warnings {
+		// A watch iteration plans the cached workspace again, and a
+		// release-set run plans twice: each warning is recorded once.
+		if slices.Contains(ws.WarningMessages(), warning) {
+			continue
+		}
+		ws.AddWarning(workspace.WarningCodePackageChannelsOff, warning)
+		if !machineOutputRequested(req) && !req.Global.Quiet {
+			req.selectionEvidence.closingNotes += "putnami: warning: " + warning + "\n"
+		}
+	}
+	req.workspaceWarnings.Report(ws)
 	// An --impacted selection can hold a project for the tasks of a changed
 	// extension only; the planner plans the project whole, and the narrowing
 	// happens here, on the plan, where the predecessor closure is visible.

@@ -243,6 +243,12 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 	if code := resolveNoCacheProjects(req, ws); code != ExitSuccess {
 		return nil, code
 	}
+	// A projects selection names the projects its entries spell one by one;
+	// --all, --impacted, a bare run, an auto-selected one and a watch
+	// iteration, whose selection the loop rewrites into IDs, name none.
+	if selectionMode == protocoljob.SelectionModeProjects && !req.Global.AutoSelected && !req.watchIteration {
+		req.selectionEvidence.namedProjects = planner.NamedProjects(ws, req.Global.Projects)
+	}
 	req.selection = planner.ResolvedRunSelection(
 		selectionMode, selectionBaseline, selectionBaselineSource, selectedProjects)
 	return selectedProjects, ExitSuccess

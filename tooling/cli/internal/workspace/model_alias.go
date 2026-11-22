@@ -31,6 +31,7 @@ const (
 	WarningCodeNameDivergence          = model.WarningCodeNameDivergence
 	WarningCodeJobsIgnored             = model.WarningCodeJobsIgnored
 	WarningCodeSharedExecutionsDropped = model.WarningCodeSharedExecutionsDropped
+	WarningCodePackageChannelsOff      = model.WarningCodePackageChannelsOff
 )
 
 // Project represents a discovered project within a workspace.

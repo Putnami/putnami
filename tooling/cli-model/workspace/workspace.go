@@ -35,8 +35,12 @@ const (
 	WarningCodeJobsIgnored WarningCode = "workspace.jobs_ignored"
 	// WarningCodeSharedExecutionsDropped means the plan of a run found nodes
 	// several commands could share but could not order them, so each node runs
-	// on its own. It is the one code a plan records rather than a load.
+	// on its own. It is a code a plan records rather than a load.
 	WarningCodeSharedExecutionsDropped WarningCode = "plan.shared_executions_dropped"
+	// WarningCodePackageChannelsOff means a packaging command packages nothing
+	// for a project the run selected without naming it: every channel the
+	// command offers the project is off. A plan records it, not a load.
+	WarningCodePackageChannelsOff WarningCode = "plan.package_channels_off"
 )
 
 // Warning is one non-fatal finding a workspace load, or the plan of a run over

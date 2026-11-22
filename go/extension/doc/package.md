@@ -31,7 +31,10 @@ publication.
 Channels are activated by passing the corresponding flag to `putnami package`,
 or by setting the flag's default under `options.package` in the project's
 `putnami.json`, such as `"options": { "package": { "docker": true } }`. With no
-active channel, `package` builds nothing.
+active channel, `package` packages nothing: a run that names the project with
+`--projects` fails with exit 2 and names `options.package.<channel>` and the
+flags; a run that selects it otherwise (`--all`, `--impacted`, a glob) warns
+with `plan.package_channels_off` and keeps its exit code.
 
 `package` is the **distribution intent**: it schedules its own cross-compile
 step, so it needs no prior `putnami build`. Ordinary [`build`](./build.md)

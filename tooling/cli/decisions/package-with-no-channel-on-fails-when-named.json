@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "package-with-no-channel-on-fails-when-named",
+  "statement": "a package run with every channel off fails, naming options.package.<channel>, for a project named with --projects, and warns with the same hint for any other selected project, so workspace-wide gates keep passing",
+  "settled": "2026-11-22",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

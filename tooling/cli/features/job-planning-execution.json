@@ -1099,6 +1099,21 @@
         }
       },
       {
+        "id": "a-package-run-with-no-channel-on-says-which-option-to-set",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-channels-of-a-packaging-command",
+            "a-project-with-every-channel-off",
+            "fail-when-named-warn-otherwise"
+          ]
+        }
+      },
+      {
         "id": "an-extension-manifest-names-its-extension",
         "stage": "coded",
         "evidenceKinds": [

@@ -112,6 +112,10 @@ type selectionEvidence struct {
 	// (workspace.ImpactedSelection.ChangeShapeEvidence), "" for any other
 	// selection.
 	closingNotes string
+	// namedProjects holds the IDs of the projects the caller named one by
+	// one with --projects or a positional target (planner.NamedProjects), nil for a
+	// selection that named none, such as --all, --impacted or a bare run.
+	namedProjects map[string]bool
 	// taskScopes maps a selected project ID to the sorted IDs of the impacted
 	// in-workspace extension projects whose tasks it runs
 	// (workspace.ImpactedSelection.TaskScopes). buildPlan keeps those tasks

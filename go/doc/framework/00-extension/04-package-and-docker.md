@@ -4,9 +4,10 @@ The Go extension can produce release artifacts for Go projects, including Docker
 
 ## Package a service as an image
 
-`putnami package` builds only the channels you turn on. With no channel, it
-builds nothing and still succeeds. Turn the image channel on in the project's
-`putnami.json`:
+`putnami package` builds only the channels you turn on. With no channel on,
+`putnami package --projects api` fails and names the option to set; under
+`--all` or `--impacted` it warns and goes on. Turn the image channel on in the
+project's `putnami.json`:
 
 ```json
 {

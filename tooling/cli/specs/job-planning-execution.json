@@ -278,6 +278,10 @@
       "text": "A task's v3 declaration may list publishChannels, the publish channels the task publishes, in the grammar of a project's publish list. The validate command names each task with an invalid list. Discovery skips a manifest stamped below the contract the list needs, with the reason, and a planned job exposes its task's channels."
     },
     {
+      "id": "a-package-run-with-no-channel-on-says-which-option-to-set",
+      "text": "A project for which no gated step of a matching packaging job would plan, after its options, publish list and the run's flags, packages nothing. A run whose --projects entry or positional target spells it fails with exit 2 naming options.<command>.<channel> and the flags; another selection (--all, --impacted, a glob, a watch iteration) warns plan.package_channels_off and keeps its exit code. A packaging job offering no channel always packages."
+    },
+    {
       "id": "an-extension-manifest-names-its-extension",
       "text": "An extension manifest names its extension. Strict validation and putnami extensions validate refuse a manifest without a name; the loader still loads an installed manifest without one, under its reference. Discovery names an extension from its manifest, else the name in its putnami.json, else its reference, takes its version from the manifest alone, and reads no package.json."
     },
