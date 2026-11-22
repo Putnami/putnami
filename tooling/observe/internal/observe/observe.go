@@ -93,7 +93,8 @@ type Options struct {
 	// Detectors replace the default detectors when not nil.
 	Detectors []components.Detector
 	// ProjectID asks the code host API for the numeric project id of the
-	// repository at path on host, for a run outside a CI; nil asks nothing.
+	// repository at path on host, for a run outside a CI or in a CI whose
+	// variables name no repository; nil asks nothing.
 	ProjectID func(ctx context.Context, provider, host, path string) (string, error)
 }
 
@@ -126,7 +127,7 @@ func Run(ctx context.Context, opts Options) Observation {
 		root = opts.Dir
 	}
 	var subjectDiags []diag.Diagnostic
-	if detection.Local {
+	if keysFromOrigin(detection, opts) {
 		subjectDiags = localSubject(ctx, root, opts, &o.Subject)
 	}
 	if o.Subject.Repository == "" {
@@ -195,8 +196,19 @@ func defaultBase(ctx context.Context, dir string, d *ci.Detection) {
 	d.Diagnostics = slices.DeleteFunc(d.Diagnostics, func(x diag.Diagnostic) bool { return x.Code == ci.CodeBaseMissing })
 }
 
-// localSubject names the repository of a run outside a CI from its origin
-// remote: the code host, the repository path and, from the code host API, the
+// keysFromOrigin reports whether the origin remote names the repository: a
+// run outside a CI, or a run that uploads from a CI that names no code host,
+// any CI but GitHub Actions and GitLab CI. A run in such a CI that does not
+// upload keeps the generic subject and asks the code host nothing.
+func keysFromOrigin(d ci.Detection, opts Options) bool {
+	if d.Local {
+		return true
+	}
+	return opts.ProjectID != nil && d.Subject.Provider == ci.ProviderGeneric
+}
+
+// localSubject names the repository of a run that keysFromOrigin selects
+// from its origin remote: the code host, the repository path and, from the code host API, the
 // numeric project id; and the current branch. A remote on another host, or
 // one whose id the API does not answer, keeps the generic provider and gets
 // a diagnostic.

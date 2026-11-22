@@ -1,6 +1,6 @@
 # Observe a change in your CI
 
-You will run `putnami observe` once on your laptop, open the full report of your change, then add one step to a GitHub Actions workflow, or one job to a GitLab CI pipeline, that explains each change from what your tests already produced. Your repository needs no Putnami workspace, and your pipeline keeps its own build and test commands.
+You will run `putnami observe` once on your laptop, open the full report of your change, then add one step to a GitHub Actions workflow, or one job to a GitLab CI, Jenkins, CircleCI, Buildkite, Azure Pipelines or Bitbucket Pipelines pipeline, that explains each change from what your tests already produced. Your repository needs no Putnami workspace, and your pipeline keeps its own build and test commands.
 
 For each pull or merge request, the step answers:
 
@@ -311,7 +311,9 @@ Without a token, the step prints the summary in the job log and writes the evide
 
 The action passes the run's `GITHUB_TOKEN` to `putnami observe` only when it publishes: with a token, unless `publish` is `false`. The `evidence` output is the path of the evidence document; `actions/upload-artifact` keeps it. The action's inputs `junit`, `coverage`, `sbom`, `base-sbom` and `base` pass the flags of the same name, and `channel` picks the release channel of the CLI and the extensions, `stable` by default. A token set in the step's `env` is not read: pass it as the `token` input. Its [README](https://github.com/Putnami/observe-action#readme) lists them.
 
-### 3) GitLab CI: add a job after your test job
+### 3) GitLab CI or another CI: add a job after your tests
+
+#### GitLab CI
 
 Add this job to `.gitlab-ci.yml`. It reads the reports from the artifacts of the job named `test`, so that job must keep its reports as artifacts with `when: always`:
 
@@ -342,6 +344,96 @@ observe:
 `--publish` needs a project access token, because the GitLab job token cannot write notes. In the project, open **Settings > Access tokens**, add a token with the **Developer** role and the `api` scope, then store it as the masked CI/CD variable `PUTNAMI_GITLAB_TOKEN`. A self-managed GitLab works the same way: the job reads its API URL from `CI_API_V4_URL`.
 
 Rename `test` in `needs` if your test job has another name. The image holds Bash, curl, tar, `sha256sum` and Git; any image with those, and Git 2.29 or later, works. `before_script: []` and `cache: []` keep your pipeline's defaults out of this job.
+
+#### Another CI
+
+Jenkins, CircleCI, Buildkite, Azure Pipelines and Bitbucket Pipelines run the same lines at the end of the job that runs your tests, so the reports are still in the checkout. Each snippet runs them when a test fails too. These CIs name no base, so each passes `--base`: the target branch of the pull request when the CI names it, else `main`; put your default branch in its place.
+
+With `--upload`, `putnami observe` reads the repository from the `origin` remote, as on a laptop, and asks GitHub or GitLab for its numeric id: the key a GitHub Actions or GitLab CI job of the same repository sends. For a private repository, also give the job `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN`, a token that reads the repository; without one, the summary names the token to set and nothing is uploaded. Store `PUTNAMI_CLOUD_TOKEN`, from [step 6](#6-upload-the-evidence-to-putnami-cloud), as a secret of the CI. Without it, drop `--upload`: the job prints the summary and writes the evidence document.
+
+Jenkins, in the `post` section of the stage that runs your tests, with the token stored as the secret text credential `putnami-cloud-token`:
+
+```groovy
+post {
+  always {
+    withCredentials([string(credentialsId: 'putnami-cloud-token', variable: 'PUTNAMI_CLOUD_TOKEN')]) {
+      sh '''
+        curl -fsSL https://putnami.dev/install.sh | bash
+        export PATH="$HOME/.putnami/bin:$PATH"
+        putnami extensions install --user @putnami/observe
+        putnami extensions install --user @putnami/cloud
+        putnami observe --base "${CHANGE_TARGET:-main}" --evidence observe-evidence.json --upload
+      '''
+    }
+    archiveArtifacts artifacts: 'observe-evidence.json', allowEmptyArchive: true
+  }
+}
+```
+
+CircleCI, as the last steps of the job that runs your tests, with `PUTNAMI_CLOUD_TOKEN` set in the project's environment variables or a context:
+
+```yaml
+      - run:
+          name: Observe the change
+          when: always
+          command: |
+            curl -fsSL https://putnami.dev/install.sh | bash
+            export PATH="$HOME/.putnami/bin:$PATH"
+            putnami extensions install --user @putnami/observe
+            putnami extensions install --user @putnami/cloud
+            putnami observe --base main --evidence observe-evidence.json --upload
+      - store_artifacts:
+          path: observe-evidence.json
+```
+
+Buildkite, at the end of the `command` of the step that runs your tests, with `PUTNAMI_CLOUD_TOKEN` exposed to the step by your secrets plugin or agent hook. Your test command records its exit status in `status` instead of stopping the step, so the lines run when a test fails, and the step ends with that status:
+
+```yaml
+steps:
+  - label: ":test_tube: Test"
+    command: |
+      your-test-command && status=0 || status=$?
+      curl -fsSL https://putnami.dev/install.sh | bash
+      export PATH="$HOME/.putnami/bin:$PATH"
+      putnami extensions install --user @putnami/observe
+      putnami extensions install --user @putnami/cloud
+      putnami observe --base "${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-main}" --evidence observe-evidence.json --upload
+      exit "$status"
+    artifact_paths:
+      - observe-evidence.json
+```
+
+Azure Pipelines, as the last steps of the job that runs your tests, with `PUTNAMI_CLOUD_TOKEN` a secret variable of the pipeline, which a script reads only when its `env` maps it:
+
+```yaml
+  - script: |
+      curl -fsSL https://putnami.dev/install.sh | bash
+      export PATH="$HOME/.putnami/bin:$PATH"
+      putnami extensions install --user @putnami/observe
+      putnami extensions install --user @putnami/cloud
+      putnami observe --base main --evidence observe-evidence.json --upload
+    displayName: Observe the change
+    condition: succeededOrFailed()
+    env:
+      PUTNAMI_CLOUD_TOKEN: $(PUTNAMI_CLOUD_TOKEN)
+  - publish: observe-evidence.json
+    artifact: observe-evidence
+    condition: succeededOrFailed()
+```
+
+Bitbucket Pipelines, in the `after-script` of the step that runs your tests, which runs when a test fails too:
+
+```yaml
+        after-script:
+          - curl -fsSL https://putnami.dev/install.sh | bash
+          - export PATH="$HOME/.putnami/bin:$PATH"
+          - putnami extensions install --user @putnami/observe
+          - putnami observe --base "${BITBUCKET_PR_DESTINATION_BRANCH:-main}" --evidence observe-evidence.json
+        artifacts:
+          - observe-evidence.json
+```
+
+A Bitbucket Pipelines checkout has its `origin` on `bitbucket.org`, neither GitHub nor GitLab, so the repository has no key Putnami Cloud reads: the job prints the summary and keeps the evidence document, and `--upload` would be refused. The step uses the Linux image of your test step; it needs Bash, curl, tar, `sha256sum` and Git 2.29 or later.
 
 ### 4) Read the job log
 
