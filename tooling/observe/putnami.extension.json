@@ -144,6 +144,10 @@
           "default": false,
           "description": "Post a commit status and one summary note, updated in place on the next run, on the pull request (GITHUB_TOKEN) or merge request (PUTNAMI_GITLAB_TOKEN). A missing token, a job outside a pull or merge request and a refused call are diagnostics; the exit code does not change."
         },
+        "history": {
+          "type": "string",
+          "description": "Observe the recent history instead of one change: the first-parent commits of the origin remote's default branch in the last <duration> (<n>h, <n>d or <n>w, at most 365d; 14d when --history comes without one), or in the same span ending at its last commit when the branch has been idle since. At most 100 commits, sampled evenly, each against its parent, in a temporary worktree and without reports, within a 10-minute budget; --evidence names a directory that gets <commit SHA>.json per commit, and --upload or --open uploads each under a submission id derived from the commit, so a second run stores nothing twice."
+        },
         "decisions": {
           "type": "string",
           "description": "Repository directories that hold MADR decision records, comma-separated; default docs/decisions and docs/adr. The summary and the evidence document list the decisions whose scope covers a changed file and the records the change adds, edits or deletes."
@@ -199,6 +203,10 @@
             {
               "command": "putnami observe --upload",
               "description": "Upload the change evidence to Putnami Cloud; the job sets PUTNAMI_CLOUD_TOKEN."
+            },
+            {
+              "command": "putnami observe --history --open",
+              "description": "On a laptop, in a repository whose CI kept nothing: observe the last 14 days of the default branch, one commit at a time, and upload them."
             },
             {
               "command": "putnami observe --publish",

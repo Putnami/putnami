@@ -309,6 +309,8 @@ func (r *Result) warn(code, field, format string, args ...any) {
 type git struct {
 	ctx context.Context
 	dir string
+	// env adds variables to the environment of the command.
+	env []string
 }
 
 func (g git) commit(revision string) (string, error) {
@@ -377,7 +379,7 @@ func (g git) output(args ...string) (string, error) {
 func (g git) raw(args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(g.ctx, "git", args...)
 	cmd.Dir = g.dir
-	cmd.Env = gitEnv()
+	cmd.Env = append(gitEnv(), g.env...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
