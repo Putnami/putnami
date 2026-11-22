@@ -71,8 +71,8 @@ my-api/
 **package.json:** Exports `./serve` pointing to `src/serve.ts`. Depends on `@putnami/application`.
 `putnami serve`, the compiled binary and the image all run `src/serve.ts`.
 
-`putnami init --project <name>` creates a `typescript-web` project. To start a
-workspace with an API, run `putnami init`, then `putnami projects create my-api --template typescript-server`.
+`putnami init --project <name>` creates a `typescript-server` project: it is
+the default starter of a new TypeScript workspace.
 
 **Use case:** JSON APIs, backend services, microservices.
 
@@ -83,6 +83,9 @@ A React web application with server-side rendering (SSR) built on `@putnami/web`
 ```bash
 putnami projects create my-app --template typescript-web
 ```
+
+In a new workspace, `putnami init --project my-app --template typescript-web`
+creates the workspace and this project in one command.
 
 **Generated structure:**
 

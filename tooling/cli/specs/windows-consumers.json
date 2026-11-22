@@ -4,7 +4,7 @@
   "feature": "cli/windows-consumers",
   "outcomes": [
     "A user on Windows 10 version 1803 or later or Windows 11, on amd64, installs the CLI with irm https://putnami.dev/install.ps1 | iex, without administrator rights, and the next terminal runs putnami",
-    "putnami init --project webapp --extension ts then putnami serve webapp give the same result on Windows as on macOS and Linux",
+    "putnami init --project webapp --extension ts --template typescript-web then putnami serve webapp give the same result on Windows as on macOS and Linux",
     "A missing Windows prerequisite is named where it is missing, with the way to fix it, instead of surfacing later as an unrelated failure",
     "Upgrading or switching the CLI on Windows replaces a running putnami.exe without Developer Mode"
   ],
@@ -56,7 +56,7 @@
       "id": "windows-release-smoke",
       "text": [
         "scripts/smoke-check-release.ps1 runs the windows/amd64 release smoke with the inputs, leg names and neutral environment of smoke-check-release.sh.",
-        "It names Bun, Git for Windows, LongPathsEnabled and tar.exe before any request, installs with the install.ps1 one-liner run as script text with -File, never passed on a command line, runs putnami init --project webapp --extension ts and putnami serve webapp, requires a 2xx response, and stops the server with CTRL_BREAK_EVENT, failing when it must kill it."
+        "It names Bun, Git for Windows, LongPathsEnabled and tar.exe before any request, installs with the install.ps1 one-liner run as script text with -File, runs the documented init and putnami serve webapp, requires a 2xx response, and stops the server with CTRL_BREAK_EVENT, failing when it must kill it."
       ]
     },
     {

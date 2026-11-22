@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -30,7 +31,10 @@ import (
 // from the user's flags comes from here.
 type initExtensionConfig struct {
 	packageName string
-	template    string
+	// template is the template --project renders when --template names none.
+	template string
+	// templates are the templates --template may name, template first.
+	templates []string
 	// agentContent is the extension whose agent content this starter opts
 	// into. No built-in starter names one: a workspace asks for
 	// @putnami/contributor with `putnami extensions install @putnami/contributor`. It is DATA,
@@ -178,6 +182,10 @@ type initFlags struct {
 	// the flag was given.
 	imports   []string
 	importSet bool
+	// template is the value of --template, and templateSet reports that the
+	// flag was given.
+	template    string
+	templateSet bool
 	// channel is the value of --channel, and channelSet reports that the flag
 	// was given: a flag with no value is a usage error, not an absent flag.
 	channel    string
@@ -189,6 +197,10 @@ func parseInitFlags(args []string) initFlags {
 	for i := 0; i < len(args); i++ {
 		if value, ok := strings.CutPrefix(args[i], initChannelFlag+"="); ok {
 			f.channel, f.channelSet = value, true
+			continue
+		}
+		if value, ok := strings.CutPrefix(args[i], "--template="); ok {
+			f.template, f.templateSet = value, true
 			continue
 		}
 		if value, ok := strings.CutPrefix(args[i], "--from="); ok {
@@ -220,6 +232,12 @@ func parseInitFlags(args []string) initFlags {
 		case "--project":
 			if i+1 < len(args) {
 				f.project = args[i+1]
+				i++
+			}
+		case "--template":
+			f.templateSet = true
+			if i+1 < len(args) {
+				f.template = args[i+1]
 				i++
 			}
 		case "--project-path":
@@ -413,8 +431,8 @@ func resolveInitRequest(flags initFlags) (initPlan, initChannel, error) {
 		if !known {
 			return initPlan{}, initChannel{}, cmderr.Usagef("unknown --from tool %q (choose: %s)", flags.from, initSourceNames())
 		}
-		if flags.project != "" || flags.projectPath != "" || flags.extensionSet {
-			return initPlan{}, initChannel{}, cmderr.Usagef("--from %s does not combine with --project, --project-path or --extension: the %s packages become the projects", flags.from, flags.from)
+		if flags.project != "" || flags.projectPath != "" || flags.extensionSet || flags.templateSet {
+			return initPlan{}, initChannel{}, cmderr.Usagef("--from %s does not combine with --project, --project-path, --template or --extension: the %s packages become the projects", flags.from, flags.from)
 		}
 		if err := validateInitMode(flags, source); err != nil {
 			return initPlan{}, initChannel{}, err
@@ -440,9 +458,19 @@ func resolveInitRequest(flags initFlags) (initPlan, initChannel, error) {
 			return initPlan{}, initChannel{}, cmderr.Usagef("--project renders the starter of the first language of --extension, and %s ships none (languages with a starter: %s)",
 				plan.languages[0].Language, initStarterLanguages())
 		}
+		if flags.templateSet && flags.project != "" {
+			starter, err := withInitTemplate(plan.starter(), plan.languages[0].Language, flags.template)
+			if err != nil {
+				return initPlan{}, initChannel{}, err
+			}
+			plan.configs[0] = starter
+		}
 	}
 	if flags.projectPath != "" && flags.project == "" {
 		return initPlan{}, initChannel{}, cmderr.Usagef("--project-path requires --project")
+	}
+	if flags.templateSet && flags.project == "" {
+		return initPlan{}, initChannel{}, cmderr.Usagef("--template requires --project: it names the template of the initial project")
 	}
 	channel, err := resolveInitChannel(flags, os.Getenv, runningCLIName())
 	if err != nil {
@@ -765,7 +793,8 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	if len(plan.languages) > 0 && len(plan.languages[0].Markers) > 0 {
 		marker = plan.languages[0].Markers[0]
 	}
-	for _, line := range initNextSteps(cwd, flags.project, flags.from != "" || len(adopted) > 0, extConfig.template, marker) {
+	library := flags.project != "" && initProjectIsLibrary(filepath.Join(cwd, projectPath))
+	for _, line := range initNextSteps(cwd, flags.project, library, flags.from != "" || len(adopted) > 0, extConfig.template, marker) {
 		iox.Fprintf(os.Stdout, "    %s\n", line)
 	}
 
@@ -776,10 +805,13 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 // requested project, for the projects the sync recorded, for a starter
 // template, or for a workspace that holds no project yet. Its gate tasks are
 // the ones the generated guidance names (agentctx.GateTasks), so each command
-// it names is one the workspace's extensions declare.
-func initNextSteps(cwd, project string, synced bool, template, marker string) []string {
+// it names is one the workspace's extensions declare. A library project, which
+// putnami serve cannot run, gets the gate alone.
+func initNextSteps(cwd, project string, library, synced bool, template, marker string) []string {
 	gate := agentctx.GateTasks(cwd)
 	switch {
+	case project != "" && library:
+		return []string{"putnami " + gate + " " + project}
 	case project != "":
 		return []string{"putnami " + gate + " " + project, "putnami serve " + project}
 	case synced:
@@ -789,6 +821,19 @@ func initNextSteps(cwd, project string, synced bool, template, marker string) []
 	default:
 		return []string{"putnami projects sync    # once the repository holds a " + marker, "putnami " + gate + " --impacted"}
 	}
+}
+
+// initProjectIsLibrary reports whether the putnami.json of the project at dir
+// declares the library type, which runs no serve.
+func initProjectIsLibrary(dir string) bool {
+	data, err := os.ReadFile(filepath.Join(dir, wsproto.ConfigFilename))
+	if err != nil {
+		return false
+	}
+	var project struct {
+		Type string `json:"type"`
+	}
+	return json.Unmarshal(data, &project) == nil && project.Type == "library"
 }
 
 // installInitWorkspace is init's first install: the toolchain pins phase,
@@ -846,6 +891,18 @@ func initializeProject(
 	}
 
 	if err := createInitProject(ctx, cwd, wsCfg, createArgs, env); err != nil {
+		// The project exists, and the installers its setup ran failed: what
+		// finishes the work is the install, not a create.
+		var installErr initInstallError
+		if errors.As(err, &installErr) {
+			next := protocolcli.SuggestedNext(installErr.err)
+			if next == "" {
+				next = "putnami deps install"
+			}
+			return protocolcli.WithNext(
+				fmt.Errorf("install workspace dependencies after creating %s: %w", flags.project, installErr.err),
+				next)
+		}
 		// A failed create may leave the project directory behind, which only
 		// --force lets the retry render over.
 		return protocolcli.WithNext(

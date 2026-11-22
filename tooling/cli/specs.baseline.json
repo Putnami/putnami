@@ -140,6 +140,7 @@
     "cli/init-a-language#every-language",
     "cli/init-a-language#init-adopts-what-it-finds",
     "cli/init-a-language#init-proposes-what-it-detects",
+    "cli/init-a-language#init-takes-a-template",
     "cli/init-a-language#languages-come-from-the-extensions",
     "cli/init-a-language#monorepo-tool-hint",
     "cli/init-a-language#project-needs-a-starter",

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -68,14 +69,52 @@ var starterNPMRegistries = map[string]json.RawMessage{
 }
 
 // initStarters are the starters of the languages that ship one, by language:
-// the template --project renders and the registries its dependencies install
-// from. Which template greets a new user is init's choice, not language
-// knowledge, so it lives here; TestInitStartersNameTheirExtension holds each
-// one to its language's extension and template.
+// the template --project renders by default, the templates --template may
+// name instead, and the registries their dependencies install from. Which
+// template greets a new user is init's choice, not language knowledge, so it
+// lives here. A server is the default of every language: an API is what a new
+// workspace most often starts with (decision init-defaults-to-a-server-template).
+// TestInitStartersNameTheirExtension holds each one to its language's extension
+// and templates.
 var initStarters = map[string]initExtensionConfig{
-	"typescript": {packageName: "@putnami/typescript", template: "typescript-web", registries: starterNPMRegistries},
-	"go":         {packageName: "@putnami/go", template: "go-server"},
-	"python":     {packageName: "@putnami/python", template: "python-server"},
+	"typescript": {packageName: "@putnami/typescript", template: "typescript-server",
+		templates: []string{"typescript-server", "typescript-web", "typescript-library"}, registries: starterNPMRegistries},
+	"go":     {packageName: "@putnami/go", template: "go-server", templates: []string{"go-server", "go-library"}},
+	"python": {packageName: "@putnami/python", template: "python-server", templates: []string{"python-server", "python-library"}},
+}
+
+// initTemplateHelp is the description of --template in `putnami init --help`:
+// the templates of each language that ships a starter, the default first.
+// TestInitTemplateHelpListsTheStarterTemplates holds the command catalog to it.
+func initTemplateHelp() string {
+	names := make([]string, 0, len(initStarters))
+	for name := range initStarters {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	parts := make([]string, len(names))
+	for i, name := range names {
+		starter := initStarters[name]
+		parts[i] = name + ": " + starter.template + " (default), " + strings.Join(starter.templates[1:], ", ")
+	}
+	return "With --project, the template of that project instead of the language's default; " + strings.Join(parts, "; ")
+}
+
+// withInitTemplate is the starter with template in place of its default. A
+// template the starter does not offer is a usage error that lists the ones it
+// does.
+func withInitTemplate(starter initExtensionConfig, language, template string) (initExtensionConfig, error) {
+	if !slices.Contains(starter.templates, template) {
+		for name, other := range initStarters {
+			if slices.Contains(other.templates, template) {
+				return initExtensionConfig{}, cmderr.Usagef("--template %q is a %s template, and the first --extension language is %s: give --extension %s (%s templates: %s)",
+					template, name, language, name, language, strings.Join(starter.templates, ", "))
+			}
+		}
+		return initExtensionConfig{}, cmderr.Usagef("--template %q is no %s template (choose: %s)", template, language, strings.Join(starter.templates, ", "))
+	}
+	starter.template = template
+	return starter, nil
 }
 
 // findInitLanguage returns the language of the index a --extension item names:

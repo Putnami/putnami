@@ -108,7 +108,7 @@ func stopHandoverMarker() string {
 // print it.
 const firstUseBlock = "curl -fsSL https://putnami.dev/install.sh | bash\n" +
 	"export PATH=\"$HOME/.putnami/bin:$PATH\"\n" +
-	"putnami init --project webapp --extension ts\n" +
+	"putnami init --project webapp --extension ts --template typescript-web\n" +
 	"putnami serve webapp\n"
 
 func firstUseScriptPath(t *testing.T) string {
@@ -337,7 +337,7 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 	switch strings.Join(args, "\x00") {
 	case "--version":
 		_, _ = os.Stdout.WriteString("Putnami   " + stubVersion + "\n")
-	case "init\x00--project\x00webapp\x00--extension\x00ts":
+	case "init\x00--project\x00webapp\x00--extension\x00ts\x00--template\x00typescript-web":
 		directory := inDirectory("first-use")
 		entries, err := os.ReadDir(directory)
 		if err != nil || len(entries) != 0 {
@@ -507,7 +507,7 @@ func TestFirstUseSmokeRunsTheDocumentedBlockThenTheChecksAndTheGoPath(t *testing
 	}
 	for _, want := range []string{
 		"smoke:   export PATH=\"$HOME/.putnami/bin:$PATH\"",
-		"smoke:   putnami init --project webapp --extension ts",
+		"smoke:   putnami init --project webapp --extension ts --template typescript-web",
 		"smoke:   putnami serve webapp",
 		"/ answered 200",
 		"/about answered 200",
@@ -666,11 +666,11 @@ func TestFirstUseSmokeReadsTheFirstBashBlockOfThePage(t *testing.T) {
 			want: "::error::block leg: ",
 		},
 		"no installer": {
-			page: firstUsePage(t, "putnami init --project webapp --extension ts\nputnami serve webapp\n"),
+			page: firstUsePage(t, "putnami init --project webapp --extension ts --template typescript-web\nputnami serve webapp\n"),
 			want: "does not install with 'curl -fsSL https://putnami.dev/install.sh | bash'",
 		},
 		"no serve at the end": {
-			page: firstUsePage(t, "curl -fsSL https://putnami.dev/install.sh | bash\nputnami init --project webapp --extension ts\n"),
+			page: firstUsePage(t, "curl -fsSL https://putnami.dev/install.sh | bash\nputnami init --project webapp --extension ts --template typescript-web\n"),
 			want: "does not end with 'putnami serve <project>'",
 		},
 		"missing page": {

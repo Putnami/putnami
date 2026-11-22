@@ -103,7 +103,7 @@ func TestInitFromRefusesWhatItCannotAdopt(t *testing.T) {
 		"an empty tool":   {[]string{"--from="}, true, "--from needs a tool (choose: bazel, moon, nx, pants, rush, turbo)"},
 		"an unknown tool": {[]string{"--from", "gradle"}, true, `unknown --from tool "gradle" (choose: bazel, moon, nx, pants, rush, turbo)`},
 		"a project":       {[]string{"--from", "pants", "--project", "web"}, true, "does not combine with --project"},
-		"an extension":    {[]string{"--from", "pants", "--extension", "go"}, true, "does not combine with --project, --project-path or --extension"},
+		"an extension":    {[]string{"--from", "pants", "--extension", "go"}, true, "does not combine with --project, --project-path, --template or --extension"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()

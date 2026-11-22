@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "init-defaults-to-a-server-template",
+  "statement": "putnami init --project renders its language's server template by default, typescript-server for TypeScript; --template names another template of the language, and init --help lists them",
+  "settled": "2026-11-22",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0086-init-declares-the-languages-a-repository-holds.md",
+  "reviewOnly": true
+}

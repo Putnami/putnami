@@ -22,7 +22,7 @@ The gated first use is exactly:
 ```bash
 curl -fsSL https://putnami.dev/install.sh | bash
 export PATH="$HOME/.putnami/bin:$PATH"
-putnami init --project webapp --extension ts
+putnami init --project webapp --extension ts --template typescript-web
 putnami serve webapp
 ```
 
@@ -523,7 +523,7 @@ Open a PowerShell window and type, from an empty directory:
 
 ```powershell
 irm https://putnami.dev/install.ps1 | iex
-putnami init --project webapp --extension ts
+putnami init --project webapp --extension ts --template typescript-web
 putnami serve webapp
 ```
 

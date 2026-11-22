@@ -68,13 +68,33 @@ func ProjectsCreate(ctx context.Context, wsRoot string, cfg *wsproto.Config, arg
 	return nil
 }
 
-// createInitProjectFiles is the create `putnami init --project` runs: init
-// runs the workspace installers itself and reports their failure
-// (initializeProject).
+// createInitProjectFiles is the create `putnami init --project` runs. A
+// failure of the installers the setup ran, after which the project exists,
+// returns as an initInstallError, which init reports as an install failure,
+// not as a create to run again (initializeProject).
 func createInitProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, env LifecycleEnv) error {
-	_, err := createProjectFiles(ctx, wsRoot, cfg, args, env)
-	return err
+	return initCreateError(createProjectFiles(ctx, wsRoot, cfg, args, env))
 }
+
+// initCreateError is the error init's create returns for a create's result:
+// the create's own failure, else the failure of the installers its setup ran,
+// as an initInstallError, else nil.
+func initCreateError(created createdProject, err error) error {
+	if err != nil {
+		return err
+	}
+	if created.installErr != nil {
+		return initInstallError{err: created.installErr}
+	}
+	return nil
+}
+
+// initInstallError is the failure of the workspace installers that the setup
+// of the project `putnami init --project` created ran. The project exists.
+type initInstallError struct{ err error }
+
+func (e initInstallError) Error() string { return e.err.Error() }
+func (e initInstallError) Unwrap() error { return e.err }
 
 // createdProject is a project createProjectFiles rendered and listed in the
 // workspace config.

@@ -52,10 +52,12 @@ var errProjectSetup = errors.New("the project-setup job failed")
 // job (toolchain.UnresolvedRuntimeToolchainLocks). When one does not, the job
 // first runs its prepare stage, which writes the files the extensions read
 // their pins from; the toolchain pins phase then records what the extensions
-// answer, and the workspace installers run when it added or changed the pin
-// of a toolchain the extension's runtime locks. The job then runs once.
-// installErr is the failure of that phase or of those installers: the setup
-// may still succeed, and the caller reports it.
+// answer and installs the toolchains they pin. The job then runs once, and
+// after it the workspace installers run when the phase added or changed the
+// pin of a toolchain the extension's runtime locks: the setup rewrites the
+// placeholder requirements of the template, which the installers would fail
+// to resolve before it. installErr is the failure of that phase or of those
+// installers: the setup may still succeed, and the caller reports it.
 func setUpProject(ctx context.Context, wsRoot, projectPath string, env LifecycleEnv) (installErr, err error) {
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
@@ -106,14 +108,20 @@ func setUpProject(ctx context.Context, wsRoot, projectPath string, env Lifecycle
 		return nil, err
 	}
 	pins, err := resolveToolchainPins(ctx, wsRoot, env)
-	switch pinned := pinnedLocks(pins, extension.RuntimeToolchainLocks(ext)); {
-	case err != nil:
-		installErr = err
-	case len(pinned) > 0:
-		iox.Fprintf(env.out(), "  The workspace lock now pins %s; running the workspace installers before the setup…\n", strings.Join(pinned, ", "))
+	if err != nil {
+		return err, run("")
+	}
+	// The pins phase installed the pinned toolchains, so the setup runs first:
+	// it rewrites the placeholder requirements of the template, such as a Go
+	// require at v0.0.0, that the installers would fail to resolve.
+	if err := run(""); err != nil {
+		return nil, err
+	}
+	if pinned := pinnedLocks(pins, extension.RuntimeToolchainLocks(ext)); len(pinned) > 0 {
+		iox.Fprintf(env.out(), "  The workspace lock now pins %s; running the workspace installers…\n", strings.Join(pinned, ", "))
 		installErr = DepsInstall(shared.WithImplicitInstall(ctx), wsRoot, wsproto.Load(wsRoot), "", "", env)
 	}
-	return installErr, run("")
+	return installErr, nil
 }
 
 // pinnedLocks returns the sorted locks whose pin the toolchain pins phase

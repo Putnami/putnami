@@ -586,9 +586,9 @@ fi
 
 # ── Leg 5: the exact public TypeScript starter initializes ──────────────────
 init_log="$workdir/init.log"
-echo "smoke: putnami init --project webapp --extension ts"
+echo "smoke: putnami init --project webapp --extension ts --template typescript-web"
 if ! (
-  putnami init --project webapp --extension ts </dev/null
+  putnami init --project webapp --extension ts --template typescript-web </dev/null
 ) >"$init_log" 2>&1; then
   echo "::error::init leg: published CLI failed the exact public TypeScript init command"
   tail -n 200 "$init_log" || true

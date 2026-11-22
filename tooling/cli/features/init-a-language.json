@@ -39,6 +39,22 @@
         }
       },
       {
+        "id": "init-takes-a-template",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "template-renders-that-template-of-the-first-language",
+            "an-unknown-template-is-refused-before-anything-is-written",
+            "init-help-lists-the-templates-of-each-starter",
+            "a-library-project-names-no-serve"
+          ]
+        }
+      },
+      {
         "id": "init-adopts-what-it-finds",
         "stage": "coded",
         "evidenceKinds": [

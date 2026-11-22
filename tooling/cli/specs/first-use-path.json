@@ -16,7 +16,7 @@
     {
       "id": "pasted-block-reaches-the-command",
       "text": [
-        "The documented block is the installer line, export PATH=\"$HOME/.putnami/bin:$PATH\", putnami init --project webapp --extension ts and putnami serve webapp.",
+        "The documented block is the installer line, export PATH=\"$HOME/.putnami/bin:$PATH\", putnami init --project webapp --extension ts --template typescript-web and putnami serve webapp.",
         "When the shell that ran install.sh cannot reach putnami, the installer's footer prints the export PATH line for its install directory as the first line under Next, before putnami --help.",
         "When that shell reaches putnami, the footer prints no PATH line."
       ]

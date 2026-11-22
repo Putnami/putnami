@@ -986,8 +986,8 @@ function Invoke-Smoke {
 
     # -- Leg 5: the exact public TypeScript starter initializes --
     $initLog = Join-Path $Workdir 'init.log'
-    Write-Smoke 'smoke: putnami init --project webapp --extension ts'
-    if ((Invoke-SmokeCommand $bin 'putnami init --project webapp --extension ts' $Workspace $initLog) -ne 0) {
+    Write-Smoke 'smoke: putnami init --project webapp --extension ts --template typescript-web'
+    if ((Invoke-SmokeCommand $bin 'putnami init --project webapp --extension ts --template typescript-web' $Workspace $initLog) -ne 0) {
         Stop-Smoke 'init leg: published CLI failed the exact public TypeScript init command' $initLog
     }
     foreach ($path in @('putnami.workspace.json', 'putnami.lock.json', 'package.json', 'bun.lock', '.npmrc',

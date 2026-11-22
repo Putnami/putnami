@@ -325,12 +325,15 @@ does not, the job first runs with `stage` set to `prepare`, which only writes
 the files a pin derives from, such as the `go.work` of a new Go project. The
 command then runs the toolchain pins phase of `putnami install`: the
 extensions answer their pins, and the CLI installs each pinned release the
-machine lacks under the Putnami home. When a toolchain the extension locks
-gained or changed a pin, the workspace installers run. The job then runs once.
+machine lacks under the Putnami home. The job then runs once, and after it,
+when a toolchain the extension locks gained or changed a pin, the workspace
+installers run: the job rewrites the template's placeholder requirements, such
+as a Go `require` at `v0.0.0`, which the installers cannot resolve before it.
 A pinned toolchain that is not installed ends that run with an error that
 names `putnami install`.
-When the installers fail but the job then succeeds, the project stays and the
-command exits non-zero with the command to run next: `putnami deps install`.
+When the job succeeds and the installers fail, the project stays and the
+command exits non-zero with the command to run next: `putnami deps install`;
+`init --project` does the same.
 
 `--channel <channel>` resolves the create on one release channel, chosen as
 `putnami init` chooses it: the flag, then `PUTNAMI_CHANNEL`, then the channel
@@ -457,14 +460,16 @@ Without `--extension`, `--from` or `--project`, `init` looks for the markers of 
 
 Without a terminal `init` declares nothing rather than guess: declaring TypeScript in another language's repository, or running sync tasks that rewrite tracked manifests unasked, is worse than a failure that writes nothing and names the command. Detection matches file names and reads no file. It skips `.git`, `.putnami`, the directories git ignores and the directories a language's extension excludes, such as `node_modules` and `target`. The languages, their markers and their excludes come from the workspace adapter of each language extension: the CLI carries a copy generated from those manifests, so a new language extension reaches `init` with the CLI release that ships it. See [ADR 0086](adr/0086-init-declares-the-languages-a-repository-holds.md).
 
-`init` can also scaffold a starter project with `--project <name>`, from the starter of the first `--extension` language: `typescript-web`, `go-server` or `python-server`. Without `--extension` it takes the TypeScript starter and looks for no language. A first language that ships no starter, such as `rust`, refuses `--project` before anything is written, and the error names the languages that have one. Use `--project-path <path>` to place that project somewhere other than the default `<project-name>` (at workspace root).
+`init` can also scaffold a starter project with `--project <name>`, from the starter of the first `--extension` language: its server template, `typescript-server`, `go-server` or `python-server`. `--template <name>` renders another template of that language instead, such as `typescript-web` for a React SSR application or `go-library`; `putnami init --help` lists each language's templates, and a template the language does not ship is refused before anything is written. Without `--extension` it takes the TypeScript starter and looks for no language. A first language that ships no starter, such as `rust`, refuses `--project` before anything is written, and the error names the languages that have one. Use `--project-path <path>` to place that project somewhere other than the default `<project-name>` (at workspace root).
 
 ```bash
 putnami init --extension go --project api            # A Go server starter
-putnami init --extension typescript,rust --project web  # A TypeScript web starter beside the Rust crates
+putnami init --project api                            # A TypeScript HTTP API starter
+putnami init --project web --template typescript-web  # A TypeScript React SSR starter
+putnami init --extension typescript,rust --project api  # A TypeScript API starter beside the Rust crates
 ```
 
-`init --from <tool>` turns a repository that a monorepo tool already describes into a workspace. It runs at the repository root, which must hold one of the tool's marker files, declares and installs the tool's extension instead of a language starter, and runs `putnami projects sync`, whose extension sync task writes each package's `putnami.json`. It takes no `--project`, `--project-path` or `--extension`: the tool's packages are the projects, and only those: a directory that holds a manifest the tool does not list, such as a test fixture's `package.json`, is no project. When two new members share a directory name, `projects sync` writes a name for each in its `putnami.json`: the name its provider reports, or its path when there is none or when that name is taken.
+`init --from <tool>` turns a repository that a monorepo tool already describes into a workspace. It runs at the repository root, which must hold one of the tool's marker files, declares and installs the tool's extension instead of a language starter, and runs `putnami projects sync`, whose extension sync task writes each package's `putnami.json`. It takes no `--project`, `--project-path`, `--template` or `--extension`: the tool's packages are the projects, and only those: a directory that holds a manifest the tool does not list, such as a test fixture's `package.json`, is no project. When two new members share a directory name, `projects sync` writes a name for each in its `putnami.json`: the name its provider reports, or its path when there is none or when that name is taken.
 
 | Tool | Marker | Extension | What the sync writes |
 |---|---|---|---|

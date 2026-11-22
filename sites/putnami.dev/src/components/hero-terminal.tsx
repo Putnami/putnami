@@ -31,7 +31,7 @@ const SCRIPT: Step[] = [
   { action: 'pause', ms: 900 },
 
   // ── Init ──
-  { action: 'type', text: 'putnami init --project webapp --extension ts' },
+  { action: 'type', text: 'putnami init --project webapp --extension ts --template typescript-web' },
   { action: 'pause', ms: 400 },
   { action: 'print', text: '✓ Workspace ready', style: 'success' },
   { action: 'print', text: '✓ webapp · @putnami/typescript', style: 'success' },

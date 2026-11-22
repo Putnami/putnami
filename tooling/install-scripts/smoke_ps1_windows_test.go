@@ -97,7 +97,7 @@ func runSmokeStubPutnami(args []string) int {
 	case "--version":
 		fmt.Println("Putnami   " + stubVersion)
 		return 0
-	case "init\x00--project\x00webapp\x00--extension\x00ts":
+	case "init\x00--project\x00webapp\x00--extension\x00ts\x00--template\x00typescript-web":
 		files := goldenPathFixture()
 		files[".gitattributes"] = lfPolicyAttributes
 		if err := writeFixture(files); err != nil {

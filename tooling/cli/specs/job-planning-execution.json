@@ -327,7 +327,7 @@
     },
     {
       "id": "project-setup-runs-in-the-project-extension",
-      "text": "projects create runs the project-setup job of the extension of the project it rendered, for it only, with params path and, in an init on a channel, putnami-channel; an extension that declares none needs none. When a toolchain the job requires does not resolve as it does for the job, create runs the job with stage prepare, pins what the lock misses, installs a newly pinned toolchain the extension locks, then runs the job once. A failed job keeps the project and names the create to rerun with --force."
+      "text": "projects create runs the project-setup job of the rendered project's extension with params path and, on a channel, putnami-channel. When a toolchain the job needs does not resolve, create runs the job with stage prepare, pins and installs what the lock misses, runs the job once, then the workspace installers if a toolchain the extension locks was newly pinned. A failed job runs no installer, keeps the project and names the create to rerun with --force; init names putnami deps install for a failed installer."
     },
     {
       "id": "deps-add-refuses-the-version-none",

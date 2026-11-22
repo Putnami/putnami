@@ -126,9 +126,9 @@ func TestTheWrittenGateAndTheInitHintRunWithoutLintOrCoverage(t *testing.T) {
 
 	lines := []string{"putnami " + gate}
 	for _, steps := range [][]string{
-		lifecycle.InitNextSteps(dir, "", true, "", ""),
-		lifecycle.InitNextSteps(dir, "", false, "", "BUILD"),
-		lifecycle.InitNextSteps(dir, "app", false, "", ""),
+		lifecycle.InitNextSteps(dir, "", false, true, "", ""),
+		lifecycle.InitNextSteps(dir, "", false, false, "", "BUILD"),
+		lifecycle.InitNextSteps(dir, "app", false, false, "", ""),
 	} {
 		for _, step := range steps {
 			if command, _, _ := strings.Cut(step, "#"); strings.Contains(command, "test,build") {

@@ -1307,6 +1307,7 @@
             "create-reads-the-toolchains-the-setup-job-resolves",
             "create-runs-the-setup-once-when-its-toolchains-resolve",
             "create-prepares-pins-and-installs-only-a-toolchain-the-extension-locks",
+            "init-reports-the-installers-the-project-setup-ran",
             "a-bare-host-create-sets-the-project-up-with-no-failed-task"
           ]
         }

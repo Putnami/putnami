@@ -9,7 +9,7 @@ You will create a React web app with Putnami, explore its structure, and add a n
 Start in an empty directory after [installing Putnami](/docs/getting-started):
 
 ```bash
-putnami init --project webapp --extension ts
+putnami init --project webapp --extension ts --template typescript-web
 ```
 
 This scaffolds a full React SSR application from the `typescript-web` template, with file-based routing, a layout, pages, and a client-side counter component.
