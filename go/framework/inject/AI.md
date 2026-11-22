@@ -28,6 +28,12 @@ and the context returns to the idle/not-started state. `Get`/`List`/`Scope`
 then report "not started" rather than handing out a half-built graph, and
 `Start` can be retried after the configuration is fixed.
 
+`StartLazy` validates the graph without building any singleton; each one is
+built on its first `Get`. The build's describe phase starts the application
+container this way. `Lazy()` reports such a start, so a consumer that
+pre-resolves dependencies at configure time, such as `http.Inject`, builds
+nothing then.
+
 ## Constructor-Based (AutoProvide)
 
 Parameters resolved by type, return type becomes the token:

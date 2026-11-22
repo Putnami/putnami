@@ -32,17 +32,22 @@ type injectedParam struct {
 	token     inject.Token // DI token (nil for context params)
 	isContext bool         // true if this is *Context or *EndpointContext
 	isScoped  bool         // true if this dep is scoped (resolved per-request)
+	isLazy    bool         // true if this singleton is resolved on call (lazy container)
 }
 
 // InjectedHandler holds the reflection metadata for a handler wrapped with Inject.
 // Before finalization, calling the handler panics. After finalization, singleton
-// deps are pre-resolved and cached; scoped deps are resolved per-request.
+// deps are pre-resolved and cached; scoped deps are resolved per-request. On a
+// lazily started container (the build-time describe phase), singletons are not
+// pre-resolved: each call resolves them from the container, which builds a
+// singleton once and caches it.
 type InjectedHandler struct {
 	fn        reflect.Value
 	params    []injectedParam
 	ctxIndex  int // index of the *Context / *EndpointContext param
 	finalized bool
 	hasScoped bool                     // true if any param is scoped
+	hasLazy   bool                     // true if any singleton param is resolved on call
 	resolved  []reflect.Value          // pre-resolved values (zero value placeholder for context and scoped slots)
 	cc        *inject.ContainerContext // container used for finalization (for idempotency check)
 	argsPool  sync.Pool                // pool for []reflect.Value slices
@@ -68,7 +73,10 @@ func (ih *InjectedHandler) DependencyTokens() []inject.Token {
 // *EndpointContext for use with the endpoint builder). All other parameters
 // are resolved from the DI container.
 //
-// Singleton deps are resolved once at startup (zero per-request cost).
+// Singleton deps are resolved once at startup (zero per-request cost). The
+// build-time describe phase starts the container lazily and resolves none of
+// them, so a dependency that needs a live system, such as *database.Pool,
+// never fails the build.
 //
 //	server.GET("/users", http.Inject(func(svc *UserService, ctx *http.Context) *http.Response {
 //	    return http.JSON(svc.ListAll())
@@ -142,9 +150,9 @@ func (ih *InjectedHandler) Handle(ctx *Context) *Response {
 	copy(args, ih.resolved)
 	args[ih.ctxIndex] = reflect.ValueOf(ctx)
 
-	if ih.hasScoped {
+	if ih.hasScoped || ih.hasLazy {
 		scopeCtx := ih.scopeContext(args)
-		if err := ih.resolveScoped(args, scopeCtx); err != nil {
+		if err := ih.resolvePerCall(args, scopeCtx); err != nil {
 			ih.argsPool.Put(argsp)
 			return scopeFailureResponse(scopeCtx, err)
 		}
@@ -170,9 +178,9 @@ func (ih *InjectedHandler) HandleEndpoint(ctx *EndpointContext) *Response {
 	copy(args, ih.resolved)
 	args[ih.ctxIndex] = reflect.ValueOf(ctx)
 
-	if ih.hasScoped {
+	if ih.hasScoped || ih.hasLazy {
 		scopeCtx := ih.scopeContext(args)
-		if err := ih.resolveScoped(args, scopeCtx); err != nil {
+		if err := ih.resolvePerCall(args, scopeCtx); err != nil {
 			ih.argsPool.Put(argsp)
 			return scopeFailureResponse(scopeCtx, err)
 		}
@@ -186,9 +194,20 @@ func (ih *InjectedHandler) HandleEndpoint(ctx *EndpointContext) *Response {
 	return results[0].Interface().(*Response) //nolint:errcheck // return type validated in Inject()
 }
 
-// resolveScoped resolves scoped parameters from the request context's DI scope.
-func (ih *InjectedHandler) resolveScoped(args []reflect.Value, ctx context.Context) error {
+// resolvePerCall resolves the parameters that are not pre-resolved: scoped
+// parameters from the request context's DI scope, and, on a lazily started
+// container, singleton parameters from the container.
+func (ih *InjectedHandler) resolvePerCall(args []reflect.Value, ctx context.Context) error {
 	for _, p := range ih.params {
+		if p.isLazy {
+			val, err := ih.cc.Get(p.token)
+			if err != nil {
+				return errors.Wrapf(err, CodeScope, "http.Inject: failed to resolve DI dependency",
+					errors.String("token", inject.TokenName(p.token)))
+			}
+			args[p.index] = injectedValue(val, ih.fn.Type().In(p.index))
+			continue
+		}
 		if !p.isScoped {
 			continue
 		}
@@ -197,7 +216,7 @@ func (ih *InjectedHandler) resolveScoped(args []reflect.Value, ctx context.Conte
 			return errors.Wrapf(err, CodeScope, "scoped dependency resolution failed",
 				errors.String("token", inject.TokenName(p.token)))
 		}
-		args[p.index] = reflect.ValueOf(val)
+		args[p.index] = injectedValue(val, ih.fn.Type().In(p.index))
 	}
 	return nil
 }
@@ -206,6 +225,13 @@ func (ih *InjectedHandler) resolveScoped(args []reflect.Value, ctx context.Conte
 // resolved once and cached. Scoped deps are marked for per-request resolution.
 // This is called by ServerPlugin.Configure().
 //
+// On a lazily started container (inject.ContainerContext.Lazy, the build-time
+// describe phase), Finalize checks that each singleton has a provider but
+// builds none: describe never builds an injected dependency. A handler
+// finalized that way resolves its singletons when it is called. At real
+// start-up the container is eager and every singleton resolves here, so a
+// misconfiguration fails before the server listens.
+//
 // If cc is nil (no DI container was created), context-only handlers are
 // finalized successfully. Handlers with DI dependencies return a clear
 // error at startup instead of panicking at request time.
@@ -213,11 +239,19 @@ func (ih *InjectedHandler) Finalize(cc *inject.ContainerContext) error {
 	if ih.finalized && ih.cc == cc {
 		return nil // idempotent — already finalized with this container
 	}
-	ih.resolved = make([]reflect.Value, len(ih.params))
+	// Build the new state in locals and commit it only on success, so a failed
+	// re-finalization leaves the handler as it was.
+	params := make([]injectedParam, len(ih.params))
+	copy(params, ih.params)
+	resolved := make([]reflect.Value, len(params))
+	hasScoped, hasLazy := false, false
+	lazy := cc != nil && cc.Lazy()
 
-	for i, p := range ih.params {
+	for i, p := range params {
+		params[i].isScoped = false
+		params[i].isLazy = false
 		if p.isContext {
-			ih.resolved[p.index] = reflect.Zero(contextType)
+			resolved[p.index] = reflect.Zero(contextType)
 			continue
 		}
 
@@ -228,12 +262,28 @@ func (ih *InjectedHandler) Finalize(cc *inject.ContainerContext) error {
 				errors.String("token", inject.TokenName(p.token)))
 		}
 
+		paramType := ih.fn.Type().In(p.index)
+
 		// Check if this is a scoped provider — resolve per-request instead of at startup
 		if cc.IsScopedProvider(p.token) {
-			ih.params[i].isScoped = true
-			ih.hasScoped = true
+			params[i].isScoped = true
+			hasScoped = true
 			// Use zero value as placeholder; resolved per-request in Handle
-			ih.resolved[p.index] = reflect.Zero(ih.fn.Type().In(p.index))
+			resolved[p.index] = reflect.Zero(paramType)
+			continue
+		}
+
+		// Lazy container (describe): build nothing, resolve on call. A missing
+		// provider is a wiring mistake, not a missing live system, so it still
+		// fails here.
+		if lazy {
+			if !cc.Has(p.token) {
+				return errors.New(CodeScope, "http.Inject: failed to resolve DI dependency: no provider is registered",
+					errors.String("token", inject.TokenName(p.token)))
+			}
+			params[i].isLazy = true
+			hasLazy = true
+			resolved[p.index] = reflect.Zero(paramType)
 			continue
 		}
 
@@ -242,16 +292,31 @@ func (ih *InjectedHandler) Finalize(cc *inject.ContainerContext) error {
 			return errors.Wrapf(err, CodeScope, "http.Inject: failed to resolve DI dependency",
 				errors.String("token", inject.TokenName(p.token)))
 		}
-		ih.resolved[p.index] = reflect.ValueOf(val)
+		resolved[p.index] = injectedValue(val, paramType)
 	}
 
+	ih.params = params
+	ih.resolved = resolved
+	ih.hasScoped = hasScoped
+	ih.hasLazy = hasLazy
+	n := len(params)
 	ih.argsPool = sync.Pool{
 		New: func() any {
-			s := make([]reflect.Value, len(ih.params))
+			s := make([]reflect.Value, n)
 			return &s
 		},
 	}
 	ih.finalized = true
 	ih.cc = cc
 	return nil
+}
+
+// injectedValue converts a resolved dependency to the handler parameter. A
+// provider that resolves to nil yields the parameter's typed zero, since the
+// zero reflect.Value would make the call panic.
+func injectedValue(val any, paramType reflect.Type) reflect.Value {
+	if val == nil {
+		return reflect.Zero(paramType)
+	}
+	return reflect.ValueOf(val)
 }

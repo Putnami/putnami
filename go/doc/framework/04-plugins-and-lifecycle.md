@@ -53,7 +53,10 @@ func main() {
 to write the generated contracts: OpenAPI, configuration schema, migration
 bundle and infrastructure requirements. In that run, `ListenAndServe` runs
 `Configure` on every plugin, writes the artifacts, and exits. It never starts
-the application, so no database pool opens and no server listens.
+the application, so no database pool opens and no server listens. It builds
+no injected dependency either: a plugin field the container would build with a
+constructor, such as `Pool *database.Pool`, stays nil during `Configure`, so
+read it in `Start` or in a handler.
 
 Everything `main` does before `ListenAndServe` still runs. Keep `main` to
 loading configuration, composing plugins and calling `ListenAndServe`:
@@ -62,7 +65,11 @@ loading configuration, composing plugins and calling `ListenAndServe`:
   or ping the database there. No database is reachable at build time, so the
   build fails.
 - Resolve dependencies where they are used: in a handler through
-  `http.Inject`, in a provider factory, or in a plugin's `Start`.
+  `http.Inject`, in a provider factory, or in a plugin's `Start`. The
+  describe run builds none of a handler's injected dependencies, so a handler
+  that takes `*database.Pool` builds without a database. At real start-up
+  they resolve before the server listens, so a missing connection still fails
+  fast.
 
 ```go
 func main() {

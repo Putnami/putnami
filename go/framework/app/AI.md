@@ -295,7 +295,11 @@ exits with the describer error (or zero on success). Code in `main` before
 `ListenAndServe` still runs during describe: keep it to loading config and
 composing plugins. Resolving a runtime dependency there, such as
 `*database.Pool`, fails the build: describe builds a lazy container that
-starts no plugin, and no database is reachable. Resolve dependencies in handlers, provider factories or
+starts no plugin, and no database is reachable. Describe itself builds no
+injected dependency: `http.Inject` handlers resolve nothing, and plugin
+auto-wiring sets only fields whose value exists without a constructor, so a
+plugin field such as `Pool *database.Pool` stays nil in `Configure` and
+`Describe`. Resolve dependencies in handlers, provider factories or
 a plugin's `Start`. Direct callers can also use
 `a.Describe(outputDir, targets)` to run the phase programmatically (used by tests).
 

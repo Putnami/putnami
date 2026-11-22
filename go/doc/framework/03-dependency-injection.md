@@ -173,6 +173,8 @@ cc.Register(inject.AutoProvide(NewUserService))
 if err := cc.Start(); err != nil {
     log.Fatal(err)
 }
+// StartLazy validates the graph and builds no singleton until its first Get;
+// the build's describe phase uses it, and Lazy() reports it.
 
 // Resolve
 val, _ := cc.Get(inject.TokenOf[*UserService]())

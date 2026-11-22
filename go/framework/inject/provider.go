@@ -55,6 +55,9 @@ type Provider struct {
 	OnClose CloseHook
 	// Lazy skips eager resolution at container startup; the value is resolved on first Get().
 	Lazy bool
+	// value is true for a ProvideValue registration: its factory returns a value
+	// that already exists and builds nothing.
+	value bool
 }
 
 // Registration is an inert provider descriptor created by Provide() and
@@ -94,9 +97,11 @@ func Provide(token Token, factory Factory, opts ...Option) Registration {
 //
 //	reg := inject.ProvideValue[*Config](configToken, cfg)
 func ProvideValue(token Token, value any, opts ...Option) Registration {
-	return Provide(token, func(_ Resolver) (any, error) {
+	reg := Provide(token, func(_ Resolver) (any, error) {
 		return value, nil
 	}, opts...)
+	reg.provider.value = true
+	return reg
 }
 
 // ProvideAlias creates a Registration that aliases Dst to the instance registered

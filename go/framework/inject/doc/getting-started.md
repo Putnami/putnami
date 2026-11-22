@@ -316,7 +316,9 @@ half-built graph, and `Start` can be retried once the configuration is fixed.
 `StartLazy()` runs steps 1–2 only; it never eagerly resolves singletons, so no
 factory runs at start time. Providers are built on first `Get`. The build-time
 describe phase uses this so running an app binary with `PUTNAMI_DESCRIBE` set
-harvests plugin metadata without reaching external systems.
+harvests plugin metadata without reaching external systems. `Lazy()` reports
+whether the context started this way; `http.Inject` reads it and pre-resolves
+no handler dependency on a lazy context.
 
 ### Shutdown
 
@@ -376,6 +378,11 @@ if err := inject.Wire(cc, plugin); err != nil {
 }
 // plugin.DB and plugin.Log are now set if their types are registered.
 ```
+
+On a lazily started container (the build's describe phase), `Wire` builds no
+dependency: it sets a field from a value registered with `ProvideValue` or a
+singleton already built, and leaves every other field nil. A plugin reads such
+a field in `Start` or a handler, not in `Configure` or `Describe`.
 
 Wiring rules:
 

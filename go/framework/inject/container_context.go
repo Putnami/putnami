@@ -52,6 +52,7 @@ type ContainerContext struct {
 	registrations []Registration
 	requirements  []Token
 	state         containerContextState
+	lazy          bool
 	mu            sync.RWMutex
 }
 
@@ -109,6 +110,7 @@ func (cc *ContainerContext) start(resolveEager bool) error {
 		)
 	}
 	cc.state = stateStarted
+	cc.lazy = !resolveEager
 	cc.mu.Unlock()
 
 	if err := cc.runStart(resolveEager); err != nil {
@@ -120,10 +122,34 @@ func (cc *ContainerContext) start(resolveEager bool) error {
 		_ = cc.root.resetBuilt() //nolint:errcheck // best-effort rollback; the original start error takes precedence
 		cc.mu.Lock()
 		cc.state = stateIdle
+		cc.lazy = false
 		cc.mu.Unlock()
 		return err
 	}
 	return nil
+}
+
+// Lazy reports whether the context was started with StartLazy: no singleton
+// was built at start, and none is built until something resolves it. The
+// build-time describe phase is the one lazy start; a consumer that pre-resolves
+// its dependencies at configure time, such as http.Inject, defers that work
+// when Lazy is true so describe never builds an injected dependency.
+func (cc *ContainerContext) Lazy() bool {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+	return cc.lazy
+}
+
+// getWithoutBuilding resolves token from the root only when that runs no
+// constructor; see Container.getWithoutBuilding.
+func (cc *ContainerContext) getWithoutBuilding(token Token) (any, bool) {
+	cc.mu.RLock()
+	if cc.state != stateStarted {
+		cc.mu.RUnlock()
+		return nil, false
+	}
+	cc.mu.RUnlock()
+	return cc.root.getWithoutBuilding(token)
 }
 
 // runStart performs the validate-and-resolve work for a single start attempt.

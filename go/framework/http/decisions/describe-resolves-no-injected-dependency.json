@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "describe-resolves-no-injected-dependency",
+  "statement": "describe never builds an injected dependency: on the lazy container only describe starts, http.Inject resolves no singleton and inject.Wire sets no field a constructor builds; real start-up stays eager and fails fast",
+  "settled": "2026-11-22",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

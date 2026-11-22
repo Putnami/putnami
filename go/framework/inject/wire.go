@@ -26,6 +26,11 @@ const CodeWireIncomplete errors.Code = "inject.wire_incomplete"
 // rather than a later nil-pointer panic.
 // Use the struct tag `inject:"-"` to exclude a field from wiring.
 //
+// On a lazily started container ([ContainerContext.Lazy], the build-time
+// describe phase), Wire builds no dependency: it sets a field only from a
+// value registered with ProvideValue (or ProvideInstance) or a singleton
+// already built, and leaves every other field nil.
+//
 // target must be a pointer to a struct. Non-struct targets are silently ignored.
 //
 // Example:
@@ -35,8 +40,10 @@ const CodeWireIncomplete errors.Code = "inject.wire_incomplete"
 //	    Log *logger.Logger
 //	}
 //
-//	func (p *MyPlugin) Configure(ctx context.Context, owner *app.Module) error {
-//	    // p.DB and p.Log are already set by the framework's auto-wire phase
+//	func (p *MyPlugin) Start(ctx context.Context, owner *app.Module) error {
+//	    // p.DB and p.Log were set by the framework's auto-wire phase. Read a
+//	    // field built by a constructor in Start or a handler: describe leaves
+//	    // it nil during Configure.
 //	    p.DB.Query(...)
 //	}
 func Wire(cc *ContainerContext, target any) error {
@@ -51,7 +58,9 @@ func Wire(cc *ContainerContext, target any) error {
 // Configure time instead of a deferred nil-pointer panic.
 //
 // A field is considered unsatisfied when its type is not registered in the
-// container (or its provider fails to resolve). Fields excluded via
+// container (or its provider fails to resolve). On a lazily started container,
+// a registered field left nil because its provider runs a constructor is not
+// unsatisfied. Fields excluded via
 // `inject:"-"`, already-set fields, unexported fields, and non-pointer /
 // non-interface fields are not candidates and never cause an error. A nil
 // container or non-struct target satisfies trivially (nil error), matching
@@ -90,6 +99,7 @@ func wireFields(cc *ContainerContext, target any) []string {
 
 	v = v.Elem()
 	t := v.Type()
+	lazy := cc.Lazy()
 
 	var unresolved []string
 	for i := 0; i < t.NumField(); i++ {
@@ -122,6 +132,17 @@ func wireFields(cc *ContainerContext, target any) []string {
 		// Try to resolve from container. An unresolved type is recorded (and
 		// reported by WireStrict) but left nil so the lenient Wire keeps going.
 		token := classToken{typ: field.Type}
+		if lazy {
+			// A lazily started container (the build-time describe phase) builds
+			// no dependency: only a registered value or an already built
+			// singleton is wired, and any other field stays nil.
+			if val, ok := cc.getWithoutBuilding(token); ok && val != nil {
+				fieldVal.Set(reflect.ValueOf(val))
+			} else if !cc.Has(token) {
+				unresolved = append(unresolved, field.Name)
+			}
+			continue
+		}
 		val, err := cc.Get(token)
 		if err != nil {
 			unresolved = append(unresolved, field.Name)

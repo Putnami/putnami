@@ -179,6 +179,27 @@ func (c *Container) list(filter FilterOptions, chain []Token, waiter *buildState
 	return results, nil
 }
 
+// getWithoutBuilding resolves token only when that runs no constructor: the
+// provider holds a value registered with ProvideValue, or its singleton is
+// already built. Otherwise it reports false and builds nothing.
+func (c *Container) getWithoutBuilding(token Token) (any, bool) {
+	provider, owner := c.findProvider(token, false)
+	if provider == nil || provider.Scope != Singleton {
+		return nil, false
+	}
+	if !provider.value {
+		owner.mu.RLock()
+		inst, built := owner.instances[token.Key()]
+		owner.mu.RUnlock()
+		return inst, built
+	}
+	val, err := c.Get(token)
+	if err != nil {
+		return nil, false
+	}
+	return val, true
+}
+
 // Has returns true if a provider for the given token exists in this container
 // or any parent (respecting visibility).
 func (c *Container) Has(token Token) bool {

@@ -131,8 +131,14 @@ request context is live logs at ERROR. Over HTTP/2, a failed write waits up to
 ## Handler Injection
 
 `http.Inject` wraps a function with DI-resolved parameters. Singleton deps are
-resolved once at startup (zero per-request cost). Scoped deps (registered via
-`ProvideScopedFunc`) are resolved per-request from the DI scope automatically:
+resolved once at startup (zero per-request cost), so a dependency that cannot
+be built, such as a `*database.Pool` with no connection, fails start-up before
+the server listens. Scoped deps (registered via `ProvideScopedFunc`) are
+resolved per-request from the DI scope automatically.
+
+`putnami build` runs `main` in describe mode, on a lazily started container:
+there `http.Inject` checks that each dependency has a provider and builds
+none, so injecting `*database.Pool` builds and describes without a database.
 
 ```go
 server.GET("/users", http.Inject(func(svc *UserService, ctx *http.Context) *http.Response {
