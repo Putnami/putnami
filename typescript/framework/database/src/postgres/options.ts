@@ -1,8 +1,33 @@
-import { type InferConfig, REDACTED, useLogger } from '@putnami/runtime';
-import postgres from 'postgres';
+import { type InferConfig, useLogger } from '@putnami/runtime';
 import type { PostgresConfig } from './config';
 import { getGcpAccessToken, resolveGcpIdentity } from './gcp.utils';
-import { TYPES } from './type-mapping';
+
+/**
+ * The connection options the package builds for one datasource, before the
+ * physical pool turns them into `Bun.SQL` options (physical-pool.ts). Times
+ * are in seconds.
+ */
+export interface ConnectionOptions {
+  database: string;
+  /** A hostname, or the directory of a Unix socket when it starts with `/`. */
+  host: string;
+  /** Omitted for a Unix socket. */
+  port?: number;
+  username: string;
+  /** A fixed password, or a thunk the driver calls for each new connection. */
+  password: string | (() => Promise<string>);
+  /** Pool size. */
+  max: number;
+  connectTimeout: number;
+  idleTimeout: number;
+  /** Omitted when connections live for ever. */
+  maxLifetime?: number;
+  ssl?: 'require';
+  /** Startup parameters sent with each connection. */
+  connection?: Record<string, string>;
+  /** Log each statement with its parameter values redacted (dev only). */
+  debug?: boolean;
+}
 
 let identityResolver: () => Promise<string> = resolveGcpIdentity;
 let tokenFetcher: () => Promise<string> = getGcpAccessToken;
@@ -63,16 +88,14 @@ async function resolveUser(): Promise<string> {
 }
 
 /**
- * Build postgres.js options for the configured database. When `user` is
+ * Build the connection options for the configured database. When `user` is
  * empty, the active GCP identity is resolved (metadata server → gcloud).
  * When `password` is empty and `host` is a Unix socket (Cloud Run mounted
  * Cloud SQL), each connection fetches an IAM token from the metadata
  * server. Otherwise no password is sent — useful with a local
  * `cloud-sql-proxy` that handles auth itself.
  */
-export async function buildOptions(
-  config: InferConfig<typeof PostgresConfig>,
-): Promise<postgres.Options<Record<string, postgres.PostgresType>>> {
+export async function buildOptions(config: InferConfig<typeof PostgresConfig>): Promise<ConnectionOptions> {
   const host = config.host;
   const explicitPassword = config.password?.trim();
   let username = config.user?.trim();
@@ -83,21 +106,15 @@ export async function buildOptions(
     username = trimServiceAccountSuffix(username);
   }
 
-  const options: postgres.Options<Record<string, postgres.PostgresType>> = {
+  const options: ConnectionOptions = {
     database: config.database,
     host,
     username,
+    password: '',
     max: config.poolSize,
-    onnotice: () => {},
-    fetch_types: true,
-    types: TYPES,
-    transform: {
-      undefined: null,
-      ...postgres.camel,
-    },
-    connect_timeout: config.connectTimeout,
-    idle_timeout: config.idleTimeout,
-    ...(config.maxLifetime > 0 ? { max_lifetime: config.maxLifetime } : {}),
+    connectTimeout: config.connectTimeout,
+    idleTimeout: config.idleTimeout,
+    ...(config.maxLifetime > 0 ? { maxLifetime: config.maxLifetime } : {}),
   };
 
   if (!isUnixSocket(host)) {
@@ -116,11 +133,10 @@ export async function buildOptions(
       }
     };
   } else {
-    // TCP host with no configured password: pin postgres.js to a no-op thunk
-    // so it can't fall back to PGPASSWORD from the shell. Harmless under
-    // cloud-sql-proxy --auto-iam-authn (Cloud SQL replies AuthenticationOk and
-    // the thunk is never invoked); avoids leaking a stray env var if the
-    // server does issue a password challenge.
+    // TCP host with no configured password: pin the driver to a no-op thunk
+    // so it can't fall back to a password from the environment. Harmless
+    // under cloud-sql-proxy --auto-iam-authn (Cloud SQL replies
+    // AuthenticationOk and the thunk is never invoked).
     options.password = async () => '';
   }
 
@@ -129,18 +145,10 @@ export async function buildOptions(
   }
 
   if (config.debug) {
-    // The postgres.js debug callback only sees positional parameter values, with
-    // no link back to their columns — so a password/token or any Sensitive()
-    // value would be logged in plaintext. The parameterized query text and types
-    // are enough to debug a statement, so redact every value by default. `debug`
-    // is a dev-only switch; never enable it in production.
-    options.debug = (_connection, query, parameters, paramTypes) => {
-      useLogger().debug('postgres query', {
-        query,
-        parameters: Array.isArray(parameters) ? parameters.map(() => REDACTED) : parameters,
-        paramTypes,
-      });
-    };
+    // The client logs each statement with every parameter value redacted
+    // (postgres/sql-query.ts): a password, a token or a Sensitive() value
+    // never reaches the log. `debug` is a dev-only switch.
+    options.debug = true;
   }
 
   const connection: Record<string, string> = {};
@@ -159,7 +167,7 @@ export async function buildOptions(
 
 /**
  * applyConnectionParams adds the extra startup parameters carried by a binding
- * (e.g. `application_name`) to already-built postgres.js options. postgres.js
+ * (e.g. `application_name`) to already-built connection options. The driver
  * sends `connection` entries as startup parameters.
  *
  * `search_path` is NOT a startup parameter the connection factory sets any
@@ -170,11 +178,11 @@ export async function buildOptions(
  * own; the factory passes `undefined`.
  */
 export function applyConnectionParams(
-  options: postgres.Options<Record<string, postgres.PostgresType>>,
+  options: ConnectionOptions,
   searchPath?: string,
   extra?: Record<string, string>,
 ): void {
-  const connection: Record<string, string> = { ...(options.connection as Record<string, string> | undefined) };
+  const connection: Record<string, string> = { ...options.connection };
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
       connection[k] = v;

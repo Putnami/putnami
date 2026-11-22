@@ -231,7 +231,7 @@ const deletedCount = await userRepo.deleteMany({ status: "inactive" });
 
 ### `conn(): Promise<SqlClient>`
 
-Get the database connection for this repository (the putnami-owned `SqlClient` type — today an alias of postgres.js's `Sql`). Useful for custom queries.
+Get the database connection for this repository: the package's own `SqlClient`, over `Bun.SQL` (see [The SQL client](advanced-queries.md#the-sql-client)). Useful for custom queries.
 
 ```typescript
 const sql = await userRepo.conn();

@@ -1,11 +1,11 @@
 import { describe, expect } from 'bun:test';
 import { runInContext } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
-import postgres from 'postgres';
+import { SQL } from 'bun';
 import { QueryAbortError } from '../src/abort';
 import { closeDatabase } from '../src/factory';
 import { DATABASE_PROTOCOL_VERSION, setDatabaseBindingOverride } from '../src/postgres/binding';
-import { __setPhysicalPoolFactoryForTests } from '../src/postgres/physical-pool';
+import { __setPhysicalPoolFactoryForTests, driverOptions } from '../src/postgres/physical-pool';
 import { DatabaseSessionStore } from '../src/session/database.store';
 
 const DATASOURCE = 'session_abort';
@@ -28,7 +28,7 @@ describe('DatabaseSessionStore under an ended request', () => {
       // would fail with a connection error, and a cancel would reject it
       // unread. Only the pool's opening ping answers.
       __setPhysicalPoolFactoryForTests((options) => {
-        const real = postgres({ ...options, host: '127.0.0.1', port: 1, max: 1, connect_timeout: 1 });
+        const real = new SQL(driverOptions({ ...options, host: '127.0.0.1', port: 1, max: 1, connectTimeout: 1 }));
         return new Proxy(real, {
           apply(target, thisArg, args: unknown[]) {
             const strings = args[0];

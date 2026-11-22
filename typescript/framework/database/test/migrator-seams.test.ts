@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { specTest } from '@putnami/spectest';
-import type postgres from 'postgres';
+import type { ReservedSqlClient, SqlClient } from '../src/sql-client';
 import { MigrationError } from '../src/errors';
 import type { Migration } from '../src/migrations/migration.entity';
 import { Migrator } from '../src/migrations/migrator';
@@ -43,7 +43,7 @@ class RecordingSql {
     return Promise.resolve([]);
   };
 
-  make(): postgres.ReservedSql {
+  make(): ReservedSqlClient {
     const tag = (strings: TemplateStringsArray, ...values: unknown[]) => this.record(strings, values);
     const withUnsafe = tag as unknown as {
       unsafe: (query: string) => Promise<unknown[]>;
@@ -58,7 +58,7 @@ class RecordingSql {
       }
       return Promise.resolve([]);
     };
-    return withUnsafe as unknown as postgres.ReservedSql;
+    return withUnsafe as unknown as ReservedSqlClient;
   }
 }
 
@@ -71,7 +71,7 @@ class StubMigrator extends Migrator {
     this.appliedRows = opts.applied ?? [];
   }
 
-  protected override async withLock<T>(fn: (sql: postgres.ReservedSql) => Promise<T>): Promise<T> {
+  protected override async withLock<T>(fn: (sql: ReservedSqlClient) => Promise<T>): Promise<T> {
     return await fn(this.sql.make());
   }
 
@@ -232,11 +232,11 @@ describe('Migrator transaction seams (spec)', () => {
       // production ones.
       const recording = new RecordingSql();
       let released = 0;
-      const reserved = recording.make() as postgres.ReservedSql & { release: () => void };
+      const reserved = recording.make() as ReservedSqlClient & { release: () => void };
       reserved.release = () => {
         released += 1;
       };
-      const pool = { reserve: async () => reserved } as unknown as postgres.Sql;
+      const pool = { reserve: async () => reserved } as unknown as SqlClient;
 
       class LockMigrator extends Migrator {
         protected override async fetchApplied(): Promise<Migration[]> {
@@ -246,7 +246,7 @@ describe('Migrator transaction seams (spec)', () => {
       const migrator = new LockMigrator('locked-ds', []);
       // The repository() seam owns table bootstrap against a live server; hand
       // it the fake pool directly so withLock's own statements stay real.
-      (migrator as unknown as { repository: () => Promise<postgres.Sql> }).repository = async () => pool;
+      (migrator as unknown as { repository: () => Promise<SqlClient> }).repository = async () => pool;
 
       await migrator.status();
 
@@ -309,10 +309,10 @@ describe('Migrator advisory-lock literal value', () => {
       }
       return Promise.resolve([]);
     };
-    const reserved = tag as unknown as postgres.ReservedSql & { release: () => void };
+    const reserved = tag as unknown as ReservedSqlClient & { release: () => void };
     (reserved as unknown as { unsafe: (q: string) => Promise<unknown[]> }).unsafe = () => Promise.resolve([]);
     reserved.release = () => {};
-    const pool = { reserve: async () => reserved } as unknown as postgres.Sql;
+    const pool = { reserve: async () => reserved } as unknown as SqlClient;
 
     class LockMigrator extends Migrator {
       protected override async fetchApplied(): Promise<Migration[]> {
@@ -320,7 +320,7 @@ describe('Migrator advisory-lock literal value', () => {
       }
     }
     const migrator = new LockMigrator('locked-ds', []);
-    (migrator as unknown as { repository: () => Promise<postgres.Sql> }).repository = async () => pool;
+    (migrator as unknown as { repository: () => Promise<SqlClient> }).repository = async () => pool;
 
     await migrator.status();
     expect(bound).toEqual(['putnami.migration:locked-ds']);

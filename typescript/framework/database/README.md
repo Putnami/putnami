@@ -442,7 +442,7 @@ session:
 - `commit()` / `rollback()` - Manual transaction control
 - `TransactionMiddleware()` - HTTP middleware for transaction cleanup and abort handling
 - `TransactionOptions` - Options type (`{ timeoutMs?: number }`)
-- `abortableQuery(pending)` - Wrap a postgres.js query with abort signal cancellation
+- `abortableQuery(pending)` - Wrap a pending query with abort signal cancellation
 - `throwIfAborted()` - Throw `QueryAbortError` if the context signal is aborted
 - `useAbortSignal()` - Read the `AbortSignal` from the current context
 - `QueryAbortError` - Error thrown on query abort (code `57014`)

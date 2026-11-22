@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { sha256Hex } from '@putnami/migration';
 import { specTest } from '@putnami/spectest';
-import type postgres from 'postgres';
+import type { ReservedSqlClient } from '../src/sql-client';
 import { MigrationError } from '../src/errors';
 import type { Migration } from '../src/migrations/migration.entity';
 import { Migrator } from '../src/migrations/migrator';
@@ -23,11 +23,11 @@ class StubMigrator extends Migrator {
     this.applied = applied;
   }
 
-  protected override async withLock<T>(fn: (sql: postgres.ReservedSql) => Promise<T>): Promise<T> {
+  protected override async withLock<T>(fn: (sql: ReservedSqlClient) => Promise<T>): Promise<T> {
     // upTo never touches the connection on the drift path (it throws before
     // any query) and only the unchanged/pending paths call apply, which we
     // also stub — so a do-nothing reserved-sql stand-in is sufficient.
-    return await fn({} as postgres.ReservedSql);
+    return await fn({} as ReservedSqlClient);
   }
 
   protected override async fetchApplied(): Promise<Migration[]> {
@@ -45,7 +45,7 @@ class StubMigrator extends Migrator {
     );
   }
 
-  protected override async apply(_sql: postgres.ReservedSql, def: SQLDefinition): Promise<Migration> {
+  protected override async apply(_sql: ReservedSqlClient, def: SQLDefinition): Promise<Migration> {
     this.newlyApplied.push(def.name);
     const hash = await sha256Hex(def.sql);
     this.applied.push({ name: def.name, hash });

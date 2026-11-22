@@ -158,7 +158,6 @@
         "@putnami/migration": "workspace:*",
         "@putnami/runtime": "workspace:*",
         "@putnami/utils": "workspace:*",
-        "postgres": "^3.4.7",
       },
       "devDependencies": {
         "@putnami/spectest": "workspace:*",
@@ -319,9 +318,6 @@
         "@putnami/database": "workspace:*",
         "@putnami/migration": "workspace:*",
         "@putnami/runtime": "workspace:*",
-      },
-      "devDependencies": {
-        "postgres": "^3.4.7",
       },
     },
     "typescript/samples/07-authentication": {
@@ -711,8 +707,6 @@
     "path-type": ["path-type@4.0.0", "", {}, "sha512-gDKb8aZMDeD/tZWs9P6+q0J9Mwkdl6xMV8TjnGP3qJVJ06bdMgkbBlLU8IdfOsIsFz2BW1rNVT3XuNEl8zPAvw=="],
 
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
-
-    "postgres": ["postgres@3.4.8", "", {}, "sha512-d+JFcLM17njZaOLkv6SCev7uoLaBtfK86vMUXhW1Z4glPWh4jozno9APvW/XKFJ3CCxVoC7OL38BqRydtu5nGg=="],
 
     "property-information": ["property-information@7.1.0", "", {}, "sha512-TwEZ+X+yCJmYfL7TPUOcvBZ4QfoT5YenQiJuX//0th53DE6w0xxLEtfK3iyryQFddXuvkIk51EEgrJQ0WJkOmQ=="],
 

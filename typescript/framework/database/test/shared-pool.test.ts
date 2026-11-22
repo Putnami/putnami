@@ -1,22 +1,19 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect } from 'bun:test';
 import type { InferConfig } from '@putnami/runtime';
 import { specTest } from '@putnami/spectest';
-import postgres from 'postgres';
+import type { SQL } from 'bun';
 import { closeAllDatabases, closeDatabase, database, physicalPoolCount } from '../src/factory';
 import { setDatabaseBindingOverride } from '../src/postgres/binding';
 import type { PostgresConfig } from '../src/postgres/config';
+import type { ConnectionOptions } from '../src/postgres/options';
 import { createDatasourceClient, RESET_SEARCH_PATH_SQL, SET_SEARCH_PATH_SQL } from '../src/postgres/datasource-client';
 import { __setPhysicalPoolFactoryForTests } from '../src/postgres/physical-pool';
 import { setPrimaryDatasource } from '../src/primary-datasource';
 
-// postgres.js types TransactionSql through Omit, which drops its tagged-template
-// call signature; the transaction still runs tagged-template queries.
-const tagged = (tx: postgres.TransactionSql) => tx as unknown as postgres.Sql;
-
 const FEATURE = 'typescript/shared-datasource-pooling';
 
 /**
- * A deterministic, in-memory stand-in for postgres.js: a callable `Sql` whose
+ * A deterministic, in-memory stand-in for `Bun.SQL`: a callable pool whose
  * `reserve()` hands out a callable connection that records every statement in
  * order, so the sharing, tuning, lifetime and per-operation search_path rules
  * are provable without a database. Queries settle on a timer so a cancel
@@ -43,7 +40,7 @@ interface FakeSql {
   (...args: unknown[]): unknown;
   log: string[];
   queries: FakeQuery[];
-  options: postgres.Options<Record<string, postgres.PostgresType>>;
+  options: ConnectionOptions;
   ended: boolean;
   failSet?: Error;
   reserve(): Promise<unknown>;
@@ -53,10 +50,8 @@ interface FakeSql {
 }
 
 /**
- * A driver-shaped query: created undispatched with the handler of the `Sql`
- * that built it, dispatched once on the first then()/execute() through
- * whatever handler it carries at that moment — exactly the seam the logical
- * client re-points.
+ * A driver-shaped query: created undispatched with the handler of the
+ * connection that built it, dispatched once on the first then()/execute().
  */
 function makeQuery(sql: FakeSql, text: string, handler: (q: FakeQuery) => void, fail?: Error): FakeQuery {
   let settle: { resolve(v: unknown): void; reject(e: unknown): void } = { resolve() {}, reject() {} };
@@ -146,7 +141,7 @@ function makeConnection(sql: FakeSql, label: string) {
   return conn;
 }
 
-function makeFakeSql(options: postgres.Options<Record<string, postgres.PostgresType>>): FakeSql {
+function makeFakeSql(options: ConnectionOptions): FakeSql {
   let poolHandler: (q: FakeQuery) => void = () => {};
   const sql = ((strings: unknown, ...args: unknown[]) => {
     if (Array.isArray(strings) && Array.isArray((strings as { raw?: unknown }).raw)) {
@@ -212,7 +207,7 @@ beforeEach(() => {
   __setPhysicalPoolFactoryForTests((options) => {
     const sql = makeFakeSql(options);
     constructed.push(sql);
-    return sql as unknown as postgres.Sql;
+    return sql as unknown as SQL;
   });
   previousOverride = setDatabaseBindingOverride(BINDING);
   setPrimaryDatasource(undefined);
@@ -332,9 +327,9 @@ describe('shared physical pool — lifetime', () => {
       await b`SELECT 1`;
       expect(constructed[0].log).toEqual([
         'reserve',
-        `then:unsafe:${SET_SEARCH_PATH_SQL}:["app_b"]`,
         `conn:unsafe:${SET_SEARCH_PATH_SQL}:["app_b"]`,
         'conn:SELECT 1',
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["app_b"]`,
         'conn:release',
       ]);
     },
@@ -402,8 +397,8 @@ describe('shared physical pool — lifetime', () => {
 
 describe('datasource-bound client — search_path per operation', () => {
   function client(searchPath: string | undefined, onEnd = async () => {}) {
-    const physical = makeFakeSql({});
-    const sql = createDatasourceClient(physical as unknown as postgres.Sql, { datasource: 'ds', searchPath, onEnd });
+    const physical = makeFakeSql({} as ConnectionOptions);
+    const sql = createDatasourceClient(physical as unknown as SQL, { datasource: 'ds', searchPath, onEnd });
     return { physical, sql };
   }
 
@@ -420,9 +415,9 @@ describe('datasource-bound client — search_path per operation', () => {
       expect<unknown>(rows).toEqual([{ ok: 1 }]);
       expect(physical.log).toEqual([
         'reserve',
-        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a, public"]`,
         `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a, public"]`,
         'conn:SELECT v FROM t WHERE id = ?',
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a, public"]`,
         'conn:release',
       ]);
     },
@@ -440,9 +435,9 @@ describe('datasource-bound client — search_path per operation', () => {
       await sql`SELECT 1`;
       expect(physical.log).toEqual([
         'reserve',
-        `then:unsafe:${RESET_SEARCH_PATH_SQL}`,
         `conn:unsafe:${RESET_SEARCH_PATH_SQL}`,
         'conn:SELECT 1',
+        `then:unsafe:${RESET_SEARCH_PATH_SQL}`,
         'conn:release',
       ]);
     },
@@ -480,9 +475,9 @@ describe('datasource-bound client — search_path per operation', () => {
       await sql.unsafe('SELECT $1::int', [7]);
       expect(physical.log).toEqual([
         'reserve',
-        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         'conn:unsafe:SELECT $1::int:[7]',
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         'conn:release',
       ]);
     },
@@ -500,8 +495,8 @@ describe('datasource-bound client — search_path per operation', () => {
       const reserved = await sql.reserve();
       expect(physical.log).toEqual([
         'reserve',
-        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
       ]);
       await reserved`BEGIN`;
       reserved.release();
@@ -520,25 +515,25 @@ describe('datasource-bound client — search_path per operation', () => {
       const { physical, sql } = client('tenant_a');
       const result = await sql.begin(async (tx) => {
         physical.log.push('callback');
-        await tagged(tx)`INSERT INTO t VALUES (1)`;
+        await tx`INSERT INTO t VALUES (1)`;
         return 'done';
       });
       expect(result).toBe('done');
       expect(physical.log).toEqual([
         'begin:',
-        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         `tx:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         'callback',
         'tx:INSERT INTO t VALUES (1)',
         'commit',
       ]);
       physical.log.length = 0;
-      const results = await sql.begin('read write', (tx) => [tagged(tx)`SELECT 1`, tagged(tx)`SELECT 2`]);
+      const results = await sql.begin('read write', (tx) => [tx`SELECT 1`, tx`SELECT 2`]);
       expect(results).toHaveLength(2);
       expect(physical.log.slice(0, 3)).toEqual([
         'begin:read write',
-        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         `tx:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
       ]);
       expect(physical.log.at(-1)).toBe('commit');
     },
@@ -570,8 +565,8 @@ describe('datasource-bound client — search_path per operation', () => {
       const early = sql`SELECT pg_sleep(1)`;
       early.cancel();
       await expect(Promise.resolve(early)).rejects.toMatchObject({ code: '57014' });
-      // Cancelled before dispatch: rejected by the driver, no connection reserved.
-      expect(physical.log).toEqual(['cancel:SELECT pg_sleep(1)']);
+      // Cancelled before dispatch: rejected without reaching the driver, no connection reserved.
+      expect(physical.log).toEqual([]);
 
       physical.log.length = 0;
       const late = sql`SELECT pg_sleep(2)`.execute();
@@ -591,6 +586,31 @@ describe('datasource-bound client — search_path per operation', () => {
   );
 
   specTest(
+    'a query used as a fragment runs on the connection of the query that holds it, and is never dispatched itself',
+    {
+      feature: FEATURE,
+      requirement: 'datasource-bound-acquire',
+      check: 'a-fragment-runs-on-the-outer-querys-connection',
+    },
+    async () => {
+      const { physical, sql } = client('tenant_a');
+      const where = sql`id = ${1}`;
+      await sql`SELECT v FROM t WHERE ${where}`;
+      expect(physical.log).toEqual([
+        'reserve',
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        'conn:SELECT v FROM t WHERE ?',
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        'conn:release',
+      ]);
+      // The fragment was built on the reserved connection, as a value of the
+      // statement, and never executed on its own.
+      const fragment = physical.queries.find((q) => q.text === 'id = ?');
+      expect(fragment?.executed).toBe(false);
+    },
+  );
+
+  specTest(
     'end() releases the datasource handle once and marks the client closed',
     { feature: FEATURE, requirement: 'shared-pool-lifetime', check: 'end-releases-the-handle-once' },
     async () => {
@@ -599,8 +619,8 @@ describe('datasource-bound client — search_path per operation', () => {
         released++;
       });
       await sql.end();
-      // The datasource client also answers close(), which postgres.Sql does not declare.
-      await (sql as postgres.Sql & { close(): Promise<void> }).close();
+      // The datasource client also answers close().
+      await sql.close();
       expect(released).toBe(1);
       await expect(Promise.resolve(sql`SELECT 1`)).rejects.toThrow('is closed');
     },
@@ -632,45 +652,9 @@ describe('datasource-bound client — search_path per operation', () => {
       grant?.();
       await new Promise((resolve) => setTimeout(resolve, 5));
       expect(await outcome).toBe('57014');
-      expect(physical.log).toEqual(['reserve', 'cancel:SELECT pg_sleep(3)', 'conn:release']);
+      // Cancelled while the reserve was pending: the connection goes back
+      // unused, and the statement never reaches the driver.
+      expect(physical.log).toEqual(['reserve', 'conn:release']);
     },
   );
-});
-
-describe('driver internals pinned by src/postgres/datasource-client.ts', () => {
-  it('postgres.js Query still exposes handler, executed, resolve, reject, cancelled and strings, and then() is a no-op once executed', async () => {
-    // A real driver instance that never connects: creating a query dispatches
-    // nothing, so the shape can be asserted without a database.
-    const sql = postgres({
-      host: '127.0.0.1',
-      port: 1,
-      database: 'x',
-      username: 'x',
-      password: 'x',
-      max: 1,
-      connect_timeout: 1,
-    });
-    try {
-      for (const q of [sql`select 1`, sql.unsafe('select 1')] as unknown as Record<string, unknown>[]) {
-        const why = 'postgres.js changed its Query internals; update src/postgres/datasource-client.ts (dispatch/bind)';
-        expect(q instanceof Promise, why).toBe(true);
-        expect(typeof q['handler'], why).toBe('function');
-        expect(q['executed'], why).toBe(false);
-        expect(typeof q['resolve'], why).toBe('function');
-        expect(typeof q['reject'], why).toBe('function');
-        expect(q['cancelled'], why).toBeNull();
-        expect(Array.isArray(q['strings']), why).toBe(true);
-        let dispatched = 0;
-        q['handler'] = () => {
-          dispatched++;
-        };
-        q['executed'] = true;
-        (q as unknown as Promise<unknown>).then(undefined, () => {});
-        await new Promise((resolve) => setTimeout(resolve, 5));
-        expect(dispatched, `${why}: then() must not dispatch an executed query`).toBe(0);
-      }
-    } finally {
-      await sql.end({ timeout: 0 }).catch(() => {});
-    }
-  });
 });

@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { emitMigrationBundle } from '@putnami/migration';
 import { resetConfigLoader } from '@putnami/runtime';
-import postgres from 'postgres';
+import { SQL } from 'bun';
 import { closeAllDatabases, database } from '../src/factory';
+import { poolClient } from '../src/postgres/sql-query';
+import type { SqlClient } from '../src/sql-client';
 import { SQLSource } from '../src/migrations/sql-source';
 import {
   type DatabaseBindingEntry,
@@ -46,8 +48,8 @@ describe('provision (live)', () => {
         const [{ one }] = await sql<{ one: number }[]>`SELECT 1 AS one`;
         expect(one).toBe(1);
         if (entry?.schema) {
-          // The factory's postgres.camel transform renames the search_path
-          // column to searchPath in result rows.
+          // The client returns row keys in camelCase: the search_path column
+          // is searchPath.
           const [{ searchPath }] = await sql<{ searchPath: string }[]>`SHOW search_path`;
           const onPath = searchPath
             .split(',')
@@ -103,24 +105,25 @@ describe('provision (live)', () => {
 const LIVE_BINDING = HAS_BINDING ? parseTestBinding(process.env['DATABASE_TEST_BINDINGS'] as string) : undefined;
 const RECLAIMS = !!LIVE_BINDING && isolationOf(LIVE_BINDING) === 'database' && !LIVE_BINDING.keepDatabases;
 
-function adminFor(conn: DatabaseConnectionSpec, db?: string): postgres.Sql {
+function adminFor(conn: DatabaseConnectionSpec, db?: string): SqlClient {
   const target = { ...conn };
   if (db) {
     setConnectionDatabase(target, db);
   }
   if (target.dsn) {
-    return postgres(target.dsn, { max: 1, onnotice: () => {} });
+    return poolClient(new SQL({ url: target.dsn, max: 1 }));
   }
-  return postgres({
-    host: target.host,
-    port: target.port,
-    database: target.database,
-    username: target.user,
-    password: target.password,
-    ssl: target.ssl ? 'require' : false,
-    max: 1,
-    onnotice: () => {},
-  });
+  return poolClient(
+    new SQL({
+      hostname: target.host,
+      port: target.port,
+      database: target.database,
+      username: target.user,
+      password: target.password,
+      tls: target.ssl ? 'require' : false,
+      max: 1,
+    }),
+  );
 }
 
 describe('provision reclaims orphans (live)', () => {
@@ -136,7 +139,7 @@ describe('provision reclaims orphans (live)', () => {
     const young = prefix + isolatedSuffix(new Date(Date.now() - 60_000));
     const exists = async (name: string): Promise<boolean> =>
       (await admin`SELECT 1 FROM pg_database WHERE datname = ${name}`).length > 0;
-    let liveClient: postgres.Sql | undefined;
+    let liveClient: SqlClient | undefined;
     try {
       for (const name of [orphan, live, young]) {
         await admin.unsafe(`CREATE DATABASE "${name}"`);

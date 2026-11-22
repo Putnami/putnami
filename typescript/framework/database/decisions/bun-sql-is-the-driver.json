@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "bun-sql-is-the-driver",
+  "statement": "@putnami/database runs on Bun.SQL behind a Putnami-owned SqlClient whose server errors carry the SQLSTATE in code and whose row queries return camelCase keys; postgres.js is not a dependency",
+  "settled": "2026-11-22",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0005-bun-sql-is-the-driver.md",
+  "reviewOnly": true
+}

@@ -35,12 +35,12 @@ class TokenRepository extends Repository<typeof TokensTable> {
   }
 }
 
-/** A pg-shaped driver error carrying a SQLSTATE on `code`, like postgres.js throws. */
+/** A pg-shaped driver error carrying a SQLSTATE on `code`, like the SQL client throws. */
 function pgError(code: string): Error {
   return Object.assign(new Error(`pg error ${code}`), { code });
 }
 
-/** A postgres.js RowList stand-in: an array carrying the affected-row `count`. */
+/** A result stand-in: an array carrying the affected-row `count`. */
 function rowsWithCount(count: number, data: Record<string, unknown>[] = []): Record<string, unknown>[] {
   const rows = [...data] as Record<string, unknown>[] & { count: number };
   rows.count = count;
@@ -48,7 +48,7 @@ function rowsWithCount(count: number, data: Record<string, unknown>[] = []): Rec
 }
 
 /**
- * A deterministic, in-memory stand-in for the postgres.js connection. Its
+ * A deterministic, in-memory stand-in for the SQL client's connection. Its
  * `unsafe(query, args)` routes to a scripted handler keyed on the leading verb of
  * the SQL, so the CAS outcome logic is pinned without a live Postgres. The same
  * object serves as both the pool (`reserve()`) and the reserved connection
@@ -80,7 +80,7 @@ function createFakeSql(script: Script) {
     return rowsWithCount(0);
   };
 
-  // biome-ignore lint/suspicious/noExplicitAny: minimal postgres.Sql-shaped fake
+  // biome-ignore lint/suspicious/noExplicitAny: minimal SqlClient-shaped fake
   const sql = ((_strings: TemplateStringsArray) => Promise.resolve([])) as any;
   sql.unsafe = (query: string, args: readonly unknown[] = []) => {
     calls.push({ query, args });

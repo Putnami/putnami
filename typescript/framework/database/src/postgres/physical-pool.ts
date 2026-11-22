@@ -1,7 +1,9 @@
-import postgres from 'postgres';
+import type { SQL } from 'bun';
+import { createDriverPool, type DriverPoolOptions } from './driver-pool';
+import type { ConnectionOptions } from './options';
 
 /**
- * The physical pool registry: one postgres.js `Sql` per CONNECTION IDENTITY,
+ * The physical pool registry: one `Bun.SQL` pool per CONNECTION IDENTITY,
  * shared by every datasource whose effective connection is byte-identical.
  *
  * A datasource is one schema of one database. A workload that owns several
@@ -80,7 +82,7 @@ export function tuningMismatchError(opener: string, other: string, diffs: string
 }
 
 /**
- * PhysicalPool is one postgres.js `Sql` shared by every datasource-bound
+ * PhysicalPool is one `Bun.SQL` pool shared by every datasource-bound
  * client whose datasource resolves to the same connection identity. Clients
  * hold references: `release` drops one and the `Sql` ends when the last handle
  * is released, so closing one datasource never kills another datasource's
@@ -93,7 +95,7 @@ class PhysicalPool {
 
   constructor(
     /** The shared driver pool. */
-    readonly sql: postgres.Sql,
+    readonly sql: SQL,
     /** What the pool was created with; every later datasource must match it. */
     readonly tuning: PhysicalTuning,
     /** The datasource that created the pool, named in the mismatch diagnostic. */
@@ -159,14 +161,39 @@ class PhysicalPool {
   }
 }
 
-type PhysicalFactory = (options: postgres.Options<Record<string, postgres.PostgresType>>) => postgres.Sql;
+type PhysicalFactory = (options: ConnectionOptions) => SQL;
 
-const realFactory: PhysicalFactory = (options) => postgres(options);
+/**
+ * driverOptions turns the package's connection options into `Bun.SQL`
+ * options. A host that starts with `/` is the directory of a Unix socket.
+ * `bigint` reads an `int8` as a JavaScript `BigInt`, as the postgres.js
+ * configuration did. TLS is set either way, so an environment default never
+ * decides it.
+ */
+export function driverOptions(options: ConnectionOptions): DriverPoolOptions {
+  const socket = options.host.startsWith('/');
+  return {
+    adapter: 'postgres',
+    database: options.database,
+    username: options.username,
+    password: options.password,
+    ...(socket ? { path: options.host } : { hostname: options.host, port: options.port }),
+    max: options.max,
+    connectionTimeout: options.connectTimeout,
+    idleTimeout: options.idleTimeout,
+    ...(options.maxLifetime ? { maxLifetime: options.maxLifetime } : {}),
+    tls: options.ssl === 'require' ? 'require' : false,
+    ...(options.connection ? { connection: options.connection } : {}),
+    bigint: true,
+  };
+}
+
+const realFactory: PhysicalFactory = (options) => createDriverPool(driverOptions(options));
 
 let factory: PhysicalFactory = realFactory;
 
 /**
- * @internal Test seam: substitute the `postgres()` constructor the registry
+ * @internal Test seam: substitute the `Bun.SQL` constructor the registry
  * opens physical pools with, so the sharing, dedup, tuning, and lifetime rules
  * are provable without a database. Pass `undefined` to restore the driver.
  * Not part of the public API — this module is excluded from the package
@@ -195,7 +222,7 @@ const connecting = new Map<string, Promise<PhysicalPool>>();
 export async function acquirePhysical(
   identity: string,
   datasource: string,
-  options: postgres.Options<Record<string, postgres.PostgresType>>,
+  options: ConnectionOptions,
   tuning: PhysicalTuning,
 ): Promise<PhysicalPool> {
   for (;;) {

@@ -1,11 +1,12 @@
 # Advanced Queries
 
-The Repository covers CRUD and filtering. For JOINs, subqueries, CTEs, and aggregations, use postgres.js directly through `database()` or `this.conn()`. This guide shows how to write these queries safely and idiomatically within the `@putnami/database` ecosystem.
+The Repository covers CRUD and filtering. For JOINs, subqueries, CTEs, and aggregations, use the SQL client directly through `database()` or `this.conn()`. This guide shows how to write these queries safely and idiomatically within the `@putnami/database` ecosystem.
 
 ## Table of contents
 
 - [When to use raw SQL](#when-to-use-raw-sql)
 - [Getting a connection](#getting-a-connection)
+- [The SQL client](#the-sql-client)
 - [JOINs](#joins)
 - [Subqueries](#subqueries)
 - [Common Table Expressions (CTEs)](#common-table-expressions-ctes)
@@ -66,6 +67,75 @@ const sql = await database();
 ```
 
 Use `useTxConnection()` when your code might run inside a transaction. Use `database()` for standalone scripts, migrations, or health checks where you explicitly want to bypass the transaction context.
+
+## The SQL client
+
+The connection is a `SqlClient`, the package's own client over Bun's native
+PostgreSQL driver, `Bun.SQL`. Call it as a template tag: every interpolated
+value is a bound parameter, and a query runs when you await it.
+
+| You write | You get |
+|---|---|
+| ``sql`SELECT ...` `` | Rows with camelCase keys (`created_at` as `createdAt`), plus `count` and `command` |
+| `sql('createdAt')` | The identifier `"created_at"` |
+| `sql(row, ...columns)`, `sql(rows, ...columns)` | The column list and values of an `INSERT`, or the assignments of an `UPDATE`: keys in snake_case, an `undefined` field sent as `NULL` |
+| `sql([1, 2, 3])` | An `IN` list |
+| `sql.json(value)` | A parameter sent as JSON |
+| `sql.unsafe(text, parameters)` | A statement given as text, with `$1` parameters |
+| ``sql`...`.values()`` | Each row as an array of its values, untransformed |
+
+A query used inside another one runs as part of it, on the same connection.
+
+```ts
+import { database } from '@putnami/database';
+
+const sql = await database();
+const users = [
+  { email: 'a@example.com', displayName: 'A' },
+  { email: 'b@example.com', displayName: undefined },
+];
+await sql`INSERT INTO users ${sql(users, 'email', 'displayName')}`;
+
+const recent = sql`created_at > now() - interval '1 day'`;
+const rows = await sql<{ email: string; displayName: string | null }[]>`
+  SELECT email, display_name FROM users
+  WHERE ${recent} AND email IN ${sql(['a@example.com', 'b@example.com'])}
+`;
+```
+
+**Values.** `bigint` reads as a JavaScript `BigInt`, `numeric` as a string
+(no precision is lost), `date`, `timestamp` and `timestamptz` as `Date` (a
+`timestamp` without time zone is read as UTC), `json` and `jsonb` as the
+parsed document, keys as stored, and an array as a plain JavaScript array
+(`bytea` stays a byte buffer). A type the driver does not know, such as a
+pgvector `vector` or an array of an enum type, reads as its text form. A
+`real` (`float4`) read with a bound parameter carries single precision: `0.1`
+reads as `0.10000000149011612`; use `double precision` or `numeric` where it
+matters. Write an enum array through text, and read it as text to get an
+array:
+
+```ts
+import { database } from '@putnami/database';
+
+const sql = await database();
+const moods = ['happy', 'sad'];
+await sql`UPDATE people SET moods = ${sql.array(moods, 'text')}::mood[] WHERE id = ${1}`;
+const [row] = await sql<{ moods: string[] }[]>`SELECT moods::text[] AS moods FROM people WHERE id = ${1}`;
+```
+
+**Errors.** A server error's `code` is the PostgreSQL SQLSTATE (`23505` for a
+unique violation); `driverCode` keeps the driver's own code. A connection
+error keeps the driver's code, such as `ERR_POSTGRES_CONNECTION_REFUSED`.
+
+**Not available.** `cursor()`, `forEach()`, `describe()`, COPY streams,
+`sql.typed`, `sql.subscribe` and `sql.largeObject` were postgres.js members
+and are not part of `SqlClient` (see
+[ADR 0005](adr/0005-bun-sql-is-the-driver.md)). Page through a large result
+with `LIMIT` and a keyset condition instead of a cursor. `unsafe()` and
+`file()` take no options argument: call `.simple()` on the query for the
+simple protocol. A builder does not read the keyword before it: `sql([...])`
+is always an `IN` list, so build a column list from identifiers
+(``sql`${sql('id')}, ${sql('email')}` ``).
 
 ## JOINs
 
@@ -437,7 +507,7 @@ Repository methods already use `abortableQuery` internally — you only need it 
 
 ## Typing results
 
-Queries return `SqlResult<SqlRow[]>` by default (putnami's aliases of postgres.js's `RowList`/`Row`). For type safety, define an interface for your result shape:
+Queries return `SqlResult<SqlRow[]>` by default: the rows, with camelCase keys, plus `count` and `command`. For type safety, define an interface for your result shape:
 
 ```ts nocheck
 interface UserWithStats {

@@ -75,9 +75,9 @@ export interface EventRow {
  * server-rendered page view, reaches the fold with `inserted: false` and moves
  * no counter.
  *
- * The property names are camelCase because the framework's postgres.js client
- * applies a camel transform to result columns (`event_id` arrives as
- * `eventId`); `inserted` has no underscore and is unchanged.
+ * The property names are camelCase because the framework's SQL client returns
+ * row keys in camelCase (`event_id` arrives as `eventId`); `inserted` has no
+ * underscore and is unchanged.
  */
 export interface RawUpsertResult {
   eventId: string;
@@ -85,9 +85,9 @@ export interface RawUpsertResult {
   name: string;
   /**
    * The stored UTC day. Declared `string | Date` because the driver decodes a
-   * `date` column into a JS `Date`: binding that value straight back into the
-   * next statement's `$1::date[]` makes the driver declare the parameter
-   * `timestamptz`, and Postgres refuses the cast.
+   * `date` column into a JS `Date`; the fold binds it back as its UTC day
+   * string, so the next statement's `$1::date[]` never depends on how the
+   * driver types a `Date` parameter.
    */
   day: string | Date;
   sessionId: string | null;

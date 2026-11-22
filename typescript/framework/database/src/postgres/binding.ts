@@ -351,7 +351,7 @@ export function resolveBindingEntry(binding: DatabaseBinding, datasource: string
  * win over its `PoolConfig` field.
  *
  * They must never reach `connectionParams`. Everything left there is put into
- * postgres.js's `connection` option, which is the STARTUP packet, and
+ * the driver's `connection` option, which is the STARTUP packet, and
  * PostgreSQL refuses a startup parameter it does not know
  * (`unrecognized configuration parameter "pool_max_conns"`) — so one pool
  * parameter in a binding would take down every connection this adapter opens.
@@ -371,9 +371,9 @@ const POOL_CONNECTION_PARAMS = new Set([
  * splitPoolParams separates the pgx pool parameters from the server parameters.
  *
  * `pool_max_conns` has an exact twin in this adapter — `poolSize`, which
- * postgres.js takes as `max` — so it is honored, with the same precedence the
+ * the driver pool takes as its size — so it is honored, with the same precedence the
  * Go adapter applies: a connection that states the size wins over the
- * configured one. The others describe bounds postgres.js either owns itself
+ * configured one. The others describe bounds the driver either owns itself
  * (`idle_timeout`, `max_lifetime`, both already configured in seconds) or does
  * not have, so they are dropped rather than guessed at.
  */

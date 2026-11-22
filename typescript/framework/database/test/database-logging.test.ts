@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { MigrationRegistry } from '@putnami/migration';
 import { JsonSink, Logger, resetDefaultLogger, setRootLogger } from '@putnami/runtime';
 import { MemoryLogger } from '@putnami/runtime/testing';
-import type postgres from 'postgres';
+import type { ReservedSqlClient } from '../src/sql-client';
 import type { Migration } from '../src/migrations/migration.entity';
 import { Migrator } from '../src/migrations/migrator';
 import { SQLRunner } from '../src/migrations/sql-runner';
@@ -252,7 +252,7 @@ class RecordingSql {
     return Promise.resolve([]);
   };
 
-  make(): postgres.ReservedSql {
+  make(): ReservedSqlClient {
     const tag = (strings: TemplateStringsArray, ...values: unknown[]) => this.record(strings, values);
     const withUnsafe = tag as unknown as { unsafe: (query: string) => Promise<unknown[]> };
     withUnsafe.unsafe = (query: string) => {
@@ -263,7 +263,7 @@ class RecordingSql {
       this.statements.push(query.trim().replace(/\s+/g, ' '));
       return Promise.resolve([]);
     };
-    return withUnsafe as unknown as postgres.ReservedSql;
+    return withUnsafe as unknown as ReservedSqlClient;
   }
 }
 
@@ -274,7 +274,7 @@ class StubMigrator extends Migrator {
     super('orders', definitions, '');
   }
 
-  protected override async withLock<T>(fn: (sql: postgres.ReservedSql) => Promise<T>): Promise<T> {
+  protected override async withLock<T>(fn: (sql: ReservedSqlClient) => Promise<T>): Promise<T> {
     return await fn(this.sql.make());
   }
 

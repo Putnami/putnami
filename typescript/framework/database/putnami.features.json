@@ -125,12 +125,26 @@
           }
         },
         {
+          "id": "connections-on-demand",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-full-pool-makes-the-next-operation-wait",
+              "a-pool-opens-a-connection-only-when-all-are-leased",
+              "the-most-recently-released-connection-is-reused-first"
+            ]
+          }
+        },
+        {
           "id": "datasource-bound-acquire",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-fragment-runs-on-the-outer-querys-connection",
               "begin-sets-the-search-path-before-the-callback",
               "builders-forward-to-the-physical-pool-untouched",
               "cancel-and-modes-reach-the-inner-query",

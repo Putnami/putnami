@@ -38,9 +38,17 @@ const CONNECTION = {
   params: { pool_max_conns: '3' },
 };
 
+// A pool of its own (another startup parameter, another identity), sized 4.
+const ON_DEMAND_APP = `on_demand_${suffix}`;
+const ON_DEMAND_CONNECTION = {
+  ...CONNECTION,
+  params: { pool_max_conns: '4', application_name: ON_DEMAND_APP },
+};
+
 const BINDING = JSON.stringify({
   protocolVersion: 1,
   databases: {
+    on_demand: { engine: 'postgres', schema: 'public', connection: ON_DEMAND_CONNECTION },
     shared_admin: { engine: 'postgres', schema: 'public', connection: CONNECTION },
     shared_a: { engine: 'postgres', schema: schemaA, connection: CONNECTION },
     shared_b: { engine: 'postgres', schema: schemaB, connection: CONNECTION },
@@ -79,6 +87,40 @@ describe.skipIf(!dockerAvailable)('shared physical pool — two datasources, one
     } finally {
       await closeAllDatabases();
       setDatabaseBindingOverride(previousOverride);
+    }
+  });
+
+  it('runs builders and nested fragments on the connection of the statement, with camelCase rows and SQLSTATE codes', async () => {
+    // The Bun.SQL behaviors the client relies on (doc/adr/0003 and 0005): a
+    // builder made by the pool and a query used as a fragment both work inside
+    // a statement of a reserved connection.
+    const a = await database('shared_a');
+    await a`CREATE TABLE items (item_id int PRIMARY KEY, display_name text, note text DEFAULT 'from-default')`;
+    const rows = [
+      { itemId: 1, displayName: 'one', note: undefined },
+      { itemId: 2, displayName: 'two', note: 'given' },
+    ];
+    await a`INSERT INTO ${a('items')} ${a(rows, 'itemId', 'displayName', 'note')}`;
+
+    const where = a`${a('itemId')} IN ${a([1, 2])}`;
+    const found = await a`SELECT * FROM items WHERE ${where} ORDER BY item_id`;
+    // Keys come back camelCase, and an undefined field was written as NULL.
+    expect<unknown[]>([...found]).toEqual([
+      { itemId: 1, displayName: 'one', note: null },
+      { itemId: 2, displayName: 'two', note: 'given' },
+    ]);
+    expect(found.count).toBe(2);
+    expect(found.command).toBe('SELECT');
+
+    const duplicate = await Promise.resolve(a`INSERT INTO items (item_id) VALUES (1)`).catch((error: unknown) => error);
+    expect(duplicate).toMatchObject({ code: '23505', driverCode: 'ERR_POSTGRES_SERVER_ERROR' });
+
+    const reserved = await a.reserve();
+    try {
+      const [row] = await reserved`SELECT ${reserved('displayName')} FROM items WHERE ${a`item_id = ${2}`}`;
+      expect<unknown>(row).toEqual({ displayName: 'two' });
+    } finally {
+      reserved.release();
     }
   });
 
@@ -152,4 +194,41 @@ describe.skipIf(!dockerAvailable)('shared physical pool — two datasources, one
     await check(sources[1], 'after closing a', b);
     await expect(Promise.resolve(a`SELECT 1`)).rejects.toThrow('is closed');
   }, 120_000);
+
+  it('opens connections as concurrent demand needs them, up to poolSize, and reads arrays as plain arrays', async () => {
+    const sql = await database('on_demand');
+    const backends = async (): Promise<number> => {
+      const [row] = await admin<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM pg_stat_activity WHERE application_name = ${ON_DEMAND_APP}
+      `;
+      return row?.n ?? -1;
+    };
+    try {
+      for (let i = 0; i < 3; i++) {
+        await sql`SELECT 1`;
+      }
+      expect(await backends()).toBe(1);
+
+      await Promise.all(Array.from({ length: 3 }, () => sql`SELECT pg_sleep(0.2)`));
+      expect(await backends()).toBe(3);
+
+      await Promise.all(Array.from({ length: 8 }, () => sql`SELECT pg_sleep(0.1)`));
+      expect(await backends()).toBe(4);
+
+      // A bound parameter selects the binary protocol, where the driver reads
+      // int4[] and float4[] as typed arrays; the client hands out plain ones.
+      const [row] = await sql`
+        SELECT ARRAY[1, 2]::int4[] AS nums, ARRAY[0.5]::float4[] AS halves, ARRAY[0.5]::float8[] AS ratios
+        WHERE ${1}::int = 1
+      `;
+      for (const column of ['nums', 'halves', 'ratios']) {
+        expect(Array.isArray(row?.[column])).toBe(true);
+      }
+      expect(row?.['nums']).toEqual([1, 2]);
+      expect(row?.['halves']).toEqual([0.5]);
+      expect(row?.['ratios']).toEqual([0.5]);
+    } finally {
+      await closeDatabase('on_demand');
+    }
+  }, 60_000);
 });

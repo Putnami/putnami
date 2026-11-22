@@ -26,7 +26,7 @@ The protocol separates three concerns and owns only the contract:
   provisions the database, and injects a `Binding` with resolved connection
   data.
 - **Data plane (the workload / test provider).** Builds a driver
-  (pgx / postgres.js) from a `Binding`'s `Connection` and talks to Postgres
+  (pgx / Bun.SQL) from a `Binding`'s `Connection` and talks to Postgres
   directly.
 
 ## Three layered shapes

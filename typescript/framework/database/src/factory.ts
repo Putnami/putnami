@@ -1,5 +1,4 @@
 import type { InferConfig } from '@putnami/runtime';
-import type postgres from 'postgres';
 import {
   type PoolHealthStats,
   recordPoolClosed,
@@ -12,7 +11,7 @@ import { effectiveConfig, resolveConnectionTarget } from './datasource-config';
 import type { ResolvedDatabaseBinding } from './postgres/binding';
 import type { PostgresConfig } from './postgres/config';
 import { createDatasourceClient } from './postgres/datasource-client';
-import { applyConnectionParams, buildOptions } from './postgres/options';
+import { applyConnectionParams, buildOptions, type ConnectionOptions } from './postgres/options';
 import { acquirePhysical, endAllPhysicalPools, type PhysicalTuning, physicalPoolCount } from './postgres/physical-pool';
 import { primarySearchPath } from './primary-datasource';
 import type { SqlClient } from './sql-client';
@@ -63,17 +62,14 @@ const TUNING_STARTUP_PARAMS = new Set(['statement_timeout', 'idle_in_transaction
  * physical pool. It carries the password, so it is never logged or put in an
  * error.
  */
-function connectionIdentity(
-  conf: InferConfig<typeof PostgresConfig>,
-  options: postgres.Options<Record<string, postgres.PostgresType>>,
-): string {
+function connectionIdentity(conf: InferConfig<typeof PostgresConfig>, options: ConnectionOptions): string {
   const explicitPassword = conf.password?.trim();
   const passwordSource = explicitPassword
     ? `explicit:${explicitPassword}`
     : conf.host.startsWith('/')
       ? 'iam-token'
       : 'none';
-  const startup = Object.entries((options.connection ?? {}) as Record<string, string>)
+  const startup = Object.entries(options.connection ?? {})
     .filter(([key]) => key !== 'search_path' && !TUNING_STARTUP_PARAMS.has(key))
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   return JSON.stringify({
@@ -161,6 +157,7 @@ async function openDatasource(
   const client = createDatasourceClient(physical.sql, {
     datasource,
     searchPath,
+    debug: conf.debug,
     onEnd: async (endOptions) => {
       if (registry.get(key)?.client === client) {
         registry.delete(key);

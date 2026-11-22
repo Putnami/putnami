@@ -61,7 +61,7 @@ const PG_CODE_TO_REPOSITORY_CODE: Record<string, RepositoryErrorCode> = {
 
 /**
  * Extract the PostgreSQL SQLSTATE carried by a thrown value, or `undefined` when
- * it is not a postgres error. postgres.js surfaces the SQLSTATE as the error's
+ * it is not a postgres error. The client surfaces the SQLSTATE as the error's
  * `code` string. This reads the driver error the CAS helpers catch directly from
  * `sql.unsafe(...)` — it is not fed an already-wrapped {@link RepositoryError}
  * (whose `code` is a {@link RepositoryErrorCode}, not a SQLSTATE). It mirrors the

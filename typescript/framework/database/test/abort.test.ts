@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import { runInContext } from '@putnami/runtime';
-import postgres from 'postgres';
+import { SQL } from 'bun';
 import { specTest } from '@putnami/spectest';
 import { abortableQuery, QueryAbortError, throwIfAborted, useAbortSignal } from '../src/abort';
+import { poolClient } from '../src/postgres/sql-query';
 import type { SqlQuery } from '../src/sql-client';
 
 describe('QueryAbortError', () => {
@@ -129,7 +130,9 @@ describe('abortableQuery', () => {
     async () => {
       // A real driver on a port nothing listens on: starting the query would
       // fail with a connection error, and a cancel would reject it unread.
-      const sql = postgres({ host: '127.0.0.1', port: 1, max: 1, connect_timeout: 1 });
+      const sql = poolClient(
+        new SQL({ hostname: '127.0.0.1', port: 1, database: 'x', username: 'x', max: 1, connectionTimeout: 1 }),
+      );
       const unhandled: unknown[] = [];
       const onUnhandled = (reason: unknown) => unhandled.push(reason);
       process.on('unhandledRejection', onUnhandled);

@@ -6,7 +6,7 @@ import {
 } from '@putnami/migration';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import postgres from 'postgres';
+import { SQL } from 'bun';
 import { closeAllDatabases } from './factory';
 import { loadProjectBundle, projectBundleDir } from './migrations/bundle-sources';
 import { SQLRunner } from './migrations/sql-runner';
@@ -24,6 +24,9 @@ import {
   type TestIsolation,
 } from './postgres/binding';
 import { applyConnectionParams, buildOptions } from './postgres/options';
+import { driverOptions } from './postgres/physical-pool';
+import { poolClient } from './postgres/sql-query';
+import type { SqlClient } from './sql-client';
 import type { PostgresConfig } from './postgres/config';
 import { type InferConfig, useLogger } from '@putnami/runtime';
 import { getProjectRoot, restoreEnv } from '@putnami/utils';
@@ -552,7 +555,7 @@ async function provisionSchema(p: Plan, _apply: boolean): Promise<() => Promise<
  * concurrent suites/processes, serialized on a Postgres advisory lock held on a
  * single dedicated connection.
  */
-async function ensureTemplate(admin: postgres.Sql, p: Plan, sources: readonly SQLSource[]): Promise<void> {
+async function ensureTemplate(admin: SqlClient, p: Plan, sources: readonly SQLSource[]): Promise<void> {
   const key = lockKey(p.template as string);
   await admin.unsafe(`SELECT pg_advisory_lock(${key})`);
   let created = false;
@@ -691,13 +694,13 @@ function readEnvBinding(): DatabaseTestBinding | undefined {
   return parseTestBinding(raw);
 }
 
-/** openAdmin builds a small postgres.js connection for DDL on the given connection. */
-async function openAdmin(conn: DatabaseConnectionSpec): Promise<postgres.Sql> {
+/** openAdmin builds a single-connection client for DDL on the given connection. */
+async function openAdmin(conn: DatabaseConnectionSpec): Promise<SqlClient> {
   const { config, connectionParams } = connectionToConfig(conn);
   const full = { ...ADMIN_DEFAULTS, ...config } as InferConfig<typeof PostgresConfig>;
   const options = await buildOptions(full);
   applyConnectionParams(options, undefined, connectionParams);
-  return postgres({ ...options, max: 1 });
+  return poolClient(new SQL(driverOptions({ ...options, max: 1 })));
 }
 
 /** dropDatabase returns a teardown that drops the per-suite database. The reused template is left warm. */

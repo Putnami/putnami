@@ -208,8 +208,16 @@ const sql2 = await database();
 A datasource is one schema of one database. Datasources whose effective
 connections are identical — same host, port, database, user, password source,
 ssl and startup parameters — share **one physical connection pool** of
-`poolSize` connections; only their `search_path` differs. `database(name)`
-returns a *datasource-bound* client over that shared pool:
+`poolSize` connections; only their `search_path` differs.
+
+The pool opens connections as concurrent demand needs them: a connection is
+opened only when every connection the pool holds is in use, and never more than
+`poolSize`. The most recently released connection serves the next operation, so
+the others go idle and close after `idleTimeout` seconds; an operation that
+finds `poolSize` connections in use waits for one. A workload that runs one
+query at a time holds one backend.
+
+`database(name)` returns a *datasource-bound* client over that shared pool:
 
 - every tagged-template query, `sql.unsafe(...)`, `sql.file(...)` and
   `sql.notify(...)` reserves a connection, sets the datasource's `search_path`
@@ -224,7 +232,7 @@ returns a *datasource-bound* client over that shared pool:
 - `${sql(identifier)}` and `sql(rows, ...columns)` builders forward to the
   driver untouched.
 
-postgres.js exposes no acquire hook and no connection identity, so — unlike
+`Bun.SQL` exposes no acquire hook and no connection identity, so — unlike
 the Go adapter, which remembers the last value per connection and skips the
 set when it matches — the TypeScript client sets the path on every operation.
 It costs server-side microseconds.
@@ -320,7 +328,8 @@ database:
     debug: true
 ```
 
-When enabled, all SQL queries are logged with parameters and types.
+When enabled, every SQL statement is logged before it runs, with each parameter
+value redacted.
 
 ### Query Profiling
 

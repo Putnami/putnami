@@ -1,12 +1,12 @@
 import { describe, expect } from 'bun:test';
 import { specTest } from '@putnami/spectest';
-import type postgres from 'postgres';
+import type { ReservedSqlClient } from '../src/sql-client';
 import type { Migration } from '../src/migrations/migration.entity';
 import { Migrator } from '../src/migrations/migrator';
 import type { SQLDefinition } from '../src/migrations/sql-source';
 
 /**
- * A DB-free recording stand-in for a reserved postgres.js connection. Both the
+ * A DB-free recording stand-in for a reserved connection. Both the
  * tagged-template form (`sql`SELECT ...``) and `sql.unsafe(str)` push the
  * statement text onto `statements`, so a test can assert the exact order in
  * which the Migrator emits its transaction body — no Postgres required. The
@@ -35,8 +35,8 @@ class RecordingSql {
     return Promise.resolve([]);
   };
 
-  // Emulate the postgres.js callable tag: sql`...` and sql.unsafe(...).
-  make(): postgres.ReservedSql {
+  // Emulate the client's callable tag: sql`...` and sql.unsafe(...).
+  make(): ReservedSqlClient {
     const tag = (strings: TemplateStringsArray, ...values: unknown[]) => this.record(strings, values);
     const withUnsafe = tag as unknown as {
       unsafe: (query: string) => Promise<unknown[]>;
@@ -46,7 +46,7 @@ class RecordingSql {
       this.values.push([]);
       return Promise.resolve([]);
     };
-    return withUnsafe as unknown as postgres.ReservedSql;
+    return withUnsafe as unknown as ReservedSqlClient;
   }
 }
 
@@ -64,7 +64,7 @@ class StubMigrator extends Migrator {
     this.appliedRows = opts.applied ?? [];
   }
 
-  protected override async withLock<T>(fn: (sql: postgres.ReservedSql) => Promise<T>): Promise<T> {
+  protected override async withLock<T>(fn: (sql: ReservedSqlClient) => Promise<T>): Promise<T> {
     return await fn(this.sql.make());
   }
 

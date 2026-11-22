@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { resetDefaultLogger, runInContext, setRootLogger } from '@putnami/runtime';
 import { assertRecord, findCase, findRecord, loadCases, MemoryLogger } from '@putnami/runtime/testing';
-import type postgres from 'postgres';
+import type { ReservedSqlClient } from '../src/sql-client';
 import { closeAllDatabases, database } from '../src/factory';
 import type { Migration } from '../src/migrations/migration.entity';
 import { Migrator } from '../src/migrations/migrator';
@@ -140,7 +140,7 @@ class RecordingSql {
   /** Migration bodies that must reject, keyed by their exact text. */
   readonly failures = new Map<string, Error>();
 
-  make(): postgres.ReservedSql {
+  make(): ReservedSqlClient {
     // Bookkeeping statements (the migration table, the applied-rows insert) run
     // through the template tag and resolve empty; only migration BODIES go through
     // `unsafe`, which is where a failure can be injected.
@@ -150,7 +150,7 @@ class RecordingSql {
       const failure = this.failures.get(query);
       return failure ? Promise.reject(failure) : Promise.resolve([]);
     };
-    return withUnsafe as unknown as postgres.ReservedSql;
+    return withUnsafe as unknown as ReservedSqlClient;
   }
 }
 
@@ -161,7 +161,7 @@ class StubMigrator extends Migrator {
     super('primary', definitions, '');
   }
 
-  protected override async withLock<T>(fn: (sql: postgres.ReservedSql) => Promise<T>): Promise<T> {
+  protected override async withLock<T>(fn: (sql: ReservedSqlClient) => Promise<T>): Promise<T> {
     return await fn(this.sql.make());
   }
 

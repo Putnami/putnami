@@ -32,7 +32,7 @@ export function isSafeIdentifier(name: string): boolean {
 /**
  * Assert `name` is a safe identifier and return it wrapped in PostgreSQL
  * double-quote syntax, for interpolation into a raw SQL string built with
- * `sql.unsafe(...)` (where postgres.js's `sql(name)` helper is unavailable).
+ * `sql.unsafe(...)` (where the client's `sql(name)` builder is unavailable).
  * The safe-identifier check forbids embedded quotes and dots, so wrapping is
  * injection-safe. Mirrors the Go adapter's `quoteIdentifier`.
  */

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { specTest } from '@putnami/spectest';
 import { resetConfigLoader } from '@putnami/runtime';
-import type postgres from 'postgres';
+import type { SQL } from 'bun';
+import type { ConnectionOptions } from '../src/postgres/options';
 import { effectiveConfig } from '../src/datasource-config';
 import { closeAllDatabases, database } from '../src/factory';
 import {
@@ -14,7 +15,7 @@ import {
 import { __setPhysicalPoolFactoryForTests } from '../src/postgres/physical-pool';
 import { setPrimaryDatasource } from '../src/primary-datasource';
 
-type Options = postgres.Options<Record<string, postgres.PostgresType>>;
+type Options = ConnectionOptions;
 
 /** The options of every physical pool the factory opened, in order. */
 const opened: Options[] = [];
@@ -32,7 +33,7 @@ beforeEach(() => {
   __setPhysicalPoolFactoryForTests((options) => {
     opened.push(options);
     const sql = Object.assign(() => undefined, { end: async () => {}, options });
-    return sql as unknown as postgres.Sql;
+    return sql as unknown as SQL;
   });
 });
 

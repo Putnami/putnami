@@ -11,6 +11,7 @@
     "typescript/relational-persistence#single-committer",
     "typescript/relational-persistence#timeout-rollback",
     "typescript/shared-datasource-pooling#acquire-time-search-path",
+    "typescript/shared-datasource-pooling#connections-on-demand",
     "typescript/shared-datasource-pooling#datasource-bound-acquire",
     "typescript/shared-datasource-pooling#one-pool-per-physical-database",
     "typescript/shared-datasource-pooling#shared-pool-lifetime",

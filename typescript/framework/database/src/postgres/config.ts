@@ -5,7 +5,7 @@ import { Config, Default, Int, Optional, Sensitive } from '@putnami/runtime';
  *
  * `host` accepts both a regular TCP hostname (e.g. `localhost`) and a Unix
  * socket directory (e.g. `/cloudsql/<project>:<region>:<instance>`). When
- * `host` starts with `/`, postgres.js connects through the socket and `port`
+ * `host` starts with `/`, the driver connects through the socket and `port`
  * is ignored.
  *
  * `user` is optional: when omitted, the active GCP IAM principal is

@@ -1,5 +1,4 @@
 import type { InferConfig } from '@putnami/runtime';
-import type postgres from 'postgres';
 import { abortableQuery, throwIfAborted } from '../abort';
 import { effectiveConfig } from '../datasource-config';
 import { classifyOutcome, RepositoryError, type RepositoryErrorCode } from '../errors';
@@ -7,7 +6,7 @@ import { assertSafeIdentifier, type EntityHelper, entityHelper, quoteIdentifier 
 import { type QueryMetrics, type SqlOperation, recordQuery, recordQueryError, recordSlowQuery } from '../observability';
 import type { PostgresConfig } from '../postgres/config';
 import { resolveDatasourceName } from '../primary-datasource';
-import type { SqlClient } from '../sql-client';
+import type { SqlClient, SqlQuery } from '../sql-client';
 import type { TableDefinition } from '../table';
 import type { InferTable } from '../table/table-inference';
 import { Outcome } from '../transaction-outcome';
@@ -20,9 +19,6 @@ const DEFAULT_FIND_LIMIT = 1000;
 
 /** Inferred entity type alias for a given TableDefinition */
 type Entity<T extends TableDefinition> = InferTable<T>;
-
-/** The parameter-array type postgres.js's `sql.unsafe(query, params)` accepts. */
-type SqlUnsafeParams = Parameters<postgres.Sql['unsafe']>[1];
 
 /**
  * RotateSpec describes an atomic predecessor→successor rotation for
@@ -229,7 +225,7 @@ export class Repository<T extends TableDefinition> {
         const keyColumnNames = Object.keys(keys);
 
         // Build the insert row keyed by column name and the ordered column list.
-        // Identifiers are asserted safe and emitted via postgres.js's `sql(...)`
+        // Identifiers are asserted safe and emitted via the client's `sql(...)`
         // helpers — no manual quoting, no `sql.unsafe`.
         const row: Record<string, unknown> = {};
         const insertColumns: string[] = [];
@@ -274,40 +270,36 @@ export class Repository<T extends TableDefinition> {
    * update) it degrades to a no-op self-assignment of the first key column so
    * the upsert still returns the existing row.
    */
-  private upsertSetClause(
-    sql: postgres.Sql,
-    updateColumns: string[],
-    keyColumnNames: string[],
-  ): postgres.PendingQuery<postgres.Row[]> {
+  private upsertSetClause(sql: SqlClient, updateColumns: string[], keyColumnNames: string[]): SqlQuery {
     if (updateColumns.length === 0) {
       const keyCol = keyColumnNames[0];
       assertSafeIdentifier(keyCol, 'conflict key column');
       return sql`${sql(keyCol)} = ${sql(this.helper.tableName)}.${sql(keyCol)}`;
     }
 
-    let clause: postgres.PendingQuery<postgres.Row[]> | undefined;
+    let clause: SqlQuery | undefined;
     for (const col of updateColumns) {
       assertSafeIdentifier(col, 'update column');
       const assignment = sql`${sql(col)} = EXCLUDED.${sql(col)}`;
       clause = clause ? sql`${clause}, ${assignment}` : assignment;
     }
-    return clause as postgres.PendingQuery<postgres.Row[]>;
+    return clause as SqlQuery;
   }
 
   /**
    * Build a comma-separated identifier list (e.g. an `ON CONFLICT` target) as a
-   * fragment. Each name is emitted via `sql(name)`, which postgres.js renders as
+   * fragment. Each name is emitted via `sql(name)`, which the client renders as
    * a quoted identifier regardless of the surrounding keywords — unlike passing
    * a string array, which the driver would treat as a `VALUES`/insert builder.
    */
-  private identList(sql: postgres.Sql, names: string[]): postgres.PendingQuery<postgres.Row[]> {
-    let list: postgres.PendingQuery<postgres.Row[]> | undefined;
+  private identList(sql: SqlClient, names: string[]): SqlQuery {
+    let list: SqlQuery | undefined;
     for (const name of names) {
       assertSafeIdentifier(name, 'identifier list');
       const ident = sql`${sql(name)}`;
       list = list ? sql`${list}, ${ident}` : ident;
     }
-    return (list ?? sql``) as postgres.PendingQuery<postgres.Row[]>;
+    return (list ?? sql``) as SqlQuery;
   }
 
   /**
@@ -399,7 +391,7 @@ export class Repository<T extends TableDefinition> {
 
         for (const { props, entities: groupEntities } of groups.values()) {
           // Build column metadata once per group. Identifiers are asserted safe;
-          // postgres.js's `sql(rows, ...columns)` helper emits the column list
+          // The client's `sql(rows, ...columns)` builder emits the column list
           // and parameterized VALUES tuples.
           const columns = props.map((prop) => {
             const columnName = this.helper.columnName(prop);
@@ -498,7 +490,7 @@ export class Repository<T extends TableDefinition> {
       async () => {
         const sql = await this.conn('read');
         const { fragment: where, hasConditions } = buildWhere(sql, filters, (prop) => this.helper.columnName(prop));
-        const whereClause: postgres.PendingQuery<postgres.Row[]> = hasConditions ? sql`WHERE ${where}` : sql``;
+        const whereClause: SqlQuery = hasConditions ? sql`WHERE ${where}` : sql``;
 
         const rows = await abortableQuery(sql`
           SELECT count(*)::int AS total
@@ -526,9 +518,9 @@ export class Repository<T extends TableDefinition> {
         const offset = Math.max(0, Math.floor(Number(options.offset ?? 0)));
         const sql = await this.conn('read');
         const { fragment: where, hasConditions } = buildWhere(sql, filters, (prop) => this.helper.columnName(prop));
-        const whereClause: postgres.PendingQuery<postgres.Row[]> = hasConditions ? sql`WHERE ${where}` : sql``;
+        const whereClause: SqlQuery = hasConditions ? sql`WHERE ${where}` : sql``;
         const orderBy = this.buildOrderBy(sql, options.orderBy);
-        const offsetClause: postgres.PendingQuery<postgres.Row[]> = offset > 0 ? sql`OFFSET ${offset}` : sql``;
+        const offsetClause: SqlQuery = offset > 0 ? sql`OFFSET ${offset}` : sql``;
 
         const rows = await abortableQuery(sql`
           SELECT * FROM ${sql(this.helper.tableName)}
@@ -550,7 +542,7 @@ export class Repository<T extends TableDefinition> {
    * blocks identifier injection through user input) and emitted via `sql(name)`.
    * The direction is constrained to the `ASC`/`DESC` literals.
    */
-  private buildOrderBy(sql: postgres.Sql, orderBy?: string): postgres.PendingQuery<postgres.Row[]> {
+  private buildOrderBy(sql: SqlClient, orderBy?: string): SqlQuery {
     if (!orderBy) {
       return sql``;
     }
@@ -560,7 +552,7 @@ export class Repository<T extends TableDefinition> {
       .map((col) => col.trim())
       .filter(Boolean);
 
-    let clause: postgres.PendingQuery<postgres.Row[]> | undefined;
+    let clause: SqlQuery | undefined;
     for (const col of columns) {
       const parts = col.split(/\s+/);
       const columnOrProp = parts[0];
@@ -621,7 +613,7 @@ export class Repository<T extends TableDefinition> {
     const table = quoteIdentifier(this.helper.tableName, 'table');
     const query = `UPDATE ${table} SET ${set} WHERE ${where}`;
     try {
-      const result = await abortableQuery(sql.unsafe(query, args as unknown as SqlUnsafeParams));
+      const result = await abortableQuery(sql.unsafe(query, args));
       return result.count;
     } catch (error) {
       throw RepositoryError.fromDatabaseError('Update where failed', error);
@@ -730,7 +722,7 @@ export class Repository<T extends TableDefinition> {
     const placeholders = spec.successorValues.map((_, i) => `$${i + 1}`).join(', ');
     const insertQuery = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`;
     try {
-      await abortableQuery(sql.unsafe(insertQuery, spec.successorValues as unknown as SqlUnsafeParams));
+      await abortableQuery(sql.unsafe(insertQuery, spec.successorValues));
       return Outcome.Applied;
     } catch (error) {
       // A unique violation on the successor is a conflict, not an I/O error.
@@ -757,7 +749,7 @@ export class Repository<T extends TableDefinition> {
 
     let count: number;
     try {
-      const result = await abortableQuery(sql.unsafe(query, args as unknown as SqlUnsafeParams));
+      const result = await abortableQuery(sql.unsafe(query, args));
       count = result.count;
     } catch (error) {
       const outcome = classifyOutcome(error);
@@ -771,9 +763,7 @@ export class Repository<T extends TableDefinition> {
     const table = quoteIdentifier(this.helper.tableName, 'table');
     const existsQuery = `SELECT EXISTS(SELECT 1 FROM ${table} WHERE ${qKey} = $1) AS present`;
     try {
-      const rows = await abortableQuery(
-        sql.unsafe<{ present: boolean }[]>(existsQuery, [keyArg] as unknown as SqlUnsafeParams),
-      );
+      const rows = await abortableQuery(sql.unsafe<{ present: boolean }[]>(existsQuery, [keyArg]));
       return rows[0]?.present ? Outcome.AlreadyConsumedConflict : Outcome.NotFound;
     } catch (error) {
       const outcome = classifyOutcome(error);

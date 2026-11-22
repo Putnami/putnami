@@ -8,8 +8,10 @@ import {
   resetDefaultLogger,
   setRootLogger,
 } from '@putnami/runtime';
+import type { SQL } from 'bun';
 import type { PostgresConfig } from '../src/postgres/config';
 import { __setIdentityResolverForTests, __setTokenFetcherForTests, buildOptions } from '../src/postgres/options';
+import { poolClient } from '../src/postgres/sql-query';
 
 const baseConfig: InferConfig<typeof PostgresConfig> = {
   host: 'localhost',
@@ -135,7 +137,7 @@ describe('buildOptions', () => {
     expect(opts.username).toBe('user@example.com');
     expect(typeof opts.password).toBe('function');
     if (typeof opts.password === 'function') {
-      // Returns empty string — blocks postgres.js's PGPASSWORD env fallback
+      // Returns empty string — blocks the driver's PGPASSWORD env fallback
       // without contributing a real password to a challenge.
       expect(await opts.password()).toBe('');
     }
@@ -219,41 +221,51 @@ describe('debug query logging', () => {
     resetDefaultLogger();
   });
 
-  it('redacts all parameter values, keeping query and types', async () => {
+  it('redacts all parameter values, keeping the statement text', async () => {
     // Route logging through a capturing sink. skipLevelCheck=true emits debug
     // entries regardless of the ambient log level.
     setRootLogger(new Logger([captureSink], undefined, {}, true));
 
     const opts = await buildOptions({ ...baseConfig, debug: true, user: 'app', password: 'pw' });
-    expect(typeof opts.debug).toBe('function');
+    expect(opts.debug).toBe(true);
 
-    // Simulate postgres.js invoking the debug hook with a query that carries a
-    // plaintext secret (e.g. a password column value) in its parameters.
-    (opts.debug as (c: number, q: string, p: unknown[], t: unknown[]) => void)(
-      1,
-      'INSERT INTO users (email, password) VALUES ($1, $2)',
-      ['alice@example.com', 'super-secret-password'],
-      [25, 25],
+    // A client built with debug on logs each statement before it runs; the
+    // statement carries a plaintext secret (e.g. a password column value).
+    const executed: unknown[] = [];
+    const driver = Object.assign(
+      (strings: TemplateStringsArray, ...values: unknown[]) => {
+        const query: Promise<unknown> & { execute?: () => unknown } = Promise.resolve(
+          Object.assign([], { count: 0, command: 'INSERT' }),
+        );
+        query.execute = () => {
+          executed.push({ text: strings.join('?'), values });
+          return query;
+        };
+        return query;
+      },
+      { end: async () => {} },
     );
+    // The client reserves a connection per statement; the stand-in is its own connection.
+    Object.assign(driver, { reserve: async () => driver, release: () => {} });
+    const sql = poolClient(driver as unknown as SQL, opts.debug);
+    const email = 'alice@example.com';
+    const secret = 'super-secret-password';
+    await sql`INSERT INTO users (email, password) VALUES (${email}, ${sql`${secret}`})`;
+    expect(executed).toHaveLength(1);
 
     const debugEntries = entries.filter((e) => e.message === 'postgres query');
     expect(debugEntries).toHaveLength(1);
     // The structured payload is logged as the first data param.
-    const data = (debugEntries[0].data?.[0] ?? {}) as {
-      query?: string;
-      parameters?: unknown[];
-      paramTypes?: unknown[];
-    };
-    // Query text and types are preserved for debugging.
-    expect(data.query).toContain('INSERT INTO users');
-    expect(data.paramTypes).toEqual([25, 25]);
+    const data = (debugEntries[0].data?.[0] ?? {}) as { query?: string; parameters?: unknown[] };
+    // The statement text is preserved for debugging, nested fragments inlined.
+    expect(data.query).toBe('INSERT INTO users (email, password) VALUES ($1, $2)');
     // Every parameter value is redacted — no plaintext secret reaches the sink.
     expect(data.parameters).toEqual([REDACTED, REDACTED]);
-    expect(JSON.stringify(debugEntries[0])).not.toContain('super-secret-password');
-    expect(JSON.stringify(debugEntries[0])).not.toContain('alice@example.com');
+    expect(JSON.stringify(debugEntries[0])).not.toContain(secret);
+    expect(JSON.stringify(debugEntries[0])).not.toContain(email);
   });
 
-  it('does not install a debug hook when debug is false', async () => {
+  it('leaves statement logging off when debug is false', async () => {
     const opts = await buildOptions({ ...baseConfig, debug: false, user: 'app', password: 'pw' });
     expect(opts.debug).toBeUndefined();
   });

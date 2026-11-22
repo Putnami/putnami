@@ -28,8 +28,7 @@
     "@putnami/application": "workspace:*",
     "@putnami/migration": "workspace:*",
     "@putnami/runtime": "workspace:*",
-    "@putnami/utils": "workspace:*",
-    "postgres": "^3.4.7"
+    "@putnami/utils": "workspace:*"
   },
   "private": false,
   "devDependencies": {

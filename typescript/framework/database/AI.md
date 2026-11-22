@@ -256,7 +256,7 @@ const users = await userRepo.find(
 ### Custom Queries
 
 Resolve a transaction-aware connection with `this.conn(mode?)` for raw SQL within
-repositories. It returns the `SqlClient` (putnami's driver-agnostic alias) for the repository's datasource and
+repositories. It returns the package's own `SqlClient`, over `Bun.SQL`, for the repository's datasource and
 automatically joins an active transaction / request `UnitOfWork`. Pass `'read'`
 for read-only queries (zero-cost outside a write transaction):
 
@@ -278,6 +278,12 @@ class UserRepository extends Repository<typeof UsersTable> {
   }
 }
 ```
+
+The client runs on `Bun.SQL`. Rows come back with camelCase keys; `sql('createdAt')`
+and the keys of `sql(rows, ...columns)` are written in snake_case, an `undefined`
+field as `NULL`; a server error's `code` is the SQLSTATE (`driverCode` keeps the
+driver's). It has no `cursor()`, `forEach()`, `describe()` or COPY streams
+(see `doc/advanced-queries.md`, The SQL client).
 
 ## Migrations
 

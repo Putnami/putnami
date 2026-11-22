@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { specTest } from '@putnami/spectest';
-import type postgres from 'postgres';
+import type { ReservedSqlClient } from '../src/sql-client';
 import type { Migration } from '../src/migrations/migration.entity';
 import { Migrator } from '../src/migrations/migrator';
 import type { SQLDefinition } from '../src/migrations/sql-source';
@@ -32,7 +32,7 @@ const APPLY_ORDER = ['app/0002_B', 'app/0002_a', 'billing-api/2026-01-01_y', 'bi
  */
 const stubSql = Object.assign(async (..._args: unknown[]) => [], {
   unsafe: async (_q: string) => [],
-}) as unknown as postgres.ReservedSql;
+}) as unknown as ReservedSqlClient;
 
 /**
  * DB-free Migrator: overrides the connection-bound seams (withLock /
@@ -50,7 +50,7 @@ class OrderingMigrator extends Migrator {
     super('ordering-test', definitions);
   }
 
-  protected override async withLock<T>(fn: (sql: postgres.ReservedSql) => Promise<T>): Promise<T> {
+  protected override async withLock<T>(fn: (sql: ReservedSqlClient) => Promise<T>): Promise<T> {
     return await fn(stubSql);
   }
 
@@ -70,7 +70,7 @@ class OrderingMigrator extends Migrator {
     );
   }
 
-  protected override async apply(_sql: postgres.ReservedSql, def: SQLDefinition): Promise<Migration> {
+  protected override async apply(_sql: ReservedSqlClient, def: SQLDefinition): Promise<Migration> {
     this.appliedOrder.push(def.name);
     return {
       id: `ordering-test:${def.name}`,

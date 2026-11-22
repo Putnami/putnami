@@ -1,10 +1,18 @@
-import { readFile } from 'node:fs';
-import type postgres from 'postgres';
-import type { SqlClient } from '../sql-client';
+import type { ReservedSqlClient, SqlClient, TransactionSqlClient } from '../sql-client';
+import {
+  beginOn,
+  type CapturedQuery,
+  createSqlClient,
+  type DriverSql,
+  normalizeError,
+  type PinnedOptions,
+  queryCancelledError,
+  reservedClient,
+} from './sql-query';
 
 /**
- * The datasource-bound logical client: a `Proxy` over the shared physical
- * postgres.js `Sql` that binds every operation to one datasource's
+ * The datasource-bound logical client: a {@link SqlClient} over the shared
+ * physical `Bun.SQL` pool that binds every operation to one datasource's
  * `search_path`.
  *
  * Several datasources — several owned schemas of one physical database — share
@@ -14,28 +22,23 @@ import type { SqlClient } from '../sql-client';
  * client sets on the connection each operation uses, before the operation's
  * own statement.
  *
- * postgres.js 3.4.8 has no acquire hook and does not expose which connection a
- * query or a `reserve()` landed on, so the marker-and-skip optimization the Go
+ * `Bun.SQL` has no acquire hook and does not expose which connection a query
+ * or a `reserve()` landed on, so the marker-and-skip optimization the Go
  * adapter's `PrepareConn` hook makes cannot exist here. Every operation
- * therefore reserves a connection, issues the set (or `RESET search_path` for
- * a datasource that runs on the server default — it must still neutralize
- * what another datasource left behind), then its statement, PIPELINED on that
- * reserved connection: statements dispatched back-to-back are written without
- * waiting for the first to answer, so the set costs server-side microseconds
- * and no extra network round trip. The connection is released once the
- * statement settled; when the set failed, the operation rejects with the set's
+ * therefore reserves a connection, executes the set (or `RESET search_path`
+ * for a datasource that runs on the server default — it must still neutralize
+ * what another datasource left behind) and then its statement back to back on
+ * that reserved connection, which pipelines them: the set costs server-side
+ * microseconds and no extra network round trip. The connection is released
+ * once both settled; when the set failed, the operation rejects with the set's
  * error — a result is never returned under an unverified `search_path`.
  *
- * The queries this client hands out are the driver's own `Query` objects,
- * created by the physical `Sql` and then re-pointed at a datasource-bound
- * dispatch: they stay `instanceof` the driver's class, so a query used as a
- * fragment inside another query (`sql\`${sql\`a = b\`}\``, the Repository's
- * upsert assignments) is still inlined by the driver, and `values()`, `raw()`,
- * `simple()`, `describe()`, `cursor()`, `forEach()`, `execute()`, `cancel()`,
- * `readable()`/`writable()` keep their native behavior. Builders
- * (`sql(identifier)`, `sql(rows, ...columns)`) touch no connection and forward
- * untouched. `reserve()` and `begin()` set the path on the pinned connection
- * they hand out, which is what the transaction machinery and the migrator need.
+ * The queries this client hands out capture their template (see
+ * sql-query.ts): a query used as a fragment of another runs on that other
+ * query's connection, and `values()`, `raw()`, `simple()` and `cancel()` reach
+ * the driver query. Builders touch no connection and come from the pool.
+ * `reserve()` and `begin()` set the path on the pinned connection they hand
+ * out, which is what the transaction machinery and the migrator need.
  */
 
 /** The statement that binds a connection's session to a datasource's `search_path`. */
@@ -44,7 +47,7 @@ export const SET_SEARCH_PATH_SQL = "SELECT set_config('search_path', $1, false)"
 export const RESET_SEARCH_PATH_SQL = 'RESET search_path';
 
 /** What the logical client needs to know about its datasource. */
-interface DatasourceClientOptions {
+export interface DatasourceClientOptions {
   /** The datasource this client is bound to; named in diagnostics. */
   readonly datasource: string;
   /**
@@ -52,251 +55,114 @@ interface DatasourceClientOptions {
    * working; no quoting), or `undefined` for the server default.
    */
   readonly searchPath: string | undefined;
+  /** Log each statement with its parameter values redacted (dev only). */
+  readonly debug?: boolean;
   /** Called once, on the first `end()`/`close()`: releases this datasource's handle. */
   readonly onEnd: (options?: { timeout?: number }) => Promise<void>;
 }
 
-/** The minimal statement surface a set needs: what `Sql`, `ReservedSql`, and `TransactionSql` all offer. */
-type Unsafe = { unsafe(query: string, parameters?: unknown[]): PromiseLike<unknown> };
+/** The driver statement a set runs: what the pool, a reserved connection and a transaction all offer. */
+type Unsafe = { unsafe(query: string, parameters?: unknown[]): PromiseLike<unknown> & { execute(): unknown } };
 
 /**
  * setSearchPath issues the session-level set (or reset) for `searchPath` on
- * `conn` and returns the pending statement WITHOUT awaiting it, so a caller
- * that dispatches its own statement right after gets both pipelined on the
- * same connection.
+ * `conn` and returns the driver statement, already executed, WITHOUT awaiting
+ * it: a statement the caller executes on `conn` right after is pipelined
+ * behind it.
  */
 function setSearchPath(conn: Unsafe, searchPath: string | undefined): PromiseLike<unknown> {
   const path = searchPath?.trim();
-  return path ? conn.unsafe(SET_SEARCH_PATH_SQL, [path]) : conn.unsafe(RESET_SEARCH_PATH_SQL);
-}
-
-/**
- * The driver's `Query` internals this client relies on. They are plain
- * instance fields set by the `Query` constructor in postgres.js 3.x: `handler`
- * receives the query when it is first awaited or executed, `executed` guards
- * against a second dispatch, `resolve`/`reject` settle it (the cursor iterator
- * re-points them per step), and `streaming` marks a COPY stream whose
- * connection stays busy after the query resolved.
- */
-interface DriverQuery extends PromiseLike<unknown> {
-  handler: (query: DriverQuery) => void;
-  executed: boolean;
-  resolve: (value: unknown) => void;
-  reject: (reason: unknown) => void;
-  streaming?: boolean;
-  cancelled?: unknown;
-  strings: unknown;
+  const statement = path ? conn.unsafe(SET_SEARCH_PATH_SQL, [path]) : conn.unsafe(RESET_SEARCH_PATH_SQL);
+  statement.execute();
+  return statement;
 }
 
 function closedError(datasource: string): Error {
   return new Error(`database: datasource ${JSON.stringify(datasource)} is closed; call database(name) to reopen it`);
 }
 
-function isTemplateStringsArray(value: unknown): value is TemplateStringsArray {
-  return Array.isArray(value) && Array.isArray((value as { raw?: unknown }).raw);
-}
-
 /**
  * createDatasourceClient returns the datasource-bound logical client over the
- * shared `physical` pool. It satisfies the `SqlClient` (= `postgres.Sql`)
- * surface structurally: `typeof client === 'function'`, tagged-template calls,
- * `unsafe`, `file`, `notify`, `reserve`, `begin`, `end`/`close` are bound to
- * the datasource; `sql(identifier)`, `sql(rows, ...columns)`, `json`, `array`,
- * `typed`, `types`, `options`, `parameters`, `listen`, `subscribe`,
- * `largeObject`, `PostgresError`, `CLOSE`, `END` and anything else forward to
- * the physical `Sql` untouched.
+ * shared `physical` pool.
  */
-export function createDatasourceClient(physical: postgres.Sql, options: DatasourceClientOptions): SqlClient {
+export function createDatasourceClient(physical: DriverSql, options: DatasourceClientOptions): SqlClient {
   let closed = false;
   let ending: Promise<void> | undefined;
+  const debug = options.debug ?? false;
+
+  const reserveDriver = async (): Promise<DriverSql & { release(): void }> => {
+    try {
+      return (await physical.reserve()) as DriverSql & { release(): void };
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  };
 
   /**
-   * dispatch runs `query` — a driver Query the physical `Sql` built but has
-   * not dispatched — on a connection reserved for this operation: it issues
-   * the set, then the query, back-to-back through the reserved connection's
-   * own handler (pipelined), fails the query with the set's error when the set
-   * failed, and releases the connection once the query settled.
+   * dispatch runs `query` on a connection reserved for this operation: it
+   * executes the set, then the query, back to back on it, fails the query
+   * with the set's error when the set failed, and releases the connection once
+   * both settled.
    */
-  const dispatch = async (query: DriverQuery): Promise<void> => {
+  const dispatch = async (query: CapturedQuery): Promise<unknown> => {
     if (closed) {
-      query.reject(closedError(options.datasource));
-      return;
+      throw closedError(options.datasource);
     }
     if (query.cancelled) {
-      // Cancelled before it was dispatched: the driver already rejected it
-      // with 57014; reserving a connection for it would only leak the handle.
-      return;
+      // Cancelled before it was dispatched: reserving a connection for it would
+      // only hold one for nothing.
+      throw queryCancelledError();
     }
-    let reserved: postgres.ReservedSql;
+    const reserved = await reserveDriver();
     try {
-      reserved = await physical.reserve();
-    } catch (err) {
-      query.reject(err);
-      return;
-    }
-    if (query.cancelled) {
-      // Cancelled while the reserve was pending: the driver already rejected
-      // the query, and connection.execute() would skip it without settling it
-      // again, leaving this connection reserved for ever. Hand it back unused.
+      if (query.cancelled) {
+        throw queryCancelledError();
+      }
+      const set = setSearchPath(reserved, options.searchPath);
+      const statement = query.runOn(reserved, debug);
+      const [setOutcome, statementOutcome] = await Promise.allSettled([set, statement]);
+      if (setOutcome.status === 'rejected') {
+        // Fail closed: never hand out a result the set did not vouch for.
+        throw normalizeError(setOutcome.reason);
+      }
+      if (statementOutcome.status === 'rejected') {
+        throw statementOutcome.reason;
+      }
+      return statementOutcome.value;
+    } finally {
       reserved.release();
-      return;
     }
-    let released = false;
-    const release = () => {
-      if (!released) {
-        released = true;
-        reserved.release();
-      }
-    };
-    // The set is a driver Query created by the reserved connection, so its
-    // handler is that connection's: executing it and then our query through
-    // the same handler puts both on the same connection, in order.
-    const set = setSearchPath(reserved, options.searchPath) as DriverQuery;
-    const handler = set.handler;
-    // Marked executed before anything can call its then(): the dispatch below
-    // is the one and only execution of the set.
-    set.executed = true;
-    // Nobody awaits the set itself — its verdict travels through the hooks
-    // below — so give its promise a handler: a failed set (connection drop,
-    // pool ended mid-flight) must not surface as an unhandled rejection. Safe
-    // because Query.then() calls handle(), a no-op once `executed` is true.
-    set.then(undefined, () => {});
-    // The server answers the pipelined pair in order and the driver settles
-    // each synchronously as it reads, so one socket read can settle both.
-    // Track the set's verdict synchronously through its own settlement hooks:
-    // a promise callback would observe it one microtask too late, after the
-    // statement had already resolved with a result read under an unverified
-    // path.
-    let setOutcome: { ok: true } | { ok: false; error: unknown } | undefined;
-    const setResolve = set.resolve;
-    const setReject = set.reject;
-    set.resolve = (value) => {
-      setOutcome = { ok: true };
-      setResolve(value);
-    };
-    set.reject = (error) => {
-      setOutcome = { ok: false, error };
-      setReject(error);
-    };
-    // Release once the driver has finished handling the message that settled
-    // the query (a microtask later), the moment transaction.ts releases after
-    // its COMMIT. The cursor iterator re-points resolve/reject on every step,
-    // so observe them through accessors instead of wrapping them once. A COPY
-    // stream keeps the connection busy after the query resolved with the
-    // stream; release when that stream closes instead.
-    const finish = () => queueMicrotask(release);
-    let innerResolve = query.resolve;
-    let innerReject = query.reject;
-    Object.defineProperty(query, 'resolve', {
-      configurable: true,
-      get: () => (value: unknown) => {
-        if (!setOutcome?.ok) {
-          // Fail closed: never hand out a result the set did not vouch for.
-          innerReject(
-            setOutcome
-              ? setOutcome.error
-              : new Error(
-                  `database: search_path for datasource ${JSON.stringify(options.datasource)} was not confirmed before the statement completed`,
-                ),
-          );
-          finish();
-          return;
-        }
-        innerResolve(value);
-        if (query.streaming && value && typeof (value as { once?: unknown }).once === 'function') {
-          const stream = value as { once(event: string, cb: () => void): unknown };
-          stream.once('close', finish);
-          stream.once('error', finish);
-        } else {
-          finish();
-        }
-      },
-      set: (fn: (value: unknown) => void) => {
-        innerResolve = fn;
-      },
-    });
-    Object.defineProperty(query, 'reject', {
-      configurable: true,
-      get: () => (reason: unknown) => {
-        innerReject(setOutcome && !setOutcome.ok ? setOutcome.error : reason);
-        finish();
-      },
-      set: (fn: (reason: unknown) => void) => {
-        innerReject = fn;
-      },
-    });
-    handler(set);
-    handler(query);
   };
 
-  /** bind re-points a physical-pool Query at the datasource-bound dispatch. */
-  const bind = <Q>(query: Q): Q => {
-    (query as unknown as DriverQuery).handler = (q) => void dispatch(q);
-    return query;
-  };
-
-  const bound: Record<PropertyKey, unknown> = {
-    unsafe: (...args: unknown[]) => bind(Reflect.apply(physical.unsafe, physical, args)),
-    file: (path: unknown, args: unknown = [], fileOptions: unknown = {}) => {
-      // Mirror the driver's own file(): read, then run as an unsafe statement
-      // with the same simple-protocol default, bound to the datasource.
-      if (!Array.isArray(args)) {
-        fileOptions = args;
-        args = [];
-      }
-      const parameters = args as unknown[];
-      // `simple` is a real driver option its typings do not declare.
-      const unsafeOptions = {
-        ...(fileOptions as object),
-        simple:
-          'simple' in (fileOptions as object) ? (fileOptions as { simple: boolean }).simple : parameters.length === 0,
-      } as postgres.UnsafeQueryOptions;
-      const query = physical.unsafe('', parameters as never, unsafeOptions) as unknown as DriverQuery;
-      query.handler = (q) => {
-        readFile(path as string, 'utf8', (err, text) => {
-          if (err) {
-            q.reject(err);
-            return;
-          }
-          q.strings = [text];
-          void dispatch(q);
-        });
-      };
-      return query;
-    },
-    notify: async (channel: string, payload: string) => {
-      const strings = Object.assign(['select pg_notify(', ', ', ')'], { raw: ['select pg_notify(', ', ', ')'] });
-      return await bind(physical(strings as unknown as TemplateStringsArray, channel, `${payload}`));
-    },
-    reserve: async (): Promise<postgres.ReservedSql> => {
+  const pinned: PinnedOptions = {
+    pool: physical,
+    debug,
+    reserve: async (): Promise<ReservedSqlClient> => {
       if (closed) {
         throw closedError(options.datasource);
       }
-      const reserved = await physical.reserve();
+      const reserved = await reserveDriver();
       try {
         await setSearchPath(reserved, options.searchPath);
-      } catch (err) {
+      } catch (error) {
         reserved.release();
-        throw err;
+        throw normalizeError(error);
       }
-      return reserved;
+      return reservedClient(reserved, pinned);
     },
-    begin: (...args: unknown[]): Promise<unknown> => {
+  };
+
+  return createSqlClient({
+    pool: physical,
+    dispatch,
+    reserve: pinned.reserve,
+    begin: async (mode: string | undefined, fn: (sql: TransactionSqlClient) => unknown): Promise<unknown> => {
       if (closed) {
-        return Promise.reject(closedError(options.datasource));
+        throw closedError(options.datasource);
       }
-      const [first, second] = args;
-      const fn = (typeof first === 'function' ? first : second) as (tx: postgres.TransactionSql) => unknown;
-      const scoped = async (tx: postgres.TransactionSql) => {
-        await setSearchPath(tx, options.searchPath);
-        const result = fn(tx);
-        // The driver awaits an array of queries returned from the callback;
-        // keep that contract now that the callback's result rides a promise.
-        return Array.isArray(result) ? Promise.all(result) : result;
-      };
-      return typeof first === 'function'
-        ? physical.begin(scoped as never)
-        : physical.begin(first as string, scoped as never);
+      return beginOn(physical, mode, fn, pinned, (tx) =>
+        Promise.resolve(setSearchPath(tx as Unsafe, options.searchPath)),
+      );
     },
     end: (endOptions?: { timeout?: number }): Promise<void> => {
       if (!closed) {
@@ -305,25 +171,5 @@ export function createDatasourceClient(physical: postgres.Sql, options: Datasour
       }
       return ending ?? Promise.resolve();
     },
-  };
-  bound['close'] = bound['end'];
-
-  const client = new Proxy(physical as unknown as (...args: unknown[]) => unknown, {
-    apply(target, thisArg, args) {
-      if (isTemplateStringsArray(args[0])) {
-        return bind(Reflect.apply(target, thisArg, args));
-      }
-      // Identifier and row/column builders: no connection involved.
-      return Reflect.apply(target, thisArg, args);
-    },
-    get(target, property) {
-      // Own keys only: `'toString' in bound` would otherwise answer with
-      // Object.prototype's member instead of the physical Sql's.
-      if (Object.hasOwn(bound, property)) {
-        return bound[property];
-      }
-      return Reflect.get(target, property, target);
-    },
   });
-  return client as unknown as SqlClient;
 }

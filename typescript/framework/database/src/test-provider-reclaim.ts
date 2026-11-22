@@ -1,4 +1,4 @@
-import type postgres from 'postgres';
+import type { SqlClient } from './sql-client';
 
 /**
  * Reclaiming the per-suite databases a killed test process left behind — the
@@ -132,7 +132,7 @@ export async function reclaimOrphans(
 }
 
 /** pgOrphanServer runs the reclaim statements on a single-connection admin client. */
-export function pgOrphanServer(admin: postgres.Sql, quoteIdent: (name: string) => string): OrphanServer {
+export function pgOrphanServer(admin: SqlClient, quoteIdent: (name: string) => string): OrphanServer {
   return {
     async tryLock(key) {
       const rows = await admin.unsafe('SELECT pg_try_advisory_lock($1) AS locked', [key]);

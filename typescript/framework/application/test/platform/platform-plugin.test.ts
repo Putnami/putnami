@@ -291,7 +291,7 @@ describe('PlatformPlugin', () => {
       const hangPlugin: Plugin & HealthChecker = {
         name: 'hang',
         // Ignores the signal on purpose — mirrors a driver that doesn't
-        // accept AbortSignal (postgres.js tagged-template queries today).
+        // accept AbortSignal (SQL tagged-template queries today).
         checkHealth(): Promise<void> {
           return new Promise<void>(() => {
             /* intentionally never settles */

@@ -309,7 +309,7 @@ export class PlatformPlugin implements Plugin {
    * Race a probe against the shared abort signal. The signal aborts when
    * `probeTimeoutMs` elapses; probes that respect it can short-circuit
    * early, but probes that ignore it (e.g. drivers that don't accept an
-   * AbortSignal — see sql.plugin.ts and postgres.js) still reject here
+   * AbortSignal — see sql.plugin.ts) still reject here
    * rather than hanging the aggregate response indefinitely.
    *
    * The abort listener is removed once the probe settles to avoid

@@ -1,6 +1,5 @@
 import { sha256Hex } from '@putnami/migration';
 import { useLogger } from '@putnami/runtime';
-import type postgres from 'postgres';
 import { database } from '../factory';
 import { MigrationError } from '../errors';
 import {
@@ -12,6 +11,7 @@ import {
 } from '../observability/database-logging';
 import { canonicalMigrationId, type Migration } from './migration.entity';
 import type { SQLDefinition } from './sql-source';
+import type { ReservedSqlClient, SqlClient } from '../sql-client';
 
 /**
  * Plain code-unit comparison (`<`/`>`). Migration ordering MUST be
@@ -34,7 +34,7 @@ const byteCompare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 
  * Migrator does NOT consult any global registry.
  */
 export class Migrator {
-  private connection?: postgres.Sql;
+  private connection?: SqlClient;
   private readonly definitions: SQLDefinition[];
   private readonly logger = useLogger(DATABASE_MIGRATION_LOGGER);
 
@@ -217,7 +217,7 @@ export class Migrator {
    * The state-store SQL is fully qualified (migration.migrations) and so is
    * unaffected either way. Mirrors Go's `applySearchPath`.
    */
-  private async applySearchPath(sql: postgres.ReservedSql): Promise<void> {
+  private async applySearchPath(sql: ReservedSqlClient): Promise<void> {
     if (!this.schema) return;
     await sql`SELECT set_config('search_path', ${this.schema}, true)`;
   }
@@ -231,11 +231,11 @@ export class Migrator {
    * COMMIT/ROLLBACK and never leaks onto the pooled connection or any other
    * query. Mirrors Go's `clearStatementTimeout`, which likewise hardcodes `0`.
    */
-  private async clearStatementTimeout(sql: postgres.ReservedSql): Promise<void> {
+  private async clearStatementTimeout(sql: ReservedSqlClient): Promise<void> {
     await sql`SELECT set_config('statement_timeout', '0', true)`;
   }
 
-  private async repository(): Promise<postgres.Sql> {
+  private async repository(): Promise<SqlClient> {
     if (this.connection) return this.connection;
     const sql = await database(this.datasource);
     await sql`CREATE SCHEMA IF NOT EXISTS migration;`;
@@ -266,7 +266,7 @@ export class Migrator {
    * Cross-language coordination: Go and TS hash the same literal
    * (`putnami.migration:<datasource>`) server-side via hashtext().
    */
-  protected async withLock<T>(fn: (sql: postgres.ReservedSql) => Promise<T>): Promise<T> {
+  protected async withLock<T>(fn: (sql: ReservedSqlClient) => Promise<T>): Promise<T> {
     const pool = await this.repository();
     const reserved = await pool.reserve();
     const lockKey = `putnami.migration:${this.datasource}`;
@@ -292,15 +292,15 @@ export class Migrator {
     }
   }
 
-  protected async fetchApplied(sql: postgres.Sql): Promise<Migration[]> {
+  protected async fetchApplied(sql: SqlClient): Promise<Migration[]> {
     return await this.fetch(sql, true);
   }
 
-  private async fetchAll(sql: postgres.Sql): Promise<Migration[]> {
+  private async fetchAll(sql: SqlClient): Promise<Migration[]> {
     return await this.fetch(sql, false);
   }
 
-  private async fetch(sql: postgres.Sql, successOnly: boolean): Promise<Migration[]> {
+  private async fetch(sql: SqlClient, successOnly: boolean): Promise<Migration[]> {
     const result = successOnly
       ? await sql`SELECT * FROM migration.migrations WHERE db_name = ${this.datasource} AND success = 1 ORDER BY executed_at ASC, name ASC`
       : await sql`SELECT * FROM migration.migrations WHERE db_name = ${this.datasource} ORDER BY executed_at ASC, name ASC`;
@@ -319,7 +319,7 @@ export class Migrator {
     }));
   }
 
-  protected async apply(sql: postgres.ReservedSql, def: SQLDefinition): Promise<Migration> {
+  protected async apply(sql: ReservedSqlClient, def: SQLDefinition): Promise<Migration> {
     const startTime = Date.now();
     const hash = await sha256Hex(def.sql);
     const downSql = def.down ?? null;
@@ -427,7 +427,7 @@ export class Migrator {
     }
   }
 
-  private async executeRollback(sql: postgres.ReservedSql, mig: Migration): Promise<Migration> {
+  private async executeRollback(sql: ReservedSqlClient, mig: Migration): Promise<Migration> {
     const downSql = mig.downSql ?? this.definitions.find((d) => d.name === mig.name)?.down;
     if (!downSql) {
       throw new MigrationError(`Migration "${mig.name}" has no down SQL — cannot roll back`, mig.name);

@@ -527,7 +527,7 @@ describe('resolveDatabaseBinding (config section)', () => {
   });
 });
 
-describe('binding → postgres.js options', () => {
+describe('binding → driver options', () => {
   it('applies the owning schema as the session search_path', async () => {
     const resolved = resolveDatabaseBinding(
       'auth',
@@ -548,7 +548,7 @@ describe('binding → postgres.js options', () => {
   });
 
   // dbtestenv puts pool_max_conns / pool_min_conns / pool_max_conn_idle_time in
-  // every test binding, for Go and TypeScript projects alike. postgres.js turns
+  // every test binding, for Go and TypeScript projects alike. The driver turns
   // `connection` into the STARTUP packet, and PostgreSQL refuses a startup
   // parameter it does not know, so leaving them there would fail every
   // connection this adapter opens with
@@ -582,7 +582,7 @@ describe('binding → postgres.js options', () => {
       expect(connection[key]).toBeUndefined();
     }
     // An unrelated driver option still travels, and the size the connection
-    // asked for reaches postgres.js as the pool ceiling.
+    // asked for reaches the driver pool as its ceiling.
     expect(connection['sslmode']).toBe('disable');
     expect(options.max).toBe(2);
   });

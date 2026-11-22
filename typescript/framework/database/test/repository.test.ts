@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { Optional } from '@putnami/runtime';
-import type postgres from 'postgres';
+import type { SqlClient } from '../src/sql-client';
 import { Column, type InferTable, Key, Migrator, Repository, RepositoryError, Table } from '../src/index';
 import { ensurePostgresContainer, isDockerAvailable, POSTGRES_SETUP_TIMEOUT_MS } from './utils/postgres-helper';
 
@@ -940,11 +940,11 @@ describe.skipIf(!dockerAvailable)('NUMERIC precision', () => {
 });
 
 /**
- * A DB-free postgres.js tag that records the final find() query's LIMIT value.
+ * A DB-free SQL client tag that records the final find() query's LIMIT value.
  * The repository's private ceiling is pinned directly so this verifies the
  * query-building behaviour without competing for the process-global test pool.
  */
-function findSql(limits: number[]): postgres.Sql {
+function findSql(limits: number[]): SqlClient {
   const sql = ((strings: TemplateStringsArray | string, ...values: unknown[]) => {
     if (typeof strings === 'string') {
       return { kind: 'identifier' };
@@ -958,7 +958,7 @@ function findSql(limits: number[]): postgres.Sql {
       return Promise.resolve([]);
     }
     return { kind: 'fragment' };
-  }) as unknown as postgres.Sql;
+  }) as unknown as SqlClient;
   return sql;
 }
 
@@ -967,7 +967,7 @@ function findLimit(requested: number): Promise<number> {
   const repo = new TestAssetRepository();
   const sql = findSql(limits);
 
-  (repo as unknown as { conn: () => Promise<postgres.Sql> }).conn = async () => sql;
+  (repo as unknown as { conn: () => Promise<SqlClient> }).conn = async () => sql;
   (repo as unknown as { _maxRowLimit: number })._maxRowLimit = 3;
 
   return repo.find({}, { limit: requested }).then(() => {

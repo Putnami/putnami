@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import type postgres from 'postgres';
+import type { SqlClient, SqlQuery } from '../src/sql-client';
 import { Column, Key, Table } from '../src/table';
 import { Repository } from '../src/repository/repository';
 
 /**
- * DB-free stand-in for the postgres.js tagged template + `sql(value)` helper.
+ * DB-free stand-in for the SQL client's tagged template + `sql(value)` helper.
  * Records emitted fragments so tests can assert the generated SQL shape, that
  * identifiers are quoted (escaped) rather than concatenated raw, and that any
  * nested fragment is spliced in. See repository-where.test.ts for the same
@@ -34,7 +34,7 @@ function isNode(value: unknown): value is Node {
   );
 }
 
-function makeSqlStub(): postgres.Sql {
+function makeSqlStub(): SqlClient {
   const tag = (strings: TemplateStringsArray | string, ...values: unknown[]): unknown => {
     if (!Array.isArray(strings) || !('raw' in (strings as TemplateStringsArray))) {
       if (Array.isArray(strings)) {
@@ -67,10 +67,10 @@ function makeSqlStub(): postgres.Sql {
     }
     return { kind: 'fragment', sql, params } satisfies Fragment;
   };
-  return tag as unknown as postgres.Sql;
+  return tag as unknown as SqlClient;
 }
 
-function frag(value: postgres.PendingQuery<postgres.Row[]>): Fragment {
+function frag(value: SqlQuery): Fragment {
   return value as unknown as Fragment;
 }
 
@@ -89,10 +89,10 @@ class OrderRepo extends Repository<typeof OrderTable> {
   constructor() {
     super(OrderTable);
   }
-  orderBy(sql: postgres.Sql, spec?: string): postgres.PendingQuery<postgres.Row[]> {
+  orderBy(sql: SqlClient, spec?: string): SqlQuery {
     return (this as unknown as { buildOrderBy: typeof OrderRepo.prototype.orderBy }).buildOrderBy(sql, spec);
   }
-  idents(sql: postgres.Sql, names: string[]): postgres.PendingQuery<postgres.Row[]> {
+  idents(sql: SqlClient, names: string[]): SqlQuery {
     return (this as unknown as { identList: typeof OrderRepo.prototype.idents }).identList(sql, names);
   }
 }

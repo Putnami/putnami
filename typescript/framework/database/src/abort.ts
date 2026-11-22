@@ -35,10 +35,10 @@ export function throwIfAborted(): void {
 }
 
 /**
- * Wrap a postgres.js PendingQuery so it is cancelled when the context signal fires.
+ * Wrap a pending query so it is cancelled when the context signal fires.
  *
  * - If the signal is already aborted, throws without starting the query: a
- *   postgres.js query runs only once something awaits it, so nothing is sent.
+ *   query runs only once something awaits it, so nothing is sent.
  * - Otherwise, on abort it calls `pending.cancel()`, which drops a query still
  *   waiting for a connection or sends a PostgreSQL protocol-level cancel
  *   request for a running one, and rejects at once with a `QueryAbortError`:

@@ -16,7 +16,7 @@ import {
 import { UnitOfWork } from '../src/unit-of-work';
 
 /**
- * A deterministic, in-memory stand-in for the postgres.js connection layer that
+ * A deterministic, in-memory stand-in for the SQL client's connection layer that
  * records BEGIN/COMMIT/ROLLBACK per datasource, so the transaction-boundary
  * telemetry can be driven end-to-end without a live Postgres. Mirrors the fake
  * used by unit-of-work.test.ts.
@@ -32,14 +32,14 @@ function createFakeBackend() {
       else if (cmd.startsWith('COMMIT')) log.push(`${key}:commit`);
       else if (cmd.startsWith('ROLLBACK')) log.push(`${key}:rollback`);
       return Promise.resolve([]);
-      // biome-ignore lint/suspicious/noExplicitAny: minimal postgres.js reserved-connection fake
+      // biome-ignore lint/suspicious/noExplicitAny: minimal reserved-connection fake
     }) as any;
     reserved.release = () => log.push(`${key}:release`);
     return reserved;
   }
 
   function makePool(key: string) {
-    // biome-ignore lint/suspicious/noExplicitAny: minimal postgres.js pool fake
+    // biome-ignore lint/suspicious/noExplicitAny: minimal pool fake
     const pool = (() => Promise.resolve([])) as any;
     pool.reserve = async () => makeReserved(key);
     return pool;
@@ -47,7 +47,7 @@ function createFakeBackend() {
 
   return {
     log,
-    // biome-ignore lint/suspicious/noExplicitAny: returns a postgres.Sql-shaped fake
+    // biome-ignore lint/suspicious/noExplicitAny: returns a SqlClient-shaped fake
     factory: async (dbName: string | undefined): Promise<any> => {
       const key = dbName ?? '__default__';
       let pool = pools.get(key);

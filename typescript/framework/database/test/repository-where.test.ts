@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'bun:test';
-import type postgres from 'postgres';
+import type { SqlClient, SqlQuery } from '../src/sql-client';
 import { buildConditionFragment, buildWhere, buildWhereFromColumnNames } from '../src/repository/repository-where';
 import { parseConditionValue } from '../src/repository/query-builder';
 
 /**
- * A DB-free stand-in for the postgres.js tagged template + its `sql(value)`
+ * A DB-free stand-in for the SQL client's tagged template + its `sql(value)`
  * helper, sufficient to exercise the WHERE/condition builders without a
  * connection. It records every emitted fragment so tests can assert:
  *
  *  - the SQL *shape* (identifiers quoted, operators/keywords literal);
  *  - that every value is *parameterized* — captured in `params`, rendered as a
  *    `?` placeholder, never interpolated into the SQL text;
- *  - that nested fragments splice in (matching postgres.js, where interpolating
+ *  - that nested fragments splice in (matching the client, where interpolating
  *    a `PendingQuery` inlines its SQL rather than treating it as a bind value).
  *
  * Two node shapes flow through interpolation:
@@ -47,12 +47,12 @@ function isNode(value: unknown): value is Node {
 }
 
 /**
- * Build a stub `sql` tag. The function form mirrors postgres.js: `sql(name)` is
+ * Build a stub `sql` tag. The function form mirrors the client: `sql(name)` is
  * an identifier helper, `sql(array)` is a values-list helper. The tagged-template
  * form composes a {@link Fragment}; interpolating a node splices it, anything
  * else is parameterized.
  */
-function makeSqlStub(): postgres.Sql {
+function makeSqlStub(): SqlClient {
   const tag = (strings: TemplateStringsArray | string, ...values: unknown[]): unknown => {
     // Helper-call form: sql('col') or sql([1, 2, 3]).
     if (!Array.isArray(strings) || !('raw' in (strings as TemplateStringsArray))) {
@@ -90,11 +90,11 @@ function makeSqlStub(): postgres.Sql {
     }
     return { kind: 'fragment', sql, params } satisfies Fragment;
   };
-  return tag as unknown as postgres.Sql;
+  return tag as unknown as SqlClient;
 }
 
 /** Read a built fragment's recorded SQL + params. */
-function frag(value: postgres.PendingQuery<postgres.Row[]>): Fragment {
+function frag(value: SqlQuery): Fragment {
   return value as unknown as Fragment;
 }
 

@@ -175,9 +175,8 @@ export class DatabaseSessionStore implements AsyncSessionStore {
     const expiresAt = new Date(Date.now() + config.ttl * 1000);
 
     // Single query: extend TTL and return data atomically. The data comes
-    // back as text: the client turns the keys of a JSON column into
-    // camelCase, and the session must return the keys it was given
-    // (`oauth_pending` stays `oauth_pending`).
+    // back as text and is parsed here, so the session returns exactly the
+    // keys it was given (`oauth_pending` stays `oauth_pending`).
     const result = await abortableQuery(sql<{ data: string }[]>`
       UPDATE sessions
       SET expires_at = ${expiresAt}, updated_at = NOW()

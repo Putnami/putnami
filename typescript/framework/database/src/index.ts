@@ -48,7 +48,17 @@ export * from './repository/query-builder';
 export * from './repository/repository';
 export { declaredRepositoryToken, provideRepository, repositoryToken } from './repository/repository-di';
 export * from './session';
-export type { ReservedSqlClient, SqlClient, SqlQuery, SqlResult, SqlRow } from './sql-client';
+export type {
+  ReservedSqlClient,
+  SqlClient,
+  SqlFragment,
+  SqlListener,
+  SqlQuery,
+  SqlResult,
+  SqlRow,
+  SqlTransactionResult,
+  TransactionSqlClient,
+} from './sql-client';
 export * from './sql.plugin';
 export * from './table';
 export {

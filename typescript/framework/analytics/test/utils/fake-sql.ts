@@ -31,7 +31,7 @@ export interface FakeSql {
   callStartingWith: (prefix: string) => FakeCall;
 }
 
-/** A postgres.js RowList stand-in: an array carrying the affected-row `count`. */
+/** A result stand-in: an array carrying the affected-row `count`. */
 function rowsWithCount(count: number, data: Record<string, unknown>[] = []): Record<string, unknown>[] {
   const rows = [...data] as Record<string, unknown>[] & { count: number };
   rows.count = count;
@@ -39,7 +39,7 @@ function rowsWithCount(count: number, data: Record<string, unknown>[] = []): Rec
 }
 
 /**
- * A deterministic, in-memory stand-in for the postgres.js connection.
+ * A deterministic, in-memory stand-in for the framework's SQL client.
  *
  * A library cannot be handed a database inside the Putnami gate — `test-env-up`
  * only plans for a project whose `infra/requirements.json` a runnable app
@@ -49,9 +49,9 @@ function rowsWithCount(count: number, data: Record<string, unknown>[] = []): Rec
  * routing on the leading verb, and `reserve()` returning itself so a statement
  * issued inside the transaction resolves this one connection.
  *
- * Result rows are camelCase because the framework's client applies a camel
- * transform to column names: the live round-trip in the sample app is what
- * proves that transform, not this fake.
+ * Result rows are camelCase because the framework's client returns row keys
+ * in camelCase: the live round-trip in the sample app is what proves that,
+ * not this fake.
  *
  * @param script - What the upsert and the cardinality probe answer.
  * @returns The fake connection and its recorded calls.
@@ -77,7 +77,7 @@ export function createFakeSql(script: FakeSqlScript = {}): FakeSql {
     return rowsWithCount(Array.isArray(first) ? first.length : 0);
   };
 
-  // biome-ignore lint/suspicious/noExplicitAny: a minimal postgres.Sql-shaped fake
+  // biome-ignore lint/suspicious/noExplicitAny: a minimal SqlClient-shaped fake
   const sql = ((strings: TemplateStringsArray) => {
     calls.push({ query: strings.join('').trim(), args: [] });
     return Promise.resolve(rowsWithCount(0));

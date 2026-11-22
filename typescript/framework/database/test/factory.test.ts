@@ -1,14 +1,10 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import type { InferConfig } from '@putnami/runtime';
-import type postgres from 'postgres';
+
 import { closeAllDatabases, closeDatabase, database } from '../src/factory';
 import type { PostgresConfig } from '../src/postgres/config';
 import { ensurePostgresContainer, isDockerAvailable, POSTGRES_SETUP_TIMEOUT_MS } from './utils/postgres-helper';
 import { setPrimaryDatasource } from '../src/primary-datasource';
-
-// postgres.js types TransactionSql through Omit, which drops its tagged-template
-// call signature; the transaction still runs tagged-template queries.
-const tagged = (tx: postgres.TransactionSql) => tx as unknown as postgres.Sql;
 
 const DB_NAME = 'factory-test';
 const DB_NAME_2 = 'factory-test-2';
@@ -131,8 +127,8 @@ describe.skipIf(!dockerAvailable)('Database Factory', () => {
       `;
 
       await sql.begin(async (tx) => {
-        await tagged(tx)`INSERT INTO factory_test (id, value) VALUES ('test-1', 'value-1')`;
-        await tagged(tx)`INSERT INTO factory_test (id, value) VALUES ('test-2', 'value-2')`;
+        await tx`INSERT INTO factory_test (id, value) VALUES ('test-1', 'value-1')`;
+        await tx`INSERT INTO factory_test (id, value) VALUES ('test-2', 'value-2')`;
       });
 
       const result = await sql`SELECT * FROM factory_test WHERE id IN ('test-1', 'test-2')`;

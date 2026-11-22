@@ -455,7 +455,8 @@ describe('selectDatasources', () => {
     );
     expect(err).toBeInstanceOf(Error);
     expect(err?.message).not.toContain('broken');
-    expect(err?.message).toMatch(/ECONNREFUSED/);
+    // The driver fails to connect to the closed port.
+    expect((err as Error & { code?: string }).code).toBe('ERR_POSTGRES_CONNECTION_REFUSED');
   });
 
   it('does not take an inherited property for a datasource', () => {
