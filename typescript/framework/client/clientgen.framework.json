@@ -42,19 +42,19 @@
           "path": "typescript/framework/client/src/runtime/connect-transport.ts",
           "transport": "http",
           "symbol": "fetch",
-          "fingerprint": "9511e3b31ddcdfd204d821896dfd2d984eeee7e6a8f8dfa49d78f5622a7345ce"
+          "fingerprint": "96bb9d4f02deb274b2896219c430bb1001a7e576fafe47d362ae5b98e1014be0"
         },
         {
           "path": "typescript/framework/client/src/runtime/connect-transport.ts",
           "transport": "http",
           "symbol": "fetch",
-          "fingerprint": "e1f4d5d7d1477556bca805709a13c40941603dd9db3ebd88c1e3b9f9d4e97e07"
+          "fingerprint": "e3ae41b5957d2a611909bd96cef4b5f651f1168c8f90143a5a720440f4f23387"
         },
         {
           "path": "typescript/framework/client/src/runtime/connect-transport.ts",
           "transport": "http",
           "symbol": "fetch",
-          "fingerprint": "fa35345598aa30eabb91857f59be14d6d5e2199f37760e6bcac1f4f0ca0571cb"
+          "fingerprint": "f2bf2353832f73498ac7fe1ae461f5a0e27b3a8f6c7dad7d1fe442a1813656cc"
         }
       ],
       "owner": "@putnami/client",
