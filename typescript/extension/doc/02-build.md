@@ -701,9 +701,9 @@ To run that test:
 3. Through the public ingress, call the unary RPC, open the bidirectional
    Connect stream and exchange a few messages, and open the WebSocket stream
    and exchange a few messages.
-4. Record each of the three results, with the deploy target and the Bun
-   version, on issue #1324, which tracks the default. If all three work, the
-   default can turn on; if the WebSocket stream fails, it stays off.
+4. Record each of the three results with the deploy target and the Bun
+   version. If all three work, the default can turn on; if the WebSocket
+   stream fails, it stays off.
 
 ## Output Layout
 
