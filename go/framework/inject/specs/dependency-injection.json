@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "cleanup",
-      "text": "Container close runs child cleanup before parent cleanup and runs close hooks in reverse registration order only for instances that were built."
+      "text": "Container close runs child cleanup before parent cleanup and runs close hooks in reverse registration order only for instances that were built; a closed child leaves its parent, so a parent does not retain the children it has closed."
     },
     {
       "id": "lifetimes",
