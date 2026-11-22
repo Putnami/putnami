@@ -37,7 +37,7 @@ summary and its note may still change in a minor release whose notes say so.
 | A text summary | The job log. |
 | One JSON document | Standard output, with `--output=json`. |
 | The change evidence document | A file, with `--evidence <path>`. It follows the `protocol/evidence` v1 schema; keep it as a CI artifact. |
-| A commit status and one summary note | The pull or merge request, with `--publish`. The next run updates the same note. |
+| A commit status and one summary note | The pull or merge request, with `--publish`. The next run updates the same note. A fork's pull request gets them from a `workflow_run` job that runs `--from-evidence`. |
 | An upload to Putnami Cloud | With `--upload` and a `PUTNAMI_CLOUD_TOKEN`. |
 
 It exits `0` whatever it observes, so a failed test or a missing report never

@@ -12,6 +12,7 @@ package ci
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"strconv"
@@ -383,4 +384,128 @@ func firstOf(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// EventWorkflowRun is the GITHUB_EVENT_NAME of a job that a workflow_run
+// event started: another workflow's run of the same repository completed.
+const EventWorkflowRun = "workflow_run"
+
+// WorkflowRun is the run a workflow_run event names: the run that triggered
+// the job, which may have built a pull request from a fork.
+type WorkflowRun struct {
+	// ID and Attempt name the run; URL is its page.
+	ID      string
+	Attempt *int
+	URL     string
+	// Event is the event that started the run, such as pull_request.
+	Event string
+	// HeadSHA and HeadBranch are the commit and the branch the run built, in
+	// HeadOwner's repository, a fork's owner for a pull request from a fork.
+	HeadSHA    string
+	HeadBranch string
+	HeadOwner  string
+	// HeadRepositoryID is the numeric id of the repository the run built:
+	// another one than the job's for a fork.
+	HeadRepositoryID string
+	// PullRequests are the pull requests of the job's repository the run
+	// built, as the payload lists them: GitHub lists none for a fork.
+	PullRequests []WorkflowRunPullRequest
+}
+
+// WorkflowRunPullRequest is one pull request of a workflow_run payload.
+type WorkflowRunPullRequest struct {
+	Number int
+	// HeadSHA is the pull request's head commit.
+	HeadSHA string
+	// BaseRepositoryID is the numeric id of the repository it targets.
+	BaseRepositoryID string
+}
+
+// workflowRunEvent is the part of a workflow_run payload observe reads.
+type workflowRunEvent struct {
+	WorkflowRun *struct {
+		ID           json.Number `json:"id"`
+		RunAttempt   json.Number `json:"run_attempt"`
+		HTMLURL      string      `json:"html_url"`
+		Event        string      `json:"event"`
+		HeadSHA      string      `json:"head_sha"`
+		HeadBranch   string      `json:"head_branch"`
+		PullRequests []struct {
+			Number int `json:"number"`
+			Head   struct {
+				SHA string `json:"sha"`
+			} `json:"head"`
+			Base struct {
+				Repo struct {
+					ID json.Number `json:"id"`
+				} `json:"repo"`
+			} `json:"base"`
+		} `json:"pull_requests"`
+		HeadRepository struct {
+			ID    json.Number `json:"id"`
+			Owner struct {
+				Login string `json:"login"`
+			} `json:"owner"`
+		} `json:"head_repository"`
+	} `json:"workflow_run"`
+}
+
+// ReadWorkflowRun reads the run that triggered a GitHub Actions job started
+// by a workflow_run event, from the event payload GITHUB_EVENT_PATH names.
+// It refuses a job of another CI or another event, and a payload that names
+// no run with a commit. readFile nil uses os.ReadFile.
+func ReadWorkflowRun(env Env, readFile ReadFile) (WorkflowRun, error) {
+	if readFile == nil {
+		readFile = os.ReadFile
+	}
+	if system, _ := evidence.DetectCISystem(env); system != SystemGitHubActions {
+		return WorkflowRun{}, errors.New("this job does not run in GitHub Actions")
+	}
+	if name := env("GITHUB_EVENT_NAME"); name != EventWorkflowRun {
+		return WorkflowRun{}, fmt.Errorf("this job runs for the event %s, not %s", strconv.Quote(name), EventWorkflowRun)
+	}
+	path := env("GITHUB_EVENT_PATH")
+	if path == "" {
+		return WorkflowRun{}, errors.New("GITHUB_EVENT_PATH names no event payload")
+	}
+	data, err := readFile(path)
+	if err == nil && len(data) > maxEventBytes {
+		err = errTooLarge
+	}
+	var e workflowRunEvent
+	if err == nil {
+		err = json.Unmarshal(data, &e)
+	}
+	if err != nil {
+		return WorkflowRun{}, fmt.Errorf("the event payload cannot be read: %w", err)
+	}
+	w := e.WorkflowRun
+	if w == nil || positive(w.ID.String()) == nil || !commitID(w.HeadSHA) {
+		return WorkflowRun{}, errors.New("the event payload names no workflow run with a head commit")
+	}
+	run := WorkflowRun{
+		ID:         w.ID.String(),
+		Attempt:    positive(w.RunAttempt.String()),
+		Event:      w.Event,
+		HeadSHA:    strings.ToLower(w.HeadSHA),
+		HeadBranch: w.HeadBranch,
+		HeadOwner:  w.HeadRepository.Owner.Login,
+	}
+	if positive(w.HeadRepository.ID.String()) != nil {
+		run.HeadRepositoryID = w.HeadRepository.ID.String()
+	}
+	if parsed, err := url.Parse(w.HTMLURL); err == nil && parsed.Scheme == "https" && parsed.Host != "" && parsed.User == nil {
+		run.URL = w.HTMLURL
+	}
+	for _, pr := range w.PullRequests {
+		if pr.Number <= 0 {
+			continue
+		}
+		run.PullRequests = append(run.PullRequests, WorkflowRunPullRequest{
+			Number:           pr.Number,
+			HeadSHA:          strings.ToLower(pr.Head.SHA),
+			BaseRepositoryID: pr.Base.Repo.ID.String(),
+		})
+	}
+	return run, nil
 }

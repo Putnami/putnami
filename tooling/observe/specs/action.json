@@ -5,6 +5,7 @@
   "outcomes": [
     "A GitHub Actions workflow adds one step, uses: Putnami/observe-action@v1, after its tests and reads the change summary in its log, with no install line to copy",
     "With a Putnami token, the same step uploads the change evidence document and posts the commit status and the summary note on the pull request",
+    "A repository that takes pull requests from forks adds a workflow_run workflow with the same action and from-artifact, and each fork's pull request gets the upload, the status and the note",
     "A release of the action moves the v1 tag, so a workflow that names v1 runs the newest compatible action"
   ],
   "nonGoals": [
@@ -48,6 +49,14 @@
       "text": [
         "The token input and the run's token reach putnami observe only, never the installer or the extension installs.",
         "A PUTNAMI_CLOUD_TOKEN or GITHUB_TOKEN the job sets in the step's environment is not read, and a PUTNAMI_CLOUD_TOKEN there without the token input gives a warning that names the token input."
+      ]
+    },
+    {
+      "id": "action-relays-a-fork-artifact",
+      "text": [
+        "With the from-artifact input set, in a workflow_run job, the step downloads that artifact from the triggering run, installs @putnami/cloud and runs putnami observe --from-evidence on its observe-evidence.json with --upload, and --publish unless publish is false.",
+        "It checks out nothing, runs nothing the artifact holds, and passes the run's GITHUB_TOKEN, which reads the pull request and the commits.",
+        "Outside a workflow_run job, when the download failed, or without that file, the step warns and passes."
       ]
     },
     {

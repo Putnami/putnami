@@ -366,7 +366,7 @@ A report it cannot find or read is a warning in the same summary, such as `obser
 
 With `--upload --publish`, on a pull or merge request, `putnami observe` sets the commit status `putnami/observe` on the pull request's head commit, or on the commit of the merge request pipeline, with a one-line summary such as `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`. It also writes one summary note with the components, their tests and coverage, the least covered changed lines and the dependency changes. The status and the note's first link open the full report the upload stored, once the reporter answers its URL; until then they link the CI run. The next run updates the same note instead of adding one.
 
-Without `--upload`, after a failed upload, without the code host token, or on a branch push, the summary says why nothing was posted, and the job still passes. On a pull request from a fork, GitHub gives a read-only `GITHUB_TOKEN` and refuses the post; the job still passes.
+Without `--upload`, after a failed upload, without the code host token, or on a branch push, the summary says why nothing was posted, and the job still passes. On a pull request from a fork, GitHub gives a read-only `GITHUB_TOKEN` and refuses the post; the job still passes. [Pull requests from forks](#pull-requests-from-forks) relays it from your repository instead.
 
 ### 6) Upload the evidence to Putnami Cloud
 
@@ -408,7 +408,53 @@ jobs:
 
 The workflow runs on each pull request and on each push to the default branch, where `putnami observe` measures the push against the commit before it. It needs no test report: add the reports of [step 1](#1-write-the-reports-your-stack-needs) to the same job, before the last step, when you want tests and coverage in the report. `PUTNAMI_ORGANIZATION` is an id, not a secret, so it sits in the file.
 
-`id-token: write` lets the job ask GitHub for an ID token that names its repository. With `PUTNAMI_ORGANIZATION` set and no `PUTNAMI_CLOUD_TOKEN`, `@putnami/cloud` asks for that token and exchanges it at `auth.putnami.cloud`, which answers an upload token only when the organization trusts the repository, or its owner, for observation. When it does not, the summary names that refusal and the trust to add; without `id-token: write`, it names the missing permission. GitHub withholds the ID token from a pull request from a fork in most repositories, so such a run uploads nothing. As always, an upload that fails is a warning, and the job still passes. A `PUTNAMI_CLOUD_TOKEN` set in the job wins over the exchange.
+`id-token: write` lets the job ask GitHub for an ID token that names its repository. With `PUTNAMI_ORGANIZATION` set and no `PUTNAMI_CLOUD_TOKEN`, `@putnami/cloud` asks for that token and exchanges it at `auth.putnami.cloud`, which answers an upload token only when the organization trusts the repository, or its owner, for observation. When it does not, the summary names that refusal and the trust to add; without `id-token: write`, it names the missing permission. GitHub withholds the ID token from a pull request from a fork in most repositories, so such a run uploads nothing: relay it as the next section says. As always, an upload that fails is a warning, and the job still passes. A `PUTNAMI_CLOUD_TOKEN` set in the job wins over the exchange.
+
+#### Pull requests from forks
+
+GitHub runs the workflow of a pull request from a fork with no ID token and a read-only `GITHUB_TOKEN`, and keeps your secrets from it, so that run can neither upload nor post. It keeps its evidence document as an artifact instead, and a second workflow of your repository relays it with your repository's credentials.
+
+The workflow that runs your tests on `pull_request`, here named `Test`, keeps the step of step 2 without a token, and keeps its document:
+
+```yaml
+      - id: observe
+        uses: Putnami/observe-action@v1
+        if: ${{ !cancelled() }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: observe-evidence
+          path: ${{ steps.observe.outputs.evidence }}
+```
+
+Then commit this workflow as `.github/workflows/putnami-relay.yml` on your default branch, where GitHub reads `workflow_run` workflows, with the name of your test workflow in `workflows` and your organization's id in place of `<organization-id>`:
+
+```yaml
+name: Putnami relay
+on:
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+permissions:
+  actions: read
+  id-token: write
+  statuses: write
+  pull-requests: write
+jobs:
+  relay:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      PUTNAMI_ORGANIZATION: <organization-id>
+    steps:
+      - uses: Putnami/observe-action@v1
+        with:
+          from-artifact: observe-evidence
+```
+
+When the test run completes, the step downloads its `observe-evidence` artifact and runs `putnami observe --from-evidence` on it with `--upload --publish`, with this job's ID token and `GITHUB_TOKEN`. `actions: read` lets it download the artifact; pass `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}` instead of `PUTNAMI_ORGANIZATION` to upload with a workspace token. The pull request gets the status and the note as a pull request from a branch does, and they link the fork's run. A branch of your repository goes the same way, so one setup serves both.
+
+The document comes from the fork, so `putnami observe` checks it before it relays it. It refuses a document over 64 MiB, one that does not validate, or one that names another repository, pull request or commit than the run that triggered the job, with the warning `observe.evidence_refused`, and the job still passes: the commit must be the run's head commit, or the merge commit GitHub keeps for the pull request, as the GitHub API answers, and the base must be that merge commit's first parent or an ancestor of the head. It takes the repository, the pull request and the run from the job and the event, never from the document. The note quotes every text of the document as code, so a test name renders no link, mention or HTML, and the log prints only counts and observe's own diagnostics. The relay job checks out nothing and runs nothing the artifact holds: keep it that way, since it holds your repository's credentials. GitHub lists no pull request in the event of a fork's run, so observe finds it with `GITHUB_TOKEN` among the open pull requests of your repository, by the fork's owner, branch and head commit; when none matches, as after a new push to the fork or once the pull request closed, it relays nothing. The action hands `GITHUB_TOKEN` to `putnami observe` for these reads, even with `publish: false`.
 
 ### 7) Add licences and known vulnerabilities from an SBOM
 

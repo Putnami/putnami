@@ -64,7 +64,9 @@ putnami observe --base origin/main
 `--evidence <path>` also writes the change evidence document, a CI artifact a
 reporter can upload. `--upload --publish` uploads it, then posts a commit
 status and one summary note that link to the report on the pull or merge
-request, which the next run updates in place.
+request, which the next run updates in place. A pull request from a fork
+cannot upload or post: `--from-evidence <path> --upload --publish`, in a
+`workflow_run` job of the base repository, relays the document its run kept.
 
 See [doc/01-observe.md](doc/01-observe.md) for what each CI provides, how the
 base is found and how reports are discovered.

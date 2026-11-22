@@ -27,6 +27,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--open` | Upload as `--upload` does, letting the reporter sign you in first, and open the report in the browser outside a CI. See [Opening the report](#opening-the-report). |
 | `--details` | Print the detailed summary instead of the short one. See [Output](#output). |
 | `--publish` | Post a commit status and one summary note that link to the report on the pull or merge request. Needs `--upload`. See [Publishing on the pull or merge request](#publishing-on-the-pull-or-merge-request). |
+| `--from-evidence <path>` | Relay the evidence document another run kept instead of observing, in a GitHub Actions `workflow_run` job: `--upload` and `--publish` then use this job's credentials. Takes no other flag but `--upload` and `--publish`. See [Pull requests from a fork](#pull-requests-from-a-fork). |
 
 A glob pattern takes `*`, `?`, `[...]` and `**`, which matches any number of
 directories.
@@ -346,8 +347,66 @@ Publishing never fails the job:
 | A refused or failed call, no GitLab API URL, an API URL that is not https, no commit to set the status on, or a run past 1 minute | `observe.publish_failed` (warning) |
 
 A pull request from a fork gets a read-only `GITHUB_TOKEN`, so GitHub refuses
-both calls with `observe.publish_failed`. A failed status call does not stop
+both calls with `observe.publish_failed`: relay its evidence from the base
+repository, as the next section says. A failed status call does not stop
 the note.
+
+## Pull requests from a fork
+
+GitHub runs the workflow of a pull request from a fork with no ID token and a
+read-only `GITHUB_TOKEN`, so that run can neither upload nor publish. It keeps
+its evidence document as an artifact instead, and a second workflow of the
+base repository, which `workflow_run` starts when the first one completes,
+relays it:
+
+```bash
+putnami observe --from-evidence observe-evidence.json --upload --publish
+```
+
+`--from-evidence` observes nothing: it runs no Git command and reads no
+report, so the job needs no checkout. It reads the document, at most 64 MiB,
+and checks it against the job:
+
+1. The job runs in GitHub Actions for a `workflow_run` event of a
+   `pull_request` run, with `GITHUB_TOKEN`, which reads the pull request and
+   the commits. The repository,
+   its numeric id and its host come from the job's `GITHUB_REPOSITORY`,
+   `GITHUB_REPOSITORY_ID` and `GITHUB_SERVER_URL`; the run, its page, its head
+   commit and its head branch from the `workflow_run` of the event payload.
+2. The pull request is the one `workflow_run.pull_requests` names at the
+   run's head commit. GitHub lists none for a fork, so observe then asks the
+   GitHub API, with `GITHUB_TOKEN`, for the open pull request of the job's
+   repository whose head is the run's head owner, branch and commit.
+3. The document's commit is the run's head commit, with a base the GitHub
+   API answers as an ancestor of it, or the test merge commit GitHub keeps
+   for the pull request, whose parents are the document's base and the run's
+   head. A pull request merge commit GitHub has rebuilt since the run, after
+   its base moved, no longer matches: run the pull request workflow again.
+4. A document that does not validate, or that names another code host, host,
+   repository, repository id, pull request, commit or base than the job's, or
+   another CI than GitHub Actions, is refused: nothing is uploaded or
+   published. So is a fork's run whose pull request is not found.
+
+The relayed document keeps the fork's checked commit and base and its analyses, and takes
+its repository, pull request and run from the job; it names no branch of a
+fork. The commit status
+goes on the pull request's head commit and the note on that pull request,
+both linking the fork's run. The document is the fork's claim, so the note
+quotes each of its texts as a code span, which renders no link, mention,
+image or HTML, and the job log prints counts and observe's own diagnostics,
+never a text of the document, so no line of it becomes a workflow command.
+Never check out or run the fork's code in that job: it holds the base
+repository's credentials.
+
+| Case | Diagnostic |
+|---|---|
+| Not a `workflow_run` job of a `pull_request` run, no `GITHUB_TOKEN` or repository id, a document that cannot be read, is over 64 MiB or does not validate, or that names another repository, pull request, commit or base, or a fork's run whose pull request is not found, such as after a new push or once it closed | `observe.evidence_refused` (warning) |
+| A run of the job's repository whose pull request is not found | `observe.pull_request_unresolved` (info): a document of the run's head commit is uploaded without a pull request and nothing is published; a document of a merge commit has no pull request to bind it, and is refused |
+
+`--from-evidence` with an observation flag, `--evidence`, `--open` or
+`--details` is a usage error. [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci)
+gives the two workflows, and the action's `from-artifact` input runs this
+relay.
 
 The note is the first one that starts with the hidden line, whoever wrote it.
 A comment that starts with that line is overwritten by the summary. When the

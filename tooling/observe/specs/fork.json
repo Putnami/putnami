@@ -1,0 +1,59 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-fork",
+  "outcomes": [
+    "A pull request opened from a fork gets the evidence upload, the putnami/observe commit status and the summary note, as a pull request from a branch does",
+    "The fork's run keeps its evidence document as an artifact, and a workflow_run job of the base repository relays it with the base repository's ID token and GITHUB_TOKEN, without running any code of the fork",
+    "A document that names another repository or another pull request is refused with a diagnostic, and the job still passes"
+  ],
+  "nonGoals": [
+    "Trusting the fork's analyses: the fork ran its own tests, so the report and the note show what the fork's run claims, under the run's page",
+    "GitLab: a merge request from a fork runs its pipeline in the target project when the project allows it, with the target's variables",
+    "Downloading the artifact in putnami observe: the workflow, or the action, downloads it"
+  ],
+  "requirements": [
+    {
+      "id": "relay-reads-a-kept-document",
+      "text": [
+        "putnami observe --from-evidence <file> reads a change evidence document another run kept, instead of observing the checkout: it runs no Git command and reads no report.",
+        "It refuses a document over 64 MiB, or that does not validate against protocol/evidence v1, with the warning observe.evidence_refused.",
+        "--upload and --publish upload and publish it as for a run that observed the change.",
+        "Any observation flag, --evidence or --open with --from-evidence is a usage error, exit 2."
+      ]
+    },
+    {
+      "id": "relay-runs-in-a-workflow-run-job",
+      "text": [
+        "--from-evidence relays only in a GitHub Actions job a workflow_run event started for a pull_request run, with GITHUB_TOKEN to read the pull request and the commits; in any other job it gives the warning observe.evidence_refused and uploads and publishes nothing.",
+        "The repository, its numeric id and its host come from the job: GITHUB_REPOSITORY, GITHUB_REPOSITORY_ID and GITHUB_SERVER_URL.",
+        "The run, its attempt, its page, its head commit and its head repository come from workflow_run in the event payload."
+      ]
+    },
+    {
+      "id": "relay-finds-the-pull-request",
+      "text": [
+        "The pull request is the one of the job's repository that workflow_run.pull_requests names at the run's head commit. For a fork it names none: observe asks the GitHub API, with GITHUB_TOKEN, for the open pull requests of the job's repository at the run's head owner and branch, and keeps the one at that commit.",
+        "The status goes on that commit and the note on that pull request.",
+        "Without one, a fork's run is refused; a run of the job's repository gives observe.pull_request_unresolved and publishes nothing."
+      ]
+    },
+    {
+      "id": "relay-refuses-another-repository",
+      "text": [
+        "The fork's document is untrusted: observe refuses, with observe.evidence_refused, one naming another provider, host, repository, repository id, CI or pull request than the job's, a commit other than the run's head or the pull request's merge commit, or a base other than that commit's first parent or an ancestor of the head, per the GitHub API. Nothing is uploaded or published, exit 0.",
+        "The relayed document takes its repository, pull request and run from the job, and names no branch of a fork."
+      ]
+    },
+    {
+      "id": "relay-keeps-the-text-inert",
+      "text": [
+        "Every text of the document reaches the summary note as a Markdown code span on one line, or as a count or an enumerated value the protocol checks, so it renders no link, mention, image or HTML.",
+        "The job log prints the counts and observe's own diagnostics, never a text of the document, so a line of the document cannot run a workflow command."
+      ]
+    }
+  ],
+  "decisions": [
+    "tooling/observe/doc/adr/0002-a-fork-evidence-is-relayed-by-the-base-repository.md"
+  ]
+}

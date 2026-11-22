@@ -13,6 +13,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,6 +34,7 @@ import (
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 	"go.putnami.dev/tooling/observe/internal/observe"
 	"go.putnami.dev/tooling/observe/internal/publish"
+	"go.putnami.dev/tooling/observe/internal/relay"
 	"go.putnami.dev/tooling/observe/internal/reports"
 	"go.putnami.dev/tooling/observe/internal/upload"
 )
@@ -52,7 +54,7 @@ const contextFlag = "--putnamiContext"
 var runtimeVersion string
 
 // knownFlags are the flags `putnami observe` takes.
-var knownFlags = []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "moon-graph", "fetch", "evidence", "upload", "publish", "pants-graph", "bazel-graph", "decisions", "details", "open"}
+var knownFlags = []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "moon-graph", "fetch", "evidence", "upload", "publish", "pants-graph", "bazel-graph", "decisions", "details", "open", "from-evidence"}
 
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	handled, err := runtimeinfo.Handle(args, stdout, extensionName, runtimeVersion)
@@ -83,6 +85,11 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return 2
 	}
 	opts.Env = getenv
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if out.fromEvidence != "" {
+		return runRelay(ctx, out, getenv, stdout, stderr)
+	}
 	if out.upload {
 		// The code host lookup is a request off the machine: only a run that
 		// uploads makes it.
@@ -90,8 +97,6 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 			return publish.ProjectID(ctx, publishClient, getenv, provider, host, path)
 		}
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	o := observe.Run(ctx, opts)
 	uploaded, reportURL, diags := writeAndUpload(ctx, o, out, getenv, stderr)
 	o.Diagnostics = append(o.Diagnostics, diags...)
@@ -144,6 +149,76 @@ type outputs struct {
 	details bool
 	// open uploads with sign-in and opens the report outside a CI.
 	open bool
+	// fromEvidence is the absolute path of a kept evidence document to relay
+	// instead of observing, "" for none.
+	fromEvidence string
+}
+
+// relayExclusive are the flags --from-evidence refuses: it observes nothing,
+// writes no document and opens no browser.
+var relayExclusive = []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "moon-graph", "fetch", "evidence", "pants-graph", "bazel-graph", "decisions", "details", "open"}
+
+// runRelay relays the evidence document a fork's run kept: it checks it
+// against the workflow_run job, uploads it on --upload and publishes it on
+// --publish. It exits 0 whatever it refuses.
+func runRelay(ctx context.Context, out outputs, getenv func(string) string, stdout, stderr io.Writer) int {
+	r := relay.Load(ctx, relay.Request{Path: out.fromEvidence, Getenv: getenv, Client: publishClient})
+	diags := slices.Clone(r.Diagnostics)
+	uploaded, reportURL := publish.NotUploaded, ""
+	if out.upload {
+		if r.Document == nil {
+			uploaded = publish.UploadFailed
+		} else {
+			var upDiags []diag.Diagnostic
+			uploaded, reportURL, upDiags = uploadDocument(ctx, r.Document, getenv, stderr)
+			diags = append(diags, upDiags...)
+		}
+	}
+	if out.publish && r.Document != nil {
+		diags = append(diags, publish.Run(ctx, publish.Request{
+			Observation: r.Observation, Upload: uploaded, ReportURL: reportURL, Getenv: getenv, Client: publishClient, Output: stderr,
+		})...)
+	}
+	if out.json {
+		r.Observation.Diagnostics = append(r.Observation.Diagnostics, diags[len(r.Diagnostics):]...)
+		if err := observe.WriteJSON(stdout, r.Observation); err != nil {
+			fmt.Fprintf(stderr, "putnami observe: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+	err := relay.WriteText(stdout, r, diags)
+	if err == nil && r.Document != nil {
+		_, err = fmt.Fprintln(stdout, upload.Next(upload.Step{Getenv: getenv, Upload: uploaded, ReportURL: reportURL}))
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "putnami observe: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+// uploadDocument writes doc to a temporary file and hands it to the evidence
+// reporter.
+func uploadDocument(ctx context.Context, doc *evidence.Document, getenv func(string) string, stderr io.Writer) (publish.Upload, string, []diag.Diagnostic) {
+	dir, err := os.MkdirTemp("", "putnami-evidence-")
+	if err != nil {
+		return publish.UploadFailed, "", upload.Skipped()
+	}
+	defer os.RemoveAll(dir)
+	path := filepath.Join(dir, "evidence.json")
+	data, err := json.Marshal(doc)
+	if err == nil {
+		err = os.WriteFile(path, append(data, '\n'), 0o600)
+	}
+	if err != nil {
+		return publish.UploadFailed, "", upload.Skipped()
+	}
+	reportURL, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr})
+	if len(diags) > 0 {
+		return publish.UploadFailed, "", diags
+	}
+	return publish.Uploaded, reportURL, nil
 }
 
 // openBrowser opens the report URL outside a CI. Tests replace it.
@@ -222,7 +297,14 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 	if err != nil {
 		return observe.Options{}, outputs{}, err
 	}
-	for _, name := range []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "evidence", "moon-graph", "pants-graph", "bazel-graph", "decisions"} {
+	if _, ok := flags["from-evidence"]; ok {
+		for _, name := range relayExclusive {
+			if _, set := flags[name]; set {
+				return observe.Options{}, outputs{}, fmt.Errorf("--from-evidence relays a kept document and observes nothing, so it takes no --%s", name)
+			}
+		}
+	}
+	for _, name := range []string{"base", "head", "junit", "coverage", "sbom", "base-sbom", "architecture", "archunit-classes", "evidence", "moon-graph", "pants-graph", "bazel-graph", "decisions", "from-evidence"} {
 		if value, ok := flags[name]; ok && (value == "" || value == "true") {
 			return observe.Options{}, outputs{}, fmt.Errorf("--%s needs a value", name)
 		}
@@ -264,6 +346,9 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 	}
 	if flags["evidence"] != "" {
 		out.evidence = opts.Resolve(flags["evidence"])
+	}
+	if flags["from-evidence"] != "" {
+		out.fromEvidence = opts.Resolve(flags["from-evidence"])
 	}
 	return opts, out, nil
 }

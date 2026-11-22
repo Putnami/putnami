@@ -2780,6 +2780,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/tooling-\u0026-workspace/observe/adr/a-fork-evidence-is-relayed-by-the-base-repository",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/tooling-\u0026-workspace/observe/adr/the-observe-action-releases-by-copy",
       "methods": [
         "GET",
@@ -5794,6 +5809,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/tooling-\u0026-workspace/observe/adr/a-fork-evidence-is-relayed-by-the-base-repository",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/tooling-\u0026-workspace/observe/adr/the-observe-action-releases-by-copy",
       "methods": [
         "GET",
@@ -6356,5 +6386,5 @@
       }
     }
   ],
-  "digest": "sha256:7021de0b508bc87026fc0f015a7d7b076fb6be6a16bf40d58118a9a7c69c969b"
+  "digest": "sha256:e9ef55dd0d7338be666006e5a18bc1187db5d09900edd0c2dd9f7c43766b7d50"
 }
