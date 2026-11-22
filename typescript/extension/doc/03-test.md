@@ -126,6 +126,29 @@ Bun strips types when it runs a test, and `build~types` reads only `src/`, `bin/
 - It caches like the test run: an unchanged project replays its verdict.
 - `--types false` skips it. An import from Nx, Turborepo, Rush or moon writes `types: false` in `options["@putnami/typescript:test"]` of each project whose test script it moves: that script type-checked nothing, so the moved test does not either.
 
+### Checking with `bun check`
+
+The step runs `tsc` unless the project chooses Bun's own checker, `bun check`, in the `type-checker` parameter:
+
+```json
+{
+  "options": {
+    "@putnami/typescript:test": {
+      "type-checker": "bun"
+    }
+  }
+}
+```
+
+`--type-checker bun` does the same for one run. Nothing else sets it: an import, a dependency or a script never switches a project to `bun check`.
+
+- `bun check` reads the same scratch tsconfig and the same compiler options as `tsc`, with `--no-pretty --all`: one line per error, every error shown. Its diagnostics are reported the way `tsc`'s are, and a type error or an unused `@ts-expect-error` fails `putnami test` the same way.
+- `--no-script` keeps a `check` script of the project's `package.json` from running in its place.
+- It keeps no incremental build info. It checks a project of this workspace in 40 to 300 ms where `tsc` takes 1 to 8 s, so a cache miss costs little.
+- It follows the semantics of TypeScript 7, which Bun embeds, not the `typescript` package the workspace installs. On every TypeScript project of this repository the two report the same diagnostics. A project whose code relies on a TypeScript 6 behavior that 7 removed can see a difference: keep `tsc` there.
+- It needs a Bun that ships `bun check`; the extension's pinned Bun does.
+- Any value other than `tsc` and `bun` fails the step and names the choices.
+
 ## Test File Conventions
 
 Test files must match one of these patterns:
@@ -292,6 +315,7 @@ Unhandled errors between tests (module-level crashes) are extracted and reported
 | `--concurrent` | `string` | — | Treat all tests as concurrent |
 | `--pass-with-no-tests` | `boolean` | `true` | Pass if no test files are found |
 | `--types` | `boolean` | `true` | Type-check every TypeScript file of the project, tests included, in the `types` step |
+| `--type-checker` | `string` | `tsc` | Checker of the `types` step: `tsc`, or `bun` for `bun check` (see [Checking with `bun check`](#checking-with-bun-check)) |
 | `--test-verbose` | `boolean` | `false` | Show the complete Bun transcript at info level; changes visibility only, never the invocation or verdict |
 | `--require-test-db` | `boolean` | `false` | Put the `require` mode on the database test binding `test-env-up` provisions, so a suite whose test database does not answer fails instead of skipping. A binding provisioned on CI carries it already. The run still starts the local test database it may start: a Docker container, or the PostgreSQL installed on the machine when no Docker daemon answers |
 
