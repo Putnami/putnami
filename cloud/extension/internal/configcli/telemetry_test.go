@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	"go.putnami.dev/protocol/features/spectest"
@@ -14,11 +15,20 @@ import (
 
 const telemetryPath = "/v1/workspaces/ws-acme/config/telemetry"
 
-// telemetryServicePattern is the service name config-api accepts today, and
-// telemetryInvalid the reason it gives for any value it refuses.
-var telemetryServicePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
+// telemetryServicePattern is the service name config-api accepts, a
+// workload's canonical name, and telemetryInvalid the reason it gives for any
+// value it refuses.
+var telemetryServicePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*(?:/[a-z0-9][a-z0-9._-]*)*$`)
 
-const telemetryInvalid = "trace budget and floor are 0 to 1000000, trace ratio 0 to 1, log level debug, info, warn or error, and a service a lowercase name"
+const telemetryInvalid = "trace budget and floor are 0 to 1000000, trace ratio 0 to 1, trace parent follow or decide, log level debug, info, warn or error, and a service a workload's canonical name"
+
+// telemetryClock fixes the clock `set --for` counts from for one test.
+func telemetryClock(t *testing.T, now time.Time) {
+	t.Helper()
+	previous := telemetryNow
+	telemetryNow = func() time.Time { return now }
+	t.Cleanup(func() { telemetryNow = previous })
+}
 
 // telemetryFake serves config-api's telemetry settings route over the rows it
 // keeps, so a write shows in the next read, as config-api resolves them. It
@@ -70,14 +80,18 @@ func (f *telemetryFake) RoundTrip(req *http.Request) (*http.Response, error) {
 			return jsonResponse(http.StatusBadRequest, map[string]any{"error": telemetryInvalid}), nil
 		}
 		fields := map[string]any{}
-		for _, key := range []string{"traceBudget", "traceRatio", "traceFloorPerMinute", "logLevel"} {
+		for _, key := range []string{"traceBudget", "traceRatio", "traceFloorPerMinute", "traceParent", "logLevel"} {
 			if value, ok := write[key]; ok && value != nil {
 				fields[key] = value
 			}
 		}
+		// A write that sets no setting removes the row, whatever its expiry.
 		if len(fields) == 0 {
 			delete(f.rows, service)
 		} else {
+			if expires, ok := write["expiresAt"]; ok && expires != nil {
+				fields["expiresAt"] = expires
+			}
 			f.rows[service] = fields
 		}
 	}
@@ -133,7 +147,7 @@ func TestTelemetryShow_PrintsWorkspaceAndServices(t *testing.T) {
 	spectest.Proves(t, "cloud/telemetry-settings", "show-prints-the-rows", "telemetry-show-prints-workspace-and-services")
 	fake := newTelemetryFake(t)
 	fake.rows[""] = map[string]any{"traceRatio": 0.5}
-	fake.rows["my-app"] = map[string]any{"traceBudget": 1000, "logLevel": "warn"}
+	fake.rows["my-app"] = map[string]any{"traceBudget": 1000, "traceParent": "decide", "logLevel": "warn", "expiresAt": "2026-05-19T10:00:00Z"}
 	ioctx, stdout := telemetryIO(t, fake)
 
 	if err := runTelemetry(ioctx, "show"); err != nil {
@@ -142,8 +156,10 @@ func TestTelemetryShow_PrintsWorkspaceAndServices(t *testing.T) {
 	text := strings.Join(*stdout, "\n")
 	assertContains(t, text, "Telemetry settings of workspace ws-acme. An unset field keeps the service's own setting.")
 	assertContains(t, text, "workspace: ratio 0.5 (updated 2026-05-19T09:00:00Z)")
-	assertContains(t, text, "my-app: budget 1000, log level warn (updated 2026-05-19T09:00:00Z)")
-	assertContains(t, text, "  in force: budget 1000, ratio 0.5, log level warn")
+	assertContains(t, text, "my-app: budget 1000, parent decide, log level warn until 2026-05-19T10:00:00Z (updated 2026-05-19T09:00:00Z)")
+	if last := (*stdout)[len(*stdout)-1]; last != "  in force: budget 1000, ratio 0.5, parent decide, log level warn" {
+		t.Fatalf("in force = %q, want the settings without an expiry", last)
+	}
 	if len(fake.writes) != 0 {
 		t.Fatalf("show wrote %v", fake.writes)
 	}
@@ -153,7 +169,6 @@ func TestTelemetryShow_AppPrintsOneService(t *testing.T) {
 	spectest.Proves(t, "cloud/telemetry-settings", "show-prints-the-rows", "telemetry-show-app-prints-one-service")
 	fake := newTelemetryFake(t)
 	fake.rows["my-app"] = map[string]any{"traceRatio": 1}
-	// A row config-api will hold for a workload once it accepts its name.
 	fake.rows["surfaces/workloads/app"] = map[string]any{"traceRatio": 0.2}
 	ioctx, stdout := telemetryIO(t, fake)
 
@@ -197,7 +212,7 @@ func TestTelemetrySet_MergesFlagsIntoTheRow(t *testing.T) {
 	fake.rows["my-app"] = map[string]any{"traceFloorPerMinute": 2, "logLevel": "warn"}
 	ioctx, stdout := telemetryIO(t, fake)
 
-	if err := runTelemetry(ioctx, "set", "--app", "my-app", "--ratio", "1", "--budget", "500", "--log-level", "ERROR"); err != nil {
+	if err := runTelemetry(ioctx, "set", "--app", "my-app", "--ratio", "1", "--budget", "500", "--parent", "DECIDE", "--log-level", "ERROR"); err != nil {
 		t.Fatalf("set: %v", err)
 	}
 	if len(fake.writes) != 1 {
@@ -205,10 +220,11 @@ func TestTelemetrySet_MergesFlagsIntoTheRow(t *testing.T) {
 	}
 	write := fake.writes[0]
 	if write["service"] != "my-app" || write["traceRatio"] != 1.0 || write["traceBudget"] != 500.0 ||
-		write["traceFloorPerMinute"] != 2.0 || write["logLevel"] != "error" {
-		t.Fatalf("write = %v, want the flags merged into the stored row", write)
+		write["traceFloorPerMinute"] != 2.0 || write["traceParent"] != "decide" || write["logLevel"] != "error" ||
+		write["expiresAt"] != nil {
+		t.Fatalf("write = %v, want the flags merged into the stored row, with no expiry", write)
 	}
-	assertContains(t, strings.Join(*stdout, "\n"), "my-app: budget 500, ratio 1, floor 2/min, log level error")
+	assertContains(t, strings.Join(*stdout, "\n"), "my-app: budget 500, ratio 1, floor 2/min, parent decide, log level error")
 
 	// Without --app, set writes the workspace row and sends no service.
 	if err := runTelemetry(ioctx, "set", "--floor", "0"); err != nil {
@@ -230,6 +246,13 @@ func TestTelemetrySet_RefusesValuesOutOfRange(t *testing.T) {
 		{"--budget", "1000001"},
 		{"--floor", "x"},
 		{"--log-level", "fatal"},
+		{"--parent", "always"},
+		{"--parent", ""},
+		{"--for", "0s"},
+		{"--for", "-1h"},
+		{"--for", "soon"},
+		{"--for", "60"},
+		{"--ratio", "1", "--for", "1d"},
 		{"--ratio"},
 	} {
 		fake := newTelemetryFake(t)
@@ -283,22 +306,19 @@ func TestTelemetryReset_RemovesTheRow(t *testing.T) {
 func TestTelemetryApp_NamesTheServiceRow(t *testing.T) {
 	spectest.Proves(t, "cloud/telemetry-settings", "app-names-the-service", "telemetry-app-names-the-service-row")
 	fake := newTelemetryFake(t)
-	ioctx, _ := telemetryIO(t, fake)
+	ioctx, stdout := telemetryIO(t, fake)
 	workspaceRoot := ioctx.Env["PUTNAMI_WORKSPACE_ROOT"]
 	writeProjectFile(t, workspaceRoot, "surfaces/workloads/app")
 
-	// The tail of a local project resolves to its canonical name. config-api
-	// refuses a name with a folder for now, and the person reads its reason
-	// and why.
-	err := runTelemetry(ioctx, "set", "--app", "app", "--ratio", "1")
+	// The tail of a local project resolves to its canonical name, folders
+	// included.
+	if err := runTelemetry(ioctx, "set", "--app", "app", "--ratio", "1"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
 	if service := fake.writes[0]["service"]; service != "surfaces/workloads/app" {
 		t.Fatalf("service = %v, want the app's canonical name", service)
 	}
-	if err == nil || clicore.ExitCode(err) != clicore.ExitUsage ||
-		!strings.Contains(err.Error(), "cloud telemetry set: "+telemetryInvalid) ||
-		!strings.Contains(err.Error(), "does not accept a service name with a folder, such as surfaces/workloads/app") {
-		t.Fatalf("set = %v, want config-api's reason and the folder-name gap", err)
-	}
+	assertContains(t, strings.Join(*stdout, "\n"), "surfaces/workloads/app: ratio 1")
 	// Without --app, the command never takes the cwd project.
 	if err := runTelemetry(ioctx, "set", "--ratio", "1"); err != nil {
 		t.Fatalf("set: %v", err)
@@ -306,11 +326,88 @@ func TestTelemetryApp_NamesTheServiceRow(t *testing.T) {
 	if service, ok := fake.writes[1]["service"]; ok {
 		t.Fatalf("service = %v, want the workspace row", service)
 	}
-	// A refusal of a plain name carries config-api's reason without the hint.
-	err = runTelemetry(ioctx, "reset", "--app", "Billing")
-	if err == nil || !strings.Contains(err.Error(), "cloud telemetry reset: "+telemetryInvalid) ||
-		strings.Contains(err.Error(), "with a folder") {
-		t.Fatalf("reset = %v, want config-api's reason alone", err)
+	// A refusal carries config-api's reason.
+	err := runTelemetry(ioctx, "reset", "--app", "Billing")
+	if err == nil || clicore.ExitCode(err) != clicore.ExitUsage || !strings.Contains(err.Error(), "cloud telemetry reset: "+telemetryInvalid) {
+		t.Fatalf("reset = %v, want config-api's reason", err)
+	}
+}
+
+func TestTelemetryFor_SetsTheExpiry(t *testing.T) {
+	spectest.Proves(t, "cloud/telemetry-settings", "for-ends-the-row", "telemetry-for-sets-the-expiry")
+	telemetryClock(t, time.Date(2026, 11, 21, 18, 30, 15, 0, time.FixedZone("CET", 3600)))
+	fake := newTelemetryFake(t)
+	ioctx, stdout := telemetryIO(t, fake)
+
+	if err := runTelemetry(ioctx, "set", "--app", "my-app", "--ratio", "1", "--parent", "decide", "--for", "1h"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	write := fake.writes[0]
+	if write["traceRatio"] != 1.0 || write["traceParent"] != "decide" || write["expiresAt"] != "2026-11-21T18:30:15Z" {
+		t.Fatalf("write = %v, want the settings and an expiry an hour after the command, in UTC", write)
+	}
+	assertContains(t, strings.Join(*stdout, "\n"), "my-app: ratio 1, parent decide until 2026-11-21T18:30:15Z")
+
+	// A duration shorter than what is left of the second still ends after
+	// the write: the expiry rounds up.
+	telemetryClock(t, time.Date(2026, 11, 21, 18, 0, 0, 0, time.UTC))
+	if err := runTelemetry(ioctx, "set", "--app", "my-app", "--for", "999ms"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if write := fake.writes[1]; write["expiresAt"] != "2026-11-21T18:00:01Z" {
+		t.Fatalf("expiresAt = %v, want it rounded up to the next second", write["expiresAt"])
+	}
+}
+
+func TestTelemetrySet_WithoutForHoldsUntilReset(t *testing.T) {
+	spectest.Proves(t, "cloud/telemetry-settings", "for-ends-the-row", "telemetry-set-without-for-holds-until-reset")
+	fake := newTelemetryFake(t)
+	fake.rows["my-app"] = map[string]any{"traceRatio": 1, "expiresAt": "2026-11-21T19:00:00Z"}
+	ioctx, _ := telemetryIO(t, fake)
+	var warnings []string
+	ioctx.Stderr = func(line string) { warnings = append(warnings, line) }
+
+	if err := runTelemetry(ioctx, "set", "--app", "my-app", "--log-level", "warn"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if write := fake.writes[0]; write["traceRatio"] != 1.0 || write["logLevel"] != "warn" || write["expiresAt"] != nil {
+		t.Fatalf("write = %v, want the row with no expiry", write)
+	}
+	assertContains(t, strings.Join(warnings, "\n"),
+		"cloud telemetry set: the row of my-app was to end at 2026-11-21T19:00:00Z and now holds until reset; give --for to end it")
+
+	// A row with no expiry draws no notice.
+	warnings = nil
+	if err := runTelemetry(ioctx, "set", "--app", "my-app", "--ratio", "0.5"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %v, want none", warnings)
+	}
+}
+
+func TestTelemetryFor_AloneMovesTheExpiry(t *testing.T) {
+	spectest.Proves(t, "cloud/telemetry-settings", "for-ends-the-row", "telemetry-for-alone-moves-the-expiry")
+	telemetryClock(t, time.Date(2026, 11, 21, 18, 0, 0, 0, time.UTC))
+	fake := newTelemetryFake(t)
+	fake.rows[""] = map[string]any{"traceRatio": 0.5, "expiresAt": "2026-11-21T18:10:00Z"}
+	ioctx, _ := telemetryIO(t, fake)
+
+	if err := runTelemetry(ioctx, "set", "--for", "2h"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if write := fake.writes[0]; write["traceRatio"] != 0.5 || write["expiresAt"] != "2026-11-21T20:00:00Z" || len(write) != 2 {
+		t.Fatalf("write = %v, want the row kept and its expiry moved", write)
+	}
+
+	// A row that sets nothing has nothing to end: the command reads it and
+	// writes nothing.
+	err := runTelemetry(ioctx, "set", "--app", "my-app", "--for", "1h")
+	if err == nil || clicore.ExitCode(err) != clicore.ExitUsage || !strings.Contains(err.Error(), "the row of my-app sets nothing to end") {
+		t.Fatalf("set = %v, want a usage error", err)
+	}
+	if len(fake.writes) != 1 {
+		t.Fatalf("writes = %v, want none for the empty row", fake.writes[1:])
 	}
 }
 
