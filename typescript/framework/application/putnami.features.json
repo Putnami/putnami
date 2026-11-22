@@ -1175,6 +1175,19 @@
           }
         },
         {
+          "id": "static-scan-root",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-scan-root-under-a-project-public-folder-is-staged",
+              "a-scan-root-outside-every-public-folder-fails-generate",
+              "a-missing-scan-root-stages-nothing"
+            ]
+          }
+        },
+        {
           "id": "route-fragments",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

@@ -117,6 +117,14 @@
       ]
     },
     {
+      "id": "static-scan-root",
+      "text": [
+        "A static folder generate stages from lies under the public/ folder of the project being built or of a workspace project, the folders the build-generate key reads.",
+        "A scan root elsewhere fails generate with an error that names the scan root and the public/ folder to move it under, and stages nothing.",
+        "A scan root that does not exist stages nothing and fails nothing."
+      ]
+    },
+    {
       "id": "route-fragments",
       "text": [
         "build() reports each pipeline route with GET and HEAD, or GET alone under secure false, and each native route with its own method, or every method when it names none.",

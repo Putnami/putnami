@@ -76,6 +76,7 @@
     "typescript/http-services#routing",
     "typescript/http-services#secure-by-default",
     "typescript/http-services#static-assets",
+    "typescript/http-services#static-scan-root",
     "typescript/server-streams#negotiated-sse-wire",
     "typescript/server-streams#sse-admission-and-bounds",
     "typescript/service-telemetry#bounded-http-metrics",
