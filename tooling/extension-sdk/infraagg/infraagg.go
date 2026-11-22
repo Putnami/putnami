@@ -10,8 +10,8 @@
 //     pipeline edges that schedule the aggregating task.
 //
 //   - The EXTENSION owns the language's runtime compatibility. Only the
-//     TypeScript extension knows Bun does not serve h2c; only a language
-//     extension can say what its workloads must run under. It states that as one
+//     TypeScript extension knows which protocols its Bun workloads run under;
+//     only a language extension can say what its workloads must run under. It states that as one
 //     function (Options.RuntimeCompatibility) instead of core inferring it from
 //     tags.
 //
@@ -94,11 +94,13 @@ const (
 
 // Options carries the one decision this package leaves to the caller.
 type Options struct {
-	// RuntimeCompatibility adjusts a workload's runtime block with constraints
-	// the LANGUAGE imposes, whatever the source of the block: it is applied to a
-	// developer-authored infra/runtime.json and to the synthesized defaults
-	// alike, because a constraint that only held for one of the two would make
-	// the authored file a way to request an unsupported runtime.
+	// RuntimeCompatibility adjusts a workload's runtime block with what the
+	// LANGUAGE says about it, whatever the source of the block: it is applied
+	// to a developer-authored infra/runtime.json and to the synthesized
+	// defaults alike. A hook that enforces a constraint must hold it for both,
+	// or the authored file becomes a way to request an unsupported runtime; a
+	// hook may instead fill a default that it leaves alone when the authored
+	// block states the value.
 	//
 	// Nil means the language imposes none.
 	RuntimeCompatibility func(*infra.Runtime)

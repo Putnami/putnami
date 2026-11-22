@@ -10,7 +10,7 @@
   ],
   "nonGoals": [
     "Defining the Connect wire itself: its codes, status pairs, envelopes, Connect-Timeout-Ms and error-detail layout belong to typescript/api-contracts",
-    "Carrying client or bidirectional streams over Connect or gRPC-Web; those RPCs are answered unimplemented and the endpoint serves them over WebSocket",
+    "Carrying client or bidirectional streams over HTTP/1.1 or gRPC-Web; there those RPCs are answered unimplemented and the endpoint serves them over WebSocket",
     "Writing the grpc-services service inventory document, which only the Go provider emits today",
     "Preserving unknown fields for re-serialization, because the provider is a leaf service and not a proxy",
     "Turning server reflection off"
@@ -35,7 +35,21 @@
       "id": "stream-shapes",
       "text": [
         "A route's stream mode is declared on its generated RPC: a server stream returns a stream, a client stream takes one, and a bidirectional stream does both.",
-        "The gRPC plugin answers a client or bidirectional RPC unimplemented: HTTP 501 with the code unimplemented for a Connect caller, and grpc-status 12 in the trailer of a 200 for a gRPC-Web caller."
+        "Over HTTP/1.1, which cannot carry a client stream, the gRPC plugin answers a client or bidirectional RPC unimplemented: HTTP 501 with the code unimplemented for a Connect caller, and grpc-status 12 in the trailer of a 200 for a gRPC-Web caller."
+      ]
+    },
+    {
+      "id": "duplex-streams-over-http2",
+      "text": [
+        "Over HTTP/2 the gRPC plugin serves a client or bidirectional RPC as a Connect stream: each request envelope's body section is one stream message, the first envelope carries the params and query, and the response ends with exactly one end-of-stream message.",
+        "A client stream answers its declared result as its one message, and a bidirectional stream answers each message as the handler sends it, while the caller still sends. A caller reset is read as canceled within a bounded grace, not as an end."
+      ]
+    },
+    {
+      "id": "duplex-stream-budgets",
+      "text": [
+        "A Connect client or bidirectional stream runs under the budgets its endpoint declares for WebSocket: a request message past maxFrameBytes ends it resource_exhausted, and no message in either direction for idleTimeoutMs ends it deadline_exceeded.",
+        "Request messages are read one at a time as the handler pulls them, in time linear in their size, so the idle budget counts from the last message the handler took or sent; a caller that leaves 16 MiB of answers unread ends the stream resource_exhausted."
       ]
     },
     {
@@ -86,6 +100,7 @@
     }
   ],
   "decisions": [
-    "typescript/framework/application/doc/adr/0004-connect-carries-the-first-party-error-as-a-typed-detail.md"
+    "typescript/framework/application/doc/adr/0004-connect-carries-the-first-party-error-as-a-typed-detail.md",
+    "typescript/framework/application/doc/adr/0008-the-server-accepts-cleartext-http2-by-default.md"
   ]
 }

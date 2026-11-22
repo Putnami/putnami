@@ -66,6 +66,10 @@
       "text": "A contract that declares Connect generates a client that calls it: the provider's protobuf descriptor travels with the generated client, the declared transport order decides the wire without the caller branching, and the deadline, retry, circuit and credential rules are the ones a REST call obeys. Connect narrows three things and each fails generation instead of shipping: more than one declared success status, a property whose protobuf json_name would rename it, and a nullable field."
     },
     {
+      "id": "connect-duplex-streams",
+      "text": "The Connect transport carries unary calls and server streams over fetch, and client and bidirectional streams over a node:http2 cleartext session: each message leaves as it is written, each answer is delivered as it arrives, and the stream ends with the provider's one end-of-stream message, a failure in it surfacing as the typed stream error. The generated clients keep carrying these two shapes over WebSocket."
+    },
+    {
       "id": "canonical-generated-sources",
       "text": "Generated TypeScript sources are formatted and lint-fixed with the client project's resolved Biome package and configuration before any byte is written, so generation, workspace lint and a fresh render produce the same bytes. The client project's own Biome package wins over the one @putnami/client carries."
     },

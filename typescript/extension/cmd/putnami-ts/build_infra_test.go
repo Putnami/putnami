@@ -13,9 +13,10 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
-// Bun does not serve h2c, and the platform may default a service to HTTP/2, so
-// the statement has to be explicit — an ABSENT protocols block would be read as
-// "take the platform default".
+// End-to-end HTTP/2 is not turned on by default for TypeScript workloads, and
+// the platform may default a service to HTTP/2, so the statement has to be
+// explicit — an ABSENT protocols block would be read as "take the platform
+// default".
 func TestDisableHTTP2_SetsTheExplicitOptOut(t *testing.T) {
 	rt := infra.DefaultRuntime()
 	disableHTTP2(rt)
@@ -28,16 +29,29 @@ func TestDisableHTTP2_SetsTheExplicitOptOut(t *testing.T) {
 	}
 }
 
-// An authored runtime.json asking for HTTP/2 is asking for something the
-// runtime cannot do; compatibility outranks the request.
-func TestDisableHTTP2_OverridesAnAuthoredRequest(t *testing.T) {
-	enabled := true
-	rt := &infra.Runtime{Protocols: &infra.RuntimeProtocols{HTTP2: &enabled}}
+// A runtime block that states http2 is the workload's own opt-in (or opt-out):
+// the default never overrides it (ADR 0013).
+func TestDisableHTTP2_KeepsAnAuthoredStatement(t *testing.T) {
+	for _, want := range []bool{true, false} {
+		stated := want
+		rt := &infra.Runtime{Protocols: &infra.RuntimeProtocols{HTTP2: &stated}}
+
+		disableHTTP2(rt)
+
+		if rt.Protocols.HTTP2 == nil || *rt.Protocols.HTTP2 != want {
+			t.Errorf("http2 = %v, want the authored %v", rt.Protocols.HTTP2, want)
+		}
+	}
+}
+
+// A protocols block that says nothing about http2 still gets the default.
+func TestDisableHTTP2_FillsAProtocolsBlockWithoutHTTP2(t *testing.T) {
+	rt := &infra.Runtime{Protocols: &infra.RuntimeProtocols{}}
 
 	disableHTTP2(rt)
 
 	if rt.Protocols.HTTP2 == nil || *rt.Protocols.HTTP2 {
-		t.Errorf("http2 = %v, want false even when the project asked for it", rt.Protocols.HTTP2)
+		t.Errorf("http2 = %v, want false", rt.Protocols.HTTP2)
 	}
 }
 
@@ -88,6 +102,71 @@ func TestBuildInfra_EmitsTypeScriptRuntimeCompatibility(t *testing.T) {
 	}
 }
 
+// End to end through the registered tasks: an authored infra/runtime.json that
+// states http2 keeps its value in the manifest and in the deployment
+// declaration, and one that states nothing gets the default off in both.
+func TestBuildInfra_KeepsAnAuthoredHTTP2(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-workload-always-has-a-runtime", "the-typescript-extension-keeps-an-authored-http2")
+	cases := []struct {
+		name     string
+		authored string
+		want     bool
+	}{
+		{"opt-in", `{"protocols":{"http2":true}}`, true},
+		{"explicit opt-out", `{"protocols":{"http2":false}}`, false},
+		{"no statement", `{"scaling":{"max":3}}`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			appRoot := filepath.Join(root, "app")
+			if err := os.MkdirAll(filepath.Join(appRoot, "infra"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(appRoot, "infra", "runtime.json"), []byte(tc.authored), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			ctx := &pctx.Context{
+				WorkspaceRoot: root,
+				Project: pctx.Project{
+					Name:     "@example/app",
+					Path:     "app",
+					FullPath: appRoot,
+					Type:     "application",
+					DependencyClosure: []pctx.ProjectRef{
+						{ID: "/app", Name: "@example/app", Path: "app", FullPath: appRoot},
+					},
+				},
+			}
+
+			status, data, err := buildInfra()(ctx, jsonl.NewForVersion(1), nil)
+			if err != nil || status != "OK" || data["outcome"] != string(infraagg.OutcomeEmitted) {
+				t.Fatalf("build-infra = %q %v %v, want OK and emitted", status, data, err)
+			}
+			manifest := readRuntimeBlock(t, filepath.Join(appRoot, ".gen", "requirements.json"))
+			if manifest.Protocols == nil || manifest.Protocols.HTTP2 == nil || *manifest.Protocols.HTTP2 != tc.want {
+				t.Errorf("aggregated runtime.protocols.http2 = %+v, want %v", manifest.Protocols, tc.want)
+			}
+
+			status, data, err = packageDeployment()(ctx, jsonl.NewForVersion(1), nil)
+			if err != nil || status != "OK" || data["outcome"] != string(infraagg.OutcomeEmitted) {
+				t.Fatalf("package-deployment = %q %v %v, want OK and emitted", status, data, err)
+			}
+			declaration, err := os.ReadFile(infraagg.DeploymentPath(appRoot))
+			if err != nil {
+				t.Fatal(err)
+			}
+			parsed, diagnostics := infra.ParseDeployment(declaration)
+			if parsed == nil {
+				t.Fatalf("the declaration is not canonical: %v", diagnostics)
+			}
+			if rt := parsed.Runtime; rt == nil || rt.Protocols == nil || rt.Protocols.HTTP2 == nil || *rt.Protocols.HTTP2 != tc.want {
+				t.Errorf("declared runtime = %+v, want http2 %v", parsed.Runtime, tc.want)
+			}
+		})
+	}
+}
+
 func readRuntimeBlock(t *testing.T, path string) *infra.Runtime {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -118,9 +197,8 @@ func readRuntimeFile(t *testing.T, path string) *infra.Runtime {
 }
 
 // The registered deployment task declares the same aggregate build-infra
-// emits, under the same hook: an authored request for HTTP/2 does not survive
-// into the declaration, and the bytes are the canonical form of build-infra's
-// manifest.
+// emits, under the same hook: an authored request for HTTP/2 survives into the
+// declaration, and the bytes are the canonical form of build-infra's manifest.
 func TestPackageDeployment_DeclaresBuildInfrasAggregate(t *testing.T) {
 	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-deployment-declaration-is-canonical", "the-typescript-extension-declares-the-aggregate-in-canonical-bytes")
 	root := t.TempDir()
@@ -157,8 +235,8 @@ func TestPackageDeployment_DeclaresBuildInfrasAggregate(t *testing.T) {
 	if parsed == nil {
 		t.Fatalf("the declaration is not canonical: %v", diagnostics)
 	}
-	if rt := parsed.Runtime; rt == nil || rt.Protocols == nil || rt.Protocols.HTTP2 == nil || *rt.Protocols.HTTP2 {
-		t.Errorf("declared runtime = %+v, want http2 false even when the project asked for it", parsed.Runtime)
+	if rt := parsed.Runtime; rt == nil || rt.Protocols == nil || rt.Protocols.HTTP2 == nil || !*rt.Protocols.HTTP2 {
+		t.Errorf("declared runtime = %+v, want the http2 true the project asked for", parsed.Runtime)
 	}
 
 	if _, _, err := buildInfra()(ctx, jsonl.NewForVersion(1), nil); err != nil {

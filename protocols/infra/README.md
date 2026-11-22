@@ -200,9 +200,12 @@ Every workload's aggregated manifest carries a `runtime` block, even when the de
 Resolution is developer-first: when `<workload>/infra/runtime.json` exists, it wins, and an aggregator run removes the defaults sidecar at `<workload>/.gen/infra/runtime.json` so it does not compete with the authored file. A cache hit of the build step that aggregates restores no sidecar and removes none, so a sidecar an earlier build left stays until the aggregator runs again; the runtime block of `<workload>/.gen/requirements.json` is the value that applies. The defaults sidecar is re-emitted on every build, so changes to `infra.DefaultRuntime()` propagate without any developer action.
 
 Language runtime compatibility defaults may further specialize the runtime block
-before it is emitted. TypeScript/Bun workloads set `runtime.protocols.http2` to
-`false` because deploy-target HTTP/2-to-container commonly means h2c, which the
-TypeScript runtime does not serve today. That statement is made by the
+before it is emitted. TypeScript/Bun workloads get `runtime.protocols.http2: false`
+when their runtime block states none: deploy-target HTTP/2-to-container commonly
+means h2c, which the TypeScript runtime accepts with prior knowledge, but Bun
+does not carry WebSockets over HTTP/2 and turning it on by default awaits a
+deployment test. A workload whose authored `infra/runtime.json` states
+`protocols.http2` keeps that value. That statement is made by the
 TypeScript extension itself (`cmd/putnami-ts/build_infra.go`); the CLI does not
 recognize a TypeScript project from its tags and does not specialize the runtime
 block on any language's behalf.
@@ -393,7 +396,8 @@ projections. Each implementer proves its part under checks named after it:
   overrides, the default runtime and the cost-policy refusal, and declares the
   aggregate in canonical bytes;
 - the TypeScript extension (`the-typescript-extension-…`), that it syncs the
-  committed requirements, turns HTTP/2 off and declares the canonical aggregate;
+  committed requirements, turns HTTP/2 off by default, keeps an authored
+  HTTP/2 statement and declares the canonical aggregate;
 - the Cloud extension (`the-cloud-…`), that its plan prints the codes of an
   invalid manifest and its publish stores the declaration byte for byte and
   refuses any other spelling.

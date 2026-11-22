@@ -104,6 +104,13 @@ export interface ServerOptions {
    */
   compression?: CompressionOptions | boolean;
   /**
+   * Accept HTTP/2 in cleartext from a client that opens with the HTTP/2
+   * preface (prior knowledge), on the same port as HTTP/1.1 and WebSocket
+   * upgrades. It is what carries a Connect client or bidirectional stream.
+   * Default `true`; `false` serves HTTP/1.1 only.
+   */
+  http2?: boolean;
+  /**
    * WebSocket resource bounds applied to Bun's websocket handler.
    *
    * Defaults bound client-controlled memory use (DoS): inbound frames larger

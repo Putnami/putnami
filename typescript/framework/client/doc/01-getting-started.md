@@ -410,7 +410,7 @@ Drift detection is non-blocking — it never prevents the client from starting.
 Streaming RPCs (server-streaming, client-streaming, bidirectional) are automatically detected from the proto spec and generated as streaming methods. The transport is picked per mode, and you never choose it:
 
 - **Server-streaming** rides Connect first — the protocol carries a server stream over HTTP/1.1 as envelope frames — and falls back to WebSocket when the server answers gRPC status 12 `UNIMPLEMENTED` or a `200` that is not a Connect stream. Other errors (a `404`, a `503`) surface typed rather than being masked by the fallback.
-- **Client- and bidirectional-streaming** go straight to WebSocket: a client stream needs HTTP/2, which `Bun.serve` does not provide as of Bun 1.4, and the framework's Connect route answers those RPCs with gRPC status 12 `UNIMPLEMENTED`.
+- **Client- and bidirectional-streaming** go straight to WebSocket. The framework's Connect route serves them only over HTTP/2 and answers gRPC status 12 `UNIMPLEMENTED` over HTTP/1.1, the only protocol `fetch` speaks in cleartext; `ConnectTransport.duplex()` carries them over a `node:http2` session when a caller wants Connect.
 
 Either way the caller sees the same observer. When a stream ends with a non-OK gRPC status the error handler receives a `ClientStreamError` carrying `grpcCode`/`grpcStatus`; when a fallback is needed and the runtime has no `WebSocket`, it receives a `ClientTransportUnavailableError` instead of a raw 501.
 

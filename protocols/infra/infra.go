@@ -365,8 +365,10 @@ type Security struct {
 
 // RuntimeProtocols declares workload HTTP protocol capabilities. HTTP2 maps to
 // deploy-target HTTP/2-to-container settings. On platforms such as Cloud Run
-// that means h2c; runtimes that cannot serve h2c set this to false so deployers
-// keep the service on HTTP/1.1 even if their platform default is HTTP/2.
+// that means h2c; a language extension states false by default, when its
+// runtime cannot serve h2c or has not been tested with it end to end, so
+// deployers keep the service on HTTP/1.1 even if their platform default is
+// HTTP/2.
 type RuntimeProtocols struct {
 	HTTP2 *bool `json:"http2,omitempty"`
 }

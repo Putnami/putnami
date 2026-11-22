@@ -134,6 +134,12 @@
       ]
     },
     {
+      "id": "cleartext-http2",
+      "text": [
+        "The server accepts HTTP/2 in cleartext from a client that opens with the HTTP/2 preface, on the same port where HTTP/1.1 requests and WebSocket upgrades keep working, and an HTTP/2 request body reaches the handler as it arrives, so a response can stream while the caller still sends."
+      ]
+    },
+    {
       "id": "request-rewrite",
       "text": [
         "A request rewrite registered on the HTTP plugin runs before route matching, in registration order, and may replace the request's path;",

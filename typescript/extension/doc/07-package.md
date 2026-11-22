@@ -468,8 +468,15 @@ member with package publisher `@putnami/typescript` and package step
    committed `infra/requirements.json` of every project in the workload's
    dependency closure, `<workload>/infra/overrides.json`, and the runtime block,
    an authored `<workload>/infra/runtime.json` or the framework defaults.
-2. Turns HTTP/2 off in the runtime block, with the same hook as the infra
-   phase, so the declaration and `.gen/requirements.json` never disagree.
+2. Turns HTTP/2 off in the runtime block unless an authored
+   `infra/runtime.json` states `protocols.http2`, with the same hook as the
+   infra phase, so the declaration and `.gen/requirements.json` never
+   disagree. A workload that states `"http2": true` declares HTTP/2 to the
+   container: its Connect client and bidirectional streams then reach it from
+   Connect callers over HTTP/2, and it may lose its WebSocket transport, which
+   Bun does not carry over HTTP/2, if the ingress sends every request over
+   HTTP/2 (see
+   [Build → Turning HTTP/2 on](./02-build.md#turning-http2-on)).
 3. Writes it in the canonical bytes of the infra protocol's
    `MarshalDeployment`: compact JSON, no `$schema`, no trailing newline. The
    same aggregate always gives the same bytes, so the member's digest moves

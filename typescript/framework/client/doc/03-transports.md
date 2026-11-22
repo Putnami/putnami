@@ -42,7 +42,7 @@ Streaming transport is chosen per RPC mode, automatically:
 | RPC mode | First choice | Fallback |
 |----------|--------------|----------|
 | Server-streaming | Connect (`application/connect+json` or `application/connect+proto`) | WebSocket, after gRPC status 12 `UNIMPLEMENTED` or a `200` that is not a Connect stream |
-| Client-streaming | WebSocket | — (Connect over HTTP/1.1 cannot carry a client stream) |
+| Client-streaming | WebSocket | — (Connect carries a client stream over HTTP/2 only; `ConnectTransport.duplex()` opens it directly) |
 | Bidirectional-streaming | WebSocket | — |
 
 Client- and bidi-streaming skip Connect entirely rather than pay a round trip to be told `UNIMPLEMENTED`. A client/bidi RPC that does reach the Connect route (for instance through `stream()`) reads the typed `UNIMPLEMENTED` and re-routes to WebSocket without the caller re-subscribing; if the runtime has no `WebSocket` global, the stream fails with `ClientTransportUnavailableError` instead of a raw 501.
@@ -353,6 +353,24 @@ A request stream is enveloped too, even when it carries one message: a bare body
 
 Streams never carry a `Connect-Timeout-Ms` derived from the per-call timeout — they are long-lived by definition.
 
+### Client and Bidirectional Streaming
+
+`ConnectTransport.duplex(path, options)` opens a client-streaming or bidirectional RPC over HTTP/2 and returns a `DuplexStream`:
+
+```typescript
+const transport = new ConnectTransport('http://localhost:3000', 'catalog.items.v1');
+const stream = transport.duplex<{ delta: number }, { total: number }>('/catalog.items.v1.ItemsService/ListItemsByIdNegotiate', {
+  params: { id: 'item-1' },
+  headers: new Headers({ 'X-Catalog-Key': key }),
+});
+stream.onMessage((running) => console.log(running.total));
+stream.send({ delta: 4 });
+stream.send({ delta: 6 });
+stream.end();
+```
+
+`fetch` speaks only HTTP/1.1 in cleartext, and HTTP/1.1 cannot carry a client stream, so the call opens a `node:http2` session of its own: cleartext with prior knowledge for an `http:` base URL, TLS for `https:`. Each `send()` leaves as one envelope frame as soon as the session is open; `end()` ends the caller's side. The first request message carries `params` and `query`, and each message's `body` section is the value sent. The provider's messages are delivered as they arrive through the same frame decoder and the same end-of-stream rules as a server stream, so a bidirectional answer reaches `onMessage` while the caller still sends. A failure in the end-of-stream message, or a refusal before it, reaches `onError` as `ClientStreamError`. `cancel()` resets the stream and closes the session. A provider that resets the stream before it answers fails it `CANCELLED`; a session that closes or goes away, or a refused stream, fails it `UNAVAILABLE`. A configured `timeoutMs` bounds establishing the session only, never the answer: a client stream is answered after the caller ends it. `send()` never blocks: a caller that writes faster than the provider reads buffers its messages in the client process. Unary calls and server streams keep riding `fetch`.
+
 ### Compression
 
 A unary call advertises `accept-encoding: gzip, identity`; a stream advertises `Connect-Accept-Encoding: gzip, identity`, which is the header the protocol reserves for per-message compression. Responses are decoded from `grpc-encoding`, `connect-content-encoding`, or `content-encoding`; a body the fetch layer already decompressed is left alone (the gzip magic header is checked before decoding). Decompressed output is bounded by `maxResponseSize`, so a small payload cannot inflate unbounded.
@@ -527,7 +545,7 @@ Open a server-streaming connection. Connect clients attempt Connect first and fa
 
 ### `protected streamDuplex<TIn, TOut>(path, options?): DuplexStream<TIn, TOut>`
 
-Open a bidirectional WebSocket stream. Connect cannot carry a client stream over HTTP/1.1, so this never attempts Connect.
+Open a bidirectional WebSocket stream. Connect carries a client stream only over HTTP/2, which `fetch` cannot open in cleartext, so this never attempts Connect; `ConnectTransport.duplex()` opens one over a `node:http2` session.
 
 **Returns:** `DuplexStream<TIn, TOut>` — extends `StreamObserver<TOut>` with `send(data: TIn)` and `end()`.
 
@@ -582,7 +600,7 @@ const users = new UsersClient({
 
 ## Boundaries
 
-- **Scope:** Unary REST/JSON and raw octets, Connect (unary and server streaming), SSE server streams, WebSocket server/client/bidirectional streams
-- **Out of scope:** gRPC-Web and native gRPC HTTP/2 (use the `grpc()` plugin on the server side); Connect client and bidirectional streaming, which HTTP/1.1 cannot carry — a duplex operation declares `websocket`
+- **Scope:** Unary REST/JSON and raw octets, Connect (unary and server streaming over `fetch`, client and bidirectional streaming over `node:http2`), SSE server streams, WebSocket server/client/bidirectional streams
+- **Out of scope:** gRPC-Web and native gRPC (use the `grpc()` plugin on the server side); generated clients dispatching a duplex operation over Connect — a duplex operation declares `websocket`
 - **Dependencies:** Native Fetch API and WebSocket API (available in Bun and modern browsers)
 - **Extension points:** Implement the `Transport` interface to add a custom transport; provide custom interceptors via `ClientConfig.interceptors`

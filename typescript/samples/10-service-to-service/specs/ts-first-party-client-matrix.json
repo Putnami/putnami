@@ -40,6 +40,10 @@
     {
       "id": "the-matrix-index-is-checkable",
       "text": "Each scenario in test-scenarios.json names a test that its file declares, states its auth, policy and encoding, and has the result pass. For each consumer, the index states each cell and family exactly once: pass with known scenarios, n/a with the rule that makes it so, or missing with a reason."
+    },
+    {
+      "id": "duplex-streams-ride-connect-over-http2",
+      "text": "Over cleartext HTTP/2 the Connect routes of /items/{id}/adjust and /items/{id}/negotiate answer: the client stream its one total after the consumer ended, the bidirectional stream each delta's running total before the next is sent. A Go Connect client over h2c and the TypeScript Connect transport each prove both. Over HTTP/1.1 both RPCs answer unimplemented."
     }
   ],
   "decisions": [

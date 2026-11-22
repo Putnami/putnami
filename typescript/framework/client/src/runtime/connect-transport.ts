@@ -36,7 +36,7 @@ import { readBodyBytesCapped, resolveMaxResponseSize } from './response-cap';
 import { parseRetryAfter } from './retry';
 import { validateResponseShape } from './response-validator';
 import type { StreamSession } from './stream-session';
-import type { StreamObserver } from './stream.type';
+import type { DuplexStream, StreamObserver } from './stream.type';
 import type { ClientRequest, ClientResponse, Transport } from './transport.type';
 import { assertHttpUrl } from './url';
 import { markTransportFailure } from './transport-failure';
@@ -54,6 +54,17 @@ const CT_UNARY_PROTO = 'application/proto';
 
 /** Per-message encodings this runtime can decode on a stream. */
 const STREAM_ACCEPT_ENCODINGS = 'gzip, identity';
+
+/** Connection-specific fields HTTP/2 forbids on a request (RFC 9113 §8.2.2), and the ones it frames itself. */
+const HTTP2_FORBIDDEN_REQUEST_HEADERS = [
+  'connection',
+  'keep-alive',
+  'proxy-connection',
+  'transfer-encoding',
+  'upgrade',
+  'host',
+  'content-length',
+];
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -147,6 +158,18 @@ export interface ConnectStreamOptions {
   onUnimplemented?: (error: ClientStreamError) => boolean;
 }
 
+/** Options for a Connect client or bidirectional stream. */
+export interface ConnectDuplexOptions {
+  /** The `params` section, carried by the first request message. */
+  params?: Record<string, unknown>;
+  /** The `query` section, carried by the first request message. */
+  query?: Record<string, unknown>;
+  /** Headers to send; may be a promise (auth interceptors resolve asynchronously). */
+  headers?: Headers | Promise<Headers>;
+  /** Caller cancel signal, combined with `cancel()` on the returned stream. */
+  signal?: AbortSignal;
+}
+
 /**
  * Connect protocol transport, version 1.
  *
@@ -164,9 +187,11 @@ export interface ConnectStreamOptions {
  * - Server streaming: a sequence of envelope frames terminated by exactly one
  *   `EndStreamResponse`.
  *
- * Client- and bidi-streaming cannot ride Connect over HTTP/1.1; the server
- * answers those RPCs with `unimplemented` and {@link ConnectStreamOptions.onUnimplemented}
- * lets the caller route them onto the WebSocket transport.
+ * - Client and bidirectional streaming: {@link duplex} carries them over an
+ *   HTTP/2 session, since HTTP/1.1 cannot carry a client stream and `fetch`
+ *   speaks only HTTP/1.1 in cleartext. Over HTTP/1.1 the server answers those
+ *   RPCs `unimplemented`, and {@link ConnectStreamOptions.onUnimplemented} lets
+ *   a server-stream caller route onto the WebSocket transport.
  */
 export class ConnectTransport implements Transport {
   private readonly baseUrl: string;
@@ -179,6 +204,8 @@ export class ConnectTransport implements Transport {
   /** `Connect-Timeout-Ms` value derived from the per-call timeout, when configured. */
   private readonly connectTimeout?: string;
   private readonly compressRequests: boolean;
+  /** The per-call timeout, when configured: it bounds a duplex stream's connection setup, never its answer. */
+  private readonly timeoutMs?: number;
 
   constructor(
     baseUrl: string,
@@ -197,6 +224,7 @@ export class ConnectTransport implements Transport {
     this.maxResponseSize = resolveMaxResponseSize(maxResponseSize);
     this.connectTimeout = options?.timeoutMs !== undefined ? formatConnectTimeoutMs(options.timeoutMs) : undefined;
     this.compressRequests = options?.compressRequests ?? false;
+    this.timeoutMs = options?.timeoutMs;
   }
 
   /** True when this transport encodes bodies as binary protobuf. */
@@ -404,6 +432,253 @@ export class ConnectTransport implements Transport {
     const relay = new StreamRelay<T>();
     this.streamInto(relay, path, options);
     return relay;
+  }
+
+  /**
+   * Open a Connect **client-streaming** or **bidirectional** RPC over HTTP/2.
+   *
+   * Each `send()` leaves as one envelope frame as soon as the session is
+   * open — messages sent before that leave in order once it is — and `end()`
+   * ends the caller's side. The provider's messages are delivered as they
+   * arrive, so a bidirectional answer reaches `onMessage` while the caller
+   * still sends; a client stream delivers its one result. The stream ends
+   * with the provider's end-of-stream message: a failure in it, or a refusal
+   * before it, is delivered as {@link ClientStreamError} on `onError`.
+   *
+   * An opening message carrying `params` and `query` and no body leaves as
+   * soon as the session opens; each later message's `body` section is the
+   * value sent. The call opens an HTTP/2
+   * session of its own — cleartext with prior knowledge for an `http:` base
+   * URL, TLS for `https:` — through `node:http2`, because `fetch` cannot
+   * stream a request body over cleartext HTTP/2. `cancel()` resets the stream
+   * and closes the session.
+   */
+  duplex<TIn, TOut>(path: string, options?: ConnectDuplexOptions): DuplexStream<TIn, TOut> {
+    const relay = new StreamRelay<TOut>();
+    const binary = this.useBinary;
+    const inputName = binary ? this.resolveMessageNames(path).input : undefined;
+    let opened: { write: (frame: Uint8Array) => void; end: () => void } | undefined;
+    let ended = false;
+
+    const frame = (message: Record<string, unknown>): Uint8Array => {
+      const payload = inputName
+        ? this.encodeProtoMessage(message, inputName)
+        : textEncoder.encode(JSON.stringify(message));
+      return writeEnvelope(0x00, payload);
+    };
+    // The opening message carries params and query and no body, and leaves
+    // as soon as the session is open: a provider that speaks first is never
+    // left waiting for the caller's first value.
+    const opening: Record<string, unknown> = {};
+    if (options?.params && Object.keys(options.params).length > 0) opening['params'] = options.params;
+    if (options?.query && Object.keys(options.query).length > 0) opening['query'] = options.query;
+    const pending: Uint8Array[] = [frame(opening)];
+
+    // biome-ignore lint/complexity/noVoid: relay owns the deliberately detached stream lifecycle
+    void this.runDuplex(relay, path, options, (sink) => {
+      opened = sink;
+      for (const pendingFrame of pending.splice(0)) sink.write(pendingFrame);
+      if (ended) sink.end();
+    }).catch((error) => {
+      if (relay.isCancelled) return;
+      relay.fail(error instanceof Error ? error : new Error(String(error)));
+    });
+
+    return {
+      onMessage: (handler) => relay.onMessage(handler),
+      onError: (handler) => relay.onError(handler),
+      onComplete: (handler) => relay.onComplete(handler),
+      cancel: () => relay.cancel(),
+      send: (value) => {
+        if (ended || relay.isCancelled) return;
+        const next = frame({ body: value });
+        if (opened) opened.write(next);
+        else pending.push(next);
+      },
+      end: () => {
+        if (ended) return;
+        ended = true;
+        opened?.end();
+      },
+    };
+  }
+
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one HTTP/2 stream's lifecycle reads best in one place
+  private async runDuplex<T>(
+    relay: StreamRelay<T>,
+    path: string,
+    options: ConnectDuplexOptions | undefined,
+    onOpen: (sink: { write: (frame: Uint8Array) => void; end: () => void }) => void,
+  ): Promise<void> {
+    const headers = new Headers(options?.headers ? await options.headers : undefined);
+    if (relay.isCancelled) return;
+    const mediaType = this.useBinary ? CT_CONNECT_STREAM_PROTO : CT_CONNECT_STREAM_JSON;
+    headers.set('Content-Type', mediaType);
+    headers.set('Accept', mediaType);
+    this.applyProtocolHeaders(headers, { deadline: false });
+    headers.set(CONNECT_ACCEPT_ENCODING_HEADER, STREAM_ACCEPT_ENCODINGS);
+    // HTTP/2 carries no connection-specific field, and the accept-encoding
+    // the protocol headers add names unary body compression, which a stream
+    // does not use.
+    for (const name of HTTP2_FORBIDDEN_REQUEST_HEADERS) headers.delete(name);
+    headers.delete('accept-encoding');
+
+    const url = new URL(`${this.baseUrl}${path}`);
+    const http2 = await import('node:http2');
+    if (relay.isCancelled) return;
+    const session = http2.connect(url.origin);
+    const requestHeaders: Record<string, string> = { ':method': 'POST', ':path': `${url.pathname}${url.search}` };
+    headers.forEach((value, name) => {
+      requestHeaders[name] = value;
+    });
+    const stream = session.request(requestHeaders);
+    const close = () => {
+      if (!stream.closed) stream.close(http2.constants.NGHTTP2_CANCEL);
+      session.close();
+    };
+    relay.attach(close);
+    const onAbort = () => relay.cancel();
+    if (options?.signal) {
+      if (options.signal.aborted) relay.cancel();
+      else options.signal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        stream.on('data', (chunk: Uint8Array) => controller.enqueue(new Uint8Array(chunk)));
+        stream.on('end', () => {
+          try {
+            controller.close();
+          } catch {
+            // Already errored.
+          }
+        });
+        stream.on('error', (error) => {
+          try {
+            controller.error(error);
+          } catch {
+            // Already closed.
+          }
+        });
+        // A stream reset or a session torn down ends the body without an
+        // `end`: closing it here lets the frame reader report the missing
+        // end-of-stream message instead of waiting for bytes that never come.
+        stream.on('close', () => {
+          try {
+            controller.close();
+          } catch {
+            // Already closed or errored.
+          }
+        });
+      },
+      cancel: () => close(),
+    });
+    // A session error is also surfaced through the stream; this listener keeps
+    // it from being an unhandled event once the response is settled.
+    session.on('error', () => {});
+    const responded = new Promise<Response>((resolve, reject) => {
+      stream.once('response', (received) => {
+        const responseHeaders = new Headers();
+        for (const [name, value] of Object.entries(received)) {
+          if (name.startsWith(':') || value === undefined) continue;
+          responseHeaders.set(name, Array.isArray(value) ? value.join(', ') : String(value));
+        }
+        resolve(new Response(body, { status: Number(received[':status']), headers: responseHeaders }));
+      });
+      // The provider closed the stream before it answered. Only a reset the
+      // provider sent on a live session is its cancellation; a session torn
+      // down or going away, a refused stream or a transport error is the
+      // provider being unavailable.
+      let sessionGone = false;
+      session.once('goaway', () => {
+        sessionGone = true;
+      });
+      const closedBeforeResponse = (cause?: unknown) => {
+        const code = stream.rstCode;
+        const canceled = !sessionGone && !session.destroyed && code === http2.constants.NGHTTP2_CANCEL;
+        reject(
+          new ClientStreamError({
+            service: this.packageName,
+            method: path,
+            message: `Connect stream closed before the provider answered (HTTP/2 code ${code ?? 'none'}${cause instanceof Error ? `: ${cause.message}` : ''})`,
+            grpcCode: canceled ? GrpcStatus.CANCELLED : GrpcStatus.UNAVAILABLE,
+            grpcStatus: canceled ? 'CANCELLED' : 'UNAVAILABLE',
+          }),
+        );
+      };
+      // The node:http2 client reports a reset or a destroyed session before
+      // the response with `close` alone, never `error`: without this, a stream
+      // that never answered would leave the caller waiting for ever.
+      stream.once('error', closedBeforeResponse);
+      session.once('error', closedBeforeResponse);
+      stream.once('close', () => closedBeforeResponse());
+      session.once('close', () => closedBeforeResponse());
+      // A configured per-call timeout bounds connecting to the provider. It
+      // never bounds the answer: a client stream is answered only after the
+      // caller ends it, and a stream is long-lived by definition.
+      if (this.timeoutMs !== undefined && session.connecting) {
+        const connecting = setTimeout(
+          () =>
+            reject(
+              new ClientStreamError({
+                service: this.packageName,
+                method: path,
+                message: `Connect session not established within ${this.timeoutMs} ms`,
+                grpcCode: GrpcStatus.DEADLINE_EXCEEDED,
+                grpcStatus: 'DEADLINE_EXCEEDED',
+              }),
+            ),
+          this.timeoutMs,
+        );
+        session.once('connect', () => clearTimeout(connecting));
+        session.once('close', () => clearTimeout(connecting));
+      }
+    });
+    onOpen({
+      write: (frame) => {
+        if (!stream.closed) stream.write(frame);
+      },
+      end: () => {
+        if (!stream.closed) stream.end();
+      },
+    });
+
+    try {
+      const response = await responded;
+      if (relay.isCancelled) return;
+      if (response.status !== 200) {
+        const info = await this.readErrorInfo(response, path);
+        relay.fail(
+          new ClientStreamError({
+            service: this.packageName,
+            method: path,
+            message: info.message ?? `HTTP ${response.status}`,
+            grpcCode: info.code,
+            grpcStatus: info.status,
+            ...(info.details ? { details: info.details } : {}),
+            status: response.status,
+          }),
+        );
+        return;
+      }
+      const contentType = response.headers.get('Content-Type') ?? '';
+      if (!contentType.split(';')[0].trim().startsWith('application/connect+')) {
+        relay.fail(
+          new ClientStreamError({
+            service: this.packageName,
+            method: path,
+            message: `Connect streaming not supported: server answered '${contentType || 'unknown content type'}'`,
+            grpcCode: GrpcStatus.UNIMPLEMENTED,
+            grpcStatus: 'UNIMPLEMENTED',
+          }),
+        );
+        return;
+      }
+      await this.pumpFrames(relay, path, response, contentType);
+    } finally {
+      options?.signal?.removeEventListener('abort', onAbort);
+      close();
+    }
   }
 
   /**

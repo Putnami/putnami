@@ -119,7 +119,7 @@ describe('buildUnimplementedRpcHandler', () => {
     {
       feature: 'typescript/grpc-services',
       requirement: 'stream-shapes',
-      check: 'a-connect-caller-of-a-client-or-bidirectional-rpc-gets-unimplemented',
+      check: 'a-connect-caller-of-a-client-or-bidirectional-rpc-over-http1-gets-unimplemented',
     },
     async () => {
       const handler = buildUnimplementedRpcHandler('bidirectional');
@@ -137,7 +137,7 @@ describe('buildUnimplementedRpcHandler', () => {
     {
       feature: 'typescript/grpc-services',
       requirement: 'stream-shapes',
-      check: 'a-connect-caller-of-a-client-or-bidirectional-rpc-gets-unimplemented',
+      check: 'a-connect-caller-of-a-client-or-bidirectional-rpc-over-http1-gets-unimplemented',
     },
     async () => {
       const handler = buildUnimplementedRpcHandler('client');

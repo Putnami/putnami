@@ -5,6 +5,7 @@
     "samples/ts-first-party-client-matrix#a-call-is-observable-and-ends-with-its-application",
     "samples/ts-first-party-client-matrix#a-declared-continuation-survives-an-instance-change",
     "samples/ts-first-party-client-matrix#a-result-is-what-the-contract-declared",
+    "samples/ts-first-party-client-matrix#duplex-streams-ride-connect-over-http2",
     "samples/ts-first-party-client-matrix#generation-is-deterministic-and-a-break-is-detected",
     "samples/ts-first-party-client-matrix#identity-is-declared-and-never-downgraded",
     "samples/ts-first-party-client-matrix#the-declared-request-policy-is-the-one-applied",

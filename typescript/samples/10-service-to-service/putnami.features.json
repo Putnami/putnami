@@ -100,6 +100,19 @@
             "kind": "acceptance",
             "checks": ["the-index-names-tests-that-exist", "the-index-states-every-cell-and-family-for-every-consumer"]
           }
+        },
+        {
+          "id": "duplex-streams-ride-connect-over-http2",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-consumer-calls-a-client-and-a-bidirectional-rpc-over-h2c",
+              "the-typescript-consumer-calls-a-client-and-a-bidirectional-rpc-over-http2",
+              "the-same-duplex-rpcs-over-http1-answer-unimplemented"
+            ]
+          }
         }
       ]
     }

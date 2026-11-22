@@ -120,7 +120,8 @@
               "the-extension-sdk-gives-a-workload-the-default-runtime",
               "the-extension-sdk-lets-an-authored-runtime-win",
               "the-extension-sdk-refuses-scaling-min",
-              "the-typescript-extension-turns-http2-off"
+              "the-typescript-extension-turns-http2-off",
+              "the-typescript-extension-keeps-an-authored-http2"
             ]
           }
         },

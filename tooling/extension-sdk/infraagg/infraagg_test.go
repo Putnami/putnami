@@ -91,8 +91,8 @@ func hasDiagCode(diags []diag.Diagnostic, code string) bool {
 }
 
 // noHTTP2 is the TypeScript extension's runtime compatibility hook, stated here
-// as the SDK's own fixture: Bun-backed services do not serve h2c, so a TS
-// workload must opt out whatever the source of its runtime block.
+// as the SDK's own fixture: a TS workload opts out of end-to-end HTTP/2
+// whatever the source of its runtime block.
 func noHTTP2(rt *infra.Runtime) {
 	http2 := false
 	if rt.Protocols == nil {

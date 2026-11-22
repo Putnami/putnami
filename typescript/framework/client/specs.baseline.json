@@ -11,6 +11,7 @@
     "typescript/service-clients#canonical-generated-sources",
     "typescript/service-clients#circuit-isolation",
     "typescript/service-clients#conditional-read",
+    "typescript/service-clients#connect-duplex-streams",
     "typescript/service-clients#connect-transport",
     "typescript/service-clients#credential-audience",
     "typescript/service-clients#credential-registry",

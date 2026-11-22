@@ -1,6 +1,8 @@
 import type { Type } from '@putnami/runtime';
 import { useLogger } from '@putnami/runtime';
 import { ApiPlugin } from '../api';
+import { isExternalClientPolicy } from '../api/client-contract';
+import { resolveStreamBudgets } from '../api/stream/first-party-stream-dispatcher';
 import type { Module, Plugin } from '../application';
 import { HttpPlugin } from '../http/http.plugin';
 import { HttpResponse } from '../http/http-response';
@@ -8,12 +10,7 @@ import type { HttpRequestContext } from '../http/http-context.type';
 import { ProtoPlugin } from '../proto';
 import { registerReflection } from './grpc-reflection';
 import { protoEnumRegistry } from './proto-codec';
-import {
-  buildUnaryRpcHandler,
-  buildStreamRpcHandler,
-  buildUnimplementedRpcHandler,
-  matchRpcToRoute,
-} from './grpc-handlers';
+import { buildDuplexRpcHandler, buildUnaryRpcHandler, buildStreamRpcHandler, matchRpcToRoute } from './grpc-handlers';
 import {
   CT_JSON,
   CT_PROTO,
@@ -47,9 +44,10 @@ export interface GrpcConfig {
  * - **Direct handler dispatch** — no internal server.fetch() loopback
  * - **Binary protobuf** — alongside Connect JSON (content-type negotiation)
  * - **Server streaming** — Connect streaming protocol with envelope framing
- * - **Client/bidi streaming** — answers gRPC status 12 UNIMPLEMENTED on the
- *   Connect route (HTTP/1.1 cannot carry client streams); the generated
- *   clients serve these modes over the WebSocket stream transport
+ * - **Client/bidi streaming** — Connect streaming over HTTP/2, read and
+ *   answered as the messages arrive; over HTTP/1.1, which cannot carry a client
+ *   stream, the Connect route answers gRPC status 12 UNIMPLEMENTED and the
+ *   generated clients serve these modes over the WebSocket stream transport
  *
  * Registers POST routes at `/{package}.{Service}/{Method}` on the existing
  * HTTP server. Incoming gRPC/Connect requests are dispatched directly to the
@@ -150,15 +148,26 @@ export class GrpcPlugin implements Plugin {
         const streamDef = route.streamMode ? apiPlugin.streamDefinitions.get(route.path) : undefined;
 
         const useCompression = this.config.compression;
-        // Server streaming rides Connect streaming frames; client/bidi streams
-        // cannot exist over HTTP/1.1 (Bun.serve's ceiling), so their RPCs
-        // answer UNIMPLEMENTED instead of silently degrading to unary — the
-        // generated clients carry those modes over the WebSocket transport.
+        // Server streaming rides Connect streaming frames on either protocol.
+        // Client and bidirectional streams ride them over HTTP/2, where the
+        // request body is read as it arrives; HTTP/1.1 cannot carry a client
+        // stream, so there they answer UNIMPLEMENTED instead of silently
+        // degrading to unary, and the generated clients carry those modes over
+        // the WebSocket transport.
         let handler: (ctx: HttpRequestContext) => Promise<HttpResponse>;
         if (streamDef?.mode === 'server') {
           handler = buildStreamRpcHandler(streamDef, route, proto.messageMeta, enums, useCompression);
         } else if (streamDef?.mode === 'client' || streamDef?.mode === 'bidirectional') {
-          handler = buildUnimplementedRpcHandler(streamDef.mode);
+          // The budgets the endpoint declares bound it on Connect exactly as
+          // they bound it on WebSocket.
+          // The contract's defaults apply only to a first-party route, as on
+          // WebSocket; an external authority's route reads its own declaration.
+          const contract = isExternalClientPolicy(streamDef.meta?.client) ? undefined : apiPlugin.clientContract;
+          const budgets = resolveStreamBudgets(contract, streamDef);
+          handler = buildDuplexRpcHandler(streamDef, route, proto.messageMeta, enums, useCompression, {
+            maxFrameBytes: budgets.maxFrameBytes,
+            idleTimeoutMs: budgets.idleTimeoutMs,
+          });
         } else {
           handler = buildUnaryRpcHandler(resolved.handler, route, proto.messageMeta, enums, useCompression);
         }

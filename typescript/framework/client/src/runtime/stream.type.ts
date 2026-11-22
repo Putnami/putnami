@@ -2,8 +2,9 @@
  * Observer for streaming responses from server-streaming or bidi RPCs.
  *
  * Server streams ride Connect envelope frames when the client speaks Connect,
- * and fall back to WebSocket otherwise; client/bidi streams always use
- * WebSocket. The observer shape is the same either way.
+ * and fall back to WebSocket otherwise; the generated clients carry client and
+ * bidi streams over WebSocket, and `ConnectTransport.duplex` carries them over
+ * HTTP/2. The observer shape is the same either way.
  *
  * @example
  * ```typescript

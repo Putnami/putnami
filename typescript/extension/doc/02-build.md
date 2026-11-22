@@ -640,10 +640,13 @@ Emits the workload's deployability manifest at `<project>/.gen/requirements.json
 3. Resolves the runtime block — an authored `<workload>/infra/runtime.json` wins
    and the run removes its stale defaults sidecar; otherwise framework defaults
    are synthesized into `<workload>/.gen/infra/runtime.json`.
-4. Turns HTTP/2 **off** in that block, whatever its source: Bun does not serve
-   h2c, and the deploy target may default a service to HTTP/2, so a TypeScript
-   workload has to opt out explicitly. This is the TypeScript extension's own
-   statement since an earlier migration; the CLI used to infer it from a
+4. Turns HTTP/2 **off** in that block unless the block states it: the
+   synthesized defaults, and an authored `infra/runtime.json` that says nothing
+   about `protocols.http2`, get `"http2": false`, stated explicitly because the
+   deploy target may default a service to HTTP/2. An authored
+   `infra/runtime.json` that states `protocols.http2` keeps its value (see
+   [Turning HTTP/2 on](#turning-http2-on)). This is the TypeScript extension's
+   own statement since an earlier migration; the CLI used to infer it from a
    project's tags.
 5. Writes the manifest atomically.
 
@@ -670,6 +673,66 @@ skip and are not cached. A cache hit does not repeat the findings.
 The `package` command's `deployment` step writes the same aggregate, under the
 same HTTP/2 hook, as the workload's deployment declaration (see
 [Package → Deployment Channel](./07-package.md#deployment-channel)).
+
+### Turning HTTP/2 on
+
+A TypeScript server accepts cleartext HTTP/2 with prior knowledge on the same
+port as HTTP/1.1, and serves Connect client and bidirectional streams only over
+HTTP/2. Deployment still defaults to HTTP/1.1 between the deploy target and the
+container. A workload turns HTTP/2 on in its own `infra/runtime.json`.
+
+An authored `infra/runtime.json` replaces the framework runtime defaults
+entirely; nothing merges it with them. A workload that has none starts from the
+generated `.gen/infra/runtime.json`: copy it to `infra/runtime.json` and set
+`protocols.http2` to `true`, so the scaling ceiling and the ingress visibility
+stay stated:
+
+```json
+{
+  "ingress": { "public": false },
+  "scaling": { "max": 1, "concurrency": 500 },
+  "protocols": { "http2": true }
+}
+```
+
+The value reaches `.gen/requirements.json` and the deployment declaration as
+written; `"http2": false` is kept the same way.
+
+The server must accept HTTP/2: the workload runs an `@putnami/application`
+release whose `http()` accepts cleartext HTTP/2 (its ADR 0008), and does not
+call `http({ http2: false })`. Otherwise the deploy target sends HTTP/2 with
+prior knowledge to a server that speaks HTTP/1.1 only, and every request fails.
+
+With HTTP/2 on, Connect client and bidirectional streams reach the workload
+from callers that open Connect over HTTP/2, such as `ConnectTransport.duplex()`
+or a Go Connect client.
+
+Bun does not carry WebSockets over HTTP/2. If the deploy target's ingress sends
+every request to the container over HTTP/2 once `http2` is on, a workload that
+opts in can lose its WebSocket transport. Generated TypeScript clients carry
+client and bidirectional streams over WebSocket with no Connect fallback, so
+those streams then fail too.
+
+The default stays off until a deployment test shows the WebSocket transport
+survives ([ADR 0013](./adr/0013-a-workload-states-http2-in-its-own-runtime-file.md)).
+To run that test:
+
+1. Take a sample workload that serves a unary RPC, a bidirectional Connect
+   stream and a WebSocket stream, such as
+   `typescript/samples/10-service-to-service`, which has no
+   `infra/runtime.json`. Build it once, copy its `.gen/infra/runtime.json` to
+   `infra/runtime.json`, then set `"ingress": {"public": true}` (or the access
+   the test needs) and `"protocols": {"http2": true}`.
+2. Build it again and check that the runtime block of `.gen/requirements.json`
+   is the whole authored block, with `ingress`, `scaling` and
+   `"protocols": {"http2": true}`, then deploy it to a non-production
+   environment.
+3. Through the public ingress, call the unary RPC, open the bidirectional
+   Connect stream and exchange a few messages, and open the WebSocket stream
+   and exchange a few messages.
+4. Record each of the three results with the deploy target and the Bun
+   version. If all three work, the default can turn on; if the WebSocket
+   stream fails, it stays off.
 
 ## Output Layout
 
