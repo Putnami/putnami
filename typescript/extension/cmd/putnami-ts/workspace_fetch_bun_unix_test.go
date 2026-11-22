@@ -42,16 +42,6 @@ cat "$HOME/.npmrc" > "$MARKER_WORKSPACE/postinstall.home-npmrc" 2>&1 || true
 cat "$MARKER_WORKSPACE/.npmrc" > "$MARKER_WORKSPACE/postinstall.workspace-npmrc" 2>&1 || true
 `
 
-// requireBun returns the bun on PATH.
-func requireBun(t *testing.T) string {
-	t.Helper()
-	bun, err := stdexec.LookPath("bun")
-	if err != nil {
-		t.Skip("bun is not installed")
-	}
-	return bun
-}
-
 // fetchFixture is a workspace with a committed bun.lock that names a private
 // package with a trusted postinstall script and a plain one, and the
 // environment its jobs run with: a home of their own whose bun cache is the

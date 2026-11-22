@@ -24,7 +24,7 @@
       "archives": true
     },
     "test": {
-      "filePatterns": ["cmd/putnami-ts/testdata/recorded/**", "putnami.extension.json", "config/biome.json"]
+      "filePatterns": ["cmd/putnami-ts/testdata/recorded/**", "putnami.extension.json", "config/biome.json", "../../putnami.lock.json"]
     },
     "publish": {
       "archives": true
