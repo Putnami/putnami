@@ -1163,6 +1163,17 @@
           "task": "deps-upgrade-exec"
         }
       ]
+    },
+    "deps-edit": {
+      "description": "Add, remove or prune the dependencies of TypeScript projects in their package.json, keeping shared versions in the workspace catalog, then install with the workspace's package manager.",
+      "visibility": "internal",
+      "quiet": true,
+      "run": [
+        {
+          "id": "deps-edit",
+          "task": "deps-edit-exec"
+        }
+      ]
     }
   },
   "tasks": {
@@ -1261,6 +1272,24 @@
       },
       "cache": false,
       "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "deps-edit-exec": {
+      "description": "Edit the dependencies of TypeScript projects in their package.json and the workspace catalog, then install with the workspace's package manager, putting every file it wrote back when a step fails or the task is stopped. Its timeout exceeds the install's own ten-minute bound so the job, not the task timeout, ends a stalled install and restores the files. Declares no outputs: the manifests are a workspace-files effect.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "deps-edit"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 660000,
       "declares": {
         "effects": [
           "network",

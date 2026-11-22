@@ -328,8 +328,8 @@ Always use the `putnami` CLI for dependencies:
 
 ```bash
 putnami deps add <package>
-putnami deps add <package> --package <target-project>
-putnami deps remove <package>
+putnami deps add <package> --projects <target-project>
+putnami deps remove <package> --projects <target-project>
 ```
 
 Never run `bun add`, `npm install`, or create lockfiles other than `bun.lock`.

@@ -15,7 +15,7 @@ This guide walks through the PostgreSQL path. If your feature is document-shaped
 ### 1) Add SQL + configure a database
 
 ```bash
-bunx putnami deps add @putnami/database
+putnami deps add @putnami/database
 ```
 
 Set the connection as one Postgres URL in `DATABASE_URL`, or commit it in

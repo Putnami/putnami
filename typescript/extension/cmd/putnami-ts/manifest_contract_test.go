@@ -416,6 +416,7 @@ func TestTaskEffectTable(t *testing.T) {
 		"build-transpile":     {"toolchain-cache"},
 		"build-types":         {"toolchain-cache"},
 		"config-extract-exec": {"toolchain-cache"},
+		"deps-edit-exec":      {"network", "toolchain-cache", "workspace-files"},
 		"deps-upgrade-exec":   {"network", "toolchain-cache", "workspace-files"},
 		"package-docker":      {"network", "toolchain-cache"},
 		// The archive step bundles its entry points with bun, which reads and

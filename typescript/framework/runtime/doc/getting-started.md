@@ -11,7 +11,7 @@ This guide will help you get started with `@putnami/runtime`, the foundational p
 ## Installation
 
 ```bash
-bun add @putnami/runtime
+putnami deps add @putnami/runtime
 ```
 
 ## Quick Start

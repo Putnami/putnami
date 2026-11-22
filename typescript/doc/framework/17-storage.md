@@ -7,7 +7,7 @@ Use `@putnami/storage` for object storage with pluggable backends, bucket declar
 ### Installation
 
 ```bash
-bunx putnami deps add @putnami/storage
+putnami deps add @putnami/storage
 ```
 
 ### Enable the storage plugin

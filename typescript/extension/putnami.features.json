@@ -551,6 +551,26 @@
           }
         },
         {
+          "id": "deps-edit-keeps-the-catalog",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bun-add-writes-the-catalog-and-references-it",
+              "a-pnpm-add-writes-the-pnpm-workspace-catalog",
+              "an-npm-add-writes-the-version-in-the-project",
+              "an-add-of-a-member-package-writes-workspace",
+              "a-remove-drops-an-entry-no-member-references",
+              "a-prune-drops-the-target-package",
+              "a-failed-install-restores-the-edited-files",
+              "a-dry-run-writes-no-file"
+            ]
+          }
+        },
+        {
           "id": "upgrade-installs-with-the-package-manager",
           "stage": "coded",
           "evidenceKinds": [

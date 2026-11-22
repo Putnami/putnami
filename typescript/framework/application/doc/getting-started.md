@@ -11,7 +11,7 @@ This guide will help you set up your first application with `@putnami/applicatio
 ## Installation
 
 ```bash
-bun add @putnami/application
+putnami deps add @putnami/application
 ```
 
 ## Project Setup

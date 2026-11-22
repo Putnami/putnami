@@ -7,7 +7,7 @@ Shared utility functions for the Putnami framework with browser/server condition
 ## Installation
 
 ```bash
-bun add @putnami/utils
+putnami deps add @putnami/utils
 ```
 
 ## Features

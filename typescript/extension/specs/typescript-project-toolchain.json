@@ -154,6 +154,10 @@
       "text": "The extension's workspace inputs and install inputs name the lockfile of every package manager it installs with and pnpm-workspace.yaml, so a change to the lockfile in use invalidates the cache of the TypeScript tasks and makes the installed workspace stale."
     },
     {
+      "id": "deps-edit-keeps-the-catalog",
+      "text": "putnami deps add, remove and prune edit one TypeScript project's package.json. add writes a member's package as workspace:* (a range with npm or Yarn 1); with Bun or pnpm another goes to the catalog, referenced as catalog:, at the spec's version, ^ its latest, or the entry's; a pinned version is kept; npm and yarn pin it in the project. remove drops it, and a catalog entry no member or override references. A failed or interrupted install restores every edited file; a dry run writes none."
+    },
+    {
       "id": "upgrade-installs-with-the-package-manager",
       "text": "putnami upgrade --deps pins the @putnami/* versions in the catalog the workspace declares, in the root package.json, else in pnpm-workspace.yaml, else in the root dependencies, then reinstalls with the workspace's package manager and its own reinstall flag. It writes no lockfile of another manager, and a failed install restores the root package.json, pnpm-workspace.yaml and that manager's lockfiles."
     },

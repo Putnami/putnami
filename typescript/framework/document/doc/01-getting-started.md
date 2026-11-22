@@ -5,13 +5,13 @@
 ## Installation
 
 ```bash
-bunx putnami deps add @putnami/document
+putnami deps add @putnami/document
 ```
 
 Add the Firestore client only when you use the Firestore adapter:
 
 ```bash
-bunx putnami deps add @google-cloud/firestore
+putnami deps add @google-cloud/firestore
 ```
 
 ## 1. Define a collection

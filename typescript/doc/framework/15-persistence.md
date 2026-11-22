@@ -9,7 +9,7 @@ If your data is document-shaped rather than relational, use [`@putnami/document`
 ### Installation
 
 ```bash
-bunx putnami deps add @putnami/database
+putnami deps add @putnami/database
 ```
 
 ### Enable the SQL plugin

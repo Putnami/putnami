@@ -50,6 +50,7 @@ var commands = map[string]cli.JobFunc{
 	"workspace-install": runWorkspaceInstall,
 	"workspace-sync":    runWorkspaceSync,
 	"deps-upgrade":      runDepsUpgrade,
+	"deps-edit":         runDepsEdit,
 
 	// The deployment declaration is build-infra's aggregate in canonical
 	// bytes, under the same runtime compatibility hook.

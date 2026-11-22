@@ -5,7 +5,7 @@ A Bun-native application framework with plugin architecture for building HTTP se
 ## Installation
 
 ```bash
-bun add @putnami/application
+putnami deps add @putnami/application
 ```
 
 ## Features

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -240,10 +241,22 @@ type npmUpgradeTransaction struct {
 	active bool
 }
 
-func beginNPMUpgradeTransaction(wsRoot string, manager packageManager) (*npmUpgradeTransaction, error) {
+// beginNPMUpgradeTransaction snapshots the root manifest, pnpm-workspace.yaml
+// and the manager's lockfiles. extra names more files to put back, by
+// absolute path, such as the member manifests a deps edit writes; one the root
+// list already holds is ignored.
+func beginNPMUpgradeTransaction(wsRoot string, manager packageManager, extra ...string) (*npmUpgradeTransaction, error) {
 	transaction := &npmUpgradeTransaction{active: true}
+	var paths []string
 	for _, name := range append([]string{"package.json", pnpmworkspace.File}, manager.lockfiles()...) {
-		path := filepath.Join(wsRoot, name)
+		paths = append(paths, filepath.Join(wsRoot, name))
+	}
+	for _, path := range extra {
+		if !slices.Contains(paths, path) {
+			paths = append(paths, path)
+		}
+	}
+	for _, path := range paths {
 		info, err := os.Lstat(path)
 		switch {
 		case err == nil:

@@ -1048,6 +1048,8 @@ manifest for you, through the `deps-edit` job of the project's extension.
 putnami deps install                       # Install all dependencies (default)
 putnami deps add golang.org/x/text@latest  # Add a Go module (sole editable project, or --projects <name>)
 putnami deps add rsc.io/quote@v1.5.2 --projects api
+putnami deps add @putnami/database --projects web  # Add an npm package to a TypeScript project
+putnami deps add zod@^3.23.0 --projects web
 putnami deps remove golang.org/x/text      # Drop a Go module and tidy
 putnami deps remove golang.org/x/text --dry-run  # Print the planned edit and change nothing
 putnami deps prune                         # Remove declared edges no import backs
@@ -1067,7 +1069,11 @@ it makes the edit and the tidy on a copy of `go.mod` and `go.sum`, and prints
 each requirement that would change. When that Go is
 missing, the error names `putnami install`. See
 [the Go extension](../../../go/extension/doc/getting-started.md#project-setup-and-dependency-edits).
-For TypeScript, edit `package.json` and run `putnami deps install`.
+`@putnami/typescript` declares it too: it edits the project's `package.json`,
+keeps a shared version in the workspace catalog (the root `package.json` for
+Bun, `pnpm-workspace.yaml` for pnpm) and references it with `catalog:`, then
+installs with the workspace's package manager. See
+[the TypeScript extension](../../../typescript/extension/doc/08-workspace-install.md#add-and-remove-dependencies).
 
 `prune` reads the provider view that the last install or build recorded. When a
 file that view was recorded from changed since, such as a hand-edited `go.mod`,

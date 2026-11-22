@@ -214,3 +214,34 @@ func TestSetCatalogEntryChangesTheVersionInPlace(t *testing.T) {
 		t.Fatal("a flow mapping was changed")
 	}
 }
+
+func TestRemoveCatalogEntryDropsOnlyItsLine(t *testing.T) {
+	text := "catalog:\n  react: ^19.0.0 # ui\n  zod: ^3.0.0\ncatalogs:\n  framework:\n    '@putnami/application': 1.0.0\n    '@putnami/web': 1.0.0\n"
+	got, found, err := RemoveCatalogEntry(text, "", "react")
+	if err != nil || !found {
+		t.Fatalf("RemoveCatalogEntry = %v, %v", found, err)
+	}
+	got, found, err = RemoveCatalogEntry(got, "framework", "@putnami/web")
+	if err != nil || !found {
+		t.Fatalf("RemoveCatalogEntry named = %v, %v", found, err)
+	}
+	want := "catalog:\n  zod: ^3.0.0\ncatalogs:\n  framework:\n    '@putnami/application': 1.0.0\n"
+	if got != want {
+		t.Fatalf("RemoveCatalogEntry =\n%s\nwant\n%s", got, want)
+	}
+	if same, found, err := RemoveCatalogEntry(got, "", "missing"); err != nil || found || same != got {
+		t.Fatalf("a missing entry: %v, %v", found, err)
+	}
+	if same, found, err := RemoveCatalogEntry(got, "other", "zod"); err != nil || found || same != got {
+		t.Fatalf("a missing catalog: %v, %v", found, err)
+	}
+	if _, _, err := RemoveCatalogEntry("catalog: {react: ^19}\n", "", "react"); err == nil {
+		t.Fatal("a flow mapping was changed")
+	}
+	if got, _, _ := RemoveCatalogEntry("packages:\n  - apps/*\ncatalog:\n  zod: ^3\n", "", "zod"); got != "packages:\n  - apps/*\n" {
+		t.Fatalf("the last entry left its key:\n%s", got)
+	}
+	if got, _, _ := RemoveCatalogEntry("catalogs:\n  tools:\n    zod: ^3\nother: 1\n", "tools", "zod"); got != "other: 1\n" {
+		t.Fatalf("the last named catalog left its keys:\n%s", got)
+	}
+}

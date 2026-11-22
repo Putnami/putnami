@@ -21,7 +21,7 @@ SQL database integration with PostgreSQL support, migrations, and repository pat
 ## Installation
 
 ```bash
-bun add @putnami/database
+putnami deps add @putnami/database
 ```
 
 ## Quick Start

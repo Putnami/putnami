@@ -723,6 +723,7 @@ var catalog = []Command{
 		Examples: []string{
 			"putnami deps add golang.org/x/text@latest",
 			"putnami deps add golang.org/x/text@latest --projects api --dry-run",
+			"putnami deps add @putnami/database --projects web",
 		},
 		Related:   []string{"deps install"},
 		Workspace: requiredWorkspace(),
@@ -739,6 +740,7 @@ var catalog = []Command{
 		Examples: []string{
 			"putnami deps remove golang.org/x/text",
 			"putnami deps remove golang.org/x/text --projects api --dry-run",
+			"putnami deps remove zod --projects web",
 		},
 		Related:   []string{"deps install"},
 		Workspace: requiredWorkspace(),

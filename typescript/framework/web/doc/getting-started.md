@@ -11,7 +11,7 @@ This guide will help you set up your first React application with `@putnami/web`
 ## Installation
 
 ```bash
-bun add @putnami/web @putnami/application
+putnami deps add @putnami/web @putnami/application
 ```
 
 ## Project Setup

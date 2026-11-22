@@ -5,7 +5,7 @@ Core utilities for dependency injection, context management, configuration, HTTP
 ## Installation
 
 ```bash
-bun add @putnami/runtime
+putnami deps add @putnami/runtime
 ```
 
 ## Features
