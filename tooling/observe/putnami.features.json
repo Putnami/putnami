@@ -203,6 +203,37 @@
               "a-workspace-change-that-touches-no-declaration-carries-an-empty-list"
             ]
           }
+        },
+        {
+          "id": "recent-history",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "history-observes-the-window-of-the-default-branch",
+              "history-falls-back-to-the-last-activity",
+              "history-samples-at-most-100-commits-evenly",
+              "history-is-bounded-in-time"
+            ]
+          }
+        },
+        {
+          "id": "history-evidence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "history-run-ids-derive-from-the-commit",
+              "history-writes-one-document-per-commit",
+              "history-leaves-the-working-tree-as-it-was"
+            ]
+          }
         }
       ]
     },
