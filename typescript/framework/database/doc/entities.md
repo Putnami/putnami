@@ -262,8 +262,8 @@ time zone of the process:
 
 | PostgreSQL type | Read as | Written by the framework as |
 | --- | --- | --- |
-| `DATE` | a `Date` at UTC midnight | the UTC calendar date |
-| `TIMESTAMP` (without time zone) | a `Date` that takes the stored clock as UTC | the UTC wall clock |
+| `DATE` | a `Date` at UTC midnight | the UTC calendar date, or a zone-less text as written |
+| `TIMESTAMP` (without time zone) | a `Date` that takes the stored clock as UTC | the UTC wall clock, or a zone-less text as written |
 | `TIMESTAMPTZ` | a `Date` at the stored instant | the instant, in UTC |
 
 A `TIMESTAMP` holds a wall clock and no zone, so the framework takes that clock
@@ -272,6 +272,18 @@ container in UTC read the same instant. The Go adapter
 (`go.putnami.dev/database`, through pgx) reads `TIMESTAMP` as UTC too. A
 `DateIso` column receives that instant as an ISO 8601 string ending in `Z`, and
 a `DateIso` string saved to a `TIMESTAMP` column is written as its UTC clock.
+
+A string bound to a `DATE` or `TIMESTAMP` column or cast is written by the same
+serializer. A string without a zone in the ISO form
+`YYYY-MM-DD[ HH:MM[:SS[.ffffff]]][ BC]`, a `T` allowed in place of the space,
+names a date or a wall clock rather than an instant: it goes to PostgreSQL as
+written, which stores that date or clock whatever the time zone of the process,
+microseconds and BC years included. Bound to a `TIMESTAMP`,
+`2026-11-22 10:30:00` stores `10:30:00`; bound to a `DATE`, `2026-11-22 00:00`
+stores `2026-11-22`. A string with a zone, such as `2026-11-22T10:30:00Z` or
+`2026-11-22T11:30:00+01:00`, is an instant and is written as its UTC clock or
+date. Any other string is parsed as a JavaScript `Date`, which takes a text
+without a zone as local time: give it a zone or use the ISO form.
 
 A bare `Date` bound in a raw query is sent as `TIMESTAMPTZ`, and PostgreSQL
 converts it to a `TIMESTAMP` column's clock in the session's `TimeZone`

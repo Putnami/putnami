@@ -60,6 +60,28 @@ const TIMESTAMP_TEXTS = [
   { text: '10000-01-01 00:00:00', instant: '+010000-01-01T00:00:00.000Z' },
 ];
 
+/**
+ * Texts without a zone, bound as a `timestamp` or `date` parameter, each paired
+ * with the clock and the date PostgreSQL stores for it. postgres.js serializes
+ * a bound string with the serializer of the type the server describes for the
+ * parameter, so these reach `serialize`. A text that `new Date` took as local
+ * time would store a clock shifted by the host's offset: Paris and Kolkata
+ * would move `00:00` to the previous day, Los Angeles would move `23:30` to the
+ * next, and none of them could read a BC year.
+ */
+const ZONELESS_TEXTS = [
+  { text: '2026-11-22 10:30:00', clock: '2026-11-22 10:30:00', day: '2026-11-22' },
+  { text: '2026-11-22 00:00', clock: '2026-11-22 00:00:00', day: '2026-11-22' },
+  { text: '2026-11-22T23:30', clock: '2026-11-22 23:30:00', day: '2026-11-22' },
+  // Microseconds, which a Date would truncate to the millisecond.
+  { text: '2026-11-22T10:30:00.123456', clock: '2026-11-22 10:30:00.123456', day: '2026-11-22' },
+  // A wall clock Paris skips when it moves to summer time.
+  { text: '2026-03-29 02:30:00', clock: '2026-03-29 02:30:00', day: '2026-03-29' },
+  { text: '2026-11-22', clock: '2026-11-22 00:00:00', day: '2026-11-22' },
+  { text: '0044-03-15 12:00:00 BC', clock: '0044-03-15 12:00:00 BC', day: '0044-03-15 BC' },
+  { text: '10000-01-01 00:00:00', clock: '10000-01-01 00:00:00', day: '10000-01-01' },
+];
+
 describe.each(NON_UTC_ZONES)('type mapping under TZ=%s', (zone) => {
   useTimeZone(zone);
 
@@ -82,6 +104,23 @@ describe.each(NON_UTC_ZONES)('type mapping under TZ=%s', (zone) => {
       expect(Number.isNaN(TYPES.timestamp.parse(text).getTime())).toBe(true);
       expect(Number.isNaN(TYPES.date.parse(text).getTime())).toBe(true);
       expect(Number.isNaN(TYPES.timestamptz.parse(text).getTime())).toBe(true);
+    }
+  });
+
+  it.each(ZONELESS_TEXTS)('writes the zone-less text $text to timestamp and date as written', ({ text }) => {
+    expect(TYPES.timestamp.serialize(text)).toBe(text);
+    expect(TYPES.date.serialize(text)).toBe(text);
+  });
+
+  it('writes a zoned text or a number as the UTC clock and date of its instant', () => {
+    const cases = [
+      { value: '2026-11-22T00:30:00.123Z', clock: '2026-11-22T00:30:00.123', day: '2026-11-22' },
+      { value: '2026-11-22T00:30:00.123+01:00', clock: '2026-11-21T23:30:00.123', day: '2026-11-21' },
+      { value: Date.parse('2026-11-22T00:30:00.123Z'), clock: '2026-11-22T00:30:00.123', day: '2026-11-22' },
+    ];
+    for (const { value, clock, day } of cases) {
+      expect(TYPES.timestamp.serialize(value)).toBe(clock);
+      expect(TYPES.date.serialize(value)).toBe(day);
     }
   });
 
@@ -152,6 +191,31 @@ describe.skipIf(!dockerAvailable)('type mapping against PostgreSQL under TZ=Euro
     expect(row?.occurredAt.toISOString()).toBe(instant.toISOString());
     expect(row?.day.toISOString()).toBe(day.toISOString());
     expect(row?.occurredAtTz.toISOString()).toBe(instant.toISOString());
+  });
+
+  it('stores a zone-less text bound to a timestamp or date column as the clock and date it names', async () => {
+    // Untyped string parameters: the server describes them from their target
+    // columns, so postgres.js writes them with the timestamp and date serializers.
+    await sql`
+      INSERT INTO ${sql(TABLE)} (id, occurred_at, day)
+      VALUES ('zone-less', ${'2026-11-22 10:30:00'}, ${'2026-11-22 00:00'})
+    `;
+
+    const [row] = await sql<{ storedClock: string; storedDay: string }[]>`
+      SELECT occurred_at::text AS stored_clock, day::text AS stored_day
+      FROM ${sql(TABLE)} WHERE id = 'zone-less'
+    `;
+    expect(row?.storedClock).toBe('2026-11-22 10:30:00');
+    expect(row?.storedDay).toBe('2026-11-22');
+  });
+
+  it('writes every zone-less text bound as a timestamp or a date as the clock and date it names', async () => {
+    for (const { text, clock, day } of ZONELESS_TEXTS) {
+      const [row] = await sql<{ clock: string; day: string }[]>`
+        SELECT ${text}::timestamp::text AS clock, ${text}::date::text AS day
+      `;
+      expect(row).toEqual({ clock, day });
+    }
   });
 
   it('reads every timestamp text PostgreSQL renders as the instant it names', async () => {

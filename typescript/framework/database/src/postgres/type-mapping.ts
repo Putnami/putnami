@@ -32,6 +32,29 @@ function parseTimestamp(text: string): Date {
   return date;
 }
 
+/**
+ * A date or timestamp text that carries no zone, in the ISO form PostgreSQL
+ * reads whatever its DateStyle: `YYYY-MM-DD`, optionally followed by `T` or a
+ * space and `HH:MM[:SS[.fraction]]`, optionally followed by ` BC`, the year
+ * four digits or more.
+ */
+const ZONELESS_TEXT = /^\d{4,}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?(?: BC)?$/;
+
+/**
+ * Tells whether a `date` or `timestamp` parameter is a zone-less ISO text.
+ *
+ * postgres.js serializes a bound string with the serializer of the type the
+ * server describes for the parameter, so a string bound to a `date` or
+ * `timestamp` column reaches `serialize`. A zone-less text names a calendar
+ * date or a wall clock, not an instant: `serialize` sends it as written, and
+ * the server stores that date or clock whatever the time zone of the process.
+ * `new Date(text)` would take it as local time, shift it by the host's offset,
+ * truncate its microseconds and reject a BC year.
+ */
+function isZonelessText(x: unknown): x is string {
+  return typeof x === 'string' && ZONELESS_TEXT.test(x);
+}
+
 export const TYPES = {
   bigint: postgres.BigInt,
   numeric: {
@@ -50,7 +73,8 @@ export const TYPES = {
     to: 1082,
     from: [1082],
     parse: (x: string) => new Date(x),
-    serialize: (x: Date | number) => {
+    serialize: (x: Date | number | string) => {
+      if (isZonelessText(x)) return x;
       const date = x instanceof Date ? x : new Date(x);
       return date?.toISOString().split('T')[0];
     },
@@ -59,7 +83,8 @@ export const TYPES = {
     to: 1114,
     from: [1114],
     parse: parseTimestamp,
-    serialize: (x: Date | number) => {
+    serialize: (x: Date | number | string) => {
+      if (isZonelessText(x)) return x;
       const date = x instanceof Date ? x : new Date(x);
       return date?.toISOString().replace('Z', '');
     },
