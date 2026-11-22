@@ -170,7 +170,7 @@
     {
       "id": "@putnami/observe",
       "kind": "package",
-      "status": "experimental",
+      "status": "preview",
       "default": false,
       "parity": "unsupported"
     },
@@ -540,7 +540,7 @@
     {
       "id": "go.putnami.dev/protocol/evidence",
       "kind": "protocol",
-      "status": "experimental",
+      "status": "preview",
       "default": false
     },
     {

@@ -241,12 +241,21 @@
         "The optional specVerification member is the features protocol's spec verification record of the repository's own workspace, carried as the engine wrote it.",
         "It is one JSON object, else evidence.invalid_spec_verification, of at most 524288 bytes, else evidence.too_large; the features protocol validates its contents."
       ]
+    },
+    {
+      "id": "version-1-changes-only-by-addition",
+      "text": [
+        "fixtures/v1 pins by digest the schema version 1 was promised with and frozen version 1 documents; each document validates, and each bound of the strict reader stays at or above its pin.",
+        "The current schema keeps the frozen dialect, each member with its type, const, $ref and pattern, the same required sets and each vocabulary value, keeps or loosens each bound, and adds no constraint.",
+        "A new optional member or vocabulary value passes."
+      ]
     }
   ],
   "decisions": [
     "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md",
     "protocols/evidence/doc/adr/0003-the-decision-records-a-change-concerns.md",
     "protocols/evidence/doc/adr/0002-architecture-results-are-an-optional-member-of-version-1.md",
-    "protocols/evidence/doc/adr/0004-test-cases-are-an-optional-member-of-version-1.md"
+    "protocols/evidence/doc/adr/0004-test-cases-are-an-optional-member-of-version-1.md",
+    "protocols/evidence/doc/adr/0005-version-1-changes-only-by-addition.md"
   ]
 }

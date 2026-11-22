@@ -109,6 +109,12 @@ ArchUnit, deptrac and import-linter results and places each violation.
 
 ## Support
 
-`@putnami/observe` is `experimental` in the
-[support catalog](../../putnami.support.json): it promises no compatibility
-yet, and no consumer in this repository runs it.
+`@putnami/observe` is `preview` in the
+[support catalog](../../putnami.support.json). The change evidence document it
+writes follows [`protocol/evidence`](../../protocols/evidence/README.md#support-status)
+version 1, which changes only by addition: a document that validates today
+keeps validating. Its flags, its text summary and its note may still change in
+a minor release whose notes say so. The language extensions and monorepo
+integrations of this repository build on its detectors, and the observe action
+runs it. Missing for `stable`: adopters outside this repository who rely on it,
+and a version gate that fails a release on an undeclared break of its flags.

@@ -110,17 +110,34 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 `fixtures/expectations.json` lists every fixture: each valid one validates
 cleanly, each invalid one gets exactly its listed codes. The tests pin the
 vocabularies, check that the schema, the Go types and the strict decoder
-declare the same members, and bind each requirement of
+declare the same members, hold the schema and the frozen version 1
+documents of `fixtures/v1/` to the promise below, and bind each requirement of
 `specs/change-evidence-document.json` to its proof.
 
 ## Support status
 
 - **Owner**: `go.putnami.dev/protocol/evidence`.
-- **Status**: `experimental`, explicit opt-in and never part of the default
-  experience, recorded as
-  `{"id": "go.putnami.dev/protocol/evidence", "kind": "protocol", "status": "experimental", "default": false}`
+- **Status**: `preview`, not part of the default experience, recorded as
+  `{"id": "go.putnami.dev/protocol/evidence", "kind": "protocol", "status": "preview", "default": false}`
   in the workspace-root [`putnami.support.json`](../../putnami.support.json)
-  catalog (contract: [`protocols/support`](../support/README.md)). The wire
-  format and finding codes may change without a migration.
-- **Missing for `preview`**: an active consumer in this repository, such as
-  the observe extension writing the document.
+  catalog (contract: [`protocols/support`](../support/README.md)).
+- **Promise**: version 1 changes only by addition, a new optional member of
+  a closed object, a new vocabulary value or a looser bound, so a document that validates today
+  keeps validating through every release of version 1; anything else opens
+  version 2 (`doc/adr/0005-version-1-changes-only-by-addition.md`, decision
+  `evidence-version-1-changes-only-by-addition`). A reader still updates
+  before its producers write an addition. The Go API of the module may change
+  in a minor release whose notes say so.
+- **Evidence**: the observe extension writes the document and the cloud
+  extension uploads it; the strict reader, the schema and the fixture corpus
+  above agree; `fixtures/v1/` freezes the promised schema and version 1
+  documents, each pinned by its digest, and `frozen_v1_test.go` fails on a
+  removed, retyped, newly required or no longer required member, a removed
+  vocabulary value, a changed pattern, const or reference, a constrained
+  member of an open object, a narrower schema bound and a smaller bound of
+  the strict reader. Go is the only implementation, so no
+  cross-implementation parity is promised.
+- **Missing for `stable`**: a reader outside this repository that relies on
+  the document, an N-1 read window or a documented migration for version 2,
+  and an entry in the
+  [compatibility budget](../../tooling/cli/doc/21-compatibility-and-migration.md).

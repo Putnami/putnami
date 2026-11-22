@@ -9,7 +9,10 @@ To add it to a pipeline, follow
 [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci). On
 GitHub Actions, it is one step: `uses: Putnami/observe-action@v1`.
 
-`@putnami/observe` is `experimental`: it promises no compatibility yet.
+`@putnami/observe` is `preview` in the [support catalog](/docs/support): the
+change evidence document it writes keeps version 1 by addition only, so a
+document that validates today keeps validating; the command's flags, its text
+summary and its note may still change in a minor release whose notes say so.
 
 ## What it answers
 

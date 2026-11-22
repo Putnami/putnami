@@ -12,7 +12,7 @@ For each pull or merge request, the step answers:
 
 It writes a short summary in the log, which ends with the one command that keeps the full report, and the whole answer as a change evidence document you keep as an artifact. Once it uploads the evidence, it also posts a status and a note on the pull or merge request that link to the full report when the reporter answers its URL, else to the CI run. It never fails your job.
 
-`putnami observe` comes with the `@putnami/observe` extension. It is `experimental`: being on the stable channel is not a compatibility promise. [Observe](/docs/tooling-&-workspace/observe) lists every CI, repository tool, report format, lockfile and SBOM format it reads.
+`putnami observe` comes with the `@putnami/observe` extension. It is `preview` in the [support catalog](/docs/support): the change evidence document it writes keeps version 1 by addition only, so a document that validates today keeps validating, while its flags, its text summary and its note may still change in a minor release whose notes say so. [Observe](/docs/tooling-&-workspace/observe) lists every CI, repository tool, report format, lockfile and SBOM format it reads.
 
 ## Start on your laptop
 

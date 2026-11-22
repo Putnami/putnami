@@ -364,6 +364,23 @@
               "the-spec-verification-record-is-one-bounded-object"
             ]
           }
+        },
+        {
+          "id": "version-1-changes-only-by-addition",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-frozen-v1-files-keep-their-digests",
+              "every-frozen-v1-document-validates",
+              "the-reader-bounds-only-grow",
+              "the-schema-extends-the-frozen-v1-schema",
+              "a-breaking-schema-change-is-refused"
+            ]
+          }
         }
       ]
     }
