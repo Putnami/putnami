@@ -13,8 +13,8 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
-// Bun does not serve h2c, and the platform may default a service to HTTP/2, so
-// the statement has to be explicit — an ABSENT protocols block would be read as
+// End-to-end HTTP/2 is not turned on for TypeScript workloads, and the platform
+// may default a service to HTTP/2, so the statement has to be explicit — an ABSENT protocols block would be read as
 // "take the platform default".
 func TestDisableHTTP2_SetsTheExplicitOptOut(t *testing.T) {
 	rt := infra.DefaultRuntime()

@@ -442,8 +442,9 @@ export class ConnectTransport implements Transport {
    * with the provider's end-of-stream message: a failure in it, or a refusal
    * before it, is delivered as {@link ClientStreamError} on `onError`.
    *
-   * The first request message carries `params` and `query`; the `body`
-   * section of each message is the value sent. The call opens an HTTP/2
+   * An opening message carrying `params` and `query` and no body leaves as
+   * soon as the session opens; each later message's `body` section is the
+   * value sent. The call opens an HTTP/2
    * session of its own — cleartext with prior knowledge for an `http:` base
    * URL, TLS for `https:` — through `node:http2`, because `fetch` cannot
    * stream a request body over cleartext HTTP/2. `cancel()` resets the stream
@@ -453,24 +454,20 @@ export class ConnectTransport implements Transport {
     const relay = new StreamRelay<TOut>();
     const binary = this.useBinary;
     const inputName = binary ? this.resolveMessageNames(path).input : undefined;
-    const pending: Uint8Array[] = [];
     let opened: { write: (frame: Uint8Array) => void; end: () => void } | undefined;
-    let first = true;
     let ended = false;
 
-    const frame = (value?: TIn): Uint8Array => {
-      const message: Record<string, unknown> = {};
-      if (first) {
-        if (options?.params && Object.keys(options.params).length > 0) message['params'] = options.params;
-        if (options?.query && Object.keys(options.query).length > 0) message['query'] = options.query;
-        first = false;
-      }
-      if (value !== undefined) message['body'] = value;
-      const payload = inputName
-        ? this.encodeProtoMessage(message, inputName)
-        : textEncoder.encode(JSON.stringify(message));
+    const frame = (message: Record<string, unknown>): Uint8Array => {
+      const payload = inputName ? this.encodeProtoMessage(message, inputName) : textEncoder.encode(JSON.stringify(message));
       return writeEnvelope(0x00, payload);
     };
+    // The opening message carries params and query and no body, and leaves
+    // as soon as the session is open: a provider that speaks first is never
+    // left waiting for the caller's first value.
+    const opening: Record<string, unknown> = {};
+    if (options?.params && Object.keys(options.params).length > 0) opening['params'] = options.params;
+    if (options?.query && Object.keys(options.query).length > 0) opening['query'] = options.query;
+    const pending: Uint8Array[] = [frame(opening)];
 
     // biome-ignore lint/complexity/noVoid: relay owns the deliberately detached stream lifecycle
     void this.runDuplex(relay, path, options, (sink) => {
@@ -489,18 +486,12 @@ export class ConnectTransport implements Transport {
       cancel: () => relay.cancel(),
       send: (value) => {
         if (ended || relay.isCancelled) return;
-        const next = frame(value);
+        const next = frame({ body: value });
         if (opened) opened.write(next);
         else pending.push(next);
       },
       end: () => {
         if (ended) return;
-        // A stream ended before any message still names its params and query.
-        if (first) {
-          const opening = frame();
-          if (opened) opened.write(opening);
-          else pending.push(opening);
-        }
         ended = true;
         opened?.end();
       },
@@ -541,9 +532,10 @@ export class ConnectTransport implements Transport {
       session.close();
     };
     relay.attach(close);
+    const onAbort = () => relay.cancel();
     if (options?.signal) {
       if (options.signal.aborted) relay.cancel();
-      else options.signal.addEventListener('abort', () => relay.cancel(), { once: true });
+      else options.signal.addEventListener('abort', onAbort, { once: true });
     }
 
     const body = new ReadableStream<Uint8Array>({
@@ -620,6 +612,7 @@ export class ConnectTransport implements Transport {
       }
       await this.pumpFrames(relay, path, response, contentType);
     } finally {
+      options?.signal?.removeEventListener('abort', onAbort);
       close();
     }
   }

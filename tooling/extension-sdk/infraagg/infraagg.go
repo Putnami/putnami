@@ -10,8 +10,8 @@
 //     pipeline edges that schedule the aggregating task.
 //
 //   - The EXTENSION owns the language's runtime compatibility. Only the
-//     TypeScript extension knows Bun does not serve h2c; only a language
-//     extension can say what its workloads must run under. It states that as one
+//     TypeScript extension knows which protocols its Bun workloads run under;
+//     only a language extension can say what its workloads must run under. It states that as one
 //     function (Options.RuntimeCompatibility) instead of core inferring it from
 //     tags.
 //

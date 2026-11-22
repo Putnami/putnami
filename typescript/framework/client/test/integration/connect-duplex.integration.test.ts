@@ -71,6 +71,27 @@ describe('ConnectTransport.duplex', () => {
       },
       'GET',
     );
+    apiPlugin.register(
+      '/tallies/[id]/greet',
+      {
+        GET: endpoint()
+          .params({ id: String })
+          .body(Stream({ delta: Number }))
+          .returns(Stream({ id: String, count: Number, total: Number }))
+          .handle(async (ctx) => {
+            // The provider speaks first, before the caller sent any value.
+            ctx.send({ id: ctx.params.id, count: 0, total: 0 });
+            let count = 0;
+            let total = 0;
+            for await (const message of ctx.messages()) {
+              count++;
+              total += message.delta;
+            }
+            return { id: ctx.params.id, count, total };
+          }),
+      },
+      'GET',
+    );
     app = application()
       .use(httpPlugin)
       .use(apiPlugin)
@@ -161,6 +182,27 @@ describe('ConnectTransport.duplex', () => {
       // The handler's returned value is the last message before completion.
       expect(received.at(-1)).toEqual({ id: 'b', count: 2, total: 5 });
       expect(received).toHaveLength(3);
+    },
+  );
+
+  specTest(
+    'delivers what a provider says first before the caller sends anything',
+    {
+      feature: 'typescript/service-clients',
+      requirement: 'connect-duplex-streams',
+      check: 'a-connect-bidirectional-stream-delivers-each-answer-while-the-caller-still-sends',
+    },
+    async () => {
+      const transport = new ConnectTransport(await start(), 'test.v1');
+      const stream = transport.duplex<{ delta: number }, Tally>('/test.v1.TalliesService/ListTalliesByIdGreet', {
+        params: { id: 'g' },
+      });
+      const greeting = await new Promise<Tally>((resolve, reject) => {
+        stream.onMessage(resolve);
+        stream.onError(reject);
+      });
+      expect(greeting).toEqual({ id: 'g', count: 0, total: 0 });
+      stream.cancel();
     },
   );
 

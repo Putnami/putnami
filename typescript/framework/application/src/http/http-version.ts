@@ -24,10 +24,11 @@ const HTTP1_FRAMING_HEADERS = [
  * a request that carries a field HTTP/2 forbids, or the length HTTP/1.1 frames
  * a body with, is not one. A cleartext HTTP/2 caller that streams its body —
  * the only one a client or bidirectional stream can come from — sends none of
- * them. An HTTP/2 caller that states a `Content-Length` is read as HTTP/1.1:
- * it already holds its whole body, so it loses nothing but the duplex. An
- * HTTP/1.1 request with no body at all sends none of them either; it carries
- * no message, so the stream it opens ends at once and nothing waits on it.
+ * them. An HTTP/2 caller that states a `Content-Length` is read as HTTP/1.1,
+ * and its client or bidirectional stream is refused UNIMPLEMENTED. An HTTP/1.1
+ * request with no body and no connection header sends none of them either and
+ * is read as HTTP/2; it carries no message, so the stream it opens ends at once
+ * and nothing waits on it.
  */
 export function arrivedOverHttp2(req: Request): boolean {
   for (const name of HTTP1_FRAMING_HEADERS) {

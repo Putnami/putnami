@@ -627,9 +627,11 @@ Emits the workload's deployability manifest at `<project>/.gen/requirements.json
 3. Resolves the runtime block — an authored `<workload>/infra/runtime.json` wins
    and the run removes its stale defaults sidecar; otherwise framework defaults
    are synthesized into `<workload>/.gen/infra/runtime.json`.
-4. Turns HTTP/2 **off** in that block, whatever its source: Bun does not serve
-   h2c, and the deploy target may default a service to HTTP/2, so a TypeScript
-   workload has to opt out explicitly. This is the TypeScript extension's own
+4. Turns HTTP/2 **off** in that block, whatever its source: the server accepts
+   cleartext HTTP/2 with prior knowledge, but end-to-end HTTP/2 from the deploy
+   target has not been turned on for TypeScript workloads, and the deploy target
+   may default a service to HTTP/2, so a TypeScript workload has to opt out
+   explicitly. This is the TypeScript extension's own
    statement since an earlier migration; the CLI used to infer it from a
    project's tags.
 5. Writes the manifest atomically.

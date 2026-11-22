@@ -429,10 +429,18 @@ export function buildDuplexRpcHandler(
   const unimplemented = buildUnimplementedRpcHandler(streamDef.mode);
 
   return async (ctx: HttpRequestContext) => {
-    if (!arrivedOverHttp2(ctx.req)) return unimplemented(ctx);
-
-    const contentType = ctx.headers.get('content-type') ?? CT_CONNECT_STREAM_JSON;
+    // Only a Connect streaming request over HTTP/2 can carry a client stream:
+    // gRPC-Web and unary media types keep the UNIMPLEMENTED answer they get
+    // over HTTP/1.1, whatever protocol they came on.
+    const contentType = ctx.headers.get('content-type') ?? '';
     const streamMediaType = parseMediaType(contentType);
+    if (
+      !arrivedOverHttp2(ctx.req) ||
+      (streamMediaType !== CT_CONNECT_STREAM_JSON && streamMediaType !== CT_CONNECT_STREAM_PROTO)
+    ) {
+      return unimplemented(ctx);
+    }
+
     const useBinaryRequest = streamMediaType === CT_CONNECT_STREAM_PROTO;
     const acceptHeader = ctx.headers.get('accept') ?? contentType;
     const useBinaryResponse = acceptContains(acceptHeader, CT_PROTO, CT_CONNECT_STREAM_PROTO);
@@ -532,7 +540,22 @@ export function buildDuplexRpcHandler(
         try {
           const first = await requests.next();
           const opening = first === undefined ? {} : decodeMessage(first);
-          const { params, query } = readRequestEnvelope(opening);
+          const envelope = readRequestEnvelope(opening);
+          // The declared params and query are validated, and coerced, as the
+          // WebSocket admission does: a stream refuses what its schema refuses
+          // whatever transport carries it.
+          const params = streamDef.schemas?.params
+            ? (validateSchema(streamDef.schemas.params, envelope.params, {
+                coerce: true,
+                label: 'params',
+              }) as Record<string, string>)
+            : envelope.params;
+          const query = streamDef.schemas?.query
+            ? (validateSchema(streamDef.schemas.query, envelope.query, {
+                coerce: true,
+                label: 'query',
+              }) as Record<string, string>)
+            : envelope.query;
           const firstMessage = first === undefined ? { present: false } : streamMessage(opening);
 
           async function* messages(): AsyncGenerator<unknown> {

@@ -201,8 +201,9 @@ Resolution is developer-first: when `<workload>/infra/runtime.json` exists, it w
 
 Language runtime compatibility defaults may further specialize the runtime block
 before it is emitted. TypeScript/Bun workloads set `runtime.protocols.http2` to
-`false` because deploy-target HTTP/2-to-container commonly means h2c, which the
-TypeScript runtime does not serve today. That statement is made by the
+`false`: deploy-target HTTP/2-to-container commonly means h2c, which the
+TypeScript runtime accepts with prior knowledge, but turning it on for
+TypeScript workloads is a decision not yet made. That statement is made by the
 TypeScript extension itself (`cmd/putnami-ts/build_infra.go`); the CLI does not
 recognize a TypeScript project from its tags and does not specialize the runtime
 block on any language's behalf.

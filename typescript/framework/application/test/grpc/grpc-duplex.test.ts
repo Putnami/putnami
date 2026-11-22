@@ -170,6 +170,22 @@ describe('Connect client and bidirectional streams', () => {
       },
       'GET',
     );
+    apiPlugin.register(
+      '/counters/[n]/doubled',
+      {
+        GET: endpoint()
+          .params({ n: Number })
+          .body(Stream({ delta: Number }))
+          .returns({ doubled: Number })
+          .handle(async (ctx) => {
+            for await (const _ of ctx.messages()) {
+              // drained
+            }
+            return { doubled: ctx.params.n * 2 };
+          }),
+      },
+      'GET',
+    );
     app = application()
       .use(httpPlugin)
       .use(apiPlugin)
@@ -273,6 +289,49 @@ describe('Connect client and bidirectional streams', () => {
 
       expect(call.frames).toHaveLength(1);
       expect(call.frames[0]?.value).toMatchObject({ error: { code: 'invalid_argument' } });
+    },
+  );
+
+  specTest(
+    'validates and coerces the declared params of the opening message',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'duplex-streams-over-http2',
+      check: 'a-connect-client-stream-over-http2-answers-its-declared-result',
+    },
+    async () => {
+      const port = await start();
+      session = http2.connect(`http://localhost:${port}`);
+      const path = '/test.v1.CountersService/ListCountersByNDoubled';
+      const accepted = openH2Stream(session, path);
+      accepted.write({ params: { n: '21' } });
+      accepted.end();
+      await accepted.done;
+      expect(accepted.frames.map((frame) => frame.value)).toEqual([{ doubled: 42 }, {}]);
+
+      const refused = openH2Stream(session, path);
+      refused.write({ params: { n: 'abc' } });
+      refused.end();
+      await refused.done;
+      expect(refused.frames).toHaveLength(1);
+      expect(refused.frames[0]?.value).toMatchObject({ error: { code: 'invalid_argument' } });
+    },
+  );
+
+  specTest(
+    'answers a non-Connect media type over HTTP/2 unimplemented',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'stream-shapes',
+      check: 'a-connect-caller-of-a-client-or-bidirectional-rpc-over-http1-gets-unimplemented',
+    },
+    async () => {
+      const port = await start();
+      session = http2.connect(`http://localhost:${port}`);
+      const call = openH2Stream(session, CLIENT_PATH, { 'content-type': 'application/json' });
+      call.end();
+      await call.done;
+      expect(await call.status).toBe(501);
     },
   );
 
