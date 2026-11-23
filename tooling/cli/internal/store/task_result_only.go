@@ -37,10 +37,9 @@ import (
 //     task-owned entry at the same key is, and for the same task.
 //   - IT CANNOT BE READ AS ANY OTHER ENTRY. The addresses are disjoint, and the
 //     directory carries none of the files the task-owned reader (entry.json) or
-//     the legacy reader (meta.json, result.json) requires, so LookupTaskEntry,
-//     Get, and an older CLI never interpret it even when they reach the address.
-//     Only a caller that does not need the files asks for it, through
-//     LookupResultOnlyTaskEntry.
+//     an older CLI (meta.json, result.json) requires, so neither interprets it
+//     even when it reaches the address. Only a caller that does not need the
+//     files asks for it, through LookupResultOnlyTaskEntry.
 //   - IT CANNOT BE PUBLISHED REMOTELY. The remote path only derives
 //     RemoteTaskEntryKey, which is TaskEntryAddress, so nothing uploads it.
 //   - PUBLICATION IS FIRST-WRITER-WINS. The directory is staged complete and
@@ -150,8 +149,8 @@ func (s *LocalStore) LookupResultOnlyTaskEntry(key string) *ResultOnlyTaskEntry 
 // descriptor's bytes are not read, because a result-only restore downloads no
 // blob, so nothing here checks that the entry records hit.Key: the provider
 // guarantees it answers with the entry stored under the requested key. A
-// legacy payload, which carries no descriptor, is an error, and the caller
-// treats it as a miss.
+// payload that carries no descriptor is an error, and the caller treats it as a
+// miss.
 func (s *LocalStore) PublishResultOnlyTaskEntry(hit RemoteTaskEntryHit) (*ResultOnlyTaskEntry, error) {
 	if hit.Key == "" {
 		return nil, fmt.Errorf("publish result-only entry: cache key required")

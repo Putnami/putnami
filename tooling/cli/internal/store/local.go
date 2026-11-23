@@ -1,15 +1,12 @@
 package store
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	cache "go.putnami.dev/protocol/cache"
 )
 
 // LocalStore is a filesystem-backed content-addressed store. The root is
@@ -19,7 +16,8 @@ import (
 // mutex. Layout:
 //
 //	<root>/
-//	  blobs/{hash[0:2]}/{hash}/   action-cache entries (task-owned, and format-1 ones a 0.3.0 CLI wrote)
+//	  blobs/{hash[0:2]}/{hash}/   action-cache entries
+//	    entry.json                declared-output descriptor (task_entry.go)
 //	    meta.json
 //	    result.json
 //	    manifest.json             per-file CAS digests (entries with outputs)
@@ -67,72 +65,6 @@ func NewLocalStore(root string) *LocalStore {
 // Root returns the store root directory.
 func (s *LocalStore) Root() string {
 	return s.root
-}
-
-// Get reads the format-1 entry stored under hash, or returns nil, nil if there
-// is none. A format-1 entry captures an output directory whole under the raw
-// cache key; a 0.3.0 CLI wrote it. This CLI writes only task-owned entries
-// (task_entry.go) and keeps reading format-1 entries until the release after
-// 0.4.0.
-//
-// A blob carrying an entry descriptor belongs to the task-owned model and
-// reads as a MISS here: its files/ tree is laid out by declared-output id, so
-// reading it as a whole-directory capture would restore a wrongly shaped tree. The two models also occupy disjoint addresses, so this
-// guard is defense in depth rather than the primary separation — it holds even
-// if a task-owned address is reached by another route.
-func (s *LocalStore) Get(hash string) (*Entry, error) {
-	blobDir := s.blobDir(hash)
-	if isTaskOwnedBlob(blobDir) {
-		return nil, nil
-	}
-	metaPath := filepath.Join(blobDir, "meta.json")
-	resultPath := filepath.Join(blobDir, "result.json")
-
-	// Read metadata
-	metaData, err := os.ReadFile(metaPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read meta.json: %w", err)
-	}
-
-	meta, err := UnmarshalMetadata(metaData)
-	if err != nil {
-		return nil, fmt.Errorf("parse meta.json: %w", err)
-	}
-
-	// Read result
-	resultData, err := os.ReadFile(resultPath)
-	if err != nil {
-		return nil, fmt.Errorf("read result.json: %w", err)
-	}
-
-	result, err := UnmarshalResult(resultData)
-	if err != nil {
-		return nil, fmt.Errorf("parse result.json: %w", err)
-	}
-
-	entry := &Entry{
-		Result:   result,
-		Metadata: meta,
-	}
-
-	// Check for files directory
-	filesDir := filepath.Join(blobDir, "files")
-	if info, err := os.Stat(filesDir); err == nil && info.IsDir() {
-		entry.FilesDir = filesDir
-	}
-
-	// Load the CAS manifest if present (absent for entries without output files).
-	if manifestData, err := os.ReadFile(filepath.Join(blobDir, manifestFilename)); err == nil {
-		var m cache.Manifest
-		if err := json.Unmarshal(manifestData, &m); err == nil {
-			entry.Manifest = &m
-		}
-	}
-
-	return entry, nil
 }
 
 // publishEntry commits a staged entry directory to blobDir with first-writer-

@@ -658,10 +658,9 @@ failure — and, like every other entry, it never leaves the machine.
 
 ### Task-owned entries (declared outputs)
 
-A 0.4.0 or older CLI also wrote **whole-output** (format 1) entries: what a walk
-of the shared per-command output directory found, under the raw key. No current
-writer produces one. The store keeps reading them until the release after
-0.4.0, and the scheduler never reuses one.
+A store can still hold **whole-output** (format 1) entries that a 0.4.0 or older
+CLI wrote under the raw key. The CLI does not read them, and garbage collection
+evicts them.
 
 A task whose manifest carries a **task contract v3 `declares` block**
 ([07-extensions.md](07-extensions.md)) is cached in the task-owned model: the
@@ -833,19 +832,19 @@ its producing run started from an empty owned directory, so no bypassed run is
 needed to correct it. To drop entries you do not trust, run
 `putnami cache clean`.
 
-The two models never see each other's payloads, because the entry-format version
-is part of the entry's **address**, not a field inside it:
+A CLI never sees the payload of another entry format, because the entry-format
+version is part of the entry's **address**, not a field inside it:
 
 ```
 address = sha256("putnami/store/entry-format\0" + <format> + "\0" + key)
 ```
 
-A legacy entry is therefore a clean MISS for the task-owned reader (never a
-legacy payload interpreted as a declared one), and a task-owned entry is
-invisible to older CLI binaries running from another worktree against the same
-machine-global store — which cannot be taught anything. Changing the format
-constant moves every address, so a future format needs no migration code: old
-entries age out through ordinary GC.
+A format-1 entry is therefore a clean MISS (never a whole-output payload
+interpreted as a declared one), and a task-owned entry is invisible to older CLI
+binaries running from another worktree against the same machine-global store —
+which cannot be taught anything. Changing the format constant moves every
+address, so a future format needs no migration code: old entries age out through
+ordinary GC.
 
 Whether a task takes this path is decided **statically**, from the declaration
 and the job shape alone, never from run results — the lookup that happens before

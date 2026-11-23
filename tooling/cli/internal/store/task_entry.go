@@ -1,26 +1,23 @@
 // Task-owned cache entries — the v3 entry model.
 //
-// # Why a second entry model
+// # The model
 //
-// The legacy entry (entry.go) records WHAT WAS FOUND: a files/ tree captured by
-// walking a directory the storing job happened to share with its siblings, minus
-// a pre-run baseline. Its shape is a function of run order, of what an earlier
-// session left behind, and of a growing list of per-artifact special cases. A
-// task-owned entry records WHAT WAS DECLARED: for each output the task's v3
+// A task-owned entry records WHAT WAS DECLARED: for each output the task's v3
 // contract names (protocols/extension task_contract.go), the entry says which id
 // it is, whether it is a file or a subtree, which root it resolves against, its
-// root-relative path, and whether the task produced bytes for it at all.
+// root-relative path, and whether the task produced bytes for it at all. It is
+// the only entry model this CLI reads or writes.
 //
 // # Entry-format version, and why the key is not enough
 //
 // Cache key v5 digests the task CONTRACT — extension, task, declared
 // outputs, effects, inputs. It does not digest the ENTRY PAYLOAD FORMAT, because
 // the payload format is a property of the CLI that wrote the entry, not of the
-// task. An entry from a CLI that predates this model therefore carries a
-// correct v5 key and a legacy payload, and the machine-global per-repo store
-// (~/.putnami/store/<repo-id>) is shared by every worktree and every branch on
-// the machine — including checkouts of older CLIs that keep publishing legacy
-// entries under keys this model would otherwise claim.
+// task. A format-1 entry — a whole-output capture published by a 0.4.0 or older
+// CLI — therefore carries a correct v5 key and a payload this build cannot
+// interpret, and the machine-global per-repo store (~/.putnami/store/<repo-id>)
+// is shared by every worktree and every branch on the machine, including
+// checkouts of those CLIs.
 //
 // The format version is consequently part of the entry's ADDRESS, not merely a
 // field inside it:
@@ -29,14 +26,13 @@
 //
 // Two properties follow:
 //
-//   - A legacy entry is invisible to the new model. LookupTaskEntry(key) reads
-//     the derived address, finds nothing, and reports a MISS — never a legacy
-//     payload interpreted as a declared one.
-//   - A task-owned entry is invisible to the legacy model, including to CLI
-//     binaries already built and running from another worktree, which cannot be
-//     taught anything. They compute blobDir(key) and never look at the derived
-//     address. Get() additionally refuses any blob carrying an entry descriptor,
-//     so the invariant holds even if an address is reached by another route.
+//   - A format-1 entry reads as absent. LookupTaskEntry(key) reads the derived
+//     address, finds nothing, and reports a MISS — never a format-1 payload
+//     interpreted as a declared one. No code reads the raw-key address, and GC
+//     evicts what it holds.
+//   - A task-owned entry is invisible to an older CLI running from another
+//     worktree, which computes blobDir(key) and never looks at the derived
+//     address.
 //
 // A future format 3 needs no migration code at all: changing the constant moves
 // every address, so old entries age out through ordinary GC.
@@ -102,17 +98,10 @@
 //
 //     symlink (rejected fast path)    ~0.05 ms/op
 //     atomic materialize (this file)  ~66–84 ms/op
-//     legacy RestoreDir (status quo)  ~91–108 ms/op
 //
 //     The cost is metadata-bound (256 creates plus 256 unlinks), not bandwidth-
-//     bound. The number that decides it is the THIRD one: whenever the fast path
-//     did not apply — any mixed run, any command with two partial snapshots —
-//     the scheduler already pays replaceDirPreserving, and the new primitive is
-//     ~20% CHEAPER than that. Skipping the fast path therefore adds no copy the
-//     CLI was not already doing on most runs; it has no special case for one
-//     snapshot covering the whole shared directory. The copy is also
-//     bounded by the DECLARED outputs rather than by everything the directory
-//     accumulated, which is the direction that shrinks with adoption.
+//     bound, and it is bounded by the DECLARED outputs rather than by everything
+//     the directory holds.
 //
 // A task-owned blob is therefore always materialized, never linked, rather than
 // producing a link that is structurally wrong.
@@ -135,10 +124,9 @@ import (
 )
 
 const (
-	// EntryFormatLegacy is the inferred-capture entry every putnami release
-	// before the v3 model wrote. It is represented on disk by
-	// the ABSENCE of an entry descriptor, which is why no legacy entry needs
-	// rewriting for the new model to recognize it.
+	// EntryFormatLegacy is the value the whole-output entries of a 0.4.0 or
+	// older CLI reserve. Their blobs carry no entry descriptor, and a
+	// descriptor that records this value reads as a miss.
 	EntryFormatLegacy = 1
 
 	// EntryFormatTaskOwned is the declared-capture entry this file defines: a
@@ -152,8 +140,7 @@ const (
 )
 
 // entryDescriptorFilename is the per-blob file whose presence identifies a
-// task-owned entry. A legacy blob never has one; that asymmetry is what lets
-// Get() recognizes (and refuses) an entry it cannot interpret.
+// task-owned entry. A blob without one is never read as an entry.
 const entryDescriptorFilename = "entry.json"
 
 // taskEntryAddressDomain namespaces the address derivation so a task cache key
@@ -283,12 +270,11 @@ type TaskEntry struct {
 	// Result is the structured job result (result.json).
 	Result *EntryResult `json:"-"`
 
-	// Metadata is the provenance sidecar (meta.json), shared with the legacy
-	// model so GC accounting and reporting need no second code path.
+	// Metadata is the provenance sidecar (meta.json).
 	Metadata *EntryMetadata `json:"-"`
 
 	// Manifest lists every captured file with its CAS digest, mirroring the
-	// remote-cache wire manifest exactly as legacy entries do (paths are
+	// remote-cache wire manifest (paths are
 	// "<output id>" for a file output and "<output id>/<rel>" for a directory
 	// output). protocols/cache is untouched by this model.
 	Manifest *cache.Manifest `json:"-"`
@@ -319,10 +305,9 @@ func (e *TaskEntry) Output(id string) (TaskEntryOutput, bool) {
 // TaskEntryAddress maps a task cache key to the store address its task-owned
 // entry lives at, binding the entry-format version into the address itself.
 //
-// This is the whole migration story. A legacy writer publishes at blobDir(key)
-// and a task-owned writer at blobDir(TaskEntryAddress(key)), so neither can read
-// the other's payload even though both are correct for the same v5 key, and
-// bumping CurrentEntryFormat relocates every entry without a rewrite pass.
+// An entry of another format lives at another address even when its v5 key is
+// the same, so no reader reaches a payload it cannot interpret, and bumping
+// CurrentEntryFormat relocates every entry without a rewrite pass.
 func TaskEntryAddress(key string) string {
 	sum := sha256.Sum256([]byte(taskEntryAddressDomain + "\x00" + strconv.Itoa(CurrentEntryFormat) + "\x00" + key))
 	return hex.EncodeToString(sum[:])
@@ -331,18 +316,16 @@ func TaskEntryAddress(key string) string {
 // LookupTaskEntry resolves a task cache key to its task-owned entry, or (nil,
 // nil) for a miss.
 //
-// A miss — never an error, never a legacy payload — is the answer for every
-// entry this build cannot interpret: no descriptor at the derived address (the
-// legacy case, and the common one right after this slice merges), a descriptor
-// whose format is not CurrentEntryFormat, a descriptor recording a different key,
+// A miss — never an error, never a foreign payload — is the answer for every
+// entry this build cannot interpret: no descriptor at the derived address (which
+// is where a key with only a format-1 entry stands), a descriptor whose format is not CurrentEntryFormat, a descriptor recording a different key,
 // and a descriptor that is torn or violates the model. Failing closed is the only
 // safe direction: a wrongly accepted entry materializes the wrong tree, while a
 // wrongly rejected one only costs a recompute.
 //
-// The entry's lastUsed sidecar is stamped under the store's SHARED lock, exactly
-// as getAndTouch does for legacy entries, so a concurrent GC (which needs the
-// exclusive lock) cannot evict the entry between this read and the caller's
-// materialize.
+// The entry's lastUsed sidecar is stamped under the store's SHARED lock, so a
+// concurrent GC (which needs the exclusive lock) cannot evict the entry between
+// this read and the caller's materialize.
 func (s *LocalStore) LookupTaskEntry(key string) (*TaskEntry, error) {
 	if key == "" {
 		return nil, nil
@@ -364,7 +347,7 @@ func (s *LocalStore) LookupTaskEntry(key string) (*TaskEntry, error) {
 }
 
 // loadTaskEntry reads a published task-owned entry from its blob directory, or
-// nil when the blob is absent, legacy, torn, or in a format this build does not
+// nil when the blob is absent, carries no descriptor, is torn, or in a format this build does not
 // read. The caller holds the store's shared lock. Every rejection is silent by
 // design — see LookupTaskEntry for why every uninterpretable entry is a miss.
 func loadTaskEntry(blobDir, address string) *TaskEntry {
@@ -401,11 +384,21 @@ func loadTaskEntry(blobDir, address string) *TaskEntry {
 	return entry
 }
 
-// TryClaimTaskEntry is TryClaim for the task-owned model: the lease is taken on
-// the entry's derived address, and "published" means a task-owned descriptor
-// exists there. Leasing on the address rather than the raw key keeps a legacy
-// publisher and a task-owned publisher of the same cache key from waiting on
-// each other — they are producing different artifacts.
+// TryClaimTaskEntry attempts to own the computation that will publish key's
+// task-owned entry. Exactly one process wins while a lease is live. A winner
+// receives an idempotent release function and a heartbeat keeps its ownership
+// alive until release. A loser should call WaitForTaskEntry, then look the entry
+// up normally. estimatedCost is optional for callers without a prediction; when
+// supplied, only its first value is used to apply CoalescingFloor.
+//
+// The lease is taken on the entry's derived address, and "published" means a
+// task-owned descriptor exists there. Leasing on the address rather than the raw
+// key keeps publishers of two entry formats from waiting on each other: they
+// produce different artifacts.
+//
+// Any filesystem/locking failure and any known cost below CoalescingFloor
+// return winner=true with a no-op release. Leasing must never make a build less
+// reliable than computing the key independently.
 func (s *LocalStore) TryClaimTaskEntry(key string, estimatedCost ...time.Duration) (bool, func()) {
 	cost := time.Duration(0)
 	if len(estimatedCost) > 0 {
@@ -414,9 +407,12 @@ func (s *LocalStore) TryClaimTaskEntry(key string, estimatedCost ...time.Duratio
 	return s.tryClaim(TaskEntryAddress(key), cost, func() bool { return s.taskEntryPublished(key) })
 }
 
-// WaitForTaskEntry is WaitForPublish for the task-owned model. It returns the
-// same ErrLeaseExpired / ErrLeaseWaitTimeout contract, so callers keep the
-// claim-again-then-compute fallback unchanged.
+// WaitForTaskEntry blocks until key's task-owned entry has been atomically
+// published, the current owner expires/releases, or timeout elapses. On
+// ErrLeaseExpired callers should call TryClaimTaskEntry again before computing,
+// so one waiter takes over rather than all waiters recomputing together. On
+// ErrLeaseWaitTimeout callers may compute directly as a bounded-wait reliability
+// fallback.
 func (s *LocalStore) WaitForTaskEntry(key string, timeout time.Duration) error {
 	return s.waitForPublish(TaskEntryAddress(key), timeout, func() bool { return s.taskEntryPublished(key) })
 }
@@ -429,15 +425,8 @@ func (s *LocalStore) taskEntryPublished(key string) bool {
 	return err == nil && fi.Mode().IsRegular()
 }
 
-// isTaskOwnedBlob reports whether a blob directory holds a task-owned entry.
-// One Stat on a file legacy blobs never have.
-func isTaskOwnedBlob(blobDir string) bool {
-	fi, err := os.Stat(filepath.Join(blobDir, entryDescriptorFilename))
-	return err == nil && fi.Mode().IsRegular()
-}
-
 // readTaskDescriptor reads and validates entry.json. It returns (nil, nil) when
-// the blob has no descriptor (a legacy entry) and an error when the descriptor
+// the blob has no descriptor and an error when the descriptor
 // exists but cannot be interpreted; both are misses to the lookup path, but the
 // distinction matters to tests and to any future repair tooling.
 func readTaskDescriptor(blobDir string) (*TaskEntry, error) {

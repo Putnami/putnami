@@ -7,158 +7,27 @@ import (
 	"testing"
 )
 
-func TestLocalStore_GetReadsAFormatOneEntry(t *testing.T) {
-	dir := t.TempDir()
-	s := NewLocalStore(dir)
-
-	entry := &Entry{
-		Result: &EntryResult{
-			Status: "success",
-			Data:   map[string]any{"output": "/dist"},
-		},
-		Metadata: &EntryMetadata{
-			Extension:  "@putnami/typescript",
-			Task:       "build~transpile",
-			Project:    "my-project",
-			DurationMs: 1500,
-		},
-	}
-
-	hash := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-
-	// Put
-	if err := putFormatOneEntry(s, hash, entry); err != nil {
-		t.Fatalf("Put: %v", err)
-	}
-
-	// Get
-	got, err := s.Get(hash)
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	if got == nil {
-		t.Fatal("Get returned nil")
-	}
-	if got.Result.Status != "success" {
-		t.Errorf("Result.Status = %q, want success", got.Result.Status)
-	}
-	if got.Result.Data["output"] != "/dist" {
-		t.Errorf("Result.Data[output] = %v, want /dist", got.Result.Data["output"])
-	}
-	if got.Metadata.Extension != "@putnami/typescript" {
-		t.Errorf("Metadata.Extension = %q, want @putnami/typescript", got.Metadata.Extension)
-	}
-	if got.Metadata.Task != "build~transpile" {
-		t.Errorf("Metadata.Task = %q, want build~transpile", got.Metadata.Task)
-	}
-	if got.Metadata.Hash != hash {
-		t.Errorf("Metadata.Hash = %q, want %s", got.Metadata.Hash, hash)
-	}
-}
-
-func TestLocalStore_GetReadsAFormatOneEntryWithFiles(t *testing.T) {
-	dir := t.TempDir()
-	s := NewLocalStore(dir)
-
-	// Create source files
-	srcDir := filepath.Join(t.TempDir(), "output")
-	os.MkdirAll(filepath.Join(srcDir, "dist"), 0o755)
-	os.WriteFile(filepath.Join(srcDir, "dist", "index.js"), []byte("console.log('hello');"), 0o644)
-	os.WriteFile(filepath.Join(srcDir, "dist", "index.d.ts"), []byte("export {};"), 0o644)
-
-	entry := &Entry{
-		Result: &EntryResult{Status: "success"},
-		Metadata: &EntryMetadata{
-			Extension: "ext",
-			Task:      "build",
-			Project:   "pkg",
-		},
-		FilesDir: srcDir,
-	}
-
-	hash := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-
-	if err := putFormatOneEntry(s, hash, entry); err != nil {
-		t.Fatalf("Put: %v", err)
-	}
-
-	got, err := s.Get(hash)
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-
-	if got.FilesDir == "" {
-		t.Fatal("FilesDir is empty, want non-empty")
-	}
-
-	// Verify files were copied
-	jsPath := filepath.Join(got.FilesDir, "dist", "index.js")
-	data, err := os.ReadFile(jsPath)
-	if err != nil {
-		t.Fatalf("read copied file: %v", err)
-	}
-	if string(data) != "console.log('hello');" {
-		t.Errorf("file content = %q, want console.log('hello');", string(data))
-	}
-
-	// Verify metadata has output files
-	if len(got.Metadata.OutputFiles) != 2 {
-		t.Errorf("OutputFiles count = %d, want 2", len(got.Metadata.OutputFiles))
-	}
-	if got.Metadata.Size <= 0 {
-		t.Errorf("Size = %d, want > 0", got.Metadata.Size)
-	}
-}
-
-func TestLocalStore_Get_NotFound(t *testing.T) {
-	dir := t.TempDir()
-	s := NewLocalStore(dir)
-
-	entry, err := s.Get("nonexistent")
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	if entry != nil {
-		t.Error("Get returned non-nil for nonexistent hash")
-	}
-}
-
-func TestLocalStore_ConcurrentFormatOnePublish(t *testing.T) {
-	dir := t.TempDir()
-	s := NewLocalStore(dir)
+func TestLocalStore_ConcurrentPublishThroughOneHandle(t *testing.T) {
+	s := NewLocalStore(t.TempDir())
+	keys := []string{"key-1", "key-2", "key-3", "key-4"}
 
 	var wg sync.WaitGroup
-	hashes := []string{
-		"a100000000000000000000000000000000000000000000000000000000000000",
-		"a200000000000000000000000000000000000000000000000000000000000000",
-		"a300000000000000000000000000000000000000000000000000000000000000",
-		"a400000000000000000000000000000000000000000000000000000000000000",
-	}
-
-	for _, h := range hashes {
-		wg.Add(1)
-		go func(hash string) {
-			defer wg.Done()
-			entry := &Entry{
-				Result:   &EntryResult{Status: "success"},
-				Metadata: &EntryMetadata{Extension: "ext", Task: "t", Project: "p"},
+	for _, key := range keys {
+		wg.Go(func() {
+			if _, err := s.IngestTaskEntry("", taskSpec(key)); err != nil {
+				t.Errorf("concurrent ingest %s: %v", key, err)
 			}
-			if err := putFormatOneEntry(s, hash, entry); err != nil {
-				t.Errorf("concurrent Put %s: %v", hash[:8], err)
-			}
-		}(h)
+		})
 	}
-
 	wg.Wait()
 
-	// All should exist
-	for _, h := range hashes {
-		got, err := s.Get(h)
+	for _, key := range keys {
+		got, err := s.LookupTaskEntry(key)
 		if err != nil {
-			t.Errorf("Get %s: %v", h[:8], err)
+			t.Errorf("LookupTaskEntry %s: %v", key, err)
 		}
 		if got == nil {
-			t.Errorf("entry %s should exist after concurrent Put", h[:8])
+			t.Errorf("entry %s should exist after a concurrent ingest", key)
 		}
 	}
 }
@@ -166,17 +35,10 @@ func TestLocalStore_ConcurrentFormatOnePublish(t *testing.T) {
 func TestLocalStore_BlobDirLayout(t *testing.T) {
 	dir := t.TempDir()
 	s := NewLocalStore(dir)
+	entry := ingestOne(t, s, "layout-key", "built")
 
-	hash := "ab12cd34ef56789012345678901234567890123456789012345678901234abcd"
-	entry := &Entry{
-		Result:   &EntryResult{Status: "success"},
-		Metadata: &EntryMetadata{Extension: "ext", Task: "t", Project: "p"},
-	}
-
-	putFormatOneEntry(s, hash, entry)
-
-	// Verify layout: blobs/ab/ab12cd34.../meta.json
-	expectedDir := filepath.Join(dir, "blobs", "ab", hash)
+	// Verify layout: blobs/<h2>/<address>/meta.json
+	expectedDir := filepath.Join(dir, "blobs", entry.Address[:2], entry.Address)
 	info, err := os.Stat(expectedDir)
 	if err != nil {
 		t.Fatalf("blob dir not at expected path: %v", err)
@@ -184,84 +46,30 @@ func TestLocalStore_BlobDirLayout(t *testing.T) {
 	if !info.IsDir() {
 		t.Error("blob dir should be a directory")
 	}
-
-	// Check meta.json exists
-	metaPath := filepath.Join(expectedDir, "meta.json")
-	if _, err := os.Stat(metaPath); err != nil {
-		t.Errorf("meta.json missing: %v", err)
-	}
-
-	// Check result.json exists
-	resultPath := filepath.Join(expectedDir, "result.json")
-	if _, err := os.Stat(resultPath); err != nil {
-		t.Errorf("result.json missing: %v", err)
+	for _, name := range []string{"meta.json", "result.json", manifestFilename, entryDescriptorFilename} {
+		if _, err := os.Stat(filepath.Join(expectedDir, name)); err != nil {
+			t.Errorf("%s missing: %v", name, err)
+		}
 	}
 }
 
-func TestLocalStore_PublishIsFirstWriterWins(t *testing.T) {
-	dir := t.TempDir()
-	s := NewLocalStore(dir)
-
-	hash := "ffff000000000000000000000000000000000000000000000000000000000000"
-
-	// First put
-	entry1 := &Entry{
-		Result:   &EntryResult{Status: "success", Data: map[string]any{"v": float64(1)}},
-		Metadata: &EntryMetadata{Extension: "ext", Task: "t", Project: "p"},
-	}
-	putFormatOneEntry(s, hash, entry1)
-
-	// A second put of the same hash must NOT clobber the first. The store is now
-	// machine-global and shared across worktrees; entries are content-addressed
-	// (byte-identical for a given hash), so the first writer's copy is kept and a
-	// concurrent sibling never destroys an entry a reader may be using.
-	entry2 := &Entry{
-		Result:   &EntryResult{Status: "success", Data: map[string]any{"v": float64(2)}},
-		Metadata: &EntryMetadata{Extension: "ext", Task: "t", Project: "p"},
-	}
-	putFormatOneEntry(s, hash, entry2)
-
-	got, err := s.Get(hash)
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	if got.Result.Data["v"] != float64(1) {
-		t.Errorf("Data[v] = %v, want 1 (first-writer-wins)", got.Result.Data["v"])
-	}
-}
-
-func TestLocalStore_ConcurrentReadWrite(t *testing.T) {
-	dir := t.TempDir()
-	s := NewLocalStore(dir)
-
-	hash := "rw00000000000000000000000000000000000000000000000000000000000000"
-	entry := &Entry{
-		Result:   &EntryResult{Status: "success", Data: map[string]any{"key": "value"}},
-		Metadata: &EntryMetadata{Extension: "ext", Task: "t", Project: "p"},
-	}
-
-	if err := putFormatOneEntry(s, hash, entry); err != nil {
-		t.Fatalf("initial Put: %v", err)
-	}
+func TestLocalStore_ConcurrentLookups(t *testing.T) {
+	s := NewLocalStore(t.TempDir())
+	const key = "concurrent-lookup-key"
+	ingestOne(t, s, key, "built")
 
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			got, err := s.Get(hash)
+	for range 20 {
+		wg.Go(func() {
+			got, err := s.LookupTaskEntry(key)
 			if err != nil {
-				t.Errorf("concurrent Get: %v", err)
+				t.Errorf("concurrent LookupTaskEntry: %v", err)
 				return
 			}
-			if got != nil && got.Result.Status != "success" {
-				t.Errorf("unexpected status: %s", got.Result.Status)
+			if got == nil || got.Result.Status != "success" {
+				t.Errorf("unexpected entry: %+v", got)
 			}
-		}()
-		go func() {
-			defer wg.Done()
-			_, _ = s.Get(hash)
-		}()
+		})
 	}
 	wg.Wait()
 }

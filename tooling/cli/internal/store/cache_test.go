@@ -144,362 +144,6 @@ func TestCacheKey_EveryProjectedParamIsSemantic(t *testing.T) {
 	}
 }
 
-func TestCacheManager_LookupReadsAFormatOneEntry(t *testing.T) {
-	dir := t.TempDir()
-	s := NewLocalStore(dir)
-	cm := NewCacheManager(s)
-
-	hash := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-
-	// Lookup miss
-	entry, err := cm.Lookup(hash)
-	if err != nil {
-		t.Fatalf("Lookup: %v", err)
-	}
-	if entry != nil {
-		t.Error("Lookup should return nil for miss")
-	}
-
-	// Save
-	result := &EntryResult{Status: "success", Data: map[string]any{"output": "/dist"}}
-	meta := &EntryMetadata{Extension: "ext", Task: "build", Project: "pkg"}
-	if err := saveFormatOneEntry(cm, hash, result, meta, ""); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-
-	// Lookup hit
-	entry, err = cm.Lookup(hash)
-	if err != nil {
-		t.Fatalf("Lookup: %v", err)
-	}
-	if entry == nil {
-		t.Fatal("Lookup should return non-nil for hit")
-	}
-	if entry.Result.Status != "success" {
-		t.Errorf("Result.Status = %q, want success", entry.Result.Status)
-	}
-}
-
-func TestCacheManager_LookupReadsAFormatOneEntryWithFiles(t *testing.T) {
-	storeDir := t.TempDir()
-	s := NewLocalStore(storeDir)
-	cm := NewCacheManager(s)
-
-	// Create output files
-	outputDir := filepath.Join(t.TempDir(), "out")
-	os.MkdirAll(filepath.Join(outputDir, "dist"), 0o755)
-	os.WriteFile(filepath.Join(outputDir, "dist", "main.js"), []byte("hello"), 0o644)
-
-	hash := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-
-	result := &EntryResult{Status: "success"}
-	meta := &EntryMetadata{Extension: "ext", Task: "build", Project: "pkg"}
-	if err := saveFormatOneEntry(cm, hash, result, meta, outputDir); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-
-	// Restore files to a new location
-	entry, _ := cm.Lookup(hash)
-	if entry == nil {
-		t.Fatal("entry not found after Save")
-	}
-
-	restoreDir := filepath.Join(t.TempDir(), "restored")
-	restored, err := cm.RestoreFiles(entry, restoreDir)
-	if err != nil {
-		t.Fatalf("RestoreFiles: %v", err)
-	}
-	if !restored {
-		t.Error("RestoreFiles returned false, want true")
-	}
-
-	// Verify restored file
-	data, err := os.ReadFile(filepath.Join(restoreDir, "dist", "main.js"))
-	if err != nil {
-		t.Fatalf("read restored file: %v", err)
-	}
-	if string(data) != "hello" {
-		t.Errorf("restored content = %q, want hello", string(data))
-	}
-}
-
-func TestCacheManager_RestoreFiles_NoFiles(t *testing.T) {
-	storeDir := t.TempDir()
-	s := NewLocalStore(storeDir)
-	cm := NewCacheManager(s)
-
-	hash := "aabbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-
-	result := &EntryResult{Status: "success"}
-	meta := &EntryMetadata{Extension: "ext", Task: "lint", Project: "pkg"}
-	saveFormatOneEntry(cm, hash, result, meta, "")
-
-	entry, _ := cm.Lookup(hash)
-	restored, err := cm.RestoreFiles(entry, t.TempDir())
-	if err != nil {
-		t.Fatalf("RestoreFiles: %v", err)
-	}
-	if restored {
-		t.Error("RestoreFiles returned true for entry with no files")
-	}
-}
-
-// RestoreDir must make the target byte-identical to the stored snapshot, not an
-// overlay onto whatever is there — so a generate cache hit cannot leave a stale
-// file from a previous tree behind. This is the store-level guarantee behind a
-// generate cache hit rematerializing .gen identically to a fresh run.
-func TestCacheManager_RestoreDir_ReplacesStaleTree(t *testing.T) {
-	s := NewLocalStore(t.TempDir())
-	cm := NewCacheManager(s)
-
-	// Snapshot a .gen-like tree into the cache.
-	src := t.TempDir()
-	os.MkdirAll(filepath.Join(src, "public", "docs"), 0o755)
-	os.WriteFile(filepath.Join(src, "public", "docs", "index.html"), []byte("fresh"), 0o644)
-	os.WriteFile(filepath.Join(src, "generate-result.json"), []byte("{}"), 0o644)
-
-	hash := "11bbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := saveFormatOneEntry(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, src); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-	entry, _ := cm.Lookup(hash)
-
-	// Target holds a stale tree that must not survive the restore.
-	target := filepath.Join(t.TempDir(), ".gen")
-	os.MkdirAll(filepath.Join(target, "public", "docs"), 0o755)
-	os.WriteFile(filepath.Join(target, "public", "docs", "stale.html"), []byte("stale"), 0o644)
-	os.WriteFile(filepath.Join(target, "public", "docs", "index.html"), []byte("old"), 0o644)
-
-	restored, err := cm.RestoreDir(entry, target)
-	if err != nil || !restored {
-		t.Fatalf("RestoreDir = (%v, %v), want (true, nil)", restored, err)
-	}
-
-	if _, err := os.Stat(filepath.Join(target, "public", "docs", "stale.html")); !os.IsNotExist(err) {
-		t.Error("stale file survived RestoreDir (it overlaid instead of replacing)")
-	}
-	if b, _ := os.ReadFile(filepath.Join(target, "public", "docs", "index.html")); string(b) != "fresh" {
-		t.Errorf("index.html = %q, want %q", b, "fresh")
-	}
-	if _, err := os.Stat(filepath.Join(target, "generate-result.json")); err != nil {
-		t.Errorf("generate-result.json not restored: %v", err)
-	}
-	if _, err := os.Stat(target + ".tmp-restore"); !os.IsNotExist(err) {
-		t.Error("RestoreDir left its staging dir behind")
-	}
-}
-
-func TestCacheManager_RestoreDir_NoFiles(t *testing.T) {
-	s := NewLocalStore(t.TempDir())
-	cm := NewCacheManager(s)
-
-	hash := "22bbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	saveFormatOneEntry(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, "")
-
-	entry, _ := cm.Lookup(hash)
-	restored, err := cm.RestoreDir(entry, filepath.Join(t.TempDir(), ".gen"))
-	if err != nil {
-		t.Fatalf("RestoreDir: %v", err)
-	}
-	if restored {
-		t.Error("RestoreDir returned true for an entry with no files")
-	}
-}
-
-func TestCacheManager_RestoreDir_UnchangedTreeIsNotRewritten(t *testing.T) {
-	s := NewLocalStore(t.TempDir())
-	cm := NewCacheManager(s)
-
-	target := t.TempDir()
-	file := filepath.Join(target, "version.json")
-	if err := os.WriteFile(file, []byte(`{"version":"1.0.0"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	before, err := os.Stat(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	hash := "22ccddaa1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := saveFormatOneEntry(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, target); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-	entry, err := cm.Lookup(hash)
-	if err != nil {
-		t.Fatalf("Lookup: %v", err)
-	}
-
-	restored, err := cm.RestoreDir(entry, target)
-	if err != nil || !restored {
-		t.Fatalf("RestoreDir = (%v, %v), want (true, nil)", restored, err)
-	}
-	after, err := os.Stat(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !os.SameFile(before, after) {
-		t.Fatal("unchanged manifest-matching tree was rewritten instead of using the no-op fast path")
-	}
-}
-
-func TestCacheManager_RestoreDirPreservingKeepsPostCaptureSidecar(t *testing.T) {
-	s := NewLocalStore(t.TempDir())
-	cm := NewCacheManager(s)
-	target := t.TempDir()
-	versionPath := filepath.Join(target, "version.json")
-	if err := os.WriteFile(versionPath, []byte("fresh\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	hash := "23ccddaa1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := saveFormatOneEntry(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, target); err != nil {
-		t.Fatal(err)
-	}
-	entry, err := cm.Lookup(hash)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	runtimePath := filepath.Join(target, "infra", "runtime.json")
-	if err := os.MkdirAll(filepath.Dir(runtimePath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(runtimePath, []byte("runtime\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	before, err := os.Stat(versionPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	preserveRuntime := func(rel string) bool { return rel == "infra/runtime.json" }
-
-	if restored, err := cm.RestoreDirPreserving(entry, target, preserveRuntime); err != nil || !restored {
-		t.Fatalf("matching RestoreDirPreserving = (%v, %v), want (true, nil)", restored, err)
-	}
-	after, err := os.Stat(versionPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !os.SameFile(before, after) {
-		t.Fatal("post-capture sidecar forced a matching generated tree to be rewritten")
-	}
-
-	if err := os.WriteFile(versionPath, []byte("stale\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if restored, err := cm.RestoreDirPreserving(entry, target, preserveRuntime); err != nil || !restored {
-		t.Fatalf("mismatching RestoreDirPreserving = (%v, %v), want (true, nil)", restored, err)
-	}
-	if b, err := os.ReadFile(versionPath); err != nil || string(b) != "fresh\n" {
-		t.Fatalf("cached file was not restored: content=%q err=%v", b, err)
-	}
-	if b, err := os.ReadFile(runtimePath); err != nil || string(b) != "runtime\n" {
-		t.Fatalf("post-capture sidecar was not preserved: content=%q err=%v", b, err)
-	}
-}
-
-func TestCacheManager_RestoreDirIgnoresUncacheableArtifacts(t *testing.T) {
-	s := NewLocalStore(t.TempDir())
-	cm := NewCacheManager(s)
-	target := t.TempDir()
-	outputPath := filepath.Join(target, "coverage", "lcov.info")
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(outputPath, []byte("coverage\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	hash := "24ccddaa1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := saveFormatOneEntry(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, target); err != nil {
-		t.Fatal(err)
-	}
-	entry, err := cm.Lookup(hash)
-	if err != nil {
-		t.Fatal(err)
-	}
-	before, err := os.Stat(outputPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tmpPath := filepath.Join(target, "coverage", "lcov.info.3.tmp")
-	if err := os.WriteFile(tmpPath, []byte("throwaway\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	if restored, err := cm.RestoreDir(entry, target); err != nil || !restored {
-		t.Fatalf("RestoreDir = (%v, %v), want (true, nil)", restored, err)
-	}
-	after, err := os.Stat(outputPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !os.SameFile(before, after) {
-		t.Fatal("excluded throwaway artifact forced a matching tree to be rewritten")
-	}
-	if _, err := os.Stat(tmpPath); err != nil {
-		t.Fatalf("throwaway artifact should be ignored by manifest matching: %v", err)
-	}
-}
-
-// A multi-rooted entry holds several sibling output trees under per-resource
-// subpaths; RestoreSubdir rematerializes each independently and byte-identically
-// (stale files removed). This is the store-level guarantee behind a single
-// generate cache hit restoring both .gen and the generated clients/ tree.
-func TestCacheManager_RestoreSubdirReadsAMultiRootedEntry(t *testing.T) {
-	s := NewLocalStore(t.TempDir())
-	cm := NewCacheManager(s)
-
-	gen := t.TempDir()
-	os.MkdirAll(filepath.Join(gen, "clientgen"), 0o755)
-	os.WriteFile(filepath.Join(gen, "clientgen", "config.json"), []byte(`{"targets":["ts"]}`), 0o644)
-
-	clients := t.TempDir()
-	os.MkdirAll(filepath.Join(clients, "ts", "src"), 0o755)
-	os.WriteFile(filepath.Join(clients, "ts", "src", "index.ts"), []byte("export class C {}\n"), 0o644)
-
-	hash := "33bbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
-	if err := saveFormatOneDirs(cm, hash, &EntryResult{Status: "success"}, &EntryMetadata{}, map[string]string{
-		"gen":     gen,
-		"clients": clients,
-	}); err != nil {
-		t.Fatalf("SaveDirs: %v", err)
-	}
-
-	entry, _ := cm.Lookup(hash)
-	if entry == nil || entry.FilesDir == "" {
-		t.Fatalf("entry has no files after SaveDirs")
-	}
-
-	// Restore clients/ over a stale tree: the stale file must not survive.
-	clientTarget := filepath.Join(t.TempDir(), "clients")
-	os.MkdirAll(filepath.Join(clientTarget, "ts", "src"), 0o755)
-	os.WriteFile(filepath.Join(clientTarget, "ts", "src", "stale.ts"), []byte("stale"), 0o644)
-
-	restored, err := cm.RestoreSubdir(entry, "clients", clientTarget)
-	if err != nil || !restored {
-		t.Fatalf("RestoreSubdir(clients) = (%v, %v), want (true, nil)", restored, err)
-	}
-	if b, _ := os.ReadFile(filepath.Join(clientTarget, "ts", "src", "index.ts")); string(b) != "export class C {}\n" {
-		t.Errorf("restored client index.ts = %q", b)
-	}
-	if _, err := os.Stat(filepath.Join(clientTarget, "ts", "src", "stale.ts")); !os.IsNotExist(err) {
-		t.Error("stale file survived RestoreSubdir (it overlaid instead of replacing)")
-	}
-
-	// gen restores independently to its own target.
-	genTarget := filepath.Join(t.TempDir(), ".gen")
-	if restored, err := cm.RestoreSubdir(entry, "gen", genTarget); err != nil || !restored {
-		t.Fatalf("RestoreSubdir(gen) = (%v, %v), want (true, nil)", restored, err)
-	}
-	if _, err := os.Stat(filepath.Join(genTarget, "clientgen", "config.json")); err != nil {
-		t.Errorf("gen subtree not restored: %v", err)
-	}
-
-	// A subpath the producing run never captured is a no-op, not an error.
-	if restored, err := cm.RestoreSubdir(entry, "go", filepath.Join(t.TempDir(), "go")); err != nil || restored {
-		t.Errorf("RestoreSubdir(go) = (%v, %v), want (false, nil) for an uncaptured subpath", restored, err)
-	}
-}
-
 func TestBuildCacheKey(t *testing.T) {
 	key := BuildCacheKey(
 		"@putnami/typescript",
@@ -1069,30 +713,28 @@ func TestCacheManager_Store(t *testing.T) {
 }
 
 func TestEntry_MarshalRoundtrip(t *testing.T) {
-	entry := &Entry{
-		Result: &EntryResult{
-			Status: "failed",
-			Data:   map[string]any{"output": "/dist"},
-			Error:  &EntryError{Message: "build failed", Code: "BUILD_ERR"},
-			Events: []protocolcache.ActionEvent{
-				{Version: 1, Type: "metric", Data: map[string]any{"name": "coverage", "value": float64(84), "unit": "percent"}},
-				{Version: 1, Type: "summary", Data: map[string]any{"message": "51/51 passed, 84.0% coverage"}},
-			},
+	entryResult := &EntryResult{
+		Status: "failed",
+		Data:   map[string]any{"output": "/dist"},
+		Error:  &EntryError{Message: "build failed", Code: "BUILD_ERR"},
+		Events: []protocolcache.ActionEvent{
+			{Version: 1, Type: "metric", Data: map[string]any{"name": "coverage", "value": float64(84), "unit": "percent"}},
+			{Version: 1, Type: "summary", Data: map[string]any{"message": "51/51 passed, 84.0% coverage"}},
 		},
-		Metadata: &EntryMetadata{
-			Hash:        "abc123",
-			CreatedAt:   time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
-			Extension:   "@putnami/typescript",
-			Task:        "build~transpile",
-			Project:     "my-project",
-			DurationMs:  1500,
-			Size:        4096,
-			OutputFiles: []string{"dist/index.js", "dist/index.d.ts"},
-		},
+	}
+	entryMeta := &EntryMetadata{
+		Hash:        "abc123",
+		CreatedAt:   time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
+		Extension:   "@putnami/typescript",
+		Task:        "build~transpile",
+		Project:     "my-project",
+		DurationMs:  1500,
+		Size:        4096,
+		OutputFiles: []string{"dist/index.js", "dist/index.d.ts"},
 	}
 
 	// Marshal result
-	resultJSON, err := json.Marshal(entry.Result)
+	resultJSON, err := json.Marshal(entryResult)
 	if err != nil {
 		t.Fatalf("marshal result: %v", err)
 	}
@@ -1119,7 +761,7 @@ func TestEntry_MarshalRoundtrip(t *testing.T) {
 	}
 
 	// Marshal metadata
-	metaJSON, err := json.Marshal(entry.Metadata)
+	metaJSON, err := json.Marshal(entryMeta)
 	if err != nil {
 		t.Fatalf("marshal metadata: %v", err)
 	}
@@ -1167,11 +809,9 @@ func TestUnmarshalMetadata_InvalidJSON(t *testing.T) {
 }
 
 func TestEntry_MarshalResult_SuccessNoError(t *testing.T) {
-	entry := &Entry{
-		Result: &EntryResult{Status: "success"},
-	}
+	entryResult := &EntryResult{Status: "success"}
 
-	data, err := json.Marshal(entry.Result)
+	data, err := json.Marshal(entryResult)
 	if err != nil {
 		t.Fatalf("marshal result: %v", err)
 	}

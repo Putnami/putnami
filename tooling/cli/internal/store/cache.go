@@ -4,13 +4,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"go.putnami.dev/sdk/extension/gitread"
 )
@@ -596,134 +594,6 @@ func (k *CacheKey) ComputeHashUsing(cm *CacheManager) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// Lookup returns the format-1 entry stored under hash, or nil for a miss. A
-// 0.3.0 CLI wrote format-1 entries; this CLI reads them until the release
-// after 0.4.0 (see LocalStore.Get). The task-owned lookup is LookupTaskEntry.
-func (cm *CacheManager) Lookup(hash string) (*Entry, error) {
-	return cm.store.Get(hash)
-}
-
-// LookupAndTouch is Lookup plus an atomic lastUsed stamp under the store's
-// shared lock, so a concurrent GC cannot evict the entry between the read and
-// the stamp. It reads format-1 entries under the same contract as Lookup.
-func (cm *CacheManager) LookupAndTouch(hash string) (*Entry, error) {
-	return cm.store.getAndTouch(hash)
-}
-
-// RestoreFiles copies cached output files to the target output directory.
-// Returns true if files were restored, false if there were no files to restore.
-func (cm *CacheManager) RestoreFiles(entry *Entry, targetDir string) (bool, error) {
-	if entry.FilesDir == "" {
-		return false, nil
-	}
-
-	// Ensure target directory exists
-	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return false, fmt.Errorf("create target dir: %w", err)
-	}
-
-	// Copy files from cache to target
-	if err := copyDir(entry.FilesDir, targetDir); err != nil {
-		return false, fmt.Errorf("restore files: %w", err)
-	}
-
-	return true, nil
-}
-
-// RestoreDir replaces targetDir with the entry's cached output files, so the
-// directory is byte-identical to the snapshot taken at store time rather than an
-// overlay onto whatever is already there. Use it for captured directory outputs
-// (e.g. a project's .gen tree) whose consumers expect exactly the tree a fresh
-// producing run would leave — overlaying could leave a stale file behind.
-// Returns false (no error) when the entry has no files.
-func (cm *CacheManager) RestoreDir(entry *Entry, targetDir string) (bool, error) {
-	return cm.RestoreDirPreserving(entry, targetDir, nil)
-}
-
-// RestoreDirPreserving is RestoreDir with an explicit set of post-capture
-// files to ignore during manifest comparison and carry forward during a full
-// replacement. preserve receives slash-normalized paths relative to targetDir.
-func (cm *CacheManager) RestoreDirPreserving(
-	entry *Entry,
-	targetDir string,
-	preserve func(rel string) bool,
-) (bool, error) {
-	if entry.FilesDir == "" {
-		return false, nil
-	}
-	if dirMatchesManifest(targetDir, entry.Manifest, "", preserve) {
-		return true, nil
-	}
-	if err := replaceDirPreserving(entry.FilesDir, targetDir, preserve); err != nil {
-		return false, fmt.Errorf("restore dir: %w", err)
-	}
-	return true, nil
-}
-
-// RestoreSubdir replaces targetDir with the entry's cached "<subpath>/" subtree
-// so targetDir is byte-identical to the snapshot (stale files removed). It is the
-// multi-rooted counterpart of RestoreDir, for a format-1 entry whose files/
-// tree holds one directory per subpath.
-// Returns (false, nil) when the entry has no files or did not capture that
-// subpath (e.g. a generate run that produced no client) — restoring a resource
-// the producing run never emitted is a no-op, not an error.
-func (cm *CacheManager) RestoreSubdir(entry *Entry, subpath, targetDir string) (bool, error) {
-	return cm.RestoreSubdirPreserving(entry, subpath, targetDir, nil)
-}
-
-// RestoreSubdirPreserving is the multi-rooted counterpart of
-// RestoreDirPreserving. preserve paths are relative to targetDir after subpath
-// has been stripped from the stored manifest.
-func (cm *CacheManager) RestoreSubdirPreserving(
-	entry *Entry,
-	subpath, targetDir string,
-	preserve func(rel string) bool,
-) (bool, error) {
-	if entry.FilesDir == "" {
-		return false, nil
-	}
-	src := filepath.Join(entry.FilesDir, subpath)
-	if info, err := os.Stat(src); err != nil || !info.IsDir() {
-		return false, nil
-	}
-	if dirMatchesManifest(targetDir, entry.Manifest, subpath, preserve) {
-		return true, nil
-	}
-	if err := replaceDirPreserving(src, targetDir, preserve); err != nil {
-		return false, fmt.Errorf("restore subdir %q: %w", subpath, err)
-	}
-	return true, nil
-}
-
-// EntryMatchesDir reports whether targetDir already contains exactly the files
-// represented by entry. Throwaway artifacts excluded during cache ingest are
-// ignored by the same rule during comparison.
-func (cm *CacheManager) EntryMatchesDir(entry *Entry, targetDir string) bool {
-	return entry != nil && entry.FilesDir != "" && dirMatchesManifest(targetDir, entry.Manifest, "", nil)
-}
-
-// OverlayDir copies the entry's cached output files INTO targetDir, merging with
-// (not replacing) whatever is already there. Unlike RestoreDir - which removes
-// targetDir first so it ends up byte-identical to the snapshot - overlay is the
-// right primitive when the directory is co-owned by several steps of one command
-// that cache independently: a shared command-output dir may already hold a sibling
-// step's real output (put there by a cache miss) that a full replace would delete.
-// Files the blob also contains are overwritten; for a deterministic task the cached
-// copy is byte-identical, so overlay converges to the same tree a fresh run leaves,
-// plus any sibling files the snapshot did not include. Returns false (no error)
-// when the entry has no files.
-func (cm *CacheManager) OverlayDir(entry *Entry, targetDir string) (bool, error) {
-	if entry.FilesDir == "" {
-		return false, nil
-	}
-	// targetDir is a workspace path being rebuilt from a blob the CAS still
-	// holds, so skip the per-file fsync (see copyDirUnsynced).
-	if err := copyDirUnsynced(entry.FilesDir, targetDir); err != nil {
-		return false, fmt.Errorf("overlay dir: %w", err)
-	}
-	return true, nil
-}
-
 // Store returns the underlying store, or nil for a nil manager (caching off),
 // so a caller can hand it to NewRunBudget without a branch.
 func (cm *CacheManager) Store() *LocalStore {
@@ -858,12 +728,4 @@ type CacheKeyPolicy struct {
 	ConfigScope ProjectConfigScope
 	// InputExpander expands the input selectors Files and WorkspaceFiles name.
 	InputExpander InputExpander
-}
-
-// CacheHitResult holds the outcome of a cache lookup for a job.
-type CacheHitResult struct {
-	Hit      bool
-	Hash     string
-	Entry    *Entry
-	Duration time.Duration
 }

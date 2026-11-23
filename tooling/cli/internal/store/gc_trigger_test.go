@@ -1,7 +1,6 @@
 package store
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -27,20 +26,6 @@ func isolateStoreBudget(t *testing.T) string {
 	t.Setenv(gcGraceEnv, "")
 	t.Setenv(maxIdleBuildsEnv, "")
 	return root
-}
-
-// putFilled stores an entry whose single output file is size bytes of fill, so
-// entries with different fills hold different CAS blobs (putSized's zero-filled
-// files would all share one blob per size).
-func putFilled(t *testing.T, s *LocalStore, hash string, size int, fill byte) {
-	t.Helper()
-	src := t.TempDir()
-	if err := os.WriteFile(filepath.Join(src, "f.bin"), bytes.Repeat([]byte{fill}, size), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := putFormatOneEntry(s, hash, entryWith(src)); err != nil {
-		t.Fatalf("Put %s: %v", hash, err)
-	}
 }
 
 func writeUsageRecord(t *testing.T, storeRoot string, usage int64) {
@@ -85,22 +70,25 @@ func TestRunBudget_ProjectsFromRecordedUsageAndSparesWhatTheRunTouched(t *testin
 	putFilled(t, seed, stale, 4000, 's')
 	putFilled(t, seed, held, 4000, 'h')
 	before := time.Now().Add(-time.Minute)
-	writeLastUsed(seed.blobDir(stale), before, 1)
-	writeLastUsed(seed.blobDir(held), before, 1)
+	writeLastUsed(taskBlobDir(seed, stale), before, 1)
+	writeLastUsed(taskBlobDir(seed, held), before, 1)
 	// The last pass measured far less than is on disk now, so only the
 	// projection (not a walk) can explain what happens next.
 	writeUsageRecord(t, root, 1000)
 
 	run := NewLocalStore(root)
 	b := NewRunBudget(ws, budgetConfig(10000), run)
-	run.markUsed(held) // the lookup an in-flight job makes
+	// The lookup an in-flight job makes.
+	if e, err := run.LookupTaskEntry(held); err != nil || e == nil {
+		t.Fatalf("LookupTaskEntry(held) = %v, %v", e, err)
+	}
 
 	putFilled(t, run, grown, 4000, 'g')
 	b.AfterBatch()
 	b.wg.Wait()
 	// Projected 1000+4000 is within budget: no pass, so nothing was measured
 	// or evicted even though the disk holds more than the budget.
-	if e, _ := run.Get(stale); e == nil {
+	if publishedEntry(run, stale) == nil {
 		t.Fatal("a pass ran while the projection was within budget")
 	}
 	if got, _ := readUsageRecord(t, root); got != 1000 {
@@ -121,11 +109,11 @@ func TestRunBudget_ProjectsFromRecordedUsageAndSparesWhatTheRunTouched(t *testin
 	b.AfterBatch() // projected 1000+10000 > 10000: a pass is due
 	b.wg.Wait()
 
-	if e, _ := run.Get(stale); e != nil {
+	if publishedEntry(run, stale) != nil {
 		t.Error("the entry the run never touched survived an over-budget pass")
 	}
 	for _, h := range []string{held, grown, grown2, dup} {
-		if e, _ := run.Get(h); e == nil {
+		if publishedEntry(run, h) == nil {
 			t.Errorf("entry %s the run touched was evicted", h)
 		}
 	}
@@ -163,7 +151,7 @@ func TestRunBudget_FirstWriteMeasuresWhenNoPassHasRecordedUsage(t *testing.T) {
 	if !ok || recorded < 3000 {
 		t.Fatalf("usage record = %d (present=%v), want the measured usage (>= 3000)", recorded, ok)
 	}
-	if e, _ := run.Get(hashN(1)); e == nil {
+	if publishedEntry(run, hashN(1)) == nil {
 		t.Error("a within-budget measuring pass evicted an entry")
 	}
 
@@ -206,7 +194,7 @@ func TestRunBudget_OverBudgetMeasurementWaitsForGrowth(t *testing.T) {
 		t.Fatalf("usage record = %d, want the corrected measurement of about 4.5 KB", recorded)
 	}
 	for _, h := range []string{hashN(1), hashN(2), hashN(3)} {
-		if e, _ := run.Get(h); e == nil {
+		if publishedEntry(run, h) == nil {
 			t.Errorf("entry %s was evicted by a pass that measured the store within budget", h)
 		}
 	}
@@ -301,7 +289,7 @@ func TestRunBudget_BusyScanIsNotAMeasurementAndIsRetriedBoundedly(t *testing.T) 
 	root := isolateStoreBudget(t)
 	seed := NewLocalStore(root)
 	putFilled(t, seed, hashN(1), 6000, 's')
-	writeLastUsed(seed.blobDir(hashN(1)), time.Now().Add(-time.Minute), 1)
+	writeLastUsed(taskBlobDir(seed, hashN(1)), time.Now().Add(-time.Minute), 1)
 	writeUsageRecord(t, root, 9000)
 
 	run := NewLocalStore(root)
@@ -335,7 +323,7 @@ func TestRunBudget_BusyScanIsNotAMeasurementAndIsRetriedBoundedly(t *testing.T) 
 	putFilled(t, run, hashN(3), 1100, 'h') // another tenth of the budget since the last attempt
 	b.AfterBatch()
 	b.wg.Wait()
-	if e, _ := run.Get(hashN(1)); e != nil {
+	if publishedEntry(run, hashN(1)) != nil {
 		t.Error("the retried pass, with the store free, did not evict the untouched entry")
 	}
 	if b.busyRetries != 0 || !b.known || b.usage == 9000 {
@@ -351,7 +339,7 @@ func TestRunBudget_EvictBusyPassIsRetriedOnceTheStoreIsFree(t *testing.T) {
 	root := isolateStoreBudget(t)
 	seed := NewLocalStore(root)
 	putFilled(t, seed, hashN(1), 6000, 's')
-	writeLastUsed(seed.blobDir(hashN(1)), time.Now().Add(-time.Minute), 1)
+	writeLastUsed(taskBlobDir(seed, hashN(1)), time.Now().Add(-time.Minute), 1)
 	writeUsageRecord(t, root, 9000)
 
 	run := NewLocalStore(root)
@@ -363,7 +351,7 @@ func TestRunBudget_EvictBusyPassIsRetriedOnceTheStoreIsFree(t *testing.T) {
 	release := NewLocalStore(root).lockShared()
 	b.AfterBatch()
 	b.wg.Wait()
-	if e, _ := run.Get(hashN(1)); e == nil {
+	if publishedEntry(run, hashN(1)) == nil {
 		t.Fatal("evicted while another holder had the store")
 	}
 	if b.report.StoresSkippedBusy != 1 || b.busyRetries != 1 {
@@ -381,7 +369,7 @@ func TestRunBudget_EvictBusyPassIsRetriedOnceTheStoreIsFree(t *testing.T) {
 	if b.report.Passes != 2 {
 		t.Fatalf("passes = %d, want the retry", b.report.Passes)
 	}
-	if e, _ := run.Get(hashN(1)); e != nil {
+	if publishedEntry(run, hashN(1)) != nil {
 		t.Error("the retry did not evict the untouched entry")
 	}
 	if b.report.EvictedEntries != 1 || b.report.FreedBytes < 4000 {
@@ -445,7 +433,7 @@ func TestNewRunBudget_RelocatedStoreArmsNoBudget(t *testing.T) {
 	if got, _ := readUsageRecord(t, root); got != 1000 {
 		t.Fatalf("usage record = %d, want the machine's 1000 untouched", got)
 	}
-	if e, _ := relocated.Get(hashN(1)); e == nil {
+	if publishedEntry(relocated, hashN(1)) == nil {
 		t.Error("the relocated store was collected")
 	}
 }
@@ -499,7 +487,7 @@ func TestStoreBudget_LeavesExtensionMachineCachesAlone(t *testing.T) {
 	if res.ScannedBytes >= 64<<10 {
 		t.Errorf("ScannedBytes = %d: the store budget counted a language cache", res.ScannedBytes)
 	}
-	if e, _ := s.Get(hashN(1)); e != nil {
+	if publishedEntry(s, hashN(1)) != nil {
 		t.Error("the over-budget pass evicted nothing it manages, so it proved nothing")
 	}
 	for _, path := range cacheFiles {

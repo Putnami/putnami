@@ -1,7 +1,6 @@
 package store
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -81,66 +80,10 @@ func WorthCoalescing(estimatedCost time.Duration) bool {
 	return estimatedCost >= CoalescingFloor
 }
 
-// TryClaim delegates cache-miss ownership to the machine-global local store.
-// Keeping this on CacheManager lets production execution coordinate without
-// reaching through to the store implementation.
-func (cm *CacheManager) TryClaim(key string, estimatedCost time.Duration) (winner bool, release func()) {
-	return cm.store.TryClaim(key, estimatedCost)
-}
-
-// WaitForPublish waits for a sibling process to publish key while remaining
-// responsive to scheduler cancellation. LocalStore's public primitive owns the
-// lease-state semantics; the short wait slices only add context cancellation
-// without spawning a goroutine that could outlive the job.
-func (cm *CacheManager) WaitForPublish(ctx context.Context, key string, timeout time.Duration) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if timeout <= 0 {
-		return cm.store.WaitForPublish(key, timeout)
-	}
-
-	deadline := time.Now().Add(timeout)
-	for {
-		remaining := time.Until(deadline)
-		if remaining <= 0 {
-			return ErrLeaseWaitTimeout
-		}
-		wait := min(remaining, leaseWaitCancelPoll)
-		err := cm.store.WaitForPublish(key, wait)
-		if !errors.Is(err, ErrLeaseWaitTimeout) {
-			return err
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-	}
-}
-
-// TryClaim attempts to own the computation that will publish key. Exactly one
-// process wins while a lease is live. A winner receives an idempotent release
-// function and a heartbeat keeps its ownership alive until release. A loser
-// should call WaitForPublish, then look the entry up normally. estimatedCost is
-// optional for callers without a prediction; when supplied, only its first
-// value is used to apply CoalescingFloor.
-//
-// Any filesystem/locking failure and any known cost below CoalescingFloor
-// return winner=true with a no-op release. Leasing must never make a build less
-// reliable than computing the key independently.
-func (s *LocalStore) TryClaim(key string, estimatedCost ...time.Duration) (winner bool, release func()) {
-	cost := time.Duration(0)
-	if len(estimatedCost) > 0 {
-		cost = estimatedCost[0]
-	}
-	return s.tryClaim(key, cost, func() bool { return s.entryPublished(key) })
-}
-
-// tryClaim is the target-agnostic form used by other store content-addressed
-// paths (for example CAS blob fetches). published must be safe to call while the
-// store's shared lock is held.
+// tryClaim is the target-agnostic claim behind TryClaimTaskEntry and the other
+// content-addressed paths (for example CAS blob fetches); see TryClaimTaskEntry
+// for the contract. published must be safe to call while the store's shared lock
+// is held.
 func (s *LocalStore) tryClaim(key string, estimatedCost time.Duration, published func() bool) (bool, func()) {
 	noop := func() {}
 	if !WorthCoalescing(estimatedCost) {
@@ -172,16 +115,8 @@ func (s *LocalStore) tryClaim(key string, estimatedCost time.Duration, published
 	return true, release
 }
 
-// WaitForPublish blocks until key has been atomically published, the current
-// owner expires/releases, or timeout elapses. On ErrLeaseExpired callers should
-// call TryClaim again before computing, so one waiter takes over rather than all
-// waiters recomputing together. On ErrLeaseWaitTimeout callers may compute
-// directly as a bounded-wait reliability fallback.
-func (s *LocalStore) WaitForPublish(key string, timeout time.Duration) error {
-	return s.waitForPublish(key, timeout, func() bool { return s.entryPublished(key) })
-}
-
-// waitForPublish is the target-agnostic form used by other store paths.
+// waitForPublish is the target-agnostic wait behind WaitForTaskEntry and the
+// other content-addressed paths; see WaitForTaskEntry for the contract.
 func (s *LocalStore) waitForPublish(key string, timeout time.Duration, published func() bool) error {
 	path := s.leasePath(key)
 	deadline := s.leaseNow().Add(timeout)
@@ -355,11 +290,6 @@ func (s *LocalStore) leaseSnapshot(path string, published func() bool) (bool, le
 		return false, leaseRecord{}, nil // malformed/crash-torn means unowned
 	}
 	return false, rec, nil
-}
-
-func (s *LocalStore) entryPublished(key string) bool {
-	fi, err := os.Stat(filepath.Join(s.blobDir(key), "result.json"))
-	return err == nil && fi.Mode().IsRegular()
 }
 
 func (s *LocalStore) leasePath(key string) string {

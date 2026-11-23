@@ -9,13 +9,13 @@
 //
 // # Decision 1: the remote key is the FORMAT-QUALIFIED address, not the cache key
 //
-// The local store already separates the two entry models by address
-// (task_entry.go): a task-owned entry lives at TaskEntryAddress(key), so a CLI
-// that only knows the legacy layout computes blobDir(key) and never sees it.
+// The local store separates entry formats by address (task_entry.go): a
+// task-owned entry lives at TaskEntryAddress(key), so a CLI that only knows the
+// format-1 layout computes blobDir(key) and never sees it.
 // The remote cache is shared far more widely than the machine-global store —
 // across machines, branches and CLI versions at once — so it needs the same
 // property or it loses it for everyone: an older binary asking the provider
-// for key K would receive a format-2 payload, materialize it as a legacy capture,
+// for key K would receive a format-2 payload, materialize it as a format-1 capture,
 // and restore a tree laid out by declared-output id into a directory that
 // expects the captured shape. That is silent corruption, and no amount of care
 // in THIS build can prevent it, because the old binary cannot be taught.
@@ -41,7 +41,7 @@
 // Two consequences, both wanted:
 //
 //   - The payload is self-describing. A hit whose manifest carries no descriptor
-//     is a legacy payload and reads as a MISS; a descriptor that is torn, in
+//     is not a task-owned payload and reads as a MISS; a descriptor that is torn, in
 //     another format, records another key, or disagrees with the manifest it
 //     arrived with also reads as a MISS. Fail closed, exactly as
 //     LookupTaskEntry does locally: a wrongly accepted entry materializes the
@@ -227,7 +227,7 @@ type RemoteTaskEntryHit struct {
 // (MaterializeTaskOutput) — there is no remote-specific delivery.
 //
 // A payload this build cannot interpret is an error, and every caller turns it
-// into a MISS: no descriptor (a legacy-format hit under this address), a
+// into a MISS: no descriptor (a format-1 hit under this address), a
 // descriptor that is torn or in another format, a descriptor recording a
 // different key, or a descriptor disagreeing with the manifest it arrived with.
 func (cm *CacheManager) MaterializeTaskEntry(hit RemoteTaskEntryHit, fetch BlobFetcher) (*TaskEntry, error) {
@@ -333,7 +333,7 @@ func (s *LocalStore) MaterializeTaskEntry(hit RemoteTaskEntryHit, fetch BlobFetc
 }
 
 // splitTaskEntryManifest separates the reserved descriptor entry from the
-// payload files. ok is false when the manifest has no descriptor (a legacy
+// payload files. ok is false when the manifest has no descriptor (a format-1
 // payload) or more than one (a manifest this build refuses to interpret).
 func splitTaskEntryManifest(manifest *cache.Manifest) (*cache.Manifest, cache.FileEntry, bool) {
 	payload := &cache.Manifest{Files: make([]cache.FileEntry, 0, len(manifest.Files))}

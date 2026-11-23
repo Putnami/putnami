@@ -34,21 +34,21 @@ func TestLease_OneWinnerPublishesForWaiter(t *testing.T) {
 	winnerStore.leaseClock = func() time.Time { return frozen }
 	waiterStore.leaseClock = func() time.Time { return frozen }
 
-	winner, release := winnerStore.TryClaim(leaseTestKey, time.Second)
+	winner, release := winnerStore.TryClaimTaskEntry(leaseTestKey, time.Second)
 	if !winner {
 		t.Fatal("first claimant did not win")
 	}
 	t.Cleanup(release)
 
-	if won, loserRelease := waiterStore.TryClaim(leaseTestKey, time.Second); won {
+	if won, loserRelease := waiterStore.TryClaimTaskEntry(leaseTestKey, time.Second); won {
 		loserRelease()
 		t.Fatal("second claimant won while the first lease was live")
 	}
 
 	waited := make(chan error, 1)
-	go func() { waited <- waiterStore.WaitForPublish(leaseTestKey, 2*time.Second) }()
+	go func() { waited <- waiterStore.WaitForTaskEntry(leaseTestKey, 2*time.Second) }()
 
-	if err := putFormatOneEntry(winnerStore, leaseTestKey, leaseStatusEntry()); err != nil {
+	if err := publishLeased(winnerStore, leaseTestKey); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
 	release()
@@ -77,7 +77,7 @@ func TestLease_HeartbeatKeepsOwnershipLive(t *testing.T) {
 	afterClaimExpiry := start.Add(ttl + 100*time.Millisecond)
 	contender.leaseClock = func() time.Time { return afterClaimExpiry }
 
-	winner, release := owner.TryClaim(leaseTestKey, time.Second)
+	winner, release := owner.TryClaimTaskEntry(leaseTestKey, time.Second)
 	if !winner {
 		t.Fatal("first claimant did not win")
 	}
@@ -88,7 +88,7 @@ func TestLease_HeartbeatKeepsOwnershipLive(t *testing.T) {
 	beforeClaimExpiry := start.Add(ttl - 100*time.Millisecond)
 	ownerNow.Store(beforeClaimExpiry.UnixNano())
 	extended := beforeClaimExpiry.Add(ttl).UnixNano()
-	path := owner.leasePath(leaseTestKey)
+	path := owner.leasePath(TaskEntryAddress(leaseTestKey))
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		_, record, err := owner.leaseSnapshot(path, nil)
@@ -104,13 +104,13 @@ func TestLease_HeartbeatKeepsOwnershipLive(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	if won, contenderRelease := contender.TryClaim(leaseTestKey, time.Second); won {
+	if won, contenderRelease := contender.TryClaimTaskEntry(leaseTestKey, time.Second); won {
 		contenderRelease()
 		t.Fatal("contender stole a heartbeating lease")
 	}
 
 	release()
-	if won, takeoverRelease := contender.TryClaim(leaseTestKey, time.Second); !won {
+	if won, takeoverRelease := contender.TryClaimTaskEntry(leaseTestKey, time.Second); !won {
 		t.Fatal("released lease was not immediately claimable")
 	} else {
 		takeoverRelease()
@@ -138,8 +138,8 @@ func TestLease_KnownCheapWorkBypassesCoalescing(t *testing.T) {
 
 	// Bypassing returns both callers as independent winners and creates no
 	// coordination sidecar at all.
-	winnerA, releaseA := a.TryClaim(leaseTestKey, floor-time.Millisecond)
-	winnerB, releaseB := b.TryClaim(leaseTestKey, floor-time.Millisecond)
+	winnerA, releaseA := a.TryClaimTaskEntry(leaseTestKey, floor-time.Millisecond)
+	winnerB, releaseB := b.TryClaimTaskEntry(leaseTestKey, floor-time.Millisecond)
 	releaseA()
 	releaseB()
 	if !winnerA || !winnerB {
@@ -157,16 +157,16 @@ func TestLease_WaitTimeoutFallsBack(t *testing.T) {
 	configureFastLease(owner, time.Second)
 	configureFastLease(waiter, time.Second)
 
-	winner, release := owner.TryClaim(leaseTestKey, time.Second)
+	winner, release := owner.TryClaimTaskEntry(leaseTestKey, time.Second)
 	if !winner {
 		t.Fatal("first claimant did not win")
 	}
 	defer release()
 
 	start := time.Now()
-	err := waiter.WaitForPublish(leaseTestKey, 50*time.Millisecond)
+	err := waiter.WaitForTaskEntry(leaseTestKey, 50*time.Millisecond)
 	if !errors.Is(err, ErrLeaseWaitTimeout) {
-		t.Fatalf("WaitForPublish error = %v, want ErrLeaseWaitTimeout", err)
+		t.Fatalf("WaitForTaskEntry error = %v, want ErrLeaseWaitTimeout", err)
 	}
 	if elapsed := time.Since(start); elapsed < 40*time.Millisecond || elapsed > time.Second {
 		t.Fatalf("wait timeout elapsed = %s, want a bounded ~50ms wait", elapsed)
@@ -180,7 +180,7 @@ func TestLease_CacheManagerWaitHonorsContextCancellation(t *testing.T) {
 	configureFastLease(owner, time.Second)
 	configureFastLease(waiter.store, time.Second)
 
-	winner, release := owner.TryClaim(leaseTestKey, time.Second)
+	winner, release := owner.TryClaimTaskEntry(leaseTestKey, time.Second)
 	if !winner {
 		t.Fatal("first claimant did not win")
 	}
@@ -189,9 +189,9 @@ func TestLease_CacheManagerWaitHonorsContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	start := time.Now()
-	err := waiter.WaitForPublish(ctx, leaseTestKey, time.Second)
+	err := waiter.WaitForTaskEntry(ctx, leaseTestKey, time.Second)
 	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("WaitForPublish error = %v, want context.Canceled", err)
+		t.Fatalf("WaitForTaskEntry error = %v, want context.Canceled", err)
 	}
 	if elapsed := time.Since(start); elapsed > 250*time.Millisecond {
 		t.Fatalf("canceled cache-manager wait took %s", elapsed)
@@ -203,21 +203,21 @@ func TestLease_GCPreservesLiveAndReapsExpiredSidecar(t *testing.T) {
 	s := NewLocalStore(root)
 	configureFastLease(s, 2*time.Second)
 
-	winner, release := s.TryClaim(leaseTestKey, time.Second)
+	winner, release := s.TryClaimTaskEntry(leaseTestKey, time.Second)
 	if !winner {
 		t.Fatal("first claimant did not win")
 	}
-	leasePath := s.leasePath(leaseTestKey)
+	leasePath := s.leasePath(TaskEntryAddress(leaseTestKey))
 	leaseInfo, err := os.Stat(leasePath)
 	if err != nil {
 		t.Fatalf("stat active lease: %v", err)
 	}
 
 	entryKey := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	if err := putFormatOneEntry(s, entryKey, leaseStatusEntry()); err != nil {
+	if err := publishLeased(s, entryKey); err != nil {
 		t.Fatalf("seed entry: %v", err)
 	}
-	expectedBytes := blobMetaBytes(s.blobDir(entryKey)) + dirBytes(filepath.Join(root, "cas"))
+	expectedBytes := blobMetaBytes(taskBlobDir(s, entryKey)) + dirBytes(filepath.Join(root, "cas"))
 
 	res, err := RunGC([]string{root}, GCOptions{
 		MaxBytes: 1,
@@ -247,9 +247,8 @@ func TestLease_GCPreservesLiveAndReapsExpiredSidecar(t *testing.T) {
 	}
 }
 
-func leaseStatusEntry() *Entry {
-	return &Entry{
-		Result:   &EntryResult{Status: "success"},
-		Metadata: &EntryMetadata{Extension: "test", Task: "build", Project: "project"},
-	}
+// publishLeased publishes key's task-owned entry, a result with no outputs.
+func publishLeased(s *LocalStore, key string) error {
+	_, err := s.IngestTaskEntry("", taskSpec(key))
+	return err
 }

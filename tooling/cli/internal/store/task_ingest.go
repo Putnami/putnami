@@ -37,10 +37,10 @@ import (
 //	<staging>/workspace/<path>        root: workspace
 //	<staging>/command-output/<path>   root: command-output
 //
-// Publication reuses the legacy machinery unchanged — CAS dedup, the shared
-// store lock, staged directory, single atomic rename, first-writer-wins — so a
-// task-owned entry is an ordinary blob to GC, to the CAS sweep, and to the
-// remote-cache manifest exchange.
+// Publication goes through CAS dedup, the shared store lock, a staged directory
+// and a single atomic rename, and the first writer wins, so a task-owned entry
+// is an ordinary blob to GC, to the CAS sweep, and to the remote-cache manifest
+// exchange.
 
 // TaskEntrySpec is everything needed to publish a task-owned entry except the
 // bytes, which come from the staging root.
@@ -180,7 +180,7 @@ func (s *LocalStore) IngestTaskEntry(stagingRoot string, spec TaskEntrySpec) (*T
 	}
 
 	// In-process lock for the atomic publish (the cross-process shared lock is
-	// already held for the whole call), mirroring put().
+	// already held for the whole call), as in MaterializeTaskEntry.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -302,7 +302,7 @@ func (s *LocalStore) ingestStagedOutput(
 
 // ingestOutputTree walks one declared directory output, ingesting every regular
 // file into the CAS under "<id>/<rel>". Empty directories are not represented in
-// cache manifests (see dirMatchesManifest), so a tree of only empty directories
+// cache manifests, so a tree of only empty directories
 // counts as no files.
 func (s *LocalStore) ingestOutputTree(srcDir, dstDir, id string, manifest *cache.Manifest) (int, int64, error) {
 	var files int
@@ -375,8 +375,7 @@ func (s *LocalStore) ingestOneFile(
 	return size, nil
 }
 
-// manifestFilePaths lists a manifest's paths, for the advisory meta.json field the
-// legacy model also carries.
+// manifestFilePaths lists a manifest's paths, for the advisory meta.json field.
 func manifestFilePaths(manifest *cache.Manifest) []string {
 	if manifest == nil || len(manifest.Files) == 0 {
 		return nil

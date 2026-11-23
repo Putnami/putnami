@@ -67,7 +67,7 @@ func TestResultOnlyEntryRecordsTheResultAndNoFile(t *testing.T) {
 }
 
 // TestResultOnlyEntryIsAddressedApartFromEveryOtherEntry keeps the result-only
-// record invisible to the task-owned and legacy readers, so no restore can
+// record invisible to the task-owned reader and to an older CLI, so no restore can
 // mistake it for an entry that holds files, and no remote path can name it.
 func TestResultOnlyEntryIsAddressedApartFromEveryOtherEntry(t *testing.T) {
 	t.Parallel()
@@ -91,9 +91,7 @@ func TestResultOnlyEntryIsAddressedApartFromEveryOtherEntry(t *testing.T) {
 	if entry, err := s.LookupTaskEntry(resultOnlyKeyA); err != nil || entry != nil {
 		t.Errorf("LookupTaskEntry served a result-only entry: %+v %v", entry, err)
 	}
-	if legacy, err := s.Get(address); err != nil || legacy != nil {
-		t.Errorf("the legacy reader interpreted the result-only blob: %+v %v", legacy, err)
-	}
+	assertHoldsNoEntryFile(t, s.blobDir(address))
 	if failure := s.LookupTaskFailure(resultOnlyKeyA); failure != nil {
 		t.Errorf("LookupTaskFailure served a result-only entry: %+v", failure)
 	}
@@ -141,7 +139,7 @@ func TestResultOnlyPublishRefusesALegacyPayload(t *testing.T) {
 	hit := resultOnlyHit(resultOnlyKeyA)
 	hit.Manifest = &cache.Manifest{Files: hit.Manifest.Files[1:]}
 	if _, err := s.PublishResultOnlyTaskEntry(hit); !errors.Is(err, ErrEntryFormat) {
-		t.Fatalf("a legacy payload error = %v, want ErrEntryFormat", err)
+		t.Fatalf("a descriptor-less payload error = %v, want ErrEntryFormat", err)
 	}
 }
 
@@ -160,7 +158,7 @@ func TestUnreadableResultOnlyEntryIsAMiss(t *testing.T) {
 		"another key":    {resultOnlyRecordFilename: record(CurrentResultOnlyTaskEntryFormat, resultOnlyKeyB, success)},
 		"no result":      {resultOnlyRecordFilename: record(CurrentResultOnlyTaskEntryFormat, resultOnlyKeyA, nil)},
 		"statusless":     {resultOnlyRecordFilename: record(CurrentResultOnlyTaskEntryFormat, resultOnlyKeyA, &EntryResult{})},
-		"legacy files only": {
+		"format-1 files only": {
 			"result.json": `{"status":"success"}`,
 			"meta.json":   `{"hash":"x"}`,
 		},

@@ -64,39 +64,6 @@ func (s *LocalStore) acquireLock(exclusive, nonBlocking bool) (func(), bool) {
 	return func() { _ = l.Release() }, true
 }
 
-// markUsed stamps the entry's lastUsed sidecar with the current time and this
-// build's generation so GC's recency/grace and idle reclaim see this hit.
-// Best-effort: it takes the shared lock (mutually exclusive with GC) and
-// silently no-ops if the entry has already been evicted.
-func (s *LocalStore) markUsed(hash string) {
-	s.ensureGeneration()
-	release := s.lockShared()
-	defer release()
-
-	blobDir := s.blobDir(hash)
-	if _, err := os.Stat(blobDir); err != nil {
-		return // gone (evicted) — nothing to stamp
-	}
-	writeLastUsed(blobDir, time.Now(), s.gen)
-}
-
-// getAndTouch returns the entry for hash AND stamps its lastUsed time +
-// generation atomically under the shared lock, so a concurrent GC (exclusive)
-// cannot evict the entry in the window between the read and the stamp. It reads
-// format-1 entries under Get's contract; plain Get does not refresh recency.
-func (s *LocalStore) getAndTouch(hash string) (*Entry, error) {
-	s.ensureGeneration()
-	release := s.lockShared()
-	defer release()
-
-	entry, err := s.Get(hash)
-	if err != nil || entry == nil {
-		return entry, err
-	}
-	writeLastUsed(s.blobDir(hash), time.Now(), s.gen)
-	return entry, nil
-}
-
 // lastUsedRecord is the JSON payload of the lastUsed sidecar: when the entry was
 // last hit and the store generation at that time.
 type lastUsedRecord struct {

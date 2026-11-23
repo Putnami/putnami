@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/sdk/extension/dirlink"
 )
 
@@ -96,17 +95,16 @@ func readReplacedFile(path string) ([]byte, error) {
 // dst is the only durable home for the bytes — anything published into the CAS,
 // where a torn file would make a blob disagree with its manifest digest.
 func copyDir(src, dst string) error {
-	return copyDirFiltered(src, dst, nil)
+	return copyDirOpts(src, dst, true)
 }
 
 // copyDirUnsynced recursively copies a directory tree without fsyncing each
 // file. Use it when dst is a workspace materialization of bytes the CAS still
-// holds — restoring a cached output tree, detaching a CAS symlink — where the
-// fsync buys only crash durability for a tree any later run rebuilds from the
-// blob. Torn-read safety comes from copyFile's stage-then-rename, not from the
-// fsync.
+// holds, such as a detached CAS symlink, where the fsync buys only crash
+// durability for a tree any later run rebuilds from the blob. Torn-read safety
+// comes from copyFile's stage-then-rename, not from the fsync.
 func copyDirUnsynced(src, dst string) error {
-	return copyDirOpts(src, dst, nil, false)
+	return copyDirOpts(src, dst, false)
 }
 
 // MaterializeDirSymlink detaches a symlinked directory into a writable real
@@ -321,131 +319,9 @@ func removeStaleLink(target string) error {
 	return nil
 }
 
-// replaceDirPreserving stages a fresh copy of src beside dst and atomically
-// swaps it into place. Selected post-capture files from the existing target are
-// carried forward; preserve receives slash-normalized paths relative to dst.
-// This keeps scheduler-owned sidecars outside a task's cache snapshot without
-// coupling their lifetime to a later regeneration phase. A nil predicate makes
-// dst byte-identical to src.
-//
-// dst is always a workspace path being rebuilt from a blob the CAS still holds,
-// so the copies skip the per-file fsync (see copyDirUnsynced).
-func replaceDirPreserving(src, dst string, preserve func(rel string) bool) error {
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return err
-	}
-	staging := dst + ".tmp-restore"
-	if err := os.RemoveAll(staging); err != nil {
-		return err
-	}
-	if err := copyDirUnsynced(src, staging); err != nil {
-		os.RemoveAll(staging)
-		return err
-	}
-	if preserve != nil {
-		if info, err := os.Stat(dst); err == nil && info.IsDir() {
-			if err := copyDirOpts(dst, staging, func(rel string) bool {
-				return !preserve(filepath.ToSlash(rel))
-			}, false); err != nil {
-				os.RemoveAll(staging)
-				return err
-			}
-		} else if err != nil && !os.IsNotExist(err) {
-			os.RemoveAll(staging)
-			return err
-		}
-	}
-	if err := os.RemoveAll(dst); err != nil {
-		os.RemoveAll(staging)
-		return err
-	}
-	if err := os.Rename(staging, dst); err != nil {
-		os.RemoveAll(staging)
-		return err
-	}
-	return nil
-}
-
-// dirMatchesManifest reports whether target already contains exactly the files
-// described by manifest. prefix selects a manifest subtree (for example
-// "gen/") and is stripped before comparing paths. Empty directories are not
-// represented in cache manifests and therefore do not affect the result.
-//
-// This content check is substantially cheaper than replacing a small generated
-// tree: replacement fsyncs every copied file, while a consecutive warm build
-// usually only needs to read a handful of already-cached bytes. Digests—not
-// mtimes—keep the fast path correct when a file was edited without changing its
-// size, and the final count rejects extra stale files.
-func dirMatchesManifest(target string, manifest *cache.Manifest, prefix string, ignore func(rel string) bool) bool {
-	if manifest == nil {
-		return false
-	}
-	prefix = filepath.ToSlash(prefix)
-	if prefix != "" && !strings.HasSuffix(prefix, "/") {
-		prefix += "/"
-	}
-
-	expected := make(map[string]cache.FileEntry)
-	for _, file := range manifest.Files {
-		path := filepath.ToSlash(file.Path)
-		if prefix != "" {
-			if !strings.HasPrefix(path, prefix) {
-				continue
-			}
-			path = strings.TrimPrefix(path, prefix)
-		}
-		if path != "" && !manifestMatchIgnored(path, ignore) {
-			expected[path] = file
-		}
-	}
-
-	matched := 0
-	err := filepath.Walk(target, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		rel, err := filepath.Rel(target, path)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-		if manifestMatchIgnored(rel, ignore) {
-			return nil
-		}
-		if !info.Mode().IsRegular() {
-			return os.ErrInvalid
-		}
-		file, ok := expected[rel]
-		if !ok || info.Size() != file.Size || uint32(info.Mode().Perm()) != file.Mode {
-			return os.ErrInvalid
-		}
-		digest, _, err := digestFile(path)
-		if err != nil || digest != file.Digest {
-			return os.ErrInvalid
-		}
-		matched++
-		return nil
-	})
-	return err == nil && matched == len(expected)
-}
-
-func manifestMatchIgnored(rel string, ignore func(rel string) bool) bool {
-	return uncacheableArtifact(rel) || (ignore != nil && ignore(rel))
-}
-
-// copyDirFiltered recursively copies a directory tree, skipping any file whose
-// path relative to src satisfies skip. Directories are always created so the
-// tree shape is preserved even when all of a directory's files are skipped.
-func copyDirFiltered(src, dst string, skip func(rel string) bool) error {
-	return copyDirOpts(src, dst, skip, true)
-}
-
-// copyDirOpts backs copyDir/copyDirFiltered/copyDirUnsynced. sync selects
-// whether each copied file is fsynced; see copyDirUnsynced for when to drop it.
-func copyDirOpts(src, dst string, skip func(rel string) bool, sync bool) error {
+// copyDirOpts backs copyDir and copyDirUnsynced. sync selects whether each
+// copied file is fsynced; see copyDirUnsynced for when to drop it.
+func copyDirOpts(src, dst string, sync bool) error {
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -459,10 +335,6 @@ func copyDirOpts(src, dst string, skip func(rel string) bool, sync bool) error {
 
 		if info.IsDir() {
 			return os.MkdirAll(target, info.Mode())
-		}
-
-		if skip != nil && skip(rel) {
-			return nil
 		}
 
 		return copyFileOpts(path, target, sync)

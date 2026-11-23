@@ -1,7 +1,6 @@
 package store
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,18 +8,18 @@ import (
 	"time"
 )
 
-// buildSyntheticStore publishes entries through the real Put path, each with
+// buildSyntheticStore publishes entries through the real ingest path, each with
 // filesPerEntry distinct small output files (so every file is its own CAS
-// blob) under a hash spread across the fan-out directories like a real key,
-// and returns the store's scan with one entry in ten as GC victims.
+// blob) at an address spread across the fan-out directories, and returns the store's scan with one entry in ten as GC victims.
 func buildSyntheticStore(b *testing.B, root string, entries, filesPerEntry int) (*storeScan, []gcEntry) {
 	b.Helper()
 	s := NewLocalStore(root)
 	src := b.TempDir()
+	out := dirOutput("out", "out")
 	for e := range entries {
 		dir := filepath.Join(src, fmt.Sprintf("e%d", e))
 		for f := range filesPerEntry {
-			path := filepath.Join(dir, "out", fmt.Sprintf("f%d.txt", f))
+			path := filepath.Join(TaskStagingPath(dir, out), fmt.Sprintf("f%d.txt", f))
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				b.Fatal(err)
 			}
@@ -28,9 +27,8 @@ func buildSyntheticStore(b *testing.B, root string, entries, filesPerEntry int) 
 				b.Fatal(err)
 			}
 		}
-		hash := fmt.Sprintf("%x", sha256.Sum256(fmt.Appendf(nil, "entry %d", e)))
-		if err := putFormatOneEntry(s, hash, entryWith(dir)); err != nil {
-			b.Fatalf("Put %s: %v", hash, err)
+		if _, err := s.IngestTaskEntry(dir, taskSpec(fmt.Sprintf("entry %d", e), out)); err != nil {
+			b.Fatalf("IngestTaskEntry %d: %v", e, err)
 		}
 		_ = os.RemoveAll(dir)
 	}

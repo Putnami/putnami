@@ -62,25 +62,22 @@ func assertNoStagedBlobs(t *testing.T, root string) {
 	}
 }
 
-// TestPutSucceedsWhenAnotherWriterPublishedTheBlob pins F2: a blob rename that
+// TestIngestSucceedsWhenAnotherWriterPublishedTheBlob pins F2: a blob rename that
 // fails while a blob with that digest exists is a lost race, not an error. The
 // digest names the bytes, so the entry links the blob the other writer
 // published, and this handle counts no bytes it did not write.
-func TestFormatOneWriteSucceedsWhenAnotherWriterPublishedTheBlob(t *testing.T) {
+func TestIngestSucceedsWhenAnotherWriterPublishedTheBlob(t *testing.T) {
 	root := t.TempDir()
 	s := NewLocalStore(root)
 	loseBlobPublishRace(t)
 
-	if err := putFormatOneEntry(s, hashA, entryWith(makeSource(t, "built"))); err != nil {
-		t.Fatalf("Put after a lost blob race: %v", err)
-	}
-	entry, err := s.Get(hashA)
+	putWithFile(t, s, hashA, "main.js", "built")
+	entry, err := s.LookupTaskEntry(hashA)
 	if err != nil || entry == nil {
-		t.Fatalf("Get: %v (entry=%v)", err, entry)
+		t.Fatalf("LookupTaskEntry: %v (entry=%v)", err, entry)
 	}
-	data, err := os.ReadFile(filepath.Join(entry.FilesDir, "dist", "main.js"))
-	if err != nil || string(data) != "built" {
-		t.Errorf("published file = %q, %v; want built", data, err)
+	if got := readDist(t, entry, "main.js"); got != "built" {
+		t.Errorf("published file = %q; want built", got)
 	}
 	if got := s.added.Load(); got != 0 {
 		t.Errorf("the handle counted %d bytes another writer published", got)
@@ -88,16 +85,23 @@ func TestFormatOneWriteSucceedsWhenAnotherWriterPublishedTheBlob(t *testing.T) {
 	assertNoStagedBlobs(t, root)
 }
 
-// TestPutFailsWhenTheBlobPublishFailsAndNoBlobExists pins the other side of
-// F2: without a blob at the digest, the failed rename is the error.
-func TestFormatOneWriteFailsWhenTheBlobPublishFailsAndNoBlobExists(t *testing.T) {
+// TestIngestFailsWhenTheBlobPublishFailsAndNoBlobExists pins the other side of
+// F2: without a blob at the digest, the failed rename is the error, and no
+// entry is published.
+func TestIngestFailsWhenTheBlobPublishFailsAndNoBlobExists(t *testing.T) {
 	root := t.TempDir()
 	s := NewLocalStore(root)
 	failBlobPublish(t)
 
-	err := putFormatOneEntry(s, hashA, entryWith(makeSource(t, "built")))
+	staging := t.TempDir()
+	out := dirOutput("dist", "dist")
+	stage(t, staging, out, "main.js", "built")
+	_, err := s.IngestTaskEntry(staging, taskSpec(hashA, out))
 	if !errors.Is(err, errHeldOpen) {
-		t.Fatalf("Put = %v, want the failed blob rename", err)
+		t.Fatalf("IngestTaskEntry = %v, want the failed blob rename", err)
+	}
+	if got := publishedEntry(s, hashA); got != nil {
+		t.Errorf("a failed ingest published an entry: %+v", got)
 	}
 	assertNoStagedBlobs(t, root)
 }
@@ -110,18 +114,16 @@ func TestMaterializeSucceedsWhenAnotherWriterPublishedTheFetchedBlob(t *testing.
 	loseBlobPublishRace(t)
 
 	content := "remote artifact bytes"
-	entry, digest := hitEntry("dist/app.js", content)
-	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte(content)}}
-	if err := materializeFormatOneEntry(s, hashA, entry, f.fetch); err != nil {
-		t.Fatalf("Materialize after a lost blob race: %v", err)
+	hit, f := distHit(t, hashA, map[string]string{"app.js": content})
+	if _, err := s.MaterializeTaskEntry(hit, f.fetch); err != nil {
+		t.Fatalf("MaterializeTaskEntry after a lost blob race: %v", err)
 	}
-	got, err := s.Get(hashA)
-	if err != nil || got == nil {
-		t.Fatalf("Get: %v (entry=%v)", err, got)
+	entry, err := s.LookupTaskEntry(hashA)
+	if err != nil || entry == nil {
+		t.Fatalf("LookupTaskEntry: %v (entry=%v)", err, entry)
 	}
-	data, err := os.ReadFile(filepath.Join(got.FilesDir, "dist", "app.js"))
-	if err != nil || string(data) != content {
-		t.Errorf("restored file = %q, %v; want %q", data, err, content)
+	if got := readDist(t, entry, "app.js"); got != content {
+		t.Errorf("restored file = %q; want %q", got, content)
 	}
 	if n := s.added.Load(); n != 0 {
 		t.Errorf("the handle counted %d bytes another writer published", n)
@@ -136,12 +138,10 @@ func TestMaterializeFailsWhenTheFetchedBlobPublishFailsAndNoBlobExists(t *testin
 	s := NewLocalStore(root)
 	failBlobPublish(t)
 
-	content := "remote artifact bytes"
-	entry, digest := hitEntry("dist/app.js", content)
-	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte(content)}}
-	err := materializeFormatOneEntry(s, hashA, entry, f.fetch)
+	hit, f := distHit(t, hashA, map[string]string{"app.js": "remote artifact bytes"})
+	_, err := s.MaterializeTaskEntry(hit, f.fetch)
 	if !errors.Is(err, errHeldOpen) {
-		t.Fatalf("Materialize = %v, want the failed blob rename", err)
+		t.Fatalf("MaterializeTaskEntry = %v, want the failed blob rename", err)
 	}
 	assertNoStagedBlobs(t, root)
 }

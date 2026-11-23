@@ -150,22 +150,6 @@ func IsCacheEnabled(job *jobmodel.ScheduledJob, bypass CacheBypass) bool {
 
 const GenResourceID = "gen"
 
-// WritesProjectGen identifies the task that owns the generated tree. It gates
-// the legacy files-less-entry rejection (remotecache/remote.go): an entry claiming to be a
-// generation result but carrying no payload cannot restore .gen and must not be
-// served as a hit. It is NOT a cache-key input — see ComputeJobCacheHash.
-func WritesProjectGen(job *jobmodel.ScheduledJob) bool {
-	if job == nil || job.JobDef == nil {
-		return false
-	}
-	for _, ref := range job.JobDef.Writes {
-		if ref.EffectiveScope() == extension.ResourceScopeProject && ref.ID == GenResourceID {
-			return true
-		}
-	}
-	return false
-}
-
 // JobWritesSourceTree detects the resource that serializes source rewriters.
 func JobWritesSourceTree(job *jobmodel.ScheduledJob) bool {
 	if job == nil || job.JobDef == nil {

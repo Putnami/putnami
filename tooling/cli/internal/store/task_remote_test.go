@@ -65,13 +65,13 @@ func hitFor(transfer *TaskEntryTransfer, key string) RemoteTaskEntryHit {
 // TestRemoteTaskEntryKeyIsFormatQualified pins DECISION 1: a task-owned entry
 // never travels under the raw cache key. A pre-B4c binary asks the provider for
 // the raw key, so publishing a format-2 payload there would hand it a payload it
-// would materialize as a legacy capture — silent corruption no newer build can
+// would materialize as a format-1 capture — silent corruption no newer build can
 // prevent.
 func TestRemoteTaskEntryKeyIsFormatQualified(t *testing.T) {
 	const key = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 	remote := RemoteTaskEntryKey(key)
 	if remote == key {
-		t.Fatal("the remote key must not be the raw cache key: an older CLI reads that address as a legacy entry")
+		t.Fatal("the remote key must not be the raw cache key: an older CLI reads that address as a format-1 entry")
 	}
 	if remote != TaskEntryAddress(key) {
 		t.Fatalf("remote key = %q, want the local task-owned address %q", remote, TaskEntryAddress(key))
@@ -347,9 +347,9 @@ func TestMaterializeTaskEntry_FailsClosed(t *testing.T) {
 	})
 }
 
-// TestMaterializeTaskEntry_RejectsALegacyBlobAtTheAddress is the other direction
-// of the format boundary: even reached at the task-owned address, a payload
-// without a descriptor is never interpreted as declared output.
+// TestMaterializeTaskEntry_RejectsALegacyBlobAtTheAddress pins the remote side of
+// the format boundary: even reached at the task-owned address, a payload without
+// a descriptor is never interpreted as declared output.
 func TestMaterializeTaskEntry_RejectsALegacyBlobAtTheAddress(t *testing.T) {
 	s := NewLocalStore(t.TempDir())
 	content := []byte("legacy bytes")

@@ -646,7 +646,7 @@ func TestDeclaredOutputsByteEquivalenceMatrix(t *testing.T) {
 	mixedJob := matrixJob()
 	shared := payloadDigestFor(t, server, remoteKey, "gen/client.ts")
 	// Warm exactly that blob into the consumer's CAS through an unrelated
-	// legacy entry, then make the server refuse to serve it. The restore can now
+	// entry, then make the server refuse to serve it. The restore can now
 	// only succeed by deduplicating against local bytes.
 	warmCASWith(t, mixedWS, "generated\n")
 	server.drop(shared)
@@ -985,9 +985,7 @@ func TestDeclaredSourceRewriterRejectsMutatingStatusEntry(t *testing.T) {
 				t.Context(), job, captureHashA, entry, &mu, hashes); restored != nil {
 				t.Fatalf("mutating source-rewriter entry restored as green: %+v", restored)
 			}
-			if entry, err := f.cache.Lookup(captureHashA); err != nil || entry != nil {
-				t.Fatalf("source rewriter also published a legacy entry: %v (err=%v)", entry, err)
-			}
+			requireNoRawEntry(t, f.cache.StoreRoot(), captureHashA)
 		})
 	}
 

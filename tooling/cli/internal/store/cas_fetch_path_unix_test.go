@@ -2,25 +2,19 @@
 
 package store
 
-import (
-	"os"
-	"path/filepath"
-	"testing"
-)
+import "testing"
 
 // TestMaterializeRestoresAColonPathOnUnix pins that the Windows-only refusal
 // of a colon leaves Unix restores unchanged: a colon is an ordinary character
 // in a Unix file name.
 func TestMaterializeRestoresAColonPathOnUnix(t *testing.T) {
 	s := NewLocalStore(t.TempDir())
-	if _, err := materializeOne(t, s, "dist/a:b.js"); err != nil {
-		t.Fatalf("Materialize: %v", err)
+	hit, f := distHit(t, hashA, map[string]string{"a:b.js": "remote artifact bytes"})
+	entry, err := s.MaterializeTaskEntry(hit, f.fetch)
+	if err != nil {
+		t.Fatalf("MaterializeTaskEntry: %v", err)
 	}
-	got, err := s.Get(hashA)
-	if err != nil || got == nil {
-		t.Fatalf("Get: %v (entry=%v)", err, got)
-	}
-	if data, err := os.ReadFile(filepath.Join(got.FilesDir, "dist", "a:b.js")); err != nil || string(data) != "remote artifact bytes" {
-		t.Errorf("restored file = %q, %v", data, err)
+	if got := readDist(t, entry, "a:b.js"); got != "remote artifact bytes" {
+		t.Errorf("restored file = %q", got)
 	}
 }

@@ -67,9 +67,9 @@ func ingestOne(t *testing.T, s *LocalStore, key, content string) *TaskEntry {
 // --- entry-format version and migration semantics --------------------------
 
 // TestTaskEntry_LegacyEntryReadsAsMiss is the invariant the whole format version
-// exists for: an entry written by any CLI up to B3 carries a correct cache key
-// v5 and a legacy payload, and the task-owned model must refuse it rather than
-// reinterpret its files/ tree.
+// exists for: a format-1 entry carries a correct cache key v5 and a payload this
+// build cannot interpret, and the lookup must refuse it rather than reinterpret
+// its files/ tree.
 //
 // The positive control in the same test — the identical key served after a
 // task-owned ingest — is what proves the miss comes from the FORMAT and not from
@@ -79,23 +79,24 @@ func TestTaskEntry_LegacyEntryReadsAsMiss(t *testing.T) {
 	s := NewLocalStore(root)
 	key := "v5keyaaaa0000000000000000000000000000000000000000000000000000000"
 
-	if err := putFormatOneEntry(s, key, entryWith(makeSource(t, "legacy"))); err != nil {
-		t.Fatalf("legacy Put: %v", err)
-	}
+	formatOneDir := writeFormatOneEntry(t, s, key, "dist/main.js", "legacy", time.Now())
 
 	entry, err := s.LookupTaskEntry(key)
 	if err != nil {
 		t.Fatalf("LookupTaskEntry: %v", err)
 	}
 	if entry != nil {
-		t.Fatalf("legacy entry served through the task-owned lookup: %+v", entry.Outputs)
+		t.Fatalf("format-1 entry served through the task-owned lookup: %+v", entry.Outputs)
+	}
+	if won, release := s.TryClaimTaskEntry(key); !won {
+		t.Error("a format-1 entry reads as published, so no process computes the key")
+	} else {
+		release()
 	}
 
-	// Coexistence: the legacy reader still serves the legacy entry unchanged,
-	// which is what keeps the scheduler working until B4b.
-	legacy, err := s.Get(key)
-	if err != nil || legacy == nil {
-		t.Fatalf("legacy Get after task-owned lookup: entry=%v err=%v", legacy, err)
+	// The lookup leaves the format-1 blob on disk for GC.
+	if data, err := os.ReadFile(filepath.Join(formatOneDir, "files", "dist", "main.js")); err != nil || string(data) != "legacy" {
+		t.Fatalf("format-1 blob after the lookup = %q, %v", data, err)
 	}
 
 	// Positive control: same key, task-owned entry → hit.
@@ -110,9 +111,9 @@ func TestTaskEntry_LegacyEntryReadsAsMiss(t *testing.T) {
 }
 
 // TestTaskEntry_AddressBindsTheFormatVersion pins the migration mechanism: the
-// two models occupy disjoint addresses derived from the same key, so neither can
-// see the other's payload — including CLI binaries already built from an older
-// worktree, which cannot be taught a new guard.
+// entry's address derives from the key and the format, so no build reads a payload
+// of another format — including CLI binaries already built from an older worktree,
+// which cannot be taught a new guard.
 func TestTaskEntry_AddressBindsTheFormatVersion(t *testing.T) {
 	key := "some-cache-key"
 
@@ -128,32 +129,6 @@ func TestTaskEntry_AddressBindsTheFormatVersion(t *testing.T) {
 	}
 	if len(address) != 64 {
 		t.Errorf("address length = %d, want a 64-char sha256 hex digest", len(address))
-	}
-}
-
-// TestTaskEntry_LegacyReaderRefusesTaskOwnedBlob is the reverse direction:
-// reaching a task-owned blob through the legacy reader must be a miss, so a
-// declared payload is never restored as an inferred capture.
-func TestTaskEntry_LegacyReaderRefusesTaskOwnedBlob(t *testing.T) {
-	s := NewLocalStore(t.TempDir())
-	key := "reverse-direction-key"
-
-	entry := ingestOne(t, s, key, "declared")
-
-	legacy, err := s.Get(entry.Address)
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	if legacy != nil {
-		t.Errorf("legacy Get served a task-owned blob: %+v", legacy.Metadata)
-	}
-
-	// Positive control: a legacy blob at its own address is still served.
-	if err := putFormatOneEntry(s, "legacy-key", entryWith(makeSource(t, "legacy"))); err != nil {
-		t.Fatal(err)
-	}
-	if got, err := s.Get("legacy-key"); err != nil || got == nil {
-		t.Fatalf("legacy blob no longer readable: got=%v err=%v", got, err)
 	}
 }
 
@@ -335,10 +310,10 @@ func TestTaskEntry_RecordedOutputVocabulariesAreClosed(t *testing.T) {
 
 // --- lease coalescing ------------------------------------------------------
 
-// TestTaskEntry_LeaseCoalescesOnTheDerivedAddress pins that the existing lease
-// primitive is EXTENDED rather than forked: exactly one claimant wins, waiting
-// on a published entry returns immediately, and a legacy claim on the same cache
-// key does not block a task-owned one (they publish different artifacts).
+// TestTaskEntry_LeaseCoalescesOnTheDerivedAddress pins where a claim lands:
+// exactly one claimant wins, the lease is taken on the entry's derived address
+// and not on the raw key, so publishers of two entry formats never wait on each
+// other, and waiting on a published entry returns immediately.
 func TestTaskEntry_LeaseCoalescesOnTheDerivedAddress(t *testing.T) {
 	s := NewLocalStore(t.TempDir())
 	key := "leased-key"
@@ -350,13 +325,12 @@ func TestTaskEntry_LeaseCoalescesOnTheDerivedAddress(t *testing.T) {
 	if again, _ := s.TryClaimTaskEntry(key); again {
 		t.Error("second claimant also won while a lease was live")
 	}
-	// A legacy claim on the same cache key is a different artifact: it must not
-	// be blocked by the task-owned lease.
-	legacyWinner, legacyRelease := s.TryClaim(key)
-	if !legacyWinner {
-		t.Error("legacy claim blocked by a task-owned lease on the same key")
+	if _, err := os.Stat(s.leasePath(TaskEntryAddress(key))); err != nil {
+		t.Errorf("no lease on the derived address: %v", err)
 	}
-	legacyRelease()
+	if _, err := os.Stat(s.leasePath(key)); !os.IsNotExist(err) {
+		t.Errorf("a lease stands on the raw key: %v", err)
+	}
 
 	release()
 	ingestOne(t, s, key, "declared")

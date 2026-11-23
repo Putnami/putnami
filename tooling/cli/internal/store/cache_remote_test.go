@@ -3,6 +3,8 @@ package store
 import (
 	"bytes"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	cache "go.putnami.dev/protocol/cache"
@@ -12,15 +14,15 @@ func TestCacheManagerRemoteFacade(t *testing.T) {
 	local := NewLocalStore(t.TempDir())
 	cm := NewCacheManager(local)
 
-	entry, digest := hitEntry("dist/out.txt", "artifact")
-	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte("artifact")}}
+	hit, f := distHit(t, hashA, map[string]string{"out.txt": "artifact"})
+	digest := cache.DigestOf([]byte("artifact"))
 
-	if err := materializeFormatOneEntry(cm.Store(), hashA, entry, f.fetch); err != nil {
-		t.Fatalf("Materialize: %v", err)
+	if _, err := cm.MaterializeTaskEntry(hit, f.fetch); err != nil {
+		t.Fatalf("MaterializeTaskEntry: %v", err)
 	}
-	copied, err := cm.Lookup(hashA)
+	copied, err := cm.LookupTaskEntry(hashA)
 	if err != nil {
-		t.Fatalf("Lookup materialized entry: %v", err)
+		t.Fatalf("LookupTaskEntry of the materialized entry: %v", err)
 	}
 	if copied == nil || copied.Result.Status != "success" {
 		t.Fatalf("materialized entry = %#v", copied)
@@ -87,8 +89,10 @@ func TestCacheManagerPrefetchBlobsWarmsCASWithoutActionEntry(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("PrefetchBlobs: %v", err)
 	}
-	if got, err := cm.Lookup(hashA); err != nil || got != nil {
-		t.Fatalf("hint prefetch published action entry: entry=%#v err=%v", got, err)
+	if blobs, err := os.ReadDir(filepath.Join(local.Root(), "blobs")); err == nil && len(blobs) != 0 {
+		t.Fatalf("hint prefetch published an action entry: %v", blobs)
+	} else if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
 	}
 	r, err := cm.OpenBlob(digest)
 	if err != nil {

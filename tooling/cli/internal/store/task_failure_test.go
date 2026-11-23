@@ -148,10 +148,7 @@ func TestFailureRecordIsAddressedApartFromEveryPositiveEntry(t *testing.T) {
 	if err != nil || entry != nil {
 		t.Errorf("LookupTaskEntry served a negative record: entry=%v err=%v", entry, err)
 	}
-	legacy, err := s.Get(TaskFailureAddress(failureKeyA))
-	if err != nil || legacy != nil {
-		t.Errorf("the legacy reader interpreted the negative blob: entry=%v err=%v", legacy, err)
-	}
+	assertHoldsNoEntryFile(t, s.blobDir(TaskFailureAddress(failureKeyA)))
 }
 
 // TestUnreadableFailureRecordIsAMiss pins the fail-closed rule: a torn, foreign,

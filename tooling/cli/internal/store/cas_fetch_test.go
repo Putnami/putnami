@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -47,34 +46,20 @@ func (f *inmemFetcher) distinctOpened() map[string]bool {
 	return set
 }
 
-// hitEntry builds a one-file remote hit (result + manifest) for content at rel.
-func hitEntry(rel, content string) (*Entry, string) {
-	digest := cache.DigestOf([]byte(content))
-	entry := &Entry{
-		Result:   &EntryResult{Status: "success"},
-		Metadata: &EntryMetadata{Extension: "ext", Task: "build", Project: "pkg"},
-		Manifest: &cache.Manifest{Files: []cache.FileEntry{
-			{Path: rel, Digest: digest, Mode: 0o644, Size: int64(len(content))},
-		}},
-	}
-	return entry, digest
-}
-
-func TestMaterialize_CreatesGettableEntry(t *testing.T) {
+func TestMaterialize_CreatesAReadableEntry(t *testing.T) {
 	dir := t.TempDir()
 	s := NewLocalStore(dir)
 
 	content := "remote artifact bytes"
-	entry, digest := hitEntry("dist/app.js", content)
-	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte(content)}}
+	hit, f := distHit(t, hashA, map[string]string{"app.js": content})
 
-	if err := materializeFormatOneEntry(s, hashA, entry, f.fetch); err != nil {
-		t.Fatalf("Materialize: %v", err)
+	if _, err := s.MaterializeTaskEntry(hit, f.fetch); err != nil {
+		t.Fatalf("MaterializeTaskEntry: %v", err)
 	}
 
-	got, err := s.Get(hashA)
+	got, err := s.LookupTaskEntry(hashA)
 	if err != nil || got == nil {
-		t.Fatalf("Get after materialize: %v (entry=%v)", err, got)
+		t.Fatalf("LookupTaskEntry after materialize: %v (entry=%v)", err, got)
 	}
 	if got.Result.Status != "success" {
 		t.Errorf("result status = %q, want success", got.Result.Status)
@@ -82,11 +67,7 @@ func TestMaterialize_CreatesGettableEntry(t *testing.T) {
 	if got.Manifest == nil || len(got.Manifest.Files) != 1 {
 		t.Fatalf("manifest not restored: %+v", got.Manifest)
 	}
-	data, err := os.ReadFile(filepath.Join(got.FilesDir, "dist", "app.js"))
-	if err != nil {
-		t.Fatalf("read materialized file: %v", err)
-	}
-	if string(data) != content {
+	if data := readDist(t, got, "app.js"); data != content {
 		t.Errorf("materialized content = %q, want %q", data, content)
 	}
 	if n := countCASBlobs(t, dir); n != 1 {
@@ -102,26 +83,27 @@ func TestMaterialize_ReusesLocalBlobWithoutFetch(t *testing.T) {
 	dir := t.TempDir()
 	s := NewLocalStore(dir)
 
-	// Seed the CAS with the content via a normal Put.
+	// Seed the CAS with the content via a local ingest.
 	content := "shared bytes"
 	putWithFile(t, s, hashA, "a.txt", content)
 
-	// Materialize a different key referencing the same content. The fetcher has
-	// no blobs: if Materialize tried to fetch, it would fail.
-	entry, _ := hitEntry("b.txt", content)
-	f := &inmemFetcher{blobs: map[string][]byte{}}
+	// Materialize a different key referencing the same content. The fetcher
+	// serves no payload blob: fetching it would fail.
+	hit, f := distHit(t, hashB, map[string]string{"b.txt": content})
+	digest := cache.DigestOf([]byte(content))
+	delete(f.blobs, digest)
 
-	if err := materializeFormatOneEntry(s, hashB, entry, f.fetch); err != nil {
-		t.Fatalf("Materialize with local dedup: %v", err)
+	if _, err := s.MaterializeTaskEntry(hit, f.fetch); err != nil {
+		t.Fatalf("MaterializeTaskEntry with local dedup: %v", err)
 	}
-	if len(f.opened) != 0 {
+	if f.distinctOpened()[digest] {
 		t.Errorf("expected no fetch for an already-local blob, fetched: %v", f.opened)
 	}
 	if n := countCASBlobs(t, dir); n != 1 {
 		t.Errorf("expected the blob to be deduplicated to 1 CAS entry, got %d", n)
 	}
 	if got := s.added.Load(); got != int64(len(content)) {
-		t.Errorf("added = %d, want only the Put's %d bytes: a reused blob adds nothing", got, len(content))
+		t.Errorf("added = %d, want only the ingest's %d bytes: a reused blob adds nothing", got, len(content))
 	}
 }
 
@@ -131,66 +113,45 @@ func TestMaterialize_ParallelMultiFileAndDedup(t *testing.T) {
 
 	// A TypeScript-build-shaped manifest: many tiny declaration files. Two files
 	// share identical content to exercise CAS dedup under the concurrent fan-out.
-	manifest := &cache.Manifest{}
-	blobs := map[string][]byte{}
 	want := map[string]string{}
+	var distinctBytes int64
 	for i := range 64 {
-		rel := fmt.Sprintf("dist/types/m%02d.d.ts", i)
 		content := fmt.Sprintf("export declare const x%d: number;", i)
-		digest := cache.DigestOf([]byte(content))
-		manifest.Files = append(manifest.Files, cache.FileEntry{Path: rel, Digest: digest, Mode: 0o644, Size: int64(len(content))})
-		blobs[digest] = []byte(content)
-		want[rel] = content
+		want[fmt.Sprintf("types/m%02d.d.ts", i)] = content
+		distinctBytes += int64(len(content))
 	}
 	shared := "export {};"
-	sharedDigest := cache.DigestOf([]byte(shared))
-	for _, rel := range []string{"dist/a.js", "dist/b.js"} {
-		manifest.Files = append(manifest.Files, cache.FileEntry{Path: rel, Digest: sharedDigest, Mode: 0o644, Size: int64(len(shared))})
-		want[rel] = shared
-	}
-	blobs[sharedDigest] = []byte(shared)
+	want["a.js"], want["b.js"] = shared, shared
+	distinctBytes += int64(len(shared))
+	const distinct = 65 // 64 declarations and the shared file
 
-	entry := &Entry{
-		Result:   &EntryResult{Status: "success"},
-		Metadata: &EntryMetadata{Extension: "ext", Task: "build", Project: "pkg"},
-		Manifest: manifest,
-	}
-	f := &inmemFetcher{blobs: blobs}
-
-	if err := materializeFormatOneEntry(s, hashA, entry, f.fetch); err != nil {
-		t.Fatalf("Materialize: %v", err)
+	hit, f := distHit(t, hashA, want)
+	if _, err := s.MaterializeTaskEntry(hit, f.fetch); err != nil {
+		t.Fatalf("MaterializeTaskEntry: %v", err)
 	}
 
-	got, err := s.Get(hashA)
+	got, err := s.LookupTaskEntry(hashA)
 	if err != nil || got == nil {
-		t.Fatalf("Get after materialize: %v", err)
+		t.Fatalf("LookupTaskEntry after materialize: %v", err)
 	}
 	for rel, content := range want {
-		data, err := os.ReadFile(filepath.Join(got.FilesDir, filepath.FromSlash(rel)))
-		if err != nil {
-			t.Fatalf("read materialized %s: %v", rel, err)
-		}
-		if string(data) != content {
+		if data := readDist(t, got, rel); data != content {
 			t.Errorf("%s = %q, want %q", rel, data, content)
 		}
 	}
 
 	// Shared content is stored once: 64 distinct + 1 shared = 65 CAS blobs, and
 	// every distinct digest was fetched (the shared one possibly twice via the
-	// publish race — storage still dedups it).
-	distinct := len(blobs)
+	// publish race — storage still dedups it), plus the entry descriptor, which
+	// never reaches the CAS.
 	if n := countCASBlobs(t, dir); n != distinct {
 		t.Errorf("CAS blobs = %d, want %d", n, distinct)
 	}
-	if opened := f.distinctOpened(); len(opened) != distinct {
-		t.Errorf("fetched %d distinct digests, want %d", len(opened), distinct)
+	if opened := f.distinctOpened(); len(opened) != distinct+1 {
+		t.Errorf("fetched %d distinct digests, want %d", len(opened), distinct+1)
 	}
 	// The racing loser's staged copy is discarded, not published, so the
 	// shared blob counts once however the fan-out interleaved.
-	var distinctBytes int64
-	for _, b := range blobs {
-		distinctBytes += int64(len(b))
-	}
 	if got := s.added.Load(); got != distinctBytes {
 		t.Errorf("added = %d, want %d (each distinct blob once)", got, distinctBytes)
 	}
@@ -200,18 +161,18 @@ func TestMaterialize_RejectsCorruptBlob(t *testing.T) {
 	dir := t.TempDir()
 	s := NewLocalStore(dir)
 
-	entry, digest := hitEntry("dist/app.js", "expected content")
+	hit, f := distHit(t, hashA, map[string]string{"app.js": "expected content"})
 	// Fetcher returns bytes that do not match the manifest digest.
-	f := &inmemFetcher{blobs: map[string][]byte{digest: []byte("tampered content")}}
+	f.blobs[cache.DigestOf([]byte("expected content"))] = []byte("tampered content")
 
-	err := materializeFormatOneEntry(s, hashA, entry, f.fetch)
+	_, err := s.MaterializeTaskEntry(hit, f.fetch)
 	if err == nil {
 		t.Fatal("expected an error for a blob that does not match its digest")
 	}
 	if !strings.Contains(err.Error(), "content-addresses to") {
 		t.Errorf("error should explain the digest mismatch, got: %v", err)
 	}
-	if got, _ := s.Get(hashA); got != nil {
+	if got := publishedEntry(s, hashA); got != nil {
 		t.Error("a failed materialize must not leave a committed entry")
 	}
 	if n := countCASBlobs(t, dir); n != 0 {
@@ -221,9 +182,11 @@ func TestMaterialize_RejectsCorruptBlob(t *testing.T) {
 
 func TestMaterialize_RequiresFetcherForMissingBlob(t *testing.T) {
 	s := NewLocalStore(t.TempDir())
-	entry, _ := hitEntry("x.txt", "bytes not in cas")
+	content := []byte("bytes not in cas")
 
-	err := materializeFormatOneEntry(s, hashA, entry, nil)
+	err := s.PrefetchBlobs(&cache.Manifest{Files: []cache.FileEntry{
+		{Path: "x.txt", Digest: cache.DigestOf(content), Mode: 0o644, Size: int64(len(content))},
+	}}, nil)
 	if err == nil {
 		t.Fatal("expected an error materializing a missing blob without a fetcher")
 	}
@@ -234,7 +197,7 @@ func TestMaterialize_RequiresFetcherForMissingBlob(t *testing.T) {
 
 func TestMaterialize_RequiresManifest(t *testing.T) {
 	s := NewLocalStore(t.TempDir())
-	err := materializeFormatOneEntry(s, hashA, &Entry{Result: &EntryResult{Status: "success"}}, nil)
+	_, err := s.MaterializeTaskEntry(RemoteTaskEntryHit{Key: hashA, Result: &EntryResult{Status: "success"}}, nil)
 	if err == nil || !strings.Contains(err.Error(), "manifest required") {
 		t.Fatalf("expected a manifest-required error, got: %v", err)
 	}

@@ -18,8 +18,7 @@ import (
 //	  cas/{digest[0:2]}/{digest}   raw file bytes, addressed by content digest
 //
 // Each Action Cache entry's files/ directory is a tree of HARDLINKS into CAS,
-// so identical bytes across entries are stored once and the existing
-// blobs/{hash}/files contract (out/ symlinks, RestoreFiles) is preserved.
+// so identical bytes across entries are stored once.
 
 // casBlobPath returns the on-disk path for a CAS blob given its digest
 // ("sha256:<hex>"). The algorithm prefix is stripped for the filesystem path.

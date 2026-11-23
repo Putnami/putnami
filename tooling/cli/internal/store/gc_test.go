@@ -1,24 +1,13 @@
 package store
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
-
-// putSized stores an entry whose single output file has the given byte size,
-// producing a distinct CAS blob of that size, and returns the hash.
-func putSized(t *testing.T, s *LocalStore, hash string, size int) {
-	t.Helper()
-	src := t.TempDir()
-	if err := os.WriteFile(filepath.Join(src, "f.bin"), make([]byte, size), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := putFormatOneEntry(s, hash, entryWith(src)); err != nil {
-		t.Fatalf("Put %s: %v", hash, err)
-	}
-}
 
 func TestRunGC_WithinBudget_NoOp(t *testing.T) {
 	root := t.TempDir()
@@ -32,7 +21,7 @@ func TestRunGC_WithinBudget_NoOp(t *testing.T) {
 	if res.EvictedEntries != 0 || res.SweptBlobs != 0 {
 		t.Errorf("within budget should be a no-op, got %+v", res)
 	}
-	if e, _ := s.Get(hashN(1)); e == nil {
+	if publishedEntry(s, hashN(1)) == nil {
 		t.Error("entry evicted while within budget")
 	}
 }
@@ -44,8 +33,8 @@ func TestRunGC_EvictsOldestAndSweepsOrphans(t *testing.T) {
 
 	putSized(t, s, hashN(1), 2000) // old → should be evicted
 	putSized(t, s, hashN(2), 1000) // recent → should survive
-	writeLastUsed(s.blobDir(hashN(1)), now.Add(-2*time.Hour), 1)
-	writeLastUsed(s.blobDir(hashN(2)), now, 1)
+	writeLastUsed(taskBlobDir(s, hashN(1)), now.Add(-2*time.Hour), 1)
+	writeLastUsed(taskBlobDir(s, hashN(2)), now, 1)
 
 	// Budget forces eviction of the single oldest entry.
 	res, err := RunGC([]string{root}, GCOptions{MaxBytes: 2500, Grace: time.Hour, Now: now})
@@ -61,10 +50,10 @@ func TestRunGC_EvictsOldestAndSweepsOrphans(t *testing.T) {
 	if res.FreedBytes < 2000 {
 		t.Errorf("FreedBytes = %d, want >= 2000", res.FreedBytes)
 	}
-	if e, _ := s.Get(hashN(1)); e != nil {
+	if publishedEntry(s, hashN(1)) != nil {
 		t.Error("oldest entry should have been evicted")
 	}
-	if e, _ := s.Get(hashN(2)); e == nil {
+	if publishedEntry(s, hashN(2)) == nil {
 		t.Error("recent entry should have survived")
 	}
 }
@@ -77,8 +66,8 @@ func TestRunGC_GraceProtectsRecent(t *testing.T) {
 	putSized(t, s, hashN(1), 5000)
 	putSized(t, s, hashN(2), 5000)
 	// Both used just now — within any reasonable grace window.
-	writeLastUsed(s.blobDir(hashN(1)), now, 1)
-	writeLastUsed(s.blobDir(hashN(2)), now, 1)
+	writeLastUsed(taskBlobDir(s, hashN(1)), now, 1)
+	writeLastUsed(taskBlobDir(s, hashN(2)), now, 1)
 
 	// Far over budget, but grace must protect both live entries.
 	res, err := RunGC([]string{root}, GCOptions{MaxBytes: 1, Grace: time.Hour, Now: now})
@@ -88,10 +77,10 @@ func TestRunGC_GraceProtectsRecent(t *testing.T) {
 	if res.EvictedEntries != 0 {
 		t.Errorf("grace should protect recent entries, evicted %d", res.EvictedEntries)
 	}
-	if e, _ := s.Get(hashN(1)); e == nil {
+	if publishedEntry(s, hashN(1)) == nil {
 		t.Error("entry 1 evicted despite grace")
 	}
-	if e, _ := s.Get(hashN(2)); e == nil {
+	if publishedEntry(s, hashN(2)) == nil {
 		t.Error("entry 2 evicted despite grace")
 	}
 }
@@ -103,21 +92,10 @@ func TestRunGC_SharedBlobSurvivesWhileReferenced(t *testing.T) {
 	s := NewLocalStore(root)
 	now := time.Now()
 
-	src1 := t.TempDir()
-	src2 := t.TempDir()
-	for _, src := range []string{src1, src2} {
-		if err := os.WriteFile(filepath.Join(src, "f.bin"), make([]byte, 4000), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := putFormatOneEntry(s, hashN(1), entryWith(src1)); err != nil {
-		t.Fatal(err)
-	}
-	if err := putFormatOneEntry(s, hashN(2), entryWith(src2)); err != nil {
-		t.Fatal(err)
-	}
-	writeLastUsed(s.blobDir(hashN(1)), now.Add(-2*time.Hour), 1) // evict this one
-	writeLastUsed(s.blobDir(hashN(2)), now, 1)                   // keep this one
+	putSized(t, s, hashN(1), 4000)
+	putSized(t, s, hashN(2), 4000)
+	writeLastUsed(taskBlobDir(s, hashN(1)), now.Add(-2*time.Hour), 1) // evict this one
+	writeLastUsed(taskBlobDir(s, hashN(2)), now, 1)                   // keep this one
 
 	res, err := RunGC([]string{root}, GCOptions{MaxBytes: 4500, Grace: time.Hour, Now: now})
 	if err != nil {
@@ -127,10 +105,10 @@ func TestRunGC_SharedBlobSurvivesWhileReferenced(t *testing.T) {
 		t.Errorf("shared blob must not be swept while referenced, swept %d", res.SweptBlobs)
 	}
 	// Surviving entry's bytes must still be readable through its files/ hardlink.
-	if e, _ := s.Get(hashN(2)); e == nil {
+	if e := publishedEntry(s, hashN(2)); e == nil {
 		t.Error("referenced entry evicted")
-	} else if _, err := os.ReadFile(filepath.Join(e.FilesDir, "f.bin")); err != nil {
-		t.Errorf("surviving entry's blob unreadable: %v", err)
+	} else if got := readDist(t, e, "f.bin"); len(got) != 4000 {
+		t.Errorf("surviving entry's blob holds %d bytes, want 4000", len(got))
 	}
 }
 
@@ -147,9 +125,9 @@ func TestRunGC_SharedBlobFreedOnlyWhenAllReferrersEvicted(t *testing.T) {
 	putSized(t, s, hashN(1), 6000) // zeros → identical content/digest as E2
 	putSized(t, s, hashN(2), 6000)
 	putSized(t, s, hashN(3), 1000)
-	writeLastUsed(s.blobDir(hashN(1)), now.Add(-3*time.Hour), 1)
-	writeLastUsed(s.blobDir(hashN(2)), now.Add(-2*time.Hour), 1)
-	writeLastUsed(s.blobDir(hashN(3)), now, 1)
+	writeLastUsed(taskBlobDir(s, hashN(1)), now.Add(-3*time.Hour), 1)
+	writeLastUsed(taskBlobDir(s, hashN(2)), now.Add(-2*time.Hour), 1)
+	writeLastUsed(taskBlobDir(s, hashN(3)), now, 1)
 
 	res, err := RunGC([]string{root}, GCOptions{MaxBytes: 5000, Grace: time.Hour, Now: now})
 	if err != nil {
@@ -164,7 +142,7 @@ func TestRunGC_SharedBlobFreedOnlyWhenAllReferrersEvicted(t *testing.T) {
 	if res.FreedBytes < 6000 {
 		t.Errorf("FreedBytes = %d, want >= 6000", res.FreedBytes)
 	}
-	if e, _ := s.Get(hashN(3)); e == nil {
+	if publishedEntry(s, hashN(3)) == nil {
 		t.Error("recent entry E3 should survive")
 	}
 }
@@ -174,7 +152,7 @@ func TestRunGC_NonBlockingSkipsBusyStore(t *testing.T) {
 	s := NewLocalStore(root)
 	now := time.Now()
 	putSized(t, s, hashN(1), 5000)
-	writeLastUsed(s.blobDir(hashN(1)), now.Add(-2*time.Hour), 1)
+	writeLastUsed(taskBlobDir(s, hashN(1)), now.Add(-2*time.Hour), 1)
 
 	// Hold the store's exclusive lock from a separate handle (models a sibling
 	// build/GC). A non-blocking GC must skip rather than wait.
@@ -189,7 +167,7 @@ func TestRunGC_NonBlockingSkipsBusyStore(t *testing.T) {
 	if res.StoresScanned != 0 || res.EvictedEntries != 0 {
 		t.Errorf("non-blocking GC should skip a locked store, got %+v", res)
 	}
-	if e, _ := s.Get(hashN(1)); e == nil {
+	if publishedEntry(s, hashN(1)) == nil {
 		t.Error("entry should be untouched when GC skips a busy store")
 	}
 }
@@ -201,8 +179,8 @@ func TestRunGC_IdleReclaim(t *testing.T) {
 	putSized(t, s, hashN(1), 1000)
 	putSized(t, s, hashN(2), 1000)
 	writeGenerationFile(root, 200)
-	writeLastUsed(s.blobDir(hashN(1)), now.Add(-2*time.Hour), 50) // idle 150 > 100 → evict
-	writeLastUsed(s.blobDir(hashN(2)), now, 150)                  // idle 50, recent → keep
+	writeLastUsed(taskBlobDir(s, hashN(1)), now.Add(-2*time.Hour), 50) // idle 150 > 100 → evict
+	writeLastUsed(taskBlobDir(s, hashN(2)), now, 150)                  // idle 50, recent → keep
 
 	// Far UNDER budget, but idle reclaim should still drop the stale entry.
 	res, err := RunGC([]string{root}, GCOptions{MaxBytes: 1 << 30, Grace: time.Hour, Now: now, MaxIdleGenerations: 100})
@@ -212,10 +190,10 @@ func TestRunGC_IdleReclaim(t *testing.T) {
 	if res.IdleEvicted != 1 || res.EvictedEntries != 1 {
 		t.Errorf("want 1 idle eviction, got EvictedEntries=%d IdleEvicted=%d", res.EvictedEntries, res.IdleEvicted)
 	}
-	if e, _ := s.Get(hashN(1)); e != nil {
+	if publishedEntry(s, hashN(1)) != nil {
 		t.Error("stale entry should be idle-evicted")
 	}
-	if e, _ := s.Get(hashN(2)); e == nil {
+	if publishedEntry(s, hashN(2)) == nil {
 		t.Error("recently-hit entry should survive idle reclaim")
 	}
 }
@@ -228,7 +206,7 @@ func TestRunGC_IdleReclaim_GraceOverrides(t *testing.T) {
 	writeGenerationFile(root, 200)
 	// Idle by generation (150 > 100) BUT hit within the grace window: grace wins,
 	// because a live reader may still hold it.
-	writeLastUsed(s.blobDir(hashN(1)), now, 50)
+	writeLastUsed(taskBlobDir(s, hashN(1)), now, 50)
 
 	res, err := RunGC([]string{root}, GCOptions{MaxBytes: 1 << 30, Grace: time.Hour, Now: now, MaxIdleGenerations: 100})
 	if err != nil {
@@ -237,7 +215,7 @@ func TestRunGC_IdleReclaim_GraceOverrides(t *testing.T) {
 	if res.IdleEvicted != 0 {
 		t.Errorf("grace must protect even idle entries, idle-evicted %d", res.IdleEvicted)
 	}
-	if e, _ := s.Get(hashN(1)); e == nil {
+	if publishedEntry(s, hashN(1)) == nil {
 		t.Error("grace-protected entry evicted")
 	}
 }
@@ -249,7 +227,7 @@ func TestRunGC_IdleReclaim_DisabledByDefaultOption(t *testing.T) {
 	now := time.Now()
 	putSized(t, s, hashN(1), 1000)
 	writeGenerationFile(root, 9999)
-	writeLastUsed(s.blobDir(hashN(1)), now.Add(-72*time.Hour), 1) // ancient
+	writeLastUsed(taskBlobDir(s, hashN(1)), now.Add(-72*time.Hour), 1) // ancient
 
 	res, err := RunGC([]string{root}, GCOptions{MaxBytes: 1 << 30, Grace: time.Hour, Now: now})
 	if err != nil {
@@ -336,7 +314,7 @@ func TestEvictStore_DoesNotCountGraceSkippedIdleVictim(t *testing.T) {
 	s := NewLocalStore(root)
 	now := time.Now()
 	putSized(t, s, hashN(1), 1000)
-	blobDir := s.blobDir(hashN(1))
+	blobDir := taskBlobDir(s, hashN(1))
 	writeLastUsed(blobDir, now, 1)
 
 	scan, _ := scanStore(root, false)
@@ -349,7 +327,7 @@ func TestEvictStore_DoesNotCountGraceSkippedIdleVictim(t *testing.T) {
 	if out.evicted != 0 || out.idleEvicted != 0 {
 		t.Errorf("grace-skipped idle victim counted as evicted: evicted=%d idle=%d", out.evicted, out.idleEvicted)
 	}
-	if e, _ := s.Get(hashN(1)); e == nil {
+	if publishedEntry(s, hashN(1)) == nil {
 		t.Error("grace-skipped entry should survive")
 	}
 }
@@ -366,8 +344,8 @@ func TestRunGC_ProtectSinceSparesEntriesUsedDuringTheRun(t *testing.T) {
 	since := time.Now()
 	putFilled(t, s, hashN(1), 2000, 'a')
 	putFilled(t, s, hashN(2), 2000, 'b')
-	writeLastUsed(s.blobDir(hashN(1)), since.Add(-time.Second), 1)
-	writeLastUsed(s.blobDir(hashN(2)), since, 1)
+	writeLastUsed(taskBlobDir(s, hashN(1)), since.Add(-time.Second), 1)
+	writeLastUsed(taskBlobDir(s, hashN(2)), since, 1)
 
 	res, err := RunGC([]string{root}, GCOptions{MaxBytes: 1, Grace: 0, ProtectSince: since})
 	if err != nil {
@@ -376,15 +354,15 @@ func TestRunGC_ProtectSinceSparesEntriesUsedDuringTheRun(t *testing.T) {
 	if res.EvictedEntries != 1 {
 		t.Errorf("EvictedEntries = %d, want 1 (only the entry used before ProtectSince)", res.EvictedEntries)
 	}
-	if e, _ := s.Get(hashN(1)); e != nil {
+	if publishedEntry(s, hashN(1)) != nil {
 		t.Error("entry last used before ProtectSince survived an over-budget pass")
 	}
-	if e, _ := s.Get(hashN(2)); e == nil {
+	if publishedEntry(s, hashN(2)) == nil {
 		t.Error("entry used at ProtectSince was evicted")
 	}
 
 	putFilled(t, s, hashN(3), 2000, 'c')
-	blobDir := s.blobDir(hashN(3))
+	blobDir := taskBlobDir(s, hashN(3))
 	writeLastUsed(blobDir, since.Add(time.Second), 1) // stamped after enumeration saw it stale
 	scan, _ := scanStore(root, false)
 	out := evictStore(root, []gcEntry{{
@@ -396,7 +374,7 @@ func TestRunGC_ProtectSinceSparesEntriesUsedDuringTheRun(t *testing.T) {
 	if out.evicted != 0 {
 		t.Error("evictStore removed a victim whose on-disk stamp is protected")
 	}
-	if e, _ := s.Get(hashN(3)); e == nil {
+	if publishedEntry(s, hashN(3)) == nil {
 		t.Error("entry used between enumeration and eviction was evicted")
 	}
 }
@@ -423,10 +401,9 @@ func TestEvictStore_YieldsBetweenSectionsAndKeepsABlobPublishedInTheGap(t *testi
 	root := t.TempDir()
 	s := NewLocalStore(root)
 	for i, fill := range []byte{'a', 'b', 'c'} {
-		putFilled(t, s, hashN(i+1), 1000, fill) // the victims, in fan-out 00
+		putFilled(t, s, keyInFanout("00", i), 1000, fill) // the victims, in fan-out 00
 	}
-	const kept = "ff00000000000000000000000000000000000000000000000000000000000001"
-	const published = "ff00000000000000000000000000000000000000000000000000000000000002"
+	kept, published := keyInFanout("ff", 0), keyInFanout("ff", 1)
 	putFilled(t, s, kept, 1000, 'k') // not a victim, in fan-out ff
 	crashed := filepath.Join(root, "tmp", gcTrashPrefix+"crashed", "0")
 	if err := os.MkdirAll(crashed, 0o755); err != nil {
@@ -476,13 +453,13 @@ func TestEvictStore_YieldsBetweenSectionsAndKeepsABlobPublishedInTheGap(t *testi
 	if out.held <= 0 || out.maxHeld > out.held {
 		t.Errorf("held=%v maxHeld=%v, want the sections accounted", out.held, out.maxHeld)
 	}
-	for _, hash := range []string{kept, published} {
-		refs := readManifestBlobs(s.blobDir(hash))
+	for _, key := range []string{kept, published} {
+		refs := readManifestBlobs(taskBlobDir(s, key))
 		if len(refs) != 1 {
-			t.Fatalf("entry %s has manifest %+v", hash, refs)
+			t.Fatalf("entry %s has manifest %+v", key, refs)
 		}
 		if _, err := os.Stat(s.casBlobPath(refs[0].digest)); err != nil {
-			t.Errorf("the blob entry %s references was swept: %v", hash, err)
+			t.Errorf("the blob entry %s references was swept: %v", key, err)
 		}
 	}
 	if trash, _ := filepath.Glob(filepath.Join(root, "tmp", gcTrashPrefix+"*")); len(trash) != 0 {
@@ -518,7 +495,7 @@ func TestEvictStore_StopsBusyWhenTheLockIsTakenBetweenSections(t *testing.T) {
 	}
 	remaining := 0
 	for i := 1; i <= 3; i++ {
-		if e, _ := s.Get(hashN(i)); e != nil {
+		if publishedEntry(s, hashN(i)) != nil {
 			remaining++
 		}
 	}
@@ -552,39 +529,26 @@ func TestGeneration_BumpAndRead(t *testing.T) {
 	}
 }
 
-func TestGetAndTouch_StampsUnderLock(t *testing.T) {
+func TestLookupTaskEntry_StampsLastUsed(t *testing.T) {
 	root := t.TempDir()
 	s := NewLocalStore(root)
 	putSized(t, s, hashN(1), 100)
-
 	before := time.Now()
-	entry, err := s.getAndTouch(hashN(1))
+	writeLastUsed(taskBlobDir(s, hashN(1)), before.Add(-time.Hour), 1)
+
+	entry, err := s.LookupTaskEntry(hashN(1))
 	if err != nil || entry == nil {
-		t.Fatalf("getAndTouch: entry=%v err=%v", entry, err)
+		t.Fatalf("LookupTaskEntry: entry=%v err=%v", entry, err)
 	}
-	if got, _ := readLastUsed(s.blobDir(hashN(1))); got.Before(before.Add(-time.Second)) {
-		t.Errorf("lastUsed = %v, want ~now", got)
-	}
-	// Miss must not error or stamp.
-	if e, err := s.getAndTouch(hashN(9)); e != nil || err != nil {
-		t.Errorf("getAndTouch miss = (%v, %v), want (nil, nil)", e, err)
-	}
-}
-
-func TestMarkUsed_StampsLastUsed(t *testing.T) {
-	root := t.TempDir()
-	s := NewLocalStore(root)
-	putSized(t, s, hashN(1), 100)
-
-	before := time.Now()
-	s.markUsed(hashN(1))
-
-	got, _ := readLastUsed(s.blobDir(hashN(1)))
-	if got.Before(before.Add(-time.Second)) {
+	if got, _ := readLastUsed(taskBlobDir(s, hashN(1))); got.Before(before.Add(-time.Second)) {
 		t.Errorf("lastUsed = %v, want ~now (>= %v)", got, before)
 	}
-	if _, err := os.Stat(filepath.Join(s.blobDir(hashN(1)), lastUsedFile)); err != nil {
-		t.Errorf("lastused sidecar not written: %v", err)
+	// Miss must not error or stamp.
+	if e, err := s.LookupTaskEntry(hashN(9)); e != nil || err != nil {
+		t.Errorf("LookupTaskEntry miss = (%v, %v), want (nil, nil)", e, err)
+	}
+	if _, err := os.Stat(taskBlobDir(s, hashN(9))); !os.IsNotExist(err) {
+		t.Errorf("a miss created the blob directory: %v", err)
 	}
 }
 
@@ -628,4 +592,19 @@ func hashN(n int) string {
 	s := []byte(base)
 	s[len(s)-1] = byte('0' + n)
 	return string(s)
+}
+
+// keyInFanout returns the nth key whose task-owned entry lives in the
+// blobs/<fanout> directory.
+func keyInFanout(fanout string, nth int) string {
+	for i := 0; ; i++ {
+		key := fmt.Sprintf("key-%d", i)
+		if !strings.HasPrefix(TaskEntryAddress(key), fanout) {
+			continue
+		}
+		if nth == 0 {
+			return key
+		}
+		nth--
+	}
 }

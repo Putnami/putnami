@@ -584,9 +584,9 @@ func packageTaskFixtureFor(project *workspace.Project, owner, version, path, tas
 	}
 }
 
-// writeFormatOneEntry writes the format-1 entry a 0.3.0 CLI left at hash in
+// writeFormatOneEntry writes the format-1 entry an older CLI leaves at hash in
 // the store rooted at storeRoot: meta.json and result.json under the raw
-// address, which LocalStore.Get reads.
+// address.
 func writeFormatOneEntry(t *testing.T, storeRoot, hash string) {
 	t.Helper()
 	blob := filepath.Join(storeRoot, "blobs", hash[:2], hash)
@@ -612,9 +612,6 @@ func TestCacheEntryPresentNeverReportsAFormatOneEntry(t *testing.T) {
 	cm := store.NewCacheManager(store.NewLocalStore(storeRoot))
 	hash := strings.Repeat("ab", 32)
 	writeFormatOneEntry(t, storeRoot, hash)
-	if entry, err := cm.Lookup(hash); err != nil || entry == nil {
-		t.Fatalf("the format-1 fixture does not read back: %v, %v", entry, err)
-	}
 
 	declared := cacheableJob("build", "/proj", "proj", "proj")
 	undeclared := cacheableJob("build", "/proj", "proj", "proj")
@@ -631,5 +628,16 @@ func TestCacheEntryPresentNeverReportsAFormatOneEntry(t *testing.T) {
 		if present {
 			t.Errorf("%s job: a format-1 entry reads as present, but the scheduler never reuses it", name)
 		}
+	}
+
+	// Positive control: the task-owned entry of the same key is present, so the
+	// absence above comes from the entry's format.
+	if _, err := cm.IngestTaskEntry(t.TempDir(), store.TaskEntrySpec{
+		Key: hash, Result: &store.EntryResult{Status: "success"},
+	}); err != nil {
+		t.Fatalf("IngestTaskEntry: %v", err)
+	}
+	if present, err := CacheEntryPresent(cm, declared, hash); err != nil || !present {
+		t.Fatalf("CacheEntryPresent(task-owned entry) = %v, %v; want present", present, err)
 	}
 }

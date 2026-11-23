@@ -50,7 +50,7 @@ func TestLeaseHelperProcess(t *testing.T) {
 
 	switch mode {
 	case "singleflight":
-		winner, release := s.TryClaim(leaseTestKey, time.Second)
+		winner, release := s.TryClaimTaskEntry(leaseTestKey, time.Second)
 		if winner {
 			counter := os.Getenv("PUTNAMI_TEST_STORE_LEASE_COUNTER")
 			f, err := os.OpenFile(counter, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
@@ -60,23 +60,23 @@ func TestLeaseHelperProcess(t *testing.T) {
 			_, _ = fmt.Fprintf(f, "%d\n", os.Getpid())
 			_ = f.Close()
 			time.Sleep(250 * time.Millisecond) // keep the cold-key contention visible
-			if err := putFormatOneEntry(s, leaseTestKey, leaseStatusEntry()); err != nil {
+			if err := publishLeased(s, leaseTestKey); err != nil {
 				release()
 				t.Fatalf("winner publish: %v", err)
 			}
 			release()
 			return
 		}
-		if err := s.WaitForPublish(leaseTestKey, 10*time.Second); err != nil {
+		if err := s.WaitForTaskEntry(leaseTestKey, 10*time.Second); err != nil {
 			t.Fatalf("loser wait: %v", err)
 		}
-		entry, err := s.Get(leaseTestKey)
+		entry, err := s.LookupTaskEntry(leaseTestKey)
 		if err != nil || entry == nil {
 			t.Fatalf("published entry missing: entry=%v err=%v", entry, err)
 		}
 
 	case "crash":
-		winner, _ := s.TryClaim(leaseTestKey, time.Second)
+		winner, _ := s.TryClaimTaskEntry(leaseTestKey, time.Second)
 		if !winner {
 			t.Fatal("crash helper did not win its cold key")
 		}
@@ -175,11 +175,11 @@ func TestLease_CrashedOwnerExpiresAndWaiterTakesOver(t *testing.T) {
 	// The owner is gone and its heartbeat died with it, but its record still
 	// stands, so neither entry point may hand the key out: claiming loses, and
 	// waiting reports a live owner rather than an expired one.
-	if winner, release := waiter.TryClaim(leaseTestKey, time.Second); winner {
+	if winner, release := waiter.TryClaimTaskEntry(leaseTestKey, time.Second); winner {
 		release()
 		t.Fatal("waiter took over before crashed owner's TTL elapsed")
 	}
-	if err := waiter.WaitForPublish(leaseTestKey, 50*time.Millisecond); !errors.Is(err, ErrLeaseWaitTimeout) {
+	if err := waiter.WaitForTaskEntry(leaseTestKey, 50*time.Millisecond); !errors.Is(err, ErrLeaseWaitTimeout) {
 		t.Fatalf("wait while the crashed owner's lease is live = %v, want ErrLeaseWaitTimeout", err)
 	}
 
@@ -192,7 +192,7 @@ func TestLease_CrashedOwnerExpiresAndWaiterTakesOver(t *testing.T) {
 	}
 
 	started := time.Now()
-	err := waiter.WaitForPublish(leaseTestKey, 3*time.Second)
+	err := waiter.WaitForTaskEntry(leaseTestKey, 3*time.Second)
 	if !errors.Is(err, ErrLeaseExpired) {
 		t.Fatalf("wait after crash = %v, want ErrLeaseExpired", err)
 	}
@@ -200,7 +200,7 @@ func TestLease_CrashedOwnerExpiresAndWaiterTakesOver(t *testing.T) {
 		t.Fatalf("crashed-owner fallback took %s", elapsed)
 	}
 
-	winner, release := waiter.TryClaim(leaseTestKey, time.Second)
+	winner, release := waiter.TryClaimTaskEntry(leaseTestKey, time.Second)
 	if !winner {
 		t.Fatal("waiter did not take over the expired lease")
 	}
@@ -214,7 +214,7 @@ func TestLease_CrashedOwnerExpiresAndWaiterTakesOver(t *testing.T) {
 // test — claim, wait, takeover — the real one.
 func expireLeaseDeadline(t *testing.T, s *LocalStore, key string) string {
 	t.Helper()
-	path := s.leasePath(key)
+	path := s.leasePath(TaskEntryAddress(key))
 
 	releaseStore := s.lockShared()
 	defer releaseStore()

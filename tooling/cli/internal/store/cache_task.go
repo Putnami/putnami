@@ -9,16 +9,15 @@ import (
 // CacheManager's task-owned surface.
 //
 // The scheduler talks to the cache through CacheManager, never through
-// LocalStore, so the declared-capture path needs the same four verbs the legacy
-// path has — look up, claim, wait, publish, restore — routed at the task-owned
-// address instead of the legacy one. These are deliberately thin: every rule
+// LocalStore, so the declared-capture path reaches every verb it needs — look
+// up, claim, wait, publish, restore — here. These are deliberately thin: every rule
 // (address derivation, complete-capture validation, explicit empty, atomic
 // materialize) lives in task_entry.go / task_ingest.go / task_materialize.go,
 // and duplicating any of it here would give the scheduler a second opinion.
 
 // LookupTaskEntry resolves a cache key to its task-owned entry, or (nil, nil)
-// for a miss. A legacy entry under the same key is invisible here by
-// construction — the two models occupy disjoint addresses.
+// for a miss. A format-1 entry under the same key reads as absent: the address
+// binds the entry format.
 func (cm *CacheManager) LookupTaskEntry(hash string) (*TaskEntry, error) {
 	return cm.store.LookupTaskEntry(hash)
 }
@@ -53,17 +52,17 @@ func (cm *CacheManager) MaterializeTaskOutput(entry *TaskEntry, id, dest, stagin
 	return cm.store.MaterializeTaskOutput(entry, id, dest, stagingRoot, keep...)
 }
 
-// TryClaimTaskEntry is TryClaim for the task-owned model: the lease is taken on
-// the entry's derived address, so a legacy publisher and a task-owned publisher
-// of the same cache key never wait on each other.
+// TryClaimTaskEntry claims the computation of key's task-owned entry. See
+// LocalStore.TryClaimTaskEntry.
 func (cm *CacheManager) TryClaimTaskEntry(key string, estimatedCost time.Duration) (winner bool, release func()) {
 	return cm.store.TryClaimTaskEntry(key, estimatedCost)
 }
 
 // WaitForTaskEntry waits for a sibling process to publish key's task-owned
-// entry while staying responsive to scheduler cancellation. It mirrors
-// WaitForPublish exactly — same slicing, same ErrLeaseExpired /
-// ErrLeaseWaitTimeout contract — so callers keep one coalescing loop.
+// entry while staying responsive to scheduler cancellation.
+// LocalStore.WaitForTaskEntry owns the lease-state semantics; the short wait
+// slices only add context cancellation without spawning a goroutine that could
+// outlive the job.
 func (cm *CacheManager) WaitForTaskEntry(ctx context.Context, key string, timeout time.Duration) error {
 	if ctx == nil {
 		ctx = context.Background()

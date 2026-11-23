@@ -7,26 +7,6 @@ import (
 	cache "go.putnami.dev/protocol/cache"
 )
 
-// Entry is a single cache entry stored under a content-addressed hash.
-// Each entry contains the job result, optional output files, and metadata.
-type Entry struct {
-	// Result is the structured job result (status, data, error).
-	Result *EntryResult `json:"result"`
-
-	// FilesDir is the absolute path to the entry's files/ directory, set by
-	// Get. Empty if the entry has no output files.
-	FilesDir string `json:"-"`
-
-	// Manifest lists the entry's output files with their CAS content digests
-	// and modes. Populated on Get for entries with output files; nil for
-	// entries without any. It mirrors the remote-cache wire manifest so a
-	// local hit and a remote hit are interchangeable.
-	Manifest *cache.Manifest `json:"-"`
-
-	// Metadata holds provenance and bookkeeping info.
-	Metadata *EntryMetadata `json:"metadata"`
-}
-
 // EntryResult mirrors the job result stored as result.json inside a blob.
 type EntryResult struct {
 	Status string              `json:"status"`

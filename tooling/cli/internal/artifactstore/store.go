@@ -157,7 +157,7 @@ func stampUsed(dir string, t time.Time) {
 // WithShared runs fn while holding the store's advisory lock in SHARED mode, so
 // a concurrent GC (which takes it EXCLUSIVE) cannot evict a digest dir that fn
 // resolves and then links/stamps in the window between the Has check and the
-// link. This is the read-side analog of the build store's getAndTouch:
+// link. This is the read-side analog of the build store's LookupTaskEntry:
 // lock-free resolution races the cross-worktree GC and can otherwise leave a
 // dangling symlink (the link's target swept between Has and Symlink) or, worse,
 // delete a per-worktree fallback after relinking to a target GC just evicted.

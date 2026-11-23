@@ -75,10 +75,8 @@ func TestIngestTaskEntry_ConcurrentSameKey(t *testing.T) {
 // destination directory keeps reading THAT inode; once a writer renames it aside
 // and reclaims it, the stale handle watches a detached tree being emptied and
 // reports 0, 1 or 2 files. Reclaiming the replaced tree at all makes that
-// unavoidable, and the legacy path is strictly worse (replaceDirPreserving
-// RemoveAll's the destination in place before renaming). What IS guaranteed, and
-// what the surviving samples check, is that the inode living at the destination
-// is never mutated after it becomes visible: a regression that populated the
+// unavoidable. What IS guaranteed, and what the surviving samples check, is that
+// the inode living at the destination is never mutated after it becomes visible: a regression that populated the
 // destination in place would keep the inode stable and be caught here.
 func TestMaterializeTaskOutput_ConcurrentSameDestination(t *testing.T) {
 	s := NewLocalStore(t.TempDir())
@@ -296,19 +294,12 @@ func countTreeFiles(dir string) (int, bool) {
 	return count, true
 }
 
-// BenchmarkTaskOutputMaterializeVsSymlink measures what retiring the CAS-symlink
-// all-hit fast path costs (the decision recorded in task_entry.go). Three ways
-// to put one cached output tree where a consumer expects it:
+// BenchmarkTaskOutputMaterializeVsSymlink measures what materializing costs over
+// a CAS symlink, the choice task_entry.go records. Two ways to put one cached
+// output tree where a consumer expects it:
 //
-//	symlink         the retired fast path — one symlink() into the blob
-//	materialize     the new atomic primitive (stage + rename)
-//	legacy-restore  what the scheduler ALREADY does whenever the fast path does
-//	                not apply (CacheManager.RestoreDir → replaceDirPreserving)
-//
-// The third is the honest comparison: the fast path only ever applied to an
-// all-hit command whose single snapshot covered the whole directory, and every
-// other restore in the CLI today pays the copy. See the recorded numbers in
-// task_entry.go.
+//	symlink      one symlink() into the blob
+//	materialize  the atomic primitive (stage + rename)
 func BenchmarkTaskOutputMaterializeVsSymlink(b *testing.B) {
 	const files = 256
 	const size = 16 * 1024
@@ -350,15 +341,6 @@ func BenchmarkTaskOutputMaterializeVsSymlink(b *testing.B) {
 		dest := filepath.Join(b.TempDir(), "out")
 		for b.Loop() {
 			if _, err := s.MaterializeTaskOutput(entry, "dist", dest, ""); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
-
-	b.Run("legacy-restore", func(b *testing.B) {
-		dest := filepath.Join(b.TempDir(), "out")
-		for b.Loop() {
-			if err := replaceDirPreserving(target, dest, nil); err != nil {
 				b.Fatal(err)
 			}
 		}

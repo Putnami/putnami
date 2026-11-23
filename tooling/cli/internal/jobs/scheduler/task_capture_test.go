@@ -180,11 +180,9 @@ func TestDeclaredCaptureRoundTripPerRoot(t *testing.T) {
 			if recorded.Root != tc.root || recorded.Path != tc.relPath || recorded.Files != 2 {
 				t.Fatalf("recorded output = %+v, want root %q path %q with 2 files", recorded, tc.root, tc.relPath)
 			}
-			// No legacy entry exists for this key: the two models are disjoint, and
-			// writing both would double the store for one result.
-			if legacy, err := f.cache.Lookup(captureHashA); err != nil || legacy != nil {
-				t.Fatalf("declared capture also wrote a legacy entry: %v (err=%v)", legacy, err)
-			}
+			// Nothing stands at the raw key: the capture publishes one entry, at
+			// the task-owned address.
+			requireNoRawEntry(t, f.cache.StoreRoot(), captureHashA)
 
 			// Warm: the tree is WRONG on disk (stale bytes plus a file the cold run
 			// never produced). A correct restore replaces it with the captured tree.
@@ -900,8 +898,7 @@ func TestDeclaredCapturePortPathOutput(t *testing.T) {
 
 // A missing REQUIRED declared output must leave the key uncached rather than
 // publishing an entry that restores less than the declaration promises. It must
-// also not silently fall back to writing a legacy entry, which nothing on this
-// path would ever read.
+// also not write a blob at the raw key, which nothing reads.
 func TestDeclaredCaptureRefusesToPublishWithoutARequiredOutput(t *testing.T) {
 	job := declaredJob("build~generate", "generate", &extension.TaskDeclaration{
 		Outputs: map[string]extension.DeclaredOutput{
@@ -920,9 +917,7 @@ func TestDeclaredCaptureRefusesToPublishWithoutARequiredOutput(t *testing.T) {
 	if entry, err := f.cache.LookupTaskEntry(captureHashA); err != nil || entry != nil {
 		t.Fatalf("a refused capture left an entry behind: %v (err=%v)", entry, err)
 	}
-	if legacy, err := f.cache.Lookup(captureHashA); err != nil || legacy != nil {
-		t.Fatalf("a refused capture fell back to a legacy entry: %v (err=%v)", legacy, err)
-	}
+	requireNoRawEntry(t, f.cache.StoreRoot(), captureHashA)
 
 	// Positive control: producing the required output makes the very same call
 	// publish, so the refusal is about completeness and nothing else.

@@ -344,11 +344,11 @@ func (r *RemoteCache) Negotiate(
 		}
 		// A declared-capture task negotiates the FORMAT-QUALIFIED address rather
 		// than the raw key: that is where its entry lives in the remote cache, and
-		// the separation keeps a binary that reads the raw key as a format-1
-		// entry from ever receiving a format-2 payload (store/task_remote.go). A
-		// local hit is served locally and never negotiated, so a fully warm
-		// rebuild never spins up the provider. LocalHits stays keyed by the local
-		// hash.
+		// the separation keeps an older binary that reads the raw key as a
+		// format-1 entry from ever receiving a format-2 payload
+		// (store/task_remote.go). A local hit is served locally and never
+		// negotiated, so a fully warm rebuild never spins up the provider.
+		// LocalHits stays keyed by the local hash.
 		if entry, err := cm.LookupTaskEntry(hash); err == nil && entry != nil {
 			r.LocalHits[hash] = true
 			continue

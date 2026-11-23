@@ -351,7 +351,7 @@ func TestIngestTaskEntry_DescriptorIsDeterministic(t *testing.T) {
 	}
 }
 
-// TestIngestTaskEntry_ExcludesThrowawayArtifacts keeps the legacy exclusion rule
+// TestIngestTaskEntry_ExcludesThrowawayArtifacts keeps the exclusion rule
 // (coverage lcov shards) applying to declared capture, so a declared directory
 // output does not smuggle multi-megabyte intermediates into the cache.
 func TestIngestTaskEntry_ExcludesThrowawayArtifacts(t *testing.T) {
