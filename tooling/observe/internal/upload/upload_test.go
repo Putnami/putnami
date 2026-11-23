@@ -69,7 +69,7 @@ func TestRunHandsTheDocumentToTheSelectedReporter(t *testing.T) {
 	executable, record := fakeCLI(t, "0")
 	path := document(t)
 	var out bytes.Buffer
-	_, diags := Run(context.Background(), Request{
+	_, _, diags := Run(context.Background(), Request{
 		Path:   path,
 		Getenv: env(map[string]string{SelectorEnv: "@acme/ledger", "PUTNAMI_CLI_EXECUTABLE": executable}),
 		Output: &out,
@@ -113,7 +113,7 @@ func TestTheReporterAnswersTheReportURL(t *testing.T) {
 	spectest.Proves(t, feature, "upload-answers-the-report-url", "the-reporter-answers-the-report-url")
 	const report = "https://putnami.app/w/acme/changes/acme%2Fshop%2342"
 	var out bytes.Buffer
-	url, diags := Run(context.Background(), Request{
+	url, _, diags := Run(context.Background(), Request{
 		Path:   document(t),
 		Getenv: env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": answeringCLI(t, resultJSON("success", `{"run_id":"r1","reportUrl":"`+report+`"}`), "0")}),
 		Output: &out,
@@ -141,7 +141,7 @@ func TestAReporterWithoutAURLStillUploaded(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			var out bytes.Buffer
-			url, diags := Run(context.Background(), Request{Path: document(t), Getenv: env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": answeringCLI(t, stdout, "0")}), Output: &out})
+			url, _, diags := Run(context.Background(), Request{Path: document(t), Getenv: env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": answeringCLI(t, stdout, "0")}), Output: &out})
 			if len(diags) != 0 || url != "" {
 				t.Fatalf("url %q, diagnostics %v", url, diags)
 			}
@@ -162,7 +162,7 @@ func TestAFailureResultNamesItsReason(t *testing.T) {
 	spectest.Proves(t, feature, "upload-answers-the-report-url", "a-failure-result-names-its-reason")
 	stdout := `{"protocolVersion":2,"command":"cloud evidence-report","status":"failure","exitCode":4,"error":{"code":"auth","message":"cloud evidence-report needs\nPUTNAMI_CLOUD_TOKEN"}}`
 	var out bytes.Buffer
-	url, diags := Run(context.Background(), Request{Path: document(t), Getenv: env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": answeringCLI(t, stdout, "4")}), Output: &out})
+	url, _, diags := Run(context.Background(), Request{Path: document(t), Getenv: env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": answeringCLI(t, stdout, "4")}), Output: &out})
 	if url != "" || len(diags) != 1 || !strings.HasSuffix(diags[0].Message, "refused the upload: cloud evidence-report needs PUTNAMI_CLOUD_TOKEN") {
 		t.Fatalf("url %q, diagnostics %+v", url, diags)
 	}
@@ -173,7 +173,7 @@ func TestAFailureResultNamesItsReason(t *testing.T) {
 	// A reporter that writes a success result, then a failure result, failed:
 	// the last result names the reason.
 	twice := resultJSON("success", `{"reportUrl":"https://putnami.app/r"}`) + "\n" + stdout
-	url, diags = Run(context.Background(), Request{Path: document(t), Getenv: env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": answeringCLI(t, twice, "4")}), Output: &out})
+	url, _, diags = Run(context.Background(), Request{Path: document(t), Getenv: env(map[string]string{"PUTNAMI_CLI_EXECUTABLE": answeringCLI(t, twice, "4")}), Output: &out})
 	if url != "" || len(diags) != 1 || !strings.HasSuffix(diags[0].Message, "needs PUTNAMI_CLOUD_TOKEN") {
 		t.Fatalf("two results: url %q, diagnostics %+v", url, diags)
 	}
@@ -227,7 +227,7 @@ func TestAFailedUploadIsAWarning(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			var out bytes.Buffer
-			url, diags := Run(context.Background(), Request{Path: document(t), Getenv: env(c.values), Output: &out, Timeout: c.timeout})
+			url, _, diags := Run(context.Background(), Request{Path: document(t), Getenv: env(c.values), Output: &out, Timeout: c.timeout})
 			if url != "" {
 				t.Fatalf("a failed upload answered %q", url)
 			}

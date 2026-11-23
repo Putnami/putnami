@@ -276,6 +276,26 @@ diagnostic. When the reporter writes several results, the last one counts.
 Standard output that holds no result goes to standard error. A reporter must
 accept `--output=json`: one that refuses the flag fails every upload.
 
+A reporter may also answer `data.level3Preview`: what level 3 would have held
+on the change, signal by signal. Putnami Cloud computes it on the run the
+upload opened.
+
+```json
+"level3Preview": {"level": 3, "baseBranch": "main",
+  "brokenRules": {"state": "known", "count": 1},
+  "vanishedTests": {"state": "unknown", "reason": "no run of main to compare"}}
+```
+
+The signals are `brokenRules`, `coverageLost`, `deletedDecisions`,
+`untestedSpecs` and `vanishedTests`. A signal is known, with its `count`, only
+when its `state` is `known` and its count is a non-negative integer. Any other
+signal, a missing one included, is unknown, with the `reason` the reporter
+gave or one observe writes: observe never reads it as zero. A known signal
+whose `notCompared` lists components is partly compared: its count holds for
+the other components only. A `level3Preview` that is not an object is dropped
+without a diagnostic, and the upload still succeeded. Observe keeps the
+preview for `--publish`.
+
 The upload never fails the job. A reporter that cannot start, exits non-zero
 or runs past 2 minutes, a selector that is not an extension name, and a
 document that was not written each give `observe.upload_failed`, and observe
@@ -379,10 +399,26 @@ On a GitHub pull request or a GitLab merge request it:
    counts the changed and dependent components, the coverage of the changed
    lines and the dependency changes, for example
    `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`,
-   or says that the base was not resolved. It links the report (its
-   `target_url`), or the CI run when the reporter answered no URL.
+   or says that the base was not resolved. With a level 3 preview it ends
+   with what level 3 would have held, for example `; level 3 would have held
+   it on 2 signals, 1 unknown`, when that fits in the status's 140
+   characters. It
+   links the report (its `target_url`), or the CI run when the reporter
+   answered no URL.
 2. Writes one Markdown note on the request. Its first link opens the report;
-   without a report URL it links the CI run alone. It lists the components
+   without a report URL it links the CI run alone. With a level 3 preview,
+   one line under the summary says what level 3 would have held on the
+   change, names each unknown signal with its reason and each partly
+   compared one, says "as far as the evidence tells" when one is either,
+   never "nothing", and names the next step to reach level 3:
+
+   > **Level 3 preview** against `main`: as far as the evidence tells, level 3
+   > would have held this change on 1 broken rule; unknown: vanished tests
+   > (`no run of main to compare`). Next step to level 3: make vanished tests
+   > known; the report shows how.
+
+   The preview informs and never blocks: the status stays success whatever
+   it holds. It lists the components
    with their tests and coverage, the failing tests, the least covered
    changed files, the dependency changes and the diagnostic codes. The note starts with the
    hidden line `<!-- putnami-observe:summary -->`. The next run finds the

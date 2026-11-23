@@ -23,6 +23,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/tooling/observe/internal/ci"
+	"go.putnami.dev/tooling/observe/internal/level3"
 	"go.putnami.dev/tooling/observe/internal/observe"
 )
 
@@ -75,6 +76,8 @@ type Request struct {
 	Upload Upload
 	// ReportURL is the report URL the reporter answered, "" for none.
 	ReportURL string
+	// Preview is the level 3 preview the reporter answered, nil for none.
+	Preview *level3.Preview
 	// Getenv reads the environment.
 	Getenv func(string) string
 	// Client sends the requests; nil uses a client with a per-request
@@ -173,13 +176,13 @@ func Run(ctx context.Context, req Request) []diag.Diagnostic {
 	if sha := h.statusSHA(); sha == "" {
 		diags = append(diags, diag.Warningf(CodeFailed, "publish",
 			"the CI names no commit of %s, so no commit status was set", h.requestLabel()))
-	} else if err := h.setStatus(ctx, sha, status{Description: Description(o), TargetURL: target(req.ReportURL, o)}); err != nil {
+	} else if err := h.setStatus(ctx, sha, status{Description: StatusDescription(o, req.Preview), TargetURL: target(req.ReportURL, o)}); err != nil {
 		diags = append(diags, fail("setting the commit status "+StatusName, err))
 	} else {
 		fmt.Fprintf(output, "putnami observe: set the commit status %s on %s\n", StatusName, short(sha))
 	}
 
-	body := Note(o, req.ReportURL)
+	body := Note(o, req.ReportURL, req.Preview)
 	id, err := h.findNote(ctx)
 	if err != nil {
 		return append(diags, fail("reading the notes", err))

@@ -53,6 +53,7 @@
     "cloud/env-definition-drift#enable-accepts-a-degraded-definition",
     "cloud/env-definition-drift#enable-fails-on-a-definition-that-stays-degraded",
     "cloud/env-definition-drift#status-names-enable-for-an-omitted-workload",
+    "cloud/evidence-upload#answers-the-level-3-preview",
     "cloud/evidence-upload#answers-the-report-url",
     "cloud/evidence-upload#exchanges-a-github-actions-id-token",
     "cloud/evidence-upload#exchanges-a-gitlab-ci-id-token",

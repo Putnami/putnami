@@ -8,6 +8,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/tooling/observe/internal/analyze"
+	"go.putnami.dev/tooling/observe/internal/level3"
 	"go.putnami.dev/tooling/observe/internal/lockdiff"
 	"go.putnami.dev/tooling/observe/internal/observe"
 )
@@ -52,9 +53,51 @@ func Description(o observe.Observation) string {
 		changed, dependent, lines, count(len(a.DependencyChanges), "dependency change"))
 }
 
+// StatusDescription is Description followed by what level 3 would have held
+// on the change, when the reporter answered a preview and the whole fits in
+// maxDescription characters.
+func StatusDescription(o observe.Observation, preview *level3.Preview) string {
+	description := Description(o)
+	if preview == nil {
+		return description
+	}
+	if with := description + "; " + level3Short(*preview); len([]rune(with)) <= maxDescription {
+		return with
+	}
+	return description
+}
+
+// level3Short says in a few words what level 3 would have held: the number
+// of signals that would have held the change, and the ones the evidence does
+// not fully tell, unknown or partly compared.
+func level3Short(p level3.Preview) string {
+	// A partly compared signal that holds the change counts as held: what it
+	// holds is known.
+	held, uncertain := len(p.Held()), len(p.Unknown())
+	for _, s := range p.Partial() {
+		if s.Count == 0 {
+			uncertain++
+		}
+	}
+	level := fmt.Sprintf("level %d", p.Level)
+	switch {
+	case len(p.Unknown()) == len(p.Signals):
+		return level + " preview unknown"
+	case uncertain == 0 && held == 0:
+		return level + " would have held nothing"
+	case uncertain == 0:
+		return level + " would have held it on " + count(held, "signal")
+	case held == 0:
+		return fmt.Sprintf("no known %s signal would have held it, %d unknown", level, uncertain)
+	}
+	return fmt.Sprintf("%s would have held it on %s, %d unknown", level, count(held, "signal"), uncertain)
+}
+
 // Note is the Markdown summary note. Its first line is Marker, and its first
-// link is reportURL, the report the upload stored, when there is one.
-func Note(o observe.Observation, reportURL string) string {
+// link is reportURL, the report the upload stored, when there is one. With a
+// level 3 preview, one line says what level 3 would have held and the next
+// step to reach it.
+func Note(o observe.Observation, reportURL string, preview *level3.Preview) string {
 	var b strings.Builder
 	fmt.Fprintln(&b, Marker)
 	fmt.Fprintln(&b, "### putnami observe")
@@ -62,6 +105,9 @@ func Note(o observe.Observation, reportURL string) string {
 	fmt.Fprintf(&b, "**%s**\n\n", Description(o))
 	if reportURL != "" {
 		fmt.Fprintf(&b, "[Open the full report](%s)\n\n", reportURL)
+	}
+	if preview != nil {
+		fmt.Fprintf(&b, "%s\n\n", level3Line(*preview, reportURL))
 	}
 	head := "Commit " + code(short(o.Subject.SHA))
 	if o.Subject.BaseSHA != "" {
@@ -77,6 +123,77 @@ func Note(o observe.Observation, reportURL string) string {
 	writeDependencies(&b, o.Analysis.DependencyChanges)
 	writeDiagnostics(&b, o.Diagnostics)
 	return bounded(b.String())
+}
+
+// level3Line says on one line what level 3 would have held on the change:
+// the known signals that count above zero; each unknown signal with its
+// reason and each partly compared one, never as a zero, with "as far as the
+// evidence tells"; and the next step to reach level 3. The preview informs;
+// it never blocks.
+func level3Line(p level3.Preview, reportURL string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "**Level %d preview**", p.Level)
+	if p.BaseBranch != "" {
+		b.WriteString(" against " + code(p.BaseBranch))
+	}
+	b.WriteString(": ")
+	held, unknown, partial := p.Held(), p.Unknown(), p.Partial()
+	hedge := len(unknown)+len(partial) > 0
+	switch {
+	case len(unknown) == len(p.Signals):
+		fmt.Fprintf(&b, "the evidence does not tell what level %d would have held on this change", p.Level)
+	case len(held) > 0:
+		if hedge {
+			b.WriteString("as far as the evidence tells, ")
+		}
+		phrases := make([]string, len(held))
+		for i, s := range held {
+			phrases[i] = s.Phrase()
+		}
+		fmt.Fprintf(&b, "level %d would have held this change on %s", p.Level, series(phrases))
+	case hedge:
+		fmt.Fprintf(&b, "as far as the evidence tells, no known level %d signal would have held this change", p.Level)
+	default:
+		fmt.Fprintf(&b, "level %d would have held nothing on this change", p.Level)
+	}
+	if len(unknown) > 0 {
+		parts := make([]string, len(unknown))
+		for i, s := range unknown {
+			// The reason is the reporter's text: a code span keeps it from
+			// rendering as Markdown, a link or a mention.
+			parts[i] = s.Label() + " (" + code(s.Reason) + ")"
+		}
+		b.WriteString("; unknown: " + strings.Join(parts, ", "))
+	}
+	if len(partial) > 0 {
+		parts := make([]string, len(partial))
+		for i, s := range partial {
+			parts[i] = fmt.Sprintf("%s (%s not compared)", s.Label(), count(s.NotCompared, "component"))
+		}
+		b.WriteString("; partly compared: " + strings.Join(parts, ", "))
+	}
+	fmt.Fprintf(&b, ". Next step to level %d: ", p.Level)
+	switch {
+	case len(unknown) > 0:
+		b.WriteString("make " + unknown[0].Label() + " known")
+	case len(partial) > 0:
+		b.WriteString("compare " + partial[0].Label() + " on every component")
+	default:
+		fmt.Fprintf(&b, "let level %d hold the merge on these signals", p.Level)
+	}
+	if reportURL != "" {
+		fmt.Fprintf(&b, "; [the report](%s) shows how", reportURL)
+	}
+	b.WriteString(".")
+	return b.String()
+}
+
+// series joins phrases as English does: a, b and c.
+func series(phrases []string) string {
+	if len(phrases) < 2 {
+		return strings.Join(phrases, "")
+	}
+	return strings.Join(phrases[:len(phrases)-1], ", ") + " and " + phrases[len(phrases)-1]
 }
 
 // writeComponents writes the changed and dependent components with their

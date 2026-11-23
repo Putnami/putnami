@@ -528,7 +528,14 @@ a checkpoint is settled with `memory.mission`.
 prints. When a report batch is refused, that result is a failure whose data
 names the run and what was stored. The result's `data.reportUrl` is the
 report URL Delivery answers when it opens the run, kept only when it is an
-absolute https URL. The command runs outside a workspace. In a CI job, set
+absolute https URL. Its `data.level3Preview` is the level 3 preview Delivery
+computes on the self-reported run, as the last report batch that answered one
+gave it: the level, the base branch and, for each signal (`brokenRules`,
+`coverageLost`, `deletedDecisions`, `untestedSpecs`, `vanishedTests`), its
+state, count and reason. A run whose batches answer none carries no
+`data.level3Preview`.
+`putnami observe --publish` writes it on the pull or merge request note. The
+command runs outside a workspace. In a CI job, set
 `PUTNAMI_CLOUD_TOKEN` to the organization's ingest token, which
 `putnami cloud token create --organization <id> --name ci` creates without a
 workspace; the upload names the repository. A workspace token of scope

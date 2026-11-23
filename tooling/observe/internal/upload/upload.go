@@ -8,7 +8,8 @@
 // started it, so a third party writes its own reporter as one
 // workspace-optional subcommand. The reporter answers on its standard output
 // one protocol CLI version 2 result, whose data.reportUrl is the URL of the
-// report it stored. Every failure is a warning diagnostic: an upload never
+// report it stored, and may carry data.level3Preview, the level 3 preview of
+// the change. Every failure is a warning diagnostic: an upload never
 // fails the job.
 package upload
 
@@ -28,6 +29,7 @@ import (
 	"time"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/tooling/observe/internal/level3"
 )
 
 const (
@@ -119,16 +121,16 @@ func Command(getenv func(string) string, environ []string, group, path string, s
 }
 
 // Run hands the document to the selected reporter. It returns the report URL
-// the reporter answered, "" for none, and the diagnostic of a failure, nil on
-// success.
-func Run(ctx context.Context, req Request) (reportURL string, diags []diag.Diagnostic) {
+// the reporter answered, "" for none, the level 3 preview it answered, nil for
+// none, and the diagnostic of a failure, nil on success.
+func Run(ctx context.Context, req Request) (reportURL string, preview *level3.Preview, diags []diag.Diagnostic) {
 	output := req.Output
 	if output == nil {
 		output = io.Discard
 	}
 	name, group, err := Reporter(req.Getenv)
 	if err != nil {
-		return "", failed("%v", err)
+		return "", nil, failed("%v", err)
 	}
 	timeout := req.Timeout
 	switch {
@@ -160,9 +162,9 @@ func Run(ctx context.Context, req Request) (reportURL string, diags []diag.Diagn
 		} else {
 			fmt.Fprintf(output, "putnami observe: the evidence reporter %s stored the evidence; the report is at %s\n", name, reportURL)
 		}
-		return reportURL, nil
+		return reportURL, answer.preview(), nil
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
-		return "", failed("the evidence reporter %s ran past %s and was stopped", name, timeout)
+		return "", nil, failed("the evidence reporter %s ran past %s and was stopped", name, timeout)
 	}
 	var exit *exec.ExitError
 	if errors.As(err, &exit) {
@@ -170,9 +172,9 @@ func Run(ctx context.Context, req Request) (reportURL string, diags []diag.Diagn
 		if reason := answer.errorMessage(); reason != "" {
 			message += ": " + reason
 		}
-		return "", failed("%s", message)
+		return "", nil, failed("%s", message)
 	}
-	return "", failed("the evidence reporter %s did not start: %v", name, err)
+	return "", nil, failed("the evidence reporter %s did not start: %v", name, err)
 }
 
 // result is the part of a protocol CLI version 2 result observe reads.
@@ -217,6 +219,21 @@ func (r result) reportURL() string {
 		return ""
 	}
 	return ReportURL(data.ReportURL)
+}
+
+// preview returns data.level3Preview of a successful result, nil when it
+// holds none or not an object.
+func (r result) preview() *level3.Preview {
+	if r.Status != "success" {
+		return nil
+	}
+	var data struct {
+		Preview json.RawMessage `json:"level3Preview"`
+	}
+	if json.Unmarshal(r.Data, &data) != nil {
+		return nil
+	}
+	return level3.Parse(data.Preview)
 }
 
 // errorMessage is the message of a failure result, on one line.

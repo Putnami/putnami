@@ -1160,6 +1160,21 @@
           }
         },
         {
+          "id": "upload-answers-the-level-3-preview",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reporter-answers-the-level-3-preview",
+              "an-unreadable-signal-is-unknown-not-zero",
+              "a-malformed-preview-is-dropped"
+            ]
+          }
+        },
+        {
           "id": "upload-fails-open",
           "stage": "coded",
           "evidenceKinds": [
@@ -1237,6 +1252,35 @@
               "a-gitlab-merge-request-gets-a-status-and-a-note",
               "a-second-run-updates-the-same-note",
               "the-note-and-the-status-link-the-report"
+            ]
+          }
+        },
+        {
+          "id": "publish-level-3-preview",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-note-says-what-level-3-would-have-held",
+              "an-unknown-signal-is-never-a-zero",
+              "the-note-names-the-next-step"
+            ]
+          }
+        },
+        {
+          "id": "publish-level-3-status",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-status-says-what-level-3-would-have-held",
+              "without-a-preview-the-note-is-unchanged"
             ]
           }
         },

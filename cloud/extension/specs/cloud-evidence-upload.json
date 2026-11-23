@@ -112,6 +112,13 @@
     {
       "id": "answers-the-report-url",
       "text": "The result carries data.reportUrl, the report URL Delivery answers when it opens the run, when that is an absolute https URL, and the summary line names it."
+    },
+    {
+      "id": "answers-the-level-3-preview",
+      "text": [
+        "When a report batch answers level3Preview, the level 3 preview Delivery computes on the self-reported run, the result carries it as data.level3Preview beside data.reportUrl, as the last batch that answered one gave it.",
+        "A run whose batches answer none carries no data.level3Preview."
+      ]
     }
   ]
 }

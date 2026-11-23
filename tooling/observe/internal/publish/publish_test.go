@@ -210,7 +210,7 @@ var gitlabEnv = map[string]string{
 // publish runs Run against a fixture and returns its diagnostics and output.
 func publish(t *testing.T, fixture string, o observe.Observation, env map[string]string) ([]diag.Diagnostic, string, *replay) {
 	t.Helper()
-	r := load(t, fixture, Note(o, ""))
+	r := load(t, fixture, Note(o, "", nil))
 	var out bytes.Buffer
 	diags := Run(context.Background(), Request{Observation: o, Upload: Uploaded, Getenv: envOf(env), Client: &http.Client{Transport: r}, Output: &out})
 	r.done()
@@ -252,7 +252,7 @@ func TestTheNoteAndTheStatusLinkTheReport(t *testing.T) {
 	spectest.Proves(t, feature, "publish-status", "the-note-and-the-status-link-the-report")
 	const report = "https://putnami.app/w/acme/changes/acme%2Fshop%2342"
 	o := pullRequest()
-	note := Note(o, report)
+	note := Note(o, report, nil)
 	if first := strings.Index(note, "]("); first < 0 || !strings.HasPrefix(note[first:], "]("+report+")") {
 		t.Fatalf("the first link of the note is not the report:\n%s", note)
 	}
@@ -361,7 +361,7 @@ func TestAMergedResultsPipelineGetsTheStatusOnItsOwnCommit(t *testing.T) {
 		o := mergeRequest()
 		o.Subject.ChangeRequest.HeadSHA = ""
 		env["CI_COMMIT_SHA"] = "main"
-		r := load(t, "gitlab-first-run.json", Note(o, ""))
+		r := load(t, "gitlab-first-run.json", Note(o, "", nil))
 		r.exchanges = r.exchanges[1:]
 		diags := Run(context.Background(), Request{Observation: o, Upload: Uploaded, Getenv: envOf(env), Client: &http.Client{Transport: r}})
 		r.done()
@@ -461,7 +461,7 @@ func TestARefusedCallIsADiagnostic(t *testing.T) {
 	t.Run("no head commit", func(t *testing.T) {
 		o := pullRequest()
 		o.Subject.ChangeRequest.HeadSHA = ""
-		r := load(t, "github-first-run.json", Note(o, ""))
+		r := load(t, "github-first-run.json", Note(o, "", nil))
 		r.exchanges = r.exchanges[1:]
 		var out bytes.Buffer
 		diags := Run(context.Background(), Request{Observation: o, Upload: Uploaded, Getenv: envOf(githubEnv), Client: &http.Client{Transport: r}, Output: &out})
@@ -508,10 +508,10 @@ func TestTheNoteRendersTheAnalysis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Note(pullRequest(), ""); got != string(golden) {
+	if got := Note(pullRequest(), "", nil); got != string(golden) {
 		t.Fatalf("note\n%s\nwant\n%s", got, golden)
 	}
-	empty := Note(observe.Observation{}, "")
+	empty := Note(observe.Observation{}, "", nil)
 	if !strings.HasPrefix(empty, Marker+"\n") || !strings.Contains(empty, "No component holds a changed file.") {
 		t.Fatalf("empty note %q", empty)
 	}
@@ -543,7 +543,7 @@ func TestTheNoteAndTheDescriptionAreBounded(t *testing.T) {
 	}
 	o := pullRequest()
 	o.Analysis = a
-	note := Note(o, "")
+	note := Note(o, "", nil)
 	for _, want := range []string{"... and 170 more components.", "- ... and 21 more", "... and 12 more files.", "... and 11 more dependency changes."} {
 		if !strings.Contains(note, want) {
 			t.Errorf("note lacks %q", want)
@@ -593,7 +593,7 @@ func TestTheNoteMarksAPOMChangeDeclared(t *testing.T) {
 		{Ecosystem: "maven", Name: "com.google.guava:guava", To: "33.4.0-jre", Change: evidence.DependencyAdded, Lockfile: "services/api/pom.xml"},
 		{Ecosystem: "maven", Name: "com.google.guava:guava", From: "33.3.1-jre", To: "33.4.0-jre", Change: evidence.DependencyUpgraded, Lockfile: "pricing/gradle.lockfile"},
 	}
-	note := Note(o, "")
+	note := Note(o, "", nil)
 	for _, row := range []string{
 		"| `com.google.guava:guava` | added | `33.4.0-jre` | `services/api/pom.xml` (declared) |\n",
 		"| `com.google.guava:guava` | upgraded | `33.3.1-jre → 33.4.0-jre` | `pricing/gradle.lockfile` |\n",

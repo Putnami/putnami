@@ -237,6 +237,8 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 
 	var stored, already, failures []string
 	statesLeftOut, casesLeftOut := "", ""
+	// preview is the level 3 preview the last batch that answered one gave.
+	var preview *deliveryapiclient.Preview
 	var casesShed []string
 	for _, batch := range evidenceBatches(doc, run.SubmissionID) {
 		if batch.Tests != nil {
@@ -274,6 +276,9 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 			failures = append(failures, err.Error())
 			continue
 		}
+		if value, ok := answer.Level3Preview.Value(); ok {
+			preview = &value
+		}
 		stored = append(stored, deref(answer.Stored)...)
 		already = append(already, deref(answer.Idempotent)...)
 		if dropped := deref(answer.Dropped); len(dropped) > 0 {
@@ -298,6 +303,9 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	reportURL := evidenceReportURL(deref(resp.ReportUrl))
 	if reportURL != "" {
 		result["reportUrl"] = reportURL
+	}
+	if preview != nil {
+		result["level3Preview"] = preview
 	}
 	if len(leftOut) > 0 {
 		result["operational_left_out"] = leftOut

@@ -46,6 +46,10 @@ type evidenceFakeServer struct {
 	refuseCasesStatus int
 	// reportURL is the report URL the run answers, "" for none.
 	reportURL string
+	// previews are the level3Preview each report batch answers, in order;
+	// a batch past the list, or a nil entry, answers none.
+	previews []map[string]any
+	batches  int
 }
 
 func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -95,7 +99,12 @@ func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error
 		if s.alreadyStored {
 			answer = "idempotent"
 		}
-		return reportJSONResponse(http.StatusOK, map[string]any{"runId": "run-1", "subjectId": "subject-1", answer: stored}), nil
+		reply := map[string]any{"runId": "run-1", "subjectId": "subject-1", answer: stored}
+		if s.batches < len(s.previews) && s.previews[s.batches] != nil {
+			reply["level3Preview"] = s.previews[s.batches]
+		}
+		s.batches++
+		return reportJSONResponse(http.StatusOK, reply), nil
 	}
 	return reportJSONResponse(http.StatusNotFound, map[string]any{"error": "not found"}), nil
 }

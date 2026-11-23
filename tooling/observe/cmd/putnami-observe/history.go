@@ -127,7 +127,7 @@ func (k *historyKeeper) keep(ctx context.Context, c observe.HistoryCommit) {
 		return
 	}
 	started := time.Now()
-	reportURL, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: k.getenv, Output: k.stderr, SignIn: k.signIn})
+	reportURL, _, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: k.getenv, Output: k.stderr, SignIn: k.signIn})
 	if k.signIn {
 		// One sign-in is enough: the reporter keeps the credential.
 		k.signIn = false

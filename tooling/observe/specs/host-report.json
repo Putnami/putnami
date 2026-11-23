@@ -5,7 +5,8 @@
   "outcomes": [
     "A reviewer reads the change summary on the pull request or merge request, not in the CI log, and one click on it reaches the full report of the change",
     "A CI job adds --upload --publish to putnami observe with the tokens it holds, and gets a commit status and one summary note that link to the full report, updated in place by the next run",
-    "A job without an upload, a failed upload, a missing code host token, or a job outside a pull or merge request logs why it published nothing and still passes"
+    "A job without an upload, a failed upload, a missing code host token, or a job outside a pull or merge request logs why it published nothing and still passes",
+    "A reviewer reads on the note, in one line, what level 3 would have held on the change, as far as the evidence tells, and the next step to reach level 3"
   ],
   "nonGoals": [
     "Failing the commit status on a failed test or a low coverage: the status says the analysis ran",
@@ -29,6 +30,21 @@
         "The note keeps its summary, and its first link is the report URL the evidence reporter answered; without one it links the CI run page.",
         "It updates the first note whose body starts with that marker and creates one when none does, so a second run updates the same note.",
         "A failed status call does not stop the note."
+      ]
+    },
+    {
+      "id": "publish-level-3-preview",
+      "text": [
+        "When the reporter answered a level 3 preview, the note holds one line that says what level 3 would have held on the change: each known signal counting above zero, or nothing when every signal is known and counts zero.",
+        "An unknown or partly compared signal is named, with its reason, never as zero or nothing, and the line says as far as the evidence tells, or that the evidence does not tell.",
+        "The line names the next step to reach level 3 and links the report when there is one."
+      ]
+    },
+    {
+      "id": "publish-level-3-status",
+      "text": [
+        "The status description ends with what level 3 would have held when that fits in its 140 characters.",
+        "The preview informs and never blocks: the status stays success whatever it holds, and without a preview the note and the status are as before."
       ]
     },
     {

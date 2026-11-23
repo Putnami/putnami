@@ -32,6 +32,7 @@ import (
 	sdkcli "go.putnami.dev/sdk/extension/cli"
 	sdkcontext "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
+	"go.putnami.dev/tooling/observe/internal/level3"
 	"go.putnami.dev/tooling/observe/internal/observe"
 	"go.putnami.dev/tooling/observe/internal/publish"
 	"go.putnami.dev/tooling/observe/internal/relay"
@@ -101,7 +102,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return runHistory(ctx, opts, out, getenv, stdout, stderr)
 	}
 	o := observe.Run(ctx, opts)
-	uploaded, reportURL, diags := writeAndUpload(ctx, o, out, getenv, stderr)
+	uploaded, reportURL, preview, diags := writeAndUpload(ctx, o, out, getenv, stderr)
 	o.Diagnostics = append(o.Diagnostics, diags...)
 	if out.open && reportURL != "" {
 		if _, inCI := evidence.DetectCISystem(getenv); !inCI {
@@ -112,7 +113,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	}
 	if out.publish {
 		o.Diagnostics = append(o.Diagnostics, publish.Run(ctx, publish.Request{
-			Observation: o, Upload: uploaded, ReportURL: reportURL, Getenv: getenv, Client: publishClient, Output: stderr,
+			Observation: o, Upload: uploaded, ReportURL: reportURL, Preview: preview, Getenv: getenv, Client: publishClient, Output: stderr,
 		})...)
 	}
 	if out.json {
@@ -170,18 +171,19 @@ func runRelay(ctx context.Context, out outputs, getenv func(string) string, stdo
 	r := relay.Load(ctx, relay.Request{Path: out.fromEvidence, Getenv: getenv, Client: publishClient})
 	diags := slices.Clone(r.Diagnostics)
 	uploaded, reportURL := publish.NotUploaded, ""
+	var preview *level3.Preview
 	if out.upload {
 		if r.Document == nil {
 			uploaded = publish.UploadFailed
 		} else {
 			var upDiags []diag.Diagnostic
-			uploaded, reportURL, upDiags = uploadDocument(ctx, r.Document, getenv, stderr)
+			uploaded, reportURL, preview, upDiags = uploadDocument(ctx, r.Document, getenv, stderr)
 			diags = append(diags, upDiags...)
 		}
 	}
 	if out.publish && r.Document != nil {
 		diags = append(diags, publish.Run(ctx, publish.Request{
-			Observation: r.Observation, Upload: uploaded, ReportURL: reportURL, Getenv: getenv, Client: publishClient, Output: stderr,
+			Observation: r.Observation, Upload: uploaded, ReportURL: reportURL, Preview: preview, Getenv: getenv, Client: publishClient, Output: stderr,
 		})...)
 	}
 	if out.json {
@@ -205,10 +207,10 @@ func runRelay(ctx context.Context, out outputs, getenv func(string) string, stdo
 
 // uploadDocument writes doc to a temporary file and hands it to the evidence
 // reporter.
-func uploadDocument(ctx context.Context, doc *evidence.Document, getenv func(string) string, stderr io.Writer) (publish.Upload, string, []diag.Diagnostic) {
+func uploadDocument(ctx context.Context, doc *evidence.Document, getenv func(string) string, stderr io.Writer) (publish.Upload, string, *level3.Preview, []diag.Diagnostic) {
 	dir, err := os.MkdirTemp("", "putnami-evidence-")
 	if err != nil {
-		return publish.UploadFailed, "", upload.Skipped()
+		return publish.UploadFailed, "", nil, upload.Skipped()
 	}
 	defer os.RemoveAll(dir)
 	path := filepath.Join(dir, "evidence.json")
@@ -217,13 +219,13 @@ func uploadDocument(ctx context.Context, doc *evidence.Document, getenv func(str
 		err = os.WriteFile(path, append(data, '\n'), 0o600)
 	}
 	if err != nil {
-		return publish.UploadFailed, "", upload.Skipped()
+		return publish.UploadFailed, "", nil, upload.Skipped()
 	}
-	reportURL, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr})
+	reportURL, preview, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr})
 	if len(diags) > 0 {
-		return publish.UploadFailed, "", diags
+		return publish.UploadFailed, "", nil, diags
 	}
-	return publish.Uploaded, reportURL, nil
+	return publish.Uploaded, reportURL, preview, nil
 }
 
 // openBrowser opens the report URL outside a CI. Tests replace it.
@@ -235,35 +237,35 @@ var publishClient *http.Client
 
 // writeAndUpload writes the evidence document when --evidence or --upload asks
 // for it, hands it to the evidence reporter on --upload, and returns what the
-// upload did, the report URL the reporter answered and the diagnostics of
-// both. Without --evidence the document lives in a temporary file for the
+// upload did, the report URL and the level 3 preview the reporter answered
+// and the diagnostics of both. Without --evidence the document lives in a temporary file for the
 // upload alone.
-func writeAndUpload(ctx context.Context, o observe.Observation, out outputs, getenv func(string) string, stderr io.Writer) (publish.Upload, string, []diag.Diagnostic) {
+func writeAndUpload(ctx context.Context, o observe.Observation, out outputs, getenv func(string) string, stderr io.Writer) (publish.Upload, string, *level3.Preview, []diag.Diagnostic) {
 	path := out.evidence
 	if path == "" && out.upload {
 		dir, err := os.MkdirTemp("", "putnami-evidence-")
 		if err != nil {
-			return publish.UploadFailed, "", upload.Skipped()
+			return publish.UploadFailed, "", nil, upload.Skipped()
 		}
 		defer os.RemoveAll(dir)
 		path = filepath.Join(dir, "evidence.json")
 	}
 	if path == "" {
-		return publish.NotUploaded, "", nil
+		return publish.NotUploaded, "", nil, nil
 	}
 	diags := observe.WriteEvidence(path, o, time.Now())
 	if !out.upload {
-		return publish.NotUploaded, "", diags
+		return publish.NotUploaded, "", nil, diags
 	}
 	if len(diags) > 0 {
-		return publish.UploadFailed, "", append(diags, upload.Skipped()...)
+		return publish.UploadFailed, "", nil, append(diags, upload.Skipped()...)
 	}
 	_, inCI := evidence.DetectCISystem(getenv)
-	reportURL, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr, SignIn: out.open && !inCI})
+	reportURL, preview, diags := upload.Run(ctx, upload.Request{Path: path, Getenv: getenv, Output: stderr, SignIn: out.open && !inCI})
 	if len(diags) > 0 {
-		return publish.UploadFailed, "", diags
+		return publish.UploadFailed, "", nil, diags
 	}
-	return publish.Uploaded, reportURL, nil
+	return publish.Uploaded, reportURL, preview, nil
 }
 
 // parseRun reads the flags of `run` against the job context, nil outside

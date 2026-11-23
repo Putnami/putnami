@@ -684,6 +684,20 @@
               "the-result-carries-the-report-url"
             ]
           }
+        },
+        {
+          "id": "answers-the-level-3-preview",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-result-carries-the-level-3-preview",
+              "a-run-without-a-preview-answers-none"
+            ]
+          }
         }
       ]
     },
