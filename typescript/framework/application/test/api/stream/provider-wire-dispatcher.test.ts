@@ -5,6 +5,7 @@ import { NotFoundException, resetConfigLoader, Stream } from '@putnami/runtime';
 import { api, type ApiPlugin } from '../../../src/api/api.plugin';
 import { ByteStream, endpoint } from '../../../src/api/route';
 import { application } from '../../../src/application';
+import { nativeEndpoints, type RegisteredRoute } from '../../../src/http/native-endpoints';
 import { http, type HttpPlugin } from '../../../src/http/http.plugin';
 import { openapi } from '../../../src/openapi/openapi.plugin';
 import { authenticate } from '../../../src/security/identity-resolver.middleware';
@@ -63,7 +64,11 @@ function registerGateway(plugin: ApiPlugin): void {
   );
 }
 
-async function startGateway(): Promise<{ port: number; document: () => Record<string, unknown> | undefined }> {
+async function startGateway(): Promise<{
+  port: number;
+  document: () => Record<string, unknown> | undefined;
+  routes: () => RegisteredRoute[];
+}> {
   const providerHttp: HttpPlugin = http({ port: 0 });
   providerHttp.prepend(authenticate({ anyOf: [apiKeyStrategy({ keys: [API_KEY], header: 'X-Gateway-Key' })] }));
   const providerApi = api({ autoScan: false, client: CONTRACT });
@@ -77,6 +82,7 @@ async function startGateway(): Promise<{ port: number; document: () => Record<st
   return {
     port: providerHttp.getServer()?.port as number,
     document: () => providerOpenApi.spec() as Record<string, unknown> | undefined,
+    routes: () => (providerHttp as unknown as { _routeEntries: RegisteredRoute[] })._routeEntries,
   };
 }
 
@@ -440,4 +446,12 @@ test('a provider-owned wire keeps the first-party conversation untouched', async
       websocket: { subprotocol: 'putnami.service.v1', resume: false },
     },
   ]);
+});
+
+test('keeps the provider-owned wire routes on the fetch path', async () => {
+  const { routes } = await startGateway();
+  const wires = routes().filter((route) => route.method === 'GET' && /connect|events\/ws/.test(route.path));
+  expect(wires.length).toBeGreaterThan(0);
+  const mapped = nativeEndpoints(routes()).map((endpoint) => endpoint.route);
+  for (const wire of wires) expect(mapped).not.toContain(wire.path);
 });

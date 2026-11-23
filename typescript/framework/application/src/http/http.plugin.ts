@@ -28,7 +28,7 @@ import { HttpResponse } from './http-response';
 import { retainRawHttpStreamScope } from './raw-http-stream';
 import { OriginGuardMiddleware } from './origin-guard.middleware';
 import { LinkedAbortController, type RequestDeadline, RequestDeadlines } from './request-deadlines';
-import { type NativeEndpoint, nativeEndpoints, patternsMayOverlap } from './native-endpoints';
+import { matchedPath, type NativeEndpoint, nativeEndpoints, patternsMayOverlap } from './native-endpoints';
 import { RouteController } from './route.controller';
 import { requestAcceptOf } from './request-accept';
 import { acceptScore, type HandlerResult } from './router';
@@ -1028,7 +1028,7 @@ function nativeEndpointHandler(
     matched?: HandlerResult<RouteHandler<HttpRequestContext>>[],
   ) => Promise<Response>,
 ): BunNativeHandler {
-  const { method, match, slashes, hasParams } = endpoint;
+  const { method, match, slashes, hasParams, route } = endpoint;
   return (req, server) => {
     // Bun serves HEAD from the GET route: the pipeline derives HEAD itself.
     if (req.method !== method) return serveRequest(req, server);
@@ -1036,13 +1036,18 @@ function nativeEndpointHandler(
     const pathStart = url.indexOf('/', url.indexOf('//') + 2);
     // Bun folds a leading `//`; the JS router reads it as written.
     if (url.charCodeAt(pathStart + 1) === CODE_SLASH) return serveRequest(req, server);
+    const query = url.indexOf('?', pathStart);
+    const path = query === -1 ? url.slice(pathStart) : url.slice(pathStart, query);
     let params: Record<string, string> | undefined;
     if (hasParams) {
       // Bun decodes params; the JS router hands them as written.
-      const query = url.indexOf('?', pathStart);
-      const percent = url.indexOf('%', pathStart);
-      if (percent !== -1 && (query === -1 || percent < query)) return serveRequest(req, server);
+      if (path.includes('%')) return serveRequest(req, server);
       params = (req as Request & { params: Record<string, string> }).params;
+      // Bun matched the raw target; req.url is normalized (dot segments,
+      // backslashes). Only a match that spells the URL's own path stands.
+      if (matchedPath(endpoint, params) !== path) return serveRequest(req, server);
+    } else if (path !== route) {
+      return serveRequest(req, server);
     }
     const accepted = acceptScore(match.accept, requestAcceptOf(req.headers.get('Accept')));
     if (accepted === 0) return serveRequest(req, server);

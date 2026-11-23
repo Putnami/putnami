@@ -3,23 +3,34 @@ import type { HandlerResult } from './router';
 import type { RouteHandler, RouteOptions } from './route.type';
 
 /**
- * The key an endpoint handler carries when Bun's native router may match it.
+ * The key a route handler carries when it must stay on the fetch path.
  * `Symbol.for` keeps the mark readable across two copies of the framework.
  */
-const SERVED_NATIVELY = Symbol.for('putnami.http.servedNatively');
+const SERVED_BY_FETCH = Symbol.for('putnami.http.servedByFetch');
 
 /**
- * Marks `handler` as an endpoint Bun's native router may match: a plain HTTP
- * endpoint, not a stream, a WebSocket upgrade or a page. Returns it.
+ * Keeps a route on the server's `fetch` path, matched by the framework's
+ * router instead of Bun's routes table. The framework marks its own pages,
+ * stream and WebSocket routes and gRPC/Connect calls with it. Any other route
+ * of a method Bun serves by name may be matched by Bun; the request then runs
+ * the same pipeline. Returns the handler.
+ *
+ * @example
+ * ```ts
+ * http().get('/legacy/[id]', servedByFetch((ctx) => ({ id: ctx.params?.['id'] })));
+ * ```
  */
-export function servedNatively<H extends RouteHandler>(handler: H): H {
-  (handler as H & { [SERVED_NATIVELY]?: true })[SERVED_NATIVELY] = true;
+export function servedByFetch<H extends RouteHandler>(handler: H): H {
+  (handler as H & { [SERVED_BY_FETCH]?: true })[SERVED_BY_FETCH] = true;
   return handler;
 }
 
-function isServedNatively(handler: RouteHandler): boolean {
-  return (handler as RouteHandler & { [SERVED_NATIVELY]?: true })[SERVED_NATIVELY] === true;
+function isServedByFetch(handler: RouteHandler): boolean {
+  return (handler as RouteHandler & { [SERVED_BY_FETCH]?: true })[SERVED_BY_FETCH] === true;
 }
+
+/** The HTTP methods Bun's routes table serves by name; HEAD and OPTIONS stay on fetch. */
+const NATIVE_METHODS: ReadonlySet<string> = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** A registered route, as the HTTP plugin records it. */
 export interface RegisteredRoute {
@@ -41,6 +52,28 @@ export interface NativeEndpoint {
   readonly match: Omit<HandlerResult<RouteHandler>, 'params' | 'score'>;
   /** Slash count of the route: the JS router's score is `slashes * 10 * accept score`. */
   readonly slashes: number;
+  /**
+   * The route's segments after its leading slash: a static segment, or the
+   * name of a param. Bun matches the raw request target, while `req.url` is
+   * normalized: the path these segments and Bun's params give must be the
+   * URL's own path, or the JS router answers the request.
+   */
+  readonly parts: readonly { readonly param: boolean; readonly value: string }[];
+}
+
+/** The path a match of `endpoint` with `params` stands for, as the URL would spell it. */
+export function matchedPath(endpoint: NativeEndpoint, params: Record<string, string> | undefined): string | undefined {
+  let path = '';
+  for (const part of endpoint.parts) {
+    if (!part.param) {
+      path += `/${part.value}`;
+      continue;
+    }
+    const value = params?.[part.value];
+    if (value === undefined) return undefined;
+    path += `/${value}`;
+  }
+  return path === '' ? '/' : path;
 }
 
 /** A static segment both routers read the same way, or a whole-segment `[param]`. */
@@ -120,8 +153,8 @@ function routerRoute(path: string): string {
 
 /**
  * The routes Bun's native router can match with the same answer as the JS
- * router: an endpoint marked {@link servedNatively}, alone at its pattern for
- * its method, whose pattern uses only static and whole-segment param
+ * router: a route of a method Bun serves by name ({@link NATIVE_METHODS}),
+ * not marked {@link servedByFetch}, alone at its pattern for its method, whose pattern uses only static and whole-segment param
  * segments and overlaps no other pattern of its method. A method with any
  * pattern of another syntax (a wildcard, an optional or suffixed param) maps
  * none of its routes.
@@ -139,6 +172,7 @@ export function nativeEndpoints(routes: readonly RegisteredRoute[]): NativeEndpo
 
   const endpoints: NativeEndpoint[] = [];
   for (const [method, list] of byMethod) {
+    if (!NATIVE_METHODS.has(method)) continue;
     const patterns = new Map<string, { segments: (string | null)[]; registered: RegisteredRoute[] }>();
     let simple = true;
     for (const registered of list) {
@@ -155,7 +189,7 @@ export function nativeEndpoints(routes: readonly RegisteredRoute[]): NativeEndpo
     if (!simple) continue;
 
     for (const [route, { segments, registered }] of patterns) {
-      if (registered.length !== 1 || !isServedNatively(registered[0].handler)) continue;
+      if (registered.length !== 1 || isServedByFetch(registered[0].handler)) continue;
       let alone = true;
       for (const [other, pattern] of patterns) {
         if (other !== route && overlaps(segments, pattern.segments)) {
@@ -171,6 +205,16 @@ export function nativeEndpoints(routes: readonly RegisteredRoute[]): NativeEndpo
         bunPath: route.replace(/\[([^\]]+)\]/g, ':$1'),
         hasParams: segments.includes(null),
         slashes: segments.length === 0 ? 1 : segments.length,
+        parts:
+          route === '/'
+            ? []
+            : route
+                .slice(1)
+                .split('/')
+                .map((segment) => {
+                  const param = PARAM_SEGMENT.exec(segment);
+                  return param ? { param: true, value: param[1] } : { param: false, value: segment };
+                }),
         match: {
           route,
           handler,

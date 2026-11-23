@@ -14,6 +14,7 @@ import {
 } from '@putnami/application';
 import { resolve } from 'node:path';
 import React from 'react';
+import { nativeEndpoints, type RegisteredRoute } from '../../../application/src/http/native-endpoints';
 import { composeMiddlewareChain } from '../../../application/src/http/route-scope';
 import { runInContext } from '../../../runtime/src/context/context.utils';
 import { CsrfInput } from '../../src/client/form/csrf-input';
@@ -83,6 +84,17 @@ describe('ReactApplication', () => {
     it('returns the internal HttpPlugin', () => {
       const plugin = app.getHttpPlugin();
       expect(plugin).toBeDefined();
+    });
+    it('keeps every page, loader and action route on the fetch path', () => {
+      const pages = new ReactApplication(createMockReactConfig());
+      pages.reactPage('/about', {
+        page: { default: () => null },
+        action: { action: actionBuilder(async () => HttpResponse.json({ ok: true })) },
+      });
+      const root = new HttpPlugin().merge(pages.getHttpPlugin());
+      const entries = (root as unknown as { _routeEntries: RegisteredRoute[] })._routeEntries;
+      expect(entries.length).toBeGreaterThan(1);
+      expect(nativeEndpoints(entries)).toEqual([]);
     });
   });
 

@@ -1,6 +1,7 @@
 import type { HttpRequestContext } from '../http/http-context.type';
 import { HttpResponse } from '../http/http-response';
 import type { HttpPlugin } from '../http/http.plugin';
+import { servedByFetch } from '../http/native-endpoints';
 import type { ProtoDocument, ProtoFieldMeta, RpcMethodMeta } from '../proto';
 import { encodeVarint } from './proto-codec';
 
@@ -104,8 +105,9 @@ export function registerReflection(httpPlugin: HttpPlugin, proto: ProtoDocument,
     });
   };
 
-  httpPlugin.route('POST', REFLECTION_V1_PATH, handler, { accept: acceptContentTypes });
-  httpPlugin.route('POST', REFLECTION_V1ALPHA_PATH, handler, { accept: acceptContentTypes });
+  const served = servedByFetch(handler);
+  httpPlugin.route('POST', REFLECTION_V1_PATH, served, { accept: acceptContentTypes });
+  httpPlugin.route('POST', REFLECTION_V1ALPHA_PATH, served, { accept: acceptContentTypes });
 }
 
 // ---------------------------------------------------------------------------

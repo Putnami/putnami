@@ -1,10 +1,12 @@
 import {
   CsrfMiddleware,
+  type HttpMethod,
   HttpPlugin,
   PutnamiConfig,
   type RouteHandler,
   type RouteOptions,
   SecurityHeadersMiddleware,
+  servedByFetch,
 } from '@putnami/application';
 import { useConfig } from '@putnami/runtime';
 import { joinPath } from '@putnami/utils';
@@ -65,6 +67,16 @@ import {
 import type { StaticPathParams } from './static';
 
 /**
+ * The HTTP plugin of a React application. Pages, their loaders and actions
+ * stay on the server's fetch path, out of Bun's routes table.
+ */
+class PageHttpPlugin extends HttpPlugin {
+  override route(method: HttpMethod, path: string, handler: RouteHandler, options?: RouteOptions): this {
+    return super.route(method, path, servedByFetch(handler), options);
+  }
+}
+
+/**
  * ReactApplication manages React routing configuration with SSR support.
  *
  * Uses an internal HttpPlugin to handle HTTP routes for pages, loaders, and
@@ -89,7 +101,7 @@ export class ReactApplication {
       ...useConfig(PutnamiConfig),
       ...useConfig(PutnamiReactConfig),
     },
-    private httpPlugin = new HttpPlugin(),
+    private httpPlugin: HttpPlugin = new PageHttpPlugin(),
     routeHelper?: RouteTreeHelper<RouteObject>,
   ) {
     this.cache = new ReactModuleCache(this.config.moduleCacheSize);

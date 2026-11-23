@@ -3,7 +3,12 @@ import type { ContainerContext, DetachedScope, ScopeContext } from '@putnami/run
 import { SCOPE_CONTAINER_KEY } from '@putnami/runtime/inject';
 import { specTest } from '@putnami/runtime/spectest';
 import { HttpAbortException } from '../../src/http/http.exception';
-import { attachRequestScope, buildHttpContext, closeRequestScope } from '../../src/http/http-context.builder';
+import {
+  attachRequestScope,
+  buildHttpContext,
+  closeRequestScope,
+  copyRequestContext,
+} from '../../src/http/http-context.builder';
 import type { HttpRequestContext } from '../../src/http/http-context.type';
 
 /** Minimal ContainerContext stub that counts scope creation/disposal. */
@@ -256,5 +261,64 @@ describe('the routing path', () => {
   it('keeps one slash less of a path that starts with a double slash', () => {
     expect(paths('http://localhost//foo')).toEqual({ pathname: '/foo', path: '/foo' });
     expect(paths('http://localhost///foo')).toEqual({ pathname: '//foo', path: '//foo' });
+  });
+});
+
+describe('the request accessors', () => {
+  it('builds no accessor until it is read, then keeps the one it built', () => {
+    const ctx = buildHttpContext<HttpRequestContext>({ req: new Request('http://localhost/a/b?x=1') });
+    expect(Object.hasOwn(ctx, 'path')).toBe(false);
+    const { path } = ctx;
+    expect(path()).toBe('a/b');
+    expect(ctx.path).toBe(path);
+  });
+
+  it('replaces an accessor that is assigned', () => {
+    const ctx = buildHttpContext<HttpRequestContext>({ req: new Request('http://localhost/a?x=1') });
+    ctx.queryParams = () => ({ x: '2' });
+    expect(ctx.queryParams()).toEqual({ x: '2' });
+  });
+
+  it('copies the accessors into a context copy, where a spread loses them', () => {
+    const ctx = buildHttpContext<HttpRequestContext>({ req: new Request('https://example.com/a/b?x=1') });
+    const copy = copyRequestContext(ctx);
+    const { path, query, queryParams, secured, host, body } = copy;
+    expect(path()).toBe('a/b');
+    expect(query()).toBe('?x=1');
+    expect(queryParams()).toEqual({ x: '1' });
+    expect(secured()).toBe(true);
+    expect(typeof host()).toBe('string');
+    expect(typeof body).toBe('function');
+  });
+});
+
+describe('a context derived from the request', () => {
+  it('reads the request accessor, and a later replacement of it', () => {
+    const ctx = buildHttpContext<HttpRequestContext>({ req: new Request('http://localhost/a?x=1') });
+    const derived = Object.create(ctx) as HttpRequestContext;
+    expect(derived.queryParams()).toEqual({ x: '1' });
+    ctx.queryParams = () => ({ x: '2' });
+    expect(derived.queryParams()).toEqual({ x: '2' });
+    expect(derived.path()).toBe('a');
+  });
+
+  it('keeps reading the request accessor after it set its own log context', () => {
+    const ctx = buildHttpContext<HttpRequestContext>({ req: new Request('http://localhost/a?x=1') });
+    const derived = Object.create(ctx) as HttpRequestContext;
+    derived.logContext = { scope: 'derived' };
+    expect(derived.queryParams()).toEqual({ x: '1' });
+    ctx.queryParams = () => ({ x: '2' });
+    expect(derived.queryParams()).toEqual({ x: '2' });
+  });
+});
+
+describe('the log context of a derived context', () => {
+  it('reads back what the derived context set, and builds the request one otherwise', () => {
+    const ctx = buildHttpContext<HttpRequestContext>({ req: new Request('http://localhost/a') });
+    const derived = Object.create(ctx) as HttpRequestContext & { logContext?: Record<string, unknown> };
+    expect(derived.logContext).toBeUndefined();
+    derived.logContext = { k: 1 };
+    expect(derived.logContext).toEqual({ k: 1 });
+    expect((ctx as typeof derived).logContext).toBeUndefined();
   });
 });

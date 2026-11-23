@@ -62,6 +62,31 @@ httpPlugin.route('POST', '/custom', handler);
 httpPlugin.route('OPTIONS', '/custom', handler);
 ```
 
+### Route Matching
+
+Bun's own router matches a `GET`, `POST`, `PUT`, `PATCH` or `DELETE` route
+whose pattern holds only static segments and whole-segment parameters, when
+no other route of that method can match the same path. The request then runs
+the same middleware and handler as any other. The framework's router matches
+everything else:
+
+- `HEAD`, `OPTIONS`, and the 404 and 405 answers;
+- every route of a method that has a wildcard, optional or suffixed pattern;
+- a route whose path a `native()` route may share;
+- every route of a server with rewrites;
+- a request whose path Bun reads another way than its URL (an encoded
+  parameter, a `.` or `..` segment, a leading `//`).
+
+The pages of a React application, `api()` stream and WebSocket routes and
+gRPC calls stay on the framework's router. Wrap a handler in `servedByFetch`
+to keep it there too:
+
+```typescript
+import { servedByFetch } from '@putnami/application';
+
+httpPlugin.get('/legacy/[id]', servedByFetch((ctx) => ({ id: ctx.params?.id })));
+```
+
 ## Automatic HTTP Methods
 
 The HTTP plugin automatically handles `HEAD`, `OPTIONS`, and (optionally) `TRACE` requests without requiring explicit route registration. This behaviour is enabled by default and can be configured or globally disabled.
@@ -202,6 +227,12 @@ httpPlugin.get('/example', async (ctx: HttpRequestContext) => {
   return { method, path, host };
 });
 ```
+
+The accessors (`body`, `queryParams`, `path`, `query`, `host`, `domain`,
+`secured`) are built the first time a request reads them, and keep working
+once destructured. A spread of the context (`{ ...ctx }`) copies its own
+fields only, so it drops them: pass the context itself, or read the values
+you need first.
 
 ### Context Properties
 

@@ -6,6 +6,7 @@ import { resolveStreamBudgets } from '../api/stream/first-party-stream-dispatche
 import type { Module, Plugin } from '../application';
 import { HttpPlugin } from '../http/http.plugin';
 import { HttpResponse } from '../http/http-response';
+import { servedByFetch } from '../http/native-endpoints';
 import type { HttpRequestContext } from '../http/http-context.type';
 import { ProtoPlugin } from '../proto';
 import { registerReflection } from './grpc-reflection';
@@ -172,7 +173,8 @@ export class GrpcPlugin implements Plugin {
           handler = buildUnaryRpcHandler(resolved.handler, route, proto.messageMeta, enums, useCompression);
         }
 
-        httpPlugin.route('POST', grpcPath, handler, {
+        // gRPC/Connect calls stay on the fetch path (see servedByFetch).
+        httpPlugin.route('POST', grpcPath, servedByFetch(handler), {
           accept: this.config.acceptContentTypes,
         });
         this.rpcCount++;
@@ -222,7 +224,7 @@ function registerHealthCheck(httpPlugin: HttpPlugin, acceptContentTypes: string[
   httpPlugin.route(
     'POST',
     healthPath,
-    async (ctx: HttpRequestContext) => {
+    servedByFetch(async (ctx: HttpRequestContext) => {
       const contentType = ctx.headers.get('content-type') ?? CT_JSON;
       const acceptHeader = ctx.headers.get('accept') ?? contentType;
       const useBinary = acceptContains(acceptHeader, CT_PROTO);
@@ -237,7 +239,7 @@ function registerHealthCheck(httpPlugin: HttpPlugin, acceptContentTypes: string[
       }
 
       return HttpResponse.json({ status }, { headers: connectResponseHeaders() });
-    },
+    }),
     { accept: acceptContentTypes },
   );
 }

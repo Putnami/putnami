@@ -50,7 +50,7 @@ import {
   resolveFirstPartyStreamAdmission,
   resolveFirstPartyStreamHandlers,
 } from './stream/first-party-stream-dispatcher';
-import { servedNatively } from '../http/native-endpoints';
+import { servedByFetch } from '../http/native-endpoints';
 
 const API_ACCEPT = [
   'application/json',
@@ -230,8 +230,7 @@ export class ApiPlugin implements Plugin {
         // Build-time AOT: swap the generic validation for compiled validators when
         // the codegen emitted them and the route has no middleware to preserve.
         // An empty result answers 204 here, inside the endpoint's middleware.
-        // A plain HTTP endpoint: Bun's native router may match it (see nativeEndpoints).
-        const routeHandler = servedNatively(buildHttpEndpointHandler(endpointTarget, aot));
+        const routeHandler = buildHttpEndpointHandler(endpointTarget, aot);
         this.httpPlugin.route(method, prefixedPath, routeHandler, {
           accept: API_ACCEPT,
           // Per-endpoint `.csrfExempt()` opts this single route out of CSRF;
@@ -248,7 +247,7 @@ export class ApiPlugin implements Plugin {
         const ep = exports[m];
         if (isEndpointDefinition(ep)) {
           this.assertExternalContract(m, prefixedPath, ep.meta?.client);
-          this.httpPlugin.route(m, prefixedPath, servedNatively(buildHttpEndpointHandler(ep)), {
+          this.httpPlugin.route(m, prefixedPath, buildHttpEndpointHandler(ep), {
             accept: API_ACCEPT,
             // Per-endpoint `.csrfExempt()` opts this single route out of CSRF;
             // otherwise fall back to the api-level default. Never widens siblings.
@@ -349,7 +348,7 @@ export class ApiPlugin implements Plugin {
       this.httpPlugin.route(
         'GET',
         route,
-        (context: HttpRequestContext) => {
+        servedByFetch((context: HttpRequestContext) => {
           if (context.req.headers.has('upgrade')) {
             return upgrade(context);
           }
@@ -358,7 +357,7 @@ export class ApiPlugin implements Plugin {
             return sseHandler(context);
           }
           throw new BadRequestException('stream endpoint requires "Upgrade: websocket" or "Accept: text/event-stream"');
-        },
+        }),
         { accept: [...API_ACCEPT, 'text/event-stream'], csrfExempt, firstPartyErrors: Boolean(contract) },
       );
 
@@ -367,10 +366,14 @@ export class ApiPlugin implements Plugin {
       // Bidirectional / client-stream: WebSocket only on the route's own path.
       // The gRPC plugin serves the same stream as a Connect RPC over HTTP/2;
       // HTTP/1.1 has no request-streaming shape for it here.
-      this.httpPlugin.route('GET', route, (context: HttpRequestContext) => {
-        if (context.req.headers.has('upgrade')) return upgrade(context);
-        throw new BadRequestException('websocket, expected header "upgrade"');
-      });
+      this.httpPlugin.route(
+        'GET',
+        route,
+        servedByFetch((context: HttpRequestContext) => {
+          if (context.req.headers.has('upgrade')) return upgrade(context);
+          throw new BadRequestException('websocket, expected header "upgrade"');
+        }),
+      );
       registerWsHandlers(this.httpPlugin, route, wsHandlers);
     }
 
@@ -398,12 +401,12 @@ export class ApiPlugin implements Plugin {
     this.httpPlugin.route(
       'GET',
       route,
-      (context: HttpRequestContext) => {
+      servedByFetch((context: HttpRequestContext) => {
         if (!context.req.headers.has('upgrade')) {
           throw new BadRequestException('websocket, expected header "upgrade"');
         }
         return upgrade(context);
-      },
+      }),
       { csrfExempt, firstPartyErrors: Boolean(this._clientContract) },
     );
     registerWsHandlers(

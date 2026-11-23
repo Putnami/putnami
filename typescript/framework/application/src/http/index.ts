@@ -7,6 +7,7 @@ export { isDevHtmlRequest, renderDevErrorPage } from './dev-error-page';
 export * from './http.exception';
 export { HttpMethodsMiddleware, type HttpMethodsOptions } from './http-methods.middleware';
 export { HttpPlugin, http } from './http.plugin';
+export { servedByFetch } from './native-endpoints';
 // Export the public context surface only — HttpRequestContextInternal stays
 // internal to the framework and is intentionally not re-exported.
 export type { HttpRequestContext, Server } from './http-context.type';

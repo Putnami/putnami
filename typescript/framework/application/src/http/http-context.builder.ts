@@ -55,15 +55,13 @@ type BuildContextArgs = {
 
 /**
  * The per-request HTTP context, implemented as a class so every request shares
- * one hidden class (monomorphic field access) and the request-derived accessors
- * (`path`, `query`, `host`, `domain`, `secured`, `throw`) live on the prototype
- * instead of being reallocated as closures on each request.
- *
- * `queryParams` and `body` stay per-instance functions: they are replaced in
- * place by the validation wrapper and `body` is extracted-and-called, so a bound
- * function keeps both patterns working while preserving a stable instance shape.
- * Mutable plumbing slots are declared and pre-initialised so later assignment by
- * the dispatcher/middleware never triggers a hidden-class transition.
+ * one hidden class (monomorphic field access). The request accessors
+ * (`queryParams`, `body`, `path`, `query`, `host`, `domain`, `secured`) are
+ * prototype getters that build a bound closure on first read and keep it in a
+ * pre-declared slot: a request pays only for the accessors it reads, and an
+ * assignment (the validation wrapper) replaces one in place. Mutable plumbing
+ * slots are declared and pre-initialised so later assignment by the
+ * dispatcher/middleware never triggers a hidden-class transition.
  */
 class HttpContext {
   readonly req: Request;
@@ -82,17 +80,20 @@ class HttpContext {
   __callbacks?: ((r: HttpResponse) => HttpResponse)[];
   __matchedHandlers?: HandlerResult<RouteHandler<HttpRequestContext>>[];
 
-  // These accessors are per-instance bound closures (not prototype methods) so
-  // they keep working when extracted and copied into sub-contexts (WebSocket /
-  // SSE / stream / gRPC) or destructured (e.g. the logger middleware) — all of
-  // which call them without the original `this`.
-  queryParams: () => Record<string, string>;
-  body: <T>() => Promise<T | undefined>;
-  secured: () => boolean;
-  host: () => string;
-  domain: () => string;
-  path: () => string;
-  query: () => string;
+  // The accessors (`path`, `query`, `body`...) are bound closures, so they keep
+  // working when extracted, destructured (the logger middleware) or copied into
+  // a sub-context (WebSocket / SSE / stream / gRPC), all of which call them
+  // without the original `this`. Each is built on its first read, from a
+  // prototype getter, and held in its slot below: a request pays only for the
+  // accessors it reads. Assigning one (the validation wrapper) replaces it.
+  private _queryParams?: () => Record<string, string>;
+  private _body?: <T>() => Promise<T | undefined>;
+  private _secured?: () => boolean;
+  private _host?: () => string;
+  private _domain?: () => string;
+  private _path?: () => string;
+  private _query?: () => string;
+  private readonly _maxBodySizeBytes?: number;
 
   private _signal?: AbortSignal;
   private _signalSource?: () => AbortSignal;
@@ -154,18 +155,105 @@ class HttpContext {
     this.__callbacks = undefined;
     this.__matchedHandlers = undefined;
 
-    this.queryParams = () => {
-      if (this._cachedQuery === undefined) {
-        this._cachedQuery = parseQueryString(this._scanner.query);
-      }
-      return this._cachedQuery;
-    };
-    this.body = parseBody(req, args.maxBodySizeBytes);
-    this.secured = () => this._scanner.secured;
-    this.host = () => this._scanner.host;
-    this.domain = () => this._scanner.domain;
-    this.path = () => this._scanner.path;
-    this.query = () => this._scanner.query;
+    this._maxBodySizeBytes = args.maxBodySizeBytes;
+    this._queryParams = undefined;
+    this._body = undefined;
+    this._secured = undefined;
+    this._host = undefined;
+    this._domain = undefined;
+    this._path = undefined;
+    this._query = undefined;
+  }
+
+  get queryParams(): () => Record<string, string> {
+    if (this._queryParams === undefined) {
+      // Built on the request's own context, so a context derived from it
+      // reads the request's accessor, and a later replacement of it.
+      const owner = requestOf(this);
+      owner._queryParams = () => {
+        if (owner._cachedQuery === undefined) {
+          owner._cachedQuery = parseQueryString(owner._scanner.query);
+        }
+        return owner._cachedQuery;
+      };
+    }
+    return this._queryParams as () => Record<string, string>;
+  }
+
+  set queryParams(queryParams: () => Record<string, string>) {
+    this._queryParams = queryParams;
+  }
+
+  get body(): <T>() => Promise<T | undefined> {
+    if (this._body === undefined) {
+      const owner = requestOf(this);
+      owner._body = parseBody(owner.req, owner._maxBodySizeBytes);
+    }
+    return this._body as <T>() => Promise<T | undefined>;
+  }
+
+  set body(body: <T>() => Promise<T | undefined>) {
+    this._body = body;
+  }
+
+  get secured(): () => boolean {
+    if (this._secured === undefined) {
+      const owner = requestOf(this);
+      owner._secured = () => owner._scanner.secured;
+    }
+    return this._secured as () => boolean;
+  }
+
+  set secured(secured: () => boolean) {
+    this._secured = secured;
+  }
+
+  get host(): () => string {
+    if (this._host === undefined) {
+      const owner = requestOf(this);
+      owner._host = () => owner._scanner.host;
+    }
+    return this._host as () => string;
+  }
+
+  set host(host: () => string) {
+    this._host = host;
+  }
+
+  get domain(): () => string {
+    if (this._domain === undefined) {
+      const owner = requestOf(this);
+      owner._domain = () => owner._scanner.domain;
+    }
+    return this._domain as () => string;
+  }
+
+  set domain(domain: () => string) {
+    this._domain = domain;
+  }
+
+  get path(): () => string {
+    if (this._path === undefined) {
+      const owner = requestOf(this);
+      owner._path = () => owner._scanner.path;
+    }
+    return this._path as () => string;
+  }
+
+  set path(path: () => string) {
+    this._path = path;
+  }
+
+  get query(): () => string {
+    if (this._query === undefined) {
+      const owner = requestOf(this);
+      owner._query = () => owner._scanner.query;
+    }
+    return this._query as () => string;
+  }
+
+  set query(query: () => string) {
+    this._query = query;
   }
 
   /** The request's signal, built on first read when the server gave a builder. */
@@ -333,6 +421,43 @@ export function deferHttpLogContext(ctx: HttpRequestContext, method: string, rou
 function ownerOf(ctx: HttpContext): HttpContext {
   let owner: HttpContext = ctx;
   while (!Object.hasOwn(owner, '_logContext')) {
+    const proto = Object.getPrototypeOf(owner) as HttpContext | null;
+    if (proto === null || proto === HttpContext.prototype) return ctx;
+    owner = proto;
+  }
+  return owner;
+}
+
+/**
+ * A copy of a request context, for a context that outlives the request (a
+ * stream). A spread copies own fields only: this adds the request accessors,
+ * the log context and the Authorization header. It does not carry `throw`,
+ * `signal`, `__endRequest` or the request's DI scope; a stream sets its own
+ * signal.
+ */
+export function copyRequestContext(ctx: HttpRequestContext): HttpRequestContext {
+  return {
+    ...ctx,
+    queryParams: ctx.queryParams,
+    body: ctx.body,
+    secured: ctx.secured,
+    host: ctx.host,
+    domain: ctx.domain,
+    path: ctx.path,
+    query: ctx.query,
+    logContext: ctx.logContext,
+    __authorizationHeader: (ctx as HttpRequestContext & { __authorizationHeader?: string }).__authorizationHeader,
+  } as HttpRequestContext;
+}
+
+/**
+ * The request's own context, which holds its URL scanner and its accessors:
+ * itself, or the prototype a context derived with `Object.create` reads
+ * through, even when the derived one set its own log context.
+ */
+function requestOf(ctx: HttpContext): HttpContext {
+  let owner: HttpContext = ctx;
+  while (!Object.hasOwn(owner, '_scanner')) {
     const proto = Object.getPrototypeOf(owner) as HttpContext | null;
     if (proto === null || proto === HttpContext.prototype) return ctx;
     owner = proto;

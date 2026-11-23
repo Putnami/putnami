@@ -3,6 +3,7 @@ import { useLogger } from '@putnami/runtime';
 import type { ClientSecurityPolicy, ClientServiceContract, ClientTransportContract } from '../client-contract';
 import type { WsCloseContext, WsDataType, WsMessageContext, WsOpenContext } from '../ws-context.type';
 import type { HttpRequestContext, HttpRequestContextInternal } from '../../http/http-context.type';
+import { copyRequestContext } from '../../http/http-context.builder';
 import { HttpResponse } from '../../http/http-response';
 import type { StreamEndpointDefinition } from '../route/stream-endpoint';
 import { validateSchema } from '../route/validate';
@@ -426,7 +427,14 @@ function admissionContext(
     headers.set(name, credential.value);
   }
   const req = new Request(original.req.url, { method: original.req.method, headers });
-  return { ...original, req, headers, user: undefined };
+  // The init frame carries the credentials: the upgrade request's Authorization is not forwarded.
+  return {
+    ...copyRequestContext(original),
+    req,
+    headers,
+    user: undefined,
+    __authorizationHeader: undefined,
+  } as HttpRequestContext;
 }
 
 async function runIdentityResolvers(ws: FirstPartySocket, context: HttpRequestContext): Promise<void> {
@@ -527,10 +535,7 @@ function startFirstPartyHandler(
   resumeFrom?: bigint,
 ): void {
   const streamContext = {
-    ...context,
-    // A spread copies own fields only: these are read from the request on first use.
-    logContext: context.logContext,
-    __authorizationHeader: (context as HttpRequestContextInternal).__authorizationHeader,
+    ...copyRequestContext(context),
     signal: state.abort?.signal,
     // The stream outlives the request's deadline: it ends on its own budgets.
     deadlineAt: undefined,
