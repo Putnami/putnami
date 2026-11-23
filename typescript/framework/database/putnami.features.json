@@ -104,7 +104,7 @@
     {
       "id": "typescript/shared-datasource-pooling",
       "type": "feature",
-      "name": "Shared physical pool per database with per-operation search_path",
+      "name": "Shared physical pool per database with a per-connection search_path",
       "outcome": "TypeScript workloads that declare several datasources on one physical database share one connection pool per database, and every unqualified query still resolves in its own datasource's schema",
       "owner": "typescript",
       "target": "coded",
@@ -116,12 +116,26 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-failed-set-rejects-the-operation-and-releases-the-connection",
+              "a-close-during-the-set-sets-the-path-again",
+              "a-closed-connection-is-set-again",
+              "a-connection-closing-during-each-set-rejects-the-operation",
+              "a-connection-is-set-once-then-reused-without-a-set",
+              "a-failed-set-rejects-the-operation-before-its-statement",
               "a-server-default-datasource-resets-search-path",
+              "alternating-datasources-set-the-path-on-each-switch",
               "the-physical-pool-carries-no-startup-search-path",
-              "the-set-precedes-the-statement-on-the-reserved-connection",
+              "the-pool-forgets-a-path-on-close-reserve-and-begin",
               "unsafe-sets-the-search-path-like-a-tagged-query"
             ]
+          }
+        },
+        {
+          "id": "connection-lifetime",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["an-unset-lifetime-draws-45-to-90-minutes-per-connection"]
           }
         },
         {

@@ -11,7 +11,6 @@
   "nonGoals": [
     "Sharing a pool across different connection identities (different host, database, user, or password source)",
     "Reconciling different pool tunings declared for one database by taking the largest",
-    "Skipping the per-operation set when the connection already carries the value: Bun.SQL exposes no acquire hook and no connection identity, so there is no marker to compare against",
     "Guarding user code that issues a session-level SET search_path, RESET, or DISCARD ALL on a framework connection",
     "Changing how transactions are keyed: useTxConnection and UnitOfWork stay keyed by datasource"
   ],
@@ -19,14 +18,15 @@
     {
       "id": "acquire-time-search-path",
       "text": [
-        "The physical pool carries no search_path startup parameter;",
-        "every operation of a datasource-bound client reserves a connection, pipelines SELECT set_config('search_path', $1, false) with the datasource's search_path \u2014 or RESET search_path for a datasource on the server default \u2014 before its own statement on that same connection, releases the connection, and rejects with the set's error when the set failed, so a result is never returned under an unverified search_path."
+        "The pool carries no search_path startup parameter and records the search_path each connection's session holds, forgetting it on a close, a reserve() or a transaction;",
+        "an operation sends its statement alone when its connection holds the datasource's path, else first awaits set_config('search_path', $1, false), or RESET search_path for the server default;",
+        "a failed set rejects the operation before its statement is sent."
       ]
     },
     {
       "id": "datasource-bound-acquire",
       "text": [
-        "database(name) returns a datasource-bound client, never the shared driver pool: tagged-template queries, unsafe, file and notify set the path per operation;",
+        "database(name) returns a datasource-bound client, never the shared driver pool: tagged-template queries, unsafe, file and notify set the path when their connection does not hold it;",
         "reserve() and begin() set it on the pinned connection they hand out;",
         "a query used as a fragment of another runs on that other query's connection;",
         "cancel and query modes reach the inner driver query;",
@@ -54,10 +54,15 @@
         "A physical pool opens a connection only when every connection it holds is leased and it holds fewer than poolSize;",
         "an operation that finds poolSize connections leased waits for one to be released, and the most recently released connection is reused first."
       ]
+    },
+    {
+      "id": "connection-lifetime",
+      "text": "Each connection of a physical pool closes after maxLifetime seconds; when maxLifetime is 0, each connection draws a lifetime between 45 and 90 minutes, so a long-running workload recycles its connections and the prepared statements they hold."
     }
   ],
   "decisions": [
     "typescript/framework/database/doc/adr/0003-shared-physical-pool-per-database.md",
-    "typescript/framework/database/doc/adr/0005-bun-sql-is-the-driver.md"
+    "typescript/framework/database/doc/adr/0005-bun-sql-is-the-driver.md",
+    "typescript/framework/database/doc/adr/0006-the-pool-remembers-each-connections-search-path.md"
   ]
 }

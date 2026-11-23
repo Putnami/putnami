@@ -24,6 +24,9 @@
     ".": "./src/index.ts",
     "./conformance": "./src/conformance/index.ts"
   },
+  "engines": {
+    "bun": ">=1.4.5"
+  },
   "dependencies": {
     "@putnami/application": "workspace:*",
     "@putnami/migration": "workspace:*",

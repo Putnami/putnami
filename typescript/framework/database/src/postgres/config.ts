@@ -54,6 +54,6 @@ export const PostgresConfig = Config('database', {
   connectTimeout: Default(Int, 10),
   /** Close idle connections after this many seconds. 0 disables. */
   idleTimeout: Default(Int, 60),
-  /** Maximum connection lifetime in seconds. 0 uses driver default (random 45–90 min). */
+  /** Maximum connection lifetime in seconds. 0 draws one between 45 and 90 minutes for each connection. */
   maxLifetime: Default(Int, 0),
 });

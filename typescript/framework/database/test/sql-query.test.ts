@@ -85,3 +85,43 @@ describe('server errors', () => {
     expect(error.code).toBe('ERR_POSTGRES_CONNECTION_REFUSED');
   });
 });
+
+describe('row builders', () => {
+  function recordingDriver() {
+    const calls: unknown[][] = [];
+    const driver = (...args: unknown[]) => {
+      calls.push(args);
+      return { fragment: args };
+    };
+    Object.assign(driver, { reserve: async () => driver, release: () => {}, end: async () => {} });
+    return { sql: poolClient(driver as unknown as SQL), calls };
+  }
+
+  it('writes the keys of a class instance in snake_case and its undefined fields as NULL, like a plain object', () => {
+    class Task {
+      createdAt = new Date(0);
+      doneAt: Date | undefined = undefined;
+      title = 'a';
+    }
+    const { sql, calls } = recordingDriver();
+    sql(new Task() as never, 'createdAt', 'doneAt');
+    sql([new Task(), { title: 'b', doneAt: undefined }] as never);
+    expect(calls[0]).toEqual([{ created_at: new Date(0), done_at: null, title: 'a' }, 'created_at', 'done_at']);
+    expect(calls[1]).toEqual([
+      [
+        { created_at: new Date(0), done_at: null, title: 'a' },
+        { title: 'b', done_at: null },
+      ],
+    ]);
+  });
+
+  it('leaves a list of dates or byte buffers untouched', () => {
+    const { sql, calls } = recordingDriver();
+    const dates = [new Date(0), new Date(1)];
+    const bytes = new Uint8Array([1]);
+    sql(dates as never);
+    sql(bytes as never);
+    expect(calls[0]?.[0]).toBe(dates);
+    expect(calls[1]?.[0]).toBe(bytes);
+  });
+});

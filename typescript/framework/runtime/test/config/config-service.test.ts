@@ -182,6 +182,30 @@ describe('ConfigService', () => {
       svc1.close();
       svc2.close();
     });
+
+    it('loads sources that hold no config once, not on every read', () => {
+      let loads = 0;
+      service = new ConfigService([
+        {
+          name: 'absent',
+          priority: 80,
+          load: () => {
+            loads++;
+            return undefined;
+          },
+        },
+      ]);
+
+      for (let i = 0; i < 3; i++) {
+        expect(service.rawSection('database')).toBeUndefined();
+        expect(service.get(TestConfig, { confInit: { port: i } }).port).toBe(i);
+      }
+      expect(loads).toBe(1);
+
+      service.invalidate();
+      service.rawSection('database');
+      expect(loads).toBe(2);
+    });
   });
 
   describe('invalidate()', () => {

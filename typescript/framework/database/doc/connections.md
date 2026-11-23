@@ -113,7 +113,7 @@ const config: InferConfig<typeof PostgresConfig> = {
   idleInTransactionTimeoutMs: 300_000,
   connectTimeout: 10,
   idleTimeout: 60,
-  maxLifetime: 0,
+  maxLifetime: 0, // 0: each connection draws a lifetime between 45 and 90 minutes
 };
 
 const sql = await database(undefined, config);
@@ -220,22 +220,29 @@ query at a time holds one backend.
 `database(name)` returns a *datasource-bound* client over that shared pool:
 
 - every tagged-template query, `sql.unsafe(...)`, `sql.file(...)` and
-  `sql.notify(...)` reserves a connection, sets the datasource's `search_path`
-  on it (`SELECT set_config('search_path', $1, false)`, or `RESET search_path`
-  for a datasource on the server default), runs the statement on that same
-  connection and releases it. The set is pipelined with the statement — no
-  extra network round trip — and a statement whose set failed rejects with the
-  set's error;
+  `sql.notify(...)` runs on a pooled connection. The pool remembers the
+  `search_path` each connection's session holds. When it is the datasource's,
+  the statement goes alone; otherwise the client first sets it
+  (`SELECT set_config('search_path', $1, false)`, or `RESET search_path` for a
+  datasource on the server default) and then sends the statement. A failed set
+  rejects the operation before its statement is sent. A workload with one
+  datasource per database sets the path once per connection;
 - `sql.reserve()` and `sql.begin(...)` set the `search_path` on the pinned
   connection before handing it out, so everything you run on it resolves in
-  the datasource's schema;
+  the datasource's schema. Afterwards the pool treats that connection's path
+  as unknown and sets it again on its next use;
 - `${sql(identifier)}` and `sql(rows, ...columns)` builders forward to the
   driver untouched.
 
-`Bun.SQL` exposes no acquire hook and no connection identity, so — unlike
-the Go adapter, which remembers the last value per connection and skips the
-set when it matches — the TypeScript client sets the path on every operation.
-It costs server-side microseconds.
+The pool forgets a connection's path when the connection closes. Each
+connection closes after `maxLifetime` seconds; with `maxLifetime: 0`, each one
+draws a lifetime between 45 and 90 minutes.
+
+Do not change `search_path` with a pooled query (`sql.unsafe('SET search_path
+...')`, `DISCARD ALL`). The pool does not see it, so the change holds on that
+connection until it closes or another datasource takes it. Change it inside
+`sql.reserve()` or `sql.begin(...)`, or with `set_config('search_path', ...,
+true)` in a transaction.
 
 Two datasources of one database **must declare the same pool tuning**
 (`poolSize`, `connectTimeout`, `idleTimeout`, `maxLifetime`,
@@ -406,7 +413,7 @@ const orders = await sql`SELECT * FROM orders`;
 ### Connection Lifecycle
 
 1. **First Request** - The physical pool for that database is created (or shared, when another datasource of the same database already opened it)
-2. **Subsequent Requests** - Connections are reused from the pool; each operation sets the datasource's `search_path` on the connection it uses
+2. **Subsequent Requests** - Connections are reused from the pool; an operation sets the datasource's `search_path` only when its connection does not already hold it
 3. **Pool Exhaustion** - New requests wait for available connections
 4. **Idle Connections** - Automatically closed after timeout
 5. **Closing** - `closeDatabase(name)` releases that datasource's handle; the pool ends when its last datasource closes

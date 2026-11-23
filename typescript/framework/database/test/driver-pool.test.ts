@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 import { specTest } from '@putnami/spectest';
 import type { SQL } from 'bun';
-import { createDriverPool, type DriverPoolOptions } from '../src/postgres/driver-pool';
+import {
+  createDriverPool,
+  DEFAULT_LIFETIME_MAX_SECONDS,
+  DEFAULT_LIFETIME_MIN_SECONDS,
+  type DriverPoolOptions,
+  leaseMember,
+  memberLifetime,
+  UNKNOWN_SEARCH_PATH,
+} from '../src/postgres/driver-pool';
 
 const FEATURE = 'typescript/shared-datasource-pooling';
 
@@ -199,4 +207,89 @@ describe('driver pool — connections on demand', () => {
     await expect(waiting).rejects.toThrow('the connection pool is closed');
     held.release();
   });
+});
+
+describe('driver pool — connection lifetime', () => {
+  specTest(
+    'each connection draws a lifetime between 45 and 90 minutes when none is configured, and keeps a configured one',
+    {
+      feature: FEATURE,
+      requirement: 'connection-lifetime',
+      check: 'an-unset-lifetime-draws-45-to-90-minutes-per-connection',
+    },
+    async () => {
+      expect(memberLifetime(undefined, () => 0)).toBe(DEFAULT_LIFETIME_MIN_SECONDS);
+      expect(memberLifetime(0, () => 1)).toBe(DEFAULT_LIFETIME_MAX_SECONDS);
+      expect(memberLifetime(600, () => 0.5)).toBe(600);
+
+      const { created, factory } = fakeMembers();
+      const pool = createDriverPool({ max: 3 }, factory);
+      const held = await Promise.all([pool.reserve(), pool.reserve(), pool.reserve()]);
+      for (const conn of held as Reserved[]) {
+        conn.release();
+      }
+      expect(created).toHaveLength(3);
+      for (const member of created) {
+        const lifetime = member.options.maxLifetime ?? 0;
+        expect(lifetime).toBeGreaterThanOrEqual(DEFAULT_LIFETIME_MIN_SECONDS);
+        expect(lifetime).toBeLessThanOrEqual(DEFAULT_LIFETIME_MAX_SECONDS);
+      }
+
+      const configured = fakeMembers();
+      const fixed = createDriverPool({ max: 1, maxLifetime: 120 }, configured.factory);
+      await fixed`SELECT 1`;
+      expect(configured.created[0]?.options.maxLifetime).toBe(120);
+    },
+  );
+});
+
+describe('driver pool — what it knows of a session', () => {
+  specTest(
+    'a leased member carries the path its session holds until its connection closes, a reservation or a transaction',
+    {
+      feature: FEATURE,
+      requirement: 'acquire-time-search-path',
+      check: 'the-pool-forgets-a-path-on-close-reserve-and-begin',
+    },
+    async () => {
+      const { created, factory } = fakeMembers();
+      const pool = createDriverPool({ max: 1 }, factory);
+      const lease = async () => {
+        const leased = await leaseMember(pool);
+        if (!leased) throw new Error('no lease');
+        return leased;
+      };
+
+      const first = await lease();
+      expect(first.session.searchPath).toBe(UNKNOWN_SEARCH_PATH);
+      first.session.searchPath = 'app';
+      first.release();
+      first.release();
+      const again = await lease();
+      expect(again.sql).toBe(first.sql);
+      expect(again.session.searchPath).toBe('app');
+
+      // The driver reports a close: the path is forgotten and the close counted.
+      const options = created[0]?.options as { onclose?: (error: unknown) => void } | undefined;
+      options?.onclose?.(new Error('idle'));
+      expect(again.session.searchPath).toBe(UNKNOWN_SEARCH_PATH);
+      expect(again.session.closes).toBe(1);
+      again.session.searchPath = 'app';
+      again.release();
+
+      const reserved = (await pool.reserve()) as Reserved;
+      reserved.release();
+      const afterReserve = await lease();
+      expect(afterReserve.session.searchPath).toBe(UNKNOWN_SEARCH_PATH);
+      afterReserve.session.searchPath = 'app';
+      afterReserve.release();
+
+      await pool.begin(async () => 1);
+      const afterBegin = await lease();
+      expect(afterBegin.session.searchPath).toBe(UNKNOWN_SEARCH_PATH);
+      afterBegin.release();
+
+      expect(leaseMember((() => undefined) as unknown as SQL)).toBeUndefined();
+    },
+  );
 });

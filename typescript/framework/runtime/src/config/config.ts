@@ -353,7 +353,7 @@ export function useRawConfigSection(path: string): Record<string, unknown> | und
   }
 
   if (!globalConfig) {
-    globalConfig = loadGlobalConfig(getDefaultSources());
+    globalConfig = loadGlobalConfig(getDefaultSources()) ?? {};
   }
   return rawSectionFromTree(globalConfig, path);
 }
@@ -396,7 +396,7 @@ function loadConfigStandalone<S extends SchemaDefinition>(
   let tree = configTree;
   if (!tree) {
     if (!globalConfig) {
-      globalConfig = loadGlobalConfig(getDefaultSources());
+      globalConfig = loadGlobalConfig(getDefaultSources()) ?? {};
     }
     tree = globalConfig;
   }

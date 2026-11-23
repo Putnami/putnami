@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { InferConfig } from '@putnami/runtime';
 import { specTest } from '@putnami/spectest';
 import type { SQL } from 'bun';
@@ -7,7 +7,8 @@ import { setDatabaseBindingOverride } from '../src/postgres/binding';
 import type { PostgresConfig } from '../src/postgres/config';
 import type { ConnectionOptions } from '../src/postgres/options';
 import { createDatasourceClient, RESET_SEARCH_PATH_SQL, SET_SEARCH_PATH_SQL } from '../src/postgres/datasource-client';
-import { __setPhysicalPoolFactoryForTests } from '../src/postgres/physical-pool';
+import { createDriverPool, type DriverPoolOptions } from '../src/postgres/driver-pool';
+import { __setPhysicalPoolFactoryForTests, assertBunVersion, MINIMUM_BUN_VERSION } from '../src/postgres/physical-pool';
 import { setPrimaryDatasource } from '../src/primary-datasource';
 
 const FEATURE = 'typescript/shared-datasource-pooling';
@@ -58,7 +59,7 @@ function makeQuery(sql: FakeSql, text: string, handler: (q: FakeQuery) => void, 
   const promise = new Promise<unknown>((resolve, reject) => {
     settle = { resolve, reject };
   });
-  const isSet = text.startsWith(`unsafe:${SET_SEARCH_PATH_SQL}`) || text === `unsafe:${RESET_SEARCH_PATH_SQL}`;
+  const isSet = text.startsWith(`unsafe:${SET_SEARCH_PATH_SQL}`) || text === RESET_SEARCH_PATH_SQL;
   // A set query gets NO blanket handler: the client must attach one itself,
   // otherwise a failing set surfaces here as an unhandled rejection.
   if (!isSet) {
@@ -141,44 +142,83 @@ function makeConnection(sql: FakeSql, label: string) {
   return conn;
 }
 
-function makeFakeSql(options: ConnectionOptions): FakeSql {
-  let poolHandler: (q: FakeQuery) => void = () => {};
-  const sql = ((strings: unknown, ...args: unknown[]) => {
+/**
+ * A single-connection member: what `Bun.SQL` with `max: 1` is to the driver
+ * pool. Its template calls and `unsafe` run on its one connection, labelled
+ * `conn`; `RESET search_path` fails with `failSet` like the set does.
+ */
+function makeFakeMember(pool: FakeSql): FakeSql {
+  const handler = connectionHandler(pool, 'conn');
+  const member = ((strings: unknown, ...args: unknown[]) => {
     if (Array.isArray(strings) && Array.isArray((strings as { raw?: unknown }).raw)) {
-      return makeQuery(sql, (strings as string[]).join('?'), poolHandler);
+      const text = (strings as string[]).join('?');
+      return makeQuery(pool, text, handler, text === RESET_SEARCH_PATH_SQL ? pool.failSet : undefined);
     }
     if (typeof strings === 'string' && args.length === 0) {
       return { identifier: strings };
     }
     return { builder: [strings, ...args] };
   }) as FakeSql;
-  poolHandler = connectionHandler(sql, 'pool');
-  sql.log = [];
-  sql.queries = [];
-  sql.options = options;
-  sql.ended = false;
-  sql.reserve = async () => {
-    sql.log.push('reserve');
-    return makeConnection(sql, 'conn');
+  member.unsafe = (query, params) => {
+    const fail = query === SET_SEARCH_PATH_SQL ? pool.failSet : undefined;
+    return makeQuery(pool, `unsafe:${query}${params ? `:${JSON.stringify(params)}` : ''}`, handler, fail);
   };
-  sql.begin = async (first: unknown, second?: unknown) => {
+  member.reserve = async () => {
+    pool.log.push('reserve');
+    return makeConnection(pool, 'conn');
+  };
+  member.begin = async (first: unknown, second?: unknown) => {
     const fn = (typeof first === 'function' ? first : second) as (tx: unknown) => unknown;
-    sql.log.push(`begin:${typeof first === 'string' ? first : ''}`);
-    const result = await fn(makeConnection(sql, 'tx'));
-    sql.log.push('commit');
+    pool.log.push(`begin:${typeof first === 'string' ? first : ''}`);
+    const result = await fn(makeConnection(pool, 'tx'));
+    pool.log.push('commit');
     return result;
   };
-  sql.unsafe = (query, params) =>
-    makeQuery(sql, `unsafe:${query}${params ? `:${JSON.stringify(params)}` : ''}`, poolHandler);
-  sql.end = async () => {
-    sql.ended = true;
-    sql.log.push('end');
-  };
-  (sql as unknown as Record<string, unknown>)['json'] = (value: unknown) => ({ json: value });
-  return sql;
+  member.end = async () => {};
+  (member as unknown as Record<string, unknown>)['json'] = (value: unknown) => ({ json: value });
+  return member;
 }
 
-const constructed: FakeSql[] = [];
+/** A fake physical pool: the package's own driver pool over fake members, with one shared log. */
+type FakePool = FakeSql & {
+  /** The members the pool created, in order. */
+  members: FakeSql[];
+  /** The options each member was created with, in order. */
+  memberOptions: DriverPoolOptions[];
+  /** Closes the connection of member `index`, as the driver reports an idle timeout or a server error. */
+  closeConnection(index?: number): void;
+};
+
+function makeFakeSql(options: ConnectionOptions): FakePool {
+  const members: FakeSql[] = [];
+  const memberOptions: DriverPoolOptions[] = [];
+  let pool: FakePool;
+  const driver = createDriverPool({ max: 2 }, (created) => {
+    memberOptions.push(created);
+    const member = makeFakeMember(pool);
+    members.push(member);
+    return member as unknown as SQL;
+  });
+  pool = driver as unknown as FakePool;
+  pool.log = [];
+  pool.queries = [];
+  pool.options = options;
+  pool.ended = false;
+  pool.members = members;
+  pool.memberOptions = memberOptions;
+  pool.closeConnection = (index = 0) => {
+    (memberOptions[index] as { onclose?: (error: unknown) => void }).onclose?.(new Error('connection closed'));
+  };
+  const end = driver.end.bind(driver);
+  pool.end = async () => {
+    pool.ended = true;
+    pool.log.push('end');
+    await end();
+  };
+  return pool;
+}
+
+const constructed: FakePool[] = [];
 
 function connection(host: string, params?: Record<string, string>) {
   return { host, port: 5432, database: 'app', user: 'svc', password: 'pw', ssl: false, ...(params ? { params } : {}) };
@@ -326,11 +366,9 @@ describe('shared physical pool — lifetime', () => {
       constructed[0].log.length = 0;
       await b`SELECT 1`;
       expect(constructed[0].log).toEqual([
-        'reserve',
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["app_b"]`,
         `conn:unsafe:${SET_SEARCH_PATH_SQL}:["app_b"]`,
         'conn:SELECT 1',
-        `then:unsafe:${SET_SEARCH_PATH_SQL}:["app_b"]`,
-        'conn:release',
       ]);
     },
   );
@@ -395,36 +433,44 @@ describe('shared physical pool — lifetime', () => {
   );
 });
 
-describe('datasource-bound client — search_path per operation', () => {
-  function client(searchPath: string | undefined, onEnd = async () => {}) {
-    const physical = makeFakeSql({} as ConnectionOptions);
+describe('datasource-bound client — search_path per connection', () => {
+  function client(
+    searchPath: string | undefined,
+    onEnd = async () => {},
+    physical = makeFakeSql({} as ConnectionOptions),
+  ) {
     const sql = createDatasourceClient(physical as unknown as SQL, { datasource: 'ds', searchPath, onEnd });
     return { physical, sql };
   }
 
+  const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
+
   specTest(
-    'a tagged-template query reserves, sets search_path, runs the statement on that connection, and releases',
+    'the first query on a connection sets search_path before its statement; the next one sends its statement alone',
     {
       feature: FEATURE,
       requirement: 'acquire-time-search-path',
-      check: 'the-set-precedes-the-statement-on-the-reserved-connection',
+      check: 'a-connection-is-set-once-then-reused-without-a-set',
     },
     async () => {
       const { physical, sql } = client('tenant_a, public');
       const rows = await sql`SELECT v FROM t WHERE id = ${1}`;
       expect<unknown>(rows).toEqual([{ ok: 1 }]);
       expect(physical.log).toEqual([
-        'reserve',
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a, public"]`,
         `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a, public"]`,
         'conn:SELECT v FROM t WHERE id = ?',
-        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a, public"]`,
-        'conn:release',
       ]);
+      physical.log.length = 0;
+      await sql`SELECT v FROM t WHERE id = ${2}`;
+      await sql.unsafe('SELECT 3');
+      expect(physical.log).toEqual(['conn:SELECT v FROM t WHERE id = ?', 'conn:unsafe:SELECT 3']);
+      expect(physical.members).toHaveLength(1);
     },
   );
 
   specTest(
-    'a datasource without a search_path resets the connection to the server default before its statement',
+    'a datasource without a search_path resets the connection to the server default once, before its first statement',
     {
       feature: FEATURE,
       requirement: 'acquire-time-search-path',
@@ -433,38 +479,137 @@ describe('datasource-bound client — search_path per operation', () => {
     async () => {
       const { physical, sql } = client(undefined);
       await sql`SELECT 1`;
+      await sql`SELECT 2`;
       expect(physical.log).toEqual([
-        'reserve',
-        `conn:unsafe:${RESET_SEARCH_PATH_SQL}`,
+        `then:${RESET_SEARCH_PATH_SQL}`,
+        `conn:${RESET_SEARCH_PATH_SQL}`,
         'conn:SELECT 1',
-        `then:unsafe:${RESET_SEARCH_PATH_SQL}`,
-        'conn:release',
+        'conn:SELECT 2',
       ]);
     },
   );
 
   specTest(
-    'a failed set rejects the operation with the set error and still releases the connection',
+    'datasources that alternate on one connection set their own path each time the connection changes hands',
     {
       feature: FEATURE,
       requirement: 'acquire-time-search-path',
-      check: 'a-failed-set-rejects-the-operation-and-releases-the-connection',
+      check: 'alternating-datasources-set-the-path-on-each-switch',
+    },
+    async () => {
+      const { physical, sql: a } = client('app_a');
+      const { sql: b } = client('app_b', async () => {}, physical);
+      await a`SELECT 'a1'`;
+      await b`SELECT 'b1'`;
+      await a`SELECT 'a2'`;
+      await a`SELECT 'a3'`;
+      expect(physical.log.filter((line) => line.startsWith('conn:'))).toEqual([
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["app_a"]`,
+        "conn:SELECT 'a1'",
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["app_b"]`,
+        "conn:SELECT 'b1'",
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["app_a"]`,
+        "conn:SELECT 'a2'",
+        "conn:SELECT 'a3'",
+      ]);
+    },
+  );
+
+  specTest(
+    'a connection that closed forgets its path, so the next query on it sets the path again',
+    {
+      feature: FEATURE,
+      requirement: 'acquire-time-search-path',
+      check: 'a-closed-connection-is-set-again',
+    },
+    async () => {
+      const { physical, sql } = client('tenant_a');
+      await sql`SELECT 1`;
+      physical.closeConnection(0);
+      physical.log.length = 0;
+      await sql`SELECT 2`;
+      expect(physical.log.filter((line) => line.startsWith('conn:'))).toEqual([
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        'conn:SELECT 2',
+      ]);
+    },
+  );
+
+  specTest(
+    'a connection that closes while its set runs is set again before the statement',
+    {
+      feature: FEATURE,
+      requirement: 'acquire-time-search-path',
+      check: 'a-close-during-the-set-sets-the-path-again',
+    },
+    async () => {
+      const { physical, sql } = client('tenant_a');
+      const pending = sql`SELECT 1`.execute();
+      await tick();
+      // The set is in flight: the driver reports the connection closed under it.
+      physical.closeConnection(0);
+      await pending;
+      expect(physical.log.filter((line) => line.startsWith('conn:'))).toEqual([
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        'conn:SELECT 1',
+      ]);
+    },
+  );
+
+  specTest(
+    'a connection that closes during every set rejects the operation without sending its statement',
+    {
+      feature: FEATURE,
+      requirement: 'acquire-time-search-path',
+      check: 'a-connection-closing-during-each-set-rejects-the-operation',
+    },
+    async () => {
+      const { physical, sql } = client('tenant_a');
+      const pending = Promise.resolve(sql`SELECT 1`);
+      await tick();
+      // Every later set closes the connection under it, as the first one does now.
+      const member = physical.members[0] as FakeSql;
+      const unsafe = member.unsafe.bind(member);
+      member.unsafe = (query, params) => {
+        const sent = unsafe(query, params);
+        physical.closeConnection(0);
+        return sent;
+      };
+      physical.closeConnection(0);
+      await expect(pending).rejects.toThrow('the connection closed while its search_path was being set');
+      expect(physical.log).not.toContain('conn:SELECT 1');
+    },
+  );
+
+  specTest(
+    'a failed set rejects the operation before its statement is sent, and the connection is set again next time',
+    {
+      feature: FEATURE,
+      requirement: 'acquire-time-search-path',
+      check: 'a-failed-set-rejects-the-operation-before-its-statement',
     },
     async () => {
       const { physical, sql } = client('tenant_a');
       physical.failSet = new Error('permission denied to set parameter');
       await expect(Promise.resolve(sql`SELECT 1`)).rejects.toThrow('permission denied to set parameter');
-      expect(physical.log.at(-1)).toBe('conn:release');
-      // The client attached a handler to the set's own promise: its rejection
-      // is observed there, never left unhandled.
+      expect(physical.log).not.toContain('conn:SELECT 1');
       expect(physical.log).toContain(`then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`);
       await expect(sql.reserve()).rejects.toThrow('permission denied to set parameter');
       expect(physical.log.at(-1)).toBe('conn:release');
+
+      physical.failSet = undefined;
+      physical.log.length = 0;
+      await sql`SELECT 2`;
+      expect(physical.log.filter((line) => line.startsWith('conn:'))).toEqual([
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        'conn:SELECT 2',
+      ]);
     },
   );
 
   specTest(
-    'unsafe goes through the same reserve, set, statement, release sequence',
+    'unsafe sets the path like a tagged query',
     {
       feature: FEATURE,
       requirement: 'acquire-time-search-path',
@@ -474,11 +619,9 @@ describe('datasource-bound client — search_path per operation', () => {
       const { physical, sql } = client('tenant_a');
       await sql.unsafe('SELECT $1::int', [7]);
       expect(physical.log).toEqual([
-        'reserve',
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         'conn:unsafe:SELECT $1::int:[7]',
-        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
-        'conn:release',
       ]);
     },
   );
@@ -495,12 +638,20 @@ describe('datasource-bound client — search_path per operation', () => {
       const reserved = await sql.reserve();
       expect(physical.log).toEqual([
         'reserve',
-        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
       ]);
       await reserved`BEGIN`;
       reserved.release();
       expect(physical.log.slice(3)).toEqual(['conn:BEGIN', 'conn:release']);
+      // What ran on the reserved connection may have changed its path: the
+      // next query on that connection sets it again.
+      physical.log.length = 0;
+      await sql`SELECT 1`;
+      expect(physical.log.filter((line) => line.startsWith('conn:'))).toEqual([
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        'conn:SELECT 1',
+      ]);
     },
   );
 
@@ -521,21 +672,30 @@ describe('datasource-bound client — search_path per operation', () => {
       expect(result).toBe('done');
       expect(physical.log).toEqual([
         'begin:',
-        `tx:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        `tx:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         'callback',
         'tx:INSERT INTO t VALUES (1)',
         'commit',
       ]);
+      // A rollback undoes a set made inside the transaction: the connection's
+      // path is unknown afterwards.
+      expect(physical.members).toHaveLength(1);
       physical.log.length = 0;
       const results = await sql.begin('read write', (tx) => [tx`SELECT 1`, tx`SELECT 2`]);
       expect(results).toHaveLength(2);
       expect(physical.log.slice(0, 3)).toEqual([
         'begin:read write',
-        `tx:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        `tx:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
       ]);
       expect(physical.log.at(-1)).toBe('commit');
+      physical.log.length = 0;
+      await sql`SELECT 3`;
+      expect(physical.log.filter((line) => line.startsWith('conn:'))).toEqual([
+        `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
+        'conn:SELECT 3',
+      ]);
     },
   );
 
@@ -565,23 +725,25 @@ describe('datasource-bound client — search_path per operation', () => {
       const early = sql`SELECT pg_sleep(1)`;
       early.cancel();
       await expect(Promise.resolve(early)).rejects.toMatchObject({ code: '57014' });
-      // Cancelled before dispatch: rejected without reaching the driver, no connection reserved.
+      // Cancelled before dispatch: rejected without reaching the driver, no connection leased.
       expect(physical.log).toEqual([]);
+      expect(physical.members).toHaveLength(0);
 
+      await sql`SELECT 0`;
       physical.log.length = 0;
       const late = sql`SELECT pg_sleep(2)`.execute();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await tick();
       late.cancel();
       await expect(Promise.resolve(late)).rejects.toMatchObject({ code: '57014' });
       expect(physical.log).toContain('cancel:SELECT pg_sleep(2)');
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(physical.log.at(-1)).toBe('conn:release');
 
       await sql`SELECT 1`.values();
       await sql`SELECT 2`.raw();
       await sql`SELECT 3`.simple();
       const modes = physical.queries.filter((q) => q.modes.length > 0).map((q) => q.modes);
       expect(modes).toEqual([['values'], ['raw'], ['simple']]);
+      // The cancelled query gave its connection back: every query ran on one.
+      expect(physical.members).toHaveLength(1);
     },
   );
 
@@ -597,13 +759,11 @@ describe('datasource-bound client — search_path per operation', () => {
       const where = sql`id = ${1}`;
       await sql`SELECT v FROM t WHERE ${where}`;
       expect(physical.log).toEqual([
-        'reserve',
+        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         `conn:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
         'conn:SELECT v FROM t WHERE ?',
-        `then:unsafe:${SET_SEARCH_PATH_SQL}:["tenant_a"]`,
-        'conn:release',
       ]);
-      // The fragment was built on the reserved connection, as a value of the
+      // The fragment was built on the leased connection, as a value of the
       // statement, and never executed on its own.
       const fragment = physical.queries.find((q) => q.text === 'id = ?');
       expect(fragment?.executed).toBe(false);
@@ -627,7 +787,7 @@ describe('datasource-bound client — search_path per operation', () => {
   );
 
   specTest(
-    'a cancel that lands while the reserve is pending hands the connection back and issues nothing',
+    'a cancel that lands while the query waits for a connection hands the connection back and issues nothing',
     {
       feature: FEATURE,
       requirement: 'datasource-bound-acquire',
@@ -635,26 +795,59 @@ describe('datasource-bound client — search_path per operation', () => {
     },
     async () => {
       const { physical, sql } = client('tenant_a');
-      let grant: (() => void) | undefined;
-      physical.reserve = () =>
-        new Promise((resolve) => {
-          physical.log.push('reserve');
-          grant = () => resolve(makeConnection(physical, 'conn'));
-        });
+      // The pool holds two connections: hold both.
+      const first = await sql.reserve();
+      const second = await sql.reserve();
+      physical.log.length = 0;
       const q = sql`SELECT pg_sleep(3)`;
       const outcome = Promise.resolve(q).then(
         () => 'resolved',
         (err: { code?: string }) => err.code,
       );
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(grant).toBeDefined();
+      await tick();
       q.cancel();
-      grant?.();
-      await new Promise((resolve) => setTimeout(resolve, 5));
+      first.release();
+      await tick(5);
       expect(await outcome).toBe('57014');
-      // Cancelled while the reserve was pending: the connection goes back
-      // unused, and the statement never reaches the driver.
-      expect(physical.log).toEqual(['reserve', 'conn:release']);
+      // Cancelled while it waited: the connection goes back unused, and the
+      // statement never reaches the driver.
+      expect(physical.log).toEqual(['conn:release']);
+      second.release();
+      await sql`SELECT 1`;
+      expect(physical.members).toHaveLength(2);
     },
   );
+});
+
+describe('datasource-bound client — runs only on the package pool', () => {
+  specTest(
+    'a client over another pool rejects its operations with an error naming the requirement',
+    {
+      feature: FEATURE,
+      requirement: 'acquire-time-search-path',
+      check: 'a-client-over-another-pool-fails',
+    },
+    async () => {
+      const foreign = Object.assign(() => undefined, { reserve: async () => ({}) });
+      const sql = createDatasourceClient(foreign as unknown as SQL, {
+        datasource: 'ds',
+        searchPath: 'a',
+        onEnd: async () => {},
+      });
+      await expect(Promise.resolve(sql`SELECT 1`)).rejects.toThrow('runs on a pool built by createDriverPool');
+    },
+  );
+});
+
+describe('physical pool — Bun floor', () => {
+  it('rejects a Bun release older than 1.4.5 with an error naming both versions', () => {
+    expect(() => assertBunVersion('1.4.0')).toThrow(
+      '@putnami/database needs Bun 1.4.5 or later; this process runs Bun 1.4.0',
+    );
+    expect(() => assertBunVersion('1.4.5')).not.toThrow();
+    expect(() => assertBunVersion('1.5.0')).not.toThrow();
+    expect(() => assertBunVersion('1.4.6-canary.3')).not.toThrow();
+    expect(() => assertBunVersion('1.4.5-canary.1')).toThrow('this process runs Bun 1.4.5-canary.1');
+    expect(MINIMUM_BUN_VERSION).toBe('1.4.5');
+  });
 });

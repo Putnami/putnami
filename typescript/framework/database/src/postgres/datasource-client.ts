@@ -1,4 +1,5 @@
 import type { ReservedSqlClient, SqlClient, TransactionSqlClient } from '../sql-client';
+import { type LeasedMember, leaseMember, UNKNOWN_SEARCH_PATH } from './driver-pool';
 import {
   beginOn,
   type CapturedQuery,
@@ -22,16 +23,18 @@ import {
  * client sets on the connection each operation uses, before the operation's
  * own statement.
  *
- * `Bun.SQL` has no acquire hook and does not expose which connection a query
- * or a `reserve()` landed on, so the marker-and-skip optimization the Go
- * adapter's `PrepareConn` hook makes cannot exist here. Every operation
- * therefore reserves a connection, executes the set (or `RESET search_path`
- * for a datasource that runs on the server default — it must still neutralize
- * what another datasource left behind) and then its statement back to back on
- * that reserved connection, which pipelines them: the set costs server-side
- * microseconds and no extra network round trip. The connection is released
- * once both settled; when the set failed, the operation rejects with the set's
- * error — a result is never returned under an unverified `search_path`.
+ * The pool is the package's own (driver-pool.ts): each member holds one
+ * connection and the pool records the `search_path` its session holds,
+ * forgetting it whenever the connection closes. An operation leases a member
+ * and, when the member's session already holds this datasource's path, runs
+ * its statement with no set at all — the common case of a workload with one
+ * datasource per database. Otherwise it first awaits
+ * `SELECT set_config('search_path', $1, false)` (or `RESET search_path` for a
+ * datasource on the server default, which must still neutralize what another
+ * datasource left behind), records the path, then runs its statement: a
+ * failed set rejects the operation before its statement was sent, so a
+ * statement never runs under an unverified `search_path`. A connection that
+ * closed while the set ran is set again on its new session.
  *
  * The queries this client hands out capture their template (see
  * sql-query.ts): a query used as a fragment of another runs on that other
@@ -61,21 +64,20 @@ export interface DatasourceClientOptions {
   readonly onEnd: (options?: { timeout?: number }) => Promise<void>;
 }
 
-/** The driver statement a set runs: what the pool, a reserved connection and a transaction all offer. */
-type Unsafe = { unsafe(query: string, parameters?: unknown[]): PromiseLike<unknown> & { execute(): unknown } };
+/** The driver statement a set runs on: a member, a reserved connection or a transaction. */
+type SetTarget = Pick<DriverSql, 'unsafe'> & ((strings: TemplateStringsArray, ...values: unknown[]) => unknown);
 
 /**
- * setSearchPath issues the session-level set (or reset) for `searchPath` on
- * `conn` and returns the driver statement, already executed, WITHOUT awaiting
- * it: a statement the caller executes on `conn` right after is pipelined
- * behind it.
+ * setSearchPath sets the session-level `search_path` of `conn` to `path`, or
+ * resets it to the server default when `path` is empty. Both run on the
+ * extended protocol.
  */
-function setSearchPath(conn: Unsafe, searchPath: string | undefined): PromiseLike<unknown> {
-  const path = searchPath?.trim();
-  const statement = path ? conn.unsafe(SET_SEARCH_PATH_SQL, [path]) : conn.unsafe(RESET_SEARCH_PATH_SQL);
-  statement.execute();
-  return statement;
+function setSearchPath(conn: SetTarget, path: string): Promise<unknown> {
+  return Promise.resolve(path ? conn.unsafe(SET_SEARCH_PATH_SQL, [path]) : conn`RESET search_path`);
 }
+
+/** How many times an operation sets the path of one connection that keeps closing under it. */
+const SET_ATTEMPTS = 2;
 
 function closedError(datasource: string): Error {
   return new Error(`database: datasource ${JSON.stringify(datasource)} is closed; call database(name) to reopen it`);
@@ -90,6 +92,8 @@ export function createDatasourceClient(physical: DriverSql, options: DatasourceC
   let ending: Promise<void> | undefined;
   const debug = options.debug ?? false;
 
+  const wanted = options.searchPath?.trim() ?? '';
+
   const reserveDriver = async (): Promise<DriverSql & { release(): void }> => {
     try {
       return (await physical.reserve()) as DriverSql & { release(): void };
@@ -98,39 +102,61 @@ export function createDatasourceClient(physical: DriverSql, options: DatasourceC
     }
   };
 
+  const leaseDriver = async (): Promise<LeasedMember> => {
+    const leased = leaseMember(physical);
+    if (!leased) {
+      throw new Error('database: a datasource client runs on a pool built by createDriverPool');
+    }
+    try {
+      return await leased;
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  };
+
   /**
-   * dispatch runs `query` on a connection reserved for this operation: it
-   * executes the set, then the query, back to back on it, fails the query
-   * with the set's error when the set failed, and releases the connection once
-   * both settled.
+   * dispatch runs `query` on a leased member: it sets the datasource's path
+   * first when the member's session does not hold it, then runs the query,
+   * and gives the member back once the query settled.
    */
   const dispatch = async (query: CapturedQuery): Promise<unknown> => {
     if (closed) {
       throw closedError(options.datasource);
     }
     if (query.cancelled) {
-      // Cancelled before it was dispatched: reserving a connection for it would
+      // Cancelled before it was dispatched: leasing a connection for it would
       // only hold one for nothing.
       throw queryCancelledError();
     }
-    const reserved = await reserveDriver();
+    const member = await leaseDriver();
     try {
       if (query.cancelled) {
         throw queryCancelledError();
       }
-      const set = setSearchPath(reserved, options.searchPath);
-      const statement = query.runOn(reserved, debug);
-      const [setOutcome, statementOutcome] = await Promise.allSettled([set, statement]);
-      if (setOutcome.status === 'rejected') {
-        // Fail closed: never hand out a result the set did not vouch for.
-        throw normalizeError(setOutcome.reason);
+      for (let attempt = 1; member.session.searchPath !== wanted; attempt++) {
+        if (attempt > SET_ATTEMPTS) {
+          throw new Error(
+            `database: datasource ${JSON.stringify(options.datasource)}: the connection closed while its search_path was being set`,
+          );
+        }
+        const closes = member.session.closes;
+        member.session.searchPath = UNKNOWN_SEARCH_PATH;
+        try {
+          await setSearchPath(member.sql as unknown as SetTarget, wanted);
+        } catch (error) {
+          throw normalizeError(error);
+        }
+        if (member.session.closes === closes) {
+          member.session.searchPath = wanted;
+        }
       }
-      if (statementOutcome.status === 'rejected') {
-        throw statementOutcome.reason;
+      if (query.cancelled) {
+        throw queryCancelledError();
       }
-      return statementOutcome.value;
+      // Sent in the same turn as the check above: no close can come between.
+      return await query.runOn(member.sql, debug);
     } finally {
-      reserved.release();
+      member.release();
     }
   };
 
@@ -143,7 +169,7 @@ export function createDatasourceClient(physical: DriverSql, options: DatasourceC
       }
       const reserved = await reserveDriver();
       try {
-        await setSearchPath(reserved, options.searchPath);
+        await setSearchPath(reserved as unknown as SetTarget, wanted);
       } catch (error) {
         reserved.release();
         throw normalizeError(error);
@@ -160,9 +186,7 @@ export function createDatasourceClient(physical: DriverSql, options: DatasourceC
       if (closed) {
         throw closedError(options.datasource);
       }
-      return beginOn(physical, mode, fn, pinned, (tx) =>
-        Promise.resolve(setSearchPath(tx as Unsafe, options.searchPath)),
-      );
+      return beginOn(physical, mode, fn, pinned, (tx) => setSearchPath(tx as unknown as SetTarget, wanted));
     },
     end: (endOptions?: { timeout?: number }): Promise<void> => {
       if (!closed) {

@@ -1,6 +1,7 @@
 # ADR 0003 — Share one physical pool per database and set search_path per operation
 
-- **Status**: accepted
+- **Status**: accepted; decision 3 amended by
+  [ADR 0006](0006-the-pool-remembers-each-connections-search-path.md)
 - **Scope**: `@putnami/database` (`typescript/framework/database`)
 
 ## Context
@@ -30,7 +31,9 @@ a builder made by the pool works inside a statement of any of its connections.
    `maxLifetime`, `statementTimeoutMs`, `idleInTransactionTimeoutMs`, `debug`.
    `database('B')` rejects on a difference, with Go's error text. Identity
    hooks are process-global in TypeScript, so there is nothing to compare.
-3. **`search_path` per operation.** `idle_in_transaction_session_timeout`
+3. **`search_path` per operation.** (Amended by ADR 0006: the pool now
+   records each connection's path and an operation skips the set when its
+   connection holds it.) `idle_in_transaction_session_timeout`
    stays a startup parameter. `database(name)` returns a datasource-bound
    client over the shared pool (`postgres/datasource-client.ts`). A tagged
    template, `unsafe`, `file` and `notify` return a Putnami query that only

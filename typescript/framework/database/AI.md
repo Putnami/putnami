@@ -110,7 +110,8 @@ tuning — a disagreement rejects `database(name)` with an error naming both
 datasources and each differing field. `database(name)` returns a
 datasource-bound client over that shared pool: every query, `unsafe`, `reserve()`
 and `begin()` sets the datasource's `search_path` on the connection it uses
-(pipelined with the statement, no extra round trip), so unqualified queries
+when that connection does not already hold it (the pool remembers each
+connection's path until it closes), so unqualified queries
 resolve in the datasource's schema whichever datasource last used that
 connection. Closing one datasource never ends another's connections; the pool
 ends with its last datasource. See `doc/adr/0003-shared-physical-pool-per-database.md`.
@@ -279,7 +280,7 @@ class UserRepository extends Repository<typeof UsersTable> {
 }
 ```
 
-The client runs on `Bun.SQL`. Rows come back with camelCase keys; `sql('createdAt')`
+The client runs on `Bun.SQL` and needs Bun 1.4.5 or later. Rows come back with camelCase keys; `sql('createdAt')`
 and the keys of `sql(rows, ...columns)` are written in snake_case, an `undefined`
 field as `NULL`; a server error's `code` is the SQLSTATE (`driverCode` keeps the
 driver's). It has no `cursor()`, `forEach()`, `describe()` or COPY streams

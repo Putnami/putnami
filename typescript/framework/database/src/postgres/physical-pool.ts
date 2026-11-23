@@ -167,7 +167,8 @@ type PhysicalFactory = (options: ConnectionOptions) => SQL;
  * driverOptions turns the package's connection options into `Bun.SQL`
  * options. A host that starts with `/` is the directory of a Unix socket.
  * `bigint` reads an `int8` as a JavaScript `BigInt`, as the postgres.js
- * configuration did. TLS is set either way, so an environment default never
+ * configuration did. A `maxLifetime` of 0 is left out: the driver pool then
+ * draws one between 45 and 90 minutes per connection (see driver-pool.ts). TLS is set either way, so an environment default never
  * decides it.
  */
 export function driverOptions(options: ConnectionOptions): DriverPoolOptions {
@@ -188,13 +189,31 @@ export function driverOptions(options: ConnectionOptions): DriverPoolOptions {
   };
 }
 
-const realFactory: PhysicalFactory = (options) => createDriverPool(driverOptions(options));
+/** The oldest Bun release the driver runs on: `sql.json()` and the pool's `onclose` need it. */
+export const MINIMUM_BUN_VERSION = '1.4.5';
+
+/**
+ * assertBunVersion rejects a Bun release older than {@link MINIMUM_BUN_VERSION}
+ * with an error that names both, before any connection opens.
+ */
+export function assertBunVersion(version: string = Bun.version): void {
+  // `order`, not `satisfies`: a range rejects every prerelease, even a canary newer than the floor.
+  if (Bun.semver.order(version, MINIMUM_BUN_VERSION) < 0) {
+    throw new Error(`@putnami/database needs Bun ${MINIMUM_BUN_VERSION} or later; this process runs Bun ${version}`);
+  }
+}
+
+const realFactory: PhysicalFactory = (options) => {
+  assertBunVersion();
+  return createDriverPool(driverOptions(options));
+};
 
 let factory: PhysicalFactory = realFactory;
 
 /**
- * @internal Test seam: substitute the `Bun.SQL` constructor the registry
- * opens physical pools with, so the sharing, dedup, tuning, and lifetime rules
+ * @internal Test seam: substitute the factory the registry opens physical
+ * pools with. A substitute returns a {@link createDriverPool} pool, since a
+ * datasource client leases members from it, so the sharing, dedup, tuning, and lifetime rules
  * are provable without a database. Pass `undefined` to restore the driver.
  * Not part of the public API — this module is excluded from the package
  * barrel, like `__setTransactionConnectionFactory`.

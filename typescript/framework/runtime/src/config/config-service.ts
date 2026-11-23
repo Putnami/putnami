@@ -109,7 +109,7 @@ export class ConfigService {
     }
 
     if (!this.globalConfig) {
-      this.globalConfig = loadGlobalConfig(this.sources);
+      this.globalConfig = loadGlobalConfig(this.sources) ?? {};
     }
 
     const data = this.validate(config, path, this.globalConfig, params.confInit);
@@ -262,7 +262,7 @@ export class ConfigService {
    */
   rawSection(path: string): Record<string, unknown> | undefined {
     if (!this.globalConfig) {
-      this.globalConfig = loadGlobalConfig(this.sources);
+      this.globalConfig = loadGlobalConfig(this.sources) ?? {};
     }
     return rawSectionFromTree(this.globalConfig, path);
   }

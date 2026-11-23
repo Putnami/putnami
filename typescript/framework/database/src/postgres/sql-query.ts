@@ -164,10 +164,19 @@ function clientResult(result: unknown, camel: boolean): unknown {
   return out;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object') return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
+/**
+ * A row a row builder converts: any object but an array, a date or binary
+ * data — a class instance too, as postgres.js converted it.
+ */
+function isRowObject(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    !(value instanceof Date) &&
+    !(value instanceof ArrayBuffer) &&
+    !ArrayBuffer.isView(value)
+  );
 }
 
 function driverRow(row: Record<string, unknown>): Record<string, unknown> {
@@ -190,10 +199,10 @@ function buildFragment(pool: DriverSql, first: unknown, rest: readonly unknown[]
     return call(fromCamel(first));
   }
   const columns = rest.flat().map((column) => fromCamel(String(column)));
-  if (Array.isArray(first) && first.length > 0 && first.every(isPlainObject)) {
+  if (Array.isArray(first) && first.length > 0 && first.every(isRowObject)) {
     return call(first.map(driverRow), ...columns);
   }
-  if (isPlainObject(first)) {
+  if (isRowObject(first)) {
     return call(driverRow(first), ...columns);
   }
   return call(first, ...rest);
