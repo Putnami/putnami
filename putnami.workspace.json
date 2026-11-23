@@ -193,7 +193,7 @@
       },
       "intelligence": {
         "enabled": true,
-        "workspace": "dev"
+        "workspace": "putnami"
       },
       "deploy": {
         "enabled": false
