@@ -539,6 +539,22 @@
           }
         },
         {
+          "id": "sends-the-test-cases",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-tests-entry-carries-its-cases",
+              "a-tests-entry-without-cases-uploads-the-same-body",
+              "cases-over-the-bound-are-left-out-largest-first",
+              "a-refused-batch-is-posted-again-without-the-cases"
+            ]
+          }
+        },
+        {
           "id": "sends-the-declared-records",
           "stage": "coded",
           "evidenceKinds": [

@@ -40,6 +40,10 @@ type evidenceFakeServer struct {
 	// refuseStates answers a batch whose dependency changes carry a before or
 	// after state as a body over the route's size.
 	refuseStates bool
+	// refuseCases answers a batch whose tests carry cases as a body over the
+	// route's size; refuseCasesStatus answers it with that status instead.
+	refuseCases       bool
+	refuseCasesStatus int
 	// reportURL is the report URL the run answers, "" for none.
 	reportURL string
 }
@@ -70,6 +74,13 @@ func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error
 	case recordsReportsIngestPath:
 		if s.refuseStates && (strings.Contains(string(raw), `"before":`) || strings.Contains(string(raw), `"after":`)) {
 			return reportJSONResponse(http.StatusRequestEntityTooLarge, map[string]any{"error": "Request body exceeds the declared bound", "message": "Request body exceeds the declared bound"}), nil
+		}
+		if (s.refuseCases || s.refuseCasesStatus != 0) && strings.Contains(string(raw), `"cases":`) {
+			status := http.StatusRequestEntityTooLarge
+			if s.refuseCasesStatus != 0 {
+				status = s.refuseCasesStatus
+			}
+			return reportJSONResponse(status, map[string]any{"error": "Request body exceeds the declared bound", "message": "Request body exceeds the declared bound"}), nil
 		}
 		if s.refuseReports != 0 {
 			return reportJSONResponse(s.refuseReports, map[string]any{"error": "request body too large", "message": "request body too large"}), nil
@@ -660,6 +671,8 @@ func TestEvidenceBatchMembersReachTheGeneratedClient(t *testing.T) {
 		{evidence.DependencyState{}, deliveryapiclient.DependencyState{}},
 		{evidence.Declaration{}, deliveryapiclient.DeclarationChange{}},
 		{evidence.Vulnerability{}, deliveryapiclient.Vulnerability{}},
+		{evidence.TestCase{}, deliveryapiclient.TestCase{}},
+		{evidenceProjectTests{}, deliveryapiclient.ProjectTests{}},
 	} {
 		known := map[string]bool{}
 		for _, name := range jsonMemberNames(reflect.TypeOf(pair.client)) {

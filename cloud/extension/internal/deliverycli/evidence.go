@@ -141,6 +141,10 @@ type evidenceProjectTests struct {
 	Skipped      int                   `json:"skipped"`
 	Total        int                   `json:"total"`
 	FailingCases []evidenceFailingCase `json:"failingCases,omitempty"`
+	// Cases and OmittedCases are the tests entry's own, so Putnami Cloud can
+	// tell a test that vanished. An entry without cases sends neither.
+	Cases        []evidence.TestCase `json:"cases,omitempty"`
+	OmittedCases int                 `json:"omittedCases,omitempty"`
 }
 
 type evidenceFailingCase struct {
@@ -228,8 +232,14 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	}
 
 	var stored, already, failures []string
-	statesLeftOut := ""
+	statesLeftOut, casesLeftOut := "", ""
+	var casesShed []string
 	for _, batch := range evidenceBatches(doc, run.SubmissionID) {
+		if batch.Tests != nil {
+			if casesShed = evidenceShedTestCases(batch.Tests, evidenceTestCasesBudget); len(casesShed) > 0 {
+				ioctx.Stderr("warning: cloud evidence-report sends no test cases for " + strings.Join(casesShed, ", ") + ": their cases outweigh the tests report's bound, and count as omitted")
+			}
+		}
 		if run.Repository != nil {
 			batch.Provider, batch.Repo, batch.Repository = run.Provider, run.Repo, run.Repository
 		}
@@ -242,6 +252,17 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 				if answer, _, err = postEvidenceBatch(ioctx, controlURL, token, plain); err == nil {
 					ioctx.Stderr("warning: cloud evidence-report sends no dependency states: " + refusal)
 					statesLeftOut = refusal
+				}
+			}
+		}
+		// The cases can still outweigh the batch, or meet a Delivery that does
+		// not take them yet: the counts and the coverage matter without them.
+		if err != nil && (refused == http.StatusRequestEntityTooLarge || refused == http.StatusBadRequest) {
+			if plain, ok := evidenceWithoutCases(batch); ok {
+				refusal := err.Error()
+				if answer, _, err = postEvidenceBatch(ioctx, controlURL, token, plain); err == nil {
+					ioctx.Stderr("warning: cloud evidence-report sends no test cases: " + refusal)
+					casesLeftOut = refusal
 				}
 			}
 		}
@@ -279,6 +300,12 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	}
 	if statesLeftOut != "" {
 		result["dependency_states_left_out"] = statesLeftOut
+	}
+	if casesLeftOut != "" {
+		result["test_cases_left_out"] = casesLeftOut
+	}
+	if len(casesShed) > 0 {
+		result["test_cases_shed"] = casesShed
 	}
 	if len(failures) > 0 {
 		result["failed"] = failures
@@ -427,6 +454,70 @@ func postEvidenceBatch(ioctx clicore.IO, controlURL, token string, batch evidenc
 			return answer, err
 		})
 	return answer, refused, err
+}
+
+// evidenceTestCasesBudget bounds the encoded cases of one tests report. It is
+// Delivery's cap on the stored cases, under the 1 MiB batch body; the counts,
+// the failing cases and the coverage share the rest. A batch that still
+// outweighs the body is posted again without its cases.
+var evidenceTestCasesBudget = 768 * 1024
+
+// evidenceShedTestCases keeps the cases of tests within budget bytes, as
+// Delivery sheds them: the cases of the entry that lists the most go first,
+// counted in its omittedCases, so the entry no longer reads as listing every
+// case. It returns the projects it shed, in the order it shed them.
+func evidenceShedTestCases(tests *evidenceTestsReport, budget int) []string {
+	size := func(project evidenceProjectTests) int {
+		data, _ := json.Marshal(project.Cases)
+		return len(data)
+	}
+	total := 0
+	for _, project := range tests.Projects {
+		if len(project.Cases) > 0 {
+			total += size(project)
+		}
+	}
+	var shed []string
+	for total > budget {
+		largest := -1
+		for i, project := range tests.Projects {
+			if len(project.Cases) > 0 && (largest < 0 || len(project.Cases) > len(tests.Projects[largest].Cases)) {
+				largest = i
+			}
+		}
+		if largest < 0 {
+			break
+		}
+		project := &tests.Projects[largest]
+		total -= size(*project)
+		project.OmittedCases += len(project.Cases)
+		project.Cases = nil
+		shed = append(shed, project.Project)
+	}
+	return shed
+}
+
+// evidenceWithoutCases returns batch with a tests report that carries no case
+// and no omitted case count, and whether one of its projects did. It leaves
+// batch as it is.
+func evidenceWithoutCases(batch evidenceReportBatch) (evidenceReportBatch, bool) {
+	if batch.Tests == nil {
+		return batch, false
+	}
+	projects := make([]evidenceProjectTests, len(batch.Tests.Projects))
+	stripped := false
+	for i, project := range batch.Tests.Projects {
+		if len(project.Cases) > 0 || project.OmittedCases != 0 {
+			stripped = true
+		}
+		project.Cases, project.OmittedCases = nil, 0
+		projects[i] = project
+	}
+	if !stripped {
+		return batch, false
+	}
+	batch.Tests = &evidenceTestsReport{Projects: projects}
+	return batch, true
 }
 
 // evidenceWithoutStates returns batch with dependency changes that carry no
@@ -633,6 +724,10 @@ func evidenceBatches(doc *evidence.Document, submissionID string) []evidenceRepo
 				Failed:  tests.Failed,
 				Skipped: tests.Skipped,
 				Total:   tests.Passed + tests.Failed + tests.Skipped,
+				// The cases go as the document lists them: Delivery checks
+				// them against the counts as the protocol does.
+				Cases:        tests.Cases,
+				OmittedCases: tests.OmittedCases,
 			}
 			for _, failing := range tests.FailingCases {
 				project.FailingCases = append(project.FailingCases, evidenceFailingCase{Name: failing.Name, File: failing.File, Message: failing.Message})

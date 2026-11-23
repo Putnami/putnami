@@ -62,6 +62,7 @@
     "cloud/evidence-upload#sends-the-declared-records",
     "cloud/evidence-upload#sends-the-dependency-states",
     "cloud/evidence-upload#sends-the-provenance-of-the-ci",
+    "cloud/evidence-upload#sends-the-test-cases",
     "cloud/evidence-upload#sends-the-tested-tree",
     "cloud/evidence-upload#signs-a-person-in",
     "cloud/ingest-token#create-calls-the-organization-route",

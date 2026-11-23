@@ -594,7 +594,15 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
    writes the document, so a job that runs `putnami observe --upload` needs
    no deeper fetch.
 2. `POST /v1/delivery/records/reports` posts the tests and coverage of each
-   component.
+   component. A component's tests carry the `cases` and `omittedCases` its
+   tests entry lists, so Putnami Cloud can tell a test that vanished; an
+   entry without cases sends neither. When the cases encode to more than
+   768 KiB, Delivery's bound on them, the cases of the component that lists
+   the most go first, counted in its `omittedCases`, until the rest fit; the
+   command warns and names those components under `data.test_cases_shed`.
+   When the route still refuses the batch with 413 or 400, as a Delivery that
+   does not take cases yet does, the command warns, posts it again without
+   the cases, and names the refusal under `data.test_cases_left_out`.
 3. The same route then posts `components`, `changedLineCoverage` and
    `dependencyChanges` as the document holds them. They go apart because the
    route refuses a body over 1 MiB whole. A dependency change keeps its

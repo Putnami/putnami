@@ -49,6 +49,48 @@
         },
         "type": "object"
       },
+      "BrokenRule": {
+        "additionalProperties": false,
+        "properties": {
+          "rule": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "violationCount": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "BrokenRulesSignal": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/BrokenRule"
+            },
+            "type": "array"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "BuildsReport": {
         "additionalProperties": false,
         "properties": {
@@ -739,6 +781,9 @@
             "nullable": true
           },
           "provenance": {
+            "type": "string"
+          },
+          "provider": {
             "type": "string"
           },
           "pullRequest": {
@@ -2083,6 +2128,57 @@
         },
         "type": "object"
       },
+      "CoverageLoss": {
+        "additionalProperties": false,
+        "properties": {
+          "basePercentage": {
+            "format": "double",
+            "type": "number"
+          },
+          "component": {
+            "type": "string"
+          },
+          "delta": {
+            "format": "double",
+            "type": "number"
+          },
+          "percentage": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CoverageLostSignal": {
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageLoss"
+            },
+            "type": "array"
+          },
+          "count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "notCompared": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CoverageReport": {
         "additionalProperties": false,
         "properties": {
@@ -2191,6 +2287,42 @@
             "type": "string"
           },
           "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeletedDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeletedDecisionsSignal": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/DeletedDecision"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "state": {
             "type": "string"
           }
         },
@@ -3063,6 +3195,42 @@
         },
         "type": "object"
       },
+      "Preview": {
+        "additionalProperties": false,
+        "properties": {
+          "baseBranch": {
+            "type": "string"
+          },
+          "brokenRules": {
+            "$ref": "#/components/schemas/BrokenRulesSignal"
+          },
+          "coverageLost": {
+            "$ref": "#/components/schemas/CoverageLostSignal"
+          },
+          "deletedDecisions": {
+            "$ref": "#/components/schemas/DeletedDecisionsSignal"
+          },
+          "holds": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "level": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "untestedSpecs": {
+            "$ref": "#/components/schemas/UntestedSpecsSignal"
+          },
+          "vanishedTests": {
+            "$ref": "#/components/schemas/VanishedTestsSignal"
+          }
+        },
+        "type": "object"
+      },
       "ProjectCoverage": {
         "additionalProperties": false,
         "properties": {
@@ -3102,6 +3270,12 @@
       "ProjectTests": {
         "additionalProperties": false,
         "properties": {
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/TestCase"
+            },
+            "type": "array"
+          },
           "failed": {
             "format": "int64",
             "maximum": 9223372036854775807,
@@ -3113,6 +3287,12 @@
               "$ref": "#/components/schemas/FailingCase"
             },
             "type": "array"
+          },
+          "omittedCases": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
           },
           "passed": {
             "format": "int64",
@@ -3623,6 +3803,10 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "level3Preview": {
+            "$ref": "#/components/schemas/Preview",
+            "nullable": true
           },
           "partial": {
             "type": "boolean"
@@ -4486,6 +4670,21 @@
         },
         "type": "object"
       },
+      "TestCase": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "suite": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TestCaseResult": {
         "additionalProperties": false,
         "properties": {
@@ -4623,6 +4822,90 @@
           },
           "release_set_id": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UntestedSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UntestedSpecsSignal": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "specs": {
+            "items": {
+              "$ref": "#/components/schemas/UntestedSpec"
+            },
+            "type": "array"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "VanishedTest": {
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "suite": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "VanishedTestsSignal": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "notCompared": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "tests": {
+            "items": {
+              "$ref": "#/components/schemas/VanishedTest"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -5827,7 +6110,7 @@
     },
     "/v1/workspaces/{workspace}/ci/queue": {
       "get": {
-        "description": "Read the merge queue setting of one branch of the repository the workspace binds. configured is false while the branch has no setting: it has no queue, and its pull requests merge through the pull request gate. depth is the depth the branch runs at: 1 until the putnami CLI can cut a release set from the entry ahead (`putnami publish --inherit-channel`). Requires platform.workspace.read at the path workspace. Responses are not cacheable.\n\nRequired scopes: platform.workspace.read.",
+        "description": "Read the merge queue setting of one branch of the repository the workspace binds. configured is false while the branch has no setting: it has no queue, and its pull requests merge through the pull request gate. depth is the depth the branch runs at: the number of queue runs in flight at most. Requires platform.workspace.read at the path workspace. Responses are not cacheable.\n\nRequired scopes: platform.workspace.read.",
         "operationId": "getV1_Workspaces_Workspace_Ci_Queue",
         "parameters": [
           {
@@ -5986,7 +6269,7 @@
         }
       },
       "put": {
-        "description": "Turn the merge queue of one branch on or off and set its depth, or pause and resume it. The body names enabled, paused, or both. enabled turns the queue on or off; turning it off empties it: every entry drops. depth goes with enabled: the number of queue runs in flight at most, 1 to 16, 4 when zero or absent. Until the putnami CLI can cut a release set from the entry ahead (`putnami publish --inherit-channel`), a depth above 1 answers 400 with the reason, and the branch runs at depth 1. Turning it on first asks Source that the workspace's code host builds queue commits and that the branch's rules make the Putnami App the bypass actor of the pull request rule and of no other rule; otherwise it answers 409 with the reason, and changes nothing. Turning it off asks nothing. paused true, with a reason of at most 500 bytes, pauses a queue that is on: nothing is built and nothing lands, a queue run already running finishes, new requests still enter in order, and every entry keeps its place. paused false resumes it: the queue moves again from its first entry. A pause or a resume of a queue that is off answers 409. Requires platform.workspace.manage at the path workspace, and a person: the setting records the principal ID of who changed it, and a pause also their code host login, when, and why.\n\nRequired scopes: platform.workspace.manage.",
+        "description": "Turn the merge queue of one branch on or off and set its depth, or pause and resume it. The body names enabled, paused, or both. enabled turns the queue on or off; turning it off empties it: every entry drops. depth goes with enabled: the number of queue runs in flight at most, 1 to 16, 4 when zero or absent; the entries build side by side, and their deploys run in landing order. Turning it on first asks Source that the workspace's code host builds queue commits and that the branch's rules make the Putnami App the bypass actor of the pull request rule and of no other rule; otherwise it answers 409 with the reason, and changes nothing. Turning it off asks nothing. paused true, with a reason of at most 500 bytes, pauses a queue that is on: nothing is built and nothing lands, a queue run already running finishes, new requests still enter in order, and every entry keeps its place. paused false resumes it: the queue moves again from its first entry. A pause or a resume of a queue that is off answers 409. Requires platform.workspace.manage at the path workspace, and a person: the setting records the principal ID of who changed it, and a pause also their code host login, when, and why.\n\nRequired scopes: platform.workspace.manage.",
         "operationId": "putV1_Workspaces_Workspace_Ci_Queue",
         "parameters": [
           {
@@ -6035,7 +6318,7 @@
                 }
               }
             },
-            "description": "Missing or malformed branch, body, depth or reason, or a depth the queue cannot run yet"
+            "description": "Missing or malformed branch, body, depth or reason"
           },
           "401": {
             "description": "Authentication required"

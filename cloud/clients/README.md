@@ -29,16 +29,17 @@ oci-server, put-server, runtime-api and source-api.
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
 file, except the ones named below. `delivery-api` comes from the later version
-`0.0.0-20261110144910-13ece114a`, published on 2026-11-10, archive digest
-`sha256:082572ded5b2acb20382e546b27da1694abc630ff83b6530988a5568052a3fed`. It
-adds the merge queue setting (`getV1_Workspaces_Workspace_Ci_Queue`,
-`putV1_Workspaces_Workspace_Ci_Queue`). `delivery-api` now comes from version
-`0.0.0-20261115185420-e7a696606`, published on 2026-11-15, archive digest
-`sha256:cb521bf9521fdcc99c1cb1dd4a37f649ea4c5cdb0944d9aed4eac9497a1204c6`. It
-adds the merge queue entries (`getV1_Workspaces_Workspace_Ci_Queue_Entries`),
-and pause and resume in the queue setting. `source-api` comes from the later
-version `0.0.0-20261115110438-6cf844fba`, published on 2026-11-15, archive
-digest
+`0.0.0-20261122231855-1fad7bba3`, published on 2026-11-22, archive digest
+`sha256:eb46b5a1dfd4b253c54a62bceb970ad1078e893e0c5dde7dd90d53131b57af81`. It
+carries the merge queue setting and entries
+(`getV1_Workspaces_Workspace_Ci_Queue`, `putV1_Workspaces_Workspace_Ci_Queue`,
+`getV1_Workspaces_Workspace_Ci_Queue_Entries`), the test cases of a tests
+report (`cases` and `omittedCases` of `ProjectTests`), which
+`putnami cloud evidence-report` sends, the level 3 preview a report batch answers
+(`ReportBatchResponse.level3Preview`) and the provider of a CI run
+(`CIRunResponse.provider`). Its queue descriptions say the entries of a deeper
+queue build side by side. `source-api` comes from the later version
+`0.0.0-20261115110438-6cf844fba`, published on 2026-11-15, archive digest
 `sha256:7edc53105fab142c91a4c50d2b3aef6df3d8c6121a305c9013a0abf45a40bbf9`. It
 adds the collaboration routes under `source/proposals`, `source/tasks` and
 `source/collaboration/capabilities`, which `@putnami/cloud` calls to serve the

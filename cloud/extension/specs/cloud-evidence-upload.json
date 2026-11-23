@@ -38,6 +38,15 @@
       ]
     },
     {
+      "id": "sends-the-test-cases",
+      "text": [
+        "Each component's tests in the first batch carry the cases and omittedCases of its tests entry, copied from the document.",
+        "An entry without cases uploads the same body as before.",
+        "Over 768 KiB of cases, the entry that lists the most loses its cases first, counted in its omittedCases, with a warning naming it.",
+        "A batch refused with 413 or 400 while it carries cases is posted again without them, with a warning naming the refusal."
+      ]
+    },
+    {
       "id": "sends-the-dependency-states",
       "text": [
         "Each dependency change in the second batch keeps the before and after states the document gives it: the licenses and the known vulnerabilities, each with its id and severity, and an empty state as empty.",
