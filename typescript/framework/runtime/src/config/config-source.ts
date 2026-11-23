@@ -1,7 +1,7 @@
 import { fileExists, getCurrentProject, joinPath, mergeDeep, readFileContent } from '@putnami/utils';
 import { isMissingOptionalCloudRuntime, loadCloudRuntimeModule } from './cloud-runtime-loader';
 import { getEnv, resetConfigLoader } from './config';
-import { registerConfigLoaderResetHook } from './loader-hooks';
+import { bumpConfigRevision, registerConfigLoaderResetHook } from './loader-hooks';
 
 // Parse YAML via Bun's native implementation. Bun.YAML.parse returns `unknown`,
 // so narrow to the config tree shape the sources contract expects.
@@ -43,6 +43,8 @@ let cloudRuntimeActivationAttempted = false;
 export function registerSourceDiscoverer(discoverer: SourceDiscoverer): void {
   if (!registeredSourceDiscoverers.includes(discoverer)) {
     registeredSourceDiscoverers.push(discoverer);
+    // A tree loaded before this source existed no longer holds every source.
+    bumpConfigRevision();
   }
 }
 

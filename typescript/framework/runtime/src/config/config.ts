@@ -4,7 +4,7 @@ import { getDeep } from '@putnami/utils';
 import type { InferSchema, SchemaDefinition, SchemaPrimitive } from '../schema';
 import { isNestedSchema, isSchemaDescriptor, validateSchema } from '../schema';
 import { getDefaultSources, loadGlobalConfig } from './config-source';
-import { runConfigLoaderResetHooks } from './loader-hooks';
+import { bumpConfigRevision, configRevision, runConfigLoaderResetHooks } from './loader-hooks';
 
 // ---------------------------------------------------------------------------
 // ConfigDefinition — the object produced by Config()
@@ -55,6 +55,21 @@ export function Config<S extends SchemaDefinition>(path: string, schema: S): Con
 
 const CONF_CACHE = new Map<string, unknown>();
 let globalConfig: Record<string, unknown> | undefined;
+/** The config revision the standalone tree was loaded under. */
+let globalConfigRevision = -1;
+
+/**
+ * The standalone merged tree, loaded once per config revision. A tree with no
+ * source is `{}`, so a workload with no config file reads its sources once.
+ */
+function standaloneTree(): Record<string, unknown> {
+  if (globalConfig === undefined || globalConfigRevision !== configRevision()) {
+    globalConfig = loadGlobalConfig(getDefaultSources()) ?? {};
+    // Read after the load: activating a registered source bumps the revision.
+    globalConfigRevision = configRevision();
+  }
+  return globalConfig;
+}
 
 /**
  * Resets the configuration loader, clearing all cached config instances
@@ -146,6 +161,7 @@ const _activeConfigServiceGetStack: ConfigServiceGetFn[] = [];
  * @internal
  */
 export function setActiveConfigServiceGet(fn: ConfigServiceGetFn | undefined): void {
+  bumpConfigRevision();
   if (!fn) {
     _activeConfigServiceGet = undefined;
     _activeConfigServiceGetStack.length = 0;
@@ -167,6 +183,7 @@ export function unsetActiveConfigServiceGet(fn: ConfigServiceGetFn): void {
     return;
   }
 
+  bumpConfigRevision();
   _activeConfigServiceGetStack.splice(idx, 1);
   _activeConfigServiceGet = _activeConfigServiceGetStack[_activeConfigServiceGetStack.length - 1];
 }
@@ -352,10 +369,7 @@ export function useRawConfigSection(path: string): Record<string, unknown> | und
     return _activeConfigServiceRawSection(path);
   }
 
-  if (!globalConfig) {
-    globalConfig = loadGlobalConfig(getDefaultSources()) ?? {};
-  }
-  return rawSectionFromTree(globalConfig, path);
+  return rawSectionFromTree(standaloneTree(), path);
 }
 
 /**
@@ -375,6 +389,15 @@ export function rawSectionFromTree(
 }
 
 /**
+ * The cache key of one config instance: its path, plus its `confInit` only
+ * when one is given, so the common read with none serializes nothing.
+ * @internal
+ */
+export function configCacheKey(path: string, confInit: object | undefined): string {
+  return confInit === undefined ? path : `${path}:${JSON.stringify(confInit)}`;
+}
+
+/**
  * Standalone config loading — used when no ConfigService is active.
  * @internal
  */
@@ -387,7 +410,7 @@ function loadConfigStandalone<S extends SchemaDefinition>(
 ): InferSchema<S> {
   const effectiveCache = cache || CONF_CACHE;
   const path = _path || config.path;
-  const cacheKey = `${path}:${JSON.stringify(confInit || {})}`;
+  const cacheKey = configCacheKey(path, confInit);
   const cached = effectiveCache.get(cacheKey);
   if (cached) {
     return cached as InferSchema<S>;
@@ -395,10 +418,7 @@ function loadConfigStandalone<S extends SchemaDefinition>(
 
   let tree = configTree;
   if (!tree) {
-    if (!globalConfig) {
-      globalConfig = loadGlobalConfig(getDefaultSources()) ?? {};
-    }
-    tree = globalConfig;
+    tree = standaloneTree();
   }
 
   const rawConfig = (getDeep(tree, path) || {}) as Record<string, unknown>;

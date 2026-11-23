@@ -12,7 +12,7 @@ export { ConfigService } from './config-service';
 export type { ConfigDescription, FieldOrigin } from './config-service';
 export { registerEmbeddedConfig, registerSourceDiscoverer } from './config-source';
 export type { ConfigSource, EmbeddedConfigFiles, SourceDiscoverer } from './config-source';
-export { registerConfigLoaderResetHook } from './loader-hooks';
+export { configRevision, registerConfigLoaderResetHook } from './loader-hooks';
 export {
   assertRegisteredConfigDefinitions,
   configToken,

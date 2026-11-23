@@ -70,7 +70,7 @@
     {
       "id": "secure-by-default",
       "text": [
-        "Every pipeline response, refusals included, carries nosniff, X-Frame-Options DENY, a self-only Content-Security-Policy and a strict referrer policy, plus HSTS only when the URL or X-Forwarded-Proto is https.",
+        "A pipeline response, refusals included, carries nosniff, and HSTS when the URL or X-Forwarded-Proto is https; a JSON one adds only CSP frame-ancestors 'none', any other X-Frame-Options DENY, a self-only CSP and a strict referrer policy.",
         "A header the handler set wins, an option overrides or removes one header, and secure false removes them with the origin guard.",
         "A minimal route skips them and the origin guard only when every matched route is minimal, and a native route bypasses the whole pipeline."
       ]

@@ -127,6 +127,15 @@ export class Logger {
     return new Logger(this.sinkList, this.loggerName, nextContext, this.skipLevelCheck);
   }
 
+  /**
+   * Whether this logger writes a record at `level`. A caller whose record is
+   * costly to build checks it first, and still calls the level method when it
+   * is not, so the dropped record is counted.
+   */
+  isEnabled(level: LogLevel): boolean {
+    return this.skipLevelCheck || shouldLog(level);
+  }
+
   /** Log at `debug` level. Extra params are captured as structured data; an `Error` param is recorded with its cause chain. */
   debug(message?: unknown, ...params: unknown[]): void {
     this.emit('debug', message, params);

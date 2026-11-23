@@ -1129,6 +1129,7 @@
               "security-headers-apply-without-an-extra-plugin",
               "a-refusal-carries-the-security-headers",
               "hsts-is-sent-only-over-https",
+              "a-json-response-carries-only-nosniff-and-frame-ancestors",
               "a-header-the-handler-set-wins",
               "secure-false-removes-the-headers-and-the-origin-guard",
               "a-minimal-route-alone-skips-the-security-chain",

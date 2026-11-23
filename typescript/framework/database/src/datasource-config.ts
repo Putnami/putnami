@@ -1,12 +1,20 @@
-import { type InferConfig, useConfig } from '@putnami/runtime';
+import { configRevision, type InferConfig, useConfig } from '@putnami/runtime';
 import {
+  databaseBindingOverride,
+  ENV_DATABASE_BINDINGS,
+  ENV_DATABASE_URL,
   type ResolvedDatabaseBinding,
   type ResolvedDatabaseUrl,
   resolveDatabaseBinding,
   resolveDatabaseUrl,
 } from './postgres/binding';
 import { PostgresConfig } from './postgres/config';
-import { primaryDatasourceName, resolveDatasourceName } from './primary-datasource';
+import {
+  getPrimaryDatasource,
+  type PrimaryDatasource,
+  primaryDatasourceName,
+  resolveDatasourceName,
+} from './primary-datasource';
 
 /**
  * Which datasource a `database(name, init)` call targets: the resolved logical
@@ -35,16 +43,59 @@ export function resolveConnectionTarget(
  * counterpart of the Go adapter's datasource-from-binding resolution, so both
  * languages share one contract.
  */
-export function effectiveConfig(
-  name: string | undefined,
-  init?: InferConfig<typeof PostgresConfig>,
-): {
+export function effectiveConfig(name: string | undefined, init?: InferConfig<typeof PostgresConfig>): EffectiveConfig {
+  if (init !== undefined) {
+    return resolveEffectiveConfig(name, init);
+  }
+  // Every query resolves its datasource: reuse the last resolution while
+  // nothing it reads has changed — the config tree, the binding pin, the two
+  // environment variables and the declared primary.
+  const revision = configRevision();
+  const override = databaseBindingOverride();
+  const bindingsEnv = process.env[ENV_DATABASE_BINDINGS];
+  const urlEnv = process.env[ENV_DATABASE_URL];
+  const primary = getPrimaryDatasource();
+  const memo = resolved.get(name);
+  if (
+    memo !== undefined &&
+    memo.revision === revision &&
+    memo.override === override &&
+    memo.bindingsEnv === bindingsEnv &&
+    memo.urlEnv === urlEnv &&
+    memo.primary === primary
+  ) {
+    return memo.result;
+  }
+  const result = resolveEffectiveConfig(name, undefined);
+  resolved.set(name, { revision, override, bindingsEnv, urlEnv, primary, result });
+  return result;
+}
+
+/** The connection config of one datasource, and where its connection came from. */
+export interface EffectiveConfig {
   conf: InferConfig<typeof PostgresConfig>;
   binding?: ResolvedDatabaseBinding;
   url?: ResolvedDatabaseUrl;
   resolvedName: string;
   connectionName?: string;
-} {
+}
+
+interface ResolvedEffectiveConfig {
+  revision: number;
+  override: string | undefined;
+  bindingsEnv: string | undefined;
+  urlEnv: string | undefined;
+  primary: PrimaryDatasource | undefined;
+  result: EffectiveConfig;
+}
+
+/** The last resolution of each datasource name `effectiveConfig` was called with and no init. */
+const resolved = new Map<string | undefined, ResolvedEffectiveConfig>();
+
+function resolveEffectiveConfig(
+  name: string | undefined,
+  init: InferConfig<typeof PostgresConfig> | undefined,
+): EffectiveConfig {
   const { resolvedName, connectionName } = resolveConnectionTarget(name, init);
   const path = `database.${resolvedName}`;
   const binding = resolveDatabaseBinding(resolvedName);

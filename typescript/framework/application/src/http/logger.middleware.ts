@@ -1,4 +1,4 @@
-import { HttpException, useLogger } from '@putnami/runtime';
+import { HttpException, type Logger, useLogger } from '@putnami/runtime';
 import type { HttpRequestContextInternal } from './http-context.type';
 import type { HttpMiddleware } from './http-middleware.type';
 
@@ -11,6 +11,18 @@ export interface LoggerOptions {
 /** Creates a middleware that logs HTTP request method, route, status, and duration. */
 export const LoggerMiddleware = (options: LoggerOptions = {}): HttpMiddleware => {
   const exclude = new Set(options.exclude || []);
+  // The `http` logger derived from the last base logger: a request served by
+  // the same base reuses it instead of deriving a new one.
+  let base: Logger | undefined;
+  let named: Logger | undefined;
+  const httpLogger = (): Logger => {
+    const current = useLogger();
+    if (current !== base || !named) {
+      base = current;
+      named = current.named('http');
+    }
+    return named;
+  };
 
   return async (context, next) => {
     const { method, route, path } = context;
@@ -25,7 +37,7 @@ export const LoggerMiddleware = (options: LoggerOptions = {}): HttpMiddleware =>
       return next();
     }
 
-    const logger = useLogger('http');
+    const logger = httpLogger();
     logger.with('http', { method, routePath });
     const start = Date.now();
 

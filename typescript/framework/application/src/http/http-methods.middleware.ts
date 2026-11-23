@@ -82,9 +82,7 @@ export function HttpMethodsMiddleware(
   router: RouteController,
   config: { head: boolean; options: boolean; trace: boolean },
 ): HttpMiddleware {
-  return async (ctx, next) => {
-    const method = ctx.req.method;
-
+  const answer = async (ctx: HttpRequestContext, next: () => Promise<HttpResponse | undefined>, method: string) => {
     // HEAD — delegate to GET handler if no explicit HEAD route was matched
     if (config.head && method === 'HEAD' && !ctx.route) {
       // Temporarily switch method to GET for route lookup
@@ -149,5 +147,13 @@ export function HttpMethodsMiddleware(
     }
 
     return next();
+  };
+
+  // A GET, POST or any method this middleware does not answer goes straight
+  // on, with no async frame of its own.
+  return (ctx, next) => {
+    const method = ctx.req.method;
+    if (method !== 'HEAD' && method !== 'OPTIONS' && method !== 'TRACE') return next();
+    return answer(ctx, next, method);
   };
 }

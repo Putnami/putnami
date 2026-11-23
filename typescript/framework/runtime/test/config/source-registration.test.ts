@@ -1,6 +1,16 @@
 import { createRequire } from 'node:module';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import { Config, ConfigService, Default, Int, Optional, resetConfigLoader, useConfig } from '../../src';
+import {
+  Config,
+  ConfigService,
+  configRevision,
+  Default,
+  Int,
+  Optional,
+  resetConfigLoader,
+  useConfig,
+  useRawConfigSection,
+} from '../../src';
 import { registerConfigLoaderResetHook, registerSourceDiscoverer } from '../../src/config';
 import { CLOUD_RUNTIME_SPECIFIER, isMissingOptionalCloudRuntime } from '../../src/config/cloud-runtime-loader';
 import { getDefaultSources, type ConfigSource } from '../../src/config/config-source';
@@ -169,5 +179,32 @@ describe('config source registration', () => {
         code: 'MODULE_NOT_FOUND',
       }),
     ).toBe(false);
+  });
+});
+
+describe('a config source registered after the first read', () => {
+  afterEach(() => {
+    resetConfigLoader();
+  });
+
+  it('is read by the next raw-section read and changes the config revision', () => {
+    resetConfigLoader();
+    delete process.env.CONFIG_DATA;
+    expect(useRawConfigSection('late')).toBeUndefined();
+    const before = configRevision();
+
+    // A discoverer stays registered for the process: it serves its source
+    // only while this test runs.
+    let active = true;
+    const late = (): ConfigSource | undefined =>
+      active ? { name: 'late', priority: 56, load: () => ({ late: { value: 1 } }) } : undefined;
+    try {
+      registerSourceDiscoverer(late);
+
+      expect(configRevision()).not.toBe(before);
+      expect(useRawConfigSection('late')?.['value']).toBe(1);
+    } finally {
+      active = false;
+    }
   });
 });

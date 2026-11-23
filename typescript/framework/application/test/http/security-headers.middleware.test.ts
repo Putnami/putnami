@@ -128,7 +128,73 @@ describe('SecurityHeadersMiddleware', () => {
 
     expect(response?.getHeader('Content-Type')).toBe('application/json');
     expect(response?.getHeader('X-Content-Type-Options')).toBe('nosniff');
-    expect(response?.getHeader('X-Frame-Options')).toBe('DENY');
+    expect(response?.getHeader('Content-Security-Policy')).toBe("frame-ancestors 'none'");
+  });
+
+  specTest(
+    'a JSON response carries only nosniff, frame-ancestors and HSTS',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'secure-by-default',
+      check: 'a-json-response-carries-only-nosniff-and-frame-ancestors',
+    },
+    async () => {
+      const middleware = SecurityHeadersMiddleware();
+      for (const [contentType, secured] of [
+        ['application/json', true],
+        ['application/json', false],
+        ['application/problem+json; charset=utf-8', true],
+      ] as const) {
+        const response = await middleware(ctx({ secured: () => secured }), async () =>
+          contentType === 'application/json'
+            ? HttpResponse.json({ ok: true })
+            : new HttpResponse('{}', { headers: { 'Content-Type': contentType } }),
+        );
+        const expected: [string, string][] = [
+          ['Content-Type', contentType],
+          ['X-Content-Type-Options', 'nosniff'],
+          ['Content-Security-Policy', "frame-ancestors 'none'"],
+        ];
+        if (secured) expected.push(['Strict-Transport-Security', 'max-age=31536000; includeSubDomains']);
+        expect([...(response?.getHeaderEntries() ?? [])].sort()).toEqual(expected.sort());
+        // The native response carries exactly the same headers.
+        const native = response?.get();
+        expect([...(native?.headers.entries() ?? [])].length).toBe(expected.length);
+        expect(native?.headers.get('content-security-policy')).toBe("frame-ancestors 'none'");
+      }
+    },
+  );
+
+  it('keeps on a JSON response every header an option sets explicitly', async () => {
+    const middleware = SecurityHeadersMiddleware({
+      frameOptions: 'SAMEORIGIN',
+      contentSecurityPolicy: "default-src 'none'",
+      referrerPolicy: false,
+    });
+    const response = await middleware(ctx({ secured: () => false }), async () => HttpResponse.json({ ok: true }));
+
+    expect(response?.getHeader('X-Frame-Options')).toBe('SAMEORIGIN');
+    expect(response?.getHeader('Content-Security-Policy')).toBe("default-src 'none'");
+    expect(response?.getHeader('Referrer-Policy')).toBeUndefined();
+    expect(response?.getHeader('Permissions-Policy')).toBeUndefined();
+    expect(response?.getHeader('X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('copies the shared JSON header list before a later header change', async () => {
+    const middleware = SecurityHeadersMiddleware();
+    const first = await middleware(ctx({ secured: () => false }), async () => HttpResponse.json({ n: 1 }));
+    first?.setHeader('X-Correlation-ID', 'abc');
+    first?.pushHeader('Set-Cookie', 'a=1');
+
+    const second = await middleware(ctx({ secured: () => false }), async () => HttpResponse.json({ n: 2 }));
+    expect(second?.getHeader('X-Correlation-ID')).toBeUndefined();
+    expect(second?.getHeaderEntries()).toHaveLength(3);
+
+    const native = first?.get();
+    expect(native?.headers.get('x-correlation-id')).toBe('abc');
+    expect(native?.headers.get('set-cookie')).toBe('a=1');
+    expect(native?.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(second?.get().headers.get('x-correlation-id')).toBeNull();
   });
 
   it('applies consistently across repeated requests on a shared instance', async () => {

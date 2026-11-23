@@ -386,6 +386,33 @@ import { TraceMiddleware } from '@putnami/application';
 httpPlugin.use(TraceMiddleware());
 ```
 
+#### Security Headers
+
+A secure server (the default) adds hardened response headers to every
+pipeline response. A response that is not JSON gets `X-Content-Type-Options:
+nosniff`, `X-Frame-Options: DENY`, a self-only `Content-Security-Policy`,
+`Referrer-Policy`, `Permissions-Policy` and `X-XSS-Protection: 0`. A JSON
+response (`application/json` or a `+json` type) is never rendered as a
+document, so it gets only `X-Content-Type-Options: nosniff` and
+`Content-Security-Policy: frame-ancestors 'none'`. Both add
+`Strict-Transport-Security` over HTTPS, and both carry every header you set
+explicitly through `securityHeaders`:
+
+```typescript
+import { http } from '@putnami/application';
+
+http({ securityHeaders: { frameOptions: 'SAMEORIGIN', referrerPolicy: false } });
+```
+
+#### Session Loading
+
+With an asynchronous session store (`session.store: database`), the server
+loads the request's session before every middleware but the outermost ones
+(telemetry), and writes it back after the response. The server reads
+`session.store` once, when it starts: an app on the default cookie store runs
+no session middleware. Changing `session.store` needs a restart; until then, a
+switch from the cookie store to an asynchronous one makes session calls fail.
+
 ### Middleware Examples
 
 #### Authentication Middleware

@@ -25,7 +25,8 @@ export function OriginGuardMiddleware(options: OriginGuardOptions = {}): HttpMid
   const allowSameSite = options.allowSameSite ?? true;
   const enforce = (options.mode ?? 'enforce') === 'enforce';
 
-  return async (ctx, next) => {
+  // Not async: a request the guard lets through goes on with no frame of its own.
+  return (ctx, next) => {
     // Per-route opt-out: skip only when every matched candidate is minimal.
     if (isMinimalRoute(ctx)) return next();
 
@@ -44,7 +45,7 @@ export function OriginGuardMiddleware(options: OriginGuardOptions = {}): HttpMid
       return next();
     }
 
-    return HttpResponse.json({ error: 'Cross-origin request blocked' }, { status: 403 });
+    return Promise.resolve(HttpResponse.json({ error: 'Cross-origin request blocked' }, { status: 403 }));
   };
 }
 

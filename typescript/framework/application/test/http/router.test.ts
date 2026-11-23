@@ -247,3 +247,83 @@ describe('Router static fast path', () => {
     expect(merged.find('/users/42').map((m) => m.handler)).toEqual(['by-id']);
   });
 });
+
+describe('Router static paths beside dynamic routes', () => {
+  function walked(routes: [string, string][]): Router<string> {
+    const router = new Router<string>();
+    for (const [path, handler] of routes) router.add(path, handler);
+    return router;
+  }
+
+  it('answers a static path no dynamic route matches exactly as the trie walk does', () => {
+    const routes: [string, string][] = [
+      ['/health', 'health'],
+      ['/tasks/[id]', 'task'],
+      ['/tasks/new', 'new-task'],
+      ['/files/*', 'files'],
+    ];
+    const router = walked(routes);
+    for (const path of ['/health', '/health/', '/tasks/new', '/tasks/42', '/files/a/b', '/missing']) {
+      for (const accept of [[], ['*/*'], ['application/json']]) {
+        const first = router.find(path, accept);
+        // The second lookup of a path takes the cached fast-path decision.
+        const second = router.find(path, accept);
+        expect(second).toEqual(first);
+      }
+    }
+    expect(router.find('/health').map((m) => m.handler)).toEqual(['health']);
+    // A static route a dynamic route also matches keeps the fallthrough to it.
+    expect(router.find('/tasks/new').map((m) => m.handler)).toEqual(['new-task', 'task']);
+  });
+
+  it('forgets a path answered alone once a route that also matches it is added', () => {
+    const router = new Router<string>();
+    router.add('/health', 'health');
+    router.add('/tasks/[id]', 'task');
+    expect(router.find('/health').map((m) => m.handler)).toEqual(['health']);
+
+    router.add('/[page]', 'page');
+    expect(router.find('/health').map((m) => m.handler)).toEqual(['health', 'page']);
+  });
+});
+
+describe('Router static paths that share a trie node with another route', () => {
+  const handlers = (router: Router<string>, path: string, accept?: string[]) =>
+    router.find(path, accept).map((m) => m.handler);
+
+  it('keeps a catch-all that also matches the root, whichever is added first', () => {
+    for (const order of [
+      ['/*', '/'],
+      ['/', '/*'],
+    ]) {
+      const router = new Router<string>();
+      for (const path of order) router.add(path, path === '/' ? 'root' : 'catch-all');
+      const first = handlers(router, '/');
+      expect(first).toContain('root');
+      expect(first).toContain('catch-all');
+      // The second lookup takes the cached decision and answers the same.
+      expect(handlers(router, '/')).toEqual(first);
+    }
+  });
+
+  it('keeps the catch-all of a merged router', () => {
+    const merged = new Router<string>().add('/', 'root').merge(new Router<string>().add('/*', 'catch-all'));
+    expect(handlers(merged, '/')).toContain('catch-all');
+  });
+
+  it('falls through to the catch-all when the static route does not accept the request', () => {
+    const router = new Router<string>();
+    router.add('/*', 'catch-all');
+    router.add('/', 'page', { accept: ['text/html'] });
+    expect(handlers(router, '/', ['text/html'])[0]).toBe('page');
+    expect(handlers(router, '/', ['text/html'])).toContain('catch-all');
+    expect(handlers(router, '/', ['application/json'])).toContain('catch-all');
+  });
+
+  it('keeps a group route that ends on the same path', () => {
+    const router = new Router<string>();
+    router.add('/(marketing)/about', 'group');
+    router.add('/about', 'about');
+    expect(handlers(router, '/about').sort()).toEqual(['about', 'group']);
+  });
+});

@@ -291,7 +291,8 @@ describe('HttpPlugin', () => {
 
         expect(res.status).toBe(403);
         expect(res.headers.get('x-content-type-options')).toBe('nosniff');
-        expect(res.headers.get('x-frame-options')).toBe('DENY');
+        // The refusal is JSON: it carries the JSON response's header set.
+        expect(res.headers.get('content-security-policy')).toBe("frame-ancestors 'none'");
       },
     );
   });
@@ -416,6 +417,12 @@ describe('HttpPlugin', () => {
         });
         return new HttpResponse(body, { headers: { 'content-type': 'text/plain' } });
       });
+      plugin.get('/late-signal', async (ctx) => {
+        // Reads the signal only after the timeout fired: it is built aborted.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        stalled = { signal: ctx.signal, context: ctx as unknown as Record<string, unknown> };
+        return new HttpResponse('late');
+      });
       plugin.get('/missing-after-timeout', async () => {
         await new Promise((resolve) => setTimeout(resolve, 300));
         throw new NotFoundException('gone');
@@ -485,6 +492,14 @@ describe('HttpPlugin', () => {
         expect(workAfterTimeout).toBe(false);
       },
     );
+
+    it('builds a signal first read after the timeout already aborted', async () => {
+      const res = await fetch(`${baseUrl}/late-signal`);
+      expect(res.status).toBe(408);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(stalled?.signal?.aborted).toBe(true);
+      expect((stalled?.signal?.reason as Error | undefined)?.name).toBe('TimeoutError');
+    });
 
     specTest(
       'a handler that stops on its ended request logs and records no error',

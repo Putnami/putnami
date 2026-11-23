@@ -1,5 +1,5 @@
 import { DEFAULT_DATASOURCE } from '@putnami/migration';
-import { useLogger } from '@putnami/runtime';
+import { type Logger, useLogger } from '@putnami/runtime';
 
 // ---------------------------------------------------------------------------
 // Database boundary log contract — the TypeScript twin of Go's
@@ -122,9 +122,31 @@ function queryGroup(record: QueryRecord, outcome: string): Record<string, unknow
   };
 }
 
-/** Emit the contract's DEBUG `query executed` record. */
+let queryLoggerBase: Logger | undefined;
+let queryLogger: Logger | undefined;
+
+/** The `database` logger, derived again only when the base logger changes. */
+function databaseLogger(): Logger {
+  const base = useLogger();
+  if (base !== queryLoggerBase || queryLogger === undefined) {
+    queryLoggerBase = base;
+    queryLogger = base.named(DATABASE_LOGGER);
+  }
+  return queryLogger;
+}
+
+/**
+ * Emit the contract's DEBUG `query executed` record. Every query reaches it,
+ * so its fields are built only when DEBUG records are written; a dropped one
+ * is still counted.
+ */
 export function logQueryExecuted(record: QueryRecord): void {
-  useLogger(DATABASE_LOGGER).debug(MSG_QUERY_EXECUTED, databaseFields(queryGroup(record, OUTCOME_SUCCESS)));
+  const logger = databaseLogger();
+  if (logger.isEnabled('debug')) {
+    logger.debug(MSG_QUERY_EXECUTED, databaseFields(queryGroup(record, OUTCOME_SUCCESS)));
+  } else {
+    logger.debug(MSG_QUERY_EXECUTED);
+  }
 }
 
 /**

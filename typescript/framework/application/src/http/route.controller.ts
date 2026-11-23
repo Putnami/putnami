@@ -53,7 +53,7 @@ export class RouteController<CONTEXT extends HttpRequestContext = HttpRequestCon
 
   /** Returns all handlers matching the request context's method and path, ordered by score. */
   find<FC extends CONTEXT = CONTEXT>(context: CONTEXT): HandlerResult<RouteHandler<FC>>[] {
-    const requestAccept = listRequestAccept(context.headers.get('Accept') || undefined);
+    const requestAccept = requestAcceptOf(context.headers.get('Accept'));
 
     return this.routes?.[context.method]?.find(context.path(), requestAccept) || [];
   }
@@ -82,6 +82,28 @@ export class RouteController<CONTEXT extends HttpRequestContext = HttpRequestCon
     return out;
   }
 }
+
+const ANY_ACCEPT: readonly string[] = ['*/*'];
+
+/** Parsed Accept headers by header value: clients send a handful of distinct values. */
+const acceptCache = new Map<string, readonly string[]>();
+const ACCEPT_CACHE_SIZE = 64;
+/** A longer header is parsed each time rather than kept. */
+const ACCEPT_CACHE_MAX_HEADER = 256;
+
+/** The media types an Accept header lists, parsed once per distinct header value. */
+const requestAcceptOf = (acceptHeader: string | null): readonly string[] => {
+  if (!acceptHeader) return ANY_ACCEPT;
+  let parsed = acceptCache.get(acceptHeader);
+  if (parsed === undefined) {
+    parsed = listRequestAccept(acceptHeader);
+    if (acceptHeader.length <= ACCEPT_CACHE_MAX_HEADER) {
+      if (acceptCache.size >= ACCEPT_CACHE_SIZE) acceptCache.clear();
+      acceptCache.set(acceptHeader, parsed);
+    }
+  }
+  return parsed;
+};
 
 const listRequestAccept = (acceptHeader?: string): string[] => {
   if (!acceptHeader) return ['*/*'];

@@ -30,7 +30,7 @@ http({
 
 > **Built-in CSRF protection:** The origin guard validates `Origin` and `Sec-Fetch-Site` headers on all state-changing requests (POST, PUT, DELETE, PATCH) and rejects cross-origin requests with `403`. It is enabled by default. Set `originGuard: false` to disable. See [Auth security considerations](/docs/frameworks/typescript/auth#security-considerations) for full details.
 
-> **Secure-by-default headers:** Every response carries hardened security headers — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, a restrictive `Content-Security-Policy`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`, and `X-XSS-Protection` — without any extra plugin. Override individual headers via `securityHeaders` (set a header to `false` to omit it) or set `securityHeaders: false` to disable them entirely.
+> **Secure-by-default headers:** Every response carries hardened security headers — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, a restrictive `Content-Security-Policy`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security` (over HTTPS), and `X-XSS-Protection` — without any extra plugin. A JSON response (`application/json` or a `+json` type) is never rendered as a document, so it carries only `X-Content-Type-Options: nosniff`, `Content-Security-Policy: frame-ancestors 'none'`, HSTS over HTTPS, and any header you set explicitly through `securityHeaders`. Override individual headers via `securityHeaders` (set a header to `false` to omit it) or set `securityHeaders: false` to disable them entirely.
 
 ### YAML configuration
 

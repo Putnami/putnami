@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { readLocalLogLevel, resolveLogLevel, watchLogLevel } from '../../src/logger/log-level';
 import { type LogRecordOutcome, observeLogRecords } from '../../src/logger/log-records';
 import { Logger } from '../../src/logger/logger';
@@ -205,4 +205,27 @@ describe('live log level', () => {
       expect(Object.fromEntries(counts)).toEqual({ 'warn/dropped': 1, 'error/emitted': 1 });
     },
   );
+});
+
+describe('Logger.isEnabled', () => {
+  afterEach(() => {
+    resetLoggerConfig();
+  });
+
+  it('follows the live level, and a logger that skips the level check is always enabled', () => {
+    setLogLevel('info');
+    const logger = new Logger([new MemorySink()]);
+    expect(logger.isEnabled('debug')).toBe(false);
+    expect(logger.isEnabled('info')).toBe(true);
+    expect(logger.isEnabled('error')).toBe(true);
+
+    setLogLevel('debug');
+    expect(logger.isEnabled('debug')).toBe(true);
+    expect(logger.named('child').isEnabled('debug')).toBe(true);
+
+    setLogLevel('error');
+    const memory = new MemoryLogger();
+    expect(memory.isEnabled('debug')).toBe(true);
+    expect(memory.named('child').isEnabled('debug')).toBe(true);
+  });
 });

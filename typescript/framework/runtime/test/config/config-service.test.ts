@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   Config,
+  configRevision,
   Default,
   Env,
   Int,
@@ -12,7 +13,7 @@ import {
   useRawConfigSection,
 } from '../../src';
 import { ConfigService } from '../../src/config/config-service';
-import type { ConfigSource } from '../../src/config/config-source';
+import { type ConfigSource, registerSourceDiscoverer } from '../../src/config/config-source';
 import { specTest } from '../../src/spectest';
 
 const TestConfig = Config('test', {
@@ -476,5 +477,81 @@ describe('ConfigService.rawSection', () => {
     process.env.CONFIG_DATA = JSON.stringify({ database: { fromEnvData: true } });
     resetConfigLoader();
     expect(useRawConfigSection('database')?.['fromEnvData']).toBe(true);
+  });
+});
+
+describe('config with no source data', () => {
+  let service: ConfigService | undefined;
+
+  beforeEach(() => {
+    resetConfigLoader();
+    delete process.env.CONFIG_DATA;
+  });
+
+  afterEach(() => {
+    service?.close();
+    service = undefined;
+    resetConfigLoader();
+  });
+
+  function emptySource(): { source: ConfigSource; loads: () => number } {
+    let loads = 0;
+    return {
+      source: {
+        name: 'empty',
+        priority: 10,
+        load: () => {
+          loads++;
+          return undefined;
+        },
+      },
+      loads: () => loads,
+    };
+  }
+
+  it('loads the standalone tree once when no source holds config, and again after a reset', () => {
+    // A discoverer adds a counting empty source to the default sources while
+    // this test runs; outside it, the discoverer contributes nothing.
+    const { source, loads } = emptySource();
+    let active = true;
+    registerSourceDiscoverer(() => (active ? source : undefined));
+    try {
+      resetConfigLoader();
+      for (let i = 0; i < 5; i++) {
+        expect(useRawConfigSection('database')).toBeUndefined();
+        expect(useConfig(TestConfig).port).toBe(3000);
+      }
+      expect(loads()).toBe(1);
+
+      resetConfigLoader();
+      expect(useRawConfigSection('database')).toBeUndefined();
+      expect(loads()).toBe(2);
+    } finally {
+      active = false;
+    }
+  });
+
+  it('changes the config revision when the config a read sees may change', () => {
+    const { source } = emptySource();
+    const start = configRevision();
+
+    service = new ConfigService([source]);
+    const active = configRevision();
+    expect(active).not.toBe(start);
+    service.rawSection('database');
+    service.get(TestConfig);
+    expect(configRevision()).toBe(active);
+
+    service.invalidate();
+    const invalidated = configRevision();
+    expect(invalidated).not.toBe(active);
+
+    service.close();
+    service = undefined;
+    expect(configRevision()).not.toBe(invalidated);
+    const closed = configRevision();
+
+    resetConfigLoader();
+    expect(configRevision()).not.toBe(closed);
   });
 });

@@ -502,6 +502,11 @@ export function setDatabaseBindingOverride(raw: string | undefined): string | un
   return prev;
 }
 
+/** The binding a programmatic pin (setDatabaseBindingOverride) holds, or undefined. */
+export function databaseBindingOverride(): string | undefined {
+  return bindingOverride;
+}
+
 /**
  * resolveDatabaseBinding resolves datasource into connection overrides from
  * the managed binding a deploy target injected. Precedence: a programmatic

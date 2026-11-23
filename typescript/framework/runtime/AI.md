@@ -123,6 +123,11 @@ validated by their own protocol parsers). It honors the active `ConfigService`
 not an object. Typed operator-facing config should keep using `Config()` +
 `useConfig()`.
 
+`configRevision()` changes whenever that tree may change (`resetConfigLoader()`,
+`ConfigService.invalidate()`, another active `ConfigService`): a value derived
+from config once and reused per request compares the revision it was derived
+under with the current one instead of reading config again.
+
 ### Fresh read
 
 `readConfig(definition, params?)` loads and validates a definition from its
@@ -298,7 +303,10 @@ process-wide floor every logger that checks the level consults on each
 record, without changing the level; telemetry sets one from an OTLP export
 directive. An `error` record is always emitted, and
 `observeLogRecords(listener)` sees every record with its outcome (`emitted`
-or `dropped`), which telemetry exports as `log.records`. See
+or `dropped`), which telemetry exports as `log.records`.
+`logger.isEnabled(level)` tells whether that logger writes a record at
+`level`: a hot path checks it before building costly fields, and still calls
+the level method when it is false, so the dropped record is counted. See
 [`doc/logging.md`](doc/logging.md).
 
 ## Error Handling

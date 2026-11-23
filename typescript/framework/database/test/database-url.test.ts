@@ -197,3 +197,47 @@ describe('the effective config of a URL-only section', () => {
     expect(effectiveConfig(undefined).conf.port).toBe(6543);
   });
 });
+
+describe('the effective config of a datasource across queries', () => {
+  it('resolves once while nothing it reads changes, and again when one input does', () => {
+    setConfig({ default: { url: 'postgres://u:p@db:5432/app' } });
+    const first = effectiveConfig(undefined);
+    expect(effectiveConfig(undefined)).toBe(first);
+
+    setConfig({ default: { url: 'postgres://u:p@db:5432/other' }, tasks: { url: 'postgres://u:p@db:5432/tasks' } });
+    const reloaded = effectiveConfig(undefined);
+    expect(reloaded.conf.database).toBe('other');
+    expect(effectiveConfig(undefined)).toBe(reloaded);
+
+    process.env[ENV_DATABASE_BINDINGS] = JSON.stringify({
+      protocolVersion: 1,
+      databases: { default: { engine: 'postgres', schema: 'public', connection: { host: 'bound-db', database: 'b' } } },
+    });
+    expect(effectiveConfig(undefined).conf.host).toBe('bound-db');
+    delete process.env[ENV_DATABASE_BINDINGS];
+
+    setDatabaseBindingOverride(
+      JSON.stringify({
+        protocolVersion: 1,
+        databases: {
+          default: { engine: 'postgres', schema: 'public', connection: { host: 'pinned-db', database: 'p' } },
+        },
+      }),
+    );
+    expect(effectiveConfig(undefined).conf.host).toBe('pinned-db');
+    setDatabaseBindingOverride(undefined);
+
+    setPrimaryDatasource({ name: 'tasks' });
+    expect(effectiveConfig(undefined).resolvedName).toBe('tasks');
+    setPrimaryDatasource(undefined);
+    expect(effectiveConfig(undefined).resolvedName).toBe('default');
+  });
+
+  it('follows DATABASE_URL when it changes', () => {
+    setConfig({});
+    process.env[ENV_DATABASE_URL] = 'postgres://u:p@one:5432/app';
+    expect(effectiveConfig(undefined).conf.host).toBe('one');
+    process.env[ENV_DATABASE_URL] = 'postgres://u:p@two:5432/app';
+    expect(effectiveConfig(undefined).conf.host).toBe('two');
+  });
+});

@@ -105,7 +105,7 @@ describe('minimal / secure:false fast lane', () => {
         expect(res.status).toBe(200);
         expect(await res.json()).toEqual({ ok: true });
         // Because not every matched candidate is minimal, security headers apply.
-        expect(res.headers.get('X-Frame-Options')).toBe('DENY');
+        expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
 
         await app.stop();
       },
@@ -119,7 +119,7 @@ describe('minimal / secure:false fast lane', () => {
       const base = `http://localhost:${plugin.getServer()?.port}`;
 
       const res = await fetch(`${base}/normal`);
-      expect(res.headers.get('X-Frame-Options')).toBe('DENY');
+      expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
       await res.arrayBuffer();
 
       await app.stop();

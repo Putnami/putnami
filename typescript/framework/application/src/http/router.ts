@@ -44,6 +44,12 @@ type StaticEntry<T> = {
   route: string;
   handlers: Handler<T>[];
   slashes: number;
+  /**
+   * Whether no dynamic route also matches this exact path, so the entry alone
+   * is the complete match set. Worked out on the first lookup of the path and
+   * forgotten whenever a route is added.
+   */
+  exclusive?: boolean;
 };
 
 type NodeMatch<T> = {
@@ -60,7 +66,7 @@ type Context<T> = {
   matches: NodeMatch<T>[];
   slashesCounter?: number;
   params?: Record<string, string> | undefined;
-  requestAccept: string[];
+  requestAccept: readonly string[];
 };
 
 const CODE_SLASH = 47; // '/'.charCodeAt(0);
@@ -291,8 +297,27 @@ export class Router<T = undefined> {
     } else {
       this.dynamicCount++;
     }
+    // A new route can match a path an indexed static route answered alone.
+    for (const entry of this.staticRoutes.values()) entry.exclusive = undefined;
 
     return this;
+  }
+
+  /**
+   * Whether the static entry at `path` is every route that matches it: the trie
+   * walk, with no Accept filter, finds no match of another route.
+   */
+  private isExclusive(entry: StaticEntry<T>, path: string): boolean {
+    if (entry.exclusive === undefined) {
+      const matches: NodeMatch<T>[] = [];
+      visitNode({ path, n: this.tree, i: 0, matches, requestAccept: [] });
+      // By handler identity: a trie node keeps one route string, so a
+      // catch-all, group or optional route ending on the same node as the
+      // static route can carry its string.
+      entry.exclusive =
+        matches.length === entry.handlers.length && matches.every((m) => entry.handlers.includes(m.handler));
+    }
+    return entry.exclusive;
   }
 
   /** Adds a handler to the static fast-path index, sharing the trie's handler object. */
@@ -306,15 +331,20 @@ export class Router<T = undefined> {
   }
 
   /** Finds all handlers matching the given path, sorted by score (best match first). */
-  find(_path: string, accept: string[] = []): HandlerResult<T>[] {
+  find(_path: string, accept: readonly string[] = []): HandlerResult<T>[] {
     const path = normalizePath(_path);
 
     // Static fast path: with no dynamic routes registered, an exact-path lookup
     // is provably the complete match set (no `[param]`/`*` route can also match),
     // so we skip the trie traversal, per-node scoring, and the final sort.
+    const entry = this.staticRoutes.get(path);
     if (this.dynamicCount === 0) {
-      const entry = this.staticRoutes.get(path);
       return entry ? matchStaticEntry(entry, accept) : [];
+    }
+    // With dynamic routes registered, a static path no dynamic route matches
+    // takes the same fast path: the trie walk proves it once per path.
+    if (entry !== undefined && this.isExclusive(entry, path)) {
+      return matchStaticEntry(entry, accept);
     }
 
     const matches: NodeMatch<T>[] = [];
@@ -389,7 +419,7 @@ const DECLARED_WILDCARD_SCORE = 1e-6;
  * matches, 0 (filtered out) otherwise. A handler that declares `*​/*` thus
  * answers any Accept, and only when no other route matches the request first.
  */
-function scoreAccept<T>(handler: Handler<T>, requestAccept: string[]): number {
+function scoreAccept<T>(handler: Handler<T>, requestAccept: readonly string[]): number {
   if (requestAccept.some((item) => handler.accept.has(item))) return 1;
   if (handler.accept.size === 0 || requestAccept.length === 0 || requestAccept.includes('*/*')) return 0.5;
   return handler.accept.has('*/*') ? DECLARED_WILDCARD_SCORE : 0;
@@ -400,7 +430,7 @@ function scoreAccept<T>(handler: Handler<T>, requestAccept: string[]): number {
  * score (`slashes * 10 * acceptScore`) and best-first ordering the trie would
  * have produced for the same exact path.
  */
-function matchStaticEntry<T>(entry: StaticEntry<T>, requestAccept: string[]): HandlerResult<T>[] {
+function matchStaticEntry<T>(entry: StaticEntry<T>, requestAccept: readonly string[]): HandlerResult<T>[] {
   const results: HandlerResult<T>[] = [];
   for (const handler of entry.handlers) {
     const acceptScore = scoreAccept(handler, requestAccept);

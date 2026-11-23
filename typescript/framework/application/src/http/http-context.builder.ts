@@ -14,7 +14,11 @@ type BuildContextArgs = {
   /** The URL the request is routed and handled at, when a rewrite replaced the client's. */
   url?: string;
   server?: Server;
-  signal?: AbortSignal;
+  /**
+   * The request's signal, or a function that builds it the first time the
+   * context's `signal` is read. Without one, the context reads `req.signal`.
+   */
+  signal?: AbortSignal | (() => AbortSignal);
   maxBodySizeBytes?: number;
 };
 
@@ -32,7 +36,6 @@ type BuildContextArgs = {
  */
 class HttpContext {
   readonly req: Request;
-  readonly signal: AbortSignal;
   readonly headers: Headers;
   readonly method: HttpMethod;
   readonly url: string;
@@ -62,6 +65,8 @@ class HttpContext {
   path: () => string;
   query: () => string;
 
+  private _signal?: AbortSignal;
+  private _signalSource?: () => AbortSignal;
   private readonly _scanner: UrlScanner;
   private _cachedQuery?: Record<string, string>;
   private _scopeContainerContext?: ContainerContext;
@@ -70,7 +75,13 @@ class HttpContext {
   constructor(args: BuildContextArgs) {
     const req = args.req;
     this.req = req;
-    this.signal = args.signal ?? req.signal;
+    if (typeof args.signal === 'function') {
+      this._signal = undefined;
+      this._signalSource = args.signal;
+    } else {
+      this._signal = args.signal ?? req.signal;
+      this._signalSource = undefined;
+    }
     this.headers = req.headers;
     this.method = req.method as HttpMethod;
     this.url = args.url ?? req.url;
@@ -78,7 +89,8 @@ class HttpContext {
     this._scanner = new UrlScanner(this.url, req.headers);
 
     // Capture raw Authorization header for downstream service-to-service JWT forwarding.
-    this.__authorizationHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? undefined;
+    // Header names are case-insensitive: one lookup finds either spelling.
+    this.__authorizationHeader = req.headers.get('Authorization') ?? undefined;
 
     // Pre-initialise the mutable plumbing so assigning these later keeps the shape stable.
     this.route = undefined;
@@ -105,6 +117,20 @@ class HttpContext {
     this.domain = () => this._scanner.domain;
     this.path = () => this._scanner.path;
     this.query = () => this._scanner.query;
+  }
+
+  /** The request's signal, built on first read when the server gave a builder. */
+  get signal(): AbortSignal {
+    if (this._signal === undefined) {
+      this._signal = this._signalSource ? this._signalSource() : this.req.signal;
+      this._signalSource = undefined;
+    }
+    return this._signal;
+  }
+
+  set signal(signal: AbortSignal) {
+    this._signal = signal;
+    this._signalSource = undefined;
   }
 
   throw(status: number, message?: string): never {

@@ -242,6 +242,22 @@ or `dropped`. A rising `debug/dropped` count tells you what `logger.level:
 debug` would show. `observeLogRecords(listener)` receives each record's level
 and outcome and returns a function that removes the listener.
 
+A hot path whose record is costly to build checks `logger.isEnabled(level)`
+first, and still calls the level method when it is false, so the dropped
+record is counted:
+
+```typescript
+import { useLogger } from '@putnami/runtime';
+
+const logger = useLogger('cache');
+const entries = new Map<string, number>();
+if (logger.isEnabled('debug')) {
+  logger.debug('cache state', { entries: Object.fromEntries(entries) });
+} else {
+  logger.debug('cache state');
+}
+```
+
 The rule is the same in Go; see
 [ADR 0002 of go.putnami.dev/logger](../../../../go/framework/logger/doc/adr/0002-the-log-level-is-live.md).
 

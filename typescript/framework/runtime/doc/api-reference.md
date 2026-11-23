@@ -99,6 +99,20 @@ registered hooks after clearing the core config caches.
 function registerConfigLoaderResetHook(reset: () => void): void
 ```
 
+### `configRevision()`
+
+Returns a number that changes whenever the config a `useConfig()` or
+`useRawConfigSection()` call reads may change: `resetConfigLoader()`, a
+`ConfigService` invalidated, or the active `ConfigService` replaced. A value
+derived from config once and reused on every request (a datasource's resolved
+connection, for one) keeps the revision it was derived under and derives
+again when the current one differs. The tree is loaded once per revision, even
+when no config file exists.
+
+```typescript
+function configRevision(): number
+```
+
 ### `InferConfig<C>`
 
 Utility type to extract the inferred TypeScript type from a `ConfigDefinition`.

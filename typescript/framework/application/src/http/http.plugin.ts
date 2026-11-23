@@ -8,6 +8,7 @@ import { WebSocketDispatcher } from '../api/ws-dispatcher';
 import { Application, type GenerateResult, type Module, type Plugin } from '../application';
 import { PutnamiConfig } from '../application/putnami.config';
 import { commitRequestSession, loadRequestSession } from '../session/request-session';
+import { SessionConfig } from '../session/session.config';
 import { CompressionMiddleware } from './compression.middleware';
 import { CsrfMiddleware, isCsrfMiddleware } from './csrf.middleware';
 import { isDevHtmlRequest, renderDevErrorPage } from './dev-error-page';
@@ -25,6 +26,7 @@ import type { HttpMiddleware } from './http-middleware.type';
 import { HttpResponse } from './http-response';
 import { retainRawHttpStreamScope } from './raw-http-stream';
 import { OriginGuardMiddleware } from './origin-guard.middleware';
+import { RequestDeadlines } from './request-deadlines';
 import { RouteController } from './route.controller';
 import type { NativeResponder, RequestRewrite, RouteHandler, RouteOptions } from './route.type';
 import { SecurityHeadersMiddleware } from './security-headers.middleware';
@@ -39,9 +41,6 @@ type BunNativeRoute =
   | Response
   | ((req: Request) => Response | Promise<Response>)
   | Record<string, Response | ((req: Request) => Response | Promise<Response>)>;
-
-/** Module-level sentinel for the request-timeout race (identity-compared; avoids a per-request Symbol). */
-const TIMEOUT_SENTINEL = Symbol('request-timeout');
 
 /**
  * The address a bound server accepts traffic on, or `undefined` when it is not
@@ -119,6 +118,21 @@ const requestSessionMiddleware: HttpMiddleware = async (context, next) => {
   await commitRequestSession();
   return response;
 };
+
+/**
+ * Whether the configured session store may keep its sessions behind
+ * asynchronous reads, so each request needs {@link requestSessionMiddleware}.
+ * The cookie store, the default, never does: an app on it runs no session
+ * middleware. A session config that cannot be read keeps the middleware, which
+ * reports the problem on the request as before.
+ */
+function sessionStoreMayBeAsync(): boolean {
+  try {
+    return useConfig(SessionConfig).store !== 'cookie';
+  } catch {
+    return true;
+  }
+}
 
 /**
  * Resolves an explicit socket idle timeout (seconds) for `serve()`, derived
@@ -352,6 +366,8 @@ export class HttpPlugin implements Plugin {
     const requestTimeoutMs = typeof this.options.requestTimeoutMs === 'number' ? this.options.requestTimeoutMs : 30_000;
 
     const httpDispatcher = new HttpDispatcher(this.router);
+    // One timer for the deadlines of every request this run serves.
+    const deadlines = requestTimeoutMs > 0 ? new RequestDeadlines(requestTimeoutMs) : undefined;
     if (this._drain.signal.aborted) this._drain = new AbortController();
     const drain = this._drain.signal;
     if (this.options.onError) {
@@ -393,31 +409,51 @@ export class HttpPlugin implements Plugin {
       // port. Its request body is read as it arrives, which is what carries a
       // Connect client or bidirectional stream.
       http2: this.options.http2 !== false,
-      fetch: async (req, server) => {
+      fetch: (req, server) => {
         let requestTimedOut = false;
         // The request's signal aborts when the client disconnects (Bun's
         // req.signal) and when the request outlives requestTimeoutMs: its
         // queries, client calls and render stop instead of running on after
-        // the 408. Both sources live for this request only.
-        const timeout = requestTimeoutMs > 0 ? new AbortController() : undefined;
-        const requestSignal = timeout ? AbortSignal.any([req.signal, timeout.signal]) : req.signal;
+        // the 408. It is built the first time something reads it: a request
+        // that never reads it pays for no controller.
+        let timeout: AbortController | undefined;
+        let stopReason: DOMException | undefined;
+        const stopRequest = (): void => {
+          if (stopReason !== undefined) return;
+          stopReason = new DOMException('Request Timeout', 'TimeoutError');
+          timeout?.abort(stopReason);
+        };
 
         const context = buildHttpContext<HttpRequestContextInternal>({
           req,
           url: this._rewrites.length > 0 ? this.rewrittenUrl(req) : undefined,
           // Bun.serve returns a Server type that is structurally compatible with HttpServer
           server: server as unknown as HttpServer,
-          signal: requestSignal,
+          signal:
+            requestTimeoutMs > 0
+              ? () => {
+                  // One controller aborts with the first of the two reasons:
+                  // the request stopped, or its client left (req.signal).
+                  const controller = new AbortController();
+                  timeout = controller;
+                  if (stopReason !== undefined) {
+                    controller.abort(stopReason);
+                  } else if (req.signal.aborted) {
+                    controller.abort(req.signal.reason);
+                  } else {
+                    req.signal.addEventListener('abort', () => controller.abort(req.signal.reason), { once: true });
+                  }
+                  return controller.signal;
+                }
+              : undefined,
           maxBodySizeBytes,
         });
         context.__drain = drain;
-        if (timeout) {
+        if (requestTimeoutMs > 0) {
           context.deadlineAt = Date.now() + requestTimeoutMs;
-          // A request that reached its deadline before the timer fired ends
-          // now: its signal aborts, as it would at the timeout.
-          context.__endRequest = () => {
-            if (!timeout.signal.aborted) timeout.abort(new DOMException('Request Timeout', 'TimeoutError'));
-          };
+          // A request that reached its deadline before the sweeper reached it
+          // ends now: its signal aborts, as it would at the timeout.
+          context.__endRequest = stopRequest;
         }
 
         const executeRequest = async (): Promise<Response> => {
@@ -500,26 +536,28 @@ export class HttpPlugin implements Plugin {
           return executeRequest();
         }
 
-        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-        const timeoutPromise = new Promise<typeof TIMEOUT_SENTINEL>((resolve) => {
-          timeoutHandle = setTimeout(() => {
+        // One promise answers the request: its response, or the 408 the
+        // shared deadline sweeper sends when the deadline comes first.
+        return new Promise<Response>((resolve, reject) => {
+          const deadline = deadlines?.add(() => {
             requestTimedOut = true;
-            timeout?.abort(new DOMException('Request Timeout', 'TimeoutError'));
-            resolve(TIMEOUT_SENTINEL);
-          }, requestTimeoutMs);
+            stopRequest();
+            resolve(createJsonErrorResponse(408, 'Request Timeout'));
+          });
+          executeRequest().then(
+            (response) => {
+              if (deadline) deadlines?.remove(deadline);
+              // The deadline bounded the request until its response. A stream
+              // or a background task that runs on after it is no longer held to it.
+              if (!requestTimedOut && stopReason === undefined && !req.signal.aborted) context.deadlineAt = undefined;
+              resolve(response);
+            },
+            (error: unknown) => {
+              if (deadline) deadlines?.remove(deadline);
+              reject(error);
+            },
+          );
         });
-
-        const result = await Promise.race([executeRequest(), timeoutPromise]);
-        if (timeoutHandle) {
-          clearTimeout(timeoutHandle);
-        }
-        // The deadline bounded the request until its response. A stream or a
-        // background task that runs on after it is no longer held to it.
-        if (result !== TIMEOUT_SENTINEL && !requestSignal.aborted) context.deadlineAt = undefined;
-        if (result === TIMEOUT_SENTINEL) {
-          return createJsonErrorResponse(408, 'Request Timeout');
-        }
-        return result;
       },
       websocket: {
         // Bound client-controlled memory: reject oversized inbound frames and
@@ -629,7 +667,7 @@ export class HttpPlugin implements Plugin {
     // middleware and written after the response is built: the session API
     // that handlers and middlewares call is synchronous. It sits inside the
     // outermost slot, so the request's span covers the read and the write.
-    middlewares.unshift(requestSessionMiddleware);
+    if (sessionStoreMayBeAsync()) middlewares.unshift(requestSessionMiddleware);
 
     // Outermost slot (telemetry): in front of compression, so a request any
     // other middleware refuses is still observed.
@@ -660,6 +698,9 @@ export class HttpPlugin implements Plugin {
     // Compose from the inside out. The innermost middleware receives `dispatch`
     // itself as `next`, so we avoid allocating a redundant terminal `() =>
     // dispatch()` closure on every request.
+    if (middlewares.length === 0) {
+      return (_ctx: HttpRequestContext, dispatch: () => Promise<HttpResponse | undefined>) => dispatch();
+    }
     let chain: MiddlewareChainFn = (ctx, dispatch) => middlewares[middlewares.length - 1](ctx, dispatch);
     for (let i = middlewares.length - 2; i >= 0; i--) {
       const mw = middlewares[i];

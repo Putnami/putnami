@@ -3,6 +3,7 @@ import type { InferSchema, SchemaDefinition } from '../schema';
 import { isSchemaDescriptor, validateSchema } from '../schema';
 import type { ConfigDefinition, ConfigParams } from './config';
 import {
+  configCacheKey,
   rawSectionFromTree,
   redactErrors,
   resolveEnvValues,
@@ -14,6 +15,7 @@ import {
   unsetActiveConfigServiceRead,
 } from './config';
 import { type ConfigSource, getDefaultSources, loadGlobalConfig } from './config-source';
+import { bumpConfigRevision } from './loader-hooks';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -102,16 +104,13 @@ export class ConfigService {
     params: ConfigParams<InferSchema<S>> = {},
   ): InferSchema<S> {
     const path = params.path || config.path;
-    const cacheKey = `${path}:${JSON.stringify(params.confInit || {})}`;
+    const cacheKey = configCacheKey(path, params.confInit);
     const cached = this.cache.get(cacheKey);
     if (cached) {
       return cached as InferSchema<S>;
     }
 
-    if (!this.globalConfig) {
-      this.globalConfig = loadGlobalConfig(this.sources) ?? {};
-    }
-
+    this.globalConfig ??= loadGlobalConfig(this.sources) ?? {};
     const data = this.validate(config, path, this.globalConfig, params.confInit);
     this.cache.set(cacheKey, data);
     return data;
@@ -261,9 +260,9 @@ export class ConfigService {
    * absent or does not hold an object.
    */
   rawSection(path: string): Record<string, unknown> | undefined {
-    if (!this.globalConfig) {
-      this.globalConfig = loadGlobalConfig(this.sources) ?? {};
-    }
+    // A tree with no source yields `{}`, not `undefined`, so a workload with no
+    // config file reads its sources once, not on every call.
+    this.globalConfig ??= loadGlobalConfig(this.sources) ?? {};
     return rawSectionFromTree(this.globalConfig, path);
   }
 
@@ -273,6 +272,7 @@ export class ConfigService {
   invalidate(): void {
     this.cache.clear();
     this.globalConfig = undefined;
+    bumpConfigRevision();
   }
 
   /**

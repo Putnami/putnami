@@ -80,6 +80,56 @@ interface PrecomputedHeader {
   httpsOnly: boolean;
 }
 
+/**
+ * The policy a JSON response carries in place of the document one: a JSON body
+ * is never rendered as a document, so only framing needs forbidding.
+ */
+const JSON_CONTENT_SECURITY_POLICY = "frame-ancestors 'none'";
+
+/**
+ * Whether a Content-Type names JSON: `application/json` or a `+json` suffix
+ * type such as `application/problem+json`, with any parameters.
+ */
+export function isJsonContentType(contentType: string | undefined): boolean {
+  if (!contentType) return false;
+  const semi = contentType.indexOf(';');
+  const mediaType = (semi >= 0 ? contentType.slice(0, semi) : contentType).trim().toLowerCase();
+  return mediaType === 'application/json' || mediaType.endsWith('+json');
+}
+
+/**
+ * The header set of a JSON response: nosniff, CSP reduced to frame-ancestors
+ * 'none', HSTS, and every header an option set explicitly. The document-only
+ * defaults (X-Frame-Options, Referrer-Policy, Permissions-Policy, X-XSS-Protection)
+ * add nothing to a body no browser renders.
+ */
+function jsonHeaderSet(precomputed: readonly PrecomputedHeader[]): PrecomputedHeader[] {
+  const set: PrecomputedHeader[] = [];
+  for (const h of precomputed) {
+    if (h.forced || h.httpsOnly || h.lowerName === 'x-content-type-options') {
+      set.push(h);
+    } else if (h.isCsp) {
+      set.push({ ...h, value: JSON_CONTENT_SECURITY_POLICY, isCsp: false });
+    }
+  }
+  return set;
+}
+
+/** A prebuilt response header list for the commonest response: JSON with no other header. */
+interface HeaderTemplate {
+  entries: readonly [string, string][];
+  headers: Headers;
+}
+
+function headerTemplate(contentType: string, set: readonly PrecomputedHeader[], secured: boolean): HeaderTemplate {
+  const entries: [string, string][] = [['Content-Type', contentType]];
+  for (const h of set) {
+    if (h.httpsOnly && !secured) continue;
+    entries.push([h.name, h.value]);
+  }
+  return { entries, headers: new Headers(entries) };
+}
+
 export const SecurityHeadersMiddleware = (options: SecurityHeadersOptions = {}): HttpMiddleware => {
   // Resolve the full header set once, at construction. The merged config never
   // changes between requests, so the only per-request work left is an optional
@@ -100,6 +150,16 @@ export const SecurityHeadersMiddleware = (options: SecurityHeadersOptions = {}):
     });
   }
 
+  const jsonSet = jsonHeaderSet(precomputed);
+  // A forced CSP may weave a per-request nonce, so only a nonce-free set gets a template.
+  const templated = !jsonSet.some((h) => h.isCsp);
+  const jsonTemplates = templated
+    ? {
+        plain: headerTemplate('application/json', jsonSet, false),
+        secured: headerTemplate('application/json', jsonSet, true),
+      }
+    : undefined;
+
   return async (ctx, next) => {
     // Per-route opt-out: skip only when every matched candidate opts out.
     if (skipsSecurityHeaders(ctx)) return next();
@@ -107,21 +167,33 @@ export const SecurityHeadersMiddleware = (options: SecurityHeadersOptions = {}):
     let res = await next();
     if (!res) return res;
 
+    const raw = res.rawHeaderEntries();
+    // The commonest response — JSON whose only header is its Content-Type —
+    // takes a header list built once, at construction.
+    if (jsonTemplates && raw.length === 1 && raw[0][0] === 'Content-Type' && raw[0][1] === 'application/json') {
+      const template = ctx.secured() ? jsonTemplates.secured : jsonTemplates.plain;
+      return res.useHeaderTemplate(template.entries, template.headers);
+    }
+
     // Map lowercased existing header name -> original casing, built only when
     // the inner response actually carries headers (the common JSON case has
     // just Content-Type). Lets us both detect conflicts and replace using the
     // existing casing without per-header array copies + toLowerCase scans.
-    const raw = res.rawHeaderEntries();
     let existing: Map<string, string> | undefined;
+    let contentType: string | undefined;
     if (raw.length > 0) {
       existing = new Map();
-      for (const [n] of raw) existing.set(n.toLowerCase(), n);
+      for (const [n, v] of raw) {
+        const lower = n.toLowerCase();
+        existing.set(lower, n);
+        if (lower === 'content-type') contentType = v;
+      }
     }
 
     const nonce = (ctx as unknown as Record<string, unknown>)[CSP_NONCE_CONTEXT_KEY];
     const hasNonce = typeof nonce === 'string' && nonce.length > 0;
 
-    for (const h of precomputed) {
+    for (const h of isJsonContentType(contentType) ? jsonSet : precomputed) {
       // HSTS is ignored by browsers over plaintext and is surprising in local /
       // HTTP-terminated setups — only emit it when the request is secure.
       if (h.httpsOnly && !ctx.secured()) continue;

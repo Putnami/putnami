@@ -203,5 +203,15 @@ export class EntityHelper<T extends TableDefinition> {
   }
 }
 
-/** Create an entity helper for a given table definition */
-export const entityHelper = <T extends TableDefinition>(tableDef: T): EntityHelper<T> => new EntityHelper(tableDef);
+/** The helper of each table definition: a repository built per request reuses it. */
+const helpers = new WeakMap<TableDefinition, EntityHelper<TableDefinition>>();
+
+/** The entity helper of a table definition, built and validated once per definition. */
+export const entityHelper = <T extends TableDefinition>(tableDef: T): EntityHelper<T> => {
+  let helper = helpers.get(tableDef) as EntityHelper<T> | undefined;
+  if (helper === undefined) {
+    helper = new EntityHelper(tableDef);
+    helpers.set(tableDef, helper as unknown as EntityHelper<TableDefinition>);
+  }
+  return helper;
+};

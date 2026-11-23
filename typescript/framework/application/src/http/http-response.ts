@@ -17,6 +17,13 @@ interface ResponseInit {
 export class HttpResponse {
   private headers?: [string, string][];
 
+  /**
+   * A shared, prebuilt `Headers` holding exactly the entries of `headers`, set
+   * by {@link useHeaderTemplate}. `get()` hands it to the native `Response`
+   * instead of rebuilding the header list; any header change drops it.
+   */
+  private headerTemplate?: Headers;
+
   readonly status?;
 
   readonly statusText?: string;
@@ -101,6 +108,15 @@ export class HttpResponse {
     }
     this.bodyUsed = true;
 
+    if (this.headerTemplate) {
+      const status = this.status || 200;
+      return new Response(this.bodyInit, {
+        headers: this.headerTemplate,
+        status,
+        statusText: this.statusText || getHttpStatusText(status),
+      });
+    }
+
     if (this.redirected) {
       return new Response(undefined, {
         status: this.status,
@@ -123,6 +139,7 @@ export class HttpResponse {
    * Mutates in-place and returns `this` to allow chaining.
    */
   setHeader(name: string, value: string): HttpResponse {
+    this.detachHeaderTemplate();
     if (!this.headers) {
       this.headers = [[name, value]];
       return this;
@@ -145,9 +162,31 @@ export class HttpResponse {
    * Mutates in-place and returns `this` to allow chaining.
    */
   pushHeader(name: string, value: string): HttpResponse {
+    this.detachHeaderTemplate();
     this.headers ??= [];
     this.headers.push([name, value]);
     return this;
+  }
+
+  /**
+   * Replaces the headers with `entries`, which `template` holds prebuilt, so
+   * the native `Response` reuses the template instead of building its header
+   * list again. Both are shared between responses and never mutated: a later
+   * header change works on a copy of `entries` and drops the template.
+   * @internal
+   */
+  useHeaderTemplate(entries: readonly [string, string][], template: Headers): HttpResponse {
+    this.headers = entries as [string, string][];
+    this.headerTemplate = template;
+    return this;
+  }
+
+  /** Before a header change: copy shared template entries and stop using the template. */
+  private detachHeaderTemplate(): void {
+    if (this.headerTemplate) {
+      this.headerTemplate = undefined;
+      this.headers = this.headers ? [...this.headers] : undefined;
+    }
   }
 
   withStatus(status: number, statusText?: string): HttpResponse {
@@ -187,6 +226,15 @@ export class HttpResponse {
   }
 
   static json(data: unknown, init?: ResponseInit): HttpResponse {
+    if (init?.headers === undefined) {
+      const rh = new HttpResponse(JSON.stringify(data), {
+        status: init?.status ?? 200,
+        statusText: init?.statusText,
+        headers: [['Content-Type', 'application/json']],
+      });
+      rh._rawData = data;
+      return rh;
+    }
     const initHeaders = init?.headers;
     const merged: Record<string, string> = {};
     if (Array.isArray(initHeaders)) {

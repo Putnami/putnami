@@ -29,11 +29,13 @@ describe('native (pipeline-bypassing) routes', () => {
       expect(native.status).toBe(200);
       expect(await native.json()).toEqual({ status: 'ok' });
       // Pipeline bypassed → none of the secure-by-default headers are present.
-      expect(native.headers.get('X-Frame-Options')).toBeNull();
+      expect(native.headers.get('X-Content-Type-Options')).toBeNull();
+      expect(native.headers.get('Content-Security-Policy')).toBeNull();
 
       // A normal pipeline route on the same server still gets the security headers.
       const normal = await fetch(`${base}/normal`);
-      expect(normal.headers.get('X-Frame-Options')).toBe('DENY');
+      expect(normal.headers.get('X-Content-Type-Options')).toBe('nosniff');
+      expect(normal.headers.get('Content-Security-Policy')).toBe("frame-ancestors 'none'");
       await normal.arrayBuffer();
 
       await app.stop();
