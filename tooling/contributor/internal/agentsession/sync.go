@@ -171,6 +171,7 @@ func recordMissedSync(cache *sessionCache, failure error, now time.Time) {
 // settleMissedSyncs clears the missed syncs a successful sync carried. A
 // sync that failed while this one ran stays counted for the next one.
 func settleMissedSyncs(cache *sessionCache, carried int64) {
+	cache.MissedNoticed = false
 	if cache.Missed == nil {
 		return
 	}
@@ -197,7 +198,7 @@ func missedReason(failure error) string {
 			}
 		}
 	case errors.Is(failure, context.DeadlineExceeded):
-		reason = "timeout: the provider did not answer in time"
+		reason = timeoutReason + ": the provider did not answer in time"
 	}
 	return firstString(boundedLine(reason, collab.MaxMissedSyncReasonLength), "unknown")
 }

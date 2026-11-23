@@ -524,6 +524,33 @@
               "an-old-marker-is-pruned-and-reclaimed"
             ]
           }
+        },
+        {
+          "id": "sync-failure-cause",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-session-start-names-the-cause-and-the-fix",
+              "a-session-start-names-a-retired-extension"
+            ]
+          }
+        },
+        {
+          "id": "failed-syncs-notice",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "three-failed-syncs-in-a-row-give-one-notice"
+            ]
+          }
         }
       ],
       "surface": {

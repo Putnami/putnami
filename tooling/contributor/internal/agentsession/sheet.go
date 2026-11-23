@@ -33,7 +33,7 @@ const sheetHeader = "Putnami mission sheet:"
 // when this session start began: a view older than it is stale, and the sheet
 // says so with its date. A session that names no mission, or a workspace
 // that binds no missions provider, has no sheet.
-func missionSheet(cache *sessionCache, syncErr error, started time.Time) string {
+func missionSheet(cache *sessionCache, syncErr error, started time.Time, retired []string) string {
 	if !sessionPublishable(cache) || unbound(syncErr) {
 		return ""
 	}
@@ -45,6 +45,10 @@ func missionSheet(cache *sessionCache, syncErr error, started time.Time) string 
 	}
 	note := ""
 	switch {
+	case syncErr != nil && !mission.Known:
+		note = "The sync at this session start failed. " + syncFailureNote(missedReason(syncErr), retired)
+	case syncErr != nil && mission.SheetAt.Before(started):
+		note = "The sync at this session start failed; the sheet dates from " + mission.SheetAt.UTC().Format(time.RFC3339) + ". " + syncFailureNote(missedReason(syncErr), retired)
 	case !mission.Known:
 		note = "The missions provider did not answer at this session start."
 	case mission.SheetAt.Before(started):

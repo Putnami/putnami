@@ -221,6 +221,11 @@ const (
 	// a session whose syncs fail keeps working while its mission stops
 	// moving.
 	CheckAgentHookFailed CheckCode = "doctor.agent_hook_failed"
+	// CheckRetiredExtensionBound marks a workspace that binds a retired
+	// extension, one the workspace protocol's registry names with its
+	// successor: a provider behind it refuses every call, and an older
+	// checkout keeps binding it until it is rebased.
+	CheckRetiredExtensionBound CheckCode = "doctor.retired_extension_bound"
 )
 
 // ValidCheckCodes enumerates the canonical, frozen check-code taxonomy.
@@ -244,6 +249,7 @@ var ValidCheckCodes = map[CheckCode]bool{
 	CheckMissingReadme:              true,
 	CheckAgentHooksUnreachable:      true,
 	CheckAgentHookFailed:            true,
+	CheckRetiredExtensionBound:      true,
 }
 
 // CheckRemediations maps every check code to its baked, actionable remediation:
@@ -269,6 +275,7 @@ var CheckRemediations = map[CheckCode]string{
 	CheckMissingReadme:              "Add a README.md at the project root with a one-line purpose, the project's putnami commands, and where its documentation lives; `putnami lint` then checks its links.",
 	CheckAgentHooksUnreachable:      "Run `putnami install` in the workspace with putnami on the PATH; in a cloud environment, run it from the environment's setup script so the hooks exist when the session starts, and in Codex, trust the new hooks with /hooks.",
 	CheckAgentHookFailed:            "Fix the cause the failure names, such as `putnami cloud login` for an authentication failure; the session's next sync that succeeds reports the updates its mission missed.",
+	CheckRetiredExtensionBound:      "Rebase on the default branch, or replace the retired extension with its successor in extensions, agentArtifacts and options.collaboration of putnami.workspace.json; the finding names the successor.",
 }
 
 // Remediation returns the baked remediation for a check code, or the empty

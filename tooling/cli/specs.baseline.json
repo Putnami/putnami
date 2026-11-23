@@ -85,6 +85,7 @@
     "cli/credential-provider#providers-are-opt-in",
     "cli/credential-provider#refusal-never-falls-back",
     "cli/deploy-environments#deploy-follows-the-environment-channel",
+    "cli/diagnostics-results#a-retired-extension-is-named",
     "cli/diagnostics-results#bounded-machine-detail",
     "cli/diagnostics-results#bounded-test-output",
     "cli/diagnostics-results#doctor-gate",

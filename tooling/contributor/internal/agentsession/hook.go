@@ -242,17 +242,23 @@ type pendingDelivery struct {
 	// continues reports that the messages continue or start a turn: none of
 	// them continues another one.
 	continues bool
+	// notice reports that the output tells the session its syncs keep
+	// failing (failedSyncsNotice): once written, no hook tells it again.
+	notice bool
 }
 
 // confirm records the messages as delivered. A message another hook
 // confirmed first stays as that hook recorded it.
 func (d pendingDelivery) confirm() error {
-	if len(d.messages) == 0 {
+	if len(d.messages) == 0 && !d.notice {
 		return nil
 	}
 	return lockedUpdate(d.files, func(cache *sessionCache) (*sessionCache, error) {
 		if cache == nil {
 			return nil, nil
+		}
+		if d.notice && cache.Missed != nil {
+			cache.MissedNoticed = true
 		}
 		for _, message := range d.messages {
 			cache.Inbox = withoutMessage(cache.Inbox, message.ID)
@@ -480,17 +486,23 @@ func setSessionState(cache *sessionCache, state collab.SessionState, event strin
 // and, in full, the waiting messages that fit after it (sessionStartText).
 // It syncs every time, and reads the mission's checkpoint when the workspace
 // binds memory; when the sync fails, the cached sheet answers with its date.
-// When the provider refuses the sync for want of a signed-in session, it also
-// shows the user one line that says reporting is off and how to turn it on.
-// The messages count as delivered once Hook wrote the text.
+// When the sync fails, the sheet names the cause and the action that fixes
+// it. A checkout that binds a retired extension is told so first, and the
+// user sees the same line; else, when the provider refuses the sync for want
+// of a signed-in session, the user sees one line that says reporting is off
+// and how to turn it on. After syncNoticeAfter failed syncs in a row, the
+// context says so once (failedSyncsNotice). The messages count as delivered
+// once Hook wrote the text.
 func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInput) (*hookOutput, pendingDelivery, error) {
 	files := e.files(engine, input.SessionID)
 	identity := e.readSessionIdentity(ctx, engine, input)
 	now := e.Now()
+	var root string
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		cache = e.openSession(cache, engine, input, identity)
 		setSessionState(cache, collab.SessionStateWorking, sessionEventStart)
 		cache.ActiveAt = now
+		root = cache.Root
 		return cache, nil
 	}); err != nil {
 		return nil, pendingDelivery{}, err
@@ -498,13 +510,22 @@ func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInp
 	syncErr := e.syncSession(ctx, files)
 	e.log(engine, input.Event, syncErr)
 	e.log(engine, input.Event, e.readCheckpoint(ctx, files))
-	var text string
+	retired := retiredNotices(root)
+	var text, notice string
 	var messages []inboxMessage
 	err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		if cache == nil {
 			return nil, nil
 		}
-		text, messages = sessionStartText(cache, missionSheet(cache, syncErr, now))
+		sheet := missionSheet(cache, syncErr, now, retired)
+		notice = failedSyncsNotice(cache)
+		text, messages = sessionStartText(cache, joinParagraphs(sheet, notice))
+		// A sheet whose sync failed names the retired extension as its
+		// fix; else it comes first, and alone in a session without a
+		// mission, which gets no reply ways.
+		if len(retired) > 0 && !strings.Contains(sheet, retired[0]) {
+			text = joinParagraphs(strings.Join(retired, "\n"), text)
+		}
 		return cache, nil
 	})
 	if err != nil {
@@ -514,16 +535,29 @@ func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInp
 	if text != "" {
 		output = contextOutput(hookEventSessionStart, text)
 	}
-	if reportingOff(syncErr) {
+	if systemMessage := sessionStartSystemMessage(syncErr, retired); systemMessage != "" {
 		if output == nil {
 			output = &hookOutput{}
 		}
-		output.SystemMessage = reportingOffNotice
+		output.SystemMessage = systemMessage
 	}
 	if output == nil {
 		return nil, pendingDelivery{}, nil
 	}
-	return output, pendingDelivery{files: files, messages: messages}, nil
+	return output, pendingDelivery{files: files, messages: messages, notice: notice != "" && text != ""}, nil
+}
+
+// sessionStartSystemMessage is the line SessionStart shows the user: the
+// notice of each retired extension the checkout binds, else the line that
+// says reporting is off for want of a signed-in session, else none.
+func sessionStartSystemMessage(syncErr error, retired []string) string {
+	switch {
+	case len(retired) > 0:
+		return strings.Join(retired, "\n")
+	case reportingOff(syncErr):
+		return reportingOffNotice
+	}
+	return ""
 }
 
 // lockedUpdate reads the cache under the lock, applies change and writes
@@ -677,7 +711,9 @@ func toolSyncDue(cache *sessionCache, now time.Time) bool {
 // deliver and an open decision this session asked, Codex waits for the
 // answer; another session's decision never holds it. When the sync answers a
 // message that continues the turn, a second sync publishes that the session
-// works again. The messages count as delivered once Hook wrote the reason, and
+// works again. After syncNoticeAfter failed syncs in a row, the reason ends
+// with failedSyncsNotice, once; with nothing else to say, the notice
+// continues the turn, unless the engine already continues a Stop. The messages count as delivered once Hook wrote the reason, and
 // the next sync reports them.
 func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*hookOutput, pendingDelivery, error) {
 	files := e.files(engine, input.SessionID)
@@ -717,7 +753,7 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 	syncErr := e.syncSession(ctx, files)
 	e.log(engine, input.Event, syncErr)
 	decidedAt := e.Now()
-	republish, wait := false, false
+	republish, wait, noticed := false, false, false
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		if cache == nil {
 			return nil, nil
@@ -727,6 +763,16 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 			if reason, messages = stopReason(cache, input.StopHookActive, true); reason != "" {
 				setSessionState(cache, collab.SessionStateWorking, sessionEventStop)
 				republish = true
+			}
+		}
+		if notice := failedSyncsNotice(cache); notice != "" {
+			switch {
+			case reason != "" && len(joinParagraphs(reason, notice)) <= hookContextMax:
+				reason, noticed = joinParagraphs(reason, notice), true
+			case reason == "" && !input.StopHookActive:
+				// The provider just failed: the next sync carries the state.
+				reason, noticed = notice, true
+				setSessionState(cache, collab.SessionStateWorking, sessionEventStop)
 			}
 		}
 		cache.ActiveAt, cache.StopDecidedAt, cache.StopContinued = decidedAt, decidedAt, reason != ""
@@ -759,7 +805,7 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 	if reason == "" {
 		return nil, pendingDelivery{}, nil
 	}
-	delivery := pendingDelivery{files: files, messages: messages, continues: true}
+	delivery := pendingDelivery{files: files, messages: messages, continues: true, notice: noticed}
 	if engine == sessionEngineClaudeCode {
 		return contextOutput(hookEventStop, reason), delivery, nil
 	}

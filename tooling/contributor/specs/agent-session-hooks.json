@@ -145,6 +145,20 @@
         "A hook that finds a marker younger than 60 seconds prints nothing and exits 0, so an event two hook sources send is handled once.",
         "A claim removes older markers, and a marker it cannot write is logged and the event handled."
       ]
+    },
+    {
+      "id": "sync-failure-cause",
+      "text": [
+        "When the sync at session start fails, the sheet names the cause the hook received, quoted, and the action that fixes it: putnami cloud login for a sign-in refusal, a later sync for a timeout, else the missions binding and putnami doctor.",
+        "When the checkout binds a retired extension, SessionStart names it, with its successor, to the agent and to the user, and that notice replaces the sign-in advice."
+      ]
+    },
+    {
+      "id": "failed-syncs-notice",
+      "text": [
+        "After 3 syncs in a row fail in a workspace that binds missions, the next SessionStart or Stop says so once in the session's context, with the last cause and its fix, so the agent can tell the person.",
+        "A Stop with nothing else to deliver continues the turn once for it, unless the host already continues a Stop. A sync that succeeds resets the count, and the next 3 failures in a row give a new notice."
+      ]
     }
   ],
   "decisions": [

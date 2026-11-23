@@ -227,6 +227,13 @@
         "A project file may name, under commands.<command>.dependsOn, the commands that command waits for in that project: command for the project's own, ^command for every project it depends on, directly or transitively.",
         "Parsing is strict there: an unknown member, an empty command name, a command that waits for itself, or an entry of another form, such as !command or command~step, is refused, and the rest of the project file stays lenient."
       ]
+    },
+    {
+      "id": "a-retired-extension-names-its-successor",
+      "text": [
+        "One registry marks each retired first-party extension and names its successor: @putnami/cloud replaces @putnami/intelligence.",
+        "A workspace binds a retired extension through extensions, an extension:<name> entry of agentArtifacts, or a provider under options.collaboration; each is answered once, with the notice \"This checkout binds <name>, which is retired; rebase on the default branch or bind <successor>.\""
+      ]
     }
   ],
   "decisions": [

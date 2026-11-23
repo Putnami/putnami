@@ -124,6 +124,9 @@ type sessionCache struct {
 	// succeeded, with the reason and time of the last one; the next sync
 	// carries it as missedSyncs.
 	Missed *collab.MissedSyncs `json:"missed_syncs,omitempty"`
+	// MissedNoticed records that a hook told the session its last
+	// syncNoticeAfter syncs or more failed; a successful sync clears it.
+	MissedNoticed bool `json:"missed_noticed,omitempty"`
 
 	// Stage is the loop stage `agent stage` recorded last; every sync
 	// carries it.

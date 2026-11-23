@@ -127,6 +127,13 @@
         "Doctor reports doctor.agent_hook_failed when the agent session hook log under the Putnami home holds a failure of this workspace, matched by its workspace root, less than 24 hours old: the finding names the last one, with its time, host, event and error.",
         "The finding is advisory and scoped to the workspace root; an older failure, another workspace's or a log line without a root reports nothing."
       ]
+    },
+    {
+      "id": "a-retired-extension-is-named",
+      "text": [
+        "putnami install prints, as a warning and before it installs anything, the notice of each retired extension the workspace binds; the install goes on.",
+        "Doctor reports doctor.retired_extension_bound for each one, with the notice as its message: the finding is advisory and scoped to the workspace root, and a workspace that binds no retired extension reports nothing."
+      ]
     }
   ],
   "decisions": [

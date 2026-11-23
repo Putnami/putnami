@@ -240,6 +240,13 @@ func Install(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []str
 			"`putnami install` cannot materialize for another platform or destination; use `putnami extensions install --platform <os>/<arch> [--dest <dir>]`")
 	}
 
+	// A checkout cut before an extension retired still binds it, and the
+	// provider behind it may refuse every call: name its successor before
+	// anything installs, and go on.
+	for _, retired := range cfg.RetiredBindings() {
+		iox.Fprintf(out, "  warning: %s\n", retired.Notice())
+	}
+
 	if err := refuseHostedAgentArtifactPins(ctx, wsRoot); err != nil {
 		return err
 	}

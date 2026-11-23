@@ -111,7 +111,7 @@ func TestTheSheetStaysWithinItsBound(t *testing.T) {
 		cache.Mission.OpenDecisions = append(cache.Mission.OpenDecisions, collab.OpenDecision{ID: decisionID, Question: strings.Repeat("why\n", collab.MaxQuestionLength/4)})
 	}
 	cache.Mission.Checkpoint = &missionCheckpoint{Revision: "r1", Content: strings.Repeat("line\n", collab.MaxContentBytes/5)}
-	sheet := missionSheet(cache, nil, sessionEpoch)
+	sheet := missionSheet(cache, nil, sessionEpoch, nil)
 	if len(sheet) > sessionSheetMax {
 		t.Errorf("the sheet holds %d bytes, more than %d", len(sheet), sessionSheetMax)
 	}
@@ -164,8 +164,9 @@ func TestTheSheetDatesAViewTheProviderDidNotAnswer(t *testing.T) {
 	h.advance(time.Hour)
 	h.provider.broken = errors.New("connection refused")
 	text := contextOf(t, h.hook(claude, "session-start", claudeSession, nil))
-	want := defaultSheet + "\n\nThe missions provider did not answer at this session start; the sheet dates from 2026-10-21T10:00:00Z.\n\n" + sessionReplyWays
-	if text != want {
+	want := defaultSheet + "\n\nThe sync at this session start failed; the sheet dates from 2026-10-21T10:00:00Z. The provider answered:\n> "
+	action := "connection refused\nCheck the missions binding under options.collaboration in putnami.workspace.json; `putnami doctor` names the last hook failure.\n\n" + sessionReplyWays
+	if !strings.HasPrefix(text, want) || !strings.HasSuffix(text, action) {
 		t.Errorf("context\n%s\nwant\n%s", text, want)
 	}
 	if !logSays(h.hookLog(), "connection refused") {
@@ -173,7 +174,7 @@ func TestTheSheetDatesAViewTheProviderDidNotAnswer(t *testing.T) {
 	}
 	// A new session that never synced has no view to show.
 	text = contextOf(t, h.hook(claude, "session-start", "other-session", nil))
-	if !strings.Contains(text, "The missions provider did not answer at this session start.") || strings.Contains(text, "Title:") {
+	if !strings.Contains(text, "The sync at this session start failed. The provider answered:") || strings.Contains(text, "Title:") {
 		t.Errorf("context\n%s", text)
 	}
 }

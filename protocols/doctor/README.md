@@ -54,6 +54,7 @@ engine.
   | `doctor.missing_readme` | A project has no `README.md` at its root. | Add one with a one-line purpose, the project's commands, and where its docs live. |
   | `doctor.agent_hooks_unreachable` | An agent host would run none of the hooks a workspace's install writes: the user's hook file of that host lacks them, or `putnami` is not on the `PATH`. | Run `putnami install` with `putnami` on the `PATH`, from a cloud environment's setup script there, and trust new Codex hooks with `/hooks`. |
   | `doctor.agent_hook_failed` | An agent session hook of the workspace failed in the last 24 hours, per the hook log under the Putnami home. | Fix the cause the failure names, such as `putnami cloud login`; the next sync that succeeds reports the updates the mission missed. |
+  | `doctor.retired_extension_bound` | The workspace binds a retired extension through `extensions`, `agentArtifacts` or `options.collaboration`; the message names its successor. | Rebase on the default branch, or bind the successor in its place. |
 
   The IDs are frozen once merged: config and capability evidence is produced
   targeted at these exact codes (notably `doctor.ephemeral_signing_key`), and a

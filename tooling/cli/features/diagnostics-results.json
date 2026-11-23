@@ -252,6 +252,21 @@
             "doctor-is-quiet-without-a-recent-hook-failure-of-the-workspace"
           ]
         }
+      },
+      {
+        "id": "a-retired-extension-is-named",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "install-names-a-retired-extension-the-workspace-binds",
+            "doctor-names-a-retired-extension-the-workspace-binds",
+            "doctor-is-quiet-without-a-retired-extension"
+          ]
+        }
       }
     ]
   }

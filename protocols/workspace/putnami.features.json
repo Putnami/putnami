@@ -411,6 +411,21 @@
               "a-project-command-dependency-is-a-command-or-its-closure"
             ]
           }
+        },
+        {
+          "id": "a-retired-extension-names-its-successor",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-registry-names-the-successor-of-a-retired-extension",
+              "a-workspace-that-binds-a-retired-extension-is-told-its-successor",
+              "a-workspace-without-a-retired-extension-binds-none"
+            ]
+          }
         }
       ]
     }

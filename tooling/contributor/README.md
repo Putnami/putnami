@@ -195,10 +195,19 @@ workspace root, and `putnami doctor` reports the workspace's last one from
 the last day. The session counts the syncs that failed since the last one
 that succeeded, with the last reason, and the next sync that succeeds
 carries them as `missedSyncs`, so a missions provider that declares the
-member shows on the mission how many updates it missed and why. When the missions
-provider refuses the SessionStart sync for want of a signed-in session, the
-hook also shows the user one line, as the host's system message: reporting is
-off, run `putnami cloud login`.
+member shows on the mission how many updates it missed and why. When the
+SessionStart sync fails, the sheet quotes the cause the provider gave and the
+action that fixes it: `putnami cloud login` for a sign-in refusal, a later
+sync for a timeout, else the missions binding and `putnami doctor`. After 3
+syncs in a row fail in a workspace that binds missions, the next SessionStart
+or Stop says so once in the session's context, so the agent can tell the
+person; with nothing else to say, that Stop continues the turn once. When the
+missions provider refuses the SessionStart sync for want of a signed-in
+session, the hook also shows the user one line, as the host's system message:
+reporting is off, run `putnami cloud login`. A checkout that binds a retired
+extension, such as `@putnami/intelligence`, is told so at every SessionStart,
+in the context and as the system message, with its successor in place of the
+sign-in advice.
 
 Codex needs three things from the workspace before these hooks report a
 session:

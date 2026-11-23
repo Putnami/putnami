@@ -39,7 +39,8 @@
         "doctor.vc_runtime_missing",
         "doctor.missing_readme",
         "doctor.agent_hooks_unreachable",
-        "doctor.agent_hook_failed"
+        "doctor.agent_hook_failed",
+        "doctor.retired_extension_bound"
       ],
       "description": "One class of doctor finding. The taxonomy is frozen: renaming, repurposing, or removing a code requires a protocol version bump; adding one is additive and does not, since documents written against an earlier vocabulary stay valid."
     },

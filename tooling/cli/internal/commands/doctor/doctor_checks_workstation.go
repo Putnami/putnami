@@ -58,6 +58,8 @@ type workstationProbe struct {
 	// lastHookFailure answers the last agent session hook failure of the
 	// workspace less than a day old, and whether there is one.
 	lastHookFailure func() (hookFailure, bool)
+	// retiredBindings answers each retired extension the workspace binds.
+	retiredBindings func() []wsproto.RetiredExtension
 }
 
 // systemWorkstationProbe returns the probe of the running host for the
@@ -75,6 +77,7 @@ func systemWorkstationProbe(wsRoot string) workstationProbe {
 		lastHookFailure: func() (hookFailure, bool) {
 			return readLastHookFailure(hookLogPath(wsRoot, os.Getenv), wsRoot, time.Now())
 		},
+		retiredBindings: func() []wsproto.RetiredExtension { return wsproto.Load(wsRoot).RetiredBindings() },
 	}
 }
 
@@ -85,6 +88,7 @@ func checkWorkstation(profile doctor.Profile, probe workstationProbe) []doctor.F
 	findings = append(findings, checkCRLFCheckout(profile, probe)...)
 	findings = append(findings, checkAgentHooks(profile, probe)...)
 	findings = append(findings, checkHookFailure(profile, probe)...)
+	findings = append(findings, checkRetiredExtensions(profile, probe)...)
 	if probe.goos == "windows" {
 		findings = append(findings, checkLongPaths(profile, probe)...)
 		findings = append(findings, checkGitLongPaths(profile, probe)...)
@@ -192,6 +196,21 @@ func workstationFinding(code doctor.CheckCode, profile doctor.Profile, path, fie
 
 // hostHookNames are the agent hosts as a report names them.
 var hostHookNames = map[string]string{"claude-code": "Claude Code", "codex": "Codex"}
+
+// checkRetiredExtensions reports each retired extension the workspace binds,
+// with the notice that names its successor. A provider behind a retired
+// extension may refuse every call, and the agent session hooks then fail on
+// every sync.
+func checkRetiredExtensions(profile doctor.Profile, probe workstationProbe) []doctor.Finding {
+	if probe.retiredBindings == nil {
+		return nil
+	}
+	var findings []doctor.Finding
+	for _, retired := range probe.retiredBindings() {
+		findings = append(findings, workstationFinding(doctor.CheckRetiredExtensionBound, profile, wsproto.WorkspaceConfigFilename, "", retired.Notice()))
+	}
+	return findings
+}
 
 // checkAgentHooks reports each way an agent host would run none of the hooks
 // the workspace's explicit install writes: a user hook file that lacks them,

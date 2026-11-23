@@ -178,6 +178,20 @@ would synthesize a document no profile validates.
 
 Code: `invalid-registries` at `registries.<ecosystem>`.
 
+#### Retired extensions
+
+`RetiredExtensions()` is the one registry of first-party extensions Putnami
+retired, each with the extension that replaces it. Today it holds one entry:
+`@putnami/cloud` replaces `@putnami/intelligence`.
+
+`Config.RetiredBindings()` answers each retired extension a workspace binds,
+once: through `extensions`, an `extension:<name>` entry of `agentArtifacts`, or
+a provider under `options.collaboration`. `putnami install`, `putnami doctor`
+and the agent session hooks print its `Notice()`:
+
+> This checkout binds @putnami/intelligence, which is retired; rebase on the
+> default branch or bind @putnami/cloud.
+
 #### Selection vocabulary
 
 File inputs use the shared `filepatterns.go` grammar for cache collection and
