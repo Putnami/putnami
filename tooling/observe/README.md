@@ -40,6 +40,19 @@ On GitHub Actions, add one step after your tests:
 The action's source is [`action/`](action/README.md); each release copies it to
 [Putnami/observe-action](https://github.com/Putnami/observe-action).
 
+On GitLab CI, include the catalog component after your tests:
+
+```yaml
+include:
+  - component: gitlab.com/putnami/observe/observe@1
+    inputs:
+      organization: <organization-id>
+```
+
+The component's source is [`gitlab/`](gitlab/README.md); each release copies it
+to the gitlab.com catalog project `putnami/observe`, as
+[Release the GitLab component](#release-the-gitlab-component) says.
+
 In another CI, install the extension in the user scope, then run it in the job:
 
 ```bash
@@ -48,7 +61,7 @@ putnami observe
 ```
 
 See [Observe a change in your CI](https://putnami.dev/docs/how-to/observe-a-change-in-your-ci)
-for the GitHub Actions step, the GitLab CI job and the steps of Jenkins,
+for the GitHub Actions step, the GitLab CI component and the steps of Jenkins,
 CircleCI, Buildkite, Azure Pipelines and Bitbucket Pipelines that install the
 CLI and the extension, run `putnami observe`, and keep the evidence document as an
 artifact. The release of the action is the workflow
@@ -121,3 +134,38 @@ a minor release whose notes say so. The language extensions and monorepo
 integrations of this repository build on its detectors, and the observe action
 runs it. Missing for `stable`: adopters outside this repository who rely on it,
 and a version gate that fails a release on an undeclared break of its flags.
+
+## Release the GitLab component
+
+The GitLab CI/CD catalog lists a component only from a gitlab.com project,
+and only for a release that project's own pipeline creates, so no workflow of
+this repository pushes it ([ADR 0003](doc/adr/0003-the-gitlab-component-releases-by-copy.md)).
+An owner of the gitlab.com group `putnami` releases it from `main`.
+
+Once, before the first release:
+
+1. Create the public project `putnami/observe` on gitlab.com with the
+   description `Explain each change from the test and coverage reports your
+   pipeline already wrote.`
+2. In **Settings > General > Visibility, project features, permissions**,
+   turn on **CI/CD Catalog project**.
+3. Protect the tags matching `*.*.*` in **Settings > Repository > Protected
+   tags**, for Maintainers only.
+
+Each release, from a checkout of `main` in this repository, with a version
+`X.Y.Z` that is a major version above the last one when it breaks an input or
+a default:
+
+```bash
+git clone git@gitlab.com:putnami/observe.git /tmp/observe-component
+bash tooling/observe/gitlab/release.sh X.Y.Z /tmp/observe-component "Putnami/putnami@$(git rev-parse HEAD)"
+```
+
+`release.sh` replaces the project's root with `templates/observe.yml`, the
+component's `README.md`, `project.gitlab-ci.yml` as `.gitlab-ci.yml` and the
+licence, tags `X.Y.Z` and pushes the branch and the tag in one atomic push. It
+refuses a version that is not `X.Y.Z` or that exists. The tag's pipeline then
+runs the `create-release` job, which publishes the version to the catalog:
+check that it passed in the project's **Build > Pipelines**, and that the
+version shows in the catalog. A pipeline that names `@1` gets it on its next
+run.

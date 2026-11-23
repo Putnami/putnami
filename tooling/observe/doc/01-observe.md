@@ -188,6 +188,9 @@ and the `--publish` diagnostics. Its last line names the next command:
 | Outside a CI | `putnami observe --open` |
 | A run of `Putnami/observe-action` without its `token` input | The `token` input and `putnami cloud token create --organization <id> --name ci`, which creates it |
 | Another GitHub Actions job whose reporter is `@putnami/cloud`, without `PUTNAMI_CLOUD_TOKEN` or `PUTNAMI_ORGANIZATION` | The ID token exchange (`PUTNAMI_ORGANIZATION` and `permissions: id-token: write`), or the `PUTNAMI_CLOUD_TOKEN` setting and `putnami cloud token create --organization <id> --name ci`, which creates it |
+| A run of the GitLab component on gitlab.com without its `organization` input or `PUTNAMI_CLOUD_TOKEN` | The `organization` input, or the `PUTNAMI_CLOUD_TOKEN` setting and `putnami cloud token create --organization <id> --name ci`, which creates it |
+| A run of the GitLab component on another GitLab instance, without `PUTNAMI_CLOUD_TOKEN` | The `PUTNAMI_CLOUD_TOKEN` setting and `putnami cloud token create --organization <id> --name ci`, which creates it |
+| Another GitLab CI job of gitlab.com whose reporter is `@putnami/cloud`, without `PUTNAMI_CLOUD_TOKEN` or `PUTNAMI_ORGANIZATION` | The ID token exchange (`PUTNAMI_ORGANIZATION` and an `id_tokens` entry `PUTNAMI_ID_TOKEN`), or the `PUTNAMI_CLOUD_TOKEN` setting and `putnami cloud token create --organization <id> --name ci`, which creates it |
 | Another CI job whose reporter is `@putnami/cloud`, without `PUTNAMI_CLOUD_TOKEN` | The `PUTNAMI_CLOUD_TOKEN` setting and `putnami cloud token create --organization <id> --name ci`, which creates it |
 | Any other CI job | `--upload` |
 

@@ -7,7 +7,9 @@ workspace and changes nothing in your pipeline.
 
 To add it to a pipeline, follow
 [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci). On
-GitHub Actions, it is one step: `uses: Putnami/observe-action@v1`.
+GitHub Actions, it is one step: `uses: Putnami/observe-action@v1`. On GitLab
+CI, it is one component: `gitlab.com/putnami/observe/observe@1`, under
+`include:`.
 
 `@putnami/observe` is `preview` in the [support catalog](/docs/support): the
 change evidence document it writes keeps version 1 by addition only, so a

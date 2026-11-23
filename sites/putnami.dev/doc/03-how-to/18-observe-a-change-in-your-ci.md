@@ -1,6 +1,6 @@
 # Observe a change in your CI
 
-You will run `putnami observe` once on your laptop, open the full report of your change, then add one step to a GitHub Actions workflow, or one job to a GitLab CI, Jenkins, CircleCI, Buildkite, Azure Pipelines or Bitbucket Pipelines pipeline, that explains each change from what your tests already produced. Your repository needs no Putnami workspace, and your pipeline keeps its own build and test commands.
+You will run `putnami observe` once on your laptop, open the full report of your change, then add one step to a GitHub Actions workflow, one component to a GitLab CI pipeline, or one job to a Jenkins, CircleCI, Buildkite, Azure Pipelines or Bitbucket Pipelines pipeline, that explains each change from what your tests already produced. Your repository needs no Putnami workspace, and your pipeline keeps its own build and test commands.
 
 For each pull or merge request, the step answers:
 
@@ -40,20 +40,20 @@ A CI deletes its logs and artifacts after a retention period, so an old reposito
 
 ## What the step installs
 
-On GitHub Actions, the step is the action `Putnami/observe-action@v1`, from the GitHub Marketplace. On GitLab CI, the job runs the same lines itself:
+On GitHub Actions, the step is the action `Putnami/observe-action@v1`, from the GitHub Marketplace. On GitLab CI, it is the component `gitlab.com/putnami/observe/observe@1`, from the GitLab CI/CD catalog. Both run these lines, and a job written by hand runs them itself:
 
 | Line | What it does |
 |---|---|
 | `curl -fsSL https://putnami.dev/install.sh \| bash` | Installs the stable Putnami CLI into `~/.putnami/bin`. |
 | `export PATH="$HOME/.putnami/bin:$PATH"` | Makes `putnami` reachable in the rest of the step. A script piped into `bash` cannot change the `PATH` of the shell that runs it. |
 | `putnami extensions install --user @putnami/observe` | Installs the extension in the user scope, so its command runs outside any workspace. `--user` takes one extension per command. |
-| `putnami extensions install --user @putnami/cloud` | Installs the extension that uploads the evidence to Putnami Cloud. The action runs this line only when its `token` input is set. |
+| `putnami extensions install --user @putnami/cloud` | Installs the extension that uploads the evidence to Putnami Cloud. The action runs this line only when its `token` input is set, and the component only when it uploads. |
 | `putnami observe --evidence observe-evidence.json` | Prints the summary and writes the evidence document. It exits `0` whatever it observes: only a usage error fails it. An evidence file it cannot write is a warning in the summary. |
-| `putnami observe --evidence observe-evidence.json --upload --publish` | Also uploads the evidence, then posts a commit status and a summary note on the pull or merge request that link to the report, or to the CI run when the reporter answers no report URL. `--publish` needs `--upload`. The action runs this line in place of the one above when its `token` input is set. |
+| `putnami observe --evidence observe-evidence.json --upload --publish` | Also uploads the evidence, then posts a commit status and a summary note on the pull or merge request that link to the report, or to the CI run when the reporter answers no report URL. `--publish` needs `--upload`. The action runs this line in place of the one above when its `token` input is set, and the component when it uploads, with `--publish` unless its `publish` input is `false`. |
 
 `putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, TRX, LCOV, Cobertura, Clover, JaCoCo and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules`, `vendor` and the Gradle and Maven build outputs that hold no report, and the reports of Bazel through its `bazel-testlogs` and `bazel-out` links.
 
-The install needs the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
+The install needs the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails. The action and the component keep the tokens they hand to `putnami observe`, and the job token GitLab gives the job, away from the installer and the extension installs.
 
 ## What leaves the CI
 
@@ -317,7 +317,41 @@ The action passes the run's `GITHUB_TOKEN` to `putnami observe` only when it pub
 
 #### GitLab CI
 
-Add this job to `.gitlab-ci.yml`. It reads the reports from the artifacts of the job named `test`, so that job must keep its reports as artifacts with `when: always`:
+Include the component in `.gitlab-ci.yml`. It adds the job `observe`, which reads the reports from the artifacts of the job named `test`, when the pipeline has it, so that job must keep its reports as artifacts with `when: always`:
+
+```yaml
+include:
+  - component: gitlab.com/putnami/observe/observe@1
+```
+
+`@1` runs the newest `1.x.y` release of the component. The job runs when a test fails too, prints the summary and keeps the evidence document `observe-evidence.json` as an artifact. Its inputs:
+
+| Input | Default | What it does |
+|---|---|---|
+| `stage` | `test` | Stage of the job: the stage of your tests or a later one. |
+| `needs` | the job `test`, optional | Jobs whose artifacts hold the reports. Name your test jobs if they have other names; a job you name that a pipeline lacks stops that pipeline, so name a job whose rules leave it out of some pipelines as `{job: <name>, optional: true}`. |
+| `image` | `buildpack-deps:bookworm-scm` | Image of the job. Any image with Bash, curl, tar, `sha256sum` and Git 2.29 or later works. |
+| `organization` | empty | Your Putnami organization id: on gitlab.com, the job uploads with its ID token, as [step 6](#on-gitlab-without-a-secret) says. |
+| `publish` | `true` | When the job uploads, also post the commit status and the summary note on the merge request. |
+| `channel` | `stable` | Release channel of the CLI and the extensions. |
+| `junit`, `coverage`, `sbom`, `base-sbom`, `base` | empty | Pass the flags of the same name. |
+
+```yaml
+include:
+  - component: gitlab.com/putnami/observe/observe@1
+    inputs:
+      needs:
+        - unit-tests
+        - job: integration-tests
+          optional: true
+      organization: <organization-id>
+```
+
+The inputs reach the job's script as variables, never as script text. To give the job rules, such as merge request pipelines only, add `observe: rules:` to your `.gitlab-ci.yml`: GitLab merges it into the component's job. For the same reason, remove an `observe` job written from an earlier version of this page. The [component's README](https://gitlab.com/putnami/observe) lists the inputs too.
+
+`--publish` needs a project access token, because the GitLab job token cannot write notes. In the project, open **Settings > Access tokens**, add a token with the **Developer** role and the `api` scope, then store it as the masked CI/CD variable `PUTNAMI_GITLAB_TOKEN`. The component hands it to `putnami observe` only when the job uploads and publishes.
+
+A self-managed GitLab includes a component of its own instance only: an administrator can mirror the project `putnami/observe` there. Without that, add this job to `.gitlab-ci.yml` instead; it runs the same lines. The job reads its API URL from `CI_API_V4_URL`:
 
 ```yaml
 observe:
@@ -343,9 +377,7 @@ observe:
       - observe-evidence.json
 ```
 
-`--publish` needs a project access token, because the GitLab job token cannot write notes. In the project, open **Settings > Access tokens**, add a token with the **Developer** role and the `api` scope, then store it as the masked CI/CD variable `PUTNAMI_GITLAB_TOKEN`. A self-managed GitLab works the same way: the job reads its API URL from `CI_API_V4_URL`.
-
-Rename `test` in `needs` if your test job has another name. The image holds Bash, curl, tar, `sha256sum` and Git; any image with those, and Git 2.29 or later, works. `before_script: []` and `cache: []` keep your pipeline's defaults out of this job.
+Rename `test` in `needs` if your test job has another name. `before_script: []` and `cache: []` keep your pipeline's defaults out of this job.
 
 #### Another CI
 
@@ -454,7 +486,7 @@ putnami observe: GitHub Actions, github.com/Putnami/demo-observe-go (project 144
 Next: pass a token from `putnami cloud token create --organization <id> --name ci` as this action's token input to keep the full report
 ```
 
-A report it cannot find or read is a warning in the same summary, such as `observe.report_missing`. The last line names what keeps the full report: the action's `token` input; in another GitHub Actions job, the organization to name for the ID token exchange or the token to set; in another CI, the token to set; `--upload` once the job holds one, or the report URL once an upload answered it. `--details` prints the changed files, the reports, each component's tests and coverage, and each dependency change instead. The evidence document is the `observe-evidence` artifact of the job.
+A report it cannot find or read is a warning in the same summary, such as `observe.report_missing`. The last line names what keeps the full report: the action's `token` input; the component's `organization` input on gitlab.com; in another GitHub Actions job or gitlab.com job, the organization to name for the ID token exchange or the token to set; in another CI, the token to set; `--upload` once the job holds one, or the report URL once an upload answered it. `--details` prints the changed files, the reports, each component's tests and coverage, and each dependency change instead. The evidence document is the `observe-evidence` artifact of the job.
 
 ### 5) Read the pull or merge request
 
@@ -464,9 +496,9 @@ Without `--upload`, after a failed upload, without the code host token, or on a 
 
 ### 6) Upload the evidence to Putnami Cloud
 
-To send the evidence to Putnami Cloud, store your organization's ingest token as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. Signed in with `putnami observe --open`, run `putnami cloud token create --organization <organization-id> --name ci` anywhere: it needs no Putnami workspace, creates a token with the `delivery.ingest` scope only, and prints it once. It needs the right to manage the organization. The upload names the repository, and its first upload opens the repository's observed workspace in the organization. `putnami cloud token list --organization <organization-id>` lists the tokens without their secrets, and `putnami cloud token revoke <name> --organization <organization-id>` revokes one. On GitHub Actions, the job can skip the secret and exchange its ID token instead, as [below](#on-github-without-a-secret) shows.
+To send the evidence to Putnami Cloud, store your organization's ingest token as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. Signed in with `putnami observe --open`, run `putnami cloud token create --organization <organization-id> --name ci` anywhere: it needs no Putnami workspace, creates a token with the `delivery.ingest` scope only, and prints it once. It needs the right to manage the organization. The upload names the repository, and its first upload opens the repository's observed workspace in the organization. `putnami cloud token list --organization <organization-id>` lists the tokens without their secrets, and `putnami cloud token revoke <name> --organization <organization-id>` revokes one. On GitHub Actions and gitlab.com, the job can skip the secret and exchange its ID token instead, as [below](#on-github-without-a-secret) shows.
 
-On GitHub, pass it to the action as `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}`, as step 2 shows. With a token, the action uploads the evidence and publishes unless you set `publish` to `false`, so the job needs the permissions of step 2. On GitLab, use the commented `--upload --publish` line in place of the line above it. An upload that fails is a diagnostic in the summary, and the job still passes.
+On GitHub, pass it to the action as `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}`, as step 2 shows. With a token, the action uploads the evidence and publishes unless you set `publish` to `false`, so the job needs the permissions of step 2. On GitLab, the component uploads once the job holds `PUTNAMI_CLOUD_TOKEN`, and publishes unless its `publish` input is `false`; in the job written by hand, use the commented `--upload --publish` line in place of the line above it. An upload that fails is a diagnostic in the summary, and the job still passes.
 
 #### On GitHub, without a secret
 
@@ -552,7 +584,18 @@ The document comes from the fork, so `putnami observe` checks it before it relay
 
 #### On GitLab, without a secret
 
-A job on gitlab.com can upload with no secret too: it exchanges an ID token GitLab gives the job for a five-minute upload token. Your Putnami organization must first trust the project, or the group that owns it, on its observe page in putnami.app. Then give the observe job of [step 3](#gitlab-ci) your organization's id and an ID token whose audience is `https://auth.putnami.cloud`, and upload:
+A job on gitlab.com can upload with no secret too: it exchanges an ID token GitLab gives the job for a five-minute upload token. Your Putnami organization must first trust the project, or the group that owns it, on its observe page in putnami.app. Then give the component of [step 3](#gitlab-ci) your organization's id:
+
+```yaml
+include:
+  - component: gitlab.com/putnami/observe/observe@1
+    inputs:
+      organization: <organization-id>
+```
+
+The organization id is not a secret, so it sits in the file. The component's job declares one ID token, `PUTNAMI_ID_TOKEN`, whose only audience is `https://auth.putnami.cloud`, the base URL of the Putnami auth server. GitLab signs it before the job starts, naming the project, its group and the job. With the `organization` input set and no `PUTNAMI_CLOUD_TOKEN`, `@putnami/cloud` exchanges it at `auth.putnami.cloud`, which answers an upload token only when the organization trusts the project, or its group, for observation. When it does not, the summary names that refusal and the trust to add. The ID token reaches `putnami observe` for that exchange only, and the job holds no other Putnami credential. Add `PUTNAMI_GITLAB_TOKEN`, as step 3 says, to also post on the merge request.
+
+A job written by hand declares the same ID token and names the organization:
 
 ```yaml
 observe:
@@ -570,7 +613,7 @@ observe:
     - putnami observe --evidence observe-evidence.json --upload
 ```
 
-`PUTNAMI_ORGANIZATION` is an id, not a secret, so it sits in the file. GitLab signs the ID token before the job starts, naming the project, its group and the job. With `PUTNAMI_ORGANIZATION` set and no `PUTNAMI_CLOUD_TOKEN`, `@putnami/cloud` exchanges `PUTNAMI_ID_TOKEN` at `auth.putnami.cloud`, which answers an upload token only when the organization trusts the project, or its group, for observation. When it does not, the summary names that refusal and the trust to add; without `PUTNAMI_ID_TOKEN`, it names the `id_tokens` entry to add. Putnami Cloud verifies the ID tokens of gitlab.com only: on a self-managed GitLab, set `PUTNAMI_CLOUD_TOKEN` as step 6 says. `@putnami/cloud` sends no ID token whose issuer is not gitlab.com or whose audience is not `https://auth.putnami.cloud`, and the summary names the one it read. A merge request from a fork runs in the fork's project, whose ID token names the fork, so it uploads nothing unless your organization trusts that project too. Add `--publish` and its `PUTNAMI_GITLAB_TOKEN`, as step 3 says, to also post on the merge request. A `PUTNAMI_CLOUD_TOKEN` set in the job wins over the exchange.
+Without `PUTNAMI_ID_TOKEN`, the summary names the `id_tokens` entry to add. Putnami Cloud verifies the ID tokens of gitlab.com only: on a self-managed GitLab, set `PUTNAMI_CLOUD_TOKEN` as step 6 says. `@putnami/cloud` sends no ID token whose issuer is not gitlab.com or whose audience is not `https://auth.putnami.cloud`, and the summary names the one it read. A merge request from a fork runs in the fork's project, whose ID token names the fork, so it uploads nothing unless your organization trusts that project too. A `PUTNAMI_CLOUD_TOKEN` set in the job wins over the exchange.
 
 ### 7) Add licences and known vulnerabilities from an SBOM
 
@@ -607,7 +650,18 @@ Then name both documents in the action's inputs:
           base-sbom: ${{ runner.temp }}/base.cdx.json
 ```
 
-On GitLab, name them on the observe line:
+On GitLab, the component runs in a job of its own: write the two documents in the checkout of a job that keeps them as artifacts, such as `head.cdx.json` and `base.cdx.json`, add that job to `needs`, and name them with the `sbom` and `base-sbom` inputs:
+
+```yaml
+include:
+  - component: gitlab.com/putnami/observe/observe@1
+    inputs:
+      needs: [test, sbom]
+      sbom: head.cdx.json
+      base-sbom: base.cdx.json
+```
+
+In a job written by hand, name them on the observe line:
 
 ```bash
 putnami observe --evidence observe-evidence.json --sbom /tmp/head.cdx.json --base-sbom /tmp/base.cdx.json

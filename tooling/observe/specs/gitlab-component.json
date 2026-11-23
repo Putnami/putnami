@@ -1,0 +1,82 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe-gitlab-component",
+  "outcomes": [
+    "A GitLab CI pipeline adds observe with one include: component: gitlab.com/putnami/observe/observe@1 line after its tests and reads the change summary in its log, with no install line to copy",
+    "On gitlab.com, with its organization id as an input, the same job exchanges its ID token for a short-lived upload token, uploads the change evidence document and posts on the merge request, with no Putnami secret in the project",
+    "A release of the component publishes a semantic version to the GitLab CI/CD catalog, so a pipeline that names @1 runs the newest compatible component"
+  ],
+  "nonGoals": [
+    "Publishing on the merge request without a project access token: the GitLab job token cannot write notes, so --publish reads PUTNAMI_GITLAB_TOKEN, a masked CI/CD variable the project sets",
+    "The ID token exchange on a self-managed GitLab: Putnami Cloud verifies the ID tokens of gitlab.com only, so such a job sets PUTNAMI_CLOUD_TOKEN as a masked CI/CD variable",
+    "Pushing to gitlab.com from this repository's CI: an owner runs the release script against a clone of the catalog project with their own credentials",
+    "Relaying a fork's evidence: a GitLab merge request from a fork runs in the fork's project, whose ID token names the fork"
+  ],
+  "requirements": [
+    {
+      "id": "component-installs-the-cli",
+      "text": [
+        "The component templates/observe.yml declares one job, observe, that runs one bash script.",
+        "It installs the Putnami CLI with https://putnami.dev/install.sh, puts ~/.putnami/bin on the PATH, and installs @putnami/observe in the user scope, all from the channel input, stable when empty, which reads latest as putnami upgrade reads it;",
+        "it installs @putnami/cloud too only when the job uploads."
+      ]
+    },
+    {
+      "id": "component-channel-is-a-channel",
+      "text": "A channel input that is a version, or outside the channel alphabet of putnami init (a lowercase letter or a digit, then lowercase letters, digits, '.', '_' and '-', 64 characters at most), fails the job before any install: the release lines do not share one version."
+    },
+    {
+      "id": "component-job-settings",
+      "text": [
+        "The stage, needs and image inputs set the job's stage, needs and image: test, the job named test with its artifacts as an optional need, so a pipeline without it is still created, and an image with Bash, curl, tar, sha256sum and Git by default.",
+        "The job runs putnami observe with --evidence observe-evidence.json in the project directory, runs when a test job failed too, keeps that document as an artifact whatever the outcome, and sets no clone depth."
+      ]
+    },
+    {
+      "id": "component-maps-inputs-to-flags",
+      "text": [
+        "Each input reaches the script as a PUTNAMI_OBSERVE_* job variable, never interpolated into the script text, so an input value cannot change a command.",
+        "Each of the junit, coverage, sbom, base-sbom and base inputs that is not empty becomes the flag of the same name with its value; an empty input passes no flag."
+      ]
+    },
+    {
+      "id": "component-uploads-with-the-id-token",
+      "text": [
+        "The job's id_tokens declares one ID token, PUTNAMI_ID_TOKEN, whose only aud is the auth server's base URL with no trailing slash, https://auth.putnami.cloud.",
+        "With the organization input set, the job sets PUTNAMI_ORGANIZATION to it and runs putnami observe with --upload, so @putnami/cloud exchanges PUTNAMI_ID_TOKEN for an upload token."
+      ]
+    },
+    {
+      "id": "component-uploads-with-a-cloud-token",
+      "text": [
+        "With PUTNAMI_CLOUD_TOKEN set as a CI/CD variable, the job uploads with it, and it wins over the exchange.",
+        "With neither it nor the organization input, the job prints the summary and writes the evidence document, and uploads nothing.",
+        "The publish input, a boolean true by default, adds --publish when the job uploads; false keeps the upload without the commit status and the note."
+      ]
+    },
+    {
+      "id": "component-tokens-reach-observe-only",
+      "text": [
+        "The installer and the extension installs see none of PUTNAMI_ID_TOKEN, PUTNAMI_CLOUD_TOKEN, PUTNAMI_GITLAB_TOKEN and the job token; putnami observe keeps the job token for Git only.",
+        "PUTNAMI_ID_TOKEN reaches putnami observe only when it exchanges it: with the organization input set and no PUTNAMI_CLOUD_TOKEN.",
+        "PUTNAMI_GITLAB_TOKEN reaches putnami observe only when the job uploads and publishes."
+      ]
+    },
+    {
+      "id": "component-release",
+      "text": [
+        "release.sh <X.Y.Z> <clone> replaces the root of a clone of the catalog project with templates/observe.yml, the component's README.md, its project pipeline as .gitlab-ci.yml and LICENSE.md, in one commit tagged X.Y.Z, pushed with the checked-out branch in one atomic push.",
+        "A version that is not X.Y.Z, or a tag the clone's origin already holds, stops before any write."
+      ]
+    },
+    {
+      "id": "component-release-pipeline",
+      "text": "The project pipeline creates the release with the release keyword in a pipeline for an X.Y.Z tag only, which publishes that version to the GitLab CI/CD catalog, and runs no other job."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "tooling/observe/doc/adr/0003-the-gitlab-component-releases-by-copy.md"
+  ]
+}

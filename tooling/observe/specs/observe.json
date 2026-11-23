@@ -91,6 +91,13 @@
       ]
     },
     {
+      "id": "next-command-gitlab",
+      "text": [
+        "In a GitLab CI job whose reporter is @putnami/cloud and that holds no PUTNAMI_CLOUD_TOKEN, the last line of the summary names, on gitlab.com: in the GitLab component, its organization input or PUTNAMI_CLOUD_TOKEN; in another job without PUTNAMI_ORGANIZATION, PUTNAMI_ORGANIZATION with an id_tokens entry PUTNAMI_ID_TOKEN, or PUTNAMI_CLOUD_TOKEN, then --upload; with it, --upload.",
+        "On another GitLab instance, PUTNAMI_CLOUD_TOKEN, with --upload outside the component."
+      ]
+    },
+    {
       "id": "laptop-repository-key",
       "text": [
         "Outside a CI, the subject is read from the origin remote: a github.com or GitLab remote names the provider, the host and the repository path.",

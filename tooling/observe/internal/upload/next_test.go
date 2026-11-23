@@ -22,7 +22,7 @@ func TestALaptopRunNamesOpen(t *testing.T) {
 
 func TestACIJobWithoutATokenNamesTheTokenSetting(t *testing.T) {
 	spectest.Proves(t, "tooling/observe", "next-command", "a-ci-job-without-a-token-names-the-token-setting")
-	got := Next(Step{Getenv: envOf(map[string]string{"GITLAB_CI": "true"})})
+	got := Next(Step{Getenv: envOf(map[string]string{"CI": "true", "JENKINS_URL": "https://ci.example.com/"})})
 	want := "Next: set PUTNAMI_CLOUD_TOKEN in this CI to a token from `putnami cloud token create --organization <id> --name ci`, then add --upload to keep the full report"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -50,6 +50,46 @@ func TestAGitHubActionsJobNamesTheIDTokenExchange(t *testing.T) {
 	named := Next(Step{Getenv: envOf(map[string]string{"GITHUB_ACTIONS": "true", OrganizationEnv: "org-acme"})})
 	if named != "Next: add --upload to keep the full report" {
 		t.Errorf("an organization named: %q", named)
+	}
+}
+
+func TestAGitLabComJobNamesTheIDTokenExchange(t *testing.T) {
+	spectest.Proves(t, "tooling/observe", "next-command-gitlab", "a-gitlab-com-job-names-the-id-token-exchange")
+	for _, host := range []string{"gitlab.com", ""} {
+		got := Next(Step{Getenv: envOf(map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": host})})
+		want := "Next: set PUTNAMI_ORGANIZATION to your organization id with an id_tokens entry PUTNAMI_ID_TOKEN, or PUTNAMI_CLOUD_TOKEN to a token from `putnami cloud token create --organization <id> --name ci`, then add --upload to keep the full report"
+		if got != want {
+			t.Errorf("host %q: got %q, want %q", host, got, want)
+		}
+	}
+	named := Next(Step{Getenv: envOf(map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", OrganizationEnv: "org-acme"})})
+	if named != "Next: add --upload to keep the full report" {
+		t.Errorf("an organization named: %q", named)
+	}
+}
+
+func TestTheComponentNamesItsOrganizationInput(t *testing.T) {
+	spectest.Proves(t, "tooling/observe", "next-command-gitlab", "the-component-names-its-organization-input")
+	got := Next(Step{Getenv: envOf(map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.com", ComponentEnv: "true"})})
+	want := "Next: set this component's organization input to your organization id, or PUTNAMI_CLOUD_TOKEN in this CI to a token from `putnami cloud token create --organization <id> --name ci`, to keep the full report"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestAnotherGitLabInstanceNamesTheCloudToken(t *testing.T) {
+	spectest.Proves(t, "tooling/observe", "next-command-gitlab", "another-gitlab-instance-names-the-cloud-token")
+	env := map[string]string{"GITLAB_CI": "true", "CI_SERVER_HOST": "gitlab.example.com", OrganizationEnv: "org-acme"}
+	got := Next(Step{Getenv: envOf(env)})
+	want := "Next: set PUTNAMI_CLOUD_TOKEN in this CI to a token from `putnami cloud token create --organization <id> --name ci`, then add --upload to keep the full report"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	env[ComponentEnv] = "true"
+	got = Next(Step{Getenv: envOf(env)})
+	want = "Next: set PUTNAMI_CLOUD_TOKEN in this CI to a token from `putnami cloud token create --organization <id> --name ci` to keep the full report"
+	if got != want {
+		t.Errorf("the component: got %q, want %q", got, want)
 	}
 }
 

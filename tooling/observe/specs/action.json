@@ -12,7 +12,7 @@
     "Windows runners: the action fails with a message that names Linux and macOS",
     "Checking out the repository or changing its fetch depth: putnami observe deepens a shallow clone itself",
     "Uploading the evidence document as a workflow artifact: the step gives its path as an output for actions/upload-artifact",
-    "GitLab CI, which has no Marketplace action"
+    "GitLab CI, which has no Marketplace action: the GitLab CI/CD catalog component of tooling/observe-gitlab-component serves it"
   ],
   "requirements": [
     {

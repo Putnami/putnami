@@ -1,0 +1,162 @@
+spec:
+  description: Explain each change from the test and coverage reports your pipeline already wrote, in the job log and on the merge request.
+  inputs:
+    stage:
+      description: Stage of the observe job, the stage of your tests or a later one.
+      default: test
+    needs:
+      description: Jobs whose artifacts hold the test and coverage reports. The observe job runs after them, even when one failed, and reads their artifacts. The default needs the job named test when the pipeline has it.
+      type: array
+      default:
+        - job: test
+          artifacts: true
+          optional: true
+    image:
+      description: Image of the observe job. It needs Bash, curl, tar, sha256sum and Git 2.29 or later.
+      default: buildpack-deps:bookworm-scm
+    organization:
+      description: Your Putnami organization id. On gitlab.com, the job exchanges its ID token for an upload token of this organization, which must trust the project or its group, and uploads the evidence. Empty, the job uploads only with a PUTNAMI_CLOUD_TOKEN CI/CD variable.
+      default: ''
+    publish:
+      description: When the job uploads, also post the commit status and the summary note on the merge request. The note needs a PUTNAMI_GITLAB_TOKEN CI/CD variable, a project access token with the api scope.
+      type: boolean
+      default: true
+    channel:
+      description: Release channel of the Putnami CLI and its extensions, such as stable or canary.
+      default: stable
+    junit:
+      description: Test report files, as the --junit flag takes them. Empty, putnami observe finds them in the checkout.
+      default: ''
+    coverage:
+      description: Coverage report files, as the --coverage flag takes them. Empty, putnami observe finds them in the checkout.
+      default: ''
+    sbom:
+      description: SBOM of the change, as the --sbom flag takes it.
+      default: ''
+    base-sbom:
+      description: SBOM of the base, as the --base-sbom flag takes it.
+      default: ''
+    base:
+      description: Commit the change is measured against, as the --base flag takes it. Empty, the merge request diff base, or on a branch push the commit before the push.
+      default: ''
+---
+observe:
+  stage: $[[ inputs.stage ]]
+  image: $[[ inputs.image ]]
+  needs: $[[ inputs.needs ]]
+  when: always
+  before_script: []
+  after_script: []
+  cache: []
+  # One ID token, for the Putnami auth server only. @putnami/cloud exchanges
+  # it for a five-minute upload token when the organization input is set.
+  id_tokens:
+    PUTNAMI_ID_TOKEN:
+      aud: https://auth.putnami.cloud
+  # The inputs reach the script as variables, never as script text.
+  variables:
+    PUTNAMI_OBSERVE_ORGANIZATION: $[[ inputs.organization ]]
+    PUTNAMI_OBSERVE_PUBLISH: "$[[ inputs.publish ]]"
+    PUTNAMI_OBSERVE_CHANNEL: $[[ inputs.channel ]]
+    PUTNAMI_OBSERVE_JUNIT: $[[ inputs.junit ]]
+    PUTNAMI_OBSERVE_COVERAGE: $[[ inputs.coverage ]]
+    PUTNAMI_OBSERVE_SBOM: $[[ inputs.sbom ]]
+    PUTNAMI_OBSERVE_BASE_SBOM: $[[ inputs.base-sbom ]]
+    PUTNAMI_OBSERVE_BASE: $[[ inputs.base ]]
+  script:
+    - |
+      set -euo pipefail
+
+      fail() {
+        echo "Putnami Observe: $1" >&2
+        exit 1
+      }
+
+      # The tokens GitLab and this component give the job reach putnami
+      # observe only, and only those it uses: the installer and the extension
+      # installs see none of them. Other CI/CD variables reach every command.
+      credentials=(PUTNAMI_ID_TOKEN PUTNAMI_CLOUD_TOKEN PUTNAMI_GITLAB_TOKEN CI_JOB_TOKEN CI_REPOSITORY_URL CI_REGISTRY_PASSWORD CI_DEPENDENCY_PROXY_PASSWORD CI_DEPLOY_PASSWORD)
+      without_credentials() {
+        local unset_args=()
+        local name
+        for name in "${credentials[@]}"; do
+          unset_args+=(-u "$name")
+        done
+        env "${unset_args[@]}" "$@"
+      }
+
+      organization="${PUTNAMI_OBSERVE_ORGANIZATION:-}"
+      cloud_token="${PUTNAMI_CLOUD_TOKEN:-}"
+      publish="${PUTNAMI_OBSERVE_PUBLISH:-true}"
+      case "$publish" in
+        true | false) ;;
+        *) fail "publish is \"$publish\": use true or false." ;;
+      esac
+
+      # A channel follows the channel alphabet of putnami init; a version names
+      # no release set, since the release lines do not share one version.
+      # stable reads latest, as putnami upgrade and putnami init read it.
+      channel="${PUTNAMI_OBSERVE_CHANNEL:-}"
+      channel="${channel:-stable}"
+      if [[ "$channel" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.+-].*)?$ ]] || ! [[ "$channel" =~ ^[a-z0-9][a-z0-9._-]{0,63}$ ]]; then
+        fail "channel is \"$channel\": name a release channel, such as stable or canary, not a version."
+      fi
+      registry_channel="$channel"
+      if [[ "$channel" == stable ]]; then
+        registry_channel=latest
+      fi
+
+      # A PUTNAMI_CLOUD_TOKEN variable uploads, and wins over the exchange;
+      # else the organization input exchanges the job's ID token.
+      upload=false
+      exchange=false
+      if [[ -n "$cloud_token" ]]; then
+        upload=true
+      elif [[ -n "$organization" ]]; then
+        upload=true
+        exchange=true
+      fi
+
+      without_credentials curl -fsSL https://putnami.dev/install.sh | without_credentials bash -s -- --version "$registry_channel"
+      export PATH="$HOME/.putnami/bin:$PATH"
+      without_credentials putnami extensions install --user "@putnami/observe@$registry_channel"
+      if [[ "$upload" == true ]]; then
+        without_credentials putnami extensions install --user "@putnami/cloud@$registry_channel"
+      fi
+
+      args=(observe --evidence observe-evidence.json)
+      add_flag() {
+        if [[ -n "$2" ]]; then
+          args+=("$1" "$2")
+        fi
+      }
+      add_flag --junit "${PUTNAMI_OBSERVE_JUNIT:-}"
+      add_flag --coverage "${PUTNAMI_OBSERVE_COVERAGE:-}"
+      add_flag --sbom "${PUTNAMI_OBSERVE_SBOM:-}"
+      add_flag --base-sbom "${PUTNAMI_OBSERVE_BASE_SBOM:-}"
+      add_flag --base "${PUTNAMI_OBSERVE_BASE:-}"
+      if [[ "$upload" == true ]]; then
+        args+=(--upload)
+        if [[ "$publish" == true ]]; then
+          args+=(--publish)
+        fi
+      fi
+
+      # The summary's last line names this component's inputs. The ID token
+      # reaches putnami observe only for the exchange, and the GitLab token
+      # only when it publishes.
+      export PUTNAMI_OBSERVE_COMPONENT=true
+      unset PUTNAMI_ORGANIZATION
+      if [[ "$exchange" == true ]]; then
+        export PUTNAMI_ORGANIZATION="$organization"
+      else
+        unset PUTNAMI_ID_TOKEN
+      fi
+      if [[ "$upload" != true || "$publish" != true ]]; then
+        unset PUTNAMI_GITLAB_TOKEN
+      fi
+      putnami "${args[@]}"
+  artifacts:
+    when: always
+    paths:
+      - observe-evidence.json

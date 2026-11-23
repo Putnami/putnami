@@ -149,6 +149,21 @@
           }
         },
         {
+          "id": "next-command-gitlab",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gitlab-com-job-names-the-id-token-exchange",
+              "the-component-names-its-organization-input",
+              "another-gitlab-instance-names-the-cloud-token"
+            ]
+          }
+        },
+        {
           "id": "laptop-repository-key",
           "stage": "coded",
           "evidenceKinds": [
@@ -2200,6 +2215,144 @@
             "kind": "acceptance",
             "checks": [
               "the-release-job-runs-from-main-in-its-environment"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tooling/observe-gitlab-component",
+      "type": "feature",
+      "name": "Observe a change in GitLab CI with one catalog component",
+      "outcome": "A GitLab CI pipeline adds observe with one include: component: line after its tests and gets the change summary in its log, and on gitlab.com, with its organization id, the evidence upload through the job's ID token with no Putnami secret, without copying install lines and without failing on what it observes",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "component-installs-the-cli",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-component-installs-the-cli-of-the-channel",
+              "the-cloud-extension-installs-only-when-uploading"
+            ]
+          }
+        },
+        {
+          "id": "component-channel-is-a-channel",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-version-or-a-bad-channel-fails-before-the-install"
+            ]
+          }
+        },
+        {
+          "id": "component-job-settings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-inputs-set-the-job",
+              "the-job-keeps-the-evidence-document"
+            ]
+          }
+        },
+        {
+          "id": "component-maps-inputs-to-flags",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-inputs-reach-the-script-as-variables",
+              "each-set-input-becomes-its-flag",
+              "an-empty-input-passes-no-flag"
+            ]
+          }
+        },
+        {
+          "id": "component-uploads-with-the-id-token",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-id-tokens-block-names-the-auth-server-only",
+              "an-organization-uploads-with-the-id-token"
+            ]
+          }
+        },
+        {
+          "id": "component-uploads-with-a-cloud-token",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cloud-token-variable-uploads-and-wins",
+              "without-a-credential-the-job-prints-the-summary-only",
+              "the-publish-input-turns-the-post-off"
+            ]
+          }
+        },
+        {
+          "id": "component-tokens-reach-observe-only",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-install-sees-no-token",
+              "the-id-token-reaches-observe-only-for-the-exchange",
+              "the-gitlab-token-reaches-observe-only-when-publishing"
+            ]
+          }
+        },
+        {
+          "id": "component-release",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-release-copies-the-component-to-the-project-root",
+              "a-release-refuses-a-bad-or-existing-version",
+              "a-rejected-push-moves-no-ref"
+            ]
+          }
+        },
+        {
+          "id": "component-release-pipeline",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-project-pipeline-publishes-a-semver-tag-to-the-catalog"
             ]
           }
         }

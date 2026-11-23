@@ -27,6 +27,7 @@
       "filePatterns": [
         "putnami.extension.json",
         "action/**",
+        "gitlab/**",
         "../../LICENSE.md",
         "../../.github/workflows/observe-action-release.yml"
       ]

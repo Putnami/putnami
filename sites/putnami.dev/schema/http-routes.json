@@ -2825,6 +2825,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/tooling-\u0026-workspace/observe/adr/the-gitlab-component-releases-by-copy",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/tooling-\u0026-workspace/observe/adr/the-observe-action-releases-by-copy",
       "methods": [
         "GET",
@@ -5884,6 +5899,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/tooling-\u0026-workspace/observe/adr/the-gitlab-component-releases-by-copy",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/tooling-\u0026-workspace/observe/adr/the-observe-action-releases-by-copy",
       "methods": [
         "GET",
@@ -6446,5 +6476,5 @@
       }
     }
   ],
-  "digest": "sha256:354399d40128b9931540f017d3b0d39c60cc356660dd59fda4b4eb1fe6339a16"
+  "digest": "sha256:3ee3d97084dc216f56fabaff4eba0ebc7f86f6f9deec0e3e287516f5bda48deb"
 }
