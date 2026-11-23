@@ -417,6 +417,8 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)
+	// No test starts the host's CLI to resolve a registry credential.
+	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
 	fixtureproc.QuietRaceExit()
 	code := m.Run()
 	_ = parityRuntimeDir.Remove()

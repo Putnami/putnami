@@ -10,12 +10,15 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 )
 
 // TestMain removes the program the install hook tests place (fixtureproc),
 // which stands in for an extension's onInstall command on every platform.
 func TestMain(m *testing.M) {
+	// No test starts the host's CLI to resolve a registry credential.
+	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
 	code := m.Run()
 	fixtureproc.Remove()
 	os.Exit(code)

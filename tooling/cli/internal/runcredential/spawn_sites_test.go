@@ -283,6 +283,7 @@ var spawnSites = map[string]spawnSite{
 		why: "read verbs only, through gitread.CurrentBranch: symbolic-ref, rev-parse"},
 	// Test support.
 	"cli/clitest/clitest.go:GitOutput":                                {spawns: 1, verdict: testSupport},
+	"cli/clitest/clitest.go:Main":                                     {spawns: 1, verdict: testSupport},
 	"cli/clitest/clitest.go:RunGit":                                   {spawns: 1, verdict: testSupport},
 	"cli/clitest/pnpmworkspace.go:PnpmInstall":                        {spawns: 1, verdict: testSupport},
 	"cli/clitest/pnpmworkspace.go:RequirePnpm":                        {spawns: 1, verdict: testSupport},

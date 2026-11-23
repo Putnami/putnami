@@ -25,16 +25,75 @@ import (
 
 const toolchainFeature = "typescript/typescript-project-toolchain"
 
-// fakeNode writes a node program that appends its PORT and arguments to log,
-// one line per start, then stays up until it is stopped.
-func fakeNode(t *testing.T, log string) string {
+// fakeNodeLogEnv turns the test binary into the node program of a watch
+// fixture: it names the log the program appends its starts to.
+const fakeNodeLogEnv = "PUTNAMI_TEST_FAKE_NODE_LOG"
+
+// What the fake node does after it logged its start, beyond staying up. The
+// behavior is the content of the file fakeNodeBehavior names, read at each
+// start.
+const (
+	// fakeNodeLeavesAChild starts a background process that holds its stdout.
+	fakeNodeLeavesAChild = "leaves a child"
+	// fakeNodeWritesALongLine writes a line longer than the forwarder reads.
+	fakeNodeWritesALongLine = "writes a long line"
+)
+
+func fakeNodeBehavior(log string) string { return log + ".behavior" }
+
+// The fake node is the test binary itself, never a script written for a test:
+// macOS scans a program file at its first start and holds that start until the
+// scan ends, which on a loaded host outlasts waitFor.
+func TestMain(m *testing.M) {
+	if log := os.Getenv(fakeNodeLogEnv); log != "" {
+		if err := runFakeNode(log); err != nil {
+			fmt.Fprintln(os.Stderr, "fake node:", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
+
+// runFakeNode appends its PORT and arguments to log, one line per start, then
+// stays up until it is stopped.
+func runFakeNode(log string) error {
+	behavior, err := os.ReadFile(fakeNodeBehavior(log))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	f, err := os.OpenFile(log, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(f, "start PORT=%s %s\n", os.Getenv("PORT"), strings.Join(os.Args[1:], " ")); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	switch string(behavior) {
+	case fakeNodeLeavesAChild:
+		child := exec.Command("sleep", "20")
+		child.Stdout = os.Stdout
+		if err := child.Start(); err != nil {
+			return err
+		}
+	case fakeNodeWritesALongLine:
+		if _, err := fmt.Printf("%s\nafter\n", strings.Repeat("x", 70000)); err != nil {
+			return err
+		}
+	}
+	time.Sleep(30 * time.Second)
+	return nil
+}
+
+// setFakeNodeBehavior sets what the fake node does from its next start on.
+func setFakeNodeBehavior(t *testing.T, log, behavior string) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "node")
-	script := "#!/bin/sh\necho \"start PORT=$PORT $*\" >> " + log + "\nexec sleep 30\n"
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+	if err := os.WriteFile(fakeNodeBehavior(log), []byte(behavior), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return path
 }
 
 // readStarts returns the starts written to log, one per complete line: an
@@ -163,8 +222,12 @@ func startWatch(t *testing.T) *watchFixture {
 	f := &watchFixture{project: t.TempDir(), sigCh: make(chan os.Signal, 1), done: make(chan bool, 1)}
 	f.log = filepath.Join(t.TempDir(), "starts.log")
 	edit(t, f.project, "v1")
+	nodeBin, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
 	f.serve = NodeServe{
-		NodeBin:     fakeNode(t, f.log),
+		NodeBin:     nodeBin,
 		ProjectPath: f.project,
 		Port:        4321,
 		Params:      Params{Watch: true},
@@ -176,7 +239,7 @@ func startWatch(t *testing.T) *watchFixture {
 			return f.build(), nil, nil
 		},
 	}
-	env := NodeEnv(os.Environ(), f.project, f.serve.Port)
+	env := append(NodeEnv(os.Environ(), f.project, f.serve.Port), fakeNodeLogEnv+"="+f.log)
 	emit := jsonl.New()
 	emit.Observe(func(message string) {
 		f.eventsMu.Lock()
@@ -229,10 +292,7 @@ func TestAChildHoldingNodeOutputDoesNotHoldARestart(t *testing.T) {
 	f := startWatch(t)
 	// The next node leaves a background process holding its stdout for
 	// longer than the restart may take.
-	script := "#!/bin/sh\necho \"start PORT=$PORT $*\" >> " + f.log + "\n(sleep 20 &)\nexec sleep 30\n"
-	if err := os.WriteFile(f.serve.NodeBin, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	setFakeNodeBehavior(t, f.log, fakeNodeLeavesAChild)
 	edit(t, f.project, "v2, a longer source")
 	waitFor(t, "the first restart", func() bool { return len(readStarts(t, f.log)) == 2 })
 	restart := time.Now()
@@ -248,10 +308,7 @@ func TestAChildHoldingNodeOutputDoesNotHoldARestart(t *testing.T) {
 
 func TestALineLongerThanTheForwarderReadsDoesNotHoldAStop(t *testing.T) {
 	f := startWatch(t)
-	script := "#!/bin/sh\necho \"start PORT=$PORT $*\" >> " + f.log + "\nhead -c 70000 /dev/zero | tr '\\0' x\necho\necho after\nexec sleep 30\n"
-	if err := os.WriteFile(f.serve.NodeBin, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	setFakeNodeBehavior(t, f.log, fakeNodeWritesALongLine)
 	edit(t, f.project, "v2, a longer source")
 	waitFor(t, "the node that writes a long line", func() bool { return len(readStarts(t, f.log)) == 2 })
 	time.Sleep(100 * time.Millisecond)

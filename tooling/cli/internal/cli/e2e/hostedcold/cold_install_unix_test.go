@@ -508,9 +508,11 @@ func storeRoot(home string) string {
 }
 
 // baseEnv is the environment of a process that runs with home as the user's
-// home, and nothing of the test's environment beyond PATH.
+// home, and nothing of the test's environment. Its PATH is the system's: the
+// host's, which names the host's putnami, would let an install without a run
+// credential start that CLI for one.
 func baseEnv(home string) []string {
-	return []string{"HOME=" + home, "PATH=" + os.Getenv("PATH"), "TMPDIR=" + os.TempDir()}
+	return []string{"HOME=" + home, "PATH=/usr/bin:/bin", "TMPDIR=" + os.TempDir()}
 }
 
 // runInstall runs `putnami install` with cli in ws, with credential on

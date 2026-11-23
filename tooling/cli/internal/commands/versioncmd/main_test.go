@@ -45,6 +45,8 @@ func TestMain(m *testing.M) {
 		os.Args[1] == registryproto.SeamParentCommand && os.Args[2] == registryproto.SeamSubcommand {
 		os.Exit(answerRegistryTokenAsFakeCLI(token))
 	}
+	// No test starts the host's CLI to resolve a registry credential.
+	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)
 	os.Unsetenv(extensionproto.OfflineDependenciesEnv)
 	os.Unsetenv(extensionproto.JobCredentialFDEnv)

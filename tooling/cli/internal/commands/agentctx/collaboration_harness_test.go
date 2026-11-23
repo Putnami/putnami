@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/sdk/extension/scratch"
+	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
 // The contributor helpers reach tasks and proposals only through `putnami
@@ -33,6 +34,8 @@ var (
 // its home as a directory of its own. A test of the user files opts in with
 // userHostHookHome.
 func TestMain(m *testing.M) {
+	// No test starts the host's CLI to resolve a registry credential.
+	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
 	home, err := os.MkdirTemp("", "agentctx-home-")
 	if err != nil {
 		panic(err)

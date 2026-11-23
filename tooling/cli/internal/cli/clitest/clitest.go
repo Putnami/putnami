@@ -53,6 +53,8 @@ const PortableTaskDeadlineMs = scheduler.DefaultTimeoutMs
 // same for the package the e2e tests were carved out of.
 func Main(m *testing.M) int {
 	_ = os.Unsetenv(extension.PrivatePutRegistryURLEnv)
+	// No test starts the host's CLI to resolve a registry credential.
+	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
 	return m.Run()
 }
 

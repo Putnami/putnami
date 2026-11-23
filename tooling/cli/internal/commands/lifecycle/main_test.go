@@ -17,6 +17,8 @@ import (
 // The toolchain fixtures are fixtureproc programs; the process removes the
 // helper build they are copies of once every test ran.
 func TestMain(m *testing.M) {
+	// No test starts the host's CLI to resolve a registry credential.
+	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)
 	code := m.Run()
 	fixtureproc.Remove()
