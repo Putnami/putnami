@@ -380,6 +380,23 @@
           }
         },
         {
+          "id": "session-url",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cloud-session-sends-its-web-address",
+              "a-remote-control-session-sends-its-web-address",
+              "a-session-without-an-address-sends-none",
+              "a-gone-remote-control-address-is-cleared-once",
+              "a-sync-refused-for-the-address-goes-once-without-it"
+            ]
+          }
+        },
+        {
           "id": "missed-syncs",
           "stage": "coded",
           "evidenceKinds": [

@@ -55,6 +55,10 @@ type sessionCache struct {
 	// Name is the session's own name, read from its transcript: it titles a
 	// mission that is untitled or still titled by its key.
 	Name string `json:"name,omitempty"`
+	// SessionURL is the web address the last ok sync carried, empty when it
+	// carried none or cleared it: a sync sends the address only when it
+	// differs from this one.
+	SessionURL string `json:"session_url,omitempty"`
 
 	Mission sessionMissionState `json:"mission"`
 

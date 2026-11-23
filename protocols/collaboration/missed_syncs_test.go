@@ -10,14 +10,16 @@ import (
 )
 
 // TestOnlyDeclaredOperationsListMembers: tasks.get lists the context members,
-// missions.sync and missions.status list missedSyncs, the proposals
+// missions.sync lists missedSyncs and sessionUrl, missions.status lists
+// missedSyncs, the proposals
 // operations that answer a proposal list pageUrl, each in canonical order,
 // and no other operation of any contract lists a member.
 func TestOnlyDeclaredOperationsListMembers(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "declared-task-context", "only-tasks-get-declares-the-context-members")
 	spectest.Proves(t, "collaboration/provider-contract", "declared-missed-syncs", "only-missions-sync-and-status-declare-missed-syncs")
 	spectest.Proves(t, "collaboration/provider-contract", "declared-page-url", "only-the-operations-that-answer-a-proposal-declare-page-url")
-	for _, vocabulary := range [][]string{TaskContextMembers, MissionMembers, ProposalMembers} {
+	spectest.Proves(t, "collaboration/provider-contract", "declared-session-url", "only-missions-sync-declares-session-url")
+	for _, vocabulary := range [][]string{TaskContextMembers, MissionMembers, MissionStatusMembers, ProposalMembers} {
 		if !slices.IsSorted(vocabulary) {
 			t.Errorf("member vocabulary %v is not in canonical order", vocabulary)
 		}
@@ -29,8 +31,10 @@ func TestOnlyDeclaredOperationsListMembers(t *testing.T) {
 			switch {
 			case spec.Name == ContractTasks && op.Name == OperationGet:
 				want = TaskContextMembers
-			case spec.Name == ContractMissions && (op.Name == OperationSync || op.Name == OperationStatus):
+			case spec.Name == ContractMissions && op.Name == OperationSync:
 				want = MissionMembers
+			case spec.Name == ContractMissions && op.Name == OperationStatus:
+				want = MissionStatusMembers
 			case spec.Name == ContractProposals && slices.Contains(answersProposal, op.Name):
 				want = ProposalMembers
 			}

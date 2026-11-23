@@ -69,8 +69,9 @@ type Target struct {
 	// and that no other operation returns one.
 	TaskMembers []string
 	// MissionMembers are the members the provider's manifest declares under
-	// the members of both its missions.sync and missions.status operations
-	// (collab.MissionMembers lists them). RunMissions sends missedSyncs only
+	// the members of its missions.sync operation (collab.MissionMembers lists
+	// them), and of its missions.status operation for those
+	// collab.MissionStatusMembers lists. RunMissions sends missedSyncs only
 	// when it is declared, as the CLI does, and checks that status answers
 	// the one the provider kept, and none when it is not declared.
 	MissionMembers []string

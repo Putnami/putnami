@@ -18,6 +18,7 @@
     "tooling/agent-session-hooks#plan-sync-in-turn",
     "tooling/agent-session-hooks#session-end",
     "tooling/agent-session-hooks#session-start-sheet",
+    "tooling/agent-session-hooks#session-url",
     "tooling/agent-session-hooks#stop-publication",
     "tooling/agent-session-hooks#sync-failure-cause",
     "tooling/agent-session-hooks#tool-use-capture",

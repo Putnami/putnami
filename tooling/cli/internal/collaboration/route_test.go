@@ -1043,20 +1043,11 @@ func TestPrepare_DropsAnUndeclaredRequestMember(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "declared-missed-syncs", "the-cli-sends-a-declared-request-member")
 	sync := `{"session":{"engine":"claude-code","id":"s1"},"mission":{"repository":"putnami/putnami","key":"issue-1250"},` +
 		`"event":"stop","state":"handed_back","observedAt":"2026-11-18T09:00:00Z",` +
-		`"missedSyncs":{"count":3,"reason":"auth.unavailable","lastAt":"2026-11-18T08:59:00Z"}}`
+		`"missedSyncs":{"count":3,"reason":"auth.unavailable","lastAt":"2026-11-18T08:59:00Z"},` +
+		`"sessionUrl":"https://claude.ai/code/session_01"}`
 	route := func(members ...string) *providerCall {
 		t.Helper()
-		read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"missions":{"provider":"@a/one","version":1}}}}`)
-		providers := collabProviders(t, collab.ContractMissions)
-		operation := providers[collab.ContractMissions].Operations[collab.OperationSync]
-		operation.Members = members
-		providers[collab.ContractMissions].Operations[collab.OperationSync] = operation
-		resolution := resolveCollab(read, collab.ContractMissions, []*extension.ExtensionDescription{provider("@a/one", providers)}, nil)
-		call, envelope := prepareCall(read, resolution, collab.OperationSync, json.RawMessage(sync))
-		if envelope != nil {
-			t.Fatalf("prepareCall refused the sync: %s %+v", envelope.Outcome, envelope.Error)
-		}
-		return call
+		return routeSync(t, sync, members...)
 	}
 
 	declared := route(collab.MissionMemberMissedSyncs)
@@ -1073,11 +1064,57 @@ func TestPrepare_DropsAnUndeclaredRequestMember(t *testing.T) {
 	if strings.Contains(string(undeclared.Arguments), "missedSyncs") {
 		t.Fatalf("a provider that does not declare missedSyncs received it: %s", undeclared.Arguments)
 	}
+	if strings.Contains(string(undeclared.Arguments), "sessionUrl") {
+		t.Fatalf("a provider that does not declare sessionUrl received it: %s", undeclared.Arguments)
+	}
 	sent = collab.MissionsSyncInput{}
 	if err := json.Unmarshal(undeclared.Arguments, &sent); err != nil {
 		t.Fatal(err)
 	}
 	if sent.Session.ID != "s1" || sent.Mission.Key != "issue-1250" || sent.State != collab.SessionStateHandedBack {
 		t.Fatalf("the rest of the sync changed: %+v", sent)
+	}
+}
+
+// routeSync prepares a missions.sync to a provider whose sync operation
+// declares members, and answers the call the CLI would send.
+func routeSync(t *testing.T, sync string, members ...string) *providerCall {
+	t.Helper()
+	read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"missions":{"provider":"@a/one","version":1}}}}`)
+	providers := collabProviders(t, collab.ContractMissions)
+	operation := providers[collab.ContractMissions].Operations[collab.OperationSync]
+	operation.Members = members
+	providers[collab.ContractMissions].Operations[collab.OperationSync] = operation
+	resolution := resolveCollab(read, collab.ContractMissions, []*extension.ExtensionDescription{provider("@a/one", providers)}, nil)
+	call, envelope := prepareCall(read, resolution, collab.OperationSync, json.RawMessage(sync))
+	if envelope != nil {
+		t.Fatalf("prepareCall refused the sync: %s %+v", envelope.Outcome, envelope.Error)
+	}
+	return call
+}
+
+// TestPrepare_SendsADeclaredSessionURL: a sync's sessionUrl, an empty one
+// included, reaches a provider whose sync operation declares it, and the CLI
+// removes it from a request to a provider that declares only missedSyncs.
+func TestPrepare_SendsADeclaredSessionURL(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "declared-session-url", "the-cli-drops-an-undeclared-session-url")
+	spectest.Proves(t, "collaboration/provider-contract", "declared-session-url", "the-cli-sends-a-declared-session-url-even-empty")
+	sync := func(address string) string {
+		return `{"session":{"engine":"claude-code","id":"s1"},"mission":{"repository":"putnami/putnami","key":"issue-1411"},` +
+			`"event":"post_tool_use","state":"working","observedAt":"2026-11-23T09:00:00Z","sessionUrl":"` + address + `"}`
+	}
+	for _, address := range []string{"https://claude.ai/code/session_01", ""} {
+		declared := routeSync(t, sync(address), collab.MissionMembers...)
+		var sent collab.MissionsSyncInput
+		if err := json.Unmarshal(declared.Arguments, &sent); err != nil {
+			t.Fatal(err)
+		}
+		if sent.SessionURL == nil || *sent.SessionURL != address {
+			t.Fatalf("a provider that declares sessionUrl received %v; want %q in %s", sent.SessionURL, address, declared.Arguments)
+		}
+		undeclared := routeSync(t, sync(address), collab.MissionMemberMissedSyncs)
+		if strings.Contains(string(undeclared.Arguments), "sessionUrl") {
+			t.Fatalf("a provider that does not declare sessionUrl received it: %s", undeclared.Arguments)
+		}
 	}
 }

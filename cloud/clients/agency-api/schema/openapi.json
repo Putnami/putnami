@@ -51,6 +51,10 @@
           "plan_counts": {
             "$ref": "#/components/schemas/PlanCounts"
           },
+          "session_url": {
+            "description": "The address where the owner opens the session on its host's web interface, once a sync carried one.",
+            "type": "string"
+          },
           "stage": {
             "description": "The loop stage the session's change is at, once a sync named one.",
             "type": "string"
@@ -156,6 +160,10 @@
           },
           "plan_counts": {
             "$ref": "#/components/schemas/PlanCounts"
+          },
+          "session_url": {
+            "description": "The address where the owner opens the session on its host's web interface, once a sync carried one.",
+            "type": "string"
           },
           "stage": {
             "description": "The loop stage the session's change is at, once a sync named one.",
@@ -2410,6 +2418,33 @@
         },
         "type": "object"
       },
+      "ReviewStartRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/RebaseRef"
+          },
+          "head": {
+            "$ref": "#/components/schemas/RebaseRef"
+          },
+          "pullRequest": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Rows": {
         "additionalProperties": false,
         "properties": {
@@ -2763,6 +2798,11 @@
               "$ref": "#/components/schemas/SyncReply"
             },
             "type": "array"
+          },
+          "session_url": {
+            "description": "The address where the owner opens the session on its host's web interface: https, on claude.ai, at most 512 bytes. Absent keeps the stored one; an empty string clears it.",
+            "nullable": true,
+            "type": "string"
           },
           "stage": {
             "description": "The contribution loop stage the session's change is at: talk, declare, show, code, check, prove, validate or merge. Absent keeps the stored stage.",
@@ -3452,6 +3492,121 @@
             {
               "encoding": "json",
               "path": "/internal/agency/gateway/rebase",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/agency/gateway/review": {
+      "post": {
+        "description": "Start the review of one pull request head on the routine of the Putnami user it acts for (agency/gateway): the gateway records a review run on that person's mission branch:\u003chead ref\u003e and fires their review trigger, or their Putnami routine, with the review request and the run id the routine reports, never another person's. started is true with the run and the claude.ai session link when the routine accepted; otherwise reason is no_trigger, no_person, disabled or unavailable. One head of one pull request starts one review run: a repeat answers it and fires nothing. Service-to-service only: exact-audience Google ID token from an allowlisted dispatcher.",
+        "operationId": "postInternal_Agency_Gateway_Review",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed review request"
+          },
+          "403": {
+            "description": "The caller is not an allowlisted dispatcher"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "The caller could not be verified"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/agency/gateway/review",
               "protocol": "rest-json"
             }
           ]

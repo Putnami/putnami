@@ -102,8 +102,15 @@ func prepareCall(document collabDocument, resolution collabResolution, operation
 // receives a member it does not know (collaboration ADR 0009). The rest of
 // the request goes unchanged.
 func dropUndeclaredMembers(input any, declared []string) {
-	if in, ok := input.(*collab.MissionsSyncInput); ok && !slices.Contains(declared, collab.MissionMemberMissedSyncs) {
+	in, ok := input.(*collab.MissionsSyncInput)
+	if !ok {
+		return
+	}
+	if !slices.Contains(declared, collab.MissionMemberMissedSyncs) {
 		in.MissedSyncs = nil
+	}
+	if !slices.Contains(declared, collab.MissionMemberSessionURL) {
+		in.SessionURL = nil
 	}
 }
 

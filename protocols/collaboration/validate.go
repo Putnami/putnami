@@ -60,6 +60,8 @@ const (
 	// MaxMissedSyncReasonLength the reason of the last one.
 	MaxMissedSyncs            = 1_000_000
 	MaxMissedSyncReasonLength = 256
+	// MaxSessionURLLength bounds a session's web address.
+	MaxSessionURLLength = 512
 )
 
 var (
@@ -1249,6 +1251,7 @@ func (c *checker) syncInput(in *MissionsSyncInput) {
 	c.loopStage("stage", in.Stage)
 	c.usage("usage", in.Usage)
 	c.missedSyncs("missedSyncs", in.MissedSyncs)
+	c.sessionURL("sessionUrl", in.SessionURL)
 	c.missionIDs("delivered", in.Delivered, MaxListMembers)
 	c.missionIDs("decisions", in.Decisions, MaxSyncDecisions)
 	if len(in.Replies) > MaxSyncReplies {
@@ -1290,6 +1293,26 @@ func (c *checker) usage(field string, usage *SessionUsage) {
 		if count.value < 0 || count.value > MaxUsageTokens {
 			c.errorf(ErrorCodeInvalidValue, count.field, "%s must be between 0 and %d", count.field, int64(MaxUsageTokens))
 		}
+	}
+}
+
+// sessionURL checks an optional session web address: absent, empty to clear
+// it, or an absolute https address of at most MaxSessionURLLength characters
+// with no credentials and no space or control character.
+func (c *checker) sessionURL(field string, value *string) {
+	if value == nil || *value == "" {
+		return
+	}
+	address := *value
+	parsed, err := url.Parse(address)
+	switch {
+	case err != nil || utf8.RuneCountInString(address) > MaxSessionURLLength ||
+		strings.ContainsFunc(address, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }):
+		c.errorf(ErrorCodeInvalidURL, field, "%s is not a URL of at most %d characters", field, MaxSessionURLLength)
+	case parsed.Scheme != "https" || !strings.HasPrefix(address, "https://") || parsed.Host == "":
+		c.errorf(ErrorCodeInvalidURL, field, "%s is not an absolute https address", field)
+	case parsed.User != nil:
+		c.errorf(ErrorCodeInvalidURL, field, "%s carries credentials; a session address never does", field)
 	}
 }
 

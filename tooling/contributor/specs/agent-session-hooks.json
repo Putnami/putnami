@@ -79,6 +79,14 @@
       ]
     },
     {
+      "id": "session-url",
+      "text": [
+        "A Claude Code sync builds https://claude.ai/code/<id> from CLAUDE_CODE_REMOTE_SESSION_ID, a cse_ prefix read as session_, else from CLAUDE_CODE_BRIDGE_SESSION_ID.",
+        "It sends it as sessionUrl when it changed, and an empty one once when it is gone; else none. Codex sends none.",
+        "A sync refused as invalid while it carries sessionUrl goes once without it."
+      ]
+    },
+    {
       "id": "missed-syncs",
       "text": [
         "The session cache counts the syncs that failed since the last one that succeeded, with the reason and time of the last one.",
@@ -164,6 +172,7 @@
   "decisions": [
     "tooling/contributor/doc/adr/0007-the-contributor-declares-agent-session-hooks.md",
     "tooling/contributor/doc/adr/0018-a-plan-change-syncs-within-the-turn.md",
+    "protocols/collaboration/doc/adr/0012-a-sync-carries-the-sessions-web-address.md",
     "protocols/collaboration/doc/adr/0009-a-declared-request-member-may-join-version-1.md"
   ]
 }

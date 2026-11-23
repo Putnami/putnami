@@ -226,6 +226,15 @@ func TestTheManifestOffersMemoryAndMissions(t *testing.T) {
 			t.Errorf("%s v%d %s has a handler and is not declared", key.Contract, key.Version, key.Operation)
 		}
 	}
+	for _, version := range []int{1, 2} {
+		missions, _ := offer.Operations(collab.ContractMissions, version)
+		if got := missions[collab.OperationSync].Members(); !slices.Equal(got, collab.MissionMembers) {
+			t.Errorf("missions v%d sync declares %v, want %v", version, got, collab.MissionMembers)
+		}
+		if got := missions[collab.OperationStatus].Members(); !slices.Equal(got, collab.MissionStatusMembers) {
+			t.Errorf("missions v%d status declares %v, want %v", version, got, collab.MissionStatusMembers)
+		}
+	}
 	memory, _ := offer.Operations(collab.ContractMemory, 1)
 	if memory["checkpoint"].Operation.Preconditions != string(collab.PreconditionsAtomic) {
 		t.Errorf("memory.checkpoint preconditions = %q, want atomic", memory["checkpoint"].Operation.Preconditions)
@@ -311,6 +320,41 @@ func TestMissionsCallAgencyAPI(t *testing.T) {
 	body := standIn.received()[0].body
 	if body["engine"] != "host-b" || body["state"] != "working" {
 		t.Fatalf("sync sent %v", body)
+	}
+}
+
+// TestTheSyncForwardsTheSessionURL sends a sync's sessionUrl as session_url,
+// an empty one included, and no session_url for a sync that carries none.
+func TestTheSyncForwardsTheSessionURL(t *testing.T) {
+	spectest.Proves(t, agencyFeature, "missions-calls-agency-api", "agency-sync-forwards-the-session-url")
+	sync := missionsV1Operations[0].arguments
+	cases := []struct {
+		name, arguments string
+		want            any
+	}{
+		{"an address", strings.Replace(sync, `"event"`, `"sessionUrl":"https://claude.ai/code/session_01","event"`, 1), "https://claude.ai/code/session_01"},
+		{"an empty address", strings.Replace(sync, `"event"`, `"sessionUrl":"","event"`, 1), ""},
+		{"no address", sync, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			standIn := newAgencyStandIn(t)
+			h, _ := agencyHarness(t, standIn, true)
+			raw, response := h.callVersion(t, collab.ContractMissions, 1, collab.OperationSync, tc.arguments)
+			if response.Outcome != collab.OutcomeOK {
+				t.Fatalf("sync answered %s", raw)
+			}
+			got, sent := standIn.received()[0].body["session_url"]
+			if tc.want == nil {
+				if sent {
+					t.Fatalf("a sync without an address sent session_url %v", got)
+				}
+				return
+			}
+			if !sent || got != tc.want {
+				t.Fatalf("session_url = %v (sent %v), want %q", got, sent, tc.want)
+			}
+		})
 	}
 }
 

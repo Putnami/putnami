@@ -51,7 +51,7 @@ Two schemas come from the putnami-cloud repository instead of the package, and
 `observability-api` adds one path from it, as the next paragraphs say.
 `agency-api/schema/openapi.json` is a byte-for-byte copy of
 `agency/workloads/agency-api/schema/openapi.json` at commit
-`5efd5633f16582a222f63a7e47280c08fe975abe` (branch `epic-5143/gateway-routine`),
+`e5de36e8d8249a8c54f45fddb5195fe255cb713e` of `main`,
 which serves the memory, missions (v1 and v2 runs), build start and audit
 attestation routes `@putnami/cloud` calls. `config-api/schema/openapi.json` is a
 byte-for-byte copy of `config/workloads/config-api/schema/openapi.json` at

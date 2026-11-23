@@ -73,6 +73,9 @@ type syncSnapshot struct {
 	missionKey string
 	planSent   bool
 	planDigest string
+	// sessionURL is the web address the request carried, nil when it
+	// carried none.
+	sessionURL *string
 	acks       []string
 	decisions  []string
 	replies    []string
@@ -213,6 +216,9 @@ func mergeSyncAnswer(cache *sessionCache, snapshot syncSnapshot, answer collab.M
 	cache.LastSyncAt = now
 	if snapshot.planSent && snapshot.missionKey == cache.Mission.Key {
 		cache.PlanSynced = snapshot.planDigest
+	}
+	if snapshot.sessionURL != nil {
+		cache.SessionURL = *snapshot.sessionURL
 	}
 	cache.Acks = without(cache.Acks, snapshot.acks)
 	cache.Decisions = without(cache.Decisions, snapshot.decisions)
@@ -383,7 +389,9 @@ func without(values, drop []string) []string {
 // carries the plan or missed syncs goes once more without either, so a plan
 // or a member the provider refuses never blocks every later sync; when that
 // one passes, the plan counts as sent until it changes and the missed syncs
-// are dropped.
+// are dropped. The session address goes the same way: refused by name, it
+// counts as sent until it changes; dropped for another member, it goes again
+// with the next sync.
 //
 // Every failed sync counts in the cache's missed syncs, with its reason;
 // the next sync carries them, and an ok answer clears what it carried.
@@ -427,6 +435,7 @@ func (e *Env) prepareSync(cache *sessionCache) (collab.MissionsSyncInput, syncSn
 	}
 	refreshUsage(cache)
 	request, snapshot := buildSyncRequest(cache, e.Now())
+	addSessionURL(&request, &snapshot, cache, e.Getenv)
 	return request, snapshot, true
 }
 
@@ -435,10 +444,12 @@ func (e *Env) prepareSync(cache *sessionCache) (collab.MissionsSyncInput, syncSn
 func (e *Env) sendSync(ctx context.Context, files sessionFiles, request collab.MissionsSyncInput, snapshot syncSnapshot) error {
 	envelope, callErr := e.call(ctx, collab.ContractMissions, collab.OperationSync, request)
 	var planRefused error
-	if callErr == nil && envelope.Outcome == collab.OutcomeInvalid && (request.Plan != nil || request.MissedSyncs != nil) && ctx.Err() == nil {
+	if callErr == nil && envelope.Outcome == collab.OutcomeInvalid && (request.Plan != nil || request.MissedSyncs != nil || request.SessionURL != nil) && ctx.Err() == nil {
 		first := outcomeError(envelope)
 		plan, missed := request.Plan != nil, request.MissedSyncs != nil
 		request.Plan, request.MissedSyncs = nil, nil
+		address := request.SessionURL != nil
+		request.SessionURL = nil
 		if envelope, callErr = e.call(ctx, collab.ContractMissions, collab.OperationSync, request); callErr == nil && envelope.Outcome == collab.OutcomeOK {
 			var refused []string
 			if plan {
@@ -446,6 +457,9 @@ func (e *Env) sendSync(ctx context.Context, files sessionFiles, request collab.M
 			}
 			if missed {
 				refused = append(refused, fmt.Sprintf("the report of %d missed syncs, which is dropped", snapshot.missed))
+			}
+			if address {
+				refused = append(refused, sessionURLRefused(&snapshot, first))
 			}
 			planRefused = fmt.Errorf("the sync went without %s: %w", strings.Join(refused, " and "), first)
 		}

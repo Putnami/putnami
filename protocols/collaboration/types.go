@@ -1054,6 +1054,13 @@ type MissionsSyncInput struct {
 	// that provider keeps the one of the last sync it applied that carried
 	// one: absent keeps it.
 	MissedSyncs *MissedSyncs `json:"missedSyncs,omitempty"`
+	// SessionURL is the address where the owner opens the session on its
+	// host's web interface: an absolute https address of at most
+	// MaxSessionURLLength characters, with no credentials. Absent keeps the
+	// address the provider holds; an empty string clears it. It is a
+	// declared member (MissionMemberSessionURL): the CLI sends it only to a
+	// provider whose sync operation declares it (ADR 0012).
+	SessionURL *string `json:"sessionUrl,omitempty"`
 }
 
 // ProposalMemberPageURL is the declared member of the proposals operations
@@ -1069,9 +1076,19 @@ var ProposalMembers = []string{ProposalMemberPageURL}
 // missions.status that reports a session's failed syncs (ADR 0009).
 const MissionMemberMissedSyncs = "missedSyncs"
 
+// MissionMemberSessionURL is the declared member of missions.sync that
+// carries the session's web address (ADR 0012).
+const MissionMemberSessionURL = "sessionUrl"
+
 // MissionMembers is the closed vocabulary of the declared members of
-// missions.sync and missions.status, in canonical order.
-var MissionMembers = []string{MissionMemberMissedSyncs}
+// missions.sync, in canonical order. It holds every declared member of the
+// missions contract.
+var MissionMembers = []string{MissionMemberMissedSyncs, MissionMemberSessionURL}
+
+// MissionStatusMembers is the closed vocabulary of the declared members of
+// missions.status, in canonical order: the members of MissionMembers a
+// status answers.
+var MissionStatusMembers = []string{MissionMemberMissedSyncs}
 
 // MissedSyncs is the syncs of a session that failed since the last one that
 // succeeded.

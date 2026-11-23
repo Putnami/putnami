@@ -90,7 +90,7 @@ func localMissionsTarget(t *testing.T) providertest.Target {
 	return providertest.Target{
 		Handlers:       p.Handlers(),
 		WorkspaceRoot:  workspace,
-		MissionMembers: collab.MissionMembers,
+		MissionMembers: []string{collab.MissionMemberMissedSyncs},
 		Post: func(t *testing.T, mission collab.MissionName, kind collab.InboxKind, text string) string {
 			posted++
 			name := "post-" + strconv.Itoa(posted) + ".json"

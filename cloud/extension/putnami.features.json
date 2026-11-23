@@ -1162,7 +1162,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "agency-missions-routes"
+              "agency-missions-routes",
+              "agency-sync-forwards-the-session-url"
             ]
           }
         },

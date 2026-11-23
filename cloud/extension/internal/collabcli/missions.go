@@ -238,6 +238,9 @@ func syncBody(in collab.MissionsSyncInput) (agencyapiclient.SessionSyncBody, boo
 		reason := missedReason(missed.Reason)
 		body.MissedSyncs = client.Some(agencyapiclient.SessionMissedSyncs{Count: &missed.Count, Reason: &reason, LastAt: &lastAt})
 	}
+	if in.SessionURL != nil {
+		body.SessionUrl = client.Some(*in.SessionURL)
+	}
 	if in.Plan != nil {
 		steps := make([]agencyapiclient.PlanStep, 0, len(in.Plan.Steps))
 		for _, step := range in.Plan.Steps {

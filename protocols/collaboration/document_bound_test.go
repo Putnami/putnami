@@ -187,6 +187,8 @@ func maximalSyncInput() *MissionsSyncInput {
 		Usage:       &SessionUsage{InputTokens: MaxUsageTokens, OutputTokens: MaxUsageTokens, CacheWriteTokens: MaxUsageTokens, CacheReadTokens: MaxUsageTokens},
 		MissedSyncs: &MissedSyncs{Count: MaxMissedSyncs, Reason: fill(MaxMissedSyncReasonLength), LastAt: maximalUTC},
 	}
+	sessionURL := "https://claude.ai/code/" + strings.Repeat("s", MaxSessionURLLength-len("https://claude.ai/code/"))
+	input.SessionURL = &sessionURL
 	for i := range MaxListMembers {
 		input.Delivered = append(input.Delivered, maximalID(i))
 	}

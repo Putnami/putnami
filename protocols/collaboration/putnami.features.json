@@ -424,6 +424,22 @@
           }
         },
         {
+          "id": "declared-session-url",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-missions-sync-declares-session-url",
+              "a-session-url-is-an-https-address",
+              "the-cli-drops-an-undeclared-session-url",
+              "the-cli-sends-a-declared-session-url-even-empty"
+            ]
+          }
+        },
+        {
           "id": "scenarios-normalize-requests",
           "stage": "coded",
           "evidenceKinds": [

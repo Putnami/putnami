@@ -122,7 +122,8 @@
         "replies": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/messageReply" }, "description": "One reply per message. A refused reply gets its own entry in the result and never refuses the sync." },
         "stage": { "$ref": "#/$defs/loopStage", "description": "The loop stage the session's change is at. Absent keeps the stage the provider holds." },
         "usage": { "$ref": "#/$defs/sessionUsage", "description": "The tokens the session used so far. Replaces the usage the provider holds; absent keeps it." },
-        "missedSyncs": { "$ref": "#/$defs/missedSyncs", "description": "The syncs that failed since the last one that succeeded. Sent only to a provider that declares it; replaces the report the provider holds, and absent keeps it." }
+        "missedSyncs": { "$ref": "#/$defs/missedSyncs", "description": "The syncs that failed since the last one that succeeded. Sent only to a provider that declares it; replaces the report the provider holds, and absent keeps it." },
+        "sessionUrl": { "type": "string", "maxLength": 512, "pattern": "^(https://\\S+)?$", "description": "The address where the owner opens the session on its host's web interface: an absolute https address, never carrying credentials. Sent only to a provider that declares it; absent keeps the address the provider holds, and an empty string clears it." }
       }
     },
     "openDecision": {

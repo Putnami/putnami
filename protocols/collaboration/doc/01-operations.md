@@ -201,7 +201,7 @@ operation must declare `workspaceSelection`.
 
 | Operation | Access | Required | Destructive | Preconditions | Host-only | Request | Result |
 |---|---|---|---|---|---|---|---|
-| `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies`, `stage`, `usage`, `missedSyncs` (declared) | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
+| `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies`, `stage`, `usage`, `missedSyncs` (declared), `sessionUrl` (declared) | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
 | `ask` | mutating | yes | no | — | no | `mission`, `question`, `context`, `options`, `recommendation`, `blocks`, `idempotencyKey` | `decision`, `replayed` |
 | `reply` | mutating | yes | no | — | no | `message`, `reply` | `message`, `replayed` |
 | `status` | read | no | no | — | no | `mission`, `page` | `mission`, `sessions`, `page` |
@@ -276,6 +276,14 @@ The CLI sends it only to a provider whose `sync` operation names it under
 `members`, and removes it from a request to any other. A provider that
 declares it keeps the `missedSyncs` of the last applied sync that carried
 one: an absent one keeps what it holds.
+
+`sessionUrl` is a declared member of `sync` only
+([ADR 0012](adr/0012-a-sync-carries-the-sessions-web-address.md)): the
+address where the owner opens the session on its host's web interface, an
+absolute `https` address of at most 512 characters with no credentials. An
+absent one keeps the address the provider holds, and an empty string clears
+it. The CLI sends it, empty included, only to a provider whose `sync`
+operation names it under `members`.
 
 - `delivered` (at most 100) lists the inbox messages the host gave the agent;
   they leave the inbox. Delivering an answer message moves its decision to

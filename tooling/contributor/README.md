@@ -164,6 +164,14 @@ nothing ([ADR 0016](doc/adr/0016-an-event-two-hook-sources-send-is-handled-once.
 - Every sync carries the session's token usage, counted from the host's
   transcript: for Claude Code, the session and its subagents; for Codex, the
   session's own thread.
+- A Claude Code session that has a web address sends it as `sessionUrl`, so
+  the mission can link to the conversation: `https://claude.ai/code/<id>`,
+  from `CLAUDE_CODE_REMOTE_SESSION_ID` in a cloud session, where a `cse_`
+  prefix becomes `session_`, else from `CLAUDE_CODE_BRIDGE_SESSION_ID` while
+  Remote Control is connected. A sync sends it when it changes, and an empty
+  one once when it is gone, as when Remote Control disconnects
+  ([collaboration ADR 0012](../../protocols/collaboration/doc/adr/0012-a-sync-carries-the-sessions-web-address.md)).
+  A Codex session sends none.
 
 A session reports to `branch:<branch>` until `putnami agent attach --issue <n>`
 makes `issue-<n>` the mission of the checkout's branch. Each Stop and each

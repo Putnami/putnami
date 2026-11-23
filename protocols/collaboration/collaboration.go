@@ -443,7 +443,7 @@ var missionsV1Operations = []OperationSpec{
 	},
 	{
 		Name: OperationStatus, Access: AccessRead,
-		Members: MissionMembers,
+		Members: MissionStatusMembers,
 		Summary: "Read a mission's view and its sessions: each session's state, loop stage, token usage and " +
 			"branch, as its last sync reported them, newest first. Take the mission's repository and key from " +
 			"the session sheet, or name another mission to follow its sessions. Optional capability.",
