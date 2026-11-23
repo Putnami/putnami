@@ -232,6 +232,12 @@ next phase begins.
 12. Close DI                              — release constructed providers
 ```
 
+Before phase 1, Start lowers GOMAXPROCS to the container's CPU limit, rounded
+up, when that limit is below it. Go's default never goes below 2, so a service
+limited to 1 CPU would otherwise run two threads in one CPU's quota and be
+throttled. Start sets it once: a limit changed later is not followed. Set
+`GOMAXPROCS` or `GODEBUG=containermaxprocs=0` to keep Go's own choice.
+
 ### Phase details
 
 **PreConfigure** — Module hooks run root-first before the container exists.

@@ -26,6 +26,20 @@
           }
         },
         {
+          "id": "cpu-quota-parallelism",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "start-lowers-gomaxprocs-to-a-cgroup-limit-below-it",
+              "start-keeps-gomaxprocs-without-a-limit-or-when-set"
+            ]
+          }
+        },
+        {
           "id": "describe",
           "stage": "coded",
           "evidenceKinds": [

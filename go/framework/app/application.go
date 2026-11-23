@@ -211,6 +211,10 @@ func (a *Application) Start(ctx context.Context) error {
 		a.mu.Unlock()
 	}()
 
+	if from, to, changed := limitProcs(); changed {
+		a.log.Info("GOMAXPROCS lowered to the CPU limit", slog.Int("from", from), slog.Int("to", to))
+	}
+
 	startedAt := time.Now()
 	allPlugins := a.CollectPlugins()
 

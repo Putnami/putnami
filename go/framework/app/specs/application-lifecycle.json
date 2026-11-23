@@ -13,7 +13,8 @@
     "Defining HTTP, gRPC, storage, database, or event transport behavior",
     "Restarting failed plugins or supervising a crashed process",
     "Promising strict compatibility between every pre-1.0 minor release",
-    "Moving the data a DARC contract governs: the consumer supplies bootstrap and updates over whichever carrier the contract declares, and darc governs only what happens to them"
+    "Moving the data a DARC contract governs: the consumer supplies bootstrap and updates over whichever carrier the contract declares, and darc governs only what happens to them",
+    "Reading cgroup v1 CPU limits"
   ],
   "requirements": [
     {
@@ -65,6 +66,13 @@
       "text": [
         "A plugin factory registered with RegisterDefaultPlugin adds its plugin to every application New creates afterwards, before any plugin the workload adds, and runs once per application.",
         "A factory that returns nil adds nothing, and a nil factory is ignored."
+      ]
+    },
+    {
+      "id": "cpu-quota-parallelism",
+      "text": [
+        "When the smallest cgroup v2 cpu.max limit of the process's cgroup and its ancestors, rounded up, is below the runtime's GOMAXPROCS, Start lowers GOMAXPROCS to it once, before any plugin runs, and a limit changed later is not followed.",
+        "Without a cgroup v2 limit, with a valid GOMAXPROCS in the environment, or with GODEBUG=containermaxprocs=0, Start leaves GOMAXPROCS unchanged."
       ]
     }
   ],
