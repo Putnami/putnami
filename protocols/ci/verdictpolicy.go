@@ -54,6 +54,14 @@ const (
 // GapUnprovenRequirement.
 const PolicyLostProof = "lost-proof"
 
+// PolicyWeakenedProof is a gap key of the policy only: a requirement the
+// change's head still proves through a test the change edits, while the
+// change leaves the requirement's declaration as it is. The CI plane lists it
+// beside the verdict's gaps; the verdict does not carry it. It takes one
+// value, not a map by maturity. A key no file names is left to the caller,
+// as every key is.
+const PolicyWeakenedProof = "weakened-proof"
+
 // verdictPolicyMaturities is the closed maturity order of a feature, from
 // low to high. It is the order of go.putnami.dev/protocol/features, which a
 // test holds it to.
@@ -71,7 +79,7 @@ var (
 var (
 	verdictPolicyGapKeys = []string{
 		GapNoRequirement, GapUnknownDeclarations, GapUnknownImpact, GapUnknownRequirements,
-		GapUnprovenRequirement, PolicyLostProof,
+		GapUnprovenRequirement, PolicyLostProof, PolicyWeakenedProof,
 	}
 	// verdictPolicyRootGapKeys belong to the change, not to a project: only
 	// the root file sets them.
@@ -98,7 +106,8 @@ type VerdictPolicy struct {
 	// Declarations maps a declaration kind to when its changes wait for an
 	// approval.
 	Declarations map[string]VerdictPolicyValue `json:"declarations,omitempty"`
-	// Gaps maps a gap kind, or PolicyLostProof, to what the gap costs.
+	// Gaps maps a gap kind, PolicyLostProof or PolicyWeakenedProof, to what
+	// the gap costs.
 	Gaps map[string]VerdictPolicyValue `json:"gaps,omitempty"`
 }
 
@@ -323,7 +332,7 @@ type VerdictPolicyChain []VerdictPolicyFileAt
 
 // Gap returns what a gap of kind costs, for a feature of the given maturity,
 // and the path of the file that decides it. kind is a gap kind or
-// PolicyLostProof. maturity is the feature's maturity, or "" for a gap that
+// PolicyLostProof or PolicyWeakenedProof. maturity is the feature's maturity, or "" for a gap that
 // concerns no feature. ok is false when no file of the chain names the
 // kind: the caller then applies its own default. A key of the change
 // (unknown-impact, unknown-declarations) is read from the root file only.

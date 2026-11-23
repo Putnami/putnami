@@ -27,14 +27,15 @@
     "gaps": {
       "type": "object",
       "additionalProperties": false,
-      "description": "What a gap of each kind costs a change. lost-proof is an unproven requirement that the change's base proved.",
+      "description": "What a gap of each kind costs a change. lost-proof is an unproven requirement that the change's base proved. weakened-proof is a requirement the head still proves through a test the change edits, while the change leaves its declaration as it is.",
       "properties": {
         "lost-proof": { "$ref": "#/$defs/costByMaturity" },
         "no-requirement": { "$ref": "#/$defs/cost" },
         "unknown-declarations": { "$ref": "#/$defs/cost" },
         "unknown-impact": { "$ref": "#/$defs/cost" },
         "unknown-requirements": { "$ref": "#/$defs/cost" },
-        "unproven-requirement": { "$ref": "#/$defs/costByMaturity" }
+        "unproven-requirement": { "$ref": "#/$defs/costByMaturity" },
+        "weakened-proof": { "$ref": "#/$defs/cost" }
       }
     }
   },

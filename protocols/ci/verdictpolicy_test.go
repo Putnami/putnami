@@ -25,7 +25,8 @@ const validRootVerdictPolicy = `{
     "unknown-declarations": "accept",
     "unknown-requirements": "accept",
     "unproven-requirement": { "modeled": "inform", "coded": "accept" },
-    "lost-proof": { "modeled": "accept", "live-verified": "block" }
+    "lost-proof": { "modeled": "accept", "live-verified": "block" },
+    "weakened-proof": "accept"
   }
 }`
 
@@ -37,6 +38,9 @@ func TestParseVerdictPolicyAdmitsAValidFile(t *testing.T) {
 	}
 	if got := policy.Gaps[PolicyLostProof].ByMaturity["live-verified"]; got != PolicyBlock {
 		t.Fatalf("lost-proof from live-verified = %q, want block", got)
+	}
+	if got := policy.Gaps[PolicyWeakenedProof].Value; got != PolicyAccept {
+		t.Fatalf("weakened-proof = %q, want accept", got)
 	}
 	if got := policy.Declarations[DeclarationADR].Value; got != PolicyNever {
 		t.Fatalf("adr = %q, want never", got)
@@ -86,6 +90,8 @@ func TestEachVerdictPolicyDefectIsRefused(t *testing.T) {
 		"a map without modeled":               {project, `{"gaps": {"lost-proof": {"ga": "block"}}}`, "ci.verdict_policy_maturity", "gaps.lost-proof"},
 		"an unknown maturity":                 {project, `{"gaps": {"lost-proof": {"modeled": "accept", "beta": "block"}}}`, "ci.verdict_policy_maturity", "gaps.lost-proof.beta"},
 		"a value inside a map":                {project, `{"declarations": {"spec": {"modeled": "inform"}}}`, "ci.verdict_policy_value", "declarations.spec.modeled"},
+		"a weakened-proof value":              {project, `{"gaps": {"weakened-proof": "always"}}`, "ci.verdict_policy_value", "gaps.weakened-proof"},
+		"a weakened-proof map":                {project, `{"gaps": {"weakened-proof": {"modeled": "accept"}}}`, "ci.verdict_policy_maturity", "gaps.weakened-proof"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, diagnostics := ParseVerdictPolicyWithDiagnostics(test.path, []byte(test.body))
@@ -255,7 +261,7 @@ func TestThePolicyPathsClimbToTheRoot(t *testing.T) {
 func TestTheNearestFileThatNamesAKeyDecides(t *testing.T) {
 	spectest.Proves(t, "ci/ci-contract", "the-nearest-verdict-policy-decides", "the-nearest-file-that-names-a-key-decides")
 	chain := VerdictPolicyChain{
-		mustPolicyAt(t, "libs/core/"+VerdictPolicyFile, `{"gaps": {"no-requirement": "block"}}`),
+		mustPolicyAt(t, "libs/core/"+VerdictPolicyFile, `{"gaps": {"no-requirement": "block", "weakened-proof": "accept"}}`),
 		mustPolicyAt(t, "libs/"+VerdictPolicyFile, `{"gaps": {"no-requirement": "inform", "unknown-requirements": "inform"}, "declarations": {"adr": "never"}}`),
 		mustPolicyAt(t, VerdictPolicyFile, `{"gaps": {"unknown-requirements": "block", "unknown-impact": "block"}, "declarations": {"adr": "always", "ci": "when-weakening"}}`),
 	}
@@ -266,6 +272,7 @@ func TestTheNearestFileThatNamesAKeyDecides(t *testing.T) {
 		{GapNoRequirement, PolicyBlock, "libs/core/" + VerdictPolicyFile, true},
 		{GapUnknownRequirements, PolicyInform, "libs/" + VerdictPolicyFile, true},
 		{GapUnknownImpact, PolicyBlock, VerdictPolicyFile, true},
+		{PolicyWeakenedProof, PolicyAccept, "libs/core/" + VerdictPolicyFile, true},
 		{GapUnprovenRequirement, "", "", false},
 	} {
 		value, by, ok := chain.Gap(test.kind, "")

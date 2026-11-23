@@ -441,7 +441,8 @@ found. The CI plane applies it; this package parses, validates and resolves it.
   "gaps": {
     "no-requirement": "inform",
     "unproven-requirement": { "modeled": "inform", "coded": "accept" },
-    "lost-proof": { "modeled": "accept", "live-verified": "block" }
+    "lost-proof": { "modeled": "accept", "live-verified": "block" },
+    "weakened-proof": "accept"
   }
 }
 ```
@@ -453,6 +454,11 @@ found. The CI plane applies it; this package parses, validates and resolves it.
   blocks), `accept` (blocks until a person accepts it) or `block` (blocks, and
   nobody can accept it). `lost-proof` is a key of the policy only: an
   `unproven-requirement` gap whose requirement the change's base proved.
+  `weakened-proof` is a key of the policy only too: a requirement the head
+  still proves through a test the change edits, while the change leaves the
+  requirement's declaration as it is. The verdict does not list it; the CI
+  plane lists it beside the gaps, and decides what a key no file names costs.
+  It takes one value, not a map by maturity.
   `unapproved-declaration` is not a key: `declarations` sets it by kind.
 - A key that concerns a feature takes one value or a map by maturity:
   `unproven-requirement`, `lost-proof`, `spec` and `binding`. Each key of the
