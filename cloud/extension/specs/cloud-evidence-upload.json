@@ -104,9 +104,9 @@
     {
       "id": "explains-a-refused-gitlab-exchange",
       "text": [
-        "PUTNAMI_ORGANIZATION in a GitLab CI job (GITLAB_CI true) without PUTNAMI_ID_TOKEN sends nothing and names the id_tokens entry to declare, with the auth-server's base URL as its audience.",
-        "A job of a GitLab instance other than gitlab.com (CI_SERVER_HOST) is told to set PUTNAMI_CLOUD_TOKEN. A PUTNAMI_ID_TOKEN whose iss is not https://gitlab.com or whose aud is not that base URL is not sent.",
-        "The auth-server's refusal for a project the organization does not trust is named with the observation trust to add."
+        "PUTNAMI_ORGANIZATION in a GitLab CI job (GITLAB_CI true) without PUTNAMI_ID_TOKEN sends nothing and names the id_tokens entry to declare, with the auth-server's base URL as aud.",
+        "A job of a GitLab instance other than gitlab.com (CI_SERVER_HOST) is told to set PUTNAMI_CLOUD_TOKEN. A PUTNAMI_ID_TOKEN whose iss is not https://gitlab.com, or with no aud exactly that base URL, is not sent.",
+        "The exchange's refusal of an untrusted project, worded as for a repository, names the trust to add."
       ]
     },
     {

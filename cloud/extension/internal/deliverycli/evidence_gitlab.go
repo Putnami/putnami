@@ -67,8 +67,10 @@ func gitlabIngestToken(params map[string]any, env map[string]string, ioctx clico
 // checkGitLabIDToken reads the unverified claims of the job's ID token and
 // refuses to send one gitlab.com did not mint for the auth-server: the job's
 // YAML fixes the audience, so a token meant for another server, or minted by
-// a self-managed instance, stays in the job. The auth-server verifies the
-// signature. No error message carries the token.
+// a self-managed instance, stays in the job. The audience is compared with
+// the auth-server's base URL exactly, as the exchange compares it, so a
+// trailing slash is named here instead of coming back as invalid_grant. The
+// auth-server verifies the signature. No error message carries the token.
 func checkGitLabIDToken(idToken, audience string) error {
 	parts := strings.Split(idToken, ".")
 	if len(parts) != 3 {
@@ -93,7 +95,7 @@ func checkGitLabIDToken(idToken, audience string) error {
 		_ = json.Unmarshal(claims.Audience, &audiences)
 	}
 	for _, aud := range audiences {
-		if clicore.TrimURL(aud) == audience {
+		if aud == audience {
 			return nil
 		}
 	}

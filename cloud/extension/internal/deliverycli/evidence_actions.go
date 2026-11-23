@@ -31,11 +31,10 @@ const (
 	deliveryIngestClientID = "delivery-ingest"
 	tokenExchangeGrantType = "urn:ietf:params:oauth:grant-type:token-exchange" //nolint:gosec // G101: an RFC 8693 grant type, not a credential
 	idTokenTokenType       = "urn:ietf:params:oauth:token-type:id_token"       //nolint:gosec // G101: an RFC 8693 token type, not a credential
-	// untrustedRepositoryRefusal and untrustedProjectRefusal are in the
-	// auth-server's error_description when the organization trusts neither
-	// the repository, or GitLab project, nor its owner.
+	// untrustedRepositoryRefusal is in the auth-server's error_description
+	// when the organization trusts neither the job's repository, which is
+	// how it words a GitLab project too, nor its owner.
 	untrustedRepositoryRefusal = "does not trust this repository"
-	untrustedProjectRefusal    = "does not trust this project"
 )
 
 // actionsOrganization returns the organization a GitHub Actions job uploads
@@ -111,7 +110,7 @@ func exchangeIngestToken(params map[string]any, env map[string]string, ioctx cli
 // because the organization trusts neither the job's repository, or project,
 // nor its owner.
 func untrustedRefusal(reason string) bool {
-	return strings.Contains(reason, untrustedRepositoryRefusal) || strings.Contains(reason, untrustedProjectRefusal)
+	return strings.Contains(reason, untrustedRepositoryRefusal)
 }
 
 // requestActionsIDToken asks the job's ID token endpoint for a token of the

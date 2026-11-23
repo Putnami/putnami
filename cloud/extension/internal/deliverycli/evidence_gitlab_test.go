@@ -229,8 +229,8 @@ func TestASelfManagedGitLabJobIsToldToUseAToken(t *testing.T) {
 
 func TestAnUntrustedGitLabProjectIsRefusedByName(t *testing.T) {
 	spectest.Proves(t, evidenceFeature, "explains-a-refused-gitlab-exchange", "an-untrusted-gitlab-project-is-refused-by-name")
+	// The exchange words an untrusted GitLab project as a repository.
 	for _, reason := range []string{
-		"the organization does not trust this project for observation",
 		"the organization does not trust this repository for observation",
 	} {
 		fake := &actionsFake{
@@ -253,17 +253,20 @@ func TestAnUntrustedGitLabProjectIsRefusedByName(t *testing.T) {
 		assertNoGitLabToken(t, err.Error())
 	}
 
-	// Any other refusal names the exchange and its reason.
-	fake := &actionsFake{
-		delivery:       &evidenceFakeServer{},
-		exchangeStatus: http.StatusBadRequest,
-		exchangeAnswer: map[string]any{"error": "invalid_grant", "error_description": "subject_token could not be verified"},
+	// Any other refusal, even one that distrusts something else, names the
+	// exchange and its reason, and no trust to add.
+	for _, reason := range []string{"subject_token could not be verified", "the organization does not trust this issuer"} {
+		fake := &actionsFake{
+			delivery:       &evidenceFakeServer{},
+			exchangeStatus: http.StatusBadRequest,
+			exchangeAnswer: map[string]any{"error": "invalid_grant", "error_description": reason},
+		}
+		_, err := runGitLab(t, fake, gitlabEnv(t))
+		if err == nil || !strings.Contains(err.Error(), "refused the GitLab CI ID token exchange at "+actionsTestAuthURL+"/token: "+reason) || strings.Contains(err.Error(), "observe page") {
+			t.Fatalf("%s: err %v", reason, err)
+		}
+		assertNoGitLabToken(t, err.Error())
 	}
-	_, err := runGitLab(t, fake, gitlabEnv(t))
-	if err == nil || !strings.Contains(err.Error(), "refused the GitLab CI ID token exchange at "+actionsTestAuthURL+"/token: subject_token could not be verified") {
-		t.Fatalf("err %v", err)
-	}
-	assertNoGitLabToken(t, err.Error())
 }
 
 func TestAGitLabIDTokenForAnotherIssuerOrAudienceIsNotSent(t *testing.T) {
@@ -273,10 +276,14 @@ func TestAGitLabIDTokenForAnotherIssuerOrAudienceIsNotSent(t *testing.T) {
 		wants []string
 	}{
 		"self-managed issuer": {gitlabIDToken(map[string]any{"iss": "https://gitlab.example.com", "aud": actionsTestAuthURL}), []string{"https://gitlab.example.com", evidenceTokenEnv}},
-		"another audience":    {gitlabIDToken(map[string]any{"iss": "https://gitlab.com", "aud": clicore.DefaultAuthURL}), []string{clicore.DefaultAuthURL, "aud: " + actionsTestAuthURL}},
-		"no audience":         {gitlabIDToken(map[string]any{"iss": "https://gitlab.com"}), []string{"audience none", "aud: " + actionsTestAuthURL}},
-		"not a JWT":           {"opaque-value", []string{"not a JSON Web Token", "id_tokens"}},
-		"unreadable claims":   {"a.%%%.c", []string{"no readable claims"}},
+		"another audience":    {gitlabIDToken(map[string]any{"iss": "https://gitlab.com", "aud": clicore.DefaultAuthURL}), []string{clicore.DefaultAuthURL, "`aud: " + actionsTestAuthURL + "`"}},
+		// The exchange compares the audience with its base URL exactly, so a
+		// trailing slash is refused here, not by the auth-server.
+		"trailing slash":           {gitlabIDToken(map[string]any{"iss": "https://gitlab.com", "aud": actionsTestAuthURL + "/"}), []string{actionsTestAuthURL + "/", "`aud: " + actionsTestAuthURL + "`"}},
+		"audience list without it": {gitlabIDToken(map[string]any{"iss": "https://gitlab.com", "aud": []string{"other", actionsTestAuthURL + "/"}}), []string{"`aud: " + actionsTestAuthURL + "`"}},
+		"no audience":              {gitlabIDToken(map[string]any{"iss": "https://gitlab.com"}), []string{"audience none", "`aud: " + actionsTestAuthURL + "`"}},
+		"not a JWT":                {"opaque-value", []string{"not a JSON Web Token", "id_tokens"}},
+		"unreadable claims":        {"a.%%%.c", []string{"no readable claims"}},
 	}
 	for name, c := range cases {
 		fake := &actionsFake{delivery: &evidenceFakeServer{}}
@@ -302,11 +309,10 @@ func TestAGitLabIDTokenForAnotherIssuerOrAudienceIsNotSent(t *testing.T) {
 		}
 	}
 
-	// An audience list that holds the auth-server's base URL, with a trailing
-	// slash, is sent.
+	// An audience list that holds the auth-server's base URL itself is sent.
 	fake := &actionsFake{delivery: &evidenceFakeServer{}}
 	env := gitlabEnv(t)
-	env[gitlabIDTokenEnv] = gitlabIDToken(map[string]any{"iss": "https://gitlab.com", "aud": []string{"other", actionsTestAuthURL + "/"}})
+	env[gitlabIDTokenEnv] = gitlabIDToken(map[string]any{"iss": "https://gitlab.com", "aud": []string{"other", actionsTestAuthURL}})
 	if _, err := runGitLab(t, fake, env); err != nil || len(fake.exchanges) != 1 {
 		t.Fatalf("an audience list: err %v, exchanges %v", err, fake.exchanges)
 	}

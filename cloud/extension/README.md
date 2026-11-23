@@ -571,9 +571,10 @@ observation. The upload then names the repository. Without
 whose `CI_SERVER_HOST` is another GitLab instance, it names
 `PUTNAMI_CLOUD_TOKEN` and sends nothing. The command reads the token's
 claims without verifying them and sends no token whose `iss` is not
-`https://gitlab.com` or whose `aud` is not the auth-server's base URL: the
-job's YAML fixes the audience, so a token meant for another server stays in
-the job. A refused exchange names the
+`https://gitlab.com`, or none of whose `aud` values is the auth-server's base
+URL exactly, as the exchange compares it: the job's YAML fixes the audience,
+so a token meant for another server, or one whose `aud` carries a trailing
+slash, stays in the job and names the `aud` to set. A refused exchange names the
 auth-server's reason, and the untrusted-project refusal names the trust to
 add. `PUTNAMI_CLOUD_TOKEN`, when set, wins.
 
