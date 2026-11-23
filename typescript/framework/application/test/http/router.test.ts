@@ -327,3 +327,37 @@ describe('Router static paths that share a trie node with another route', () => 
     expect(handlers(router, '/about').sort()).toEqual(['about', 'group']);
   });
 });
+
+describe('Router root route beside a first-segment parameter', () => {
+  const handlers = (router: Router<string>, path: string) => router.find(path).map((m) => m.handler);
+
+  for (const order of [
+    ['/', '/[slug]'],
+    ['/[slug]', '/'],
+  ]) {
+    it(`matches the root only at / and the parameter elsewhere (added ${order.join(', ')})`, () => {
+      const router = new Router<string>();
+      for (const path of order) router.add(path, path === '/' ? 'root' : 'slug');
+      expect(router.find('/')).toMatchObject([{ handler: 'root', route: '/' }]);
+      expect(router.find('')).toMatchObject([{ handler: 'root', route: '/' }]);
+      expect(router.find('/zz')).toMatchObject([{ handler: 'slug', route: '/[slug]', params: { slug: 'zz' } }]);
+      expect(router.find('zz')).toMatchObject([{ handler: 'slug', route: '/[slug]', params: { slug: 'zz' } }]);
+      // The cached exclusivity decision answers the same on a second lookup.
+      expect(handlers(router, '/')).toEqual(['root']);
+    });
+  }
+
+  it('keeps both routes apart in a merged router', () => {
+    const merged = new Router<string>().add('/', 'root').merge(new Router<string>().add('/[slug]', 'slug'));
+    expect(handlers(merged, '/')).toEqual(['root']);
+    expect(merged.find('/zz')).toMatchObject([{ handler: 'slug', route: '/[slug]', params: { slug: 'zz' } }]);
+  });
+
+  it('keeps a nested parameter route apart from a static route on its parent', () => {
+    const router = new Router<string>();
+    router.add('/docs/[page]', 'page');
+    router.add('/docs', 'docs');
+    expect(handlers(router, '/docs')).toEqual(['docs']);
+    expect(router.find('/docs/intro')).toMatchObject([{ handler: 'page', params: { page: 'intro' } }]);
+  });
+});

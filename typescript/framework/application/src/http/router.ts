@@ -32,6 +32,12 @@ type Node<T> = {
   handlers?: Handler<T>[];
   paramName?: string;
   paramNode?: Node<T>;
+  /**
+   * Holds the route and handlers of a route that ends on this node's parameter
+   * (`/[slug]`), apart from the node's own handlers: the root route `/` ends on
+   * the same node as `/[slug]`, and sharing it would answer one for the other.
+   */
+  paramLeaf?: Node<T>;
   wildcard?: Handler<T>[];
 };
 
@@ -117,6 +123,9 @@ export class Router<T = undefined> {
       } else if (n.handlers?.length) {
         looger?.info(path, n?.route, n.paramName);
       }
+      if (n.paramLeaf) {
+        printVisitor(n.paramLeaf, `${path}[${n.paramName}]`);
+      }
       if (n.children) {
         for (const [k, next] of Object.entries(n.children)) {
           // Object.entries returns string keys; charCode trie stores numeric keys as strings
@@ -142,6 +151,10 @@ export class Router<T = undefined> {
         for (const h of toVisit.handlers) {
           target.handlers.push(h);
         }
+      }
+      if (toVisit.paramLeaf) {
+        target.paramLeaf ||= {};
+        visit(target.paramLeaf, toVisit.paramLeaf);
       }
       if (toVisit.children) {
         for (const [cCode, cNode] of Object.entries(toVisit.children)) {
@@ -268,6 +281,10 @@ export class Router<T = undefined> {
             i += 1;
             prevChar = nextChar;
           }
+        } else {
+          // The route ends on the parameter: keep its handlers off the node's own.
+          n.paramLeaf ||= {};
+          n = n.paramLeaf;
         }
         continue;
       }
@@ -665,9 +682,10 @@ function visitParamNode<T>(ctx: Context<T>, startIndex: number, slashesCounter: 
     }
   }
 
-  if (n.handlers && i === path.length) {
-    for (const handler of n.handlers) {
-      pushMatch(ctx, n, 0.3, slashesCounter, handler, currentParams);
+  const leaf = n.paramLeaf;
+  if (leaf?.handlers && i === path.length) {
+    for (const handler of leaf.handlers) {
+      pushMatch(ctx, leaf, 0.3, slashesCounter, handler, currentParams);
     }
   }
 
@@ -695,7 +713,7 @@ function visitNode<T>(context: Context<T>): void {
     }
 
     if (i >= path.length) {
-      if (n.handlers && !n.paramName) {
+      if (n.handlers) {
         for (const handler of n.handlers) {
           pushMatch(context, n, 10, slashesCounter, handler, params);
         }

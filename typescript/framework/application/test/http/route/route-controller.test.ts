@@ -196,3 +196,21 @@ describe('RouteController.findFirst', () => {
     expect(controller.findFirst(buildContext('/nope'))).toBeUndefined();
   });
 });
+
+describe('RouteController root route beside a first-segment parameter', () => {
+  const contextFor = (path: string) =>
+    ({ method: 'GET', headers: new Headers(), path: () => path }) as unknown as HttpRequestContext;
+
+  it('finds the root route for an empty path and the parameter route for zz', () => {
+    const root = () => new Response('root');
+    const slug = () => new Response('slug');
+    const controller = new RouteController();
+    controller.route('GET', '/', root);
+    controller.route('GET', '/[slug]', slug);
+
+    expect(controller.find(contextFor('')).map((m) => m.handler)).toEqual([root]);
+    expect(controller.find(contextFor('zz'))).toMatchObject([
+      { handler: slug, route: '/[slug]', params: { slug: 'zz' } },
+    ]);
+  });
+});
