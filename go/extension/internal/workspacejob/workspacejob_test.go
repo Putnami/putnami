@@ -24,6 +24,7 @@ import (
 
 func TestMain(m *testing.M) {
 	jobtest.ServeFake()
+	workspacejob.ServeMachineGo()
 	os.Exit(m.Run())
 }
 

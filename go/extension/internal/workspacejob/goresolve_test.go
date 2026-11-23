@@ -2,12 +2,16 @@ package workspacejob
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -477,23 +481,60 @@ func machineGo(t *testing.T, goVersion string) string {
 	return dir
 }
 
-// writeFakeGo writes in dir a go command that prints goVersion for
+// machineGoSuffix names the file beside a fake go command that holds the
+// version it reports.
+const machineGoSuffix = ".machinego"
+
+// writeFakeGo places in dir a go command that prints goVersion for
 // `go env GOVERSION` under GOTOOLCHAIN=local with GOROOT unset, go1.99.9
 // otherwise, and fails for any other argument. A goVersion of "fail" makes
 // it fail every call.
+//
+// The command is a symbolic link to this test binary, which ServeMachineGo
+// makes act as that go command. A script written for the test would be a new
+// file, which macOS scans before its first run: on a loaded host the scan alone
+// can outlast machineGoProbeTimeout.
 func writeFakeGo(t *testing.T, dir, goVersion string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("the fake go command is a shell script")
+		t.Skip("the fake go command is a symbolic link")
 	}
-	script := `#!/bin/sh
-[ "$1 $2" = "env GOVERSION" ] || exit 2
-[ "` + goVersion + `" = fail ] && exit 1
-if [ "$GOTOOLCHAIN" = local ] && [ -z "${GOROOT+set}" ]; then echo '` + goVersion + `'; else echo go1.99.9; fi
-`
-	if err := os.WriteFile(filepath.Join(dir, "go"), []byte(script), 0o755); err != nil {
+	self, err := os.Executable()
+	if err != nil {
 		t.Fatal(err)
 	}
+	path := filepath.Join(dir, "go")
+	if err := os.WriteFile(path+machineGoSuffix, []byte(goVersion), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(self, path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// ServeMachineGo acts as the fake go command writeFakeGo placed and exits, or
+// returns when the binary runs as itself. TestMain calls it first.
+func ServeMachineGo() {
+	content, err := os.ReadFile(os.Args[0] + machineGoSuffix)
+	if errors.Is(err, fs.ErrNotExist) {
+		return
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "fake go cannot read its version: "+err.Error())
+		os.Exit(3)
+	}
+	if !slices.Equal(os.Args[1:], []string{"env", "GOVERSION"}) {
+		os.Exit(2)
+	}
+	goVersion := string(content)
+	if goVersion == "fail" {
+		os.Exit(1)
+	}
+	if _, set := os.LookupEnv("GOROOT"); set || os.Getenv("GOTOOLCHAIN") != "local" {
+		goVersion = "go1.99.9"
+	}
+	fmt.Println(goVersion)
+	os.Exit(0)
 }
 
 // goModuleWorkspace returns goWorkspace(t, goWork) with a Go module at

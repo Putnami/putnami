@@ -804,11 +804,16 @@ func (f *Fakes) link(t *testing.T, name string) string {
 	return linkBinary(t, filepath.Join(f.Dir, pkgmeta.ExecutableName(runtime.GOOS, name)))
 }
 
-// linkBinary places the test binary at target: a hard link, a symbolic link
-// where the file system refuses one, and a copy as the last resort. Windows
-// always gets a copy: a hard link to the running test binary cannot be deleted
-// while the binary runs, so the test's TempDir cleanup would fail, and a
-// standard user cannot create a symbolic link.
+// linkBinary places the test binary at target: a symbolic link, or a copy where
+// the file system refuses one. Windows always gets a copy: a standard user
+// cannot create a symbolic link there.
+//
+// Never a hard link: macOS scans a program by path before it runs it, and for a
+// file with several hard links that path can be a link another test has
+// removed with its temporary directory. The scan then cannot read the file and
+// macOS kills the program with SIGKILL. A symbolic link leaves the test binary
+// the one name it keeps for the whole run. A copy is a new file, which macOS
+// scans before its first run.
 func linkBinary(t *testing.T, target string) string {
 	t.Helper()
 	self, err := os.Executable()
@@ -816,11 +821,13 @@ func linkBinary(t *testing.T, target string) string {
 		t.Fatal(err)
 	}
 	if runtime.GOOS != "windows" {
-		if err := os.Link(self, target); err == nil {
+		err := os.Symlink(self, target)
+		if err == nil {
 			return target
 		}
-		if err := os.Symlink(self, target); err == nil {
-			return target
+		// A copy over an existing link would overwrite the test binary.
+		if errors.Is(err, fs.ErrExist) {
+			t.Fatal(err)
 		}
 	}
 	data, err := os.ReadFile(self)
