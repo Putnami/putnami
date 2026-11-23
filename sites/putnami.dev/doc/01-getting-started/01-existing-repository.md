@@ -53,7 +53,7 @@ With the workspace in place, hosted CI runs its pipeline on each pull request. T
 
 - [Set up the workspace](/docs/platform/setup) and [Source](/docs/platform/source) to link and connect the repository.
 - [Hosted CI](/docs/platform/ci) to enable the pipeline, and [Read what a change proved and lost](/docs/platform/ci#read-what-a-change-proved-and-lost) for the verdict.
-- [Intelligence and reviews](/docs/platform/intelligence) for reviews.
+- [Agency and reviews](/docs/platform/agency) for reviews.
 - [Decide a change in the app](/docs/platform/ci#decide-a-change-in-the-app) to approve and merge from the change page.
 - [Connect Claude or Codex](/docs/platform/mcp) to give your agents the same view.
 

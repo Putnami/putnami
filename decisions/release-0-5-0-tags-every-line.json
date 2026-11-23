@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "release-0-5-0-tags-every-line",
+  "statement": "the 0.5.0 release tags all sixteen version lines at 0.5.0, the eight never tagged included, each with its explicit tag, whatever version the line computes; D-004 and D-005 keep deciding every later release",
+  "settled": "2026-11-23",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

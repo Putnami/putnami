@@ -1,5 +1,104 @@
 # Changelog
 
+## 0.5.0 — unreleased
+
+Every version line moves to 0.5.0: the `putnami` CLI and its extensions, the Go,
+TypeScript and Python frameworks, the protocols, the sites, and the `cloud` and
+`intelligence` lines. The `integrations`, `rust`, `java`, `swift`, `dart`,
+`dotnet`, `ruby` and `php` lines are tagged for the first time. Each line's own
+changelog lists its commits.
+
+- `putnami init --from bazel|moon|nx|pants|rush|turbo` turns a repository of that
+  tool into a workspace. The six integrations are on the stable channel for the
+  first time and stay `experimental`.
+- Language stacks for Rust, Java and Kotlin, Swift, Dart, .NET, Ruby and PHP are on
+  the stable channel for the first time and stay `experimental`.
+- `@putnami/observe` and the evidence document are `preview`. Observe reads more
+  build tools and CI systems, uploads without a secret from GitHub Actions and
+  GitLab CI, and analyzes recent history on a laptop.
+- `@putnami/gitlab-collaboration` is a `preview` tasks and proposals provider.
+- A feature can read its requirements from GitHub Spec Kit, OpenSpec, Kiro and
+  Gherkin files.
+- TypeScript: npm, pnpm and yarn installs, Vitest and Jest suites, ESLint, Node
+  services, and `putnami deps add|remove`.
+- `@putnami/cloud` hosts the `putnami agency` commands and the hosted memory and
+  missions providers. This repository no longer loads `@putnami/intelligence`.
+
+### What you have to change
+
+Run `putnami upgrade`, then `putnami install`. Upgrade the CLI and the extensions
+together: an extension of this release does not load in an older CLI.
+
+#### Every workspace
+
+- **A lock below format 4 is no longer read.** Delete `putnami.lock.json`, run
+  `putnami install`, review the versions it records, and commit it.
+- **An undeclared flag exits 2.**
+- **`PUTNAMI_UNSAFE_UPDATE`, `PUTNAMI_CACHE_COMMAND` and
+  `PUTNAMI_HTTP_RETRY_BACKOFF` are gone.** Remove them.
+- **`putnami package` exits 2 on a project you name with no package channel on.**
+  Set `options.package.<channel>` or pass its flag.
+- **Git holds no generated client.** Remove the committed client files and
+  `client.putnami.json`, and name the provider in `generatedFrom`. The
+  `clientgen`, `clientgen-sync` and `clientgen-adopt` commands are gone.
+
+#### TypeScript
+
+- **`@putnami/database` runs on `Bun.SQL`.** `cursor`, `forEach`, `describe`,
+  COPY, `typed`, `subscribe`, `largeObject` and the `unsafe()` options are gone.
+  `sql([...])` is always an `IN` list. JSON keys come back as stored, and pgvector
+  and enum arrays read as text.
+- **`DatabaseSessionStore` implements `AsyncSessionStore`,** without its process
+  cache. A store with a row per session loads it once per request.
+- **A static folder other than `public/` fails the build.** Move it under the
+  `public/` the error names, or copy it into `.gen/public` with
+  `options.generate.assets`.
+- **`flushIntervalS` is ignored.** Set `metricIntervalS` and `spanBatchDelayS`.
+- **`http.{METHOD}.{route}.*` and `http.error.*` metrics are gone.** Read
+  `http.server.request_count` and `http.server.duration`, and filter on
+  `http.status_code`. `HistogramAggregate` gains a required `bucketCounts`.
+- **An endpoint that returns `undefined` answers 204, a malformed JSON body 400,
+  and an endpoint asked for a type it cannot serialize 406.**
+- **`clientGenerator()` takes no options.**
+- **A spread of the request context (`{ ...ctx }`) no longer copies its
+  accessors.** Pass the context itself, or read the values first.
+
+#### Go
+
+- **`Config.TraceSampleRate` and `SampleRate()` are gone.** Set
+  `Config.TraceSampling`. Unset, it samples by the trace budget, not every trace.
+- **`api.ClientsOptions` keeps only `ThirdParty`.**
+- **`Severities`, `CycloneDXVersions` and `SPDXVersions` of
+  `go.putnami.dev/evidence/readers` are functions.** Call them.
+- **Exports of `go.putnami.dev/cli/model` and `go.putnami.dev/sdk/extension` are
+  gone,** and `oci.PushContent` has a new signature.
+
+#### Services in both languages
+
+- **Access lines with a 2xx, 4xx or 499 status log at DEBUG.** Count
+  `http.server.request_count` instead, or set `logger.level` to `debug`.
+- **A service exports a bounded set of traces.** Set
+  `telemetry.traces.budget`, `.ratio` and `.floorPerMinute`. TypeScript records
+  only sampled spans.
+- **Metrics leave every 60 s instead of 10 s.** Adjust alerts that expect 10 s.
+
+#### Putnami Cloud, observe and extension authors
+
+- **`putnami cloud login` asks for `agency.read` and `agency.audit`.** No
+  `intelligence.*` scope remains. Sign in again, and bind missions and memory to
+  `@putnami/cloud`.
+- **`putnami observe --publish` needs `--upload`.** A third-party evidence
+  reporter must accept `--output=json`.
+- **The Go tooling writes runtime events at protocol 2, and a cache provider must
+  speak provider RPC 2.** The `cacheHit` and `coalesced` wire fields are gone.
+- **`@putnami/cloud` requires CLI contract 24.**
+- **The CLI no longer reads the whole-output (format 1) cache entries a 0.4.0 or
+  older CLI wrote.** Such an entry is a cache miss, so the first run after the
+  upgrade may rebuild its tasks. Garbage collection evicts the entries.
+
+Rollback: `putnami pin 0.4.0` in a workspace, or
+`putnami upgrade --version 0.4.0` for the machine-wide CLI.
+
 ## 0.4.0 — 2026-11-04
 
 Every version line moves to 0.4.0: the `putnami` CLI and its extensions, the Go,

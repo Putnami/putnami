@@ -2180,6 +2180,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/platform/agency",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/platform/agent-environments",
       "methods": [
         "GET",
@@ -2330,7 +2345,7 @@
     },
     {
       "match": "exact",
-      "path": "/docs/platform/install",
+      "path": "/docs/platform/factory",
       "methods": [
         "GET",
         "HEAD"
@@ -2345,7 +2360,67 @@
     },
     {
       "match": "exact",
-      "path": "/docs/platform/intelligence",
+      "path": "/docs/platform/factory/build-from-an-issue",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/platform/factory/merge-queue-and-release",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/platform/factory/validation",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/platform/factory/verdict-policy",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/platform/install",
       "methods": [
         "GET",
         "HEAD"
@@ -2451,6 +2526,21 @@
     {
       "match": "exact",
       "path": "/docs/platform/runtime",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/docs/platform/security",
       "methods": [
         "GET",
         "HEAD"
@@ -5254,6 +5344,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/platform/agency",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/platform/agent-environments",
       "methods": [
         "GET",
@@ -5404,7 +5509,7 @@
     },
     {
       "match": "exact",
-      "path": "/fr/docs/platform/install",
+      "path": "/fr/docs/platform/factory",
       "methods": [
         "GET",
         "HEAD"
@@ -5419,7 +5524,67 @@
     },
     {
       "match": "exact",
-      "path": "/fr/docs/platform/intelligence",
+      "path": "/fr/docs/platform/factory/build-from-an-issue",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/platform/factory/merge-queue-and-release",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/platform/factory/validation",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/platform/factory/verdict-policy",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/platform/install",
       "methods": [
         "GET",
         "HEAD"
@@ -5525,6 +5690,21 @@
     {
       "match": "exact",
       "path": "/fr/docs/platform/runtime",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/platform/security",
       "methods": [
         "GET",
         "HEAD"
@@ -6476,5 +6656,5 @@
       }
     }
   ],
-  "digest": "sha256:3ee3d97084dc216f56fabaff4eba0ebc7f86f6f9deec0e3e287516f5bda48deb"
+  "digest": "sha256:f9094665ed31195a346ea12a688aa3fb99b84d00b38133c16f83d81c82441161"
 }
