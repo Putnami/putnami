@@ -96,8 +96,9 @@ func TestReapOrphans_SparesLiveOwner_KillsDeadOwnerGroup(t *testing.T) {
 	root := t.TempDir()
 	isolator := &fakeIsolator{}
 	deps := reapDeps{
-		isolator:  func() (dbtestenv.DatabaseIsolator, bool) { return isolator, true },
-		killDelay: 200 * time.Millisecond,
+		isolator:     func() (dbtestenv.DatabaseIsolator, bool) { return isolator, true },
+		killDelay:    200 * time.Millisecond,
+		confirmDelay: hangDetector,
 	}
 
 	// An orphan whose member ignores SIGTERM: the reaper must escalate.
@@ -215,7 +216,7 @@ func TestLease_SurvivesAKilledOwnerAndIsReaped(t *testing.T) {
 		t.Fatalf("surviving lease = %s (%v)", data, err)
 	}
 
-	reaped := reapOrphans(root, reapDeps{killDelay: time.Second})
+	reaped := reapOrphans(root, reapDeps{killDelay: time.Second, confirmDelay: hangDetector})
 	if len(reaped) != 1 || reaped[0].ID != id {
 		t.Fatalf("reaped = %+v, want %s", reaped, id)
 	}

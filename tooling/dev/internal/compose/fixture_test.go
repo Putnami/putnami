@@ -323,7 +323,9 @@ func writeFile(t *testing.T, path, content string) {
 func (f *compositionFixture) deps(provider databaseProvider) upDeps {
 	return upDeps{
 		provider: func() databaseProvider { return provider },
-		reap:     func(root string) []ReapedLease { return reapOrphans(root, reapDeps{killDelay: 100 * time.Millisecond}) },
+		reap: func(root string) []ReapedLease {
+			return reapOrphans(root, reapDeps{killDelay: 100 * time.Millisecond, confirmDelay: hangDetector})
+		},
 	}
 }
 

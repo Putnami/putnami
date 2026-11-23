@@ -318,7 +318,7 @@ func TestReapOrphans_StopsTheServeRunAndTheServeStepOfAKilledComposition(t *test
 			t.Fatalf("group %d of the killed composition is already gone", pgid)
 		}
 	}
-	reaped := reapOrphans(root, reapDeps{killDelay: time.Second})
+	reaped := reapOrphans(root, reapDeps{killDelay: time.Second, confirmDelay: hangDetector})
 	if len(reaped) != 1 || reaped[0].ID != id || len(reaped[0].Leftovers) != 0 {
 		t.Fatalf("reaped = %+v, want %s released", reaped, id)
 	}

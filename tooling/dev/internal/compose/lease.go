@@ -27,6 +27,9 @@ const (
 	// reapKillDelay is how long a reaped process group has to exit after
 	// SIGTERM before it receives SIGKILL.
 	reapKillDelay = 2 * time.Second
+	// reapConfirmDelay is how long a reaped process group has to exit after
+	// SIGKILL before the reap names it as left running.
+	reapConfirmDelay = time.Second
 	// reapDropTimeout bounds dropping one orphaned database.
 	reapDropTimeout = 30 * time.Second
 	// groupPollInterval is the cadence of the liveness checks while a signaled
@@ -233,8 +236,9 @@ func readLease(dir string) (Lease, bool) {
 
 // reapDeps are the effects ReapOrphans acts through, replaceable in tests.
 type reapDeps struct {
-	isolator  func() (dbtestenv.DatabaseIsolator, bool)
-	killDelay time.Duration
+	isolator     func() (dbtestenv.DatabaseIsolator, bool)
+	killDelay    time.Duration
+	confirmDelay time.Duration
 }
 
 func defaultReapDeps() reapDeps {
@@ -243,7 +247,8 @@ func defaultReapDeps() reapDeps {
 			isolator, ok := dbtestenv.SelectProvider().(dbtestenv.DatabaseIsolator)
 			return isolator, ok
 		},
-		killDelay: reapKillDelay,
+		killDelay:    reapKillDelay,
+		confirmDelay: reapConfirmDelay,
 	}
 }
 
@@ -283,7 +288,7 @@ func reapOrphans(workspaceRoot string, deps reapDeps) []ReapedLease {
 			continue // a live owner, or another reaper, holds it
 		}
 		result := ReapedLease{Lease: lease}
-		result.Leftovers = append(result.Leftovers, stopProcessGroups(lease, deps.killDelay)...)
+		result.Leftovers = append(result.Leftovers, stopProcessGroups(lease, deps)...)
 		result.Leftovers = append(result.Leftovers, dropLeaseDatabases(lease, deps)...)
 		_ = filelock.RemoveDir(dir, ownerLockName, lock.Release)
 		reaped = append(reaped, result)
@@ -298,7 +303,7 @@ func reapOrphans(workspaceRoot string, deps reapDeps) []ReapedLease {
 }
 
 // stopProcessGroups terminates the lease's process groups that it confirms are
-// still the ones the composition started, escalates to SIGKILL after delay
+// still the ones the composition started, escalates to SIGKILL after killDelay
 // (confirming again first), and names every group it left running.
 //
 // A process group id is handed to another process once its group is empty, so
@@ -307,7 +312,7 @@ func reapOrphans(workspaceRoot string, deps reapDeps) []ReapedLease {
 // record, or a leader that is gone while the group still runs — is named and
 // never signaled. An id whose leader is a different process names a group
 // that is not this composition's: it is neither signaled nor reported.
-func stopProcessGroups(lease Lease, delay time.Duration) []string {
+func stopProcessGroups(lease Lease, deps reapDeps) []string {
 	var leftovers []string
 	var running []int
 	for _, pgid := range lease.PGIDs {
@@ -319,7 +324,7 @@ func stopProcessGroups(lease Lease, delay time.Duration) []string {
 			leftovers = append(leftovers, unverifiedGroup(pgid))
 		}
 	}
-	running = waitForGroups(running, delay)
+	running = waitForGroups(running, deps.killDelay)
 	var killed []int
 	for _, pgid := range running {
 		switch identifyGroup(pgid, lease.leaderStart(pgid)) {
@@ -330,7 +335,7 @@ func stopProcessGroups(lease Lease, delay time.Duration) []string {
 			leftovers = append(leftovers, unverifiedGroup(pgid))
 		}
 	}
-	for _, pgid := range waitForGroups(killed, time.Second) {
+	for _, pgid := range waitForGroups(killed, deps.confirmDelay) {
 		leftovers = append(leftovers, fmt.Sprintf("process group %d", pgid))
 	}
 	return leftovers
