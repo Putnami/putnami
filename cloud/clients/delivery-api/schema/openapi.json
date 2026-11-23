@@ -158,6 +158,31 @@
         },
         "type": "object"
       },
+      "CIRunCIResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "runAttempt": {
+            "description": "The attempt of the CI run, 1 or more.",
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "runId": {
+            "description": "The CI's own id for the run.",
+            "type": "string"
+          },
+          "runUrl": {
+            "description": "The https address of the run's page at its CI.",
+            "type": "string"
+          },
+          "system": {
+            "description": "The CI that ran the run: putnami-ci, github-actions, gitlab-ci, or the short name an upload gave.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CIRunCancelRequest": {
         "additionalProperties": false,
         "properties": {
@@ -729,6 +754,10 @@
               "type": "string"
             },
             "type": "object"
+          },
+          "ci": {
+            "$ref": "#/components/schemas/CIRunCIResponse",
+            "nullable": true
           },
           "conclusion": {
             "type": "string"
@@ -4437,6 +4466,10 @@
             "$ref": "#/components/schemas/ChangeRequest",
             "nullable": true
           },
+          "ciSystem": {
+            "description": "The CI that ran the job: github-actions, gitlab-ci, or another short lowercase name. putnami-ci is reserved for Putnami's own runner and refused. Required by runId, runAttempt and runUrl.",
+            "type": "string"
+          },
           "conclusion": {
             "type": "string"
           },
@@ -4482,6 +4515,21 @@
           "repository": {
             "$ref": "#/components/schemas/RepositoryRef",
             "nullable": true
+          },
+          "runAttempt": {
+            "description": "The attempt of the CI run, 1 or more (GITHUB_RUN_ATTEMPT). A GitLab pipeline has one attempt: absent, it reads 1.",
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "runId": {
+            "description": "The CI's own id for the run: a GitHub Actions workflow run id (GITHUB_RUN_ID), a GitLab pipeline id (CI_PIPELINE_ID). Absent, Delivery reads it from runUrl when the url has its CI's shape.",
+            "type": "string"
+          },
+          "runUrl": {
+            "description": "The https address of the run's page at its CI.",
+            "type": "string"
           },
           "selection": {
             "$ref": "#/components/schemas/GateSelection",

@@ -22,6 +22,15 @@
       ]
     },
     {
+      "id": "sends-the-ci-run",
+      "text": [
+        "The run names its CI: ciSystem is the document's system, for a generic one the CI the environment's markers name;",
+        "runId, runAttempt and runUrl are the document's, runUrl without query or fragment. A local run sends none.",
+        "A member Delivery would refuse is left out with a warning: ciSystem putnami-ci or not short and lowercase, with the other three;",
+        "a run id over 128 characters, an attempt over 2147483647, a url not https without credentials or over 2048 characters, either with a space or control character."
+      ]
+    },
+    {
       "id": "sends-the-tested-tree",
       "text": [
         "The run carries under operational what the job tested, read with Git where the command was invoked: testedTree when the subject's commit is the merge the CI built (GitHub refs/pull/<n>/merge at GITHUB_SHA, a GitLab merged results or merge train pipeline at CI_COMMIT_SHA), else testedHeadTree;",

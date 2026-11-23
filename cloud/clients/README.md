@@ -29,9 +29,11 @@ oci-server, put-server, runtime-api and source-api.
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
 file, except the ones named below. `delivery-api` comes from the later version
-`0.0.0-20261122231855-1fad7bba3`, published on 2026-11-22, archive digest
-`sha256:eb46b5a1dfd4b253c54a62bceb970ad1078e893e0c5dde7dd90d53131b57af81`. It
-carries the merge queue setting and entries
+`0.0.0-20261123111359-587eb29f5`, published on 2026-11-23, archive digest
+`sha256:7b962ef088c65103e2dc061272450a14d5d3a109f1da4520b5e6eb8111cd65f8`. It
+carries the CI run of a records submission (`ciSystem`, `runId`, `runAttempt`
+and `runUrl` of `SubmitRequest`), which `putnami cloud evidence-report` sends,
+and its read (`CIRunResponse.ci`). It also carries the merge queue setting and entries
 (`getV1_Workspaces_Workspace_Ci_Queue`, `putV1_Workspaces_Workspace_Ci_Queue`,
 `getV1_Workspaces_Workspace_Ci_Queue_Entries`), the test cases of a tests
 report (`cases` and `omittedCases` of `ProjectTests`), which

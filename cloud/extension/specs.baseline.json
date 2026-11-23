@@ -62,6 +62,7 @@
     "cloud/evidence-upload#opens-the-external-run",
     "cloud/evidence-upload#posts-the-reports-in-two-batches",
     "cloud/evidence-upload#refuses-what-it-cannot-upload",
+    "cloud/evidence-upload#sends-the-ci-run",
     "cloud/evidence-upload#sends-the-declared-records",
     "cloud/evidence-upload#sends-the-dependency-states",
     "cloud/evidence-upload#sends-the-provenance-of-the-ci",

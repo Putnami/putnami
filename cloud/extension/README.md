@@ -612,6 +612,20 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
    job, so uploading one job twice opens one run. GitHub Actions gives every
    leg of a matrix the same job key, so a `gha` id also carries a digest of
    what the leg measured, and each leg opens its own run.
+   The run names its CI run apart from the provenance, so Putnami Cloud can
+   show it and link to it: `ciSystem` is the document's CI system
+   (`github-actions`, `gitlab-ci`, or another short name), and for a
+   `generic` document the CI the evidence protocol's markers name in the
+   upload's environment; `runId`, `runAttempt` and `runUrl` are the
+   document's run id, attempt and url, the url without its query and
+   fragment, which can carry a token and which Delivery does not keep. A `local` run names none of them. A
+   member Delivery would refuse (a run id over 128 characters, an attempt
+   over its bound, a url that is not an https address without credentials
+   or is over 2048 characters, a run id or url with a space or a control
+   character) is left out with a
+   warning, and the run still opens. A CI system Delivery would refuse,
+   `putnami-ci` or a name that is not short and lowercase, takes the other
+   three members with it.
    The run's `operational` member names what the job tested, read with Git
    in the directory the command was invoked from. `testedTree` is the tree
    of the document's commit when that commit is the merge the CI built: a

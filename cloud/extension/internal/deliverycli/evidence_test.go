@@ -682,6 +682,7 @@ func TestEvidenceBatchMembersReachTheGeneratedClient(t *testing.T) {
 		{evidence.Vulnerability{}, deliveryapiclient.Vulnerability{}},
 		{evidence.TestCase{}, deliveryapiclient.TestCase{}},
 		{evidenceProjectTests{}, deliveryapiclient.ProjectTests{}},
+		{evidenceSubmitRequest{}, deliveryapiclient.SubmitRequest{}},
 	} {
 		known := map[string]bool{}
 		for _, name := range jsonMemberNames(reflect.TypeOf(pair.client)) {

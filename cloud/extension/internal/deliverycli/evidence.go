@@ -37,8 +37,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	deliveryapiclient "go.putnami.dev/cloud/clients/delivery-api/go"
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
@@ -83,7 +85,26 @@ type evidenceSubmitRequest struct {
 	Conclusion    string                 `json:"conclusion"`
 	Operational   *evidenceOperational   `json:"operational,omitempty"`
 	Repository    *evidenceRepository    `json:"repository,omitempty"`
+	// CISystem, RunID, RunAttempt and RunURL name the CI run that produced the
+	// evidence, apart from the provenance: a local run names none.
+	CISystem   string `json:"ciSystem,omitempty"`
+	RunID      string `json:"runId,omitempty"`
+	RunAttempt int    `json:"runAttempt,omitempty"`
+	RunURL     string `json:"runUrl,omitempty"`
 }
+
+// evidenceCISystemPattern is the CI system name Delivery takes: short and
+// lowercase, such as github-actions or gitlab-ci.
+var evidenceCISystemPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
+
+// Delivery's bounds on the members that name a CI run, and the CI system only
+// its own runner names.
+const (
+	evidenceCISystemPutnamiCI = "putnami-ci"
+	maxEvidenceCIRunIDLength  = 128
+	maxEvidenceCIRunURLLength = 2048
+	maxEvidenceCIRunAttempt   = 1<<31 - 1
+)
 
 // evidenceRepository names the repository of an upload. Delivery resolves the
 // observed workspace from it for a person's upload, which names no workspace,
@@ -213,6 +234,10 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 		if reason, ok := leftOut[field]; ok {
 			ioctx.Stderr("warning: cloud evidence-report sends no " + field + ": " + reason)
 		}
+	}
+
+	for _, member := range evidenceCIRun(&run, doc, env) {
+		ioctx.Stderr("warning: cloud evidence-report sends no " + member)
 	}
 
 	resp, refused, err := openEvidenceRun(ioctx, controlURL, token, run)
@@ -432,6 +457,71 @@ func evidenceRun(doc *evidence.Document, env map[string]string) (evidenceSubmitR
 		}
 	}
 	return run, nil
+}
+
+// evidenceCIRun names on run the CI run that produced the document: its CI
+// system, and the run id, attempt and url the document gives. A generic
+// document names the CI the environment of the upload describes; a local run
+// names none. A member Delivery would refuse is left out, so the run still
+// opens: it returns each one with why, for a warning.
+func evidenceCIRun(run *evidenceSubmitRequest, doc *evidence.Document, env map[string]string) []string {
+	if run.Provenance == provenanceLocal {
+		return nil
+	}
+	system := doc.CI.System
+	if system == evidence.CISystemGeneric {
+		if detected, inCI := evidence.DetectCISystem(envLookup(env)); inCI {
+			system = detected
+		}
+	}
+	// Delivery refuses putnami-ci, which only its own runner names, and any
+	// name that is not short and lowercase; it refuses the run id, attempt and
+	// url without a system, so they go with it.
+	if system == evidenceCISystemPutnamiCI || !evidenceCISystemPattern.MatchString(system) {
+		return []string{"ciSystem, runId, runAttempt or runUrl: Delivery takes no CI system " + strconv.Quote(system)}
+	}
+	run.CISystem = system
+	var leftOut []string
+	if id := strings.TrimSpace(doc.CI.RunID); id != "" {
+		if len(id) > maxEvidenceCIRunIDLength || !evidencePrintableToken(id) {
+			leftOut = append(leftOut, fmt.Sprintf("runId: the run id must be at most %d printable characters without spaces", maxEvidenceCIRunIDLength))
+		} else {
+			run.RunID = id
+		}
+	}
+	if attempt := doc.CI.Attempt; attempt != nil {
+		if *attempt < 1 || *attempt > maxEvidenceCIRunAttempt {
+			leftOut = append(leftOut, fmt.Sprintf("runAttempt: the attempt %d is not between 1 and %d", *attempt, maxEvidenceCIRunAttempt))
+		} else {
+			run.RunAttempt = *attempt
+		}
+	}
+	if address := strings.TrimSpace(doc.CI.URL); address != "" {
+		parsed, err := url.Parse(address)
+		switch {
+		case len(address) > maxEvidenceCIRunURLLength || !evidencePrintableToken(address):
+			leftOut = append(leftOut, fmt.Sprintf("runUrl: the run url must be at most %d printable characters without spaces", maxEvidenceCIRunURLLength))
+		case err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil:
+			leftOut = append(leftOut, "runUrl: the run url must be an https address without credentials")
+		default:
+			// Delivery stores the url without its query and fragment, since a
+			// query can carry a token: neither leaves the job.
+			parsed.RawQuery, parsed.ForceQuery, parsed.Fragment, parsed.RawFragment = "", false, "", ""
+			run.RunURL = parsed.String()
+		}
+	}
+	return leftOut
+}
+
+// evidencePrintableToken reports whether value holds no space and no control
+// character, as Delivery checks a CI run id and url.
+func evidencePrintableToken(value string) bool {
+	for _, r := range value {
+		if unicode.IsSpace(r) || !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return true
 }
 
 // openEvidenceRun opens the run on the records route. It also returns the

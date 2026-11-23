@@ -510,6 +510,23 @@
           }
         },
         {
+          "id": "sends-the-ci-run",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-github-actions-run-names-its-ci",
+              "a-gitlab-ci-run-names-its-ci",
+              "a-generic-document-in-a-ci-names-the-ci-it-detects",
+              "a-local-run-names-no-ci",
+              "a-member-delivery-would-refuse-is-left-out"
+            ]
+          }
+        },
+        {
           "id": "sends-the-tested-tree",
           "stage": "coded",
           "evidenceKinds": [
