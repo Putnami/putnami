@@ -1189,6 +1189,7 @@
               "a-server-error-logs-at-error-without-its-text-in-the-message",
               "a-client-outcome-logs-as-success",
               "an-excluded-path-logs-nothing",
+              "a-request-below-debug-builds-no-log-context",
               "the-request-record-matches-the-cross-language-log-corpus",
               "the-trace-id-follows-the-request-and-returns-in-the-response"
             ]

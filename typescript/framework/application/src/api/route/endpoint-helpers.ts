@@ -71,9 +71,9 @@ export function buildHttpEndpointHandler(def: EndpointDefinition, aot?: AotValid
   const middleware = def.middleware ?? [];
   let validated: RouteHandler = raw;
   if (aot && middleware.length === 0) {
-    validated = buildAotValidatedHandler(def, aot);
+    validated = validatingInput(raw, def.schemas, aot) ?? buildAotValidatedHandler(def, aot);
   } else if (needsValidation(def.schemas)) {
-    validated = wrapWithValidation(raw, def.schemas);
+    validated = validatingInput(raw, def.schemas) ?? wrapWithValidation(raw, def.schemas);
   }
   const answered = answeringNoContent(validated);
   return middleware.length > 0 ? wrapWithMiddleware(answered, middleware) : answered;
@@ -92,13 +92,24 @@ export function isEmptyEndpointAnswer(result: unknown): boolean {
 }
 
 function answeringNoContent(handler: RouteHandler): RouteHandler {
-  return async (ctx: HttpRequestContext) => {
-    const result = await handler(ctx);
+  const answer = (ctx: HttpRequestContext, result: RouteHandlerResult): RouteHandlerResult => {
     if (result !== undefined) return result;
     const status = ctx.statusCode && ctx.statusCode !== 200 ? ctx.statusCode : 204;
-    const answer = new HttpResponse(undefined, { status });
-    emptyAnswers.add(answer);
-    return answer;
+    const empty = new HttpResponse(undefined, { status });
+    emptyAnswers.add(empty);
+    return empty;
+  };
+  // No async frame of its own: the answer is read in the continuation of the
+  // handler's promise, and a handler that throws or answers at once still
+  // answers through a promise.
+  return (ctx: HttpRequestContext) => {
+    let result: Promise<RouteHandlerResult> | RouteHandlerResult;
+    try {
+      result = handler(ctx);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    return Promise.resolve(result).then((value) => answer(ctx, value));
   };
 }
 
@@ -159,6 +170,25 @@ function wrapWithMiddleware(handler: RouteHandler, middleware: readonly HttpMidd
 }
 
 const DEV_MODE = process.env.NODE_ENV !== 'production';
+
+/**
+ * The input validation of an endpoint served over HTTP, as a plain call in
+ * front of its handler: with no streamed binary answer and no dev-mode
+ * response check, nothing runs after the handler, so the validation needs no
+ * async frame of its own. Undefined when something does: the full wrapper
+ * applies. Its caller turns a synchronous throw into a rejection.
+ */
+function validatingInput(
+  handler: RouteHandler,
+  schemas: EndpointDefinition['schemas'],
+  aot?: AotValidators,
+): RouteHandler | undefined {
+  if (schemas?.returnsBinary?.streamed || (DEV_MODE && schemas?.returns)) return undefined;
+  return (ctx: HttpRequestContext) => {
+    applyInputValidation(ctx, schemas, aot);
+    return handler(ctx);
+  };
+}
 
 function wrapWithValidation(
   handler: RouteHandler,

@@ -1,4 +1,6 @@
+import type { HttpRequestContext } from './http-context.type';
 import type { HttpMiddleware } from './http-middleware.type';
+import type { HttpResponse } from './http-response';
 import { skipsSecurityHeaders } from './minimal.util';
 
 export const CSP_NONCE_CONTEXT_KEY = 'cspNonce';
@@ -160,12 +162,10 @@ export const SecurityHeadersMiddleware = (options: SecurityHeadersOptions = {}):
       }
     : undefined;
 
-  return async (ctx, next) => {
-    // Per-route opt-out: skip only when every matched candidate opts out.
-    if (skipsSecurityHeaders(ctx)) return next();
-
-    let res = await next();
-    if (!res) return res;
+  /** Applies the header set to the response the inner chain produced. */
+  const secure = (ctx: HttpRequestContext, response: HttpResponse | undefined): HttpResponse | undefined => {
+    if (!response) return response;
+    let res = response;
 
     const raw = res.rawHeaderEntries();
     // The commonest response — JSON whose only header is its Content-Type —
@@ -205,5 +205,22 @@ export const SecurityHeadersMiddleware = (options: SecurityHeadersOptions = {}):
     }
 
     return res;
+  };
+
+  // No async layer of its own: the headers apply in the continuation of the
+  // inner chain's promise.
+  return (ctx, next) => {
+    // Per-route opt-out: skip only when every matched candidate opts out.
+    if (skipsSecurityHeaders(ctx)) return next();
+
+    let inner: Promise<HttpResponse | undefined>;
+    try {
+      inner = next();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const apply = (res: HttpResponse | undefined) => secure(ctx, res);
+    // A middleware that broke its contract and returned a plain value still works.
+    return inner instanceof Promise ? inner.then(apply) : Promise.resolve(inner).then(apply);
   };
 };

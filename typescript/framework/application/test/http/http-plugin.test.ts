@@ -341,6 +341,26 @@ describe('HttpPlugin', () => {
     });
   });
 
+  // Bun may normalize the double slash before the handler: the routing path unit test proves the rule itself.
+  it('routes a path that starts with a double slash as path() names it', async () => {
+    const plugin = http({ port: 0 });
+    plugin.get('/foo', () => HttpResponse.json({ route: 'foo' }));
+    plugin.get('/[tenant]/bar', (ctx) => HttpResponse.json({ tenant: ctx.params?.['tenant'] }));
+    const app = application().use(plugin);
+    await app.start();
+    try {
+      const base = `http://localhost:${plugin.getServer()?.port}`;
+      const res = await fetch(`${base}//foo`);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ route: 'foo' });
+      const param = await fetch(`${base}//acme/bar`);
+      expect(param.status).toBe(200);
+      expect(await param.json()).toEqual({ tenant: 'acme' });
+    } finally {
+      await app.stop();
+    }
+  });
+
   describe('Request Safeguards', () => {
     let app: Application;
     let plugin: HttpPlugin;
@@ -455,6 +475,20 @@ describe('HttpPlugin', () => {
         expect(res.status).toBe(413);
       },
     );
+
+    it('aborts the request signal when its client leaves, with the client reason', async () => {
+      const client = new AbortController();
+      const pending = fetch(`${baseUrl}/stalled`, { signal: client.signal }).catch(() => undefined);
+      const started = Date.now();
+      while (stalled === undefined && Date.now() - started < 1000) await Bun.sleep(5);
+      expect(stalled?.signal?.aborted).toBe(false);
+      client.abort();
+      while (!stalled?.signal?.aborted && Date.now() - started < 1000) await Bun.sleep(5);
+      await pending;
+      expect(stalled?.signal?.aborted).toBe(true);
+      // The signal carries the client's reason, not the timeout's: the client left first.
+      expect((stalled?.signal?.reason as DOMException | undefined)?.name).not.toBe('TimeoutError');
+    });
 
     specTest(
       'should timeout long-running requests',

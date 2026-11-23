@@ -50,6 +50,14 @@ type StaticEntry<T> = {
    * forgotten whenever a route is added.
    */
   exclusive?: boolean;
+  /**
+   * The match list of the last lookup and the parsed Accept list it was
+   * built for. Callers share parsed Accept lists by header value, so a path
+   * served again with the same Accept reuses the list instead of rebuilding it.
+   * Never mutated by callers.
+   */
+  lastAccept?: readonly string[];
+  lastResults?: HandlerResult<T>[];
 };
 
 type NodeMatch<T> = {
@@ -298,7 +306,11 @@ export class Router<T = undefined> {
       this.dynamicCount++;
     }
     // A new route can match a path an indexed static route answered alone.
-    for (const entry of this.staticRoutes.values()) entry.exclusive = undefined;
+    for (const entry of this.staticRoutes.values()) {
+      entry.exclusive = undefined;
+      entry.lastAccept = undefined;
+      entry.lastResults = undefined;
+    }
 
     return this;
   }
@@ -431,6 +443,9 @@ function scoreAccept<T>(handler: Handler<T>, requestAccept: readonly string[]): 
  * have produced for the same exact path.
  */
 function matchStaticEntry<T>(entry: StaticEntry<T>, requestAccept: readonly string[]): HandlerResult<T>[] {
+  if (entry.lastAccept === requestAccept && entry.lastResults !== undefined) {
+    return entry.lastResults;
+  }
   const results: HandlerResult<T>[] = [];
   for (const handler of entry.handlers) {
     const acceptScore = scoreAccept(handler, requestAccept);
@@ -454,10 +469,21 @@ function matchStaticEntry<T>(entry: StaticEntry<T>, requestAccept: readonly stri
   if (results.length > 1) {
     results.sort((a, b) => b.score - a.score);
   }
+  entry.lastAccept = requestAccept;
+  entry.lastResults = results;
   return results;
 }
 
 const normalizePath = (_path: string): string => {
+  // A path that starts with a slash and does not end with one is already normal.
+  const length = _path.length;
+  if (
+    length > 0 &&
+    _path.charCodeAt(0) === CODE_SLASH &&
+    (length === 1 || _path.charCodeAt(length - 1) !== CODE_SLASH)
+  ) {
+    return _path;
+  }
   let path = _path;
   if (path === '') {
     path = '/';
@@ -647,37 +673,55 @@ function visitParamNode<T>(ctx: Context<T>, startIndex: number, slashesCounter: 
 }
 
 function visitNode<T>(context: Context<T>): void {
-  const { n, path, matches, requestAccept, params } = context;
-  const i = context.i;
+  const { path, matches, requestAccept, params } = context;
+  let n = context.n;
+  let i = context.i;
   let slashesCounter = context.slashesCounter ?? 0;
 
-  if (n.wildcard) {
-    visitWildcard(context, slashesCounter);
-  }
-
-  if (!path[i]) {
-    if (n.handlers && !n.paramName) {
-      for (const handler of n.handlers) {
-        pushMatch(context, n, 10, slashesCounter, handler, params);
-      }
+  // Descend a run of plain static nodes in place: only a branch (a node that
+  // also holds a parameter) recurses, so a path walk allocates no context per
+  // character.
+  for (;;) {
+    if (n.wildcard) {
+      visitWildcard(
+        n === context.n ? context : { path, n, i, matches, slashesCounter, params, requestAccept },
+        slashesCounter,
+      );
     }
-    return;
-  }
 
-  const c = path.charCodeAt(i);
-  if (c === CODE_SLASH) {
-    slashesCounter++;
-  }
-  if (c === CODE_QUESTION) {
-    return;
-  }
+    if (i >= path.length) {
+      if (n.handlers && !n.paramName) {
+        for (const handler of n.handlers) {
+          pushMatch(context, n, 10, slashesCounter, handler, params);
+        }
+      }
+      return;
+    }
 
-  const staticChild = n.children?.[c];
-  if (staticChild) {
-    visitNode({ path, n: staticChild, i: i + 1, matches, slashesCounter, params, requestAccept });
-  }
+    const c = path.charCodeAt(i);
+    if (c === CODE_SLASH) {
+      slashesCounter++;
+    }
+    if (c === CODE_QUESTION) {
+      return;
+    }
 
-  if (n.paramName) {
-    visitParamNode(context, i, slashesCounter);
+    const staticChild = n.children?.[c];
+    if (n.paramName) {
+      if (staticChild) {
+        visitNode({ path, n: staticChild, i: i + 1, matches, slashesCounter, params, requestAccept });
+      }
+      visitParamNode(
+        n === context.n ? context : { path, n, i, matches, slashesCounter, params, requestAccept },
+        i,
+        slashesCounter,
+      );
+      return;
+    }
+    if (!staticChild) {
+      return;
+    }
+    n = staticChild;
+    i++;
   }
 }

@@ -230,8 +230,9 @@ export class HttpResponse {
       const rh = new HttpResponse(JSON.stringify(data), {
         status: init?.status ?? 200,
         statusText: init?.statusText,
-        headers: [['Content-Type', 'application/json']],
       });
+      // A list of its own, set directly: the constructor's defensive copy has nothing to protect.
+      rh.headers = [['Content-Type', 'application/json']];
       rh._rawData = data;
       return rh;
     }

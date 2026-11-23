@@ -528,6 +528,9 @@ function startFirstPartyHandler(
 ): void {
   const streamContext = {
     ...context,
+    // A spread copies own fields only: these are read from the request on first use.
+    logContext: context.logContext,
+    __authorizationHeader: (context as HttpRequestContextInternal).__authorizationHeader,
     signal: state.abort?.signal,
     // The stream outlives the request's deadline: it ends on its own budgets.
     deadlineAt: undefined,

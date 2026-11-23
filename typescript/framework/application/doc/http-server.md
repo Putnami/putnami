@@ -376,6 +376,14 @@ import { LoggerMiddleware } from '@putnami/application';
 httpPlugin.use(LoggerMiddleware());
 ```
 
+The completion log is written at `error` for a 5xx answer with a recorded
+error and for an error that escapes the chain, and at `debug` otherwise. Every
+record a logger writes during the request carries the request's `method` and
+`routePath` under `http`; the completion log adds `status`, `durationMs` and
+`outcome`. That context is built when the first record of the request is
+written: below `debug`, a request that ends without an error writes no record
+and builds no context.
+
 #### Trace Middleware
 
 Adds request tracing:

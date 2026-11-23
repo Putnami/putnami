@@ -16,6 +16,7 @@ import {
   attachRequestScope,
   buildHttpContext,
   closeRequestScope,
+  type RequestLifetime,
   DEFAULT_MAX_BODY_SIZE_BYTES,
 } from './http-context.builder';
 import type { HttpRequestContext, HttpRequestContextInternal, Server as HttpServer } from './http-context.type';
@@ -26,7 +27,7 @@ import type { HttpMiddleware } from './http-middleware.type';
 import { HttpResponse } from './http-response';
 import { retainRawHttpStreamScope } from './raw-http-stream';
 import { OriginGuardMiddleware } from './origin-guard.middleware';
-import { RequestDeadlines } from './request-deadlines';
+import { LinkedAbortController, type RequestDeadline, RequestDeadlines } from './request-deadlines';
 import { RouteController } from './route.controller';
 import type { NativeResponder, RequestRewrite, RouteHandler, RouteOptions } from './route.type';
 import { SecurityHeadersMiddleware } from './security-headers.middleware';
@@ -410,50 +411,26 @@ export class HttpPlugin implements Plugin {
       // Connect client or bidirectional stream.
       http2: this.options.http2 !== false,
       fetch: (req, server) => {
-        let requestTimedOut = false;
-        // The request's signal aborts when the client disconnects (Bun's
-        // req.signal) and when the request outlives requestTimeoutMs: its
-        // queries, client calls and render stop instead of running on after
-        // the 408. It is built the first time something reads it: a request
-        // that never reads it pays for no controller.
-        let timeout: AbortController | undefined;
-        let stopReason: DOMException | undefined;
-        const stopRequest = (): void => {
-          if (stopReason !== undefined) return;
-          stopReason = new DOMException('Request Timeout', 'TimeoutError');
-          timeout?.abort(stopReason);
-        };
-
+        // A request with a deadline has a lifetime: its signal aborts when the
+        // client disconnects (Bun's req.signal) and when the request outlives
+        // requestTimeoutMs, so its queries, client calls and render stop
+        // instead of running on after the 408. The signal is built the first
+        // time something reads it: a request that never reads it pays for no
+        // controller.
+        const lifetime = deadlines !== undefined ? new ServedRequest(req) : undefined;
         const context = buildHttpContext<HttpRequestContextInternal>({
           req,
           url: this._rewrites.length > 0 ? this.rewrittenUrl(req) : undefined,
           // Bun.serve returns a Server type that is structurally compatible with HttpServer
           server: server as unknown as HttpServer,
-          signal:
-            requestTimeoutMs > 0
-              ? () => {
-                  // One controller aborts with the first of the two reasons:
-                  // the request stopped, or its client left (req.signal).
-                  const controller = new AbortController();
-                  timeout = controller;
-                  if (stopReason !== undefined) {
-                    controller.abort(stopReason);
-                  } else if (req.signal.aborted) {
-                    controller.abort(req.signal.reason);
-                  } else {
-                    req.signal.addEventListener('abort', () => controller.abort(req.signal.reason), { once: true });
-                  }
-                  return controller.signal;
-                }
-              : undefined,
+          lifetime,
           maxBodySizeBytes,
         });
         context.__drain = drain;
-        if (requestTimeoutMs > 0) {
-          context.deadlineAt = Date.now() + requestTimeoutMs;
+        if (lifetime !== undefined) {
           // A request that reached its deadline before the sweeper reached it
-          // ends now: its signal aborts, as it would at the timeout.
-          context.__endRequest = stopRequest;
+          // ends now (__endRequest): its signal aborts, as it would at the timeout.
+          context.deadlineAt = Date.now() + requestTimeoutMs;
         }
 
         const executeRequest = async (): Promise<Response> => {
@@ -461,7 +438,7 @@ export class HttpPlugin implements Plugin {
           // Match route BEFORE running middlewares so ctx.route/params are available
           httpDispatcher.matchRoute(context);
 
-          const dispatch = async () => httpDispatcher.handle(context);
+          const dispatch = () => httpDispatcher.handle(context);
 
           // Attach the DI context so a per-request scope is created lazily — only
           // if a handler or middleware actually resolves a dependency. Requests
@@ -481,7 +458,7 @@ export class HttpPlugin implements Plugin {
                 // A request that ended (its timeout fired or its client left)
                 // answers 408. Its stopped work unwinds quietly; any other
                 // error is logged as it would be during the request.
-                if (requestTimedOut || requestEnded(context)) {
+                if (lifetime?.timedOut || requestEnded(context)) {
                   const loggedLive = e instanceof HttpResponse || e instanceof HttpException;
                   if (!loggedLive && !isRequestStop(e, context) && !context.__requestErrorLogged) {
                     useLogger().error('Unhandled error', e);
@@ -505,12 +482,12 @@ export class HttpPlugin implements Plugin {
             });
             if (res) {
               const response = res.get();
-              if (context.__rawHttpStreamResponse && response.body && !requestTimedOut) {
+              if (context.__rawHttpStreamResponse && response.body && !lifetime?.timedOut) {
                 const streamed = retainRawHttpStreamScope(response, context, () => closeRequestScope(context));
                 scopeTransferred = true;
                 return streamed;
               }
-              if (requestTimedOut) await response.body?.cancel().catch(() => {});
+              if (lifetime?.timedOut) await response.body?.cancel().catch(() => {});
               return response;
             }
             if ((context.__matchedHandlers?.length || 0) > 0) {
@@ -532,32 +509,10 @@ export class HttpPlugin implements Plugin {
           }
         };
 
-        if (requestTimeoutMs <= 0) {
+        if (lifetime === undefined || deadlines === undefined) {
           return executeRequest();
         }
-
-        // One promise answers the request: its response, or the 408 the
-        // shared deadline sweeper sends when the deadline comes first.
-        return new Promise<Response>((resolve, reject) => {
-          const deadline = deadlines?.add(() => {
-            requestTimedOut = true;
-            stopRequest();
-            resolve(createJsonErrorResponse(408, 'Request Timeout'));
-          });
-          executeRequest().then(
-            (response) => {
-              if (deadline) deadlines?.remove(deadline);
-              // The deadline bounded the request until its response. A stream
-              // or a background task that runs on after it is no longer held to it.
-              if (!requestTimedOut && stopReason === undefined && !req.signal.aborted) context.deadlineAt = undefined;
-              resolve(response);
-            },
-            (error: unknown) => {
-              if (deadline) deadlines?.remove(deadline);
-              reject(error);
-            },
-          );
-        });
+        return lifetime.answer(deadlines, context, executeRequest);
       },
       websocket: {
         // Bound client-controlled memory: reject oversized inbound frames and
@@ -821,6 +776,84 @@ function formatAllowHeader(methods: string[]): string {
   }
   allow.add('OPTIONS');
   return [...allow].join(', ');
+}
+
+/**
+ * The lifetime of one request served with a deadline, in one object: the
+ * signal it builds on first read, its stop, its entry in the shared deadline
+ * queue and the answer that the response or the 408 settles first.
+ */
+class ServedRequest implements RequestLifetime, RequestDeadline {
+  at = 0;
+  prev: RequestDeadline | undefined = undefined;
+  next: RequestDeadline | undefined = undefined;
+  queued = false;
+  /** Whether the deadline answered the request with a 408. */
+  timedOut = false;
+  private stopReason: DOMException | undefined = undefined;
+  private controller: LinkedAbortController | undefined = undefined;
+  private settle: ((response: Response) => void) | undefined = undefined;
+
+  constructor(private readonly req: Request) {}
+
+  /**
+   * One controller aborts with the first of the two reasons: the request
+   * stopped, or its client left. Every context of the request (a derived one
+   * reads it again) shares it, so the timeout aborts them all.
+   */
+  signal(): AbortSignal {
+    if (this.controller !== undefined) return this.controller.signal;
+    const controller = new LinkedAbortController(this.req.signal);
+    this.controller = controller;
+    if (this.stopReason !== undefined) {
+      controller.abort(this.stopReason);
+    } else {
+      controller.follow();
+    }
+    return controller.signal;
+  }
+
+  stop(): void {
+    if (this.stopReason !== undefined) return;
+    this.stopReason = new DOMException('Request Timeout', 'TimeoutError');
+    this.controller?.abort(this.stopReason);
+  }
+
+  /** The deadline came first: the request stops and answers 408. */
+  expire(): void {
+    this.timedOut = true;
+    this.stop();
+    this.settle?.(createJsonErrorResponse(408, 'Request Timeout'));
+  }
+
+  /** One promise answers the request: its response, or the 408 the shared deadline sweeper sends first. */
+  answer(
+    deadlines: RequestDeadlines,
+    context: HttpRequestContextInternal,
+    run: () => Promise<Response>,
+  ): Promise<Response> {
+    return new Promise<Response>((resolve, reject) => {
+      this.settle = resolve;
+      deadlines.enqueue(this);
+      run().then(
+        (response) => {
+          deadlines.remove(this);
+          // The deadline bounded the request until its response. A stream or a
+          // background task that runs on after it is no longer held to it. A
+          // request that never built its signal does not read req.signal here:
+          // requestEnded() reads the signal, which still sees the client leave.
+          if (!this.timedOut && this.stopReason === undefined && !this.controller?.signal.aborted) {
+            context.deadlineAt = undefined;
+          }
+          resolve(response);
+        },
+        (error: unknown) => {
+          deadlines.remove(this);
+          reject(error);
+        },
+      );
+    });
+  }
 }
 
 function createJsonErrorResponse(status: number, error: string, headers?: HeadersInit): Response {

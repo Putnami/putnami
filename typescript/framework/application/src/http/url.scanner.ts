@@ -69,49 +69,46 @@ export class UrlScanner {
     return this._domain;
   }
 
-  private _path?: string;
-  get path() {
-    if (this._path) {
-      return this._path;
+  private _pathname?: string;
+  /**
+   * The URL's path with its leading slash and without its query: the form
+   * the router matches, read without slicing the URL again.
+   */
+  get pathname(): string {
+    if (this._pathname !== undefined) {
+      return this._pathname;
     }
 
-    let urlPath = this.url;
-
-    // If absolute, strip scheme and host
-    if (urlPath.startsWith('http')) {
-      const doubleSlashIndex = urlPath.indexOf('//');
+    let start = 0;
+    // If absolute, skip scheme and host
+    if (this.url.startsWith('http')) {
+      const doubleSlashIndex = this.url.indexOf('//');
       if (doubleSlashIndex !== -1) {
-        const nextSlash = urlPath.indexOf('/', doubleSlashIndex + 2);
-        if (nextSlash !== -1) {
-          urlPath = urlPath.slice(nextSlash);
-        } else {
-          // http://example.com -> / (implicit) or empty?
-          // Usually path is / if empty.
-          // But let's check query
-          const queryIndex = urlPath.indexOf('?');
-          if (queryIndex !== -1) {
-            // http://example.com?foo -> /
-            urlPath = `/${urlPath.slice(queryIndex)}`;
-          } else {
-            urlPath = '/';
-          }
+        const nextSlash = this.url.indexOf('/', doubleSlashIndex + 2);
+        if (nextSlash === -1) {
+          // http://example.com and http://example.com?foo have the path /
+          this._pathname = '/';
+          return this._pathname;
         }
+        start = nextSlash;
       }
     }
 
-    const queryIndex = urlPath.indexOf('?');
-    if (queryIndex !== -1) {
-      // Remove query string, but keep leading slash if present
-      this._path = urlPath.slice(0, queryIndex);
-    } else {
-      this._path = urlPath;
+    const queryIndex = this.url.indexOf('?', start);
+    const end = queryIndex === -1 ? this.url.length : queryIndex;
+    this._pathname = start === 0 && end === this.url.length ? this.url : this.url.slice(start, end);
+    return this._pathname;
+  }
+
+  private _path?: string;
+  get path() {
+    if (this._path !== undefined) {
+      return this._path;
     }
 
     // Strip leading slash — callers expect bare path segments (e.g. 'test' not '/test')
-    if (this._path.startsWith('/')) {
-      this._path = this._path.slice(1);
-    }
-
+    const pathname = this.pathname;
+    this._path = pathname.startsWith('/') ? pathname.slice(1) : pathname;
     return this._path;
   }
 

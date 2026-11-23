@@ -9,6 +9,14 @@ import type { RouteHandler } from './route.type';
 import type { HandlerResult } from './router';
 import { UrlScanner } from './url.scanner';
 
+/** The lifetime of a served request that has a deadline: its signal and its end. */
+export interface RequestLifetime {
+  /** Builds the request's signal; called once, on its first read. */
+  signal(): AbortSignal;
+  /** Ends the request now: its signal aborts with a `TimeoutError`. */
+  stop(): void;
+}
+
 type BuildContextArgs = {
   req: Request;
   /** The URL the request is routed and handled at, when a rewrite replaced the client's. */
@@ -19,6 +27,11 @@ type BuildContextArgs = {
    * context's `signal` is read. Without one, the context reads `req.signal`.
    */
   signal?: AbortSignal | (() => AbortSignal);
+  /**
+   * The lifetime of a request with a deadline: it builds the signal on its
+   * first read and gives the context its `__endRequest`.
+   */
+  lifetime?: RequestLifetime;
   maxBodySizeBytes?: number;
 };
 
@@ -46,10 +59,8 @@ class HttpContext {
   statusCode?: number;
   user?: Record<string, unknown>;
 
-  __authorizationHeader?: string;
   __requestError?: unknown;
   __requestErrorLogged?: boolean;
-  __endRequest?: () => void;
   __callbacks?: ((r: HttpResponse) => HttpResponse)[];
   __matchedHandlers?: HandlerResult<RouteHandler<HttpRequestContext>>[];
 
@@ -67,6 +78,16 @@ class HttpContext {
 
   private _signal?: AbortSignal;
   private _signalSource?: () => AbortSignal;
+  private readonly _lifetime?: RequestLifetime;
+  private _endRequest?: () => void;
+  /** The Authorization header once read, `null` before its first read. */
+  private _authorization?: string | null;
+  /** The request's log context once built; see {@link logContext}. */
+  private _logContext?: Record<string, unknown>;
+  /** The route path of the deferred `http` log context, set by {@link deferHttpLogContext}. */
+  private _logRoute?: string;
+  /** The method of the deferred `http` log context, as the request arrived. */
+  private _logMethod?: string;
   private readonly _scanner: UrlScanner;
   private _cachedQuery?: Record<string, string>;
   private _scopeContainerContext?: ContainerContext;
@@ -75,22 +96,26 @@ class HttpContext {
   constructor(args: BuildContextArgs) {
     const req = args.req;
     this.req = req;
+    this._lifetime = args.lifetime;
+    this._endRequest = undefined;
     if (typeof args.signal === 'function') {
       this._signal = undefined;
       this._signalSource = args.signal;
-    } else {
+    } else if (args.signal !== undefined || args.lifetime === undefined) {
       this._signal = args.signal ?? req.signal;
       this._signalSource = undefined;
+    } else {
+      this._signal = undefined;
+      this._signalSource = undefined;
     }
-    this.headers = req.headers;
+    // Each read of a native request field builds its value again: read each once.
+    const headers = req.headers;
+    this.headers = headers;
     this.method = req.method as HttpMethod;
     this.url = args.url ?? req.url;
     this.server = args.server;
-    this._scanner = new UrlScanner(this.url, req.headers);
-
-    // Capture raw Authorization header for downstream service-to-service JWT forwarding.
-    // Header names are case-insensitive: one lookup finds either spelling.
-    this.__authorizationHeader = req.headers.get('Authorization') ?? undefined;
+    this._scanner = new UrlScanner(this.url, headers);
+    this._authorization = null;
 
     // Pre-initialise the mutable plumbing so assigning these later keeps the shape stable.
     this.route = undefined;
@@ -98,6 +123,9 @@ class HttpContext {
     this.statusCode = undefined;
     this.user = undefined;
     this._cachedQuery = undefined;
+    this._logContext = undefined;
+    this._logRoute = undefined;
+    this._logMethod = undefined;
     this._scopeContainerContext = undefined;
     this._scope = undefined;
     this.__requestError = undefined;
@@ -122,15 +150,99 @@ class HttpContext {
   /** The request's signal, built on first read when the server gave a builder. */
   get signal(): AbortSignal {
     if (this._signal === undefined) {
-      this._signal = this._signalSource ? this._signalSource() : this.req.signal;
+      if (this._signalSource) {
+        this._signal = this._signalSource();
+      } else {
+        this._signal = this._lifetime ? this._lifetime.signal() : this.req.signal;
+      }
       this._signalSource = undefined;
     }
     return this._signal;
   }
 
+  /**
+   * Ends the request now: its signal aborts, as it would at the timeout. Only
+   * a request with a deadline has one; the function is built on first read.
+   */
+  get __endRequest(): (() => void) | undefined {
+    if (this._endRequest === undefined && this._lifetime !== undefined) {
+      const lifetime = this._lifetime;
+      this._endRequest = () => lifetime.stop();
+    }
+    return this._endRequest;
+  }
+
+  set __endRequest(endRequest: (() => void) | undefined) {
+    this._endRequest = endRequest;
+  }
+
+  /**
+   * The raw Authorization header, captured for downstream service-to-service
+   * forwarding. Read from the request on first use: most requests never
+   * forward it. Header names are case-insensitive: one lookup finds either spelling.
+   */
+  get __authorizationHeader(): string | undefined {
+    if (this._authorization === null) {
+      this._authorization = this.headers.get('Authorization') ?? undefined;
+    }
+    return this._authorization;
+  }
+
+  set __authorizationHeader(authorization: string | undefined) {
+    this._authorization = authorization;
+  }
+
   set signal(signal: AbortSignal) {
     this._signal = signal;
     this._signalSource = undefined;
+  }
+
+  /**
+   * The request-scoped log context every logger of the request writes and
+   * reads. When the logger middleware deferred its `http` field, the first
+   * read builds `{ http: { method, routePath } }`: a request that writes no
+   * record and sets no field never builds it.
+   *
+   * A context derived from this one with `Object.create` (a client call's
+   * telemetry scope) reads and builds the request's own log context, as it
+   * read the field the logger middleware used to set on the request.
+   */
+  get logContext(): Record<string, unknown> | undefined {
+    const owner = ownerOf(this);
+    if (owner._logContext === undefined && owner._logRoute !== undefined) {
+      owner._logContext = { http: { method: owner._logMethod, routePath: owner._logRoute } };
+      owner._logRoute = undefined;
+      owner._logMethod = undefined;
+    }
+    return owner._logContext;
+  }
+
+  set logContext(logContext: Record<string, unknown> | undefined) {
+    this._logContext = logContext;
+    this._logRoute = undefined;
+    this._logMethod = undefined;
+  }
+
+  /**
+   * Defers the `http` log field, with the method and route path the request
+   * has now; false when the log context already exists.
+   */
+  deferHttpLogContext(method: string, routePath: string): boolean {
+    const owner = ownerOf(this);
+    if (owner._logContext !== undefined) return false;
+    owner._logRoute = routePath;
+    owner._logMethod = method;
+    return true;
+  }
+
+  /**
+   * The path the router matches: the URL path less one leading slash, with a
+   * leading slash again. A path that starts with `//` keeps one slash less,
+   * as `path()` gives it; any other path is the URL path itself.
+   */
+  __pathname(): string {
+    const pathname = this._scanner.pathname;
+    return pathname.charCodeAt(1) === 47 && pathname.charCodeAt(0) === 47 ? pathname.slice(1) : pathname;
   }
 
   throw(status: number, message?: string): never {
@@ -179,6 +291,32 @@ Object.defineProperty(HttpContext.prototype, SCOPE_CONTAINER_KEY, {
 
 export function buildHttpContext<C extends HttpRequestContext>(context: BuildContextArgs): C {
   return new HttpContext(context) as unknown as C;
+}
+
+/**
+ * Defers the `{ method, routePath }` http log field of a request until its log
+ * context is first read: when a record is written or a field is set. Returns
+ * false when the context cannot defer it (not a pipeline request context, or
+ * its log context already exists): the caller then sets the field itself.
+ */
+export function deferHttpLogContext(ctx: HttpRequestContext, method: string, routePath: string): boolean {
+  return ctx instanceof HttpContext && ctx.deferHttpLogContext(method, routePath);
+}
+
+/**
+ * The request context that holds the log state a context reads: itself, or,
+ * for a context derived with `Object.create`, the first prototype that owns
+ * it. Every context owns it from its constructor; a derived one owns it once
+ * it set its own log context.
+ */
+function ownerOf(ctx: HttpContext): HttpContext {
+  let owner: HttpContext = ctx;
+  while (!Object.hasOwn(owner, '_logContext')) {
+    const proto = Object.getPrototypeOf(owner) as HttpContext | null;
+    if (proto === null || proto === HttpContext.prototype) return ctx;
+    owner = proto;
+  }
+  return owner;
 }
 
 /** Attach a DI context to a request so its scope is created lazily on first resolve. */

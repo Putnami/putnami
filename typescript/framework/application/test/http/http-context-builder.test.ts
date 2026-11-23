@@ -239,3 +239,22 @@ describe('buildHttpContext lazy DI scope', () => {
     expect(counters.closed).toBe(1);
   });
 });
+
+describe('the routing path', () => {
+  /** The path the context hands the router, beside the path() handlers read. */
+  const paths = (url: string) => {
+    const ctx = buildHttpContext({ req: new Request(url) }) as HttpRequestContext & { __pathname(): string };
+    return { pathname: ctx.__pathname(), path: ctx.path() };
+  };
+
+  it('is the URL path with one leading slash, as path() names it with a slash again', () => {
+    expect(paths('http://localhost/tasks/42?x=1')).toEqual({ pathname: '/tasks/42', path: 'tasks/42' });
+    expect(paths('http://localhost/')).toEqual({ pathname: '/', path: '' });
+    expect(paths('http://localhost?x=1')).toEqual({ pathname: '/', path: '' });
+  });
+
+  it('keeps one slash less of a path that starts with a double slash', () => {
+    expect(paths('http://localhost//foo')).toEqual({ pathname: '/foo', path: '/foo' });
+    expect(paths('http://localhost///foo')).toEqual({ pathname: '//foo', path: '//foo' });
+  });
+});

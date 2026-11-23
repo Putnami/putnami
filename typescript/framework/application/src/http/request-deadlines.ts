@@ -2,9 +2,10 @@ import { useLogger } from '@putnami/runtime';
 
 /** One request waiting on its deadline in a {@link RequestDeadlines} queue. */
 export interface RequestDeadline {
-  /** When the request expires, on the `performance.now()` clock. */
-  readonly at: number;
-  readonly expire: () => void;
+  /** When the request expires, on the `performance.now()` clock; set when it is queued. */
+  at: number;
+  /** Called, as a method of the entry, when the deadline passes first. */
+  expire(): void;
   prev: RequestDeadline | undefined;
   next: RequestDeadline | undefined;
   queued: boolean;
@@ -24,15 +25,15 @@ export class RequestDeadlines {
 
   constructor(private readonly timeoutMs: number) {}
 
-  /** Queues a request that expires `timeoutMs` from now by calling `expire`, unless removed first. */
-  add(expire: () => void): RequestDeadline {
-    const entry: RequestDeadline = {
-      at: performance.now() + this.timeoutMs,
-      expire,
-      prev: this.tail,
-      next: undefined,
-      queued: true,
-    };
+  /**
+   * Queues an entry the caller owns, such as the request itself, so queuing
+   * allocates nothing: it expires `timeoutMs` from now unless removed first.
+   */
+  enqueue(entry: RequestDeadline): void {
+    entry.at = performance.now() + this.timeoutMs;
+    entry.prev = this.tail;
+    entry.next = undefined;
+    entry.queued = true;
     if (this.tail) {
       this.tail.next = entry;
     } else {
@@ -42,7 +43,6 @@ export class RequestDeadlines {
     if (this.timer === undefined) {
       this.arm(entry.at);
     }
-    return entry;
   }
 
   /** Removes a request that answered before its deadline. Removing it twice does nothing. */
@@ -95,4 +95,33 @@ export class RequestDeadlines {
       this.arm(this.head.at);
     }
   };
+}
+
+/**
+ * A controller that also aborts when its source signal aborts, with the
+ * source's reason. It listens to the source as an event listener object
+ * (`handleEvent`), so following the source costs no closure and no listener
+ * options: the cheapest form Bun offers for a signal that ends on either cause.
+ */
+export class LinkedAbortController extends AbortController {
+  private readonly source: AbortSignal;
+
+  constructor(source: AbortSignal) {
+    super();
+    this.source = source;
+  }
+
+  /** Starts following the source: aborts now when it already aborted. */
+  follow(): void {
+    if (this.source.aborted) {
+      this.abort(this.source.reason);
+    } else {
+      this.source.addEventListener('abort', this);
+    }
+  }
+
+  /** The source aborted: abort with its reason. */
+  handleEvent(): void {
+    this.abort(this.source.reason);
+  }
 }

@@ -53,9 +53,13 @@ export class RouteController<CONTEXT extends HttpRequestContext = HttpRequestCon
 
   /** Returns all handlers matching the request context's method and path, ordered by score. */
   find<FC extends CONTEXT = CONTEXT>(context: CONTEXT): HandlerResult<RouteHandler<FC>>[] {
+    const router = this.routes?.[context.method];
+    if (router === undefined) return [];
     const requestAccept = requestAcceptOf(context.headers.get('Accept'));
-
-    return this.routes?.[context.method]?.find(context.path(), requestAccept) || [];
+    // A pipeline request context gives its path with the leading slash the
+    // router matches, so the router need not prefix one again.
+    const pathname = (context as { __pathname?: () => string }).__pathname;
+    return router.find(pathname === undefined ? context.path() : pathname.call(context), requestAccept);
   }
 
   /**

@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from 'bun';
 import { BadRequestException, HttpException, useLogger } from '@putnami/runtime';
-import type { HttpRequestContext } from '../../http/http-context.type';
+import type { HttpRequestContext, HttpRequestContextInternal } from '../../http/http-context.type';
 import type { HttpResponse } from '../../http/http-response';
 import { upgradeToWebSocket } from '../api-ws.utils';
 import type { ClientOperationPolicy, ClientServiceContract } from '../client-contract';
@@ -135,6 +135,9 @@ export function resolveProviderWireHandlers(
       }
       const streamContext = {
         ...context,
+        // A spread copies own fields only: these are read from the request on first use.
+        logContext: context.logContext,
+        __authorizationHeader: (context as HttpRequestContextInternal).__authorizationHeader,
         signal: state.abort.signal,
         // The stream outlives the request's deadline: it ends on its own budgets.
         deadlineAt: undefined,

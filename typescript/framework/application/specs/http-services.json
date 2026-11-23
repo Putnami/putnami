@@ -102,11 +102,11 @@
     {
       "id": "request-log-and-trace",
       "text": [
-        "The logger writes one record per request, with the message [METHOD] route and the status, method, route path, duration and outcome.",
-        "A 5xx or a thrown error logs at ERROR with the outcome failure and the error on the record, never in the message;",
-        "any other status, a missing response as 404, logs at DEBUG with the outcome success.",
-        "An excluded path logs nothing.",
-        "The trace ID comes from X-Cloud-Trace-Context, then X-Correlation-ID, else a new one, and returns in X-Correlation-ID."
+        "The logger writes one record per request: message [METHOD] route; status, method, route path, duration, outcome.",
+        "A 5xx or thrown error logs at ERROR, outcome failure, the error on the record, never in the message;",
+        "any other status, a missing response as 404, at DEBUG, outcome success.",
+        "An excluded path logs nothing; below DEBUG, an error-free request builds no http log context unless a record is written.",
+        "The trace ID is X-Cloud-Trace-Context, then X-Correlation-ID, else new, and returns in X-Correlation-ID."
       ]
     },
     {
