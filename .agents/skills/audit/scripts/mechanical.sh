@@ -19,7 +19,7 @@
 #                               (config.sh modules) or relative TS imports, per file
 #   ops-logging               — console.* (TS) / fmt.Print* & println (Go)
 #
-# When the workspace sets options["@putnami/intelligence"].audit.checks, that
+# When the workspace sets options["@putnami/cloud"].audit.checks, that
 # repository script runs last with the same project path and its JSON lines join
 # this output; its exit status is this script's. It owns the checks that only
 # make sense in that repository.

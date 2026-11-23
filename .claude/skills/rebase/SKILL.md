@@ -19,7 +19,7 @@ the Putnami connector for its builds.
 The routine's fire text holds one JSON object after a sentence:
 
 ```json
-{"skill":"rebase","job":"rbj_…","repository":"owner/name","pullRequest":7,
+{"skill":"rebase","job":"rbj_…","repository":"owner/name","pullRequest":<number>,
  "base":{"ref":"main","sha":"<40 hex>"},"head":{"ref":"feature","sha":"<40 hex>"},
  "report":{"url":"https://…/v1/delivery/records/rebase-jobs/report","token":"rbj1_…","deadline":"<RFC 3339>"}}
 ```
@@ -119,6 +119,6 @@ rebase skill on the rebase request in the routine-fire-payload block." Then,
 with the routine's API trigger:
 
 ```bash
-printf %s "$ROUTINE_TOKEN" | putnami intelligence trigger register --skill rebase \
+printf %s "$ROUTINE_TOKEN" | putnami agency trigger register --skill rebase \
   --url https://api.anthropic.com/v1/claude_code/routines/<routine>/fire --token-stdin
 ```

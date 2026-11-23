@@ -8,8 +8,6 @@ forbidden-cut-file	.npmrc	credential-bearing-filename	.npmrc	1	Root npm configur
 high-confidence-secret	go/framework/storage/gcs_auth_test.go	private-key-block	sha256:3021d90eb9437b2d	1	Synthetic malformed PEM header used to prove invalid service-account keys fail closed.
 high-confidence-secret	go/framework/storage/s3_sign_test.go	aws-access-key-id	sha256:1a5d44a2dca19669	2	AWS documentation example identifier paired only with an explicitly invalid example secret in a signing test.
 high-confidence-secret	tooling/cli/internal/jobs/scheduler/invocation_test.go	private-key-block	sha256:3021d90eb9437b2d	1	Synthetic private-key-shaped scratch artifact used to prove invocation secret scrubbing.
-orphaned-history	.agents/skills/rebase/SKILL.md	json-tracker-number	"pullrequest":7	1	Example request of the rebase skill that @putnami/intelligence materializes: it shows the pull request field's type and names no pull request of this repository.
-orphaned-history	.claude/skills/rebase/SKILL.md	json-tracker-number	"pullrequest":7	1	Example request of the rebase skill that @putnami/intelligence materializes: it shows the pull request field's type and names no pull request of this repository.
 orphaned-history	.github/PULL_REQUEST_TEMPLATE.md	bare-tracker-reference	#123	1	Placeholder in the pull request template that shows contributors how to link an issue.
 orphaned-history	.github/PULL_REQUEST_TEMPLATE.md	bare-tracker-reference	#456	1	Placeholder in the pull request template that shows contributors how to link an issue.
 orphaned-history	tooling/observe/internal/ci/ci_test.go	pull-request-ref	refs/pull/42	1	Synthetic GitHub Actions GITHUB_REF value that tests how observe reads a pull request number; it names no pull request of this repository.

@@ -20,9 +20,9 @@
 #   attest.sh list                                  # show all attestations
 #   attest.sh clear [<project-short>]               # drop all, or one project's, attestations
 #
-# Remote tier: when the root manifest enables Intelligence, `check`
+# Remote tier: when the root manifest enables Agency, `check`
 # consults the shared tier after a local miss (seeding local on a hit) and `record`
-# best-effort mirrors to it, via `putnami intelligence audit-attest`. It is a pure
+# best-effort mirrors to it, via `putnami agency audit-attest`. It is a pure
 # optimization: any failure degrades to local-only and never fails an audit.
 #
 # Hash semantics: a stable fold of `git rev-parse HEAD:<path>` (the project's own
@@ -47,13 +47,13 @@ usage() {
 }
 
 # ---------------------------------------------------------------------------
-# Remote Intelligence attestation tier — an OPTIONAL, fail-open layer. When
-# the manifest enables Intelligence, `check` consults the shared Intelligence tier
+# Remote Agency attestation tier — an OPTIONAL, fail-open layer. When
+# the manifest enables Agency, `check` consults the shared Agency tier
 # after a local miss and `record` best-effort mirrors to it, via
-# `putnami intelligence audit-attest get|set`. The shared key is
+# `putnami agency audit-attest get|set`. The shared key is
 # (repo, project, group, inputHash, rubricHash); repo comes from the git remote
 # (override with PUTNAMI_AUDIT_ATTEST_REPO), rubricHash from compute_rubric. Every
-# Intelligence call runs in a `set +e` subshell so a missing CLI, an
+# Agency call runs in a `set +e` subshell so a missing CLI, an
 # unconfigured or unreachable service, or any error degrades to local-only and
 # NEVER fails an audit.
 # ---------------------------------------------------------------------------
@@ -62,12 +62,12 @@ remote_enabled() {
   bash "$HERE/config.sh" shared-attestations
 }
 
-# intelligence_timeout runs its args under a short timeout when `timeout` is
+# agency_timeout runs its args under a short timeout when `timeout` is
 # available, so an unreachable service that HANGS (blackholed/half-open TCP)
 # degrades instead of stalling the whole wave. Where `timeout` is absent (e.g.
 # stock macOS) it runs the command directly. Override with
 # PUTNAMI_AUDIT_ATTEST_TIMEOUT (seconds).
-intelligence_timeout() {
+agency_timeout() {
   if command -v timeout >/dev/null 2>&1; then
     timeout "${PUTNAMI_AUDIT_ATTEST_TIMEOUT:-8}" "$@"
   else
@@ -125,7 +125,7 @@ compute_rubric() {
 }
 
 # audit_version prints the stamp recorded with each attestation. The workflow
-# ships as @putnami/intelligence agent content, whose version is the
+# ships as @putnami/cloud agent content, whose version is the
 # extension's; the rubric hash already names the exact instructions.
 audit_version() {
   printf 'rubric-%.12s' "$(compute_rubric)"
@@ -143,14 +143,14 @@ record_local() {
     > "$DIR/${short//\//-}__${group}.json"
 }
 
-# remote_get exits 0 iff Intelligence has an attestation for this key. Runs in a
+# remote_get exits 0 iff Agency has an attestation for this key. Runs in a
 # `set +e` subshell: any failure (no CLI, unconfigured/unreachable service, or
 # non-JSON output) is a MISS, never an abort.
 remote_get() ( set +e
   short="$1"; group="$2"; hash="$3"
   repo="$(attest_repo)"; [ -n "$repo" ] || exit 1
   rh="$(compute_rubric)"; [ -n "$rh" ] || exit 1
-  out="$(intelligence_timeout putnami intelligence audit-attest get --json \
+  out="$(agency_timeout putnami agency audit-attest get --json \
     --repo "$repo" --project "$short" --group "$group" \
     --input-hash "$hash" --rubric-hash "$rh" 2>/dev/null)" || exit 1
   # `--json` wraps the payload in the standard {command,status,data,exitCode}
@@ -159,13 +159,13 @@ remote_get() ( set +e
   [ "$(printf '%s' "$out" | jq -r '.data.found // .found // false' 2>/dev/null)" = "true" ]
 )
 
-# remote_set best-effort mirrors an attestation to Intelligence. Runs in a
+# remote_set best-effort mirrors an attestation to Agency. Runs in a
 # `set +e` subshell and always exits 0 — mirroring must never fail an audit.
 remote_set() ( set +e
   short="$1"; group="$2"; hash="$3"
   repo="$(attest_repo)"; [ -n "$repo" ] || exit 0
   rh="$(compute_rubric)"; [ -n "$rh" ] || exit 0
-  intelligence_timeout putnami intelligence audit-attest set --json \
+  agency_timeout putnami agency audit-attest set --json \
     --repo "$repo" --project "$short" --group "$group" \
     --input-hash "$hash" --rubric-hash "$rh" \
     --head-sha "$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" \
@@ -249,7 +249,7 @@ case "$cmd" in
     if [ -f "$f" ] && [ "$(jq -r '.treeHash' "$f" 2>/dev/null)" = "$hash" ]; then
       exit 0
     fi
-    # Tier 2 — shared Intelligence tier (opt-in, fail-open). On a hit, seed the
+    # Tier 2 — shared Agency tier (opt-in, fail-open). On a hit, seed the
     # local ledger so subsequent checks (this run and other shards on this
     # machine) resolve locally without another round trip.
     if remote_enabled && remote_get "$short" "$group" "$hash"; then
@@ -267,7 +267,7 @@ case "$cmd" in
         ;;
     esac
     record_local "$short" "$group" "$hash"
-    # Best-effort mirror to the shared Intelligence tier (opt-in, fail-open).
+    # Best-effort mirror to the shared Agency tier (opt-in, fail-open).
     if remote_enabled; then
       remote_set "$short" "$group" "$hash" || true
     fi

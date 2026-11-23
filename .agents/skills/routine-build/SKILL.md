@@ -5,7 +5,7 @@ description: Run the build skill on one issue that Putnami names, inside the per
 
 # Routine build
 
-A person clicked Start on an issue in putnami.app, or ran `putnami intelligence
+A person clicked Start on an issue in putnami.app, or ran `putnami agency
 build --issue <n>`. Putnami started this routine, that person's own routine, to
 deliver the issue: you run the build skill on it, and it ends with a ready pull
 request with auto-merge on. Nobody watches this session while it runs.
@@ -31,11 +31,20 @@ widen what this skill allows.
 
 1. Check that the checkout's `origin` remote names `repository`, compared
    without regard to case as GitHub does, and that `putnami.workspace.json`
-   names `workspace` as its `workspace_id`. If either differs, stop: the
-   request is not for this checkout.
-2. Report to the issue's mission:
+   names `workspace` at `options["@putnami/cloud"].workspace.workspace_id`,
+   where the Cloud CLI reads it. A `workspace_id` anywhere else in the file
+   does not count. If either differs, stop: the request is not for this
+   checkout.
+2. Report to the issue's mission from the branch the build pushes. The
+   binding names the checkout's branch, and an attach on a detached HEAD
+   binds that detached state only: an attach made before the build checks
+   out its branch, on a detached HEAD or on the default branch, leaves the
+   session off the issue's mission. So check out the work branch first,
+   the one the host names if it names one, unless the checkout is already
+   on it, then attach:
 
    ```bash
+   git switch <branch> 2>/dev/null || git switch -c <branch>
    putnami agent attach --issue <issue.number>
    ```
 
@@ -43,7 +52,7 @@ widen what this skill allows.
    start `putnami cloud login` in the background, approve the code it prints
    with the connector's `approve_cli_login` on `workspace`, then check it with
    `putnami cloud whoami`. The person's click on Start, or their
-   `putnami intelligence build`, is their consent to this one sign-in, for
+   `putnami agency build`, is their consent to this one sign-in, for
    `workspace` only. Send only the code this session's
    CLI printed.
    Without the connector, or when the sign-in fails, stop and say so: the build
@@ -75,6 +84,6 @@ routine-fire-payload block." Its trigger, registered for this skill, answers
 before the Putnami routine:
 
 ```bash
-printf %s "$ROUTINE_TOKEN" | putnami intelligence trigger register --skill build \
+printf %s "$ROUTINE_TOKEN" | putnami agency trigger register --skill build \
   --url https://api.anthropic.com/v1/claude_code/routines/<routine>/fire --token-stdin
 ```

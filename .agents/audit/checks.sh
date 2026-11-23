@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Repository checks for /audit, run by the managed mechanical.sh after its own
-# portable checks (options["@putnami/intelligence"].audit.checks). These are the
+# portable checks (options["@putnami/cloud"].audit.checks). These are the
 # framework's deterministic properties; the portable ones (file size, nesting,
 # import fan-out, raw prints) stay in mechanical.sh.
 #

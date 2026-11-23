@@ -8,7 +8,7 @@ description: Create the person's Putnami routine, the one Claude routine Putnami
 A person keeps one Putnami routine per workspace. Putnami fires it for each
 routine task of theirs: the rebase of their pull request the merge queue found
 in conflict with its base, and the build of an issue they start from
-putnami.app or with `putnami intelligence build`. Its saved prompt,
+putnami.app or with `putnami agency build`. Its saved prompt,
 `references/saved-prompt.md`, sends the routine to `references/dispatch.md`,
 which hands each request to `scripts/dispatch.sh`. The script names the skill
 to run only when the request's skill is on the allowlist this skill ships:
@@ -24,7 +24,7 @@ token, and never fire the routine.
 
 - Work from the workspace root: the directory that holds
   `putnami.workspace.json`. Its `agentArtifacts` must list
-  `extension:@putnami/intelligence`, or the routine's checkout carries neither
+  `extension:@putnami/cloud`, or the routine's checkout carries neither
   this skill nor the skills it dispatches: say so and stop.
 - The repository is the one `git remote get-url origin` names.
 
@@ -78,11 +78,11 @@ these steps, with the routine's name, then stop:
    terminal, at the workspace root, register them with Putnami:
 
    ```bash
-   printf %s "$ROUTINE_TOKEN" | putnami intelligence trigger register \
+   printf %s "$ROUTINE_TOKEN" | putnami agency trigger register \
      --url https://api.anthropic.com/v1/claude_code/routines/<routine>/fire --token-stdin
    ```
 
-   Never paste the token into a conversation. `putnami intelligence trigger
+   Never paste the token into a conversation. `putnami agency trigger
    show` then shows the routine Putnami starts, never its token.
 
 A trigger registered for one skill, with `--skill`, answers before the

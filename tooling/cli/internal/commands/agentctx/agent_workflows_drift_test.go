@@ -17,23 +17,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
-// publishedAgentTrees are the paths under the host trees that a published
-// extension's agent content owns: the audit, putnami-routine, routine-build and
-// rebase skills and the prune-* workers come from @putnami/intelligence, which
-// no local source builds (.agents/constraints.md, "Agent Workflows").
-var publishedAgentTrees = []string{
-	".agents/skills/audit/",
-	".claude/skills/audit/",
-	".agents/skills/putnami-routine/",
-	".claude/skills/putnami-routine/",
-	".agents/skills/routine-build/",
-	".claude/skills/routine-build/",
-	".agents/skills/rebase/",
-	".claude/skills/rebase/",
-	".claude/agents/prune-",
-	".codex/agents/prune-",
-}
-
 // generatedAgentTrees are the host directories this repository's own agent
 // content owns.
 var generatedAgentTrees = []string{".agents/skills", ".claude/skills", ".claude/agents", ".codex/agents"}
@@ -93,11 +76,6 @@ func TestLocalAgentContentMatchesCommittedRoot(t *testing.T) {
 				return err
 			}
 			rel = filepath.ToSlash(rel)
-			for _, prefix := range publishedAgentTrees {
-				if strings.HasPrefix(rel, prefix) {
-					return nil
-				}
-			}
 			if _, ok := emitted[rel]; !ok {
 				drift = append(drift, rel+": no opted-in local extension produces it")
 			}
@@ -110,7 +88,7 @@ func TestLocalAgentContentMatchesCommittedRoot(t *testing.T) {
 	if len(drift) > 0 {
 		sort.Strings(drift)
 		t.Fatalf("committed agent workflow files drifted from their source:\n  %s\n"+
-			"Edit the source under tooling/contributor/src, "+
+			"Edit the source under tooling/contributor/src or cloud/extension/agent-src, "+
 			"then run `./putnamiw context generate` and commit the result.", strings.Join(drift, "\n  "))
 	}
 }

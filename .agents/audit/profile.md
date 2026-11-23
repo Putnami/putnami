@@ -1,7 +1,7 @@
 # Putnami framework audit profile
 
 The managed `/audit` skill reads this file before it scans
-(`options["@putnami/intelligence"].audit.profile`). It states how the portable
+(`options["@putnami/cloud"].audit.profile`). It states how the portable
 rubric applies to this repository. It never changes the workflow itself.
 
 This repository is a framework, not a service. Its users are experienced

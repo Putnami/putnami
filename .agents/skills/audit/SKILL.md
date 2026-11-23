@@ -9,9 +9,9 @@ Scan Putnami projects for quality findings. Each finding becomes a GitHub issue 
 
 ## Portable host contract
 
-This is the canonical workflow for both Claude Code and Codex: invoke it with `/audit` on Claude Code or `$audit` on Codex. The `@putnami/intelligence` extension ships it; `putnami install` materializes it when the workspace lists `extension:@putnami/intelligence` in `agentArtifacts`. Helper scripts live under `.agents/skills/audit/scripts/` on both hosts; run them from the workspace root through `bash`. Run semantic audit judgment on the strongest available model.
+This is the canonical workflow for both Claude Code and Codex: invoke it with `/audit` on Claude Code or `$audit` on Codex. The `@putnami/cloud` extension ships it; `putnami install` materializes it when the workspace lists `extension:@putnami/cloud` in `agentArtifacts`. Helper scripts live under `.agents/skills/audit/scripts/` on both hosts; run them from the workspace root through `bash`. Run semantic audit judgment on the strongest available model.
 
-The audit unit is a Putnami **scope**: a directory whose `putnami.json` declares projects (`putnami scopes list`). Repository settings live in the workspace manifest under `options["@putnami/intelligence"].audit`; `bash .agents/skills/audit/scripts/config.sh` resolves them:
+The audit unit is a Putnami **scope**: a directory whose `putnami.json` declares projects (`putnami scopes list`). Repository settings live in the workspace manifest under `options["@putnami/cloud"].audit`; `bash .agents/skills/audit/scripts/config.sh` resolves them:
 
 | Key | Meaning | Default |
 |---|---|---|
@@ -137,7 +137,7 @@ bash .agents/skills/audit/scripts/attest.sh record <project-short> <group> "$has
 
 The hash also folds each **direct dependency**'s tree object and the **rubric hash** (`SKILL.md` + `mechanical.sh` + `config.sh` + the repository profile and checks script when set), so a dep change, a rubric edit or a profile edit invalidates attestations implicitly — no manual `--no-cache`. If `putnami projects describe` is unavailable the dep set is unknown, so the hash is marked `-dirty` and the project re-scans rather than skip on a partial hash.
 
-**Shared Intelligence tier.** When the root Putnami manifest enables Intelligence (`options["@putnami/intelligence"].enabled`, written by `putnami intelligence setup`), ephemeral web sessions and CI reuse each other's verifications through `putnami intelligence audit-attest` (keyed by repo + project + group + input hash + rubric hash). After a local miss `check` consults Intelligence and seeds the local ledger on a hit; `record` mirrors best-effort. This remains a pure, fail-open optimization — unavailable Intelligence degrades to local-only and never fails an audit. `fleet.sh` batch-prefetches the ledger in one ordered request before dispatch (also skipped under `--no-cache`).
+**Shared Agency tier.** When the root Putnami manifest opts in (`options["@putnami/cloud"].audit.sharedAttestations: true`) on a workspace linked to Putnami Cloud, ephemeral web sessions and CI reuse each other's verifications through `putnami agency audit-attest` (keyed by repo + project + group + input hash + rubric hash). After a local miss `check` consults Agency and seeds the local ledger on a hit; `record` mirrors best-effort. This remains a pure, fail-open optimization — unavailable Agency degrades to local-only and never fails an audit. `fleet.sh` batch-prefetches the ledger in one ordered request before dispatch (also skipped under `--no-cache`).
 
 The helper refuses to record `-dirty` hashes, so a dirty working tree is always re-scanned. Report skipped pairs in the summary — a silent skip reads as coverage.
 
@@ -436,7 +436,7 @@ Module granularity and god files are reported as observations in the umbrella is
 
 ### Workers
 
-Judgment and edits run on different tiers. This extension ships both workers with the skill: `prune-triage` (read-only, strongest tier, high effort) and `prune-apply` (edits, light tier, medium effort), under `.claude/agents/` and `.codex/agents/`. On Codex, the repository registers them in `.codex/config.toml`.
+Judgment and edits run on different tiers. This extension ships both workers with the skill: `prune-triage` (read-only, middle tier, high effort) and `prune-apply` (edits, light tier, medium effort), under `.claude/agents/` and `.codex/agents/`. On Codex, the repository registers them in `.codex/config.toml`.
 
 | Step | Who | Why |
 | --- | --- | --- |

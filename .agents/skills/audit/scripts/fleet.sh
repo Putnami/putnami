@@ -7,8 +7,8 @@
 # a plain deterministic script, no model — to refresh shared scorecard state.
 # Attestations (attest.sh) make re-runs cheap: shards skip (project, group)
 # pairs whose content hasn't changed; pass --no-cache to force a full re-scan.
-# When the root manifest enables Intelligence, the ledger is prefetched from the
-# shared Intelligence tier in one batched call before dispatch and seeded
+# When the root manifest enables Agency, the ledger is prefetched from the
+# shared Agency tier in one batched call before dispatch and seeded
 # locally, so shards resolve locally instead of each making per-key remote
 # lookups (fail-open; skipped under --no-cache).
 #
@@ -106,16 +106,16 @@ run_slice() {
 # --- shared-tier prefetch (opt-in; fail-open) ---------------------------------
 prefetch_call() {
   if command -v timeout >/dev/null 2>&1; then
-    timeout "${PUTNAMI_AUDIT_ATTEST_TIMEOUT:-30}" putnami intelligence audit-attest prefetch
+    timeout "${PUTNAMI_AUDIT_ATTEST_TIMEOUT:-30}" putnami agency audit-attest prefetch
   else
-    putnami intelligence audit-attest prefetch
+    putnami agency audit-attest prefetch
   fi
 }
 
-# prefetch_ledger pulls the whole wave's ledger from shared Intelligence
+# prefetch_ledger pulls the whole wave's ledger from shared Agency
 # tier in ONE batched call and seeds the machine-local store, so shards resolve
 # locally instead of each doing per-(project, group) remote round trips. Opt-in via
-# the manifest Intelligence setting and fail-open (a `set +e` subshell): any error
+# the manifest Agency setting and fail-open (a `set +e` subshell): any error
 # just means shards fall back to their own per-key lookups. Skipped under
 # --no-cache. repo and rubricHash come from attest.sh so the derived keys match
 # exactly what the remote tier uses.

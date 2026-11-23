@@ -86,7 +86,7 @@ client.gen.go
 
 # BEGIN PUTNAMI AUDIT MANAGED
 # Local audit attestations and parallel fleet-run state, written by the audit
-# skill of @putnami/intelligence.
+# skill of @putnami/cloud.
 .putnami/audit/
 # Written by audit copies that the retired Cloud audit installer placed.
 .AI/audit/attestations/

@@ -32,12 +32,11 @@
     "/tooling/contributor",
     "/tooling/dev",
     "/tooling/github-collaboration",
-    "/cloud/extension",
-    "@putnami/intelligence"
+    "/cloud/extension"
   ],
   "agentArtifacts": [
     "extension:@putnami/contributor",
-    "extension:@putnami/intelligence",
+    "extension:@putnami/cloud",
     "extension:@putnami/web"
   ],
   "includes": [
@@ -103,8 +102,8 @@
         "version": 1
       },
       "missions": {
-        "provider": "@putnami/intelligence",
-        "version": 1,
+        "provider": "@putnami/cloud",
+        "version": 2,
         "require": [
           "status"
         ]
@@ -176,7 +175,10 @@
     "@putnami/typescript": {
       "fix": true
     },
-    "@putnami/intelligence": {
+    "@putnami/cloud": {
+      "workspace": {
+        "workspace_id": "a3839d53-5b31-48d4-8924-fb29df25c743"
+      },
       "audit": {
         "priority": [
           "security",
@@ -188,11 +190,6 @@
         ],
         "profile": ".agents/audit/profile.md",
         "checks": ".agents/audit/checks.sh"
-      }
-    },
-    "@putnami/cloud": {
-      "workspace": {
-        "workspace_id": "a3839d53-5b31-48d4-8924-fb29df25c743"
       },
       "intelligence": {
         "enabled": true,

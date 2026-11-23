@@ -20,7 +20,7 @@ description = "Read-only GPT-6 Astra reviewer: the independent check of a frozen
 config_file = "agents/reviewer.toml"
 
 [agents."prune-triage"]
-description = "Read-only GPT-6 Astra triage worker for /audit --prune: apply / verdict / drop per removal candidate, against every consumer repository."
+description = "Read-only GPT-6 Sol triage worker for /audit --prune: apply / verdict / drop per removal candidate, against every consumer repository."
 config_file = "agents/prune-triage.toml"
 
 [agents."prune-apply"]

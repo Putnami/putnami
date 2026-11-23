@@ -15,7 +15,7 @@
 #   --dry-run               print the generated bodies and write nothing
 #
 # Scopes come from `putnami scopes list` and settings from
-# options["@putnami/intelligence"].audit (see config.sh). Scorecards are opt-in
+# options["@putnami/cloud"].audit (see config.sh). Scorecards are opt-in
 # (`"scorecards": true`). Each scorecard is a task of the bound tasks provider,
 # found or opened through `putnami tasks create` with the idempotency key
 # `scorecard:<scope label>` (`scorecard:workspace` for the rollup), so nothing
@@ -47,7 +47,7 @@ done
 command -v jq >/dev/null || { echo "scorecard: jq not found" >&2; exit 1; }
 
 if [ "$DRY_RUN" != 1 ] && ! bash "$CONFIG" scorecards; then
-  echo "scorecard: scorecards are off; set options[\"@putnami/intelligence\"].audit.scorecards to true to enable them" >&2
+  echo "scorecard: scorecards are off; set options[\"@putnami/cloud\"].audit.scorecards to true to enable them" >&2
   exit 0
 fi
 

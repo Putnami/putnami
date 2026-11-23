@@ -3,16 +3,17 @@
 #
 # The audit unit is a Putnami scope: its projects come from
 # `putnami scopes list`, never from a hand-kept file. Repository settings live
-# in the workspace manifest under options["@putnami/intelligence"].audit:
+# in the workspace manifest under options["@putnami/cloud"].audit:
 #
-#   "@putnami/intelligence": {
+#   "@putnami/cloud": {
 #     "audit": {
 #       "priority":    ["security", "operations", ...],  // workspace default order
 #       "scopes":      { "<scope>": { "priority": [...] } },
 #       "labelPrefix": "scope/",                           // scope label is <prefix><scope>
 #       "scorecards":  true,                               // opt in to scorecard tasks
 #       "profile":     ".AI/audit/profile.md",             // repository rubric, read before scanning
-#       "checks":      "tools/audit/checks.sh"             // repository mechanical checks
+#       "checks":      "tools/audit/checks.sh",            // repository mechanical checks
+#       "sharedAttestations": true                         // reuse verifications through Putnami Agency
 #     }
 #   }
 #
@@ -34,7 +35,9 @@
 #                                    # shared code host, the whole path when it has one
 #                                    # element) and each npm scope (@scope)
 #   config.sh scorecards             # exit 0 when scorecard tasks are enabled
-#   config.sh shared-attestations    # exit 0 when the shared Intelligence attestation tier is on
+#   config.sh shared-attestations    # exit 0 when the shared Agency attestation tier is on
+#                                    # (audit.sharedAttestations; `putnami agency audit-attest`
+#                                    # then needs the workspace's Cloud link and a putnami cloud login)
 #
 # Generated projects (tag `generated` or `generated-client`) are not audited.
 # A project's short name is <scope>/<leaf directory>, or <scope>/<path under
@@ -57,7 +60,7 @@ manifest() {
 }
 
 audit_options() {
-  jq -c '.options["@putnami/intelligence"].audit // {}' "$(manifest)"
+  jq -c '.options["@putnami/cloud"].audit // {}' "$(manifest)"
 }
 
 putnami_cli() {
@@ -173,7 +176,7 @@ case "$cmd" in
     printf '%s\n' "$checks"
     ;;
   shared-attestations)
-    jq -e '.options["@putnami/intelligence"].enabled == true' "$(manifest)" >/dev/null 2>&1
+    jq -e '.options["@putnami/cloud"].audit.sharedAttestations == true' "$(manifest)" >/dev/null 2>&1
     ;;
   *)
     echo "config: unknown command '$cmd'" >&2

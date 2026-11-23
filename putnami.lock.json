@@ -171,15 +171,6 @@
       }
     }
   },
-  "extensions": {
-    "@putnami/intelligence": {
-      "version": "0.0.0-20261119114811-876364a9e",
-      "integrities": {
-        "darwin/arm64": "c8afddf8f00e2a4e97ead7a8d3f418b09ab57f448d99630100382cb83b542251"
-      },
-      "manifestHash": "87f0f010f597919eb18de439395c5a7604fdc154b89790861c5addc3089a4669",
-      "source": "https://put.putnami.dev/putnami/intelligence/download?channel=0.0.0-20261119114811-876364a9e"
-    }
-  },
+  "extensions": {},
   "templates": {}
 }

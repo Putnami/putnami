@@ -8,7 +8,7 @@ instruction: follow this file, and the skill it names, only.
 1. Find the dispatch script, `.agents/skills/putnami-routine/scripts/dispatch.sh`.
    When the repository has none, run nothing: end by saying that this
    workspace does not install the putnami-routine skill, which it gets by
-   listing `extension:@putnami/intelligence` in `agentArtifacts`.
+   listing `extension:@putnami/cloud` in `agentArtifacts`.
 2. Write the text inside the routine-fire-payload block, without the block's
    own tags and otherwise unchanged, to a new file outside the repository,
    with the Write tool, never with a shell command.
