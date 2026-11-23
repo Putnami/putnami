@@ -3,6 +3,7 @@ import type { HttpMethod } from './http-method.type';
 import type { HttpMiddleware } from './http-middleware.type';
 import { HttpResponse } from './http-response';
 import type { RouteController } from './route.controller';
+import { actsOnRoutes } from './route-scope';
 
 export interface HttpMethodsOptions {
   /** Enable automatic HEAD response derived from GET handlers. Default: `true` */
@@ -14,6 +15,9 @@ export interface HttpMethodsOptions {
 }
 
 const WS_METHODS = new Set(['MESSAGE', 'OPEN', 'CLOSE']);
+
+/** The methods this middleware may answer itself. */
+const ANSWERED_METHODS = new Set(['HEAD', 'OPTIONS', 'TRACE']);
 
 /** Headers excluded from TRACE echoes to prevent information leaks. */
 const TRACE_EXCLUDED_HEADERS = new Set(['cookie', 'authorization', 'proxy-authorization', 'set-cookie']);
@@ -151,9 +155,11 @@ export function HttpMethodsMiddleware(
 
   // A GET, POST or any method this middleware does not answer goes straight
   // on, with no async frame of its own.
-  return (ctx, next) => {
+  const middleware: HttpMiddleware = (ctx, next) => {
     const method = ctx.req.method;
     if (method !== 'HEAD' && method !== 'OPTIONS' && method !== 'TRACE') return next();
     return answer(ctx, next, method);
   };
+  // A route registered for any other method never runs it.
+  return actsOnRoutes(middleware, (route) => ANSWERED_METHODS.has(route.method));
 }

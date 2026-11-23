@@ -14,6 +14,7 @@ import type { HttpRequestContext, HttpRequestContextInternal, Server } from './h
 import { HttpResponse } from './http-response';
 import { getHttpStatusText } from './http-status.type';
 import type { RouteController } from './route.controller';
+import type { HandlerResult } from './router';
 import type { RouteHandler } from './route.type';
 
 /**
@@ -43,7 +44,14 @@ export class HttpDispatcher {
    * Caches the matched handlers on the context so handle() can reuse them.
    */
   matchRoute(httpContext: HttpRequestContextInternal): void {
-    const handlers = this.router.find(httpContext);
+    this.useMatch(httpContext, this.router.find(httpContext));
+  }
+
+  /**
+   * Records `handlers` as the request's match, as {@link matchRoute} does with
+   * the router's: a route Bun's native router matched arrives with its match.
+   */
+  useMatch(httpContext: HttpRequestContextInternal, handlers: HandlerResult<RouteHandler<HttpRequestContext>>[]): void {
     httpContext.__matchedHandlers = handlers;
     if (handlers.length > 0) {
       const first = handlers[0];
@@ -55,22 +63,36 @@ export class HttpDispatcher {
   }
 
   /** Iterates through matched handlers until one produces a response, populating route context on each attempt. */
-  async handle(httpContext: HttpRequestContextInternal): Promise<undefined | HttpResponse> {
-    // Reuse cached match from matchRoute() if available, otherwise find fresh
-    const handlers = httpContext.__matchedHandlers ?? this.router.find(httpContext);
+  handle(httpContext: HttpRequestContextInternal): Promise<undefined | HttpResponse> {
+    let handlers: HandlerResult<RouteHandler<HttpRequestContext>>[];
+    let alreadyInContext: boolean;
+    try {
+      // Reuse cached match from matchRoute() if available, otherwise find fresh
+      handlers = httpContext.__matchedHandlers ?? this.router.find(httpContext);
+      // The HTTP plugin already wraps the whole request in runInContext(httpContext),
+      // so re-entering AsyncLocalStorage with the same store per handler is redundant.
+      // Only establish the context here when called outside one (e.g. the standalone
+      // dispatch() entrypoint used by gRPC / testing).
+      alreadyInContext = tryContext() === httpContext;
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    // One candidate, inside the request's context: no loop and no async frame of its own.
+    if (handlers.length === 1 && alreadyInContext) {
+      useCandidate(httpContext, handlers[0]);
+      return this.runHandler(handlers[0].handler, httpContext).catch(skipNotAcceptable);
+    }
+    return this.handleEach(httpContext, handlers, alreadyInContext);
+  }
 
-    // The HTTP plugin already wraps the whole request in runInContext(httpContext),
-    // so re-entering AsyncLocalStorage with the same store per handler is redundant.
-    // Only establish the context here when called outside one (e.g. the standalone
-    // dispatch() entrypoint used by gRPC / testing).
-    const alreadyInContext = tryContext() === httpContext;
-
+  private async handleEach(
+    httpContext: HttpRequestContextInternal,
+    handlers: HandlerResult<RouteHandler<HttpRequestContext>>[],
+    alreadyInContext: boolean,
+  ): Promise<undefined | HttpResponse> {
     for (let i = 0; i < handlers.length; i++) {
       const handlerResult = handlers[i];
-      httpContext.route = handlerResult.route;
-      httpContext.params = handlerResult.params;
-      httpContext.statusCode = handlerResult.statusCode;
-      httpContext.__firstPartyErrors = handlerResult.firstPartyErrors;
+      useCandidate(httpContext, handlerResult);
 
       const handler = handlerResult.handler;
       try {
@@ -90,18 +112,43 @@ export class HttpDispatcher {
     return undefined;
   }
 
-  private runHandler = async <CONTEXT extends HttpRequestContext = HttpRequestContext>(
+  /**
+   * Runs one handler and wraps its result, or answers its error. A handler
+   * that answers synchronously goes through no async frame.
+   */
+  private runHandler = <CONTEXT extends HttpRequestContext = HttpRequestContext>(
     handler: RouteHandler<CONTEXT>,
     context: CONTEXT,
-  ) => {
-    let r: undefined | HttpResponse | Promise<HttpResponse>;
+  ): Promise<HttpResponse | undefined> => {
+    const answerError = (e: unknown) => this.handleError(e, context).then(flushContext);
+    let result: ReturnType<RouteHandler<CONTEXT>>;
     try {
-      const result = await handler(context);
-      r = wrapResponse(result, context);
+      result = handler(context);
     } catch (e) {
-      r = await this.handleError(e, context);
+      return answerError(e);
     }
-    return flushContext(r);
+    if (isThenable(result)) {
+      return Promise.resolve(result).then((value) => {
+        let wrapped: HttpResponse | undefined;
+        try {
+          wrapped = wrapResponse(value, context);
+        } catch (e) {
+          return answerError(e);
+        }
+        return flushContext(wrapped);
+      }, answerError);
+    }
+    let wrapped: HttpResponse | undefined;
+    try {
+      wrapped = wrapResponse(result, context);
+    } catch (e) {
+      return answerError(e);
+    }
+    try {
+      return Promise.resolve(flushContext(wrapped));
+    } catch (e) {
+      return Promise.reject(e);
+    }
   };
 
   /**
@@ -307,3 +354,27 @@ const flushContext = <R = undefined | HttpResponse | Promise<HttpResponse>>(r: R
 type ContextWithCallback = {
   __callbacks?: ((r: HttpResponse) => HttpResponse)[];
 };
+
+/** Records `candidate` as the handler the request now tries. */
+function useCandidate(
+  httpContext: HttpRequestContextInternal,
+  candidate: HandlerResult<RouteHandler<HttpRequestContext>>,
+): void {
+  httpContext.route = candidate.route;
+  httpContext.params = candidate.params;
+  httpContext.statusCode = candidate.statusCode;
+  httpContext.__firstPartyErrors = candidate.firstPartyErrors;
+}
+
+/** A candidate that refused the request's Accept leaves it unanswered, as the next candidate would. */
+function skipNotAcceptable(e: unknown): undefined {
+  if (e instanceof NotAcceptableException) return undefined;
+  throw e;
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value instanceof Promise ||
+    (typeof value === 'object' && value !== null && typeof (value as PromiseLike<unknown>).then === 'function')
+  );
+}

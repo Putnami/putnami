@@ -3,6 +3,7 @@ import { DEFAULT_MAX_BODY_SIZE_BYTES, ensureBodyWithinLimit } from './http-conte
 import type { HttpRequestContextInternal } from './http-context.type';
 import type { HttpMiddleware } from './http-middleware.type';
 import { HttpResponse } from './http-response';
+import { actsOnRoutes } from './route-scope';
 
 export interface CsrfOptions {
   /** Name of the cookie that stores the CSRF token. Default: `'_csrf'` */
@@ -315,5 +316,7 @@ export const CsrfMiddleware = (options: CsrfOptions = {}): HttpMiddleware => {
     return res;
   };
 
+  // A route exempt from CSRF (every `api()` route) never runs it.
+  actsOnRoutes(middleware, (route) => !route.csrfExempt);
   return Object.assign(middleware, { __csrfMiddleware: CSRF_MIDDLEWARE_MARKER });
 };

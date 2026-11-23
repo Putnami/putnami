@@ -432,9 +432,14 @@ const DECLARED_WILDCARD_SCORE = 1e-6;
  * answers any Accept, and only when no other route matches the request first.
  */
 function scoreAccept<T>(handler: Handler<T>, requestAccept: readonly string[]): number {
-  if (requestAccept.some((item) => handler.accept.has(item))) return 1;
-  if (handler.accept.size === 0 || requestAccept.length === 0 || requestAccept.includes('*/*')) return 0.5;
-  return handler.accept.has('*/*') ? DECLARED_WILDCARD_SCORE : 0;
+  return acceptScore(handler.accept, requestAccept);
+}
+
+/** The content-negotiation score of a handler accepting `accept` for a request accepting `requestAccept`; 0 refuses. */
+export function acceptScore(accept: ReadonlySet<string>, requestAccept: readonly string[]): number {
+  if (requestAccept.some((item) => accept.has(item))) return 1;
+  if (accept.size === 0 || requestAccept.length === 0 || requestAccept.includes('*/*')) return 0.5;
+  return accept.has('*/*') ? DECLARED_WILDCARD_SCORE : 0;
 }
 
 /**

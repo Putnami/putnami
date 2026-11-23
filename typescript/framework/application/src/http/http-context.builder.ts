@@ -10,7 +10,25 @@ import type { HandlerResult } from './router';
 import { UrlScanner } from './url.scanner';
 
 /** The lifetime of a served request that has a deadline: its signal and its end. */
-export interface RequestLifetime {
+/**
+ * The key a request context holds its {@link RequestAbortHooks} under.
+ * `@putnami/database` reads the same key (`Symbol.for`, so two copies of the
+ * framework agree) to cancel a query without building the request's signal.
+ */
+export const REQUEST_ABORT_HOOKS = Symbol.for('putnami.request.abortHooks');
+
+/**
+ * What a request's signal tells, without the signal: whether the request
+ * ended, and a listener called once when it ends. A request served with a
+ * deadline ends on its timeout or when its client leaves, as its signal does.
+ */
+export interface RequestAbortHooks {
+  aborted(): boolean;
+  onAbort(listener: () => void): void;
+  offAbort(listener: () => void): void;
+}
+
+export interface RequestLifetime extends RequestAbortHooks {
   /** Builds the request's signal; called once, on its first read. */
   signal(): AbortSignal;
   /** Ends the request now: its signal aborts with a `TimeoutError`. */
@@ -79,6 +97,8 @@ class HttpContext {
   private _signal?: AbortSignal;
   private _signalSource?: () => AbortSignal;
   private readonly _lifetime?: RequestLifetime;
+  /** The request's abort hooks, an own property so a context copy keeps them. */
+  [REQUEST_ABORT_HOOKS]: RequestAbortHooks | undefined;
   private _endRequest?: () => void;
   /** The Authorization header once read, `null` before its first read. */
   private _authorization?: string | null;
@@ -97,6 +117,7 @@ class HttpContext {
     const req = args.req;
     this.req = req;
     this._lifetime = args.lifetime;
+    this[REQUEST_ABORT_HOOKS] = args.lifetime;
     this._endRequest = undefined;
     if (typeof args.signal === 'function') {
       this._signal = undefined;

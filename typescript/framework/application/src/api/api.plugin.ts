@@ -50,6 +50,7 @@ import {
   resolveFirstPartyStreamAdmission,
   resolveFirstPartyStreamHandlers,
 } from './stream/first-party-stream-dispatcher';
+import { servedNatively } from '../http/native-endpoints';
 
 const API_ACCEPT = [
   'application/json',
@@ -229,7 +230,8 @@ export class ApiPlugin implements Plugin {
         // Build-time AOT: swap the generic validation for compiled validators when
         // the codegen emitted them and the route has no middleware to preserve.
         // An empty result answers 204 here, inside the endpoint's middleware.
-        const routeHandler = buildHttpEndpointHandler(endpointTarget, aot);
+        // A plain HTTP endpoint: Bun's native router may match it (see nativeEndpoints).
+        const routeHandler = servedNatively(buildHttpEndpointHandler(endpointTarget, aot));
         this.httpPlugin.route(method, prefixedPath, routeHandler, {
           accept: API_ACCEPT,
           // Per-endpoint `.csrfExempt()` opts this single route out of CSRF;
@@ -246,7 +248,7 @@ export class ApiPlugin implements Plugin {
         const ep = exports[m];
         if (isEndpointDefinition(ep)) {
           this.assertExternalContract(m, prefixedPath, ep.meta?.client);
-          this.httpPlugin.route(m, prefixedPath, buildHttpEndpointHandler(ep), {
+          this.httpPlugin.route(m, prefixedPath, servedNatively(buildHttpEndpointHandler(ep)), {
             accept: API_ACCEPT,
             // Per-endpoint `.csrfExempt()` opts this single route out of CSRF;
             // otherwise fall back to the api-level default. Never widens siblings.

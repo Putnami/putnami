@@ -161,3 +161,62 @@ describe('abortableQuery', () => {
     controller.abort();
   });
 });
+
+describe('request abort hooks', () => {
+  /** Hooks as an HTTP request context carries them, under the key @putnami/application sets. */
+  const hooked = () => {
+    const listeners = new Set<() => void>();
+    let ended = false;
+    return {
+      [Symbol.for('putnami.request.abortHooks')]: {
+        aborted: () => ended,
+        onAbort: (listener: () => void) => listeners.add(listener),
+        offAbort: (listener: () => void) => listeners.delete(listener),
+      },
+      end: () => {
+        ended = true;
+        for (const listener of [...listeners]) listener();
+      },
+      listeners,
+    };
+  };
+  const pendingQuery = () => {
+    let cancelled = false;
+    const query = new Promise<never>(() => {}) as unknown as SqlQuery<[]> & { cancel: () => void };
+    query.cancel = () => {
+      cancelled = true;
+    };
+    return { query, cancelled: () => cancelled };
+  };
+
+  it('cancels a query when the request ends, through the hooks', async () => {
+    const context = hooked();
+    const { query, cancelled } = pendingQuery();
+    const running = runInContext(context, () => abortableQuery(query));
+    expect(context.listeners.size).toBe(1);
+    context.end();
+    await expect(running).rejects.toBeInstanceOf(QueryAbortError);
+    expect(cancelled()).toBe(true);
+  });
+
+  it('refuses to start after the request ended, and leaves no listener behind', async () => {
+    const context = hooked();
+    context.end();
+    await runInContext(context, async () => {
+      expect(() => throwIfAborted()).toThrow(QueryAbortError);
+      await expect(abortableQuery(pendingQuery().query)).rejects.toBeInstanceOf(QueryAbortError);
+    });
+    expect(context.listeners.size).toBe(0);
+  });
+
+  it('lets a context with a signal of its own be governed by that signal', async () => {
+    const context = hooked();
+    const controller = new AbortController();
+    const { query, cancelled } = pendingQuery();
+    const running = runInContext({ ...context, signal: controller.signal }, () => abortableQuery(query));
+    expect(context.listeners.size).toBe(0);
+    controller.abort();
+    await expect(running).rejects.toBeInstanceOf(QueryAbortError);
+    expect(cancelled()).toBe(true);
+  });
+});

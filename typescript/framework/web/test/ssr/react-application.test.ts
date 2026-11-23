@@ -14,6 +14,7 @@ import {
 } from '@putnami/application';
 import { resolve } from 'node:path';
 import React from 'react';
+import { composeMiddlewareChain } from '../../../application/src/http/route-scope';
 import { runInContext } from '../../../runtime/src/context/context.utils';
 import { CsrfInput } from '../../src/client/form/csrf-input';
 import { action as actionBuilder } from '../../src/ssr/action';
@@ -1229,10 +1230,7 @@ describe('ReactApplication', () => {
       };
       type HttpPluginInternals = {
         router: { find: (ctx: never) => MatchedRoute[] };
-        buildMiddlewareChain: () => (
-          ctx: never,
-          dispatch: () => Promise<HttpResponse | undefined>,
-        ) => Promise<HttpResponse | undefined>;
+        buildMiddlewares: () => HttpMiddleware[];
       };
       const parsed = new URL(url);
       const headers = new Headers({ Accept: 'text/html' });
@@ -1256,7 +1254,7 @@ describe('ReactApplication', () => {
         params: first?.params ?? {},
         statusCode: first?.statusCode ?? 200,
       });
-      const chain = internals.buildMiddlewareChain();
+      const chain = composeMiddlewareChain(internals.buildMiddlewares());
       return chain(
         ctx,
         async () =>

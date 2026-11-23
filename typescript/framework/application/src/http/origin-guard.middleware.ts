@@ -3,6 +3,7 @@ import type { HttpRequestContext } from './http-context.type';
 import type { HttpMiddleware } from './http-middleware.type';
 import { HttpResponse } from './http-response';
 import { isMinimalRoute } from './minimal.util';
+import { actsOnRoutes } from './route-scope';
 
 export interface OriginGuardOptions {
   /** Origins to trust for cross-origin requests (e.g. `'https://admin.example.com'`). */
@@ -26,7 +27,7 @@ export function OriginGuardMiddleware(options: OriginGuardOptions = {}): HttpMid
   const enforce = (options.mode ?? 'enforce') === 'enforce';
 
   // Not async: a request the guard lets through goes on with no frame of its own.
-  return (ctx, next) => {
+  const middleware: HttpMiddleware = (ctx, next) => {
     // Per-route opt-out: skip only when every matched candidate is minimal.
     if (isMinimalRoute(ctx)) return next();
 
@@ -47,6 +48,8 @@ export function OriginGuardMiddleware(options: OriginGuardOptions = {}): HttpMid
 
     return Promise.resolve(HttpResponse.json({ error: 'Cross-origin request blocked' }, { status: 403 }));
   };
+  // A route served on a safe method, or a minimal one, never runs it.
+  return actsOnRoutes(middleware, (route) => !route.minimal && !SAFE_METHODS.has(route.method));
 }
 
 function isOriginAllowed(ctx: HttpRequestContext, trustedHosts: Set<string>, allowSameSite: boolean): boolean {

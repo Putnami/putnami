@@ -1,7 +1,9 @@
 import type { ContainerContext } from '@putnami/runtime';
 import type { HealthContribution, Module, Plugin } from '../application';
 import { HttpPlugin } from '../http/http.plugin';
+import type { HttpMiddleware } from '../http/http-middleware.type';
 import { HttpResponse } from '../http/http-response';
+import { actsOnRoutes, routeMayMatch } from '../http/route-scope';
 import { isHealthChecker, isReadinessChecker } from './checker';
 import {
   DEFAULT_PROBE_TIMEOUT_MS,
@@ -166,7 +168,14 @@ export class PlatformPlugin implements Plugin {
     this.discoverHealthContributions();
 
     const httpPlugin = await owner.ensurePlugin(HttpPlugin);
-    httpPlugin.prepend(async (ctx, next) => {
+    // The probe paths, under the prefix: it is fixed at construction.
+    const livez = joinPrefix(this.prefix, PATH_LIVEZ);
+    const healthz = joinPrefix(this.prefix, PATH_HEALTHZ);
+    const readyz = joinPrefix(this.prefix, PATH_READYZ);
+    const version = joinPrefix(this.prefix, PATH_VERSION);
+    const probePaths = [livez, healthz, readyz, version];
+
+    const probes: HttpMiddleware = async (ctx, next) => {
       if (ctx.method !== 'GET') return next();
 
       // ctx.path() returns the request path; compare against the
@@ -174,22 +183,30 @@ export class PlatformPlugin implements Plugin {
       // matches the published helper.
       const path = `/${ctx.path()}`.replace(/^\/+/, '/');
 
-      if (path === joinPrefix(this.prefix, PATH_LIVEZ)) {
+      if (path === livez) {
         return this.livez();
       }
-      if (path === joinPrefix(this.prefix, PATH_HEALTHZ)) {
+      if (path === healthz) {
         this.discoverHealthContributions();
         return this.aggregate(this.running, this.healthCheckers);
       }
-      if (path === joinPrefix(this.prefix, PATH_READYZ)) {
+      if (path === readyz) {
         this.discoverHealthContributions();
         return this.aggregate(this.running && this.ready, this.readinessCheckers, this.required);
       }
-      if (path === joinPrefix(this.prefix, PATH_VERSION)) {
+      if (path === version) {
         return HttpResponse.json(this.version);
       }
       return next();
-    });
+    };
+    // The probes answer GET on their own paths only: a route that cannot
+    // match one of them never runs them.
+    httpPlugin.prepend(
+      actsOnRoutes(
+        probes,
+        (route) => route.method === 'GET' && probePaths.some((probe) => routeMayMatch(route.route, probe)),
+      ),
+    );
   }
 
   async start(owner?: Module): Promise<void> {
