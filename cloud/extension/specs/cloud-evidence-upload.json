@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "cloud/evidence-upload",
   "outcomes": [
-    "A CI job that is not Putnami's uploads its change evidence document to Putnami Cloud with a workspace token, or a GitHub Actions job with its own ID token and no secret, or a person uploads it after signing in, and the run shows its tests, coverage, components, changed-line coverage and dependency changes, marked as self-reported, at the report URL the upload answers"
+    "A CI job that is not Putnami's uploads its change evidence document to Putnami Cloud with a workspace token, or a GitHub Actions or gitlab.com CI job with its own ID token and no secret, or a person uploads it after signing in, and the run shows its tests, coverage, components, changed-line coverage and dependency changes, marked as self-reported, at the report URL the upload answers"
   ],
   "nonGoals": [
     "Creating the observed workspace or its token: the runbook does it by hand for this slice",
@@ -74,7 +74,7 @@
     {
       "id": "signs-a-person-in",
       "text": [
-        "With --sign-in, no token and no GitHub Actions exchange, the command uses the session putnami cloud login stored, refreshed when expired, and runs the same device sign-in when none exists, then uploads as that person: the run names the repository and no workspace, and Putnami Cloud opens the observed workspace in the person's organization.",
+        "With --sign-in, no token and no ID token exchange, the command uses the session putnami cloud login stored, refreshed when expired, and runs the same device sign-in when none exists, then uploads as that person: the run names the repository and no workspace, and Putnami Cloud opens the observed workspace in the person's organization.",
         "With a token in PUTNAMI_CLOUD_TOKEN, the upload names the repository too: an organization's ingest token needs it.",
         "Without --sign-in, a token or the exchange, it refuses."
       ]
@@ -87,11 +87,26 @@
       ]
     },
     {
+      "id": "exchanges-a-gitlab-ci-id-token",
+      "text": [
+        "In a GitLab CI job (GITLAB_CI true) with PUTNAMI_ORGANIZATION and no PUTNAMI_CLOUD_TOKEN, it reads the job's ID token from PUTNAMI_ID_TOKEN, which the job's id_tokens declares with the auth-server's base URL as its audience, exchanges it at the auth-server for client delivery-ingest and that organization_id, and uploads with the answered token, naming the repository, even with --sign-in.",
+        "An explicit PUTNAMI_CLOUD_TOKEN wins: the ID token is not sent."
+      ]
+    },
+    {
       "id": "explains-a-refused-exchange",
       "text": [
         "PUTNAMI_ORGANIZATION in a GitHub Actions job (GITHUB_ACTIONS true) without ACTIONS_ID_TOKEN_REQUEST_URL or ACTIONS_ID_TOKEN_REQUEST_TOKEN sends nothing and names permissions id-token: write.",
         "The auth-server's refusal for a repository the organization does not trust is named with the observation trust to add.",
         "Any other failed request names the request and its reason. Each exits non-zero and prints no token."
+      ]
+    },
+    {
+      "id": "explains-a-refused-gitlab-exchange",
+      "text": [
+        "PUTNAMI_ORGANIZATION in a GitLab CI job (GITLAB_CI true) without PUTNAMI_ID_TOKEN sends nothing and names the id_tokens entry to declare, with the auth-server's base URL as its audience.",
+        "A job of a GitLab instance other than gitlab.com (CI_SERVER_HOST) is told to set PUTNAMI_CLOUD_TOKEN. A PUTNAMI_ID_TOKEN whose iss is not https://gitlab.com or whose aud is not that base URL is not sent.",
+        "The auth-server's refusal for a project the organization does not trust is named with the observation trust to add."
       ]
     },
     {

@@ -59,7 +59,7 @@ The install needs the network: when the installer or the registry cannot be reac
 
 `putnami observe` reads the checkout and the reports on the machine that runs it. Without `--upload` or `--open`, nothing about the change leaves that machine: it prints the summary and writes the evidence document where `--evidence` names it, and your CI keeps that file as an artifact. Its only other network use is Git, which fetches from your `origin` remote the history the base of the change needs, deepening a shallow clone.
 
-`--open` uploads too. With either flag, `putnami observe` first asks the GitHub or GitLab API for the repository's numeric id when it runs outside a CI or in a CI other than GitHub Actions and GitLab CI, with `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` when one is set; GitHub Actions and GitLab CI state that id themselves. It then hands the evidence document to the `@putnami/cloud` extension, which sends Putnami Cloud these fields, with `PUTNAMI_CLOUD_TOKEN`, the short-lived token a GitHub Actions job gets for its own ID token, or your signed-in session as the credential. That GitHub Actions job first sends its ID token, signed by GitHub and naming the repository, its owner, the workflow, the ref and the actor that started the run, with your organization's id to `auth.putnami.cloud`. The evidence then carries:
+`--open` uploads too. With either flag, `putnami observe` first asks the GitHub or GitLab API for the repository's numeric id when it runs outside a CI or in a CI other than GitHub Actions and GitLab CI, with `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` when one is set; GitHub Actions and GitLab CI state that id themselves. It then hands the evidence document to the `@putnami/cloud` extension, which sends Putnami Cloud these fields, with `PUTNAMI_CLOUD_TOKEN`, the short-lived token a GitHub Actions or gitlab.com job gets for its own ID token, or your signed-in session as the credential. That GitHub Actions job first sends its ID token, signed by GitHub and naming the repository, its owner, the workflow, the ref and the actor that started the run, with your organization's id to `auth.putnami.cloud`; that GitLab job sends its ID token, signed by gitlab.com and naming the project, its group, the pipeline, the job, the ref, and the id, login and email address of the user that started the pipeline, with your organization's id to `auth.putnami.cloud`. The evidence then carries:
 
 | Part | Fields |
 |---|---|
@@ -549,6 +549,28 @@ jobs:
 When the test run completes, the step downloads its `observe-evidence` artifact and runs `putnami observe --from-evidence` on it with `--upload --publish`, with this job's ID token and `GITHUB_TOKEN`. `actions: read` lets it download the artifact; pass `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}` instead of `PUTNAMI_ORGANIZATION` to upload with a workspace token. The pull request gets the status and the note as a pull request from a branch does, and they link the fork's run. A branch of your repository goes the same way, so one setup serves both.
 
 The document comes from the fork, so `putnami observe` checks it before it relays it. It refuses a document over 64 MiB, one that does not validate, or one that names another repository, pull request or commit than the run that triggered the job, with the warning `observe.evidence_refused`, and the job still passes: the commit must be the run's head commit, or the merge commit GitHub keeps for the pull request, as the GitHub API answers, and the base must be that merge commit's first parent or an ancestor of the head. It takes the repository, the pull request and the run from the job and the event, never from the document. The note quotes every text of the document as code, so a test name renders no link, mention or HTML, and the log prints only counts and observe's own diagnostics. The relay job checks out nothing and runs nothing the artifact holds: keep it that way, since it holds your repository's credentials. GitHub lists no pull request in the event of a fork's run, so observe finds it with `GITHUB_TOKEN` among the open pull requests of your repository, by the fork's owner, branch and head commit; when none matches, as after a new push to the fork or once the pull request closed, it relays nothing. The action hands `GITHUB_TOKEN` to `putnami observe` for these reads, even with `publish: false`.
+
+#### On GitLab, without a secret
+
+A job on gitlab.com can upload with no secret too: it exchanges an ID token GitLab gives the job for a five-minute upload token. Your Putnami organization must first trust the project, or the group that owns it, on its observe page in putnami.app. Then give the observe job of [step 3](#gitlab-ci) your organization's id and an ID token whose audience is `https://auth.putnami.cloud`, and upload:
+
+```yaml
+observe:
+  # ...the job of step 3, with these additions:
+  variables:
+    PUTNAMI_ORGANIZATION: <organization-id>
+  id_tokens:
+    PUTNAMI_ID_TOKEN:
+      aud: https://auth.putnami.cloud
+  script:
+    - curl -fsSL https://putnami.dev/install.sh | bash
+    - export PATH="$HOME/.putnami/bin:$PATH"
+    - putnami extensions install --user @putnami/observe
+    - putnami extensions install --user @putnami/cloud
+    - putnami observe --evidence observe-evidence.json --upload
+```
+
+`PUTNAMI_ORGANIZATION` is an id, not a secret, so it sits in the file. GitLab signs the ID token before the job starts, naming the project, its group and the job. With `PUTNAMI_ORGANIZATION` set and no `PUTNAMI_CLOUD_TOKEN`, `@putnami/cloud` exchanges `PUTNAMI_ID_TOKEN` at `auth.putnami.cloud`, which answers an upload token only when the organization trusts the project, or its group, for observation. When it does not, the summary names that refusal and the trust to add; without `PUTNAMI_ID_TOKEN`, it names the `id_tokens` entry to add. Putnami Cloud verifies the ID tokens of gitlab.com only: on a self-managed GitLab, set `PUTNAMI_CLOUD_TOKEN` as step 6 says. `@putnami/cloud` sends no ID token whose issuer is not gitlab.com or whose audience is not `https://auth.putnami.cloud`, and the summary names the one it read. A merge request from a fork runs in the fork's project, whose ID token names the fork, so it uploads nothing unless your organization trusts that project too. Add `--publish` and its `PUTNAMI_GITLAB_TOKEN`, as step 3 says, to also post on the merge request. A `PUTNAMI_CLOUD_TOKEN` set in the job wins over the exchange.
 
 ### 7) Add licences and known vulnerabilities from an SBOM
 

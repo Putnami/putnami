@@ -282,7 +282,9 @@ diagnostic ends with the result's error message.
 For `@putnami/cloud`, the job sets `PUTNAMI_CLOUD_TOKEN` to its organization's
 ingest token, which `putnami cloud token create --organization <id> --name ci`
 creates and prints once, signed in, with no Putnami workspace. A GitHub
-Actions job can instead set `PUTNAMI_ORGANIZATION` and exchange its ID token.
+Actions job, or a gitlab.com CI job whose `id_tokens` declares
+`PUTNAMI_ID_TOKEN`, can instead set `PUTNAMI_ORGANIZATION` and exchange its ID
+token.
 See
 [the Cloud extension](https://github.com/putnami/putnami/blob/main/cloud/extension/README.md#upload-a-change-evidence-document).
 

@@ -628,6 +628,20 @@
           }
         },
         {
+          "id": "exchanges-a-gitlab-ci-id-token",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gitlab-job-exchanges-its-id-token-and-uploads",
+              "an-explicit-token-skips-the-gitlab-exchange"
+            ]
+          }
+        },
+        {
           "id": "explains-a-refused-exchange",
           "stage": "coded",
           "evidenceKinds": [
@@ -639,6 +653,22 @@
               "a-job-without-id-token-permission-is-told-so",
               "an-untrusted-repository-is-refused-by-name",
               "a-failed-exchange-names-its-cause"
+            ]
+          }
+        },
+        {
+          "id": "explains-a-refused-gitlab-exchange",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gitlab-job-without-an-id-token-is-told-so",
+              "a-self-managed-gitlab-job-is-told-to-use-a-token",
+              "a-gitlab-id-token-for-another-issuer-or-audience-is-not-sent",
+              "an-untrusted-gitlab-project-is-refused-by-name"
             ]
           }
         },

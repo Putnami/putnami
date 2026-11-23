@@ -179,9 +179,13 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	token := clicore.EnvGet(env, evidenceTokenEnv)
 	namesRepository := false
 	if token == "" {
-		switch organization := actionsOrganization(env); {
-		case organization != "":
-			if token, err = actionsIngestToken(params, env, ioctx, organization); err != nil {
+		switch actions, gitlab := actionsOrganization(env), gitlabOrganization(env); {
+		case actions != "":
+			if token, err = actionsIngestToken(params, env, ioctx, actions); err != nil {
+				return err
+			}
+		case gitlab != "":
+			if token, err = gitlabIngestToken(params, env, ioctx, gitlab); err != nil {
 				return err
 			}
 		case clicore.BoolParam(params, false, "sign-in", "signIn"):
@@ -189,7 +193,7 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 				return err
 			}
 		default:
-			return clicore.NewError("cloud evidence-report needs a credential: "+evidenceTokenEnv+" set to an organization ingest token (putnami cloud token create --organization <id>) or a workspace token of scope delivery.ingest, "+evidenceOrganizationEnv+" in a GitHub Actions job with permissions id-token: write, or --sign-in to upload as the signed-in person", clicore.ExitAuth)
+			return clicore.NewError("cloud evidence-report needs a credential: "+evidenceTokenEnv+" set to an organization ingest token (putnami cloud token create --organization <id>) or a workspace token of scope delivery.ingest, "+evidenceOrganizationEnv+" in a GitHub Actions job with permissions id-token: write or in a gitlab.com CI job whose id_tokens declares "+gitlabIDTokenEnv+", or --sign-in to upload as the signed-in person", clicore.ExitAuth)
 		}
 		namesRepository = true
 	}

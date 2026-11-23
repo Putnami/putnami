@@ -31,9 +31,11 @@ const (
 	deliveryIngestClientID = "delivery-ingest"
 	tokenExchangeGrantType = "urn:ietf:params:oauth:grant-type:token-exchange" //nolint:gosec // G101: an RFC 8693 grant type, not a credential
 	idTokenTokenType       = "urn:ietf:params:oauth:token-type:id_token"       //nolint:gosec // G101: an RFC 8693 token type, not a credential
-	// untrustedRepositoryRefusal is the auth-server's error_description when
-	// the organization trusts neither the repository nor its owner.
+	// untrustedRepositoryRefusal and untrustedProjectRefusal are in the
+	// auth-server's error_description when the organization trusts neither
+	// the repository, or GitLab project, nor its owner.
 	untrustedRepositoryRefusal = "does not trust this repository"
+	untrustedProjectRefusal    = "does not trust this project"
 )
 
 // actionsOrganization returns the organization a GitHub Actions job uploads
@@ -58,30 +60,58 @@ func actionsIngestToken(params map[string]any, env map[string]string, ioctx clic
 	if err != nil {
 		return "", err
 	}
+	repository := clicore.FirstString(strings.TrimSpace(clicore.EnvGet(env, "GITHUB_REPOSITORY")), "this repository")
+	return exchangeIngestToken(params, env, ioctx, idTokenExchange{
+		ci:           "GitHub Actions",
+		organization: organization,
+		idToken:      idToken,
+		trustHint:    "Trust " + repository + ", or its owner,",
+	})
+}
+
+// idTokenExchange is one CI job's ID token exchange: the CI that issued the
+// token, the organization the job uploads for, the token, and the trust that
+// an untrusted-repository refusal names.
+type idTokenExchange struct {
+	ci           string
+	organization string
+	idToken      string
+	trustHint    string
+}
+
+// exchangeIngestToken exchanges a CI job's ID token at the auth-server for
+// the organization's ingest token. No error message carries a token.
+func exchangeIngestToken(params map[string]any, env map[string]string, ioctx clicore.IO, exchange idTokenExchange) (string, error) {
 	tokenURL := clicore.AuthEndpoints(params, env, ioctx.Client, "").TokenURL
 	answer, err := clicore.PostTokenEndpoint(ioctx.Client, tokenURL, map[string]any{
 		"grant_type":         tokenExchangeGrantType,
 		"client_id":          deliveryIngestClientID,
-		"subject_token":      idToken,
+		"subject_token":      exchange.idToken,
 		"subject_token_type": idTokenTokenType,
-		"organization_id":    organization,
+		"organization_id":    exchange.organization,
 	}, []int{http.StatusOK, http.StatusBadRequest, http.StatusUnauthorized})
 	if err != nil {
-		return "", clicore.NewError("cloud evidence-report: the GitHub Actions ID token exchange at "+tokenURL+" failed: "+err.Error(), clicore.ExitAuth)
+		return "", clicore.NewError("cloud evidence-report: the "+exchange.ci+" ID token exchange at "+tokenURL+" failed: "+err.Error(), clicore.ExitAuth)
 	}
 	if refusal := clicore.ValueString(answer, "error"); refusal != "" {
 		reason := clicore.FirstString(clicore.ValueString(answer, "error_description"), refusal)
-		if strings.Contains(reason, untrustedRepositoryRefusal) {
-			repository := clicore.FirstString(strings.TrimSpace(clicore.EnvGet(env, "GITHUB_REPOSITORY")), "this repository")
-			return "", clicore.NewError("cloud evidence-report: Putnami Cloud refused the GitHub Actions ID token exchange: "+reason+". Trust "+repository+", or its owner, for observation in the organization "+organization+" on its observe page in putnami.app, or set "+evidenceOrganizationEnv+" to the id of the organization that trusts it, then run the job again", clicore.ExitAuth)
+		if untrustedRefusal(reason) {
+			return "", clicore.NewError("cloud evidence-report: Putnami Cloud refused the "+exchange.ci+" ID token exchange: "+reason+". "+exchange.trustHint+" for observation in the organization "+exchange.organization+" on its observe page in putnami.app, or set "+evidenceOrganizationEnv+" to the id of the organization that trusts it, then run the job again", clicore.ExitAuth)
 		}
-		return "", clicore.NewError("cloud evidence-report: Putnami Cloud refused the GitHub Actions ID token exchange at "+tokenURL+": "+reason, clicore.ExitAuth)
+		return "", clicore.NewError("cloud evidence-report: Putnami Cloud refused the "+exchange.ci+" ID token exchange at "+tokenURL+": "+reason, clicore.ExitAuth)
 	}
 	token := strings.TrimSpace(clicore.ValueString(answer, "access_token"))
 	if token == "" {
-		return "", clicore.NewError("cloud evidence-report: the GitHub Actions ID token exchange at "+tokenURL+" answered no access_token", clicore.ExitAuth)
+		return "", clicore.NewError("cloud evidence-report: the "+exchange.ci+" ID token exchange at "+tokenURL+" answered no access_token", clicore.ExitAuth)
 	}
 	return token, nil
+}
+
+// untrustedRefusal reports whether the auth-server refused the exchange
+// because the organization trusts neither the job's repository, or project,
+// nor its owner.
+func untrustedRefusal(reason string) bool {
+	return strings.Contains(reason, untrustedRepositoryRefusal) || strings.Contains(reason, untrustedProjectRefusal)
 }
 
 // requestActionsIDToken asks the job's ID token endpoint for a token of the

@@ -553,6 +553,34 @@ repository. Without `id-token: write`, the command says so; a refused
 exchange names the auth-server's reason, and the untrusted-repository refusal
 names the trust to add. `PUTNAMI_CLOUD_TOKEN`, when set, wins.
 
+A gitlab.com CI job needs no secret either. With `PUTNAMI_ORGANIZATION` set,
+an ID token declared in the job's `id_tokens` as `PUTNAMI_ID_TOKEN` with the
+auth-server's base URL as its `aud`, and no `PUTNAMI_CLOUD_TOKEN`, the command
+exchanges that token at the same token endpoint, for the same five-minute
+token. The auth-server verifies it against gitlab.com's keys and mints the
+token only when the organization trusts the job's project, or its group, for
+observation. The upload then names the repository. Without
+`PUTNAMI_ID_TOKEN`, the command names the `id_tokens` entry to add; in a job
+whose `CI_SERVER_HOST` is another GitLab instance, it names
+`PUTNAMI_CLOUD_TOKEN` and sends nothing. The command reads the token's
+claims without verifying them and sends no token whose `iss` is not
+`https://gitlab.com` or whose `aud` is not the auth-server's base URL: the
+job's YAML fixes the audience, so a token meant for another server stays in
+the job. A refused exchange names the
+auth-server's reason, and the untrusted-project refusal names the trust to
+add. `PUTNAMI_CLOUD_TOKEN`, when set, wins.
+
+```yaml
+observe:
+  variables:
+    PUTNAMI_ORGANIZATION: <organization-id>
+  id_tokens:
+    PUTNAMI_ID_TOKEN:
+      aud: https://auth.putnami.cloud
+  script:
+    - putnami observe --upload
+```
+
 On a laptop, `putnami observe --open` adds `--sign-in`. Without
 `PUTNAMI_CLOUD_TOKEN`, the command then uploads as the person signed in with
 `putnami cloud login`, refreshing the session when it expired, and runs the
