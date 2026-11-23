@@ -87,8 +87,8 @@ type ServerConfig struct {
 type ServerPlugin struct {
 	config             ServerConfig
 	routes             *RouteController
-	routeBodyLimits    map[string]int64
-	routeWriteTimeouts map[string]time.Duration
+	routeBodyLimits    map[routeID]int64
+	routeWriteTimeouts map[routeID]time.Duration
 	httpRouteFacts     []httpRouteFact
 	projectName        string
 	middlewares        []Middleware
@@ -134,8 +134,8 @@ func NewServerPlugin(config ServerConfig) *ServerPlugin {
 	return &ServerPlugin{
 		config:             config,
 		routes:             newRouteController(),
-		routeBodyLimits:    make(map[string]int64),
-		routeWriteTimeouts: make(map[string]time.Duration),
+		routeBodyLimits:    make(map[routeID]int64),
+		routeWriteTimeouts: make(map[routeID]time.Duration),
 		log:                logger.Default().Named("http"),
 	}
 }
@@ -470,7 +470,11 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Match route
 		matchedMethod := r.Method
-		match := p.routes.lookup(r.Method, r.URL.Path)
+		var match *routeMatch[Handler]
+		found, ok := p.routes.find(r.Method, r.URL.Path)
+		if ok {
+			match = &found
+		}
 		if match == nil {
 			if r.Method == "HEAD" {
 				match = p.routes.lookup("GET", r.URL.Path)
@@ -508,9 +512,10 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			}
 		}
 
+		route := routeKey(matchedMethod, match.Pattern)
 		if !longLivedRequest(r) {
 			deadline := requestDeadline
-			if timeout := p.routeWriteTimeouts[routeKey(matchedMethod, match.Pattern)]; timeout > 0 {
+			if timeout := p.routeWriteTimeouts[route]; timeout > 0 {
 				// The route answers under its own bound: move the write deadline
 				// the server armed from WriteTimeout. A writer that does not
 				// expose its deadline, such as a recorder, keeps the bound its
@@ -519,8 +524,8 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 				deadline = deadlineWithin(timeout)
 			}
 			if deadline > 0 {
-				reqCtx, cancel := context.WithTimeout(r.Context(), deadline)
-				defer cancel()
+				reqCtx := newRequestContext(r.Context(), deadline)
+				defer reqCtx.cancel()
 				r = r.WithContext(reqCtx)
 			}
 		}
@@ -528,11 +533,15 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 		ctx.Route = match.Pattern
 		ctx.Params = match.Params
 		bodyLimit := maxBody
-		if routeLimit := p.routeBodyLimits[routeKey(matchedMethod, match.Pattern)]; routeLimit > 0 {
+		if routeLimit := p.routeBodyLimits[route]; routeLimit > 0 {
 			bodyLimit = routeLimit
 		}
-		body := &maxBytesBody{ReadCloser: http.MaxBytesReader(w, r.Body, bodyLimit)}
-		r.Body = body
+		// A request without a body has nothing to bound.
+		var body *maxBytesBody
+		if r.Body != nil && r.Body != http.NoBody {
+			body = &maxBytesBody{ReadCloser: http.MaxBytesReader(w, r.Body, bodyLimit)}
+			r.Body = body
+		}
 		// RawBody reads up to the same limit the reader above enforces.
 		ctx.maxBodySize = bodyLimit
 
@@ -554,7 +563,7 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			}
 			scope = s
 			scopeCtx = scope.Context(r.Context())
-			ctx = ctx.WithContext(scopeCtx)
+			ctx.SetContext(scopeCtx)
 		}
 
 		// finalize reconciles a request-scoped UnitOfWork with the handler outcome
@@ -600,7 +609,7 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 
 		// Execute pre-composed handler (middleware chain applied at Start time)
 		resp := match.Handlers[0](ctx)
-		if body.exceeded.Load() {
+		if body != nil && body.exceeded.Load() {
 			if resp != nil && resp.stream != nil {
 				if err := resp.stream.Close(); err != nil {
 					p.log.Error("close refused response stream", err)
@@ -687,8 +696,16 @@ func payloadTooLargeResponse() *Response {
 	return ErrorResponse(errors.New(errors.CodePayloadTooLarge, "Request body exceeds the declared bound"))
 }
 
-func routeKey(method, path string) string {
-	return strings.ToUpper(method) + "\x00" + path
+// routeID identifies a route by its method and pattern.
+type routeID struct {
+	method  string
+	pattern string
+}
+
+// routeKey returns the routeID of method and path. strings.ToUpper returns an
+// upper-case method as it is, so a request method costs no allocation.
+func routeKey(method, path string) routeID {
+	return routeID{method: strings.ToUpper(method), pattern: path}
 }
 
 // requestOutcome classifies a handler's result for the request-scope
@@ -885,6 +902,15 @@ func (rc *RouteController) lookup(method, path string) *routeMatch[Handler] {
 		return nil
 	}
 	return r.lookup(path)
+}
+
+// find matches method and path like lookup, and returns the match by value.
+func (rc *RouteController) find(method, path string) (routeMatch[Handler], bool) {
+	r, ok := rc.routers[method]
+	if !ok {
+		return routeMatch[Handler]{}, false
+	}
+	return r.find(path)
 }
 
 // allowedMethods returns the sorted set of HTTP methods registered for path,

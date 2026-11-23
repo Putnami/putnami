@@ -283,3 +283,37 @@ func TestAnErrorPassesTheLimit(t *testing.T) {
 			after["warn/dropped"]-before["warn/dropped"], after["error/emitted"]-before["error/emitted"])
 	}
 }
+
+func TestSkipCountsADroppedRecordOnce(t *testing.T) {
+	spectest.Proves(t, "go/structured-logging", "records-counted", "a-skipped-record-counts-as-dropped")
+	counts := func() map[string]uint64 {
+		m := map[string]uint64{}
+		for _, c := range RecordCounts() {
+			m[c.Level+"/"+c.Outcome] = c.Count
+		}
+		return m
+	}
+	var buf bytes.Buffer
+	log := New("skip", LevelInfo, NewJSONSinkWriter(&buf))
+	before := counts()
+	if !log.Skip(LevelDebug) {
+		t.Fatal("Skip(debug) = false under an info logger, want true")
+	}
+	if log.Skip(LevelInfo) {
+		t.Fatal("Skip(info) = true under an info logger, want false")
+	}
+	log.Info("kept")
+	if log.Skip(LevelError) {
+		t.Fatal("Skip(error) = true, want false: an error always passes")
+	}
+	after := counts()
+	if got := after["debug/dropped"] - before["debug/dropped"]; got != 1 {
+		t.Fatalf("debug/dropped moved by %d, want 1", got)
+	}
+	if got := after["info/emitted"] - before["info/emitted"]; got != 1 {
+		t.Fatalf("info/emitted moved by %d, want 1: Skip must not count a record it lets pass", got)
+	}
+	if buf.Len() == 0 {
+		t.Fatal("the admitted record was not written")
+	}
+}

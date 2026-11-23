@@ -210,6 +210,10 @@ defer scope.Close()
 val, err := scope.Get(token)
 ```
 
+A detached scope creates its container on the first resolution, through the
+scope or through a context it is attached to. A scope nothing resolves from
+costs one small allocation, and its `Finalize` and `Close` do nothing.
+
 ### Context-Based Resolution
 
 Scoped containers are attached to `context.Context`. Use `Resolve` to access scoped dependencies from handlers:
@@ -322,7 +326,7 @@ no handler dependency on a lazy context.
 
 ### Shutdown
 
-`Close()` disposes resources in reverse registration order. Children are closed before parents. A closed child leaves its parent, so a long-lived parent, such as an application root that opens one scope per request, does not keep the scopes it has closed.
+`Close()` disposes resources in reverse registration order. Children are closed before parents. A closed child leaves its parent, so a long-lived parent, such as an application root that opens one scope per request, does not keep the scopes it has closed. A child created under a closed parent is closed from the start and never joins it, so a request scope first used after shutdown resolves nothing.
 
 ```go
 c.Register(inject.AutoProvide(NewDatabase,

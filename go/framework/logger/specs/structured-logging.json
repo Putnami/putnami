@@ -46,7 +46,10 @@
     },
     {
       "id": "records-counted",
-      "text": "Every record a logger receives counts once in log.records, labeled with its level and the outcome emitted or dropped, the outcome dropped meaning the minimum level filtered it."
+      "text": [
+        "Every record a logger receives counts once in log.records, labeled with its level and the outcome emitted or dropped, the outcome dropped meaning the minimum level filtered it.",
+        "Skip reports whether a record at a level would be dropped and counts it as dropped when so, so a caller that builds no record it would drop still counts it once."
+      ]
     },
     {
       "id": "level-limit",

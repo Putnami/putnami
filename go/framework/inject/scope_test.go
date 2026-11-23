@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestScopeFrom_NoScope(t *testing.T) {
@@ -14,14 +16,17 @@ func TestScopeFrom_NoScope(t *testing.T) {
 }
 
 func TestScopeFrom_WithScope(t *testing.T) {
-	container := NewContainer("test", nil)
-	ctx := withScope(context.Background(), container)
+	parent := NewContainer("test", nil)
+	ctx := withScope(context.Background(), newDetachedScope(parent))
 	scope := ScopeFrom(ctx)
 	if scope == nil {
 		t.Fatal("expected non-nil scope")
 	}
-	if scope.name != "test" {
-		t.Errorf("scope name = %q, want test", scope.name)
+	if scope.parent != parent {
+		t.Error("the scope's container is not a child of the scope's parent")
+	}
+	if again := ScopeFrom(ctx); again != scope {
+		t.Error("a second lookup returned another container")
 	}
 }
 
@@ -145,5 +150,157 @@ func TestCreateScope_Detached(t *testing.T) {
 
 	if err := scope.Close(); err != nil {
 		t.Fatalf("close scope: %v", err)
+	}
+}
+
+func TestDetachedScopeCreatesItsContainerOnFirstResolution(t *testing.T) {
+	cc := NewContainerContext("lazy-scope")
+	tok := Named[int]("n")
+	if err := cc.Register(ProvideValue(tok, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if err := cc.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer cc.Close()
+
+	unused, err := cc.CreateScope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = unused.Context(context.Background())
+	if unused.materialized() != nil {
+		t.Fatal("creating the scope and its context created a container")
+	}
+	if err := unused.Finalize(context.Background(), nil); err != nil {
+		t.Fatalf("Finalize of an unused scope: %v", err)
+	}
+	if err := unused.Close(); err != nil {
+		t.Fatalf("Close of an unused scope: %v", err)
+	}
+	if n := len(cc.root.children); n != 0 {
+		t.Fatalf("the root holds %d children after an unused scope, want 0", n)
+	}
+
+	used, err := cc.CreateScope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := used.Context(context.Background())
+	if got, err := Resolve[int](ctx, tok); err != nil || got != 1 {
+		t.Fatalf("Resolve = %v, %v, want 1", got, err)
+	}
+	if used.materialized() == nil {
+		t.Fatal("a resolution did not create the container")
+	}
+	if err := used.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(cc.root.children); n != 0 {
+		t.Fatalf("the root holds %d children after the scope closed, want 0", n)
+	}
+}
+
+func TestDetachedScopeClosedBeforeUseRefusesResolution(t *testing.T) {
+	cc := NewContainerContext("closed-scope")
+	tok := Named[int]("n")
+	if err := cc.Register(ProvideValue(tok, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if err := cc.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer cc.Close()
+
+	scope, err := cc.CreateScope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := scope.Context(context.Background())
+	if err := scope.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Resolve[int](ctx, tok); err == nil {
+		t.Fatal("a scope closed before use resolved a dependency")
+	}
+	if n := len(cc.root.children); n != 0 {
+		t.Fatalf("the root holds %d children, want 0", n)
+	}
+}
+
+func TestDetachedScopeResolvesConcurrentlyIntoOneContainer(t *testing.T) {
+	cc := NewContainerContext("concurrent-scope")
+	if err := cc.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer cc.Close()
+	scope, err := cc.CreateScope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scope.Close()
+	ctx := scope.Context(context.Background())
+
+	const workers = 8
+	got := make(chan *Container, workers)
+	for range workers {
+		go func() { got <- ScopeFrom(ctx) }()
+	}
+	first := <-got
+	for range workers - 1 {
+		if c := <-got; c != first {
+			t.Fatal("concurrent first resolutions created two containers")
+		}
+	}
+}
+
+func TestDetachedScopeFirstUsedAfterTheRootClosedRefusesResolution(t *testing.T) {
+	spectest.Proves(t, "go/dependency-injection", "cleanup", "a-child-created-under-a-closed-parent-is-closed")
+	cc := NewContainerContext("closed-root")
+	tok := Named[int]("n")
+	if err := cc.Register(ProvideValue(tok, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if err := cc.Start(); err != nil {
+		t.Fatal(err)
+	}
+	scope, err := cc.CreateScope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := scope.Context(context.Background())
+	if err := cc.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Resolve[int](ctx, tok); err == nil {
+		t.Fatal("a scope first used after its root closed resolved a dependency")
+	}
+	if n := len(cc.root.children); n != 0 {
+		t.Fatalf("the closed root holds %d children, want 0", n)
+	}
+	if err := scope.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDetachedScopeClosedBeforeUseStillAnswersHas(t *testing.T) {
+	cc := NewContainerContext("closed-has")
+	tok := Named[int]("n")
+	if err := cc.Register(ProvideValue(tok, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if err := cc.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer cc.Close()
+	scope, err := cc.CreateScope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scope.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !scope.Has(tok) {
+		t.Fatal("Has = false on a scope closed before use, want the parent's answer")
 	}
 }

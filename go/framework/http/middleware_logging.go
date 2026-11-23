@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"go.putnami.dev/errors"
@@ -21,10 +22,26 @@ import (
 // middleware stores the correlation ID inside the request context.Context.
 type requestIDCtxKey struct{}
 
+// requestIDContext is a context.Context that carries a request ID under
+// requestIDCtxKey and delegates everything else to its parent.
+type requestIDContext struct {
+	context.Context
+	id string
+}
+
+// Value returns the request ID for requestIDCtxKey and the parent's value for
+// any other key.
+func (c *requestIDContext) Value(key any) any {
+	if _, ok := key.(requestIDCtxKey); ok {
+		return c.id
+	}
+	return c.Context.Value(key)
+}
+
 // contextWithRequestID returns a copy of ctx that carries the given request ID.
 // It is the storage side of the bridge that RequestIDFromContext reads.
 func contextWithRequestID(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, requestIDCtxKey{}, id)
+	return &requestIDContext{Context: ctx, id: id}
 }
 
 // RequestIDFromContext extracts the correlation ID stored by the RequestID
@@ -54,36 +71,72 @@ func init() {
 
 // RequestID middleware establishes a correlation ID for each request. It reuses
 // an inbound X-Request-ID or X-Cloud-Trace-Context header when present and
-// generates a fresh random ID otherwise, so every request is correlatable. The
+// generates a fresh ID otherwise, so every request is correlatable. The
 // resolved ID is stored on the Context (ctx.RequestID), injected into the
 // request context.Context (so context-aware logs correlate via
 // logger.TraceIDFromContext — see RequestIDFromContext), and echoed on the
 // response via X-Request-ID.
 func RequestID() Middleware {
 	return func(ctx *Context, next func() *Response) *Response {
-		traceID := ctx.Header("X-Request-ID")
+		traceID := firstHeaderValue(ctx.Request.Header, requestIDHeader)
 		if traceID == "" {
-			traceID = ctx.Header("X-Cloud-Trace-Context")
+			traceID = firstHeaderValue(ctx.Request.Header, cloudTraceHeader)
 		}
 		if traceID == "" {
 			traceID = generateRequestID()
 		}
 		ctx.RequestID = traceID
 		ctx.SetContext(contextWithRequestID(ctx.Context(), traceID))
-		ctx.SetHeader("X-Request-ID", traceID)
+		ctx.Writer.Header()[requestIDHeader] = []string{traceID}
 		return next()
 	}
 }
 
-// generateRequestID returns a random 128-bit hex correlation ID. On the
-// vanishingly rare chance the entropy source fails, it falls back to a
-// timestamp-derived value so a request is never left without an ID.
-func generateRequestID() string {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return fmt.Sprintf("req-%d", time.Now().UnixNano())
+// The canonical forms of the correlation headers, as net/http stores them.
+const (
+	requestIDHeader  = "X-Request-Id"
+	cloudTraceHeader = "X-Cloud-Trace-Context"
+)
+
+// firstHeaderValue returns the first value of h under key, a canonical header
+// name, or "" when h has none.
+func firstHeaderValue(h http.Header, key string) string {
+	if values := h[key]; len(values) > 0 {
+		return values[0]
 	}
-	return hex.EncodeToString(b[:])
+	return ""
+}
+
+// requestIDPrefix is the random 64-bit half every request ID of this process
+// starts with, and requestIDCounter numbers the IDs this process generates.
+var (
+	requestIDPrefix  = newRequestIDPrefix()
+	requestIDCounter atomic.Uint64
+)
+
+// newRequestIDPrefix returns 16 hex digits of entropy. On the vanishingly rare
+// chance the entropy source fails, it derives them from the start time.
+func newRequestIDPrefix() [16]byte {
+	var raw [8]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		binary.BigEndian.PutUint64(raw[:], uint64(time.Now().UnixNano()))
+	}
+	var prefix [16]byte
+	hex.Encode(prefix[:], raw[:])
+	return prefix
+}
+
+// generateRequestID returns a 128-bit hex correlation ID: the process prefix
+// followed by the next value of the process counter, so two IDs of one
+// process never repeat and two processes share an ID only if their random
+// prefixes collide.
+func generateRequestID() string {
+	var counter [8]byte
+	binary.BigEndian.PutUint64(counter[:], requestIDCounter.Add(1))
+	var id [32]byte
+	copy(id[:16], requestIDPrefix[:])
+	hex.Encode(id[16:], counter[:])
+	return string(id[:])
 }
 
 // LoggerOptions configures the logging middleware.
@@ -143,11 +196,6 @@ func Logging(opts LoggerOptions) Middleware {
 			status = resp.Status
 		}
 
-		routePath := ctx.Route
-		if routePath == "" {
-			routePath = ctx.Path
-		}
-
 		// A handler that returns a 5xx after it wrote a lower status failed
 		// mid-answer: the record keeps the written status and logs the failure.
 		outcome := "success"
@@ -156,6 +204,16 @@ func Logging(opts LoggerOptions) Middleware {
 			outcome = "failure"
 		case status == errors.StatusClientClosedRequest:
 			outcome = "canceled"
+		}
+
+		// Any other outcome logs at debug: build nothing the logger drops.
+		if outcome != "failure" && log.Skip(logger.LevelDebug) {
+			return resp
+		}
+
+		routePath := ctx.Route
+		if routePath == "" {
+			routePath = ctx.Path
 		}
 
 		// Re-read the request context at emit time so the terminal record
@@ -179,7 +237,7 @@ func Logging(opts LoggerOptions) Middleware {
 		// Message is "[METHOD] routePath" for every status: severity plus the
 		// structured error carry the failure, so no StatusText or error text
 		// leaks into the message (matches the frozen conformance fixture).
-		msg := fmt.Sprintf("[%s] %s", ctx.Method, routePath)
+		msg := "[" + ctx.Method + "] " + routePath
 		switch {
 		case outcome == "failure":
 			// RequestError may be nil when nothing recorded an error (e.g. a
@@ -254,30 +312,45 @@ func (w statusHijacker) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return w.hijacker.Hijack()
 }
 
+// flushHijackStatusWriter is a statusWriter over a writer that flushes and
+// hijacks.
+type flushHijackStatusWriter struct {
+	statusWriter
+	statusFlusher
+	statusHijacker
+}
+
+// flushStatusWriter is a statusWriter over a writer that flushes.
+type flushStatusWriter struct {
+	statusWriter
+	statusFlusher
+}
+
+// hijackStatusWriter is a statusWriter over a writer that hijacks.
+type hijackStatusWriter struct {
+	statusWriter
+	statusHijacker
+}
+
 // newStatusWriter wraps w in a statusWriter that implements http.Flusher and
 // http.Hijacker exactly when w does. It returns the writer to hand down and
 // the recorder to read the status from.
 func newStatusWriter(w http.ResponseWriter) (http.ResponseWriter, *statusWriter) {
-	sw := &statusWriter{ResponseWriter: w}
 	flusher, canFlush := w.(http.Flusher)
 	hijacker, canHijack := w.(http.Hijacker)
 	switch {
 	case canFlush && canHijack:
-		return struct {
-			*statusWriter
-			statusFlusher
-			statusHijacker
-		}{sw, statusFlusher{sw, flusher}, statusHijacker{hijacker}}, sw
+		sw := &flushHijackStatusWriter{statusWriter: statusWriter{ResponseWriter: w}, statusHijacker: statusHijacker{hijacker}}
+		sw.statusFlusher = statusFlusher{&sw.statusWriter, flusher}
+		return sw, &sw.statusWriter
 	case canFlush:
-		return struct {
-			*statusWriter
-			statusFlusher
-		}{sw, statusFlusher{sw, flusher}}, sw
+		sw := &flushStatusWriter{statusWriter: statusWriter{ResponseWriter: w}}
+		sw.statusFlusher = statusFlusher{&sw.statusWriter, flusher}
+		return sw, &sw.statusWriter
 	case canHijack:
-		return struct {
-			*statusWriter
-			statusHijacker
-		}{sw, statusHijacker{hijacker}}, sw
+		sw := &hijackStatusWriter{statusWriter: statusWriter{ResponseWriter: w}, statusHijacker: statusHijacker{hijacker}}
+		return sw, &sw.statusWriter
 	}
+	sw := &statusWriter{ResponseWriter: w}
 	return sw, sw
 }

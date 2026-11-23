@@ -749,6 +749,9 @@ func (p *Pool) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 		return errRow{err: err}
 	}
 	row := q.QueryRow(ctx, sql, args...)
+	if p.log == nil && p.cfg.QueryObserver == nil {
+		return row
+	}
 	return observedRow{row: row, pool: p, ctx: ctx, start: start}
 }
 

@@ -104,6 +104,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-skipped-record-counts-as-dropped",
               "records-are-counted-per-level-and-outcome"
             ]
           }

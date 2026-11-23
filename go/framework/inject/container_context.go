@@ -3,6 +3,7 @@ package inject
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"go.putnami.dev/errors"
 )
@@ -29,19 +30,84 @@ type ScopeContext interface {
 
 // DetachedScope is a scope that must be explicitly closed by the caller.
 // Use this when you need a scope outside of the Scope() callback pattern.
+//
+// Its container is created the first time something resolves from the scope,
+// directly or through the context.Context it is attached to. A scope nothing
+// resolved from finalizes and closes as a no-op.
 type DetachedScope struct {
+	// ScopeContext is the scope itself, as the read-only view.
 	ScopeContext
-	container *Container
+	parent    *Container
+	container atomic.Pointer[Container]
+	mu        sync.Mutex
+	closed    bool
+}
+
+// newDetachedScope returns a scope whose container will be a child of parent.
+func newDetachedScope(parent *Container) *DetachedScope {
+	s := &DetachedScope{parent: parent}
+	s.ScopeContext = s
+	return s
+}
+
+// materialized returns the scope's container, or nil when nothing resolved
+// from the scope yet.
+func (s *DetachedScope) materialized() *Container {
+	return s.container.Load()
+}
+
+// materialize returns the scope's container, creating it on the first call.
+// A scope closed before its first resolution, or whose parent closed, gets a
+// closed container, which refuses every resolution.
+func (s *DetachedScope) materialize() *Container {
+	if c := s.container.Load(); c != nil {
+		return c
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if c := s.container.Load(); c != nil {
+		return c
+	}
+	var c *Container
+	if s.closed {
+		c = newClosedChild("scope", s.parent)
+	} else {
+		c = s.parent.CreateChild("scope")
+	}
+	s.container.Store(c)
+	return c
+}
+
+// Get resolves a single dependency by token.
+func (s *DetachedScope) Get(token Token) (any, error) {
+	return s.materialize().Get(token)
+}
+
+// List resolves all providers matching the filter.
+func (s *DetachedScope) List(filter FilterOptions) ([]any, error) {
+	return s.materialize().List(filter)
+}
+
+// Has returns true if a provider exists.
+func (s *DetachedScope) Has(token Token) bool {
+	return s.materialize().Has(token)
 }
 
 // Close closes the detached scope and releases resources.
 func (s *DetachedScope) Close() error {
-	return s.container.Close()
+	s.mu.Lock()
+	s.closed = true
+	c := s.container.Load()
+	s.mu.Unlock()
+	if c == nil {
+		return nil
+	}
+	return c.Close()
 }
 
 // Context returns a context.Context with this scope attached.
 func (s *DetachedScope) Context(parent context.Context) context.Context {
-	return withScope(parent, s.container)
+	return withScope(parent, s)
 }
 
 // ContainerContext is the application-level DI entry point.
@@ -261,11 +327,7 @@ func (cc *ContainerContext) CreateScope() (*DetachedScope, error) {
 	}
 	cc.mu.RUnlock()
 
-	scopeContainer := cc.root.CreateChild("scope")
-	return &DetachedScope{
-		ScopeContext: &scopedContainerAdapter{container: scopeContainer},
-		container:    scopeContainer,
-	}, nil
+	return newDetachedScope(cc.root), nil
 }
 
 // Fork creates a test fork of this container context.
@@ -341,22 +403,4 @@ func (f *ContainerContextFork) Start() (*ContainerContext, error) {
 		return nil, err
 	}
 	return cc, nil
-}
-
-// --- scopedContainerAdapter ---
-
-type scopedContainerAdapter struct {
-	container *Container
-}
-
-func (a *scopedContainerAdapter) Get(token Token) (any, error) {
-	return a.container.Get(token)
-}
-
-func (a *scopedContainerAdapter) List(filter FilterOptions) ([]any, error) {
-	return a.container.List(filter)
-}
-
-func (a *scopedContainerAdapter) Has(token Token) bool {
-	return a.container.Has(token)
 }

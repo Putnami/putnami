@@ -106,6 +106,9 @@ func queryGroup(op QueryOp, datasource string, dur time.Duration, outcome string
 // The pgx.ErrNoRows not-found sentinel routes here too: it is the expected
 // outcome of a "look it up, 404 if absent" lookup, not a failure.
 func logQueryExecuted(ctx context.Context, log *logger.Logger, op QueryOp, datasource string, dur time.Duration) {
+	if log.Skip(logger.LevelDebug) {
+		return
+	}
 	log.DebugCtx(ctx, msgQueryExecuted, databaseAttr(queryGroup(op, datasource, dur, outcomeSuccess)))
 }
 
@@ -136,6 +139,9 @@ func logSlowQuery(ctx context.Context, log *logger.Logger, op QueryOp, datasourc
 // the classified, secret-free RollbackCause, so a bound parameter value or a row
 // datum embedded in a driver error can never reach a log line.
 func logTransaction(ctx context.Context, log *logger.Logger, obs TxObservation) {
+	if obs.Outcome != TxOutcomeRolledBack && log.Skip(logger.LevelDebug) {
+		return
+	}
 	group := map[string]any{
 		"datasource": resolveDatasource(obs.Datasource, ""),
 		"outcome":    outcomeSuccess,

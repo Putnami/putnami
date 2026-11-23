@@ -76,6 +76,7 @@ type closeHookEntry struct {
 }
 
 // NewContainer creates a new container with the given name and optional parent.
+// A container created under a closed parent is closed: it resolves nothing.
 func NewContainer(name string, parent *Container) *Container {
 	c := &Container{
 		name:      name,
@@ -87,10 +88,29 @@ func NewContainer(name string, parent *Container) *Container {
 	}
 	if parent != nil {
 		parent.mu.Lock()
-		parent.children = append(parent.children, c)
+		if parent.closed {
+			c.closed = true
+		} else {
+			parent.children = append(parent.children, c)
+		}
 		parent.mu.Unlock()
 	}
 	return c
+}
+
+// newClosedChild returns a closed container whose parent is parent, without
+// attaching it to parent's children: it resolves nothing and answers Has from
+// parent's providers.
+func newClosedChild(name string, parent *Container) *Container {
+	return &Container{
+		name:      name,
+		parent:    parent,
+		providers: make(map[string]*Provider),
+		instances: make(map[string]any),
+		building:  make(map[string]*buildState),
+		tags:      make(map[string][]Token),
+		closed:    true,
+	}
 }
 
 // Name returns the container name.

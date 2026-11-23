@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/textproto"
 	"sync"
 
 	perrors "go.putnami.dev/errors"
@@ -195,12 +196,21 @@ func (r *Response) BodyBytes() ([]byte, error) {
 	return nil, nil
 }
 
-// writeHead copies the response headers to w and writes the status.
+// writeHead copies the response headers to w and writes the status. A key w
+// does not hold yet takes the response's values as they are, clipped so an
+// append on w copies them first.
 func (r *Response) writeHead(w http.ResponseWriter) {
+	dst := w.Header()
 	for key, values := range r.Headers {
-		for _, v := range values {
-			w.Header().Add(key, v)
+		if len(values) == 0 {
+			continue
 		}
+		key = textproto.CanonicalMIMEHeaderKey(key)
+		if existing := dst[key]; len(existing) > 0 {
+			dst[key] = append(existing, values...)
+			continue
+		}
+		dst[key] = values[:len(values):len(values)]
 	}
 	status := r.Status
 	if status == 0 {

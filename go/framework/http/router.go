@@ -12,6 +12,10 @@ import (
 // named catch-alls, and content negotiation.
 type Router[T any] struct {
 	root *trieNode[T]
+	// static holds the node of every pattern without a parameter or a
+	// trailing slash, by pattern: a path equal to such a pattern reaches that
+	// node through the trie too, since the trie tries static segments first.
+	static map[string]*trieNode[T]
 }
 
 // NewRouter creates a new empty router.
@@ -20,6 +24,7 @@ func NewRouter[T any]() *Router[T] {
 		root: &trieNode[T]{
 			children: make(map[byte]*trieNode[T]),
 		},
+		static: make(map[string]*trieNode[T]),
 	}
 }
 
@@ -113,21 +118,36 @@ func (r *Router[T]) Add(pattern string, handler T) {
 	}
 	node.handlers = append(node.handlers, handler)
 	node.pattern = pattern
+	if !strings.Contains(pattern, "{") && !strings.HasSuffix(pattern, "/") {
+		r.static[pattern] = node
+	}
 }
 
 // lookup finds handlers matching the given path, extracting any path parameters.
 // Returns nil if no match is found.
 func (r *Router[T]) lookup(path string) *routeMatch[T] {
+	match, ok := r.find(path)
+	if !ok {
+		return nil
+	}
+	return &match
+}
+
+// find matches path like lookup, and returns the match by value.
+func (r *Router[T]) find(path string) (routeMatch[T], bool) {
+	if node, ok := r.static[path]; ok {
+		return routeMatch[T]{Handlers: node.handlers, Pattern: node.pattern}, true
+	}
 	var params map[string]string
 	node := r.match(r.root, splitPath(path), &params)
 	if node == nil || len(node.handlers) == 0 {
-		return nil
+		return routeMatch[T]{}, false
 	}
-	return &routeMatch[T]{
+	return routeMatch[T]{
 		Handlers: node.handlers,
 		Params:   params,
 		Pattern:  node.pattern,
-	}
+	}, true
 }
 
 // Routes returns all registered route patterns.
@@ -201,35 +221,6 @@ func (r *Router[T]) match(node *trieNode[T], parts []string, params *map[string]
 	part := parts[0]
 	remaining := parts[1:]
 
-	// matchRemaining continues from the node reached at the end of the current
-	// segment (`end`). When more segments follow, it crosses the explicit '/'
-	// boundary node inserted by Add; a path with a different segmentation but
-	// identical bytes (e.g. "/hea/lth") therefore cannot reach a handler
-	// registered for another segmentation ("/health").
-	matchRemaining := func(end *trieNode[T]) *trieNode[T] {
-		if len(remaining) == 0 {
-			return r.match(end, remaining, params)
-		}
-		// A single trailing empty segment means the request path ended in "/"
-		// (splitPath("/v2/") == {"v2", ""}). Treat that trailing slash as
-		// optional so "/v2/" reaches a handler registered for "/v2" — the
-		// conventional trailing-slash tolerance every OCI/Docker client and most
-		// HTTP routers assume (the OCI Distribution base endpoint is literally
-		// "/v2/"). This does not weaken the '/'-boundary guard against path
-		// confusion: that guard only concerns interior segments that carry
-		// bytes, never a trailing empty one.
-		if len(remaining) == 1 && remaining[0] == "" {
-			if result := r.match(end, remaining[1:], params); result != nil {
-				return result
-			}
-		}
-		sep, ok := end.children['/']
-		if !ok {
-			return nil
-		}
-		return r.match(sep, remaining, params)
-	}
-
 	// Try exact static match first
 	current := node
 	matched := true
@@ -242,7 +233,7 @@ func (r *Router[T]) match(node *trieNode[T], parts []string, params *map[string]
 		current = child
 	}
 	if matched {
-		if result := matchRemaining(current); result != nil {
+		if result := r.matchRemaining(current, remaining, params); result != nil {
 			return result
 		}
 	}
@@ -253,7 +244,7 @@ func (r *Router[T]) match(node *trieNode[T], parts []string, params *map[string]
 			*params = make(map[string]string)
 		}
 		(*params)[node.paramChild.paramName] = part
-		if result := matchRemaining(node.paramChild); result != nil {
+		if result := r.matchRemaining(node.paramChild, remaining, params); result != nil {
 			return result
 		}
 		delete(*params, node.paramChild.paramName)
@@ -305,6 +296,35 @@ func (r *Router[T]) match(node *trieNode[T], parts []string, params *map[string]
 	}
 
 	return nil
+}
+
+// matchRemaining continues from the node reached at the end of the current
+// segment (end). When more segments follow, it crosses the explicit '/'
+// boundary node inserted by Add; a path with a different segmentation but
+// identical bytes (e.g. "/hea/lth") therefore cannot reach a handler
+// registered for another segmentation ("/health").
+func (r *Router[T]) matchRemaining(end *trieNode[T], remaining []string, params *map[string]string) *trieNode[T] {
+	if len(remaining) == 0 {
+		return r.match(end, remaining, params)
+	}
+	// A single trailing empty segment means the request path ended in "/"
+	// (splitPath("/v2/") == {"v2", ""}). Treat that trailing slash as
+	// optional so "/v2/" reaches a handler registered for "/v2" — the
+	// conventional trailing-slash tolerance every OCI/Docker client and most
+	// HTTP routers assume (the OCI Distribution base endpoint is literally
+	// "/v2/"). This does not weaken the '/'-boundary guard against path
+	// confusion: that guard only concerns interior segments that carry
+	// bytes, never a trailing empty one.
+	if len(remaining) == 1 && remaining[0] == "" {
+		if result := r.match(end, remaining[1:], params); result != nil {
+			return result
+		}
+	}
+	sep, ok := end.children['/']
+	if !ok {
+		return nil
+	}
+	return r.match(sep, remaining, params)
 }
 
 // splitPath splits a URL path into segments without heap-allocating for

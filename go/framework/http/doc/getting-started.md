@@ -316,7 +316,7 @@ server.Use(http.Recovery())
 
 #### RequestID
 
-Establishes a correlation ID for each request: it reuses an inbound `X-Request-ID` or `X-Cloud-Trace-Context` header when present, and generates a random one otherwise. The ID is stored on the context (`ctx.RequestID`), echoed on the response as `X-Request-ID`, and — when `Logging()` is also installed — included in the access log as `requestId`:
+Establishes a correlation ID for each request: it reuses an inbound `X-Request-ID` or `X-Cloud-Trace-Context` header when present, and generates one otherwise: a random prefix drawn once per process followed by a per-process counter, so a generated ID is unique but reveals the instance and its request count. The ID is stored on the context (`ctx.RequestID`), echoed on the response as `X-Request-ID`, and — when `Logging()` is also installed — included in the access log as `requestId`:
 
 ```go
 server.Use(http.RequestID())

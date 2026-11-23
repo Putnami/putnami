@@ -1712,3 +1712,33 @@ func TestContext_SetHeader(t *testing.T) {
 		t.Errorf("SetHeader did not set header")
 	}
 }
+
+func TestRouterStaticPatternMatchesLikeTheTrie(t *testing.T) {
+	r := NewRouter[string]()
+	r.Add("/users/me", "me")
+	r.Add("/users/{id}", "user")
+	r.Add("/v2", "base")
+
+	cases := map[string]string{"/users/me": "me", "/users/42": "user", "/v2": "base", "/v2/": "base"}
+	for path, want := range cases {
+		match := r.lookup(path)
+		if match == nil || match.Handlers[0] != want {
+			t.Fatalf("lookup(%q) = %v, want %q", path, match, want)
+		}
+	}
+	if match := r.lookup("/users/me"); match.Params != nil {
+		t.Fatalf("a static match carries params %v", match.Params)
+	}
+	if match := r.lookup("/hea/lth"); match != nil {
+		t.Fatalf("lookup(/hea/lth) = %v, want no match", match)
+	}
+}
+
+func TestRouterTrailingSlashPatternKeepsTheTrieOrder(t *testing.T) {
+	r := NewRouter[string]()
+	r.Add("/a", "bare")
+	r.Add("/a/", "slash")
+	if match := r.lookup("/a/"); match == nil || match.Handlers[0] != "bare" {
+		t.Fatalf("lookup(/a/) = %v, want the /a handler the trie prefers", match)
+	}
+}

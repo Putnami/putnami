@@ -76,6 +76,9 @@ ctx := scope.Context(context.Background())
 svc, _ := inject.Resolve[*MyService](ctx, myToken)
 ```
 
+The scope's container is created on its first resolution; an unused scope
+finalizes and closes as a no-op.
+
 Or run within a managed scope that closes automatically:
 
 ```go

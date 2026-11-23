@@ -289,7 +289,9 @@ func isWebSocketRequest(r *http.Request) bool {
 }
 
 func headerContainsToken(header, token string) bool {
-	for _, part := range strings.Split(header, ",") {
+	for header != "" {
+		var part string
+		part, header, _ = strings.Cut(header, ",")
 		if strings.EqualFold(strings.TrimSpace(part), token) {
 			return true
 		}

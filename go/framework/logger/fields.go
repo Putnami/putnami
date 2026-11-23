@@ -27,9 +27,10 @@ type FieldBag struct {
 	requestErr error
 }
 
-// NewFieldBag returns an empty, ready-to-use FieldBag.
+// NewFieldBag returns an empty, ready-to-use FieldBag. Its map is created by
+// the first write.
 func NewFieldBag() *FieldBag {
-	return &FieldBag{fields: make(map[string]any)}
+	return &FieldBag{}
 }
 
 type fieldBagKey struct{}
@@ -121,6 +122,9 @@ func (b *FieldBag) Snapshot() map[string]any {
 // and replacing any non-map intermediate with a fresh map. Callers must hold
 // b.mu.
 func (b *FieldBag) walk(keys []string) map[string]any {
+	if b.fields == nil {
+		b.fields = make(map[string]any)
+	}
 	node := b.fields
 	for _, k := range keys {
 		next, ok := node[k].(map[string]any)

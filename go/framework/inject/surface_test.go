@@ -61,8 +61,8 @@ func TestContainerContext_Has(t *testing.T) {
 	}
 }
 
-// TestScopeAdapter_HasAndList covers the ScopeContext adapter returned by
-// CreateScope (scopedContainerAdapter.Has / .List).
+// TestScopeAdapter_HasAndList covers the ScopeContext view of the scope
+// CreateScope returns (DetachedScope.Has / .List).
 func TestScopeAdapter_HasAndList(t *testing.T) {
 	cc := NewContainerContext("app")
 	mustRegister(t, cc, Provide(Named[string]("a"), func(_ Resolver) (any, error) { return "a", nil },

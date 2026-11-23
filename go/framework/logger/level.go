@@ -122,9 +122,27 @@ func SetLevelLimit(limit func() Level) {
 // and the level limit, and counts the record as emitted or dropped. A record
 // at error or above always passes.
 func (l *Logger) admit(level Level) bool {
-	emitted := level >= LevelError || (level >= l.level.Level() && passesLimit(level))
+	emitted := l.passes(level)
 	countRecord(level, emitted)
 	return emitted
+}
+
+// passes reports whether a record at level passes this logger's minimum level
+// and the level limit. A record at error or above always passes.
+func (l *Logger) passes(level Level) bool {
+	return level >= LevelError || (level >= l.level.Level() && passesLimit(level))
+}
+
+// Skip reports whether a record at level would be dropped, and counts it as
+// dropped when so. A caller that builds a costly record checks Skip first and
+// builds nothing when it returns true; when it returns false, the record it
+// then logs is admitted and counted as emitted.
+func (l *Logger) Skip(level Level) bool {
+	if l.passes(level) {
+		return false
+	}
+	countRecord(level, false)
+	return true
 }
 
 func passesLimit(level Level) bool {

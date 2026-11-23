@@ -7,19 +7,19 @@ import (
 // scopeKey is the context key for storing the scoped container.
 type scopeKey struct{}
 
-// withScope attaches a scoped container to a context.Context.
-func withScope(ctx context.Context, scope *Container) context.Context {
+// withScope attaches a scope to a context.Context.
+func withScope(ctx context.Context, scope *DetachedScope) context.Context {
 	return context.WithValue(ctx, scopeKey{}, scope)
 }
 
-// ScopeFrom retrieves the scoped container from a context.Context.
-// Returns nil if no scope is active.
+// ScopeFrom retrieves the scoped container from a context.Context, creating
+// it on the scope's first resolution. Returns nil if no scope is active.
 func ScopeFrom(ctx context.Context) *Container {
-	scope, ok := ctx.Value(scopeKey{}).(*Container)
+	scope, ok := ctx.Value(scopeKey{}).(*DetachedScope)
 	if !ok {
 		return nil
 	}
-	return scope
+	return scope.materialize()
 }
 
 // Resolve is a convenience function that resolves a typed dependency

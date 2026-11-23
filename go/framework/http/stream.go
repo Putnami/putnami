@@ -391,8 +391,12 @@ func writeSSEEvent(writer http.ResponseWriter, flusher http.Flusher, armWriteDea
 }
 
 func acceptsEventStream(r *http.Request) bool {
-	for _, part := range strings.Split(r.Header.Get("Accept"), ",") {
-		if strings.EqualFold(strings.TrimSpace(strings.Split(part, ";")[0]), "text/event-stream") {
+	accept := r.Header.Get("Accept")
+	for accept != "" {
+		var part string
+		part, accept, _ = strings.Cut(accept, ",")
+		mediaType, _, _ := strings.Cut(part, ";")
+		if strings.EqualFold(strings.TrimSpace(mediaType), "text/event-stream") {
 			return true
 		}
 	}

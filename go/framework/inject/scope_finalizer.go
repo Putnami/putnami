@@ -30,7 +30,11 @@ type ScopeFinalizer interface {
 // call on a scope that materialized no finalizer — then it is a no-op — and it
 // is independent of Close, which still runs the ordinary close hooks afterward.
 func (s *DetachedScope) Finalize(ctx context.Context, outcome error) error {
-	return s.container.finalizeScope(ctx, outcome)
+	c := s.materialized()
+	if c == nil {
+		return nil
+	}
+	return c.finalizeScope(ctx, outcome)
 }
 
 // finalizeScope invokes FinalizeScope on every instance materialized in this

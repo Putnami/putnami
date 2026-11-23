@@ -391,3 +391,18 @@ func TestPool_LogPoolUtilization_NilPoolNoPanic(t *testing.T) {
 	p := &Pool{}
 	p.LogPoolUtilization(context.Background()) // must not panic
 }
+
+func TestPool_QueryRowWithoutObserverReturnsTheDriverRow(t *testing.T) {
+	pool := &Pool{}
+	want := &mockRow{}
+	q := &mockQuerier{
+		queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+			return want
+		},
+	}
+	ctx := contextWithTx(context.Background(), pool, &mockTx{mockQuerier: *q})
+
+	if got := pool.QueryRow(ctx, "SELECT 1"); got != pgx.Row(want) {
+		t.Fatalf("QueryRow on a pool nothing observes = %T, want the driver row", got)
+	}
+}

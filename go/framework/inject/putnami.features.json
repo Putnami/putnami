@@ -20,6 +20,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-child-created-under-a-closed-parent-is-closed",
               "close-hook-runs-for-built-instance",
               "close-hooks-run-in-reverse-registration-order",
               "close-runs-children-before-parent",
