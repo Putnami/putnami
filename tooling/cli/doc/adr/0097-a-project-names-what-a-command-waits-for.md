@@ -56,9 +56,28 @@ per task. Three adoptions lost the order their tool kept:
   every project, as a manifest's does.
 - The adoption syncs write these entries from what the tool declares: Rush's
   build order and phased commands, `turbo.json`'s `dependsOn`, moon's
-  resolved `deps`. A delegated task keeps one tool process on its own project
-  (`delegate-runs-one-process-per-task`): `rush test --only` stays, and waits
-  for the `rush build --to` the project's build task runs.
+  resolved `deps`. A delegated Rush task keeps one tool process on its own
+  project (`delegate-runs-one-process-per-task`): `rush test --only` stays,
+  and waits for the `rush build --to` the project's build task runs.
+
+## Amendment, 2026-11-24
+
+`delegate-runs-one-process-per-task` now runs a delegated verb of moon and
+Nx as one tool command over its projects
+([stacks ADR 0019](../../../stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md)),
+on measurements of 2026-11-11 on an unchanged tree: `moon run` alone took
+0.2 s where ten delegated tasks took 4.8 s, and `nx affected -t build` 2.0 s
+where fifteen took 25.8 s.
+
+- The entries this ADR adds still order the tasks of a verb. A delegated
+  project whose file names `^build` waits for the builds of the projects it
+  depends on, so its build joins the command of a later wave, and the tool's
+  cache answers the upstream targets it runs again there. A verb whose
+  projects do not depend on each other runs one command.
+- A batched delegated task publishes no key, as before: the key of a task
+  that waits for it folds the key that task would have, unchanged by the
+  batch.
+- Rush keeps one process per task until its profile states the batch command.
 
 ## Rejected alternatives
 

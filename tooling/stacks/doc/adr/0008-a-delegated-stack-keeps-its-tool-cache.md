@@ -1,6 +1,7 @@
 # ADR 0008 — A delegated stack keeps its build tool's cache
 
-- **Status**: accepted
+- **Status**: accepted; amended by [ADR 0019](0019-a-delegated-verb-runs-as-one-tool-command.md),
+  which runs a delegated verb as one tool command
 - **Date**: 2026-11-08
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), `integrations/pants`
   (`@putnami/pants`), `integrations/nx` (`@putnami/nx`), `integrations/moon`
