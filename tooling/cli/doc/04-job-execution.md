@@ -675,24 +675,25 @@ cache keys:
   The store retains the largest successful, history-backed singleton ceiling
   **before** configured or learned weight is applied, so a throttled observation
   cannot lower the next grant and starve a known long pole, while changing or
-  removing a weight affects the next comparable run. Version-1 stores retain
-  their CPU/wall EMAs during migration but drop the old post-weight concurrency
-  floor because its multiplier cannot be reconstructed. A task with no history
+  removing a weight affects the next comparable run. A task with no history
   receives the whole machine for its first execution, avoiding the cold-history
   critical-path regression; that fallback (and a batch's fixed class grant) is
   not persisted as proven singleton demand, so the next run uses the
-  measurement it just learned. Version 3 also retains a bounded set of at most
+  measurement it just learned. The store also retains a bounded set of at most
   eight concurrency-conditioned observations per task: CPU, wall, peak RSS,
   granted concurrency, physical batch size, sample count, confidence, and
   saturation. Measurements at different ceilings or batch sizes do not get
   averaged into a fictitious common RSS.
-  Version-2 stores migrate their usable CPU/wall and unweighted-ceiling evidence
-  without inventing RSS or an observation concurrency; corrupt observations are
-  discarded and fall back to the first-cold resource class. A history-backed
-  singleton that receives a higher class ceiling persists only its own
-  pre-weight recommendation, never the class inflation.
+  A store of another version is ignored and every task starts cold once. Corrupt
+  observations are discarded and fall back to the first-cold resource class. A
+  history-backed singleton that receives a higher class ceiling persists only
+  its own pre-weight recommendation, never the class inflation.
   Wall-time history remains separate and supplies the expected durations behind
   longest-first dispatch and cache waiting decisions.
+  An executing dry run (`publish --dry-run`) keeps its own history for every
+  task whose cache key carries `dry-run=true`: every step of a command that
+  declares the flag, and every task that declares it as an input. What a preview
+  measures never sizes the real execution, nor the reverse.
 
 ### Scheduler Observability
 

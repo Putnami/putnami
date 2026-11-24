@@ -10,10 +10,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 const (
-	taskStatsVersion            = 3
+	// A store of another version is ignored.
+	taskStatsVersion            = 4
 	maxTaskResourceObservations = 8
 
 	// taskStatsAlpha is the EMA smoothing factor: half the estimate renews on
@@ -62,6 +65,9 @@ type taskStatsStore struct {
 	mu      sync.Mutex
 	path    string
 	entries map[string]*taskStat
+	// dryRuns holds the keys of the jobs this run executes as a dry run
+	// (markDryRuns).
+	dryRuns map[string]bool
 	dirty   bool
 }
 
@@ -194,6 +200,50 @@ func taskStatKey(job *ScheduledJob) string {
 	return job.Project.ID + "|" + job.DisplayName()
 }
 
+// dryRunParam is the parameter an executing dry run hands to its tasks.
+const dryRunParam = "dry-run"
+
+// dryRunStatSuffix ends the history name of a job executed as a dry run.
+const dryRunStatSuffix = "|" + dryRunParam
+
+// markDryRuns records which planned jobs execute as a dry run: their history
+// stays apart from the real task's.
+//
+// The boundary is the cache key's: a job whose keyed params carry dry-run=true
+// is a different execution from the one without it. Every step of a command
+// that declares the flag is keyed on it, whether or not the step reads it.
+func (s *Scheduler) markDryRuns() {
+	if dryRun, _ := s.commandParams[dryRunParam].(bool); s.taskStats == nil || !dryRun {
+		return
+	}
+	s.taskStats.dryRuns = make(map[string]bool)
+	for _, job := range s.planned {
+		if job == nil || job.JobDef == nil || job.Extension == nil {
+			continue
+		}
+		params := cachekey.TaskCacheParamsWith(s.ws, job, s.commandParams, false)
+		if dryRun, _ := params[dryRunParam].(bool); dryRun {
+			s.taskStats.dryRuns[job.Key()] = true
+		}
+	}
+}
+
+// statKey is taskStatKey in this run's history: a dry run's entry is apart.
+func (s *taskStatsStore) statKey(job *ScheduledJob) string {
+	if s.dryRuns[job.Key()] {
+		return taskStatKey(job) + dryRunStatSuffix
+	}
+	return taskStatKey(job)
+}
+
+// statName is the name part of statKey, which groups a job with its peers.
+func (s *taskStatsStore) statName(job *ScheduledJob) string {
+	if s.dryRuns[job.Key()] {
+		return job.DisplayName() + dryRunStatSuffix
+	}
+	return job.DisplayName()
+}
+
 // record folds a real execution into the history. Cache hits, failures, and
 // cancellations are excluded: hits did no work, and aborted runs would teach
 // the store durations the task does not have. The pre-weight ceiling is
@@ -216,7 +266,7 @@ func (s *taskStatsStore) record(job *ScheduledJob, result *JobResult) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := taskStatKey(job)
+	key := s.statKey(job)
 	stat := s.entries[key]
 	if stat == nil || stat.Samples <= 0 {
 		stat = &taskStat{CPUMs: cpuMs, WallMs: wallMs}
@@ -355,7 +405,7 @@ func applyTaskTuning(planned []*ScheduledJob, stats *taskStatsStore) {
 		if job == nil {
 			continue
 		}
-		stat := stats.entries[taskStatKey(job)]
+		stat := stats.entries[stats.statKey(job)]
 		if stat == nil {
 			continue
 		}
@@ -364,7 +414,7 @@ func applyTaskTuning(planned []*ScheduledJob, stats *taskStatsStore) {
 		job.HistoricalCPUCeiling = max(stat.MaxUnweightedConcurrency, 0)
 		job.ResourceProfile = resourceProfileFromStat(stat)
 
-		peers := cpuByName[job.DisplayName()]
+		peers := cpuByName[stats.statName(job)]
 		if len(peers) < learnedWeightMinPeers || stat.CPUMs <= 0 {
 			continue
 		}

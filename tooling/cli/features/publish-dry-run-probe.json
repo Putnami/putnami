@@ -48,6 +48,19 @@
             "unexpected-probe-fails"
           ]
         }
+      },
+      {
+        "id": "own-task-history",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-dry-run-never-sizes-the-real-execution"
+          ]
+        }
       }
     ]
   }

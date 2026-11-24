@@ -547,6 +547,7 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 	// plan's keys read, before the batch guard below reads the first one.
 	cachekey.PrimePlanInputs(s.ws, s.planned, s.cache)
 	s.taskStats = loadTaskStats(s.ws.Root)
+	s.markDryRuns()
 	applyTaskTuning(s.planned, s.taskStats)
 	applyCriticalPathTuning(s.planned)
 	// Size the allocator by the parallelism the host will actually deliver.

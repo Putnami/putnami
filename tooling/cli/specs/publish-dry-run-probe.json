@@ -32,6 +32,13 @@
         "A probe for a member the plan does not select, or whose version differs from the planned version, is rejected and fails the run.",
         "An absent answer obtained without a credential produces one warning, because a registry answers such a request for a private member as for a missing one."
       ]
+    },
+    {
+      "id": "own-task-history",
+      "text": [
+        "A task whose cache key carries dry-run=true records and reads its execution history apart from the real task's.",
+        "What a dry run measures never sizes the CPU grant of the real execution, nor the reverse."
+      ]
     }
   ],
   "decisions": [

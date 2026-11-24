@@ -290,6 +290,7 @@
     "cli/provider-publication#open-credential-release-through-one-provider",
     "cli/provider-publication#uploads-go-to-the-credential-provider",
     "cli/publish-dry-run-probe#one-pass-verdict",
+    "cli/publish-dry-run-probe#own-task-history",
     "cli/publish-dry-run-probe#plan-coverage",
     "cli/runtime-toolchain-pinning#exact-lock-resolution",
     "cli/runtime-toolchain-pinning#identity-keys-results",

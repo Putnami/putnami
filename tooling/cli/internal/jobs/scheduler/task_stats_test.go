@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -689,4 +690,111 @@ func keysOf(jobs []*ScheduledJob) []string {
 		keys = append(keys, j.Key())
 	}
 	return keys
+}
+
+// dryRunnableJob is a statJob whose command declares the dry-run flag.
+func dryRunnableJob(projectID, jobName string) *ScheduledJob {
+	job := statJob(projectID, jobName)
+	job.Extension = &extension.ExtensionDescription{Name: "@putnami/go"}
+	job.JobDef.Flags = map[string]extension.FlagDefinition{dryRunParam: {Type: "boolean"}}
+	return job
+}
+
+// A dry run and the real execution of one task each read the history of their
+// own runs, and a task with none gets the whole machine.
+func TestTaskStats_ADryRunKeepsItsOwnHistory(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/publish-dry-run-probe", "own-task-history", "a-dry-run-never-sizes-the-real-execution")
+	root := t.TempDir()
+	archives := func() *ScheduledJob { return dryRunnableJob("/go/extension", "package~archives") }
+	compile := func() *ScheduledJob { return statJob("/go/extension", "build~compile") }
+	prepare := func(commandParams map[string]any, jobs ...*ScheduledJob) *Scheduler {
+		s := &Scheduler{
+			ws:            &workspace.Workspace{Root: root},
+			planned:       jobs,
+			renderer:      &mockRenderer{},
+			commandParams: commandParams,
+		}
+		s.prepareScheduling(ParallelDecision{LogicalCPU: 10, Workers: 5})
+		return s
+	}
+	dryRunParams := map[string]any{dryRunParam: true}
+
+	dry, compiled := archives(), compile()
+	s := prepare(dryRunParams, dry, compiled)
+	s.taskStats.record(dry, successResult(3395*time.Millisecond, 1034*time.Millisecond))
+	s.taskStats.record(compiled, successResult(20*time.Second, 60*time.Second))
+	s.taskStats.save()
+
+	publish, compiled := archives(), compile()
+	s = prepare(map[string]any{}, publish, compiled)
+	if publish.ExpectedWallMs != 0 {
+		t.Fatalf("the publish read the dry run's history: expected wall = %d ms", publish.ExpectedWallMs)
+	}
+	if _, ceiling := s.plannedCeiling(publish); ceiling != 10 {
+		t.Fatalf("publish ceiling after a dry run = %d, want the whole machine (10)", ceiling)
+	}
+	if compiled.ExpectedWallMs != 20_000 {
+		t.Fatalf("a task that reads no dry-run parameter lost its history: expected wall = %d ms", compiled.ExpectedWallMs)
+	}
+	s.taskStats.record(publish, successResult(100*time.Second, 500*time.Second))
+	s.taskStats.save()
+
+	again := archives()
+	s = prepare(dryRunParams, again)
+	if again.ExpectedWallMs != 3395 || again.ExpectedCPUWorkMs != 1034 {
+		t.Fatalf("second dry run read %d/%.0f ms, want its own 3395/1034", again.ExpectedWallMs, again.ExpectedCPUWorkMs)
+	}
+	s.taskStats.record(again, successResult(time.Second, time.Second))
+	s.taskStats.save()
+
+	publish = archives()
+	s = prepare(map[string]any{dryRunParam: false}, publish)
+	if _, ceiling := s.plannedCeiling(publish); publish.ExpectedWallMs != 100_000 || ceiling < 5 {
+		t.Fatalf("second publish read %d ms and a ceiling of %d, want 100000 ms and its measured 5 cores",
+			publish.ExpectedWallMs, ceiling)
+	}
+}
+
+// A dry run is compared with the dry runs of its peers.
+func TestTaskStats_ADryRunIsWeighedAgainstDryRuns(t *testing.T) {
+	t.Parallel()
+	store := loadTaskStats(t.TempDir())
+	job := dryRunnableJob("/go/extension", "package~archives")
+	for key, cpu := range map[string]float64{
+		"/go/extension|package~archives|dry-run": 1_000,
+		"/a|package~archives":                    10,
+		"/b|package~archives":                    10,
+		"/c|package~archives|dry-run":            1_000,
+	} {
+		store.entries[key] = &taskStat{CPUMs: cpu, WallMs: cpu, Samples: 1}
+	}
+	s := &Scheduler{
+		planned:       []*ScheduledJob{job},
+		commandParams: map[string]any{dryRunParam: true},
+		taskStats:     store,
+	}
+	s.markDryRuns()
+	applyTaskTuning([]*ScheduledJob{job}, store)
+	if job.ExpectedCPUWorkMs != 1_000 || job.LearnedCPUWeight != 0 {
+		t.Fatalf("dry run = %.0f ms at learned weight %v, want 1000 ms and no boost",
+			job.ExpectedCPUWorkMs, job.LearnedCPUWeight)
+	}
+}
+
+// A store of another version is ignored.
+func TestTaskStats_AnEarlierStoreIsIgnored(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := taskStatsPath(root)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data := `{"version":3,"tasks":{"/go/extension|package~archives":{"cpuMs":1034,"wallMs":3395,"samples":1}}}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if entries := loadTaskStats(root).entries; len(entries) != 0 {
+		t.Fatalf("a version 3 store kept %d entries, want none", len(entries))
+	}
 }
