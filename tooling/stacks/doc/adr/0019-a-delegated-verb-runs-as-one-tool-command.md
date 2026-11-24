@@ -51,9 +51,10 @@ delegated task has its cache off.
   flight, the ready tasks run at once. The batch key leaves out the project's
   own option layers of the stack's extension: the stack reads each member's
   from the project, and a sync writes them per project.
-- The shared invocation runs the toolchain check once, takes the stack root's
-  lock once, removes each component's reports, runs the batch steps at the
-  root, then answers one result per selected project id. The stack extension
+- The shared invocation runs one command per stack root, batch shape and
+  resolved toolchain: for each, it runs the toolchain check once, takes the
+  stack root's lock once, removes each component's reports and runs the batch
+  steps at the root. It then answers one result per selected project id. The stack extension
   reads the tool's report:
   - moon: the run report moon writes in `.moon/cache/runReport.json` during
     the command. A target moon reports `passed` or `cached` passes; a target
