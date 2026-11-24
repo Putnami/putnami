@@ -1,6 +1,7 @@
 # ADR 0097 — A project names what a command waits for
 
-- **Status**: accepted.
+- **Status**: accepted; amended on 2026-11-24 by
+  [stacks ADR 0019](../../../stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md).
 - **Scope**: `protocols/workspace` (`ProjectConfig.Commands`), `@putnami/cli`
   (`internal/jobs/planner`, `internal/jobs/cachekey`, the scheduler's key
   publication), `@putnami/rush`, `@putnami/turbo`, `@putnami/moon`

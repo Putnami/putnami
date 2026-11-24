@@ -7,7 +7,9 @@
   `integrations/nx` (`@putnami/nx`); `@putnami/turbo`, `@putnami/rush`,
   `@putnami/pants` and `@putnami/bazel` follow in their own change
 - **Amends**: [ADR 0008](0008-a-delegated-stack-keeps-its-tool-cache.md),
-  which ran the tool once per component
+  which ran the tool once per component, and
+  [ADR 0097 of tooling/cli](../../../cli/doc/adr/0097-a-project-names-what-a-command-waits-for.md),
+  which kept one tool process per delegated task
 
 ## Context
 
@@ -53,7 +55,8 @@ delegated task has its cache off.
   from the project, and a sync writes them per project.
 - The shared invocation runs one command per stack root, batch shape and
   resolved toolchain: for each, it runs the toolchain check once, takes the
-  stack root's lock once, removes each component's reports and runs the batch
+  stack root's lock once, removes each component's reports and the tool's own
+  report files the stack names, and runs the batch
   steps at the root. It then answers one result per selected project id. The stack extension
   reads the tool's report:
   - moon: the run report moon writes in `.moon/cache/runReport.json` during
@@ -103,6 +106,18 @@ delegated task has its cache off.
 
 ## Consequences
 
+- A component that passed a step which failed before the last one fails as
+  not run: the later steps ran on no component.
+- One command per stack root, batch shape and toolchain, including the
+  version each member's own version files state: members that differ run
+  separate commands.
+- The scheduler reads a batchable task whose cache is off as a delegated
+  tool's: any extension that declares one gets the wait for its peers.
+- A serve in flight does not count as work that ends: a verb never waits on
+  it.
+- The command line grows with the number of projects of the verb; nothing
+  bounds it yet, so a verb over very many projects may exceed the limit of
+  the platform, Windows' 32,767 characters first.
 - A warm delegated `putnami lint` on moon or Nx starts one tool process per
   verb, plus one per later wave of a verb whose projects depend on each other
   through a `^command` entry ([ADR 0097 of tooling/cli](../../../cli/doc/adr/0097-a-project-names-what-a-command-waits-for.md)).
