@@ -28,6 +28,8 @@ import (
 	"time"
 
 	pdb "go.putnami.dev/protocol/database"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // postgresImagePinned is the digest-pinned postgres:17 image the provisioner
@@ -404,7 +406,7 @@ func (p *Provisioner) docker(ctx context.Context, timeout time.Duration, args ..
 // value — the run argv carries the password, so nothing derived from a failed
 // invocation (which could echo arguments) is ever returned to a caller.
 func execRunner(ctx context.Context, args ...string) (string, error) {
-	out, err := exec.CommandContext(ctx, "docker", args...).Output()
+	out, err := procstat.Output(exec.CommandContext(ctx, "docker", args...))
 	if err != nil {
 		return "", err
 	}

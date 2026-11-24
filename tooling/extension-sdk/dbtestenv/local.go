@@ -18,6 +18,8 @@ import (
 	"time"
 
 	pdb "go.putnami.dev/protocol/database"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // dockerProbeTimeout bounds the call that asks whether a Docker daemon answers.
@@ -52,7 +54,7 @@ func dockerDaemonAnswers() bool {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), dockerProbeTimeout)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "docker", "version", "--format", "{{.Server.Version}}").Output()
+	out, err := procstat.Output(exec.CommandContext(ctx, "docker", "version", "--format", "{{.Server.Version}}"))
 	return err == nil && strings.TrimSpace(string(out)) != ""
 }
 

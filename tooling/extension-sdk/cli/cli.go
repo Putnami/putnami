@@ -19,8 +19,10 @@ import (
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	runtime "go.putnami.dev/protocol/runtime"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Result status strings emitted on the JSONL wire (the runtime event protocol).
@@ -114,7 +116,7 @@ func Run(job JobFunc, opts ...RunOption) {
 	emit := jsonl.New()
 
 	if o.skipEmptyProject && ctx.Project.Name == "" {
-		emit.Result(statusSkip, nil)
+		emit.Result(statusSkip, withProcessReport(nil))
 		os.Exit(protocolcli.ExitSuccess)
 	}
 
@@ -123,14 +125,28 @@ func Run(job JobFunc, opts ...RunOption) {
 	status, data, jobErr := job(ctx, emit, flags.jobArgs)
 	if jobErr != nil {
 		emit.Error(jobErr.Error())
-		emit.Result(statusFailed, nil)
+		emit.Result(statusFailed, withProcessReport(nil))
 		os.Exit(exitCodeFor(statusFailed, jobErr))
 	}
-	emit.Result(status, data)
+	emit.Result(status, withProcessReport(data))
 	if code := exitCodeFor(status, nil); code != protocolcli.ExitSuccess {
 		os.Exit(code)
 	}
 	// Success: return so the caller's main exits 0 normally.
+}
+
+// withProcessReport is data with the job process's own accounting under
+// runtime.ProcessReportResultDataKey: its CPU without its children, the
+// processes it started and its git calls (go.putnami.dev/sdk/extension/procstat).
+// The engine sums the reports into the run's orchestration report. data is
+// copied, never changed.
+func withProcessReport(data map[string]any) map[string]any {
+	out := make(map[string]any, len(data)+1)
+	for key, value := range data {
+		out[key] = value
+	}
+	out[runtime.ProcessReportResultDataKey] = procstat.Take().Report()
+	return out
 }
 
 // standardFlags holds the CLI-contract flags every extension job accepts,

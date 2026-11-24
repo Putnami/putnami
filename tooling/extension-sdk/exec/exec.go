@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // waitDelay bounds how long Run waits, once the command has exited or its
@@ -143,7 +145,7 @@ func Run(name string, args []string, opts ...Option) (*Result, error) {
 		cmd.Stdin = strings.NewReader(o.stdin)
 	}
 
-	err := cmd.Run()
+	err := procstat.Run(cmd)
 
 	exitCode := 0
 	if err != nil {

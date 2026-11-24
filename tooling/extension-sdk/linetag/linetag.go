@@ -28,6 +28,8 @@ import (
 	"time"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // gitTimeout bounds one git call. Every call reads local objects only.
@@ -179,7 +181,7 @@ func runGitCapture(dir string, stdin io.Reader, args ...string) (string, string,
 	cmd.Stdin = stdin
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd, procstat.Git); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", stderr.String(), fmt.Errorf("git %s (in %s): timed out after %s", args[0], dir, gitTimeout)
 		}

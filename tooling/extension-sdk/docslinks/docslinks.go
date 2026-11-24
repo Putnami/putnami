@@ -47,6 +47,8 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/sdk/extension/gitcandidate"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Code is the diagnostic code every finding is reported under.
@@ -399,7 +401,7 @@ func isDocument(root, path string) bool {
 func ignoredDirectories(root string) map[string]bool {
 	cmd := exec.Command("git", "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z")
 	cmd.Dir = root
-	output, err := cmd.Output()
+	output, err := procstat.Output(cmd, procstat.Git)
 	if err != nil {
 		return nil
 	}
