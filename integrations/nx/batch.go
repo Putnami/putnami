@@ -109,7 +109,9 @@ type runMany struct {
 	notRun map[string]string
 }
 
-// The lists of tasks Nx did not finish.
+// The lists of Nx's closing summary the reader reads: the tasks that
+// failed, those Nx did not run or skipped, and those it stopped before they
+// finished.
 const (
 	notRunList  = "not run"
 	stoppedList = "stopped"
@@ -169,7 +171,7 @@ func (r runMany) judge(component, target string) verdict {
 
 // readRunMany reads Nx's static output: each section, by the task its header
 // names, and the ids the closing summaries list under a heading of failed
-// tasks or of tasks Nx did not run.
+// tasks, of tasks Nx did not run or skipped, or of tasks it stopped.
 func readRunMany(output string) runMany {
 	r := runMany{sections: map[string]string{}, tasks: map[string]task{}, failed: map[string]bool{}, notRun: map[string]string{}}
 	var current string
@@ -204,8 +206,9 @@ func readRunMany(output string) runMany {
 			continue
 		}
 		if inSummary {
-			// Each heading opens a list: the failed tasks, or the tasks Nx
-			// did not run, which it lists the same way.
+			// Each heading opens a list: the tasks Nx stopped, those it did
+			// not run or skipped, or those that failed, all listed the same
+			// way. Any other heading ends the current list.
 			if heading := strings.TrimSpace(line); strings.HasSuffix(heading, ":") {
 				lower := strings.ToLower(heading)
 				switch {

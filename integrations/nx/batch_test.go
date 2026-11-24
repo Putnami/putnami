@@ -199,7 +199,7 @@ func TestASyncedTargetRunsAsItsOwnRunMany(t *testing.T) {
 
 // TestReadBatchJudgesATargetByItsOwnRunsAlone pins the Nx reader over the
 // matrix of a's own run of build (exact, default configuration, none) and its
-// outcome (passed, failed, not run), beside a quoted sibling target
+// outcome (passed, failed, not run, stopped), beside a quoted sibling target
 // a:"build:x" (absent, passed, failed), with b:build failing so the command
 // fails.
 func TestReadBatchJudgesATargetByItsOwnRunsAlone(t *testing.T) {
