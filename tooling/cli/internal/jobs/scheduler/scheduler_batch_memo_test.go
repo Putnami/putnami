@@ -25,7 +25,6 @@ func makeMixedBatchPlan(t *testing.T) (*workspace.Workspace, []*ScheduledJob) {
 	t.Helper()
 	root := t.TempDir()
 	writeTestFile(t, filepath.Join(root, "biome.json"), `{"formatter":{"enabled":true}}`)
-	writeTestFile(t, filepath.Join(root, "bun.lock"), `{"lockfileVersion":1}`)
 
 	var projects []*workspace.Project
 	for i := range 12 {
@@ -65,7 +64,9 @@ func makeMixedBatchPlan(t *testing.T) (*workspace.Workspace, []*ScheduledJob) {
 	test := &extension.TaskBatchPolicy{
 		Tool:        "bun",
 		MaxProjects: 3,
-		ConfigFiles: []string{"{workspaceRoot}/bun.lock"},
+		// No candidate exists, so the key folds no path of the temporary
+		// root: it is the same on every machine, and the test pins it.
+		ConfigFiles: []string{"{workspaceRoot}/bunfig.toml"},
 	}
 
 	var planned []*ScheduledJob
@@ -107,21 +108,38 @@ func makeMixedBatchPlan(t *testing.T) (*workspace.Workspace, []*ScheduledJob) {
 	return ws, planned
 }
 
-// drainPendingGroups dispatches the whole queue and returns each group's keys,
-// in dispatch order. forget drops the memo before every scan, which is how the
-// scheduler computed the keys before they were memoized.
-func drainPendingGroups(s *Scheduler, pending []*ScheduledJob, forget bool) [][]string {
-	var groups [][]string
-	for len(pending) > 0 {
-		if forget {
-			s.pendingBatches = nil
-		}
-		var group jobGroup
-		group, pending = s.takePendingGroup(pending)
-		groups = append(groups, keysOf(group.jobs))
-	}
-	return groups
+// mainDispatchGroups are the groups the scheduler dispatched for
+// makeMixedBatchPlan before the batch key was memoized (a9bf099d), recomputing
+// every candidate's key on every scan, in dispatch order.
+var mainDispatchGroups = [][]string{
+	{"/p04:build~compile"},
+	{"/p09:build~compile"},
+	{"/p03:build~compile"},
+	{"/p08:build~compile"},
+	{"/p02:lint~check", "/p04/nested:lint~check", "/p08:lint~check", "/p01:lint~check", "/p10:lint~check", "/p00:lint~check", "/p06:lint~check", "/p09:lint~check"},
+	{"/p11:lint~check"},
+	{"/p03:test~test", "/p08:test~test", "/p04:test~test"},
+	{"/p07:test~test", "/p00:test~test", "/p09:test~test"},
+	{"/p11:test~test", "/p04/nested:test~test", "/p01:test~test"},
+	{"/p02:build~compile"},
+	{"/p07:build~compile"},
+	{"/p02:test~test", "/p10:test~test", "/p06:test~test"},
+	{"/p07:lint~check"},
+	{"/p04:lint~check"},
+	{"/p01:build~compile"},
+	{"/p06:build~compile"},
+	{"/p11:build~compile"},
+	{"/p00:build~compile"},
+	{"/p04/nested:build~compile"},
+	{"/p10:build~compile"},
+	{"/p03:lint~check"},
 }
+
+// mainTestClassKey is the batch key the scheduler computed for the test class
+// of makeMixedBatchPlan at a9bf099d, from json.Marshal(BuildJobContext(...).Params).
+// The class reads no config file, so the key folds no path of the temporary
+// root.
+const mainTestClassKey = "e5104c5f906474c8dd446ffd401e98b905835b6921229e7eaf3455eed9c89f2a"
 
 // newBatchMemoScheduler is this file's one scheduler construction: the memo
 // and the dispatch scan it feeds are scheduler methods.
@@ -129,60 +147,37 @@ func newBatchMemoScheduler(ws *workspace.Workspace, planned []*ScheduledJob) *Sc
 	return newScheduler(ws, planned, nil, SchedulerConfig{}, &mockRenderer{}, nil)
 }
 
-// The memo changes when a pending job's batch key is computed, never which
-// groups dispatch: the groups of a fixture plan are the same whether every
-// scan recomputes each key or reads the one computed when the job became ready.
+// queueReady computes each job's batch key when the job becomes ready, and the
+// dispatch scans that follow form the groups the scheduler formed before the
+// key was memoized, from the key it computed then.
 func TestPendingBatchMemoKeepsTheDispatchGroups(t *testing.T) {
 	ws, planned := makeMixedBatchPlan(t)
-	pending := append([]*ScheduledJob(nil), planned...)
-	sortPendingLongestFirst(pending)
-
 	scheduler := newBatchMemoScheduler(ws, planned)
-	recomputed := drainPendingGroups(scheduler, append([]*ScheduledJob(nil), pending...), true)
-
-	scheduler.pendingBatches = nil
-	for _, job := range pending {
-		scheduler.pendingBatch(job)
-	}
-	got := drainPendingGroups(scheduler, append([]*ScheduledJob(nil), pending...), false)
-
-	if !reflect.DeepEqual(got, recomputed) {
-		t.Fatalf("memoized groups differ:\n got  %v\n want %v", got, recomputed)
-	}
-	batched := 0
-	for _, group := range got {
-		if len(group) > 1 {
-			batched++
-		}
-	}
-	if batched == 0 {
-		t.Fatalf("fixture plan formed no batch group: %v", got)
-	}
-}
-
-// queueReady computes a job's batch key when the job becomes ready, from the
-// parameter bag its job context delivers.
-func TestQueueReadyComputesTheBatchKeyFromTheDeliveredParams(t *testing.T) {
-	ws, jobs := makeBatchSchedulerFixture(t, "")
-	scheduler := newBatchMemoScheduler(ws, jobs)
 	scheduler.metrics = newSchedulerMetrics() // Run sets it up
 	var mu sync.Mutex
 	completed := 0
-	state := planner.NewDAGState(planner.SchedulableJobs(jobs))
-	pending := scheduler.queueReady(nil, jobs, state, map[string]*JobResult{}, &mu, &completed)
-	if len(pending) != len(jobs) {
-		t.Fatalf("queued %d jobs, want %d", len(pending), len(jobs))
+	state := planner.NewDAGState(planner.SchedulableJobs(planned))
+	pending := scheduler.queueReady(nil, planned, state, map[string]*JobResult{}, &mu, &completed)
+	if len(scheduler.pendingBatches) != len(planned) {
+		t.Fatalf("queueReady computed %d batch keys, want one per ready job (%d)", len(scheduler.pendingBatches), len(planned))
 	}
-	for _, job := range jobs {
-		memo, ok := scheduler.pendingBatches[job]
-		if !ok || memo.key == "" {
-			t.Fatalf("%s: no batch key computed when it became ready", job.Key())
+	for _, job := range planned {
+		if job.JobDef.CommandName != "test" {
+			continue
 		}
-		defaults := cachekey.JobConfigDefaults(ws, job)
-		delivered := BuildJobContext(ws, job, scheduler.taskParams, defaults, scheduler.cfg.VersionInfo).Params
-		if !reflect.DeepEqual(cachekey.DeliveredJobParams(job, scheduler.taskParams, defaults), delivered) {
-			t.Fatalf("%s: the batch key reads another bag than the job context delivers", job.Key())
+		if key := scheduler.pendingBatches[job].key; key != mainTestClassKey {
+			t.Fatalf("%s: batch key %s, want the key computed from the job context's params %s", job.Key(), key, mainTestClassKey)
 		}
+	}
+
+	var got [][]string
+	for len(pending) > 0 {
+		var group jobGroup
+		group, pending = scheduler.takePendingGroup(pending)
+		got = append(got, keysOf(group.jobs))
+	}
+	if !reflect.DeepEqual(got, mainDispatchGroups) {
+		t.Fatalf("dispatch groups differ from before the memo:\n got  %v\n want %v", got, mainDispatchGroups)
 	}
 }
 
