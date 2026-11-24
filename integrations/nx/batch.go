@@ -28,31 +28,30 @@ var (
 )
 
 // ReadBatch reads the static output of a failed nx run-many over several
-// projects (ADR 0019 of tooling/stacks): each component's target that the
-// closing summary lists as failed fails with its section, and a target with
-// a section that is not listed passes.
+// projects (ADR 0019 of tooling/stacks). A component's target fails when one
+// of its own runs failed, with that run's section, or when Nx lists it among
+// the tasks it did not run; it passes when one of its runs has a section and
+// none failed; it is not named otherwise, and the core fails it as not run.
+// A run of <target> is <project>:<target> or <project>:<target>:<config>; a
+// quoted target such as <project>:"<target>:x" is another target.
 func ReadBatch(report stacks.BatchReport) map[string]stacks.BatchOutcome {
-	sections, failed := readRunMany(string(report.Output))
-	if len(sections) == 0 && len(failed) == 0 {
+	run := readRunMany(string(report.Output))
+	if len(run.sections) == 0 && len(run.failed) == 0 && len(run.notRun) == 0 {
 		return nil
 	}
-	targets := commandTargets(report.Command)
 	out := map[string]stacks.BatchOutcome{}
 	for _, component := range report.Components {
 		named, anyFailed := false, false
 		var messages []string
-		for _, target := range targets {
-			key, section, ran, isFailed := taskOutcome(sections, failed, component+":"+target)
-			if isFailed {
+		for _, target := range commandTargets(report.Command) {
+			verdict := run.judge(component, target)
+			switch {
+			case verdict.failed:
 				anyFailed, named = true, true
-				message := "nx run " + key + " failed"
-				if tail := lastLines(section, sectionLines); tail != "" {
-					message += ":\n" + tail
-				}
-				messages = append(messages, message)
-				continue
+				messages = append(messages, verdict.message)
+			case verdict.passed:
+				named = true
 			}
-			named = named || ran
 		}
 		switch {
 		case anyFailed:
@@ -64,47 +63,108 @@ func ReadBatch(report stacks.BatchReport) map[string]stacks.BatchOutcome {
 	return out
 }
 
-// taskOutcome answers a target's outcome: the task key it quotes, its
-// section, whether it ran and whether it failed. A target with a section of
-// its own name is that task alone: a sibling such as <target>:lib is another
-// task. Otherwise the target ran its default configuration,
-// <project>:<target>:<configuration>, and it fails when the summary lists any
-// such task as failed; it ran when any such task has a section.
-func taskOutcome(sections map[string]string, failed map[string]bool, target string) (string, string, bool, bool) {
-	if section, ok := sections[target]; ok {
-		return target, section, true, failed[target]
-	}
-	if failed[target] {
-		return target, "", false, true
-	}
-	key, section, ran := target, "", false
-	// Sorted, so that the same output always quotes the same section.
-	for _, listed := range slices.Sorted(maps.Keys(failed)) {
-		if strings.HasPrefix(listed, target+":") {
-			section, ran := sections[listed]
-			return listed, section, ran, true
-		}
-	}
-	for _, k := range slices.Sorted(maps.Keys(sections)) {
-		if strings.HasPrefix(k, target+":") {
-			key, section, ran = k, sections[k], true
-			break
-		}
-	}
-	return key, section, ran, false
+// task is one task of Nx's output: its project, its target and its
+// configuration, with the id Nx's summary names it by.
+type task struct {
+	project, target, config string
 }
 
-// readRunMany splits Nx's static output into each target's section, by
-// project:target, and the targets its closing summaries list as failed.
-func readRunMany(output string) (map[string]string, map[string]bool) {
-	sections := map[string]string{}
-	failed := map[string]bool{}
+// parseTask reads a task as a section header prints it: project:target,
+// project:target:config, or project:"target":config for a target that holds a
+// colon. A summary prints the id unquoted, which parseTask reads as an
+// unquoted header.
+func parseTask(text string) (task, bool) {
+	project, rest, ok := strings.Cut(text, ":")
+	if !ok || project == "" || rest == "" {
+		return task{}, false
+	}
+	if quoted, ok := strings.CutPrefix(rest, `"`); ok {
+		target, after, ok := strings.Cut(quoted, `"`)
+		if !ok || target == "" {
+			return task{}, false
+		}
+		return task{project: project, target: target, config: strings.TrimPrefix(after, ":")}, true
+	}
+	target, config, _ := strings.Cut(rest, ":")
+	return task{project: project, target: target, config: config}, true
+}
+
+// id is the task's id as Nx's summary prints it.
+func (t task) id() string {
+	id := t.project + ":" + t.target
+	if t.config != "" {
+		id += ":" + t.config
+	}
+	return id
+}
+
+// runMany is what Nx's static output states: each task that ran, with its
+// section, by id, and the ids its summary lists as failed or as not run.
+type runMany struct {
+	sections map[string]string
+	tasks    map[string]task
+	failed   map[string]bool
+	notRun   map[string]bool
+}
+
+// verdict is a target's outcome in one component.
+type verdict struct {
+	failed, passed bool
+	message        string
+}
+
+// judge answers the outcome of component:target. Its runs are the tasks
+// whose section header names that target, unquoted, with or without a
+// configuration. An id the summary lists without a section resolves through
+// the headers when one names it; otherwise <component>:<target> is its run,
+// and so is <component>:<target>:<x> when the target has no run of its own.
+func (r runMany) judge(component, target string) verdict {
+	own := component + ":" + target
+	runs := map[string]bool{}
+	for id, t := range r.tasks {
+		if t.project == component && t.target == target {
+			runs[id] = true
+		}
+	}
+	ranAlone := len(runs) > 0
+	belongs := func(id string) bool {
+		if runs[id] {
+			return true
+		}
+		if _, known := r.tasks[id]; known {
+			return false
+		}
+		return id == own || (!ranAlone && strings.HasPrefix(id, own+":"))
+	}
+	for _, id := range slices.Sorted(maps.Keys(r.failed)) {
+		if belongs(id) {
+			message := "nx run " + id + " failed"
+			if tail := lastLines(r.sections[id], sectionLines); tail != "" {
+				message += ":\n" + tail
+			}
+			return verdict{failed: true, message: message}
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(r.notRun)) {
+		if belongs(id) && !runs[id] {
+			return verdict{failed: true, message: "nx did not run " + id + ": a task it depends on failed"}
+		}
+	}
+	return verdict{passed: ranAlone}
+}
+
+// readRunMany reads Nx's static output: each section, by the task its header
+// names, and the ids the closing summaries list under a heading of failed
+// tasks or of tasks Nx did not run.
+func readRunMany(output string) runMany {
+	r := runMany{sections: map[string]string{}, tasks: map[string]task{}, failed: map[string]bool{}, notRun: map[string]bool{}}
 	var current string
 	var body []string
-	inSummary, inFailed := false, false
+	inSummary := false
+	var list map[string]bool
 	flush := func() {
 		if current != "" {
-			sections[current] = strings.TrimSpace(strings.Join(body, "\n"))
+			r.sections[current] = strings.TrimSpace(strings.Join(body, "\n"))
 		}
 		current, body = "", nil
 	}
@@ -113,9 +173,10 @@ func readRunMany(output string) (map[string]string, map[string]bool) {
 		if m := sectionStart.FindStringSubmatch(line); m != nil {
 			flush()
 			inSummary = false
-			// Nx quotes a target whose name holds a colon:
-			// > nx run a:"test:lib"; its summary does not.
-			current = strings.ReplaceAll(m[1], `"`, "")
+			if t, ok := parseTask(m[1]); ok {
+				current = t.id()
+				r.tasks[current] = t
+			}
 			continue
 		}
 		if strings.HasPrefix(strings.TrimSpace(line), "::endgroup::") {
@@ -123,19 +184,26 @@ func readRunMany(output string) (map[string]string, map[string]bool) {
 		}
 		if summaryStart.MatchString(line) {
 			flush()
-			inSummary, inFailed = true, false
+			inSummary, list = true, nil
 			continue
 		}
 		if inSummary {
-			// Only the block of failed tasks: the tasks Nx did not run are
-			// listed the same way under their own heading.
+			// Each heading opens a list: the failed tasks, or the tasks Nx
+			// did not run, which it lists the same way.
 			if heading := strings.TrimSpace(line); strings.HasSuffix(heading, ":") {
 				lower := strings.ToLower(heading)
-				inFailed = strings.Contains(lower, "fail") && !strings.Contains(lower, "not run")
+				switch {
+				case strings.Contains(lower, "not run"), strings.Contains(lower, "skipped"), strings.Contains(lower, "stopped"):
+					list = r.notRun
+				case strings.Contains(lower, "fail"):
+					list = r.failed
+				default:
+					list = nil
+				}
 				continue
 			}
-			if m := failedItem.FindStringSubmatch(line); m != nil && inFailed {
-				failed[m[1]] = true
+			if m := failedItem.FindStringSubmatch(line); m != nil && list != nil {
+				list[m[1]] = true
 			}
 			continue
 		}
@@ -144,7 +212,7 @@ func readRunMany(output string) (map[string]string, map[string]bool) {
 		}
 	}
 	flush()
-	return sections, failed
+	return r
 }
 
 // commandTargets are the targets an nx run-many command names after -t or

@@ -2,6 +2,7 @@ package nx
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -163,8 +164,8 @@ func TestReadBatchReadsOnlyTheFailedTasksAndTheExactSection(t *testing.T) {
 	if a, ok := got["a"]; !ok || a.Failed {
 		t.Errorf("a = %+v (%v), want the pass of its own a:test section", a, ok)
 	}
-	if _, ok := got["b"]; ok {
-		t.Errorf("b = %+v, want it not named: Nx did not run it", got["b"])
+	if b := got["b"]; !b.Failed || !strings.Contains(b.Message, "did not run b:test") {
+		t.Errorf("b = %+v, want a failure as not run: Nx lists it among the tasks it did not run", b)
 	}
 }
 
@@ -193,5 +194,89 @@ func TestASyncedTargetRunsAsItsOwnRunMany(t *testing.T) {
 	}
 	if got := commandTargets([]string{"nx", "run-many", "--targets=lint,test", "-p", "a"}); !reflect.DeepEqual(got, []string{"lint", "test"}) {
 		t.Errorf("commandTargets = %q", got)
+	}
+}
+
+// TestReadBatchJudgesATargetByItsOwnRunsAlone pins the Nx reader over the
+// matrix of a's own run of build (exact, default configuration, none) and its
+// outcome (passed, failed, not run), beside a quoted sibling target
+// a:"build:x" (absent, passed, failed), with b:build failing so the command
+// fails.
+func TestReadBatchJudgesATargetByItsOwnRunsAlone(t *testing.T) {
+	type outcome string
+	const (
+		passed outcome = "passed"
+		failed outcome = "failed"
+		notRun outcome = "not run"
+		absent outcome = "absent"
+	)
+	for _, own := range []string{"a:build", "a:build:production", ""} {
+		for _, result := range []outcome{passed, failed, notRun} {
+			for _, sibling := range []outcome{absent, passed, failed} {
+				if own == "" && result != notRun {
+					continue
+				}
+				var out, failedList, notRunList strings.Builder
+				header := func(id, quoted string, o outcome) {
+					switch o {
+					case passed, failed:
+						out.WriteString("> nx run " + quoted + "\n\n" + id + " output\n\n")
+					}
+					switch o {
+					case failed:
+						failedList.WriteString("      - nx run " + id + "\n")
+					case notRun:
+						notRunList.WriteString("      - " + id + "\n")
+					}
+				}
+				id := own
+				if id == "" {
+					id = "a:build"
+				}
+				header(id, id, result)
+				header("a:build:x", `a:"build:x"`, sibling)
+				header("b:build", "b:build", failed)
+				out.WriteString(" NX   Ran target build for 2 projects\n\n   ✖  targets failed, including the following:\n\n" + failedList.String() + "\n")
+				if notRunList.Len() > 0 {
+					out.WriteString("   Tasks not run because their dependencies failed or --nx-bail=true:\n\n" + notRunList.String())
+				}
+				got := ReadBatch(stacks.BatchReport{Components: []string{"a", "b"}, Command: []string{"npx", "--no", "nx", "run-many", "-t", "build", "-p", "a,b"}, Output: []byte(out.String())})
+				name := fmt.Sprintf("own %q %s, sibling %s", own, result, sibling)
+				a, named := got["a"]
+				switch result {
+				case passed:
+					if !named || a.Failed {
+						t.Errorf("%s: a = %+v (%v), want a pass", name, a, named)
+					}
+				case failed:
+					if !a.Failed || !strings.Contains(a.Message, id+" output") {
+						t.Errorf("%s: a = %+v, want its own failed section", name, a)
+					}
+				case notRun:
+					if !a.Failed || !strings.Contains(a.Message, "did not run") {
+						t.Errorf("%s: a = %+v, want a failure as not run", name, a)
+					}
+				}
+				if !got["b"].Failed {
+					t.Errorf("%s: b = %+v, want its failure", name, got["b"])
+				}
+			}
+		}
+	}
+}
+
+func TestADependencyThatFailedBeforeTheTargetRanFailsIt(t *testing.T) {
+	// a:build depends on a:"build:x", which passed, and a:codegen, which
+	// failed: Nx never ran a:build. The ^build variant lists it the same way.
+	for name, output := range map[string]string{
+		"own dependency": "> nx run a:\"build:x\"\n\nx ok\n\n> nx run a:codegen\n\ncodegen boom\n\n> nx run b:build\n\nb boom\n\n",
+		"^build":         "> nx run c:build\n\nc boom\n\n> nx run b:build\n\nb boom\n\n",
+	} {
+		output += " NX   Ran target build for 2 projects\n\n   ✖  targets failed, including the following:\n\n      - nx run a:codegen\n      - nx run c:build\n      - nx run b:build\n\n" +
+			"   Tasks not run because their dependencies failed or --nx-bail=true:\n\n      - a:build\n"
+		got := ReadBatch(stacks.BatchReport{Components: []string{"a", "b"}, Command: []string{"npx", "--no", "nx", "run-many", "-t", "build", "-p", "a,b"}, Output: []byte(output)})
+		if a := got["a"]; !a.Failed || !strings.Contains(a.Message, "did not run a:build") {
+			t.Errorf("%s: a = %+v, want a failure as not run", name, a)
+		}
 	}
 }

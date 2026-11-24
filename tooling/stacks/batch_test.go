@@ -327,3 +327,35 @@ func TestTailBufferKeepsTheEnd(t *testing.T) {
 		t.Errorf("tail = %q, want defg", got)
 	}
 }
+
+func TestALaterStepReadsNeitherTheReportNorTheOutputOfAnEarlierOne(t *testing.T) {
+	root := t.TempDir()
+	bin := t.TempDir()
+	// first writes the tool's report and prints a section; second fails
+	// before it writes either.
+	writeFile(t, bin, "tool", "#!/bin/sh\ncase \"$1\" in --version) echo 'tool 1.0.0'; exit 0;; esac\n"+
+		"if [ \"$1\" = first ]; then echo stale > report.txt; echo 'section of first'; exit 0; fi\nexit 1\n")
+	if err := os.Chmod(filepath.Join(bin, "tool"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	var read BatchReport
+	var reportLeft bool
+	s := batchStack(t, func(report BatchReport) map[string]BatchOutcome {
+		read = report
+		_, err := os.Stat(filepath.Join(report.Root, "report.txt"))
+		reportLeft = err == nil
+		return nil
+	})
+	s.BatchReports = []string{"report.txt"}
+	lint := s.Profile.Tasks[TaskLint]
+	lint.Batch = &Batch{Steps: [][]string{{"tool", "first", "{component}"}, {"tool", "second", "{component}"}}}
+	s.Profile.Tasks[TaskLint] = lint
+	runLintBatch(t, s, root)
+	if reportLeft {
+		t.Error("the second step's reader found the first step's report")
+	}
+	if strings.Contains(string(read.Output), "section of first") || read.Command[1] != "second" {
+		t.Errorf("the reader read %q of %q, want the second step's output alone", read.Output, read.Command)
+	}
+}

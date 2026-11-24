@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -280,5 +281,24 @@ func TestTwoVerbsWaitingOnEachOtherRunWhileAServeIsInFlight(t *testing.T) {
 	}
 	if len(result.Results) != len(planned) {
 		t.Fatalf("result rows = %d, want %d", len(result.Results), len(planned))
+	}
+}
+
+func TestAFiniteStepOfAServePipelineCountsAsWorkThatEnds(t *testing.T) {
+	t.Parallel()
+	_, planned := makeDelegatedVerbPlan(t, "")
+	// A serve pipeline's finite step carries the serve trait too; only the
+	// plan's serve steps run until interrupted.
+	finite := planned[0]
+	finite.JobDef.Traits.Workload = extensionproto.WorkloadServe
+	serve := planned[2]
+	waves := newVerbWaves(planned, map[string]bool{serve.Key(): true})
+	waves.track([]*ScheduledJob{finite, serve}, 1)
+	if got := waves.serves(); got != 1 {
+		t.Errorf("serves = %d, want the serve step alone", got)
+	}
+	waves.track([]*ScheduledJob{finite, serve}, -1)
+	if got := waves.serves(); got != 0 {
+		t.Errorf("serves after completion = %d, want 0", got)
 	}
 }
