@@ -1,5 +1,113 @@
 # Changelog — typescript
 
+## 0.5.0 — 2026-11-24
+
+### Breaking
+
+- perf(typescript)!: build the request context on first use and route plain http() routes natively (88cb8ab)
+- feat(database)!: @putnami/database runs on Bun.SQL instead of postgres.js (fa52709)
+- fix(typescript)!: build-generate keys public/ across its dependency closure (651620c)
+- feat(logging)!: a service reads its log level live, always emits errors and counts its records (8be87df)
+- feat(telemetry)!: services keep a trace budget with a per-minute floor and count each decision (e1fc98d)
+- feat(telemetry)!: metrics leave every 60 s and spans in 30 s batches (53f125d)
+- fix(typescript)!: HTTP telemetry records http.server.* metrics like the Go runtime (d40cedd)
+- feat(clientgen)!: a generated client is built, not committed (3ad93a2)
+- refactor(tooling)!: prune multi-version paths, guards and lint escapes (wave 2) (3cd6ecb)
+- refactor(tooling)!: prune dead code, dual paths, duplicates, comments and config knobs (fa16476)
+
+### Features
+
+- feat(docs): type-check the code examples of the documentation (2ed6002)
+- feat(typescript): putnami deps add and deps remove for TypeScript projects (d16d177)
+- feat(database): read DATABASE_URL and migrate provisioned test databases (2bd11da)
+- feat(typescript): serve client and bidirectional Connect streams over HTTP/2 (4b8a760)
+- feat(typescript): type-check tests with bun check as an opt-in (31a8cc0)
+- feat(telemetry): trace settings set from Cloud win, a service decides behind an outside parent, and putnami cloud telemetry (e63b24e)
+- feat(cloud): Cloud remote config sources refresh on an opt-in period (afc56da)
+- feat(telemetry): a published event carries its trace, and its consumer continues it (c44d9e0)
+- feat(telemetry): services apply the export directives and 429 delays their OTLP endpoint returns (cacad72)
+- feat(telemetry): a server span parents to its client span through a proxy that rewrites traceparent (df1ecf9)
+- feat(web): validate i18n drafts by namespace with one confirmation (71f0dbf)
+- feat(web): publish @putnami/web as an extension archive so putnami i18n runs outside the monorepo (220fec3)
+- feat(web): a page declares the requirements it proves, and the route inventory carries them (bed9119)
+- feat(telemetry): logs follow the environment and the token source like metrics and traces (9097357)
+- feat(telemetry): TypeScript workloads export to the collector their environment names (d59509e)
+- feat(client): generated TypeScript clients send If-None-Match and answer a 304 (0cbe289)
+- feat(test): a Postgres suite fails instead of skipping, and runs on a native Postgres without Docker (87b4940)
+- feat(cloud): a site-content section may be a declared generated output (db5189b)
+- feat(features): a root may hold one file per feature, and a requirement text may be an array of sentences (0ee3222)
+- feat(typescript): build compiles a library with tsc when its build script does (654f519)
+- feat(typescript): serve, run and package a TypeScript workload on Node (b9bdeda)
+- feat(typescript): lint runs a project's ESLint configuration (b24b609)
+- feat(typescript): test runs a project's Vitest or Jest suite with its JUnit and coverage reports (47fd2e3)
+- feat(typescript): install with the repository's npm, pnpm or yarn and keep its lockfile (7de6c9a)
+- feat(typescript): fail a node-target build that reaches a Bun-only API (89e474b)
+- feat(protocols): the collaboration and architecture contracts get a compatibility promise (e3c5026)
+- feat(protocols): one protocol module owns the code-host slugs and their vocabulary (83922ec)
+- feat(features): a manifest entry names an external spec, read through one discovery (09bfc65)
+
+### Fixes
+
+- fix(application): read a reset Connect stream as a cancellation however loaded the server is (a296d0b)
+- fix(typescript): the compiled executable emits the production JSX runtime (867d1a3)
+- fix(go): extension archives ship the docs they link, and only their own (804fb25)
+- fix(cli): init reports only real errors and creates an API project on request (eb21e2e)
+- fix(typescript): package a runnable image on a fresh workspace (b5d5482)
+- fix(typescript): the compiled service honors the project's config (b155b43)
+- fix(application): answer 204 for empty results, 400 for malformed JSON and match */* routes (4515a58)
+- fix(cli): fail a named package run with no channel on and warn otherwise (4d46516)
+- fix(application): emit a boolean gzip flag when static compression is off (16f0dc3)
+- fix(typescript): build libraries a compiled service can load with Bun 1.4.5 (3b648cc)
+- fix(application): a request past its timeout cancels its work (54ff7e1)
+- fix: run and serve hold the project reader lock while they load .gen (587b131)
+- fix(telemetry): each exporting process names its own service.instance.id (d3844b5)
+- fix(clientgen): a consumer selected alone generates the clients of its closure and keys on them (d0e7297)
+- fix(database): the database session store returns keys as they were written (cc9bf89)
+- fix(database): a bundled app that uses sql() without tables starts (5b56f30)
+- fix(database): the session store runs no DDL when its table exists, and ships the table as a migration (05fd125)
+- fix(database): the database session store works behind useSession (cf3a308)
+- fix(application): a refresh token answered once keeps its answer for 60 seconds (2877fb1)
+- fix(typescript): an import writes biome.json, tsconfig.json and @types/bun only for a task that reads them (117a647)
+- fix: specs, ADRs and docs say what the code does, and the projects set aside are declared (b3178a1)
+- fix(cli): a command option layer reaches only the steps that read it (c9c6ded)
+- fix(import): a moved lint that only checked only checks (4bcac0b)
+- fix(stacks): a moved TypeScript task does what its script did (b89a51d)
+- fix(cli): an extension change selects only the projects it plans tasks in, and the gate keeps the tree (085f1a2)
+- fix(cli): stream every task's start and end, and quote the failing line (6e9c656)
+- fix(typescript): an import keeps the repository's member list, lockfile and installer (c3bf9e4)
+- fix(cli): a command output directory never holds another project's outputs (27565d9)
+- fix(cli): declared_edge, --channel and the ESLint advice state what is true (0b3c10d)
+- fix(cli,typescript): Putnami keeps the escapes and symbolic links of the files it writes (6f2858c)
+- fix(extensions): package --port declares no default, so the extensions' flags stay compatible (86fb618)
+- fix(typescript): lint no longer crashes on useReducer (a430fb9)
+- fix(cli): the CLI result redacts GitLab tokens as it redacts GitHub ones (8ebf3fb)
+- fix(typescript): the hosted workspace-fetch keeps its bearer when NPM_CONFIG_USERCONFIG is set (b9ffbe1)
+- fix(typescript): serve --kill-port kills only the process listening on the port (05d9e6a)
+- fix(database): a timed-out transaction keeps none of its writes (f654121)
+- fix(typescript): the shipped Biome rules keep a specs baseline expanded (f6d6ccd)
+- fix(sdd): the specs ratchet refuses a stale baseline (449a2fc)
+- fix(features): a requirement name keeps its accented Latin letters in its ID (83d3925)
+
+### Performance
+
+- perf(typescript): serve each endpoint through a handler built for its route (f614c7a)
+- perf(typescript): remove the per-request work left in the HTTP pipeline (ec66ba7)
+- perf(typescript): remove per-request config reads, header building and timers from the HTTP and database path (478c41c)
+- perf(database): skip the search_path set when the connection holds it (8f6b4d0)
+- perf(typescript): compiled executables carry bytecode on Bun 1.4.5 (2c54309)
+
+### Other
+
+- test: start no host process from the CLI, TypeScript and Python tests (db2d786)
+- test(typescript): putnami-ts tests run with the pinned Bun release (723753e)
+- docs(typescript): record the Bun 1.4 gains and the flag verdicts (8411c1d)
+- docs: document packaging, the image port and database setup for Go and TypeScript services (3b0b74b)
+- test(client): the overall-deadline retry test drives a fake clock (44a1dde)
+- test(typescript): the node serve test reads no start from an empty or unfinished start log (0b41176)
+- test(typescript): one edit of a watched source restarts node once, and a failed watch test reports what the watch left behind (b5895b5)
+- test(database): the session TTL test reads one clock (b84f0a7)
+- test(tooling): every test fixture runs git without the caller's git environment (f2075f8)
+
 ## 0.4.0 — 2026-11-04
 
 ### Breaking

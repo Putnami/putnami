@@ -1,5 +1,76 @@
 # Changelog — cloud
 
+## 0.5.0 — 2026-11-24
+
+### Breaking
+
+- feat(clientgen)!: a generated client is built, not committed (3ad93a2)
+- refactor(tooling)!: prune multi-version paths, guards and lint escapes (wave 2) (3cd6ecb)
+- refactor(tooling)!: prune dead code, dual paths, duplicates, comments and config knobs (fa16476)
+
+### Features
+
+- feat(contributor): a session publishes its web address with its sync (5417d8c)
+- feat(cloud): the evidence upload names its CI and links its run (0164779)
+- feat(observe): the pull request note says what level 3 would have held and the next step (f3e9b44)
+- feat(cloud): @putnami/cloud exchanges a GitLab CI ID token, and the GitLab job needs no secret (4d4ad0a)
+- feat(cloud): the evidence upload sends the test cases once Delivery accepts them (6d55e45)
+- feat(evidence): the evidence names each test case that ran (8069279)
+- feat(cloud): the CI upload token is the organization ingest token, created from the CLI (4d1a0fb)
+- feat(cloud): putnami cloud telemetry set takes --parent and --for (aad8045)
+- feat(cloud): the proposals provider answers the putnami.app change page of a pull request (7e2ac7d)
+- feat(telemetry): trace settings set from Cloud win, a service decides behind an outside parent, and putnami cloud telemetry (e63b24e)
+- feat(cloud): putnami observe uploads from GitHub Actions with the job's ID token (9036e5c)
+- feat(cloud): @putnami/cloud ships the routine skills (putnami-routine, rebase, routine-build) (d2eec44)
+- feat(cloud): @putnami/cloud hosts the agency commands and the hosted memory and missions providers (a75432f)
+- feat(cloud): Cloud remote config sources refresh on an opt-in period (afc56da)
+- feat(telemetry): a published event carries its trace, and its consumer continues it (c44d9e0)
+- feat(web): publish @putnami/web as an extension archive so putnami i18n runs outside the monorepo (220fec3)
+- feat(cloud): the cache token recipe prints a delegated session's own access token (600367a)
+- feat(telemetry): TypeScript workloads export to the collector their environment names (d59509e)
+- feat(contributor): change finalize uploads the screenshots it verifies to the proposals provider (3d849e4)
+- feat(cloud): putnami cloud ci queue lists its entries, and pauses and resumes the queue (948a3e2)
+- feat(cloud): whoami and status recognise a delegated session, and a refused route names the MCP read tool (9fd85fd)
+- feat(cloud): publish pull requests through Putnami Source (210caf8)
+- feat(cloud): the CLI works in a hosted agent session (01c8b36)
+- feat(cloud): serve the tasks and proposals contracts through Putnami Source (d9a4829)
+- feat(observe): a workspace change carries its declarations and spec verification record (85f52ce)
+- feat(cloud): a site-content section may be a declared generated output (db5189b)
+- feat(features): a root may hold one file per feature, and a requirement text may be an array of sentences (0ee3222)
+- feat(ci): verdict policy files state what each gap and each declaration change costs, by directory and by feature maturity (638311d)
+- feat(telemetry): Go services record request metrics and traces when the environment names a collector (3d93329)
+- feat(cloud): putnami cloud ci queue turns the merge queue on in one command (1f519cc)
+- feat(observe): a short summary in the log, and --open signs in and opens the full report (2aff020)
+- feat(observe): the pull or merge request note links to the full report and needs an upload (428d2d9)
+- feat(cloud): the evidence reporters send the provenance external for a CI other than GitHub or GitLab (0547b54)
+- feat(protocols): one protocol module owns the code-host slugs and their vocabulary (83922ec)
+
+### Fixes
+
+- fix(cloud): the GitLab ID token check accepts only the audience the exchange accepts (2cfdb1a)
+- fix(cloud): traces prints no root-span-only span count and reads one trace whole with --trace (7eea39f)
+- fix(cloud): serialize the CLI session refresh across processes (72ab837)
+- fix(cloud): a delegated CLI session mints no registry token (fa762bc)
+- fix(cloud): routine-build attaches from the branch it pushes, and audit names prune-triage's middle tier (42e21bc)
+- fix(cloud): the Config member accepts a map entry whose sensitive field is omitted (8ec6181)
+- fix(observe): a declared change that touches no declaration carries an empty declarations list (5dd7b04)
+- fix(publication): a retry of the same commit passes publish, and uploads renew their bearer (794248f)
+- fix: specs, ADRs and docs say what the code does, and the projects set aside are declared (b3178a1)
+- fix(cloud): an upload with a token names its repository (3ed9db1)
+- fix(cli): a command output directory never holds another project's outputs (27565d9)
+- fix(cloud): resolve projects by their workspace name (8b2fa6a)
+- fix(cloud): the Config publisher versions its member from the job context, not from the shared stamp (7545408)
+- fix(sdd): the specs ratchet refuses a stale baseline (449a2fc)
+- fix(cloud): a Config member mismatch names the selected and prepared version and source revision (a541c23)
+
+### Other
+
+- chore(contributor): run review on the fix-heavy tier at high effort (8f237f2)
+- test(cloud): env enable and env status tests run in a user home they own (71aaa1a)
+- test(cloud): clear every token-discovery variable in remote source tests (cae177f)
+- test(tooling): every test fixture runs git without the caller's git environment (f2075f8)
+- refactor(cloud): ON MAIN tests run git without the 5 s status deadline (c85ee96)
+
 ## 0.4.0 — 2026-11-04
 
 ### Breaking

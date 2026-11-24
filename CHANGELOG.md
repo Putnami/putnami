@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 — unreleased
+## 0.5.0 — 2026-11-24
 
 Every version line moves to 0.5.0: the `putnami` CLI and its extensions, the Go,
 TypeScript and Python frameworks, the protocols, the sites, and the `cloud` and

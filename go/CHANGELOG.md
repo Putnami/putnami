@@ -1,5 +1,77 @@
 # Changelog — go
 
+## 0.5.0 — 2026-11-24
+
+### Breaking
+
+- feat(logging)!: a service reads its log level live, always emits errors and counts its records (8be87df)
+- feat(telemetry)!: services keep a trace budget with a per-minute floor and count each decision (e1fc98d)
+- feat(telemetry)!: metrics leave every 60 s and spans in 30 s batches (53f125d)
+- fix(typescript)!: HTTP telemetry records http.server.* metrics like the Go runtime (d40cedd)
+- feat(clientgen)!: a generated client is built, not committed (3ad93a2)
+- refactor(tooling)!: prune multi-version paths, guards and lint escapes (wave 2) (3cd6ecb)
+- refactor(tooling)!: prune dead code, dual paths, duplicates, comments and config knobs (fa16476)
+
+### Features
+
+- feat(cli): init links the recipe that builds a Postgres API in Go or TypeScript (37b3460)
+- feat(docs): type-check the code examples of the documentation (2ed6002)
+- feat(database): read DATABASE_URL and migrate provisioned test databases (2bd11da)
+- feat(telemetry): trace settings set from Cloud win, a service decides behind an outside parent, and putnami cloud telemetry (e63b24e)
+- feat(cloud): @putnami/cloud hosts the agency commands and the hosted memory and missions providers (a75432f)
+- feat(cloud): Cloud remote config sources refresh on an opt-in period (afc56da)
+- feat(telemetry): a published event carries its trace, and its consumer continues it (c44d9e0)
+- feat(telemetry): services apply the export directives and 429 delays their OTLP endpoint returns (cacad72)
+- feat(telemetry): a server span parents to its client span through a proxy that rewrites traceparent (df1ecf9)
+- feat(test): a Postgres suite fails instead of skipping, and runs on a native Postgres without Docker (87b4940)
+- feat(cloud): a site-content section may be a declared generated output (db5189b)
+- feat(features): a root may hold one file per feature, and a requirement text may be an array of sentences (0ee3222)
+- feat(features): record each settled decision in its own file (e4e3854)
+- feat(ci): verdict policy files state what each gap and each declaration change costs, by directory and by feature maturity (638311d)
+- feat(telemetry): Go services record request metrics and traces when the environment names a collector (3d93329)
+- feat(protocols): the collaboration and architecture contracts get a compatibility promise (e3c5026)
+- feat(protocols): one protocol module owns the code-host slugs and their vocabulary (83922ec)
+- feat(tooling): @putnami/gitlab-collaboration serves the tasks contract on GitLab issues (4d08749)
+
+### Fixes
+
+- fix(app): lower GOMAXPROCS to a cgroup CPU limit below it (f486711)
+- fix(go): extension archives ship the docs they link, and only their own (804fb25)
+- fix(cli): init reports only real errors and creates an API project on request (eb21e2e)
+- fix(go): deps add keeps a module nothing imports yet (66db0d6)
+- fix(go): package takes a full image reference and the project's port (20f0642)
+- fix(cli): fail a named package run with no channel on and warn otherwise (4d46516)
+- fix(http): describe never builds an injected dependency (7eb9d0a)
+- fix(go): skip VCS stamping when the checkout's .git is a file (a3404d5)
+- fix(inject): a closed scope leaves its parent's children (b6d48d7)
+- fix(telemetry): each exporting process names its own service.instance.id (d3844b5)
+- fix(clientgen): a consumer selected alone generates the clients of its closure and keys on them (d0e7297)
+- fix(go): install pins the Go the machine runs when go.work declares none (e2fd955)
+- fix: specs, ADRs and docs say what the code does, and the projects set aside are declared (b3178a1)
+- fix(cli): a command option layer reaches only the steps that read it (c9c6ded)
+- fix(clientgen): the runtime gate and the producer attribution are proven where the spec gate reads (862cafa)
+- fix(cli): a command output directory never holds another project's outputs (27565d9)
+- fix(toolchain): the Nx probe reads Nx's version, and a Go on PATH that meets the pin qualifies (9ee51d0)
+- fix(go): build~tidy reports and does not cache a tidy the committed go.mod does not pin (b3798c8)
+- fix(extensions): package --port declares no default, so the extensions' flags stay compatible (86fb618)
+- fix(database): serialize a request's concurrent queries on its unit of work (c3b0b95)
+- fix(go): serve --kill-port kills only the process listening on the port (d757ba9)
+- fix(sdd): the specs ratchet refuses a stale baseline (449a2fc)
+- fix(storage): a remote Put's request timeout bounds storage, not the caller's body (45c6dd2)
+
+### Performance
+
+- perf(go): cut per-request allocations in the HTTP layer (84db894)
+
+### Other
+
+- test(go): the extension tests hold under CPU load (ed10d2e)
+- docs: document packaging, the image port and database setup for Go and TypeScript services (3b0b74b)
+- test(client): the provider-wire heartbeat subtest tolerates a loaded host (6f65adf)
+- docs(observe): putnami.dev publishes the observe reference and every tool it reads (4f8ad96)
+- test(go): stage the snapshot restore failure so it holds for root (dc4c07f)
+- test(tooling): every test fixture runs git without the caller's git environment (f2075f8)
+
 ## 0.4.0 — 2026-11-04
 
 ### Breaking

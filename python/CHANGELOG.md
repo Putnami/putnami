@@ -1,5 +1,31 @@
 # Changelog — python
 
+## 0.5.0 — 2026-11-24
+
+### Breaking
+
+- refactor(tooling)!: prune multi-version paths, guards and lint escapes (wave 2) (3cd6ecb)
+
+### Features
+
+- feat(features): a root may hold one file per feature, and a requirement text may be an array of sentences (0ee3222)
+- feat(python): add package and publish with a Docker channel (72497a4)
+
+### Fixes
+
+- fix(cli): init reports only real errors and creates an API project on request (eb21e2e)
+- fix: specs, ADRs and docs say what the code does, and the projects set aside are declared (b3178a1)
+- fix(typescript): an import keeps the repository's member list, lockfile and installer (c3bf9e4)
+- fix(cli): a command output directory never holds another project's outputs (27565d9)
+- fix(python): install the interpreter the image is based on when the runner has none (7c996ca)
+- fix(extension-sdk): publish --docker honors --docker-registry (5fc22d4)
+- fix(python,java): plan the image package step of a release-set member (2b2042d)
+
+### Other
+
+- test: start no host process from the CLI, TypeScript and Python tests (db2d786)
+- test(extensions): an image test never runs the developer's Docker credential helper (540e9a4)
+
 ## 0.4.0 — 2026-11-04
 
 ### Breaking
