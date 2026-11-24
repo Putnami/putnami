@@ -880,8 +880,10 @@ batch waits for its peers. While a task of the same extension, task and tool
 is not ready yet, and no task of that verb is among its transitive
 prerequisites, the ready ones wait, as long as other work is in flight; with
 nothing in flight they run at once. A task of that verb that waits for another
-one's result joins a later command. Each member still returns its own result
-in `batchResults`, and nothing is cached
+one's result joins a later command. Its batch key leaves out the project's own
+`options["<extension>"]` and `options["<extension>:<command>"]` layers: the
+stack reads each member's own from the project. Each member still returns its
+own result in `batchResults`, and nothing is cached
 ([stacks ADR 0019](../../../tooling/stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md)).
 
 `configFiles` should list only **shared** candidates (workspace- or

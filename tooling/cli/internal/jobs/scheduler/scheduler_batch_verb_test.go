@@ -2,11 +2,14 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -156,4 +159,49 @@ func TestAWaitingTaskRunsWhenNothingIsInFlight(t *testing.T) {
 		t.Fatalf("with nothing in flight: group %+v, rest %d, admitted %v; want a's lint", group.jobs, len(rest), admitted)
 	}
 	s.resources.release(group.reservation)
+}
+
+func TestADelegatedVerbSharesItsKeyAcrossTheProjectsOwnOptions(t *testing.T) {
+	t.Parallel()
+	ws, planned := makeDelegatedVerbPlan(t, "")
+	s := delegatedVerbScheduler(ws, planned)
+	var lints []*ScheduledJob
+	for _, job := range planned {
+		if job.JobDef.Batchable != nil {
+			lints = append(lints, job)
+		}
+	}
+	// Each project's own layer of the extension differs, as a sync writes
+	// it per project; the stack reads it from the project itself.
+	for i, lint := range lints {
+		var config wsproto.ProjectConfig
+		if err := json.Unmarshal([]byte(fmt.Sprintf(`{"options": {%q: {"filePatterns": ["%d/x"]}, %q: {"depth": %d}, "lint": {"shared": true}}}`,
+			lint.Extension.Name, i, lint.Extension.Name+":lint", i)), &config); err != nil {
+			t.Fatal(err)
+		}
+		lint.Project.Config = &config
+	}
+	a, _ := s.readyBatch(lints[0])
+	b, _ := s.readyBatch(lints[1])
+	if a == "" || a != b {
+		t.Fatalf("batch keys %q and %q, want one key for the verb", a, b)
+	}
+	// A cached batch keeps folding them: its group shares one context.
+	for _, lint := range lints {
+		lint.JobDef.Cache = true
+	}
+	a, _ = s.readyBatch(lints[0])
+	b, _ = s.readyBatch(lints[1])
+	if a == b {
+		t.Fatal("a cached batch ignores the projects' own options")
+	}
+	// A layer every member reads alike still keys the verb.
+	for _, lint := range lints {
+		lint.JobDef.Cache = false
+	}
+	lints[1].Project.Config.Options["lint"]["shared"] = false
+	a, _ = s.readyBatch(lints[0])
+	if b, _ = s.readyBatch(lints[1]); a == "" || a == b {
+		t.Error("a delegated verb ignores the command's own project layer")
+	}
 }

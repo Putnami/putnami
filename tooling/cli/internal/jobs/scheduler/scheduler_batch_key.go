@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -66,7 +67,25 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 	// The parameter bag the job context delivers (BuildJobContext assigns the
 	// same cachekey.DeliveredJobParams to its Params), without building the
 	// rest of the context.
-	delivered := cachekey.DeliveredJobParams(job, s.taskParams, cachekey.JobConfigDefaults(s.ws, job))
+	//
+	// A delegated task (its cache off) leaves out the project's own layers of
+	// its extension: the stack reads each member's from its project file
+	// (ADR 0019 of tooling/stacks), and a sync writes them per project, such
+	// as the file patterns of the project's depth. Folding them would split
+	// one verb into one command per project.
+	paramsJob := job
+	if cfg := job.Project.Config; !job.JobDef.Cache && cfg != nil && cfg.Options != nil {
+		own := *cfg
+		own.Options = maps.Clone(cfg.Options)
+		delete(own.Options, job.Extension.Name)
+		delete(own.Options, job.Extension.Name+":"+jobCommandName(job))
+		project := *job.Project
+		project.Config = &own
+		copied := *job
+		copied.Project = &project
+		paramsJob = &copied
+	}
+	delivered := cachekey.DeliveredJobParams(paramsJob, s.taskParams, cachekey.JobConfigDefaults(s.ws, job))
 	params, err := json.Marshal(delivered)
 	if err != nil {
 		return "", 0

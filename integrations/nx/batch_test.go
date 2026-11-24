@@ -128,6 +128,19 @@ func TestReadBatchReadsTheOlderFailedTasksSummary(t *testing.T) {
 	}
 }
 
+func TestReadBatchReadsAConfigurationAndAGitHubGroup(t *testing.T) {
+	output := "::group::✔ > nx run b:build:production\n\nok\n::endgroup::\n" +
+		"::group::✖ > nx run a:build:production\n\nboom\n::endgroup::\n" +
+		" NX   Ran target build for 2 projects\n\n   ✖  1/2 targets failed, including the following:\n\n      - nx run a:build:production\n"
+	got := ReadBatch(stacks.BatchReport{Components: []string{"a", "b"}, Command: []string{"npx", "--no", "nx", "run-many", "-t", "build", "-p", "a,b"}, Output: []byte(output)})
+	if !got["a"].Failed || !strings.Contains(got["a"].Message, "nx run a:build:production failed") || !strings.Contains(got["a"].Message, "boom") {
+		t.Errorf("a = %+v, want its failed section", got["a"])
+	}
+	if b, ok := got["b"]; !ok || b.Failed {
+		t.Errorf("b = %+v (%v), want the pass Nx reported", b, ok)
+	}
+}
+
 func TestASyncedTargetRunsAsItsOwnRunMany(t *testing.T) {
 	got := batchSteps("test", [][]string{runStep("test:lib"), runStep("e2e")})
 	want := [][]string{

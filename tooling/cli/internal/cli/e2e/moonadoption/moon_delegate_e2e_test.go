@@ -149,9 +149,10 @@ exit 0
 }
 
 // moonRuns runs putnami <verb> --impacted from base and returns the moon
-// targets it ran, sorted, and the run's output. Every moon run is at the
+// targets it ran, sorted, the number of moon run commands, and the run's
+// output. Every moon run is at the
 // workspace root, and the run looks up and stores no Putnami cache entry.
-func moonRuns(t *testing.T, root, verb, base, log string) ([]string, string) {
+func moonRuns(t *testing.T, root, verb, base, log string) ([]string, int, string) {
 	t.Helper()
 	_ = os.Remove(log)
 	code, out := clitest.RunGateArgs(t, root, verb, "--impacted", "--baseline", base)
@@ -164,6 +165,7 @@ func moonRuns(t *testing.T, root, verb, base, log string) ([]string, string) {
 	}
 	rootReal, _ := filepath.EvalSymlinks(root)
 	var ran []string
+	commands := 0
 	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
 		dir, call, _ := strings.Cut(line, " moon ")
 		target, ok := strings.CutPrefix(call, "run ")
@@ -173,13 +175,15 @@ func moonRuns(t *testing.T, root, verb, base, log string) ([]string, string) {
 		if real, _ := filepath.EvalSymlinks(dir); real != rootReal {
 			t.Errorf("moon run ran in %s, want the workspace root", dir)
 		}
-		ran = append(ran, target)
+		// The projects of one verb run as one moon run (stacks ADR 0019).
+		ran = append(ran, strings.Fields(target)...)
+		commands++
 	}
 	slices.Sort(ran)
 	if !strings.Contains(out, "Cache: 0 local hit · 0 miss") {
 		t.Errorf("the run looked up or stored Putnami cache entries for delegated tasks:\n%s", out)
 	}
-	return ran, out
+	return ran, commands, out
 }
 
 func commit(t *testing.T, root, message string) string {
@@ -251,9 +255,9 @@ func TestAChangeToOneMoonProjectRunsItAndItsDependentsThroughMoon(t *testing.T) 
 		clitest.WriteFile(t, filepath.Join(root, rel), content)
 	}
 	pricingChange := commit(t, root, "change pricing")
-	ran, out := moonRuns(t, root, "test", base, log)
-	if want := []string{"api:test", "pricing:unit"}; !slices.Equal(ran, want) {
-		t.Errorf("moon ran %v, want %v: the changed project and its dependent\n%s", ran, want, out)
+	ran, commands, out := moonRuns(t, root, "test", base, log)
+	if want := []string{"api:test", "pricing:unit"}; !slices.Equal(ran, want) || commands != 1 {
+		t.Errorf("moon ran %v in %d commands, want %v in one: the changed project and its dependent\n%s", ran, commands, want, out)
 	}
 	// Each result records the delegation.
 	if code, jsonl := clitest.RunGateArgs(t, root, "test", "--impacted", "--baseline", base, "--output=jsonl"); code != 0 || strings.Count(jsonl, `"delegatedTo":"moon"`) < 2 {
@@ -263,7 +267,7 @@ func TestAChangeToOneMoonProjectRunsItAndItsDependentsThroughMoon(t *testing.T) 
 	// A change to api runs api alone: pricing, its dependency, runs no moon.
 	clitest.WriteFile(t, filepath.Join(root, "apps/api/src/index.ts"), "export const api = 2;\n")
 	commit(t, root, "change api")
-	ran, out = moonRuns(t, root, "test", pricingChange, log)
+	ran, _, out = moonRuns(t, root, "test", pricingChange, log)
 	if want := []string{"api:test"}; !slices.Equal(ran, want) {
 		t.Errorf("moon ran %v, want %v: a dependency runs no moon\n%s", ran, want, out)
 	}

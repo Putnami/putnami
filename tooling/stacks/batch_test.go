@@ -155,6 +155,21 @@ func TestAFailedBatchWhoseReportNamesNoneFailsEveryProject(t *testing.T) {
 	}
 }
 
+func TestAFailedBatchWhoseReportNamesNoFailureFailsEveryProject(t *testing.T) {
+	root := t.TempDir()
+	stubBatchTool(t, root)
+	t.Setenv("STUB_EXIT", "137")
+	// The tool was killed after it reported a and b passed.
+	results := runLintBatch(t, batchStack(t, func(BatchReport) map[string]BatchOutcome {
+		return map[string]BatchOutcome{"a": {}, "b": {}}
+	}), root)
+	for id, r := range results {
+		if r.Status != statusFailed || len(r.Diagnostics) != 1 || !strings.Contains(r.Diagnostics[0].Description, "exit status 137") {
+			t.Errorf("%s = %+v, want the command's failure", id, r)
+		}
+	}
+}
+
 func TestAJobWithoutASelectionRunsItsOwnSteps(t *testing.T) {
 	root := t.TempDir()
 	stubBatchTool(t, root)

@@ -354,6 +354,12 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 			}
 		}
 	}
+	// A command that failed while its report names no failure fails every
+	// project: the report cannot say which one, and passing one would turn a
+	// killed or crashed tool green.
+	if len(failed) == 0 {
+		named = false
+	}
 	command := strings.Join(failedArgv, " ")
 	for _, m := range members {
 		var memberErr error

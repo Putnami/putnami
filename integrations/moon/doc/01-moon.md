@@ -137,6 +137,18 @@ joins once the sync has written its `putnami.json`.
 project with no such task has that command in `disable.jobs`. Every other
 task is listed by the sync and keeps running through moon.
 
+The projects of one verb run as one command
+(ADR 0019 of `tooling/stacks`):
+`putnami lint` over `api` and `web` runs `moon run api:lint web:lint` once at
+the workspace root, each project with its own task, such as `pricing:unit`
+for a tagged one. Each project's result is read from the run report moon
+writes in `.moon/cache/runReport.json`: a target moon reports `passed` or
+`cached` passes, and one it reports failed fails with moon's error and the
+end of the output moon kept for it under `.moon/cache/states`. When the
+command fails, a target the report does not name fails as not run, and a
+report that names no failed target fails every project. A task that runs
+alone, such as a retry, runs `moon run <project>:<task>`.
+
 A moon project at the workspace root, such as moon's `root`, becomes no
 Putnami project: a project there would own every file no deeper project
 claims. The sync names it and the tasks that keep running through
@@ -159,7 +171,9 @@ claims. The sync names it and the tasks that keep running through
   the one that does not run it, such as `@putnami/moon:test` for a test that
   moved and `@putnami/go:lint` for a lint that stays;
 - for a task moon runs that is tagged rather than named, the step under
-  `options["@putnami/moon"].tasks.<command>.steps`;
+  `options["@putnami/moon"].tasks.<command>.steps`, and the same step under
+  `batch.steps` beside it, so the project joins the one `moon run` of its
+  verb;
 - for a TypeScript project, the runner of a test that moved, `bun`, `vitest`
   or `jest`,
   under `options["@putnami/typescript:test"].runner`, with `types: false`

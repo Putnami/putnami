@@ -15,8 +15,9 @@ var (
 	// ansi matches the escape sequences of a colored output.
 	ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
 	// sectionStart is the line that opens a target's section in Nx's static
-	// output: > nx run <project>:<target>, maybe followed by a cache note.
-	sectionStart = regexp.MustCompile(`^\s*>\s+nx run\s+(\S+)`)
+	// output: > nx run <project>:<target>, maybe followed by a cache note; on
+	// GitHub Actions Nx opens a log group before it: ::group::<icon> > nx run.
+	sectionStart = regexp.MustCompile(`^\s*(?:::group::[^>]{0,8})?>\s+nx run\s+(\S+)`)
 	// summaryStart is the line that opens Nx's closing summary: " NX  …",
 	// or " >  NX  …" before Nx 17.
 	summaryStart = regexp.MustCompile(`^\s*(?:>\s+)?NX\s{2,}`)
@@ -39,9 +40,10 @@ func ReadBatch(report stacks.BatchReport) map[string]stacks.BatchOutcome {
 		named, anyFailed := false, false
 		var messages []string
 		for _, target := range targets {
-			key := component + ":" + target
-			section, ran := sections[key]
-			if failed[key] {
+			// A target that runs its default configuration is named
+			// <project>:<target>:<configuration>.
+			key, section, ran := taskOf(sections, component+":"+target)
+			if failedTask(failed, component+":"+target) {
 				anyFailed, named = true, true
 				message := "nx run " + key + " failed"
 				if tail := lastLines(section, sectionLines); tail != "" {
@@ -60,6 +62,34 @@ func ReadBatch(report stacks.BatchReport) map[string]stacks.BatchOutcome {
 		}
 	}
 	return out
+}
+
+// taskOf answers the section of a target, named as the command names it or
+// with the configuration Nx resolved: its key, section and whether it ran.
+func taskOf(sections map[string]string, target string) (string, string, bool) {
+	if section, ok := sections[target]; ok {
+		return target, section, true
+	}
+	for key, section := range sections {
+		if strings.HasPrefix(key, target+":") {
+			return key, section, true
+		}
+	}
+	return target, "", false
+}
+
+// failedTask reports whether the summary lists the target as failed, with or
+// without its configuration.
+func failedTask(failed map[string]bool, target string) bool {
+	if failed[target] {
+		return true
+	}
+	for key := range failed {
+		if strings.HasPrefix(key, target+":") {
+			return true
+		}
+	}
+	return false
 }
 
 // readRunMany splits Nx's static output into each target's section, by
