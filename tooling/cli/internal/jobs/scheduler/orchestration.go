@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	model "go.putnami.dev/cli/model/jobs"
@@ -12,16 +13,49 @@ import (
 type OrchestrationSnapshot = model.OrchestrationSnapshot
 
 // OrchestrationClock times the engine phases of one run. The engine creates
-// it before its first phase and hands it to the scheduler, which settles the
+// it when the run starts and hands it to the scheduler, which settles the
 // run's orchestration report from it (Config.Orchestration). Its methods are
 // safe for concurrent use; a nil clock records nothing.
 type OrchestrationClock struct {
 	mu     sync.Mutex
 	phases []model.OrchestrationPhaseWall
+	// base is what the process-wide ledgers held when the clock started, nil
+	// for the first run of the process, which reports everything since the
+	// process started: its bootstrap is part of its orchestration. A later run
+	// in the same process, as cache verify and an impact plan start, reports
+	// its own share only.
+	base *ledgerReading
 }
 
+// ledgerReading is one reading of the process-wide ledgers and CPU.
+type ledgerReading struct {
+	engine         procstat.Snapshot
+	jobs           procstat.Reported
+	self, children time.Duration
+	measured       bool
+}
+
+func readLedgers() ledgerReading {
+	self, selfOK := procstat.SelfCPU()
+	children, childrenOK := procstat.ChildrenCPU()
+	return ledgerReading{
+		engine: procstat.Take(), jobs: procstat.TakeReported(),
+		self: self, children: children, measured: selfOK && childrenOK,
+	}
+}
+
+// clockStarted is set once a clock of this process has started.
+var clockStarted atomic.Bool
+
 // NewOrchestrationClock returns a clock with no phase.
-func NewOrchestrationClock() *OrchestrationClock { return &OrchestrationClock{} }
+func NewOrchestrationClock() *OrchestrationClock {
+	clock := &OrchestrationClock{}
+	if clockStarted.Swap(true) {
+		reading := readLedgers()
+		clock.base = &reading
+	}
+	return clock
+}
 
 // Phase records that the run spent the wall since started in phase. A phase
 // entered twice sums its walls.
@@ -54,29 +88,42 @@ func (c *OrchestrationClock) Snapshot() *OrchestrationSnapshot {
 	phases := append([]model.OrchestrationPhaseWall(nil), c.phases...)
 	c.mu.Unlock()
 
-	engine := procstat.Take()
-	jobs := procstat.TakeReported()
+	now := readLedgers()
+	base := ledgerReading{}
+	if c.base != nil {
+		base = *c.base
+	}
 	snapshot := &OrchestrationSnapshot{
 		Phases:              phases,
-		Engine:              ledgerOf(engine.Kinds, engine.Git),
-		Jobs:                ledgerOf(jobs.Kinds, jobs.Git),
-		ExtensionCPU:        jobs.SelfCPU,
-		UnreportedProcesses: jobs.Unreported,
+		Engine:              ledgerOf(now.engine.Kinds, base.engine.Kinds, now.engine.Git, base.engine.Git),
+		Jobs:                ledgerOf(now.jobs.Kinds, base.jobs.Kinds, now.jobs.Git, base.jobs.Git),
+		ExtensionCPU:        now.jobs.SelfCPU - base.jobs.SelfCPU,
+		UnreportedProcesses: now.jobs.Unreported - base.jobs.Unreported,
 	}
-	self, selfOK := procstat.SelfCPU()
-	children, childrenOK := procstat.ChildrenCPU()
-	if selfOK && childrenOK {
+	if now.measured {
 		snapshot.CPUMeasured = true
-		snapshot.EngineCPU = self
-		snapshot.RunCPU = self + children
+		snapshot.EngineCPU = now.self - base.self
+		snapshot.RunCPU = now.self + now.children - base.self - base.children
 	}
 	return snapshot
 }
 
-func ledgerOf(kinds []procstat.KindCount, git map[string]int64) model.ProcessLedger {
-	ledger := model.ProcessLedger{Git: git}
-	for _, kind := range kinds {
-		ledger.Kinds = append(ledger.Kinds, model.ProcessCount{Kind: string(kind.Kind), Starts: kind.Starts, CPU: kind.CPU})
+// ledgerOf is the ledger between two readings, by kind and git subcommand.
+func ledgerOf(kinds, baseKinds []procstat.KindCount, git, baseGit map[string]int64) model.ProcessLedger {
+	ledger := model.ProcessLedger{Git: map[string]int64{}}
+	for i, kind := range kinds {
+		count := model.ProcessCount{Kind: string(kind.Kind), Starts: kind.Starts, CPU: kind.CPU, Measured: kind.Measured}
+		if i < len(baseKinds) {
+			count.Starts -= baseKinds[i].Starts
+			count.CPU -= baseKinds[i].CPU
+			count.Measured -= baseKinds[i].Measured
+		}
+		ledger.Kinds = append(ledger.Kinds, count)
+	}
+	for subcommand, calls := range git {
+		if calls -= baseGit[subcommand]; calls > 0 {
+			ledger.Git[subcommand] = calls
+		}
 	}
 	return ledger
 }

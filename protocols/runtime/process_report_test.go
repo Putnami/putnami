@@ -22,7 +22,7 @@ func TestExtractProcessReport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report == nil || report.SelfCPUMs == nil || *report.SelfCPUMs != 12 || len(report.Starts) != 2 || report.Starts[0].CPUMs != 4 || len(report.Git) != 2 {
+	if report == nil || report.SelfCPUMs == nil || *report.SelfCPUMs != 12 || len(report.Starts) != 2 || report.Starts[0].CPUMs == nil || *report.Starts[0].CPUMs != 4 || len(report.Git) != 2 {
 		t.Fatalf("report = %#v", report)
 	}
 	if missing, err := ExtractProcessReport(map[string]any{}); missing != nil || err != nil {
@@ -38,7 +38,7 @@ func TestValidateProcessReportRefusesWhatItCannotCount(t *testing.T) {
 		"unknown kind":      {Starts: []ProcessStarts{{Kind: "daemon", Count: 1}}},
 		"kind twice":        {Starts: []ProcessStarts{{Kind: "git", Count: 1}, {Kind: "git", Count: 2}}},
 		"zero count":        {Starts: []ProcessStarts{{Kind: "git"}}},
-		"negative cpu":      {Starts: []ProcessStarts{{Kind: "git", Count: 1, CPUMs: -1}}},
+		"negative cpu":      {Starts: []ProcessStarts{{Kind: "git", Count: 1, CPUMs: &negative}}},
 		"subcommand twice":  {Git: []GitCalls{{Subcommand: "log", Count: 1}, {Subcommand: "log", Count: 1}}},
 		"zero git count":    {Git: []GitCalls{{Subcommand: "log"}}},
 		"empty subcommand":  {Git: []GitCalls{{Count: 1}}},

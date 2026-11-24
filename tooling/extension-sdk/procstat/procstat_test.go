@@ -33,7 +33,9 @@ func child(t *testing.T, name string) *exec.Cmd {
 	}
 	cmd := exec.Command(executable)
 	cmd.Env = append(os.Environ(), "PROCSTAT_CHILD=1")
-	// The name the ledger classifies the process by; the program is the test.
+	// argv[0] only: the ledger classifies a process by its program, cmd.Path,
+	// which is the test binary, so every child here counts as other unless a
+	// kind is given.
 	cmd.Args[0] = name
 	return cmd
 }
@@ -130,8 +132,8 @@ func TestTheReportCarriesTheProcessOwnCPUApartFromItsChildren(t *testing.T) {
 	}
 	var other int64
 	for _, start := range report.Starts {
-		if start.Kind == string(Other) {
-			other = start.CPUMs
+		if start.Kind == string(Other) && start.CPUMs != nil {
+			other = *start.CPUMs
 		}
 	}
 	if other == 0 || other > children.Milliseconds()+1 {
@@ -141,10 +143,10 @@ func TestTheReportCarriesTheProcessOwnCPUApartFromItsChildren(t *testing.T) {
 
 func TestAbsorbSumsTheReportsOfJobProcesses(t *testing.T) {
 	before := TakeReported()
-	self := int64(40)
+	self, six, nine := int64(40), int64(6), int64(900)
 	Absorb(&runtimeproto.ProcessReport{
 		SelfCPUMs: &self,
-		Starts:    []runtimeproto.ProcessStarts{{Kind: "git", Count: 2, CPUMs: 6}, {Kind: "other", Count: 1, CPUMs: 900}},
+		Starts:    []runtimeproto.ProcessStarts{{Kind: "git", Count: 2, CPUMs: &six}, {Kind: "other", Count: 1, CPUMs: &nine}},
 		Git:       []runtimeproto.GitCalls{{Subcommand: "rev-parse", Count: 2}},
 	})
 	Absorb(&runtimeproto.ProcessReport{SelfCPUMs: &self, Starts: []runtimeproto.ProcessStarts{{Kind: "git", Count: 1}}, Git: []runtimeproto.GitCalls{{Subcommand: "rev-parse", Count: 1}}})

@@ -28,7 +28,7 @@ func TestOrchestrationSnapshot_CPUAddsBothOriginsOfCLIAndGit(t *testing.T) {
 		ExtensionCPU: 50,
 	}
 	engine, extension, control, cli, git := snapshot.OrchestrationCPU()
-	if engine != 100 || extension != 50 || control != 5 || cli != 11 || git != 22 {
+	if engine != 100 || extension != 50 || control != 5 || cli != 10 || git != 22 {
 		t.Errorf("cpu = %d %d %d %d %d: job and tool CPU is never orchestration", engine, extension, control, cli, git)
 	}
 	if got := snapshot.Jobs.Of("batch"); got.Kind != "batch" || got.Starts != 0 {

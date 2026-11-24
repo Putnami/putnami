@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -586,23 +586,26 @@ func jobProcessKind(ctx context.Context) procstat.Kind {
 	return procstat.Job
 }
 
-// takeProcessReport removes the process report from the result's data and
-// returns it. A report that does not decode is no report. The data map is
-// copied, never changed in place.
-func takeProcessReport(result *JobResult) *runtimeproto.ProcessReport {
-	if _, ok := result.Data[runtimeproto.ProcessReportResultDataKey]; !ok {
-		return nil
+// processReportReader takes the process report out of a job's result event
+// before anything reads the event: the live stream, the retained events a
+// cache entry stores, and the result. A report is about this spawn alone, so a
+// replay must never carry it.
+type processReportReader struct {
+	report *runtimeproto.ProcessReport
+}
+
+// mapper wraps next with the removal of the report from a result event.
+func (r *processReportReader) mapper(next eventMapper) eventMapper {
+	return func(event RawJobEvent) RawJobEvent {
+		if next != nil {
+			event = next(event)
+		}
+		event, report := takeProcessReport(event)
+		if report != nil {
+			r.report = report
+		}
+		return event
 	}
-	report, err := runtimeproto.ExtractProcessReport(result.Data)
-	if err != nil {
-		report = nil
-	}
-	result.Data = maps.Clone(result.Data)
-	delete(result.Data, runtimeproto.ProcessReportResultDataKey)
-	if len(result.Data) == 0 {
-		result.Data = nil
-	}
-	return report
 }
 
 // runJob is RunJob with the run-level process environment the scheduler owns.
@@ -625,6 +628,9 @@ func runJob(
 	ctx = CaptureProcessCapabilities(ctx)
 	onEvent = processCapabilityEventSink(ctx, job, onEvent)
 	start := time.Now()
+	// The job may write its process report: this CLI reads it (runtimeproto
+	// ProcessReportEnv). Like extraEnv, a fact about this spawn, never an input.
+	extraEnv = append(slices.Clone(extraEnv), runtimeproto.ProcessReportEnv+"=1")
 
 	ctx, cancel, inv, err := prepareJobInvocation(ctx, ws, job, commandParams, configDefaults, versions, extraEnv)
 	if err != nil {
@@ -720,6 +726,7 @@ func runJob(
 	waitCh := make(chan error, 1)
 	var spawnToFirstEvent time.Duration
 	firstEventObserved := false
+	reports := &processReportReader{}
 	observeValidEvent := func() {
 		if !firstEventObserved {
 			spawnToFirstEvent = time.Since(spawnedAt)
@@ -731,7 +738,7 @@ func runJob(
 		events, result := readJSONLEventsObserved(
 			stdout,
 			onEvent,
-			workspacePathEventMapper(ws.Root, inv.projRoot, inv.cwd),
+			reports.mapper(workspacePathEventMapper(ws.Root, inv.projRoot, inv.cwd)),
 			observeValidEvent,
 		)
 		eventsCh <- jobReadResult{events: events, result: result}
@@ -781,10 +788,10 @@ func runJob(
 	}
 	// The job process's own accounting joins the run's: what it started, and
 	// the CPU it spent itself. A process that wrote no report is counted as
-	// unreported, and the report leaves the result data so no cache entry
-	// replays it.
+	// unreported. The reader took the report out of the result event before
+	// the live stream, the retained events or the result saw it.
 	procstat.Exited(processKind, cmd.ProcessState)
-	procstat.Absorb(takeProcessReport(result))
+	procstat.Absorb(reports.report)
 	result.Events = evResult.events
 	result.Duration = duration
 	result.SpawnToFirstEvent = spawnToFirstEvent

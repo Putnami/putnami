@@ -32,9 +32,12 @@ func orchestrationSummary(snapshot *jobs.OrchestrationSnapshot, tasks int) *prot
 			if count.Starts <= 0 {
 				continue
 			}
-			out.Processes = append(out.Processes, protocolcli.OrchestrationProcesses{
-				Origin: origin.name, Kind: kind, Count: count.Starts, CPUMs: millis(count.CPU),
-			})
+			entry := protocolcli.OrchestrationProcesses{Origin: origin.name, Kind: kind, Count: count.Starts}
+			if count.Measured > 0 {
+				ms := millis(count.CPU)
+				entry.CPUMs = &ms
+			}
+			out.Processes = append(out.Processes, entry)
 		}
 		subcommands := make([]string, 0, len(origin.ledger.Git))
 		for subcommand, calls := range origin.ledger.Git {
@@ -63,10 +66,12 @@ func orchestrationSummary(snapshot *jobs.OrchestrationSnapshot, tasks int) *prot
 		// finds it exactly.
 		cpu.TotalMs = cpu.EngineMs + cpu.ExtensionMs + cpu.ControlMs + cpu.CLIMs + cpu.GitMs
 		if cpu.RunMs > 0 {
-			cpu.SharePermille = cpu.TotalMs * 1000 / cpu.RunMs
+			share := cpu.TotalMs * 1000 / cpu.RunMs
+			cpu.SharePermille = &share
 		}
 		if tasks > 0 {
-			cpu.PerTaskMs = cpu.TotalMs / int64(tasks)
+			perTask := cpu.TotalMs / int64(tasks)
+			cpu.PerTaskMs = &perTask
 		}
 		cpu.UnreportedProcesses = nonNegative64(snapshot.UnreportedProcesses)
 		out.CPU = cpu

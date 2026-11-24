@@ -569,7 +569,8 @@ export interface OrchestrationGitCalls {
 
 /**
  * CPU spent orchestrating rather than running tools. `totalMs` is the sum of
- * the five parts; `sharePermille` is `totalMs * 1000 / runMs`, truncated.
+ * the five parts; `sharePermille` is `totalMs * 1000 / runMs`, truncated,
+ * present exactly when `runMs` is above 0.
  */
 export interface OrchestrationCPU {
   engineMs: number;
@@ -1891,8 +1892,8 @@ const orchestrationCPUFields: Field[] = [
 
 /**
  * Validates the orchestration CPU and its two ties: `totalMs` is the sum of its
- * five parts, and `sharePermille` is `totalMs` over `runMs` in truncated
- * thousandths, absent when that truncates to 0.
+ * five parts, and `sharePermille`, present exactly when `runMs` is above 0, is
+ * `totalMs` over `runMs` in truncated thousandths.
  */
 const orchestrationCPU: Check = (v, path, value) => {
   const obj = object(v, path, value, orchestrationCPUFields);
@@ -1913,11 +1914,13 @@ const orchestrationCPU: Check = (v, path, value) => {
   }
   const run = childInt(obj, 'runMs');
   const share = childInt(obj, 'sharePermille');
-  if (total !== undefined && run !== undefined && run > 0) {
-    const expected = Math.floor((total * 1000) / run);
-    if ((share === undefined && expected > 0) || (share !== undefined && share !== expected)) {
-      v.add(VIOLATION_CODE.countMismatch, join(path, 'sharePermille'));
-    }
+  if (total === undefined || run === undefined) {
+    return;
+  }
+  // sharePermille is present exactly when runMs is above 0, and then equals the
+  // truncated thousandths: 0 is a measured share, never an absent one.
+  if (run > 0 !== (share !== undefined) || (share !== undefined && share !== Math.floor((total * 1000) / run))) {
+    v.add(VIOLATION_CODE.countMismatch, join(path, 'sharePermille'));
   }
 };
 

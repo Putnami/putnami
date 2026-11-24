@@ -603,6 +603,9 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	// before version discovery or repository lifecycle hooks can spawn.
 	ctx = scheduler.CaptureProcessCapabilities(ctx)
 	req := &request
+	// The run's orchestration report counts from here: the processes the
+	// version snapshot, the hooks and the providers start are the run's too.
+	req.orchestration = scheduler.NewOrchestrationClock()
 	req.versions, req.versionsErr = nil, nil
 	if req.ErrorOut == nil {
 		req.ErrorOut = os.Stderr
@@ -718,7 +721,6 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 // run is the lifecycle proper, between the before and after hooks.
 func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (SessionResult, error) {
 	// Each phase below records its wall on the run's orchestration report.
-	req.orchestration = scheduler.NewOrchestrationClock()
 	clock := req.orchestration
 	phaseStarted := time.Now()
 	// Phase 1: load the workspace and resolve extensions — once per run.

@@ -10,6 +10,11 @@ import (
 func TestAResultCarriesTheJobProcessReport(t *testing.T) {
 	spectest.Proves(t, "cli/diagnostics-results", "a-run-reports-its-orchestration-cpu", "an-sdk-job-reports-its-own-cpu-apart-from-its-children")
 	data := map[string]any{"testSummary": map[string]any{"total": 1}}
+	t.Setenv(runtime.ProcessReportEnv, "")
+	if out := withProcessReport(data); out[runtime.ProcessReportResultDataKey] != nil {
+		t.Fatal("a report was written for a CLI that did not ask for one")
+	}
+	t.Setenv(runtime.ProcessReportEnv, "1")
 	out := withProcessReport(data)
 	if _, changed := data[runtime.ProcessReportResultDataKey]; changed {
 		t.Fatal("the job's own data map was changed")

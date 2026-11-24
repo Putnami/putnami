@@ -678,8 +678,9 @@ type OrchestrationProcesses struct {
 	// Count is how many were started, at least 1.
 	Count int64 `json:"count"`
 	// CPUMs is the CPU of those that exited before the run ended, each with its
-	// waited-for descendants. Absent when none was measured.
-	CPUMs int64 `json:"cpuMs,omitempty"`
+	// waited-for descendants. Absent when none was measured; 0 when some were
+	// and spent under a millisecond.
+	CPUMs *int64 `json:"cpuMs,omitempty"`
 }
 
 // OrchestrationGitCalls counts the git calls of one subcommand one origin made.
@@ -700,9 +701,11 @@ type OrchestrationCPU struct {
 	// ExtensionMs is the CPU job processes reported for themselves, without
 	// their children.
 	ExtensionMs int64 `json:"extensionMs"`
-	// ControlMs is the CPU of the control processes the engine started.
+	// ControlMs is the CPU of the control processes the engine started, each
+	// with the descendants it waited for.
 	ControlMs int64 `json:"controlMs"`
-	// CLIMs is the CPU of the CLI processes the engine or a job started.
+	// CLIMs is the CPU of the CLI processes jobs started. A CLI process the
+	// engine starts, such as a hook, is counted in processes and not here.
 	CLIMs int64 `json:"cliMs"`
 	// GitMs is the CPU of the git processes the engine or a job started.
 	GitMs int64 `json:"gitMs"`
@@ -711,12 +714,12 @@ type OrchestrationCPU struct {
 	// RunMs is the run's whole CPU: the CLI process and every child it waited
 	// for.
 	RunMs int64 `json:"runMs"`
-	// SharePermille is TotalMs over RunMs, in thousandths, truncated. Absent
-	// when RunMs is 0.
-	SharePermille int64 `json:"sharePermille,omitempty"`
+	// SharePermille is TotalMs over RunMs, in thousandths, truncated. Present
+	// exactly when RunMs is above 0.
+	SharePermille *int64 `json:"sharePermille,omitempty"`
 	// PerTaskMs is TotalMs over run.counts.total, truncated. Absent when the
 	// run selected no task.
-	PerTaskMs int64 `json:"perTaskMs,omitempty"`
+	PerTaskMs *int64 `json:"perTaskMs,omitempty"`
 	// UnreportedProcesses counts the job and batch processes that reported no
 	// CPU of their own: a runtime not built on the extension SDK. Their CPU is
 	// in no member above, and absent when every one reported.

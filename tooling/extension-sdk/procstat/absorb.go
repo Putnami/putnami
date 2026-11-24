@@ -44,7 +44,10 @@ func Absorb(report *runtimeproto.ProcessReport) {
 			reported.kinds[kind] = entry
 		}
 		entry.Starts += start.Count
-		entry.CPU += time.Duration(start.CPUMs) * time.Millisecond
+		if start.CPUMs != nil {
+			entry.CPU += time.Duration(*start.CPUMs) * time.Millisecond
+			entry.Measured++
+		}
 	}
 	for _, call := range report.Git {
 		reported.git[call.Subcommand] += call.Count

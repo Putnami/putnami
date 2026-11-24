@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // runInteractive runs cmd, an interactive job that shares the CLI's terminal,
@@ -43,7 +45,8 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) (for
 	if err := startJob(func() error { return hold.start(cmd.Start) }); err != nil {
 		return false, err
 	}
-	err = cmd.Wait()
+	procstat.Started(procstat.Job, cmd.Args)
+	err = procstat.Wait(cmd, procstat.Job)
 	hold.release()
 	return hold.forced(), err
 }

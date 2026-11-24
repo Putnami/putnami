@@ -2,6 +2,8 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +58,24 @@ func TestRunJob_CountsTheJobAndAbsorbsItsProcessReport(t *testing.T) {
 	}
 	if result.Data["binaryPath"] != "dist/app" {
 		t.Errorf("result data = %v, want the job's own data kept", result.Data)
+	}
+	// The retained result event is what a cache entry stores and a hit replays:
+	// it carries no report either.
+	retained, err := json.Marshal(result.Events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(retained), runtimeproto.ProcessReportResultDataKey) {
+		t.Errorf("a retained event still carries the process report: %s", retained)
+	}
+}
+
+func TestAdoptSharedResult_DropsTheLeadersWaits(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "a-run-reports-its-orchestration-cost", "the-session-and-the-result-carry-the-engine-phases-and-the-task-waits")
+	leader := &JobResult{Status: "success"}
+	leader.Waits.AddKey(time.Millisecond)
+	if adopted := adoptSharedResult(leader); adopted.Waits.Any() {
+		t.Errorf("the follower adopted the leader's waits %+v", adopted.Waits)
 	}
 }
 

@@ -838,8 +838,8 @@ func orchestrationGitCalls(v *validator, path string, value any) {
 }
 
 // orchestrationCPU validates the orchestration CPU and its two ties: totalMs
-// is the sum of its five parts, and sharePermille is totalMs over runMs in
-// truncated thousandths.
+// is the sum of its five parts, and sharePermille, present exactly when runMs
+// is above 0, is totalMs over runMs in truncated thousandths.
 func orchestrationCPU(v *validator, path string, value any) {
 	obj := object(v, path, value, orchestrationCPUFields)
 	if obj == nil {
@@ -859,10 +859,12 @@ func orchestrationCPU(v *validator, path string, value any) {
 	}
 	run, hasRun := childInt(obj, "runMs")
 	share, hasShare := childInt(obj, "sharePermille")
-	if hasTotal && hasRun && run > 0 && hasShare != (total*1000/run > 0) {
-		v.add(ViolationCountMismatch, join(path, "sharePermille"))
+	if !hasTotal || !hasRun {
+		return
 	}
-	if hasTotal && hasRun && run > 0 && hasShare && share != total*1000/run {
+	// sharePermille is present exactly when runMs is above 0, and then equals
+	// the truncated thousandths: 0 is a measured share, never an absent one.
+	if (run > 0) != hasShare || (hasShare && share != total*1000/run) {
 		v.add(ViolationCountMismatch, join(path, "sharePermille"))
 	}
 }

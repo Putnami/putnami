@@ -116,8 +116,8 @@ run:
   the CPU of the processes it started;
 - the control processes: an extension process the engine starts for anything
   but a job, such as a runtime handshake, the workspace probe, a hook or a
-  provider;
-- the CLI starts made by the engine or by a job, such as a registry credential;
+  provider, with the descendants it waited for;
+- the CLI starts made by jobs, such as a registry credential;
 - git, started by the engine or by an SDK job.
 
 The tools a job runs, `go`, `bun`, `tsc` and what they start, are not
@@ -129,14 +129,15 @@ orchestration, and neither is the git a tool runs itself, such as
 | `run.orchestration.phases[]` | Wall of each engine phase the run entered: `workspace-load`, `runtime-sync`, `probe`, `selection`, `plan`. |
 | `run.orchestration.processes[]` | Processes started by `origin` (`engine`, or `jobs` built on the SDK) and `kind` (`job`, `batch`, `control`, `cli`, `git`, `other`), with the CPU of those that exited before the run ended. |
 | `run.orchestration.git[]` | Git calls by origin and subcommand (`rev-parse`, `ls-files`). |
-| `run.orchestration.cpu` | `engineMs`, `extensionMs`, `controlMs`, `cliMs`, `gitMs`, their sum `totalMs`, the run's whole CPU `runMs` (the CLI process and every child it waited for), `sharePermille` (`totalMs` over `runMs`, in thousandths) and `perTaskMs` (`totalMs` over the selected tasks). `unreportedProcesses` counts the job processes that reported no CPU of their own: a runtime not built on the SDK. |
+| `run.orchestration.cpu` | `engineMs`, `extensionMs`, `controlMs`, `cliMs`, `gitMs`, their sum `totalMs`, the run's whole CPU `runMs` (the CLI process and every child it waited for), `sharePermille` (`totalMs` over `runMs`, in thousandths, present whenever `runMs` is) and `perTaskMs` (`totalMs` over the selected tasks). `unreportedProcesses` counts the job processes that reported no CPU of their own: a runtime not built on the SDK. |
 | `tasks[].orchestration` | Per task: `keyMs` (computing its cache key), `lockWaitMs` (waiting for a cache lease another process held, or for its task-output locks) and `restoreMs` (restoring a cache entry). A step the task never entered is absent. |
 
 The counts come from the processes themselves rather than from an outside
 poller: the engine and the SDK start every process through one ledger
 (`go.putnami.dev/sdk/extension/procstat`), and an SDK job writes its ledger in
-its result. They cover the CLI process since it started, so a watch session
-reports cumulative numbers. Process CPU is measured where the platform reports
+its result. The first run of a CLI process covers the process since it started,
+its bootstrap included; a later run in the same process, as `cache verify` and
+an impact plan start, covers its own share only. Process CPU is measured where the platform reports
 it (`getrusage` on Unix); elsewhere `cpu` is absent. A long-lived process still
 running when the run ends, such as a cache provider, is counted but its CPU is
 not.
@@ -155,7 +156,7 @@ not.
 ### Checking the counts
 
 `tooling/cli/scripts/check-orchestration-counts.sh <putnami arguments>` runs
-`./putnamiw` under `strace -f`, with a `git` shim first on `PATH` that logs each
+`./putnamiw` under `strace -f -ttt`, with a `git` shim first on `PATH` that logs each
 call and runs the real git, and prints the counts each side saw:
 
 ```bash
@@ -166,9 +167,9 @@ From the trace it counts the processes whose first `execve` happens while their
 parent is the CLI process or a job process (a child of the CLI started with
 `--putnamiContext`), and compares them with `processes[]`; from the shim it
 counts the git calls of those processes and compares them with `git[]`. A
-process a tool started is in neither. The calls the CLI makes after the session
-is settled, such as the git reads of the run report, are in the trace and not
-in the report.
+process a tool started is in neither. The processes the CLI starts after the
+session is settled, such as the git reads of the run report, are left out by
+their trace time.
 
 ## Cache Economics Benchmark
 

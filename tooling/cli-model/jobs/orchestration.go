@@ -42,10 +42,13 @@ type OrchestrationPhaseWall struct {
 }
 
 // ProcessCount is the processes of one kind and the CPU of those measured.
+// Measured counts the processes whose CPU is in CPU: zero means no CPU was
+// measured, which is not a CPU of zero.
 type ProcessCount struct {
-	Kind   string
-	Starts int64
-	CPU    time.Duration
+	Kind     string
+	Starts   int64
+	CPU      time.Duration
+	Measured int64
 }
 
 // ProcessLedger is the processes one origin started, by kind in canonical
@@ -86,10 +89,11 @@ func (l ProcessLedger) Of(kind string) ProcessCount {
 
 // OrchestrationCPU is the orchestration CPU of s: the engine, the extension
 // processes without their children, the control processes, the CLI starts
-// and the git calls of both origins.
+// made by jobs, and the git calls of both origins. A CLI the engine starts,
+// such as a workspace hook, is counted among its processes and not here.
 func (s *OrchestrationSnapshot) OrchestrationCPU() (engine, extension, control, cli, git time.Duration) {
 	return s.EngineCPU, s.ExtensionCPU,
 		s.Engine.Of("control").CPU,
-		s.Engine.Of("cli").CPU + s.Jobs.Of("cli").CPU,
+		s.Jobs.Of("cli").CPU,
 		s.Engine.Of("git").CPU + s.Jobs.Of("git").CPU
 }

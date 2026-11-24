@@ -397,6 +397,35 @@ func ExtractResult(data map[string]any) *JobResult {
 	return result
 }
 
+// TakeProcessReport removes the process report from a result event's data
+// and returns the event without it and the report. Any other event, or a result
+// without a report, is returned unchanged with a nil report; a report that
+// does not decode is removed and not returned. The event's maps are copied,
+// never changed.
+func TakeProcessReport(event RawJobEvent) (RawJobEvent, *runtimeproto.ProcessReport) {
+	if event.Type != EventTypeResult {
+		return event, nil
+	}
+	// The result's own data map, read the way ExtractResult reads it.
+	data := ExtractResult(event.Data).Data
+	if _, ok := data[runtimeproto.ProcessReportResultDataKey]; !ok {
+		return event, nil
+	}
+	report, err := runtimeproto.ExtractProcessReport(data)
+	if err != nil {
+		report = nil
+	}
+	data = maps.Clone(data)
+	delete(data, runtimeproto.ProcessReportResultDataKey)
+	event.Data = maps.Clone(event.Data)
+	if len(data) == 0 {
+		delete(event.Data, "data")
+	} else {
+		event.Data["data"] = data
+	}
+	return event, report
+}
+
 // NormalizeStatus maps any status string to the canonical values. It delegates
 // to ParseTaskStatus so the subprocess stream and the batch wire schema share
 // one status vocabulary; an unrecognized spelling is passed through unchanged,

@@ -102,6 +102,12 @@ type LintSummary struct {
 	Infos int `json:"infos,omitempty"`
 }
 
+// ProcessReportEnv is the variable a CLI that reads ProcessReport sets in a
+// job's environment. A runtime writes the report only when it is set, so an
+// older CLI, which would keep the report in the task's result data and its
+// cache entry, never receives one.
+const ProcessReportEnv = "PUTNAMI_PROCESS_REPORT"
+
 // ProcessReportResultDataKey is the result-data location of a job process's
 // own accounting: the CPU it spent itself and the processes it started. A
 // runtime that does not measure them omits the key; it never reports zeros it
@@ -147,8 +153,8 @@ type ProcessStarts struct {
 	// Count is how many processes of this kind were started, at least 1.
 	Count int64 `json:"count"`
 	// CPUMs is the CPU of those that exited and were measured. Absent when none
-	// was.
-	CPUMs int64 `json:"cpuMs,omitempty"`
+	// was; 0 when some were and spent under a millisecond.
+	CPUMs *int64 `json:"cpuMs,omitempty"`
 }
 
 // GitCalls counts the git calls of one subcommand ("rev-parse", "ls-files").
@@ -195,7 +201,7 @@ func ValidateProcessReport(report *ProcessReport) error {
 			return fmt.Errorf("processReport.starts lists kind %q twice", start.Kind)
 		}
 		kinds[start.Kind] = true
-		if start.Count < 1 || start.CPUMs < 0 {
+		if start.Count < 1 || (start.CPUMs != nil && *start.CPUMs < 0) {
 			return fmt.Errorf("processReport.starts[%s] has a count below 1 or a negative CPU", start.Kind)
 		}
 	}

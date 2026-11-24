@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 )
 
@@ -50,8 +51,9 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) (for
 	if err := startJob(func() error { return hold.start(tree.Start) }); err != nil {
 		return false, err
 	}
+	procstat.Started(procstat.Job, cmd.Args)
 	defer func() { _ = tree.Close() }()
-	err = cmd.Wait()
+	err = procstat.Wait(cmd, procstat.Job)
 	close(waitDone)
 	hold.release()
 	forced = hold.forced()

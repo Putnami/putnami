@@ -11,6 +11,11 @@ require (
 	golang.org/x/sys v0.44.0
 )
 
+require (
+	go.putnami.dev/protocol/diagnostic v0.0.0 // indirect
+	go.putnami.dev/protocol/runtime v0.0.0 // indirect
+)
+
 replace (
 	go.putnami.dev/protocol/features => ../../protocols/features
 	go.putnami.dev/sdk/extension => ../extension-sdk

@@ -672,12 +672,15 @@ measure is absent rather than zero.
 
 `cpu.totalMs` is the sum of `engineMs` (the CLI process itself), `extensionMs`
 (what job processes reported for themselves, without their children),
-`controlMs` (extension processes the engine started for anything but a job),
-`cliMs` (CLI processes the engine or a job started) and `gitMs` (git the engine
-or an SDK job started); `cli.result.count_mismatch` otherwise. `runMs` is the
-whole run: the CLI process and every child it waited for. `sharePermille` is
-`totalMs × 1000 / runMs`, truncating, and absent when that is 0; `perTaskMs` is
-`totalMs / counts.total`, truncating, and absent when the run selected no task.
+`controlMs` (extension processes the engine started for anything but a job,
+with the descendants they waited for), `cliMs` (CLI processes jobs started) and
+`gitMs` (git the engine or an SDK job started); `cli.result.count_mismatch`
+otherwise. `runMs` is the whole run: the CLI process and every child it waited
+for. `sharePermille` is `totalMs × 1000 / runMs`, truncating, present exactly
+when `runMs` is above 0; `perTaskMs` is `totalMs / counts.total`, truncating,
+and absent when the run selected no task. A `processes[].cpuMs` is absent when
+no process of that entry exited before the run ended, and 0 when some did in
+under a millisecond.
 `unreportedProcesses` counts the job and batch processes that reported no CPU of
 their own, a runtime not built on the extension SDK: their CPU is in no member.
 

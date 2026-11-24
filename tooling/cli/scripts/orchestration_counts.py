@@ -4,13 +4,15 @@
 Usage: orchestration_counts.py <strace-file> <git-shim-log> <session.json>
 
 The strace file comes from
-    strace -f -qq -v -s 4096 -e trace=execve,clone,clone3,fork,vfork -o <file> <putnami ...>
+    strace -f -qq -ttt -v -s 4096 -e trace=execve,clone,clone3,fork,vfork -o <file> <putnami ...>
 and the git shim log has one line per call: "<caller pid> <shim pid> <git
 arguments>".
 
 A process the report counts is one the CLI process started (origin engine) or
 one a job process started (origin jobs): a new process whose first successful
-execve happens while its parent is the CLI process or a job process. A job
+execve happens while its parent is the CLI process or a job process, before
+the session was settled (its endTime, read against the trace's -ttt
+timestamps). A job
 process is a child of the CLI process started with --putnamiContext. A process
 a tool started is not counted, nor the execve a process makes over itself.
 """
@@ -19,40 +21,45 @@ import json
 import re
 import sys
 from collections import Counter
+from datetime import datetime
 
-LINE = re.compile(r"^(\d+)\s+(.*)$")
+LINE = re.compile(r"^(\d+)\s+(?:(\d+\.\d+)\s+)?(.*)$")
 CALL = re.compile(r"^(clone3?|fork|vfork|execve)\((.*)$")
 RESUMED = re.compile(r"^<\.\.\. (clone3?|fork|vfork|execve) resumed>(.*)$")
 RESULT = re.compile(r"=\s+(-?\d+)")
 
 
 def parse(path):
-    """Yield (pid, syscall, args, result) with unfinished calls joined."""
+    """Yield (pid, time, syscall, args, result) with unfinished calls joined.
+
+    The time is the call's start, in seconds since the epoch, when the trace
+    has -ttt timestamps, and None otherwise."""
     pending = {}
     with open(path, encoding="utf-8", errors="replace") as handle:
         for raw in handle:
             match = LINE.match(raw.rstrip("\n"))
             if not match:
                 continue
-            pid, rest = int(match.group(1)), match.group(2)
+            pid, rest = int(match.group(1)), match.group(3)
+            stamp = float(match.group(2)) if match.group(2) else None
             if rest.startswith("+++") or rest.startswith("---"):
                 continue
             resumed = RESUMED.match(rest)
             if resumed:
-                name, args = pending.pop(pid, (resumed.group(1), ""))
+                name, args, started = pending.pop(pid, (resumed.group(1), "", stamp))
                 rest_args = args + resumed.group(2)
                 result = RESULT.search(resumed.group(2))
-                yield pid, name, rest_args, int(result.group(1)) if result else None
+                yield pid, started, name, rest_args, int(result.group(1)) if result else None
                 continue
             call = CALL.match(rest)
             if not call:
                 continue
             name, args = call.group(1), call.group(2)
             if "<unfinished ...>" in args:
-                pending[pid] = (name, args.replace("<unfinished ...>", ""))
+                pending[pid] = (name, args.replace("<unfinished ...>", ""), stamp)
                 continue
             result = RESULT.search(args.rsplit(")", 1)[-1]) if ")" in args else None
-            yield pid, name, args, int(result.group(1)) if result else None
+            yield pid, stamp, name, args, int(result.group(1)) if result else None
 
 
 def first_arg(args):
@@ -77,10 +84,15 @@ def main():
     engine_ready = False  # the traced root runs the CLI, not the wrapper
     starts = []    # (parent pid, child pid, argv) for each process's first execve
 
+    with open(session_file, encoding="utf-8") as handle:
+        session = json.load(handle)
+    settled = None
+    if session.get("endTime"):
+        settled = datetime.fromisoformat(session["endTime"].replace("Z", "+00:00")).timestamp()
     events = list(parse(strace_file))
     # A vfork child runs, and execs, before its parent's clone returns, so the
     # process tree is read whole before any start is attributed.
-    for pid, name, args, result in events:
+    for pid, _, name, args, result in events:
         proc = tgid.setdefault(pid, pid)
         if root is None:
             root = proc
@@ -90,9 +102,13 @@ def main():
             else:
                 tgid[result] = result
                 parent[result] = proc
-    for pid, name, args, result in events:
+    for pid, stamp, name, args, result in events:
         proc = tgid.get(pid, pid)
         if name != "execve" or result != 0:
+            continue
+        # What the CLI starts after the session is settled, such as the git
+        # reads of the run report, is not in the session's report.
+        if settled is not None and stamp is not None and stamp > settled:
             continue
         vector = argv(args) or [first_arg(args)]
         if proc == root and first_arg(args).rsplit("/", 1)[-1] == "putnami":
@@ -126,8 +142,7 @@ def main():
             if origin:
                 shim[origin] += 1
 
-    with open(session_file, encoding="utf-8") as handle:
-        orchestration = json.load(handle)["run"].get("orchestration") or {}
+    orchestration = session["run"].get("orchestration") or {}
     reported = Counter()
     reported_git = Counter()
     for entry in orchestration.get("processes", []):

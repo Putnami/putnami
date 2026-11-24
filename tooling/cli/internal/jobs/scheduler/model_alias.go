@@ -341,3 +341,6 @@ var (
 	taskDeclarationOf       = model.TaskDeclarationOf
 	usesDeclaredCapture     = model.UsesDeclaredCapture
 )
+
+// takeProcessReport removes the process report from a result event.
+var takeProcessReport = model.TakeProcessReport

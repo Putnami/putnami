@@ -275,9 +275,12 @@ func (s Snapshot) Report() *runtimeproto.ProcessReport {
 		if entry.Starts == 0 {
 			continue
 		}
-		report.Starts = append(report.Starts, runtimeproto.ProcessStarts{
-			Kind: string(entry.Kind), Count: entry.Starts, CPUMs: entry.CPU.Milliseconds(),
-		})
+		start := runtimeproto.ProcessStarts{Kind: string(entry.Kind), Count: entry.Starts}
+		if entry.Measured > 0 {
+			ms := entry.CPU.Milliseconds()
+			start.CPUMs = &ms
+		}
+		report.Starts = append(report.Starts, start)
 	}
 	subcommands := make([]string, 0, len(s.Git))
 	for subcommand := range s.Git {

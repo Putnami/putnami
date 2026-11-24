@@ -118,9 +118,13 @@ func reportOrchestration(w io.Writer, g *GlobalFlags, result *scheduler.Schedule
 		return
 	}
 	if cpu := report.CPU; cpu != nil {
-		iox.Fprintf(w, "  Orchestration CPU: %s of %s (%d.%d%%) · %s per task",
-			formatDurationMs(cpu.TotalMs), formatDurationMs(cpu.RunMs),
-			cpu.SharePermille/10, cpu.SharePermille%10, formatDurationMs(cpu.PerTaskMs))
+		iox.Fprintf(w, "  Orchestration CPU: %s of %s", formatDurationMs(cpu.TotalMs), formatDurationMs(cpu.RunMs))
+		if share := cpu.SharePermille; share != nil {
+			iox.Fprintf(w, " (%d.%d%%)", *share/10, *share%10)
+		}
+		if perTask := cpu.PerTaskMs; perTask != nil {
+			iox.Fprintf(w, " · %s per task", formatDurationMs(*perTask))
+		}
 		iox.Fprintf(w, " (engine %s · extensions %s · control %s · cli %s · git %s)\n",
 			formatDurationMs(cpu.EngineMs), formatDurationMs(cpu.ExtensionMs), formatDurationMs(cpu.ControlMs),
 			formatDurationMs(cpu.CLIMs), formatDurationMs(cpu.GitMs))

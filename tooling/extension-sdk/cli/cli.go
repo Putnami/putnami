@@ -138,9 +138,15 @@ func Run(job JobFunc, opts ...RunOption) {
 // withProcessReport is data with the job process's own accounting under
 // runtime.ProcessReportResultDataKey: its CPU without its children, the
 // processes it started and its git calls (go.putnami.dev/sdk/extension/procstat).
-// The engine sums the reports into the run's orchestration report. data is
-// copied, never changed.
+// The engine sums the reports into the run's orchestration report. It is
+// written only when the engine set runtime.ProcessReportEnv. data is copied,
+// never changed.
 func withProcessReport(data map[string]any) map[string]any {
+	// A CLI that reads the report says so; an older one would keep it in the
+	// task's result data and its cache entry.
+	if os.Getenv(runtime.ProcessReportEnv) != "1" {
+		return data
+	}
 	out := make(map[string]any, len(data)+1)
 	for key, value := range data {
 		out[key] = value

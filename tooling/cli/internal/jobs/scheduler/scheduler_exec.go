@@ -287,6 +287,9 @@ func (s *Scheduler) abandonTask(item taskWork, result *JobResult) jobDone {
 	s.renderer.JobStart(item.job)
 	// A leader that dies before its subprocess exists still owes its followers
 	// an answer, or they wait for the run's whole duration.
+	// The task's waits are on its result before a follower can copy it, and
+	// adoptSharedResult drops them from the copy.
+	s.waits.stampWaits(item.job, result)
 	item.shared.publish(result)
 	return jobDone{job: item.job, result: result}
 }
@@ -702,6 +705,9 @@ func (s *Scheduler) closeTask(
 	// its outputs are on disk, its entry is published and its result is final —
 	// so a follower captures the same tree the leader was cached from and can
 	// never observe a half-written one. Non-leaders and unshared tasks no-op.
+	// The task's waits are on its result before a follower can copy it, and
+	// adoptSharedResult drops them from the copy.
+	s.waits.stampWaits(item.job, result)
 	item.shared.publish(result)
 	return jobDone{job: item.job, result: result}
 }
@@ -981,7 +987,10 @@ func (s *Scheduler) coalesceMiss(
 		err := coalescer.wait(ctx, hash, remaining)
 		s.waits.lockWait(job, waitStarted)
 		if err == nil {
-			if result := coalescer.restore(ctx, hash); result != nil {
+			restoreStarted := time.Now()
+			result := coalescer.restore(ctx, hash)
+			if result != nil {
+				s.waits.restore(job, restoreStarted)
 				// The entry was absent when this scheduler arrived and was
 				// published by the lease owner while we waited. Keep the stored
 				// execution status for DAG semantics, but report the reuse as

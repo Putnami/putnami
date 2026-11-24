@@ -36,7 +36,7 @@ cd "$root"
 ./putnamiw --version >/dev/null
 sessions() { ls -1 .putnami/sessions 2>/dev/null | grep -E '^[0-9]{8}-' | sort; }
 before="$(sessions | tail -n 1 || true)"
-PATH="$work/bin:$PATH" strace -f -qq -v -s 4096 -e trace=execve,clone,clone3,fork,vfork -o "$work/strace.log" \
+PATH="$work/bin:$PATH" strace -f -qq -ttt -v -s 4096 -e trace=execve,clone,clone3,fork,vfork -o "$work/strace.log" \
   ./putnamiw "$@" || true
 
 session=""

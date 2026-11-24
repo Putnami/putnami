@@ -738,6 +738,335 @@
       }
     },
     {
+      "id": "envelope.run.orchestration-zero-share",
+      "document": "resultEnvelope",
+      "expect": "accept",
+      "summary": "A share that truncates to 0 is a measured share: sharePermille is present, at 0, whenever runMs is above 0.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "build",
+        "status": "success",
+        "exitCode": 0,
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": {
+            "total": 4,
+            "succeeded": 4,
+            "failed": 0,
+            "canceled": 0,
+            "skipped": 0
+          },
+          "reuse": {
+            "localCache": 2,
+            "remoteCache": 1,
+            "coalesced": 0
+          },
+          "durationMs": 812,
+          "orchestration": {
+            "phases": [
+              {
+                "phase": "workspace-load",
+                "wallMs": 41
+              },
+              {
+                "phase": "runtime-sync",
+                "wallMs": 12
+              },
+              {
+                "phase": "probe",
+                "wallMs": 3
+              },
+              {
+                "phase": "selection",
+                "wallMs": 20
+              },
+              {
+                "phase": "plan",
+                "wallMs": 64
+              }
+            ],
+            "processes": [
+              {
+                "origin": "engine",
+                "kind": "job",
+                "count": 1
+              },
+              {
+                "origin": "engine",
+                "kind": "git",
+                "count": 6,
+                "cpuMs": 18
+              },
+              {
+                "origin": "jobs",
+                "kind": "git",
+                "count": 2,
+                "cpuMs": 5
+              },
+              {
+                "origin": "jobs",
+                "kind": "other",
+                "count": 1,
+                "cpuMs": 2100
+              }
+            ],
+            "git": [
+              {
+                "origin": "engine",
+                "subcommand": "ls-files",
+                "count": 2
+              },
+              {
+                "origin": "engine",
+                "subcommand": "rev-parse",
+                "count": 4
+              },
+              {
+                "origin": "jobs",
+                "subcommand": "rev-parse",
+                "count": 2
+              }
+            ],
+            "cpu": {
+              "engineMs": 0,
+              "extensionMs": 0,
+              "controlMs": 0,
+              "cliMs": 0,
+              "gitMs": 0,
+              "totalMs": 0,
+              "runMs": 1000,
+              "sharePermille": 0,
+              "perTaskMs": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "invalid.envelope.orchestration-share-missing",
+      "document": "resultEnvelope",
+      "expect": "reject",
+      "summary": "sharePermille is present exactly when runMs is above 0, even when it truncates to 0.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "build",
+        "status": "success",
+        "exitCode": 0,
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": {
+            "total": 4,
+            "succeeded": 4,
+            "failed": 0,
+            "canceled": 0,
+            "skipped": 0
+          },
+          "reuse": {
+            "localCache": 2,
+            "remoteCache": 1,
+            "coalesced": 0
+          },
+          "durationMs": 812,
+          "orchestration": {
+            "phases": [
+              {
+                "phase": "workspace-load",
+                "wallMs": 41
+              },
+              {
+                "phase": "runtime-sync",
+                "wallMs": 12
+              },
+              {
+                "phase": "probe",
+                "wallMs": 3
+              },
+              {
+                "phase": "selection",
+                "wallMs": 20
+              },
+              {
+                "phase": "plan",
+                "wallMs": 64
+              }
+            ],
+            "processes": [
+              {
+                "origin": "engine",
+                "kind": "job",
+                "count": 1
+              },
+              {
+                "origin": "engine",
+                "kind": "git",
+                "count": 6,
+                "cpuMs": 18
+              },
+              {
+                "origin": "jobs",
+                "kind": "git",
+                "count": 2,
+                "cpuMs": 5
+              },
+              {
+                "origin": "jobs",
+                "kind": "other",
+                "count": 1,
+                "cpuMs": 2100
+              }
+            ],
+            "git": [
+              {
+                "origin": "engine",
+                "subcommand": "ls-files",
+                "count": 2
+              },
+              {
+                "origin": "engine",
+                "subcommand": "rev-parse",
+                "count": 4
+              },
+              {
+                "origin": "jobs",
+                "subcommand": "rev-parse",
+                "count": 2
+              }
+            ],
+            "cpu": {
+              "engineMs": 0,
+              "extensionMs": 0,
+              "controlMs": 0,
+              "cliMs": 0,
+              "gitMs": 0,
+              "totalMs": 0,
+              "runMs": 1000,
+              "perTaskMs": 0
+            }
+          }
+        }
+      },
+      "violations": [
+        {
+          "code": "cli.result.count_mismatch",
+          "path": "run.orchestration.cpu.sharePermille"
+        }
+      ]
+    },
+    {
+      "id": "invalid.envelope.orchestration-share-without-run-cpu",
+      "document": "resultEnvelope",
+      "expect": "reject",
+      "summary": "Without run CPU there is no share to state.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "build",
+        "status": "success",
+        "exitCode": 0,
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": {
+            "total": 4,
+            "succeeded": 4,
+            "failed": 0,
+            "canceled": 0,
+            "skipped": 0
+          },
+          "reuse": {
+            "localCache": 2,
+            "remoteCache": 1,
+            "coalesced": 0
+          },
+          "durationMs": 812,
+          "orchestration": {
+            "phases": [
+              {
+                "phase": "workspace-load",
+                "wallMs": 41
+              },
+              {
+                "phase": "runtime-sync",
+                "wallMs": 12
+              },
+              {
+                "phase": "probe",
+                "wallMs": 3
+              },
+              {
+                "phase": "selection",
+                "wallMs": 20
+              },
+              {
+                "phase": "plan",
+                "wallMs": 64
+              }
+            ],
+            "processes": [
+              {
+                "origin": "engine",
+                "kind": "job",
+                "count": 1
+              },
+              {
+                "origin": "engine",
+                "kind": "git",
+                "count": 6,
+                "cpuMs": 18
+              },
+              {
+                "origin": "jobs",
+                "kind": "git",
+                "count": 2,
+                "cpuMs": 5
+              },
+              {
+                "origin": "jobs",
+                "kind": "other",
+                "count": 1,
+                "cpuMs": 2100
+              }
+            ],
+            "git": [
+              {
+                "origin": "engine",
+                "subcommand": "ls-files",
+                "count": 2
+              },
+              {
+                "origin": "engine",
+                "subcommand": "rev-parse",
+                "count": 4
+              },
+              {
+                "origin": "jobs",
+                "subcommand": "rev-parse",
+                "count": 2
+              }
+            ],
+            "cpu": {
+              "engineMs": 0,
+              "extensionMs": 0,
+              "controlMs": 0,
+              "cliMs": 0,
+              "gitMs": 0,
+              "totalMs": 0,
+              "runMs": 0,
+              "sharePermille": 5,
+              "perTaskMs": 0
+            }
+          }
+        }
+      },
+      "violations": [
+        {
+          "code": "cli.result.count_mismatch",
+          "path": "run.orchestration.cpu.sharePermille"
+        }
+      ]
+    },
+    {
       "id": "envelope.run.docker-publication",
       "document": "resultEnvelope",
       "expect": "accept",
