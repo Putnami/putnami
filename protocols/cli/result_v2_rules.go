@@ -73,6 +73,7 @@ var (
 		req("durationMs", intAtLeast(0)),
 		opt("taskWallMs", intAtLeast(0)),
 		opt("spawnToFirstEventMs", intAtLeast(0)),
+		opt("orchestration", taskOrchestration),
 		opt("error", resultError),
 		opt("diagnostics", arrayOf(diagnostic)),
 		opt("testCasesDropped", intAtLeast(1)),
@@ -161,6 +162,50 @@ var (
 		opt("local", runLocalCache),
 	}
 
+	taskOrchestrationFields = []field{
+		opt("keyMs", intAtLeast(0)),
+		opt("lockWaitMs", intAtLeast(0)),
+		opt("restoreMs", intAtLeast(0)),
+	}
+
+	orchestrationPhaseFields = []field{
+		req("phase", enumOf(OrchestrationPhases...)),
+		req("wallMs", intAtLeast(0)),
+	}
+
+	orchestrationProcessesFields = []field{
+		req("origin", enumOf(OrchestrationOriginEngine, OrchestrationOriginJobs)),
+		req("kind", enumOf(OrchestrationKinds...)),
+		req("count", intAtLeast(1)),
+		opt("cpuMs", intAtLeast(0)),
+	}
+
+	orchestrationGitCallsFields = []field{
+		req("origin", enumOf(OrchestrationOriginEngine, OrchestrationOriginJobs)),
+		req("subcommand", nonEmptyString),
+		req("count", intAtLeast(1)),
+	}
+
+	orchestrationCPUFields = []field{
+		req("engineMs", intAtLeast(0)),
+		req("extensionMs", intAtLeast(0)),
+		req("controlMs", intAtLeast(0)),
+		req("cliMs", intAtLeast(0)),
+		req("gitMs", intAtLeast(0)),
+		req("totalMs", intAtLeast(0)),
+		req("runMs", intAtLeast(0)),
+		opt("sharePermille", intAtLeast(0)),
+		opt("perTaskMs", intAtLeast(0)),
+		opt("unreportedProcesses", intAtLeast(1)),
+	}
+
+	runOrchestrationFields = []field{
+		opt("phases", arrayOf(orchestrationPhase)),
+		opt("processes", arrayOf(orchestrationProcesses)),
+		opt("git", arrayOf(orchestrationGitCalls)),
+		opt("cpu", orchestrationCPU),
+	}
+
 	runSummaryFields = []field{
 		req("outcome", enumOf(RunOutcomeSuccess, RunOutcomeFailure, RunOutcomeAborted)),
 		opt("abortedBy", enumOf(AbortedByUser, AbortedBySignal)),
@@ -172,6 +217,7 @@ var (
 		opt("publications", arrayOf(dockerPublication)),
 		opt("cpu", runCPU),
 		opt("cache", runCache),
+		opt("orchestration", runOrchestration),
 	}
 
 	streamRunSummaryFields = []field{
@@ -577,6 +623,12 @@ var v2FieldSets = map[string][]field{
 	"runCpu":                   runCPUFields,
 	"runLocalCache":            runLocalCacheFields,
 	"runCache":                 runCacheFields,
+	"taskOrchestration":        taskOrchestrationFields,
+	"orchestrationPhase":       orchestrationPhaseFields,
+	"orchestrationProcesses":   orchestrationProcessesFields,
+	"orchestrationGitCalls":    orchestrationGitCallsFields,
+	"orchestrationCpu":         orchestrationCPUFields,
+	"runOrchestration":         runOrchestrationFields,
 	"runSummary":               runSummaryFields,
 	"streamRunSummary":         streamRunSummaryFields,
 	"cgroupThrottle":           cgroupThrottleFields,
@@ -767,6 +819,83 @@ func runLocalCache(v *validator, path string, value any) {
 
 func runCache(v *validator, path string, value any) {
 	object(v, path, value, runCacheFields)
+}
+
+func taskOrchestration(v *validator, path string, value any) {
+	object(v, path, value, taskOrchestrationFields)
+}
+
+func orchestrationPhase(v *validator, path string, value any) {
+	object(v, path, value, orchestrationPhaseFields)
+}
+
+func orchestrationProcesses(v *validator, path string, value any) {
+	object(v, path, value, orchestrationProcessesFields)
+}
+
+func orchestrationGitCalls(v *validator, path string, value any) {
+	object(v, path, value, orchestrationGitCallsFields)
+}
+
+// orchestrationCPU validates the orchestration CPU and its two ties: totalMs
+// is the sum of its five parts, and sharePermille is totalMs over runMs in
+// truncated thousandths.
+func orchestrationCPU(v *validator, path string, value any) {
+	obj := object(v, path, value, orchestrationCPUFields)
+	if obj == nil {
+		return
+	}
+	var sum int64
+	for _, member := range []string{"engineMs", "extensionMs", "controlMs", "cliMs", "gitMs"} {
+		part, ok := childInt(obj, member)
+		if !ok {
+			return
+		}
+		sum += part
+	}
+	total, hasTotal := childInt(obj, "totalMs")
+	if hasTotal && total != sum {
+		v.add(ViolationCountMismatch, join(path, "totalMs"))
+	}
+	run, hasRun := childInt(obj, "runMs")
+	share, hasShare := childInt(obj, "sharePermille")
+	if hasTotal && hasRun && run > 0 && hasShare != (total*1000/run > 0) {
+		v.add(ViolationCountMismatch, join(path, "sharePermille"))
+	}
+	if hasTotal && hasRun && run > 0 && hasShare && share != total*1000/run {
+		v.add(ViolationCountMismatch, join(path, "sharePermille"))
+	}
+}
+
+// runOrchestration validates the orchestration report: each phase is listed
+// once, each origin and kind pair once, and each origin and subcommand once.
+func runOrchestration(v *validator, path string, value any) {
+	obj := object(v, path, value, runOrchestrationFields)
+	if obj == nil {
+		return
+	}
+	unique := func(member string, key func(map[string]any) string) {
+		items, _ := obj[member].([]any)
+		seen := map[string]bool{}
+		for i, item := range items {
+			entry, _ := item.(map[string]any)
+			if entry == nil {
+				continue
+			}
+			k := key(entry)
+			if seen[k] {
+				v.add(ViolationInvalidValue, join(path, member+"["+strconv.Itoa(i)+"]"))
+			}
+			seen[k] = true
+		}
+	}
+	text := func(entry map[string]any, member string) string {
+		value, _ := entry[member].(string)
+		return value
+	}
+	unique("phases", func(e map[string]any) string { return text(e, "phase") })
+	unique("processes", func(e map[string]any) string { return text(e, "origin") + "\x00" + text(e, "kind") })
+	unique("git", func(e map[string]any) string { return text(e, "origin") + "\x00" + text(e, "subcommand") })
 }
 
 // runSummary validates the canonical run verdict, including the two decisions

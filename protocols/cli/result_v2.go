@@ -426,6 +426,10 @@ type TaskRecord struct {
 	TaskWallMs int64 `json:"taskWallMs,omitempty"`
 	// SpawnToFirstEventMs is absent when no subprocess event was observed.
 	SpawnToFirstEventMs int64 `json:"spawnToFirstEventMs,omitempty"`
+	// Orchestration is the wall the scheduler spent on this task outside its
+	// subprocess: computing its key, waiting for a lock, restoring an entry.
+	// Absent when the task entered none of the three.
+	Orchestration *TaskOrchestration `json:"orchestration,omitempty"`
 	// Error is present only when the task did not succeed.
 	Error *ResultError `json:"error,omitempty"`
 	// Diagnostics are the task's diagnostics. They are orthogonal to Status: a
@@ -598,6 +602,140 @@ type RunCPU struct {
 	Executions int `json:"executions"`
 }
 
+// Engine phases: the closed vocabulary of RunOrchestration.Phases, in the order
+// a run enters them.
+const (
+	OrchestrationPhaseWorkspaceLoad = "workspace-load"
+	OrchestrationPhaseRuntimeSync   = "runtime-sync"
+	OrchestrationPhaseProbe         = "probe"
+	OrchestrationPhaseSelection     = "selection"
+	OrchestrationPhasePlan          = "plan"
+)
+
+// OrchestrationPhases is the engine-phase vocabulary, in canonical order.
+var OrchestrationPhases = []string{
+	OrchestrationPhaseWorkspaceLoad, OrchestrationPhaseRuntimeSync, OrchestrationPhaseProbe,
+	OrchestrationPhaseSelection, OrchestrationPhasePlan,
+}
+
+// Process origins: who started a counted process.
+const (
+	// OrchestrationOriginEngine is the CLI process that runs the engine.
+	OrchestrationOriginEngine = "engine"
+	// OrchestrationOriginJobs is the job processes built on the extension SDK,
+	// as each reported itself.
+	OrchestrationOriginJobs = "jobs"
+)
+
+// Process kinds: the closed vocabulary of OrchestrationProcesses.Kind. The
+// values repeat protocol/runtime's ProcessKind* constants by value, the
+// vocabulary a job process reports in.
+const (
+	OrchestrationKindJob     = "job"
+	OrchestrationKindBatch   = "batch"
+	OrchestrationKindControl = "control"
+	OrchestrationKindCLI     = "cli"
+	OrchestrationKindGit     = "git"
+	OrchestrationKindOther   = "other"
+)
+
+// OrchestrationKinds is the process-kind vocabulary, in canonical order.
+var OrchestrationKinds = []string{
+	OrchestrationKindJob, OrchestrationKindBatch, OrchestrationKindControl,
+	OrchestrationKindCLI, OrchestrationKindGit, OrchestrationKindOther,
+}
+
+// RunOrchestration is the run's orchestration report.
+type RunOrchestration struct {
+	// Phases are the engine phases the run entered, in OrchestrationPhases
+	// order, each once.
+	Phases []OrchestrationPhase `json:"phases,omitempty"`
+	// Processes are the processes started, by origin then kind, one entry per
+	// pair that started at least one.
+	Processes []OrchestrationProcesses `json:"processes,omitempty"`
+	// Git are the git calls by origin then subcommand.
+	Git []OrchestrationGitCalls `json:"git,omitempty"`
+	// CPU is the orchestration CPU, absent where the platform measures no
+	// process CPU.
+	CPU *OrchestrationCPU `json:"cpu,omitempty"`
+}
+
+// OrchestrationPhase is the wall of one engine phase.
+type OrchestrationPhase struct {
+	// Phase is one of OrchestrationPhases.
+	Phase string `json:"phase"`
+	// WallMs is the phase's wall, summed when the run entered it more than once.
+	WallMs int64 `json:"wallMs"`
+}
+
+// OrchestrationProcesses counts the processes of one kind one origin started.
+type OrchestrationProcesses struct {
+	// Origin is OrchestrationOriginEngine or OrchestrationOriginJobs.
+	Origin string `json:"origin"`
+	// Kind is one of OrchestrationKinds. A job process starts only cli, git and
+	// other processes.
+	Kind string `json:"kind"`
+	// Count is how many were started, at least 1.
+	Count int64 `json:"count"`
+	// CPUMs is the CPU of those that exited before the run ended, each with its
+	// waited-for descendants. Absent when none was measured.
+	CPUMs int64 `json:"cpuMs,omitempty"`
+}
+
+// OrchestrationGitCalls counts the git calls of one subcommand one origin made.
+type OrchestrationGitCalls struct {
+	Origin     string `json:"origin"`
+	Subcommand string `json:"subcommand"`
+	Count      int64  `json:"count"`
+}
+
+// OrchestrationCPU is the CPU a run spent orchestrating rather than running
+// tools: the engine process, each extension process without its children, the
+// control processes, the CLI starts made by jobs, and git started by the engine
+// or by an SDK job. The tools a job runs, and what they start, are not
+// orchestration.
+type OrchestrationCPU struct {
+	// EngineMs is the CLI process's own CPU, user plus system.
+	EngineMs int64 `json:"engineMs"`
+	// ExtensionMs is the CPU job processes reported for themselves, without
+	// their children.
+	ExtensionMs int64 `json:"extensionMs"`
+	// ControlMs is the CPU of the control processes the engine started.
+	ControlMs int64 `json:"controlMs"`
+	// CLIMs is the CPU of the CLI processes the engine or a job started.
+	CLIMs int64 `json:"cliMs"`
+	// GitMs is the CPU of the git processes the engine or a job started.
+	GitMs int64 `json:"gitMs"`
+	// TotalMs is the orchestration CPU: the sum of the five above.
+	TotalMs int64 `json:"totalMs"`
+	// RunMs is the run's whole CPU: the CLI process and every child it waited
+	// for.
+	RunMs int64 `json:"runMs"`
+	// SharePermille is TotalMs over RunMs, in thousandths, truncated. Absent
+	// when RunMs is 0.
+	SharePermille int64 `json:"sharePermille,omitempty"`
+	// PerTaskMs is TotalMs over run.counts.total, truncated. Absent when the
+	// run selected no task.
+	PerTaskMs int64 `json:"perTaskMs,omitempty"`
+	// UnreportedProcesses counts the job and batch processes that reported no
+	// CPU of their own: a runtime not built on the extension SDK. Their CPU is
+	// in no member above, and absent when every one reported.
+	UnreportedProcesses int64 `json:"unreportedProcesses,omitempty"`
+}
+
+// TaskOrchestration is the wall one task spent in the scheduler outside its
+// subprocess. Each member is present when the task entered that step, even
+// when it took under a millisecond.
+type TaskOrchestration struct {
+	// KeyMs is the wall spent computing the task's cache key.
+	KeyMs *int64 `json:"keyMs,omitempty"`
+	// LockWaitMs is the wall spent waiting for a cache lease another process
+	// held, or for the task-output locks.
+	LockWaitMs *int64 `json:"lockWaitMs,omitempty"`
+	// RestoreMs is the wall spent restoring a cache entry.
+	RestoreMs *int64 `json:"restoreMs,omitempty"`
+}
+
 // RunLocalCache attributes the cache-serving work performed by the CLI itself.
 // ServedMs is the union of all measured local cache intervals, so concurrent
 // tasks do not multiply elapsed time. Each segment of that union is assigned
@@ -651,6 +789,11 @@ type RunSummary struct {
 	// Cache attributes the cache-serving work that occurs outside task spans.
 	// It is additive and absent when caching performed no measurable work.
 	Cache *RunCache `json:"cache,omitempty"`
+	// Orchestration is where the run's orchestration time and CPU went: the
+	// engine phases, the processes started, the git calls, and the CPU spent
+	// outside the tools jobs run. It is information: it fails nothing, and it is
+	// absent when the producer measured none of it.
+	Orchestration *RunOrchestration `json:"orchestration,omitempty"`
 }
 
 // StreamRunSummary is the bounded terminal verdict carried by session:end.

@@ -382,6 +382,11 @@ export interface TaskRecord {
   durationMs: number;
   taskWallMs?: number;
   spawnToFirstEventMs?: number;
+  /**
+   * Wall the scheduler spent on this task outside its subprocess. Absent when
+   * the task computed no key, waited for no lock and restored no entry.
+   */
+  orchestration?: TaskOrchestration;
   error?: ResultErrorV2;
   diagnostics?: DiagnosticV2[];
   /**
@@ -522,6 +527,71 @@ export interface RunCache {
   local?: RunLocalCache;
 }
 
+/** Engine phases a run's orchestration report names, in the order a run enters them. */
+export const ORCHESTRATION_PHASES = ['workspace-load', 'runtime-sync', 'probe', 'selection', 'plan'] as const;
+
+/** Who started a counted process: the CLI engine, or a job built on the extension SDK. */
+export const ORCHESTRATION_ORIGINS = ['engine', 'jobs'] as const;
+
+/** Process kinds a run's orchestration report counts. */
+export const ORCHESTRATION_KINDS = ['job', 'batch', 'control', 'cli', 'git', 'other'] as const;
+
+/**
+ * Wall one task spent in the scheduler outside its subprocess. Each member is
+ * present when the task entered that step, even under a millisecond.
+ */
+export interface TaskOrchestration {
+  keyMs?: number;
+  lockWaitMs?: number;
+  restoreMs?: number;
+}
+
+/** The wall of one engine phase. */
+export interface OrchestrationPhase {
+  phase: (typeof ORCHESTRATION_PHASES)[number];
+  wallMs: number;
+}
+
+/** The processes of one kind one origin started, and the CPU of those that exited. */
+export interface OrchestrationProcesses {
+  origin: (typeof ORCHESTRATION_ORIGINS)[number];
+  kind: (typeof ORCHESTRATION_KINDS)[number];
+  count: number;
+  cpuMs?: number;
+}
+
+/** The git calls of one subcommand one origin made. */
+export interface OrchestrationGitCalls {
+  origin: (typeof ORCHESTRATION_ORIGINS)[number];
+  subcommand: string;
+  count: number;
+}
+
+/**
+ * CPU spent orchestrating rather than running tools. `totalMs` is the sum of
+ * the five parts; `sharePermille` is `totalMs * 1000 / runMs`, truncated.
+ */
+export interface OrchestrationCPU {
+  engineMs: number;
+  extensionMs: number;
+  controlMs: number;
+  cliMs: number;
+  gitMs: number;
+  totalMs: number;
+  runMs: number;
+  sharePermille?: number;
+  perTaskMs?: number;
+  unreportedProcesses?: number;
+}
+
+/** Where a run's orchestration time and CPU went. Information only: it fails nothing. */
+export interface RunOrchestration {
+  phases?: OrchestrationPhase[];
+  processes?: OrchestrationProcesses[];
+  git?: OrchestrationGitCalls[];
+  cpu?: OrchestrationCPU;
+}
+
 /**
  * The canonical verdict of one run, identical on all four surfaces.
  *
@@ -539,6 +609,7 @@ export interface RunSummary {
   publications?: DockerPublication[];
   cpu?: RunCPU;
   cache?: RunCache;
+  orchestration?: RunOrchestration;
 }
 
 /**
@@ -1600,6 +1671,14 @@ const executionRecordFields: Field[] = [
 
 const executionRecord: Check = (v, path, value) => object(v, path, value, executionRecordFields);
 
+const taskOrchestrationFields: Field[] = [
+  opt('keyMs', intAtLeast(0)),
+  opt('lockWaitMs', intAtLeast(0)),
+  opt('restoreMs', intAtLeast(0)),
+];
+
+const taskOrchestration: Check = (v, path, value) => object(v, path, value, taskOrchestrationFields);
+
 const taskRecordFields: Field[] = [
   req('identity', identity),
   opt('executionId', nonEmptyString),
@@ -1610,6 +1689,7 @@ const taskRecordFields: Field[] = [
   req('durationMs', intAtLeast(0)),
   opt('taskWallMs', intAtLeast(0)),
   opt('spawnToFirstEventMs', intAtLeast(0)),
+  opt('orchestration', taskOrchestration),
   opt('error', resultError),
   opt('diagnostics', arrayOf(diagnostic)),
   opt('testCasesDropped', intAtLeast(1)),
@@ -1775,6 +1855,114 @@ const runCacheFields: Field[] = [opt('local', runLocalCache)];
 
 const runCache: Check = (v, path, value) => object(v, path, value, runCacheFields);
 
+const orchestrationPhaseFields: Field[] = [req('phase', enumOf(...ORCHESTRATION_PHASES)), req('wallMs', intAtLeast(0))];
+
+const orchestrationPhase: Check = (v, path, value) => object(v, path, value, orchestrationPhaseFields);
+
+const orchestrationProcessesFields: Field[] = [
+  req('origin', enumOf(...ORCHESTRATION_ORIGINS)),
+  req('kind', enumOf(...ORCHESTRATION_KINDS)),
+  req('count', intAtLeast(1)),
+  opt('cpuMs', intAtLeast(0)),
+];
+
+const orchestrationProcesses: Check = (v, path, value) => object(v, path, value, orchestrationProcessesFields);
+
+const orchestrationGitCallsFields: Field[] = [
+  req('origin', enumOf(...ORCHESTRATION_ORIGINS)),
+  req('subcommand', nonEmptyString),
+  req('count', intAtLeast(1)),
+];
+
+const orchestrationGitCalls: Check = (v, path, value) => object(v, path, value, orchestrationGitCallsFields);
+
+const orchestrationCPUFields: Field[] = [
+  req('engineMs', intAtLeast(0)),
+  req('extensionMs', intAtLeast(0)),
+  req('controlMs', intAtLeast(0)),
+  req('cliMs', intAtLeast(0)),
+  req('gitMs', intAtLeast(0)),
+  req('totalMs', intAtLeast(0)),
+  req('runMs', intAtLeast(0)),
+  opt('sharePermille', intAtLeast(0)),
+  opt('perTaskMs', intAtLeast(0)),
+  opt('unreportedProcesses', intAtLeast(1)),
+];
+
+/**
+ * Validates the orchestration CPU and its two ties: `totalMs` is the sum of its
+ * five parts, and `sharePermille` is `totalMs` over `runMs` in truncated
+ * thousandths, absent when that truncates to 0.
+ */
+const orchestrationCPU: Check = (v, path, value) => {
+  const obj = object(v, path, value, orchestrationCPUFields);
+  if (obj === undefined) {
+    return;
+  }
+  let sum = 0;
+  for (const member of ['engineMs', 'extensionMs', 'controlMs', 'cliMs', 'gitMs']) {
+    const part = childInt(obj, member);
+    if (part === undefined) {
+      return;
+    }
+    sum += part;
+  }
+  const total = childInt(obj, 'totalMs');
+  if (total !== undefined && total !== sum) {
+    v.add(VIOLATION_CODE.countMismatch, join(path, 'totalMs'));
+  }
+  const run = childInt(obj, 'runMs');
+  const share = childInt(obj, 'sharePermille');
+  if (total !== undefined && run !== undefined && run > 0) {
+    const expected = Math.floor((total * 1000) / run);
+    if ((share === undefined && expected > 0) || (share !== undefined && share !== expected)) {
+      v.add(VIOLATION_CODE.countMismatch, join(path, 'sharePermille'));
+    }
+  }
+};
+
+const runOrchestrationFields: Field[] = [
+  opt('phases', arrayOf(orchestrationPhase)),
+  opt('processes', arrayOf(orchestrationProcesses)),
+  opt('git', arrayOf(orchestrationGitCalls)),
+  opt('cpu', orchestrationCPU),
+];
+
+/**
+ * Validates the orchestration report: each phase is listed once, each origin
+ * and kind pair once, and each origin and subcommand once.
+ */
+const runOrchestration: Check = (v, path, value) => {
+  const obj = object(v, path, value, runOrchestrationFields);
+  if (obj === undefined) {
+    return;
+  }
+  const unique = (member: string, key: (entry: JsonObject) => string): void => {
+    const items = obj[member];
+    if (!Array.isArray(items)) {
+      return;
+    }
+    const seen = new Set<string>();
+    items.forEach((item, index) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        return;
+      }
+      const k = key(item as JsonObject);
+      if (seen.has(k)) {
+        v.add(VIOLATION_CODE.invalidValue, join(path, `${member}[${index}]`));
+      }
+      seen.add(k);
+    });
+  };
+  const text = (entry: JsonObject, member: string): string => {
+    const value = entry[member];
+    return typeof value === 'string' ? value : '';
+  };
+  unique('phases', (e) => text(e, 'phase'));
+  unique('processes', (e) => `${text(e, 'origin')}\u0000${text(e, 'kind')}`);
+  unique('git', (e) => `${text(e, 'origin')}\u0000${text(e, 'subcommand')}`);
+};
+
 const runSummaryFields: Field[] = [
   req('outcome', enumOf(RUN_OUTCOME.success, RUN_OUTCOME.failure, RUN_OUTCOME.aborted)),
   opt('abortedBy', enumOf(ABORTED_BY.user, ABORTED_BY.signal)),
@@ -1786,6 +1974,7 @@ const runSummaryFields: Field[] = [
   opt('publications', arrayOf(dockerPublication)),
   opt('cpu', runCPU),
   opt('cache', runCache),
+  opt('orchestration', runOrchestration),
 ];
 
 const streamRunSummaryFields: Field[] = [
@@ -2969,6 +3158,12 @@ export const V2_FIELD_NAMES: Record<string, { members: string[]; required: strin
       ['runCpu', runCPUFields],
       ['runLocalCache', runLocalCacheFields],
       ['runCache', runCacheFields],
+      ['taskOrchestration', taskOrchestrationFields],
+      ['orchestrationPhase', orchestrationPhaseFields],
+      ['orchestrationProcesses', orchestrationProcessesFields],
+      ['orchestrationGitCalls', orchestrationGitCallsFields],
+      ['orchestrationCpu', orchestrationCPUFields],
+      ['runOrchestration', runOrchestrationFields],
       ['runSummary', runSummaryFields],
       ['streamRunSummary', streamRunSummaryFields],
       ['cgroupThrottle', cgroupThrottleFields],

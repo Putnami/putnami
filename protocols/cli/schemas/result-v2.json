@@ -253,6 +253,7 @@
           "$ref": "#/$defs/durationMs",
           "description": "Latency from spawn to the first runtime event. Absent when no subprocess event was observed."
         },
+        "orchestration": { "$ref": "#/$defs/taskOrchestration" },
         "error": {
           "$ref": "#/$defs/resultError",
           "description": "Present only when the task did not succeed."
@@ -489,6 +490,78 @@
         "local": { "$ref": "#/$defs/runLocalCache" }
       }
     },
+    "taskOrchestration": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Wall the scheduler spent on one task outside its subprocess. Each member is present when the task entered that step, even under a millisecond; the object is absent when it entered none.",
+      "properties": {
+        "keyMs": { "$ref": "#/$defs/durationMs", "description": "Wall spent computing the task's cache key." },
+        "lockWaitMs": { "$ref": "#/$defs/durationMs", "description": "Wall spent waiting for a cache lease another process held, or for the task-output locks." },
+        "restoreMs": { "$ref": "#/$defs/durationMs", "description": "Wall spent restoring a cache entry." }
+      }
+    },
+    "orchestrationPhase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "wallMs"],
+      "description": "The wall of one engine phase.",
+      "properties": {
+        "phase": { "type": "string", "enum": ["workspace-load", "runtime-sync", "probe", "selection", "plan"] },
+        "wallMs": { "$ref": "#/$defs/durationMs" }
+      }
+    },
+    "orchestrationProcesses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "kind", "count"],
+      "description": "The processes of one kind one origin started. The engine starts job, batch, control, cli, git and other processes; a job built on the extension SDK reports the cli, git and other processes it started.",
+      "properties": {
+        "origin": { "type": "string", "enum": ["engine", "jobs"] },
+        "kind": { "type": "string", "enum": ["job", "batch", "control", "cli", "git", "other"] },
+        "count": { "type": "integer", "minimum": 1 },
+        "cpuMs": { "type": "integer", "minimum": 0, "description": "CPU of those that exited before the run ended, each with its waited-for descendants. Absent when none was measured." }
+      }
+    },
+    "orchestrationGitCalls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "subcommand", "count"],
+      "description": "The git calls of one subcommand one origin made. A call that names no subcommand counts under its first argument.",
+      "properties": {
+        "origin": { "type": "string", "enum": ["engine", "jobs"] },
+        "subcommand": { "type": "string", "minLength": 1 },
+        "count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "orchestrationCpu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engineMs", "extensionMs", "controlMs", "cliMs", "gitMs", "totalMs", "runMs"],
+      "description": "CPU spent orchestrating rather than running tools: the engine process, each extension process without its children, the control processes, the CLI starts made by the engine or a job, and git started by the engine or an SDK job. totalMs is the sum of the five; sharePermille is totalMs * 1000 / runMs, truncated.",
+      "properties": {
+        "engineMs": { "type": "integer", "minimum": 0 },
+        "extensionMs": { "type": "integer", "minimum": 0, "description": "CPU job processes reported for themselves, without their children." },
+        "controlMs": { "type": "integer", "minimum": 0 },
+        "cliMs": { "type": "integer", "minimum": 0 },
+        "gitMs": { "type": "integer", "minimum": 0 },
+        "totalMs": { "type": "integer", "minimum": 0 },
+        "runMs": { "type": "integer", "minimum": 0, "description": "The run's whole CPU: the CLI process and every child it waited for." },
+        "sharePermille": { "type": "integer", "minimum": 0, "description": "Absent when runMs is 0 or the share truncates to 0." },
+        "perTaskMs": { "type": "integer", "minimum": 0, "description": "totalMs over run.counts.total, truncated. Absent when the run selected no task." },
+        "unreportedProcesses": { "type": "integer", "minimum": 1, "description": "Job and batch processes that reported no CPU of their own; their CPU is in no member." }
+      }
+    },
+    "runOrchestration": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where the run's orchestration time and CPU went. Information only: it fails nothing, and it is absent when the producer measured none of it.",
+      "properties": {
+        "phases": { "type": "array", "items": { "$ref": "#/$defs/orchestrationPhase" } },
+        "processes": { "type": "array", "items": { "$ref": "#/$defs/orchestrationProcesses" } },
+        "git": { "type": "array", "items": { "$ref": "#/$defs/orchestrationGitCalls" } },
+        "cpu": { "$ref": "#/$defs/orchestrationCpu" }
+      }
+    },
     "runSummary": {
       "type": "object",
       "additionalProperties": false,
@@ -515,7 +588,8 @@
           "items": { "$ref": "#/$defs/dockerPublication" }
         },
         "cpu": { "$ref": "#/$defs/runCpu" },
-        "cache": { "$ref": "#/$defs/runCache" }
+        "cache": { "$ref": "#/$defs/runCache" },
+        "orchestration": { "$ref": "#/$defs/runOrchestration" }
       },
       "allOf": [
         {

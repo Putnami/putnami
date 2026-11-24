@@ -111,6 +111,633 @@
       }
     },
     {
+      "id": "envelope.run.orchestration-report",
+      "document": "resultEnvelope",
+      "expect": "accept",
+      "summary": "A run states where its orchestration went: the engine phases, the processes by origin and kind, the git calls by subcommand, and the orchestration CPU, which is the sum of its five parts, with its share of the run's CPU and its milliseconds per task.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "build",
+        "status": "success",
+        "exitCode": 0,
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": {
+            "total": 4,
+            "succeeded": 4,
+            "failed": 0,
+            "canceled": 0,
+            "skipped": 0
+          },
+          "reuse": {
+            "localCache": 2,
+            "remoteCache": 1,
+            "coalesced": 0
+          },
+          "durationMs": 812,
+          "orchestration": {
+            "phases": [
+              {
+                "phase": "workspace-load",
+                "wallMs": 41
+              },
+              {
+                "phase": "runtime-sync",
+                "wallMs": 12
+              },
+              {
+                "phase": "probe",
+                "wallMs": 3
+              },
+              {
+                "phase": "selection",
+                "wallMs": 20
+              },
+              {
+                "phase": "plan",
+                "wallMs": 64
+              }
+            ],
+            "processes": [
+              {
+                "origin": "engine",
+                "kind": "job",
+                "count": 1
+              },
+              {
+                "origin": "engine",
+                "kind": "git",
+                "count": 6,
+                "cpuMs": 18
+              },
+              {
+                "origin": "jobs",
+                "kind": "git",
+                "count": 2,
+                "cpuMs": 5
+              },
+              {
+                "origin": "jobs",
+                "kind": "other",
+                "count": 1,
+                "cpuMs": 2100
+              }
+            ],
+            "git": [
+              {
+                "origin": "engine",
+                "subcommand": "ls-files",
+                "count": 2
+              },
+              {
+                "origin": "engine",
+                "subcommand": "rev-parse",
+                "count": 4
+              },
+              {
+                "origin": "jobs",
+                "subcommand": "rev-parse",
+                "count": 2
+              }
+            ],
+            "cpu": {
+              "engineMs": 620,
+              "extensionMs": 80,
+              "controlMs": 40,
+              "cliMs": 0,
+              "gitMs": 23,
+              "totalMs": 763,
+              "runMs": 2960,
+              "sharePermille": 257,
+              "perTaskMs": 190
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "invalid.envelope.orchestration-total-is-not-its-parts",
+      "document": "resultEnvelope",
+      "expect": "reject",
+      "summary": "totalMs is the sum of engineMs, extensionMs, controlMs, cliMs and gitMs; another total is a second accounting.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "build",
+        "status": "success",
+        "exitCode": 0,
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": {
+            "total": 4,
+            "succeeded": 4,
+            "failed": 0,
+            "canceled": 0,
+            "skipped": 0
+          },
+          "reuse": {
+            "localCache": 2,
+            "remoteCache": 1,
+            "coalesced": 0
+          },
+          "durationMs": 812,
+          "orchestration": {
+            "phases": [
+              {
+                "phase": "workspace-load",
+                "wallMs": 41
+              },
+              {
+                "phase": "runtime-sync",
+                "wallMs": 12
+              },
+              {
+                "phase": "probe",
+                "wallMs": 3
+              },
+              {
+                "phase": "selection",
+                "wallMs": 20
+              },
+              {
+                "phase": "plan",
+                "wallMs": 64
+              }
+            ],
+            "processes": [
+              {
+                "origin": "engine",
+                "kind": "job",
+                "count": 1
+              },
+              {
+                "origin": "engine",
+                "kind": "git",
+                "count": 6,
+                "cpuMs": 18
+              },
+              {
+                "origin": "jobs",
+                "kind": "git",
+                "count": 2,
+                "cpuMs": 5
+              },
+              {
+                "origin": "jobs",
+                "kind": "other",
+                "count": 1,
+                "cpuMs": 2100
+              }
+            ],
+            "git": [
+              {
+                "origin": "engine",
+                "subcommand": "ls-files",
+                "count": 2
+              },
+              {
+                "origin": "engine",
+                "subcommand": "rev-parse",
+                "count": 4
+              },
+              {
+                "origin": "jobs",
+                "subcommand": "rev-parse",
+                "count": 2
+              }
+            ],
+            "cpu": {
+              "engineMs": 620,
+              "extensionMs": 80,
+              "controlMs": 40,
+              "cliMs": 0,
+              "gitMs": 23,
+              "totalMs": 700,
+              "runMs": 2960,
+              "sharePermille": 236,
+              "perTaskMs": 190
+            }
+          }
+        }
+      },
+      "violations": [
+        {
+          "code": "cli.result.count_mismatch",
+          "path": "run.orchestration.cpu.totalMs"
+        }
+      ]
+    },
+    {
+      "id": "invalid.envelope.orchestration-share-is-not-total-over-run",
+      "document": "resultEnvelope",
+      "expect": "reject",
+      "summary": "sharePermille is totalMs * 1000 / runMs, truncated.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "build",
+        "status": "success",
+        "exitCode": 0,
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": {
+            "total": 4,
+            "succeeded": 4,
+            "failed": 0,
+            "canceled": 0,
+            "skipped": 0
+          },
+          "reuse": {
+            "localCache": 2,
+            "remoteCache": 1,
+            "coalesced": 0
+          },
+          "durationMs": 812,
+          "orchestration": {
+            "phases": [
+              {
+                "phase": "workspace-load",
+                "wallMs": 41
+              },
+              {
+                "phase": "runtime-sync",
+                "wallMs": 12
+              },
+              {
+                "phase": "probe",
+                "wallMs": 3
+              },
+              {
+                "phase": "selection",
+                "wallMs": 20
+              },
+              {
+                "phase": "plan",
+                "wallMs": 64
+              }
+            ],
+            "processes": [
+              {
+                "origin": "engine",
+                "kind": "job",
+                "count": 1
+              },
+              {
+                "origin": "engine",
+                "kind": "git",
+                "count": 6,
+                "cpuMs": 18
+              },
+              {
+                "origin": "jobs",
+                "kind": "git",
+                "count": 2,
+                "cpuMs": 5
+              },
+              {
+                "origin": "jobs",
+                "kind": "other",
+                "count": 1,
+                "cpuMs": 2100
+              }
+            ],
+            "git": [
+              {
+                "origin": "engine",
+                "subcommand": "ls-files",
+                "count": 2
+              },
+              {
+                "origin": "engine",
+                "subcommand": "rev-parse",
+                "count": 4
+              },
+              {
+                "origin": "jobs",
+                "subcommand": "rev-parse",
+                "count": 2
+              }
+            ],
+            "cpu": {
+              "engineMs": 620,
+              "extensionMs": 80,
+              "controlMs": 40,
+              "cliMs": 0,
+              "gitMs": 23,
+              "totalMs": 763,
+              "runMs": 2960,
+              "sharePermille": 300,
+              "perTaskMs": 190
+            }
+          }
+        }
+      },
+      "violations": [
+        {
+          "code": "cli.result.count_mismatch",
+          "path": "run.orchestration.cpu.sharePermille"
+        }
+      ]
+    },
+    {
+      "id": "invalid.envelope.orchestration-phase-twice",
+      "document": "resultEnvelope",
+      "expect": "reject",
+      "summary": "An engine phase is listed once, its walls summed.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "build",
+        "status": "success",
+        "exitCode": 0,
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": {
+            "total": 4,
+            "succeeded": 4,
+            "failed": 0,
+            "canceled": 0,
+            "skipped": 0
+          },
+          "reuse": {
+            "localCache": 2,
+            "remoteCache": 1,
+            "coalesced": 0
+          },
+          "durationMs": 812,
+          "orchestration": {
+            "phases": [
+              {
+                "phase": "workspace-load",
+                "wallMs": 41
+              },
+              {
+                "phase": "runtime-sync",
+                "wallMs": 12
+              },
+              {
+                "phase": "probe",
+                "wallMs": 3
+              },
+              {
+                "phase": "selection",
+                "wallMs": 20
+              },
+              {
+                "phase": "plan",
+                "wallMs": 64
+              },
+              {
+                "phase": "plan",
+                "wallMs": 1
+              }
+            ],
+            "processes": [
+              {
+                "origin": "engine",
+                "kind": "job",
+                "count": 1
+              },
+              {
+                "origin": "engine",
+                "kind": "git",
+                "count": 6,
+                "cpuMs": 18
+              },
+              {
+                "origin": "jobs",
+                "kind": "git",
+                "count": 2,
+                "cpuMs": 5
+              },
+              {
+                "origin": "jobs",
+                "kind": "other",
+                "count": 1,
+                "cpuMs": 2100
+              }
+            ],
+            "git": [
+              {
+                "origin": "engine",
+                "subcommand": "ls-files",
+                "count": 2
+              },
+              {
+                "origin": "engine",
+                "subcommand": "rev-parse",
+                "count": 4
+              },
+              {
+                "origin": "jobs",
+                "subcommand": "rev-parse",
+                "count": 2
+              }
+            ],
+            "cpu": {
+              "engineMs": 620,
+              "extensionMs": 80,
+              "controlMs": 40,
+              "cliMs": 0,
+              "gitMs": 23,
+              "totalMs": 763,
+              "runMs": 2960,
+              "sharePermille": 257,
+              "perTaskMs": 190
+            }
+          }
+        }
+      },
+      "violations": [
+        {
+          "code": "cli.result.invalid_value",
+          "path": "run.orchestration.phases[5]"
+        }
+      ]
+    },
+    {
+      "id": "invalid.envelope.orchestration-unknown-kind",
+      "document": "resultEnvelope",
+      "expect": "reject",
+      "summary": "A process kind is one of job, batch, control, cli, git and other.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "build",
+        "status": "success",
+        "exitCode": 0,
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": {
+            "total": 4,
+            "succeeded": 4,
+            "failed": 0,
+            "canceled": 0,
+            "skipped": 0
+          },
+          "reuse": {
+            "localCache": 2,
+            "remoteCache": 1,
+            "coalesced": 0
+          },
+          "durationMs": 812,
+          "orchestration": {
+            "phases": [
+              {
+                "phase": "workspace-load",
+                "wallMs": 41
+              },
+              {
+                "phase": "runtime-sync",
+                "wallMs": 12
+              },
+              {
+                "phase": "probe",
+                "wallMs": 3
+              },
+              {
+                "phase": "selection",
+                "wallMs": 20
+              },
+              {
+                "phase": "plan",
+                "wallMs": 64
+              }
+            ],
+            "processes": [
+              {
+                "origin": "engine",
+                "kind": "daemon",
+                "count": 1
+              },
+              {
+                "origin": "engine",
+                "kind": "git",
+                "count": 6,
+                "cpuMs": 18
+              },
+              {
+                "origin": "jobs",
+                "kind": "git",
+                "count": 2,
+                "cpuMs": 5
+              },
+              {
+                "origin": "jobs",
+                "kind": "other",
+                "count": 1,
+                "cpuMs": 2100
+              }
+            ],
+            "git": [
+              {
+                "origin": "engine",
+                "subcommand": "ls-files",
+                "count": 2
+              },
+              {
+                "origin": "engine",
+                "subcommand": "rev-parse",
+                "count": 4
+              },
+              {
+                "origin": "jobs",
+                "subcommand": "rev-parse",
+                "count": 2
+              }
+            ],
+            "cpu": {
+              "engineMs": 620,
+              "extensionMs": 80,
+              "controlMs": 40,
+              "cliMs": 0,
+              "gitMs": 23,
+              "totalMs": 763,
+              "runMs": 2960,
+              "sharePermille": 257,
+              "perTaskMs": 190
+            }
+          }
+        }
+      },
+      "violations": [
+        {
+          "code": "cli.result.invalid_enum",
+          "path": "run.orchestration.processes[0].kind"
+        }
+      ]
+    },
+    {
+      "id": "session.file.task-orchestration",
+      "document": "sessionFile",
+      "expect": "accept",
+      "summary": "A task record states the wall it spent computing its key, waiting for a lock and restoring an entry; a member is present when the task entered that step, even at 0 ms.",
+      "value": {
+        "protocolVersion": 2,
+        "sessionId": "20260728-091500-a1b2c3",
+        "startTime": "2026-07-28T09:15:00.000Z",
+        "endTime": "2026-07-28T09:15:03.500Z",
+        "commands": [
+          "build"
+        ],
+        "git": {
+          "branch": "epic/cli-vnext-core",
+          "baseline": "origin/main"
+        },
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": {
+            "total": 1,
+            "succeeded": 1,
+            "failed": 0,
+            "canceled": 0,
+            "skipped": 0
+          },
+          "reuse": {
+            "localCache": 0,
+            "remoteCache": 0,
+            "coalesced": 0
+          },
+          "durationMs": 3500
+        },
+        "tasks": [
+          {
+            "identity": {
+              "key": "/tooling/cli:build~compile",
+              "scope": "project",
+              "project": {
+                "id": "/tooling/cli",
+                "name": "@putnami/cli"
+              },
+              "task": {
+                "name": "build~compile",
+                "command": "build",
+                "step": "compile",
+                "kind": "go-build"
+              },
+              "provider": {
+                "extension": "@putnami/go",
+                "version": "0.1.0"
+              }
+            },
+            "status": "success",
+            "reuse": "none",
+            "exitCode": 0,
+            "durationMs": 3320,
+            "taskWallMs": 3480,
+            "spawnToFirstEventMs": 41,
+            "orchestration": {
+              "keyMs": 3,
+              "lockWaitMs": 0,
+              "restoreMs": 11
+            }
+          }
+        ]
+      }
+    },
+    {
       "id": "envelope.run.docker-publication",
       "document": "resultEnvelope",
       "expect": "accept",

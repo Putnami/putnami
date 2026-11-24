@@ -656,6 +656,41 @@ report it; a surface reduced without the physical ledger (the `--output=jsonl`
 `session:end` record, and the `--output=json` envelope) simply omits it, which
 is the same "no measurement, no claim" rule the environment block follows.
 
+### Orchestration report
+
+`run.orchestration` is an additive optional object on the run summary. It says
+where the run spent time and CPU outside the tools its jobs run. It is
+information: no rule fails a run on it, and a member the producer could not
+measure is absent rather than zero.
+
+| Member | Meaning |
+|--------|---------|
+| `phases[]` | `{phase, wallMs}` for each engine phase the run entered: `workspace-load`, `runtime-sync`, `probe`, `selection`, `plan`, each listed once |
+| `processes[]` | `{origin, kind, count, cpuMs?}`: processes started by the `engine` or by `jobs` built on the extension SDK, by kind (`job`, `batch`, `control`, `cli`, `git`, `other`), one entry per pair |
+| `git[]` | `{origin, subcommand, count}`: git calls by subcommand, one entry per pair |
+| `cpu` | the orchestration CPU, below |
+
+`cpu.totalMs` is the sum of `engineMs` (the CLI process itself), `extensionMs`
+(what job processes reported for themselves, without their children),
+`controlMs` (extension processes the engine started for anything but a job),
+`cliMs` (CLI processes the engine or a job started) and `gitMs` (git the engine
+or an SDK job started); `cli.result.count_mismatch` otherwise. `runMs` is the
+whole run: the CLI process and every child it waited for. `sharePermille` is
+`totalMs × 1000 / runMs`, truncating, and absent when that is 0; `perTaskMs` is
+`totalMs / counts.total`, truncating, and absent when the run selected no task.
+`unreportedProcesses` counts the job and batch processes that reported no CPU of
+their own, a runtime not built on the extension SDK: their CPU is in no member.
+
+A task record carries `orchestration` with `keyMs`, `lockWaitMs` and
+`restoreMs`: the wall the scheduler spent computing its key, waiting for a cache
+lease or its task-output locks, and restoring an entry. A member is present
+when the task entered that step, even at 0 ms, and the object is absent when it
+entered none.
+
+A job process states its own part in its result data under `processReport`
+(`protocols/runtime`): `selfCpuMs`, `starts[]` by kind and `git[]` by
+subcommand. The engine sums those reports into the `jobs` origin.
+
 ### Dependency preparation
 
 `sessionFile.preparation` is an additive optional object: the stage that
