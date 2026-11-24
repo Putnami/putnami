@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "whole-repository-gates-run-on-main",
+  "statement": "a gate that keys on every file of a kind in the repository carries the whole-repository tag, which disable.tags names, and runs on main by name; gates that read a known document set key on those documents and stay in the per-change gate",
+  "settled": "2026-11-24",
+  "settledBy": "a build session, for the owner to review on its proposal",
+  "adr": "tooling/cli-documents/doc/adr/0001-whole-repository-gates-run-on-main.md",
+  "reviewOnly": true
+}
