@@ -15,6 +15,7 @@ import (
 
 	"go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 const (
@@ -96,7 +97,7 @@ func runAttached(cmd *exec.Cmd, forward *jsonl.Emitter) error {
 	if forward == nil {
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
-		return cmd.Run()
+		return procstat.Run(cmd)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -106,7 +107,7 @@ func runAttached(cmd *exec.Cmd, forward *jsonl.Emitter) error {
 	if err != nil {
 		return err
 	}
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd); err != nil {
 		return err
 	}
 	var readers sync.WaitGroup
@@ -114,5 +115,5 @@ func runAttached(cmd *exec.Cmd, forward *jsonl.Emitter) error {
 	go jsonl.ForwardPipe(forward, stdout, "info", &readers)
 	go jsonl.ForwardPipe(forward, stderr, "info", &readers)
 	readers.Wait()
-	return cmd.Wait()
+	return procstat.Wait(cmd)
 }

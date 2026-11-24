@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/registrycred"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -166,7 +167,7 @@ func fetched(ctx context.Context, root stacks.RootStep) bool {
 	cmd := exec.CommandContext(ctx, root.Program("cargo"), "fetch", "--locked", "--offline", "--quiet") //nolint:gosec // the selected toolchain
 	cmd.Dir = root.Dir
 	cmd.Env = root.Env
-	return cmd.Run() == nil
+	return procstat.Run(cmd) == nil
 }
 
 // installTestTools installs the test task's tools the PATH lacks ahead of the
@@ -197,7 +198,7 @@ func runCargo(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter, co
 	cmd.Env = root.Env
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		emit.DiagnosticWithCode("error", fmt.Sprintf("cargo %s in %s: %v", strings.Join(args, " "), root.Dir, err), "", 0, 0, code)
 		return fmt.Errorf("%s: %w", code, err)
 	}

@@ -13,6 +13,7 @@ import (
 
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/typescript/extension/internal/errs"
 	"go.putnami.dev/typescript/extension/internal/project"
@@ -177,6 +178,7 @@ func runOnce(emit *jsonl.Emitter, bin string, args []string, projectPath string,
 		emit.Diagnostic("error", "failed to start workload: "+err.Error(), "", 0)
 		return 1
 	}
+	procstat.Started(procstat.Classify(cmd.Path), cmd.Args)
 	// Ends what the workload left running once it exits (on Windows, the
 	// descendants in its job).
 	defer func() { _ = tree.Close() }()
@@ -189,7 +191,7 @@ func runOnce(emit *jsonl.Emitter, bin string, args []string, projectPath string,
 	doneCh := make(chan error, 1)
 	go func() {
 		wg.Wait()
-		doneCh <- cmd.Wait()
+		doneCh <- procstat.Wait(cmd)
 	}()
 
 	sigCh := make(chan os.Signal, 1)

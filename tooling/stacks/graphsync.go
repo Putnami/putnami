@@ -17,6 +17,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // ProjectSchema is the schema a putnami.json the graph sync creates names.
@@ -738,7 +739,7 @@ func ExportGraph(ctx context.Context, root, stack, program string, args []string
 	cmd.Dir = root
 	cmd.Stdout = out
 	cmd.Stderr = stderr
-	runErr := cmd.Run()
+	runErr := procstat.Run(cmd)
 	if err := out.Close(); err != nil && runErr == nil {
 		runErr = err
 	}

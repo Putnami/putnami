@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/stacks"
 	"go.putnami.dev/tooling/stacks/imageload"
 )
@@ -267,7 +268,7 @@ func crateBinary(c context.Context, tools compiler, root stacks.RootStep, entryp
 	cmd.Env = tools.env
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd)
 	if err != nil {
 		return "", "", fmt.Errorf("cargo metadata: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}

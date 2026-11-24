@@ -20,6 +20,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Diagnostic codes of the task runner.
@@ -766,7 +767,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		cmd.Env = env
 		cmd.Stdout = in.stdout
 		cmd.Stderr = in.stdout
-		if err := cmd.Run(); err != nil {
+		if err := procstat.Run(cmd); err != nil {
 			stepErr = failWith(emit, CodeStepFailed, "%s: %v", strings.Join(argv, " "), err)
 			break
 		}
@@ -782,7 +783,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		cmd.Env = env
 		cmd.Stdout = in.stdout
 		cmd.Stderr = in.stdout
-		if err := cmd.Run(); err != nil {
+		if err := procstat.Run(cmd); err != nil {
 			if stepErr == nil {
 				stepErr = failWith(emit, CodeStepFailed, "%s: %v", strings.Join(argv, " "), err)
 			} else {
@@ -904,7 +905,7 @@ func hasCoverageSupport(ctx context.Context, program string, args []string, dir 
 	cmd := exec.CommandContext(ctx, program, args...) //nolint:gosec // the profile's own probe
 	cmd.Dir = dir
 	cmd.Env = env
-	return cmd.Run() == nil
+	return procstat.Run(cmd) == nil
 }
 
 // runtimePath is what {runtime} expands to: Stack.Runtime, else the running

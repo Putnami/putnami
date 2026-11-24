@@ -21,6 +21,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	coveragecheck "go.putnami.dev/sdk/extension/coverage"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/sdk/extension/specreport"
 	"golang.org/x/mod/modfile"
@@ -137,11 +138,11 @@ var runGoCommand = func(binary string, args []string, dir string, env []string) 
 	cmd.Dir = dir
 	cmd.Env = env
 	if len(args) == 0 || (args[0] != "list" && args[0] != "env") {
-		return cmd.CombinedOutput()
+		return procstat.CombinedOutput(cmd)
 	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		return append(stdout.Bytes(), stderr.Bytes()...), err
 	}
 	return stdout.Bytes(), nil
@@ -777,7 +778,7 @@ func evaluateBatchProject(
 				htmlPath := filepath.Join(project.outputDir, "coverage.html")
 				cmd := exec.Command(goBinary, "tool", "cover", "-html="+project.coverFile, "-o", htmlPath)
 				cmd.Env = project.env
-				_ = cmd.Run()
+				_ = procstat.Run(cmd)
 			}
 		}
 	}

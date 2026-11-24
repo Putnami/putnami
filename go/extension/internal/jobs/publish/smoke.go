@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.putnami.dev/go/extension/internal/toolchain"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // smokeTestTimeout caps the smoke test runtime. `go mod download` on a
@@ -111,7 +112,7 @@ func runGoModDownload(ctx context.Context, proxy, cache, modulePath, version str
 	}
 	cmd := exec.CommandContext(ctx, goBinary, "mod", "download", "-x", modulePath+"@"+version)
 	cmd.Env = goModDownloadEnvironment(os.Environ(), goBinary, proxy, cache)
-	out, err := cmd.CombinedOutput()
+	out, err := procstat.CombinedOutput(cmd)
 	return string(out), err
 }
 

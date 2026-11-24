@@ -10,6 +10,7 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/pinnedarchive"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/stacks"
 )
 
@@ -130,7 +131,7 @@ var provideCompiler = func(ctx context.Context, expected stacks.Expected, target
 		cmd.Env = append(withoutRustupEnv(os.Environ()), "RUSTUP_HOME="+rustupHome)
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
+		if err := procstat.Run(cmd); err != nil {
 			return compiler{}, fmt.Errorf("rustup target add: %w", err)
 		}
 	}

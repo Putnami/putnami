@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 )
 
@@ -190,7 +191,7 @@ func spawnServerOn(goos string, emit *jsonl.Emitter, cmdArgs []string, cwd strin
 	proc := &serverProcess{cmd: cmd, tree: tree, done: make(chan struct{})}
 	go func() {
 		wg.Wait()
-		proc.waitErr = cmd.Wait()
+		proc.waitErr = procstat.Wait(cmd)
 		_ = proc.tree.Close()
 		close(proc.done)
 	}()
@@ -205,12 +206,13 @@ func spawnServerOn(goos string, emit *jsonl.Emitter, cmdArgs []string, cwd strin
 // that receives the stop requests this process relays, and the tree is nil.
 func startServer(cmd *exec.Cmd, goos string) (*proctree.Tree, error) {
 	if goos != "windows" {
-		return nil, cmd.Start()
+		return nil, procstat.Start(cmd)
 	}
 	tree := proctree.New(cmd)
 	if err := tree.Start(); err != nil {
 		return nil, err
 	}
+	procstat.Started(procstat.Classify(cmd.Path), cmd.Args)
 	return tree, nil
 }
 

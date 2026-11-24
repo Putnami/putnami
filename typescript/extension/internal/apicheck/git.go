@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/typescript/extension/internal/apisurface"
 )
 
@@ -58,7 +59,7 @@ func gitCapture(dir string, env []string, stdin io.Reader, args ...string) (stri
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", stderr.String(), fmt.Errorf("timed out after %s", gitTimeout)
 		}

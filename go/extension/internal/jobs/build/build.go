@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Invocation intent, bound by the PHASE the manifest step selected.
@@ -165,7 +166,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 				tee := io.MultiWriter(os.Stderr, &tidyOut)
 				cmd.Stdout = tee
 				cmd.Stderr = tee
-				if err := cmd.Run(); err != nil {
+				if err := procstat.Run(cmd); err != nil {
 					// A tidy that RAN and failed degrades to an uncacheable SKIP
 					// that re-runs its network round trips on every build, so
 					// surface it as a diagnostic (visible at default verbosity),
@@ -327,7 +328,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 		cmd.Dir = ctx.Project.FullPath
 		cmd.Env = buildEnv
 
-		output, err := cmd.CombinedOutput()
+		output, err := procstat.CombinedOutput(cmd)
 
 		if err != nil {
 			parse.GoBuildErrors(string(output), ctx.WorkspaceRoot, ctx.Project.FullPath, emit)
@@ -481,7 +482,7 @@ func runCrossCompile(ctx *pctx.Context, emit *jsonl.Emitter, goBinary, entrypoin
 					cmd := exec.Command(goBinary, buildArgs...)
 					cmd.Dir = ctx.Project.FullPath
 					cmd.Env = platformEnv
-					return cmd.CombinedOutput()
+					return procstat.CombinedOutput(cmd)
 				})
 				if err != nil {
 					parse.GoBuildErrors(string(output), ctx.WorkspaceRoot, ctx.Project.FullPath, emit)
@@ -562,7 +563,7 @@ func runCompileCheck(
 		cmd.Dir = ctx.Project.FullPath
 		cmd.Env = env
 
-		if output, err := cmd.CombinedOutput(); err != nil {
+		if output, err := procstat.CombinedOutput(cmd); err != nil {
 			parse.GoBuildErrors(string(output), ctx.WorkspaceRoot, ctx.Project.FullPath, emit)
 			failed = true
 		}
@@ -775,7 +776,7 @@ func runTidyCheck(ctx *pctx.Context, emit *jsonl.Emitter, goBinary string) (stri
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = io.MultiWriter(os.Stderr, &stderr)
-	err := cmd.Run()
+	err := procstat.Run(cmd)
 	switch {
 	case err == nil:
 		emit.PhaseEnd("setup", "success")

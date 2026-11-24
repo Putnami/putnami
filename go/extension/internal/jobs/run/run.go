@@ -26,6 +26,7 @@ import (
 	"go.putnami.dev/go/extension/internal/toolchain"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 )
 
@@ -131,7 +132,7 @@ func buildHostBinary(goBinary, binPath, entrypoint string, race bool, dir string
 	if err != nil {
 		return false
 	}
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd); err != nil {
 		emit.Diagnostic("error", "failed to start build: "+err.Error(), "", 0)
 		return false
 	}
@@ -142,7 +143,7 @@ func buildHostBinary(goBinary, binPath, entrypoint string, race bool, dir string
 	go jsonl.ForwardPipe(emit, stderrPipe, "error", &wg)
 	wg.Wait()
 
-	return cmd.Wait() == nil
+	return procstat.Wait(cmd) == nil
 }
 
 // runOnce runs the command a single time, streaming stdout/stderr as JSONL log
@@ -162,7 +163,7 @@ func runOnce(cmdArgs []string, dir string, emit *jsonl.Emitter) int {
 		return 1
 	}
 
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd); err != nil {
 		emit.Diagnostic("error", "failed to start workload: "+err.Error(), "", 0)
 		return 1
 	}
@@ -175,7 +176,7 @@ func runOnce(cmdArgs []string, dir string, emit *jsonl.Emitter) int {
 	doneChan := make(chan error, 1)
 	go func() {
 		wg.Wait()
-		doneChan <- cmd.Wait()
+		doneChan <- procstat.Wait(cmd)
 	}()
 
 	sigChan := make(chan os.Signal, 1)

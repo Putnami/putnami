@@ -10,6 +10,7 @@ import (
 
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/stacks"
 )
 
@@ -73,6 +74,6 @@ func nextestAccepts(root stacks.RootStep, option string) bool {
 	cmd := exec.CommandContext(ctx, root.Program("cargo"), "nextest", "run", "--help") //nolint:gosec // the selected toolchain
 	cmd.Dir = root.Project
 	cmd.Env = root.Env
-	help, err := cmd.Output()
+	help, err := procstat.Output(cmd)
 	return err == nil && bytes.Contains(help, []byte(option))
 }

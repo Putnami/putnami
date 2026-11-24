@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/typescript/extension/internal/errs"
 )
 
@@ -132,7 +133,7 @@ func superviseProcess(emit *jsonl.Emitter, cmd *exec.Cmd, sigCh <-chan os.Signal
 	if err != nil {
 		return false, fmt.Errorf("stderr pipe: %w", err)
 	}
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd); err != nil {
 		return false, fmt.Errorf("starting %s: %w", filepath.Base(cmd.Path), err)
 	}
 
@@ -144,7 +145,7 @@ func superviseProcess(emit *jsonl.Emitter, cmd *exec.Cmd, sigCh <-chan os.Signal
 	doneCh := make(chan error, 1)
 	go func() {
 		wg.Wait()
-		doneCh <- cmd.Wait()
+		doneCh <- procstat.Wait(cmd)
 	}()
 
 	waitErr, stopped := superviseServe(cmd.Process, sigCh, doneCh)
@@ -239,7 +240,7 @@ func startNode(emit *jsonl.Emitter, nodeBin string, args []string, dir string, e
 	cmd.Stdout = stdoutWriter
 	cmd.Stderr = stderrWriter
 	cmd.WaitDelay = nodeOutputDelay
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd); err != nil {
 		return nil, err
 	}
 
@@ -250,7 +251,7 @@ func startNode(emit *jsonl.Emitter, nodeBin string, args []string, dir string, e
 
 	done := make(chan error, 1)
 	go func() {
-		err := cmd.Wait()
+		err := procstat.Wait(cmd)
 		if errors.Is(err, exec.ErrWaitDelay) {
 			err = nil
 		}

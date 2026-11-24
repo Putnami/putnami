@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 const (
@@ -252,7 +253,7 @@ func pythonVersion(uv, wsRoot string, env []string) (string, error) {
 	version := exec.Command(uv, "run", "--no-sync", "python", "-c", "import platform; print(platform.python_version())") //nolint:gosec // the resolved uv
 	version.Dir = wsRoot
 	version.Env = env
-	answer, err := version.Output()
+	answer, err := procstat.Output(version)
 	if err != nil {
 		return "", fmt.Errorf("uv run python: %w%s", err, stderrOf(err))
 	}
@@ -311,7 +312,7 @@ func installDependencies(ctx *pctx.Context, uv string, env []string, wheelPlatfo
 		"--package", ResolvePackageName(ctx))
 	export.Dir = wsRoot
 	export.Env = env
-	exported, err := export.Output()
+	exported, err := procstat.Output(export)
 	if err != nil {
 		return fmt.Errorf("uv export: %w%s", err, stderrOf(err))
 	}
@@ -484,7 +485,7 @@ func runUV(uv, wsRoot string, env, args []string) error {
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	command.Stdout = &stderr
-	if err := command.Run(); err != nil {
+	if err := procstat.Run(command); err != nil {
 		return fmt.Errorf("uv %s: %w\n%s", strings.Join(args[:2], " "), err, strings.TrimSpace(stderr.String()))
 	}
 	return nil
@@ -699,13 +700,13 @@ func loadImage(layout string, tags []string) error {
 	}
 	load := exec.Command("docker", "load", "-i", archive.Name()) //nolint:gosec // fixed program, a path from CreateTemp
 	load.Stderr = os.Stderr
-	if err := load.Run(); err != nil {
+	if err := procstat.Run(load); err != nil {
 		return errors.New("docker load failed for " + tags[0])
 	}
 	for _, alias := range tags[1:] {
 		tag := exec.Command("docker", "tag", tags[0], alias) //nolint:gosec // fixed program
 		tag.Stderr = os.Stderr
-		if err := tag.Run(); err != nil {
+		if err := procstat.Run(tag); err != nil {
 			return errors.New("docker tag failed for " + alias)
 		}
 	}

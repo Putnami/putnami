@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/go/extension/internal/toolchain"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Emitter is the part of the job event stream the lifecycle jobs write.
@@ -184,7 +185,7 @@ func (j *Job) run(c command) (stdout, stderr string, err error) {
 		cmd.Stdout = j.writerFor(c.stdout, &outBuf, j.Stdout)
 		cmd.Stderr = j.writerFor(c.stderr, &errBuf, j.Stderr)
 	}
-	err = cmd.Run()
+	err = procstat.Run(cmd)
 	j.trap.check()
 	return trimNewlines(outBuf.String()), trimNewlines(errBuf.String()), err
 }

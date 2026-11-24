@@ -11,6 +11,7 @@ import (
 	"go.putnami.dev/go/extension/internal/parse"
 	"go.putnami.dev/go/extension/internal/toolchain"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Batch staticcheck reuses ONE staticcheck process across several compatible
@@ -350,7 +351,7 @@ var runStaticcheckCommand = func(binary string, patterns []string, dir string) (
 	cmd := exec.Command(binary, patterns...)
 	cmd.Dir = dir
 	cmd.Env = toolchain.WorkspaceBuildEnv(os.Environ(), dir, toolchain.CurrentGoBinary())
-	return cmd.CombinedOutput()
+	return procstat.CombinedOutput(cmd)
 }
 
 // resolveStaticcheckBinary is a package variable so tests can bypass the real

@@ -18,6 +18,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	coveragecheck "go.putnami.dev/sdk/extension/coverage"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/sdk/extension/specreport"
 )
@@ -285,7 +286,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 				htmlPath := filepath.Join(outDir, "coverage.html")
 				htmlCmd := exec.Command(goBinary, "tool", "cover", "-html="+coverFile, "-o", htmlPath)
 				htmlCmd.Env = testEnv
-				htmlCmd.Run() //nolint:errcheck // best-effort HTML report
+				procstat.Run(htmlCmd) //nolint:errcheck // best-effort HTML report
 			}
 		}
 	}

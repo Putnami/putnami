@@ -15,6 +15,8 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Diagnostic codes of the toolchain check.
@@ -535,7 +537,7 @@ func (t Toolchain) MachineVersions(ctx context.Context, dir string, env []string
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		return nil, fmt.Errorf("%s: %w: %s", strings.Join(t.Command, " "), err, strings.TrimSpace(stderr.String()))
 	}
 	idx := re.SubexpIndex("version")
@@ -568,7 +570,7 @@ func (t Toolchain) MachineVersion(ctx context.Context, dir string, env []string)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		return "", fmt.Errorf("%s: %w: %s", strings.Join(t.Command, " "), err, strings.TrimSpace(stderr.String()))
 	}
 	idx := re.SubexpIndex("version")

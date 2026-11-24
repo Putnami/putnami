@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/pinnedarchive"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/robustio"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -140,7 +141,7 @@ func Provide(ctx context.Context, expected stacks.Expected, info func(string)) (
 	// The job's stdout carries its protocol.
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		return stacks.Provided{}, fmt.Errorf("rustup toolchain install %s: %w", channel, err)
 	}
 	if err := os.WriteFile(filepath.Join(toolchain, installedMarker), nil, 0o644); err != nil { //nolint:gosec // a marker in the extension's own folder

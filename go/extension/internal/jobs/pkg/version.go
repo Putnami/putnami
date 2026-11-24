@@ -12,6 +12,7 @@ import (
 
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 func resolveVersion(ctx *pctx.Context) (baseVersion, packageName string) {
@@ -59,7 +60,7 @@ func resolveSuffix(ctx *pctx.Context) string {
 
 func gitSuffix(workspaceRoot string) string {
 	shaCmd := exec.Command("git", "-C", workspaceRoot, "rev-parse", "--short", "HEAD")
-	shaOut, err := shaCmd.Output()
+	shaOut, err := procstat.Output(shaCmd)
 	if err != nil {
 		return "nogit"
 	}
@@ -70,13 +71,13 @@ func gitSuffix(workspaceRoot string) string {
 
 	// Detect dirty working tree and append a diff-based hash
 	statusCmd := exec.Command("git", "-C", workspaceRoot, "status", "--porcelain")
-	statusOut, err := statusCmd.Output()
+	statusOut, err := procstat.Output(statusCmd)
 	if err != nil || strings.TrimSpace(string(statusOut)) == "" {
 		return sha
 	}
 
 	diffCmd := exec.Command("git", "-C", workspaceRoot, "diff", "HEAD", "--no-color")
-	diffOut, _ := diffCmd.Output()
+	diffOut, _ := procstat.Output(diffCmd)
 	h := sha256.Sum256(diffOut)
 	dirtyHash := fmt.Sprintf("%x", h[:4])[:7]
 	return sha + "-" + dirtyHash

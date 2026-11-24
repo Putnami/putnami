@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // pyTestBatchDiagnostic mirrors the scheduler's batchWireDiagnostic JSON shape
@@ -69,7 +70,7 @@ func runPytestCommand(cmdCtx context.Context, name string, args []string, dir st
 	cmd := exec.CommandContext(cmdCtx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = env
-	out, err := cmd.CombinedOutput()
+	out, err := procstat.CombinedOutput(cmd)
 	return string(out), err
 }
 

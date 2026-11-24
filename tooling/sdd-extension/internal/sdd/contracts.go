@@ -37,6 +37,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	contracts "go.putnami.dev/protocol/contracts"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Committed and staged contract artifact paths, all project-relative. The
@@ -478,7 +479,7 @@ func outcomeError(r CheckReport) error {
 func GitPriorManifest(repoRoot, projectRel string) PriorLoader {
 	return func() ([]byte, error) {
 		rel := filepath.ToSlash(filepath.Join(projectRel, ContractsSourcePath))
-		out, err := exec.Command("git", "-C", repoRoot, "show", "HEAD:"+rel).Output()
+		out, err := procstat.Output(exec.Command("git", "-C", repoRoot, "show", "HEAD:"+rel))
 		if err != nil {
 			// git ran and exited non-zero: the ref/path is absent or this is not
 			// a git repo — a legitimate "no baseline", not a failure.

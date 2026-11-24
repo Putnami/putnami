@@ -31,6 +31,7 @@ import (
 	"go.putnami.dev/go/extension/internal/toolchain"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 )
 
@@ -202,7 +203,7 @@ func buildServeBinary(goBinary, binPath, entrypoint string, race bool, dir strin
 	cmd.Dir = dir
 	cmd.Env = toolchain.WorkspaceBuildEnv(os.Environ(), dir, goBinary)
 
-	output, err := cmd.CombinedOutput()
+	output, err := procstat.CombinedOutput(cmd)
 	if err != nil {
 		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
 			emit.Diagnostic("error", trimmed, "", 0)
@@ -232,7 +233,7 @@ func runCommand(cmdArgs []string, dir string, env []string, emit *jsonl.Emitter)
 		return 1
 	}
 
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd); err != nil {
 		return 1
 	}
 
@@ -242,7 +243,7 @@ func runCommand(cmdArgs []string, dir string, env []string, emit *jsonl.Emitter)
 	go jsonl.ForwardPipe(emit, stderrPipe, "warn", &wg)
 	wg.Wait()
 
-	if err := cmd.Wait(); err != nil {
+	if err := procstat.Wait(cmd); err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			return exitErr.ExitCode()
@@ -333,6 +334,7 @@ func startWatchedServer(cmdArgs []string, dir string, env []string, emit *jsonl.
 	if err := tree.Start(); err != nil {
 		return nil, err
 	}
+	procstat.Started(procstat.Classify(cmd.Path), cmd.Args)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -342,7 +344,7 @@ func startWatchedServer(cmdArgs []string, dir string, env []string, emit *jsonl.
 	done := make(chan error, 1)
 	go func() {
 		wg.Wait()
-		err := cmd.Wait()
+		err := procstat.Wait(cmd)
 		_ = tree.Close()
 		done <- err
 	}()
@@ -414,7 +416,7 @@ func killProcessOnPort(port string) bool {
 	if lsof, err := exec.LookPath("lsof"); err == nil {
 		// lsof is resolved by LookPath and port is a validated decimal TCP port.
 		// It exits with a failure when no process listens on the port.
-		out, err := exec.Command(lsof, "-n", "-P", "-t", "-i", "tcp:"+port, "-sTCP:LISTEN").Output() //nolint:gosec
+		out, err := procstat.Output(exec.Command(lsof, "-n", "-P", "-t", "-i", "tcp:"+port, "-sTCP:LISTEN")) //nolint:gosec
 		if err != nil {
 			return false
 		}
@@ -441,7 +443,7 @@ func killProcessOnPort(port string) bool {
 	if fuser, err := exec.LookPath("fuser"); err == nil {
 		// fuser is resolved by LookPath and port is a validated decimal TCP port.
 		// It exits with a failure when no process uses the port.
-		return exec.Command(fuser, "-k", port+"/tcp").Run() == nil //nolint:gosec
+		return procstat.Run(exec.Command(fuser, "-k", port+"/tcp")) == nil //nolint:gosec
 	}
 
 	return false
