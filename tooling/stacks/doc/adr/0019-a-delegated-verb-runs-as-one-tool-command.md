@@ -74,6 +74,13 @@ delegated task has its cache off.
   other commands it would have started.
 - A task that runs alone, such as a retry or the only task of its verb, runs
   its own steps, as before.
+- A project's override that replaces a task's `steps` drops the profile's
+  `batch` unless it states its own: the batch stands for the steps it
+  replaced. A sync that writes a project's steps writes their batch beside
+  them: moon writes `moon run {component}:<its task>`, so `moon run api:test
+  pricing:unit` runs both in one command, and Nx one `nx run-many -t <target>`
+  per mapped target. Members whose batch steps differ beyond the argument
+  that names their component run separate commands.
 
 ## Rejected alternatives
 
@@ -99,5 +106,8 @@ delegated task has its cache off.
   tool's own rule, and a target the tool does not run fails as not run.
 - A run report or an output the tool changes its format of fails every
   project of a failing command with the step's message, never passes one.
+- The scheduler groups only tasks whose effective parameters match, so a
+  project whose options give its task other parameters, such as its own
+  reports, runs its own command.
 - turbo, rush, pants and bazel keep one process per task until their profiles
   state `batch.steps`.
