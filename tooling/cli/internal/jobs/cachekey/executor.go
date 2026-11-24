@@ -912,8 +912,7 @@ func ComputeJobCacheHashWith(
 	// about another set of projects.
 	//
 	// The membership is the run's workspace, which no task of the run writes,
-	// so the run derives its digest once: encoding the configuration of every
-	// project for each such job held the key precomputation for the whole run.
+	// so the run derives its digest once.
 	if KeysOnCandidateCut(job) {
 		digest, err := cache.Digest("workspace-membership\x00"+ws.Root, func() (string, error) {
 			return workspaceMembershipDigest(ws)

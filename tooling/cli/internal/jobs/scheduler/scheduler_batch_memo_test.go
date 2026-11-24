@@ -108,9 +108,8 @@ func makeMixedBatchPlan(t *testing.T) (*workspace.Workspace, []*ScheduledJob) {
 	return ws, planned
 }
 
-// mainDispatchGroups are the groups the scheduler dispatched for
-// makeMixedBatchPlan before the batch key was memoized (a9bf099d), recomputing
-// every candidate's key on every scan, in dispatch order.
+// mainDispatchGroups are the groups the unmemoized scan at a9bf099d computed
+// for makeMixedBatchPlan, in dispatch order.
 var mainDispatchGroups = [][]string{
 	{"/p04:build~compile"},
 	{"/p09:build~compile"},
@@ -135,8 +134,9 @@ var mainDispatchGroups = [][]string{
 	{"/p03:lint~check"},
 }
 
-// mainTestClassKey is the batch key the scheduler computed for the test class
-// of makeMixedBatchPlan at a9bf099d, from json.Marshal(BuildJobContext(...).Params).
+// mainTestClassKey is the batch key the unmemoized scan at a9bf099d computed
+// for the test class of makeMixedBatchPlan, from
+// json.Marshal(BuildJobContext(...).Params).
 // The class reads no config file, so the key folds no path of the temporary
 // root.
 const mainTestClassKey = "e5104c5f906474c8dd446ffd401e98b905835b6921229e7eaf3455eed9c89f2a"
@@ -148,8 +148,8 @@ func newBatchMemoScheduler(ws *workspace.Workspace, planned []*ScheduledJob) *Sc
 }
 
 // queueReady computes each job's batch key when the job becomes ready, and the
-// dispatch scans that follow form the groups the scheduler formed before the
-// key was memoized, from the key it computed then.
+// dispatch scans that follow form the groups of the unmemoized scan at
+// a9bf099d, from the same key.
 func TestPendingBatchMemoKeepsTheDispatchGroups(t *testing.T) {
 	ws, planned := makeMixedBatchPlan(t)
 	scheduler := newBatchMemoScheduler(ws, planned)
@@ -177,7 +177,7 @@ func TestPendingBatchMemoKeepsTheDispatchGroups(t *testing.T) {
 		got = append(got, keysOf(group.jobs))
 	}
 	if !reflect.DeepEqual(got, mainDispatchGroups) {
-		t.Fatalf("dispatch groups differ from before the memo:\n got  %v\n want %v", got, mainDispatchGroups)
+		t.Fatalf("dispatch groups differ from the unmemoized scan:\n got  %v\n want %v", got, mainDispatchGroups)
 	}
 }
 
