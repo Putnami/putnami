@@ -1,0 +1,2 @@
+{"v":1,"type":"meta","time":"2026-06-10T07:00:00.000Z","level":"info","message":"Starting build","data":{"extension":"@putnami/go","job":"build"}}
+{"v":1,"type":"result","time":"2026-06-10T07:00:01.400Z","level":"info","message":"Job SUCCESS","data":{"status":"SUCCESS","data":{"processReport":{"selfCpuMs":40,"starts":[{"kind":"git","count":2,"cpuMs":6},{"kind":"other","count":1}],"git":[{"subcommand":"rev-parse","count":2}]}}}}

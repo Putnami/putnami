@@ -77,8 +77,8 @@ func TestDrift_ProcessKinds(t *testing.T) {
 	assertEnumSync(t, "process kind", kinds, ProcessKinds)
 }
 
-func TestTheTypedPayloadFixtureCarriesAValidProcessReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("fixtures", "valid", "typed-payloads.jsonl"))
+func TestTheProcessReportFixtureCarriesAValidReport(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("fixtures", "valid", "process-report.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
