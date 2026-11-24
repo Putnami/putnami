@@ -6,6 +6,7 @@
   "dependencies": ["/typescript/samples/10-service-to-service/clients/ts"],
   "options": {
     "test": {
+      "filePatterns": ["clients/ts/src/**", "clients/ts/package.json"],
       "coverage": false,
       "coverage-threshold": 0
     },

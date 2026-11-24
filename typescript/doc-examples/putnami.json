@@ -24,7 +24,9 @@
         "../../tooling/observe/doc/**",
         "../extension/README.md",
         "../framework/*/README.md",
-        "../../tooling/extension-sdk/doc/**"
+        "../../tooling/extension-sdk/doc/**",
+        "../../cloud/runtime/typescript/src/**",
+        "../../cloud/runtime/typescript/package.json"
       ]
     }
   }

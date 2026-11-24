@@ -24,6 +24,9 @@
         "../extension/AI.md",
         "../extension/doc/**",
         "../framework/**",
+        "!../framework/**/*_test.go",
+        "!../framework/**/testdata/**",
+        "!../framework/**/adr/**",
         "../../sites/putnami.dev/doc/**",
         "../../tooling/doc/**",
         "../../tooling/sdd-extension/doc/**",
@@ -32,8 +35,16 @@
         "../../go.work.sum",
         "../extension/README.md",
         "../../protocols/**",
+        "!../../protocols/**/*_test.go",
+        "!../../protocols/**/testdata/**",
+        "!../../protocols/**/*.md",
         "../../cloud/runtime/go/**",
-        "../../tooling/extension-sdk/**"
+        "!../../cloud/runtime/go/**/*_test.go",
+        "!../../cloud/runtime/go/**/testdata/**",
+        "../../tooling/extension-sdk/**",
+        "!../../tooling/extension-sdk/**/*_test.go",
+        "!../../tooling/extension-sdk/**/testdata/**",
+        "!../../tooling/extension-sdk/doc/adr/**"
       ]
     }
   }

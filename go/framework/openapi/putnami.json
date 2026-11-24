@@ -26,8 +26,18 @@
     },
     "test": {
       "filePatterns": [
-        "../../../typescript/framework/*/src/**",
-        "../../../typescript/framework/*/package.json",
+        "../../../typescript/framework/application/src/**",
+        "../../../typescript/framework/application/package.json",
+        "../../../typescript/framework/client/src/**",
+        "../../../typescript/framework/client/package.json",
+        "../../../typescript/framework/migration/src/**",
+        "../../../typescript/framework/migration/package.json",
+        "../../../typescript/framework/runtime/src/**",
+        "../../../typescript/framework/runtime/package.json",
+        "../../../typescript/framework/spectest/src/**",
+        "../../../typescript/framework/spectest/package.json",
+        "../../../typescript/framework/utils/src/**",
+        "../../../typescript/framework/utils/package.json",
         "../../../tsconfig.base.json",
         "../../../package.json",
         "../../../bun.lock"
