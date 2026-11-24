@@ -6,13 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -344,7 +347,30 @@ func runEngine(t *testing.T, self, wsRoot, cleanHome string, hosted bool, extraE
 
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
-	err := cmd.Run()
+	// A process the engine started that outlives it, such as a provider the
+	// engine never shut down, would keep its output open, and Wait with it.
+	cmd.WaitDelay = engineWaitDelay
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start engine: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	bound := engineBound(t)
+	var err error
+	select {
+	case err = <-done:
+	case <-time.After(bound):
+		// The Go runtime answers SIGQUIT by printing every goroutine to the
+		// engine's output and exiting, which names what the engine waits on.
+		_ = cmd.Process.Signal(syscall.SIGQUIT)
+		select {
+		case <-done:
+		case <-time.After(engineWaitDelay):
+			_ = cmd.Process.Kill()
+			<-done
+		}
+		t.Fatalf("the engine did not finish within %s; its output and goroutines:\n%s", bound, out.String())
+	}
 	code := 0
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -358,6 +384,33 @@ func runEngine(t *testing.T, self, wsRoot, cleanHome string, hosted bool, extraE
 		t.Errorf("the bearer reached the engine output:\n%s", out.String())
 	}
 	return code, out.String()
+}
+
+// engineWaitDelay is how long runEngine waits for the engine's output to close
+// once it exited, and for the engine to exit once it was told to quit.
+const engineWaitDelay = 10 * time.Second
+
+// runEngine leaves a tenth of the test's remaining time, at most
+// maxEngineDeadlineMargin, to dump the engine and fail before the package
+// timeout panics. The largest margin covers the quit, the kill and both
+// waits (engineWaitDelay).
+const (
+	engineMarginDivisor     = 10
+	maxEngineDeadlineMargin = 30 * time.Second
+)
+
+// engineBound is how long runEngine lets the engine run: until shortly before
+// the test binary's deadline, so an engine that waits on something without
+// end fails the test with its goroutines instead of panicking the package
+// with the test's alone. Without a deadline, it is unbounded in practice.
+func engineBound(t *testing.T) time.Duration {
+	deadline, ok := t.Deadline()
+	if !ok {
+		return math.MaxInt64
+	}
+	remaining := time.Until(deadline)
+	margin := min(remaining/engineMarginDivisor, maxEngineDeadlineMargin)
+	return remaining - margin
 }
 
 // artifactDir is the artifact store of a run whose home is home.

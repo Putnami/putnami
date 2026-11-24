@@ -3,6 +3,7 @@
 package credentialcustody
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,7 +11,10 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // The Linux-only reach a repository process of the same user has into another
@@ -134,7 +138,9 @@ func probeProcMem(role string, pid int) finding {
 
 // probeProcFD lists the parent's /proc/<pid>/fd and reads what it can of each
 // descriptor, in case one still holds the credential pipe. Capture closed that
-// descriptor, and procguard denies the listing, so this finds nothing.
+// descriptor, and procguard denies the listing, so this finds nothing. A
+// reader procguard does not deny, such as root, lists them and copies what
+// the parent's pipes hold without taking it (readDescriptor).
 func probeProcFD(role string, pid int) finding {
 	f := finding{Role: role, Probe: "proc-fd-parent", Checked: true}
 	entries, err := os.ReadDir(procPath(pid, "fd"))
@@ -217,17 +223,27 @@ func probePtrace(role string, pid int) finding {
 // no data yet.
 const descriptorReadWait = 100 * time.Millisecond
 
+// descriptorPollInterval is how often readDescriptor looks again at an empty
+// pipe within descriptorReadWait.
+const descriptorPollInterval = 5 * time.Millisecond
+
+// maxPipeCopy is the most a pipe copy holds: the largest pipe an unprivileged
+// process may ask for (/proc/sys/fs/pipe-max-size by default).
+const maxPipeCopy = 1 << 20
+
 // readDescriptor reads at most limit bytes of what the /proc descriptor link
-// path opens: a regular file, or a pipe without blocking. A pipe of a readable
-// parent that no writer fills, such as its standard input, would otherwise
-// hold the probe, and the parent with it, forever. It reads nothing else.
+// path opens: a regular file, or a copy of what a pipe holds (peekPipe). It
+// reads nothing else.
 func readDescriptor(path string, limit int) ([]byte, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
 	mode := info.Mode()
-	if !mode.IsRegular() && mode&os.ModeNamedPipe == 0 {
+	if mode&os.ModeNamedPipe != 0 {
+		return peekPipe(path, limit)
+	}
+	if !mode.IsRegular() {
 		return nil, fmt.Errorf("%s: not a file or a pipe", path)
 	}
 	file, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
@@ -235,14 +251,59 @@ func readDescriptor(path string, limit int) ([]byte, error) {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
-	if mode&os.ModeNamedPipe != 0 {
-		_ = file.SetReadDeadline(time.Now().Add(descriptorReadWait))
-	}
 	data, err := io.ReadAll(io.LimitReader(file, int64(limit)))
 	if len(data) > 0 {
 		return data, nil
 	}
 	return nil, err
+}
+
+// peekPipe copies at most limit bytes of what the pipe that path opens holds,
+// waiting descriptorReadWait at most for data, and leaves every byte in it.
+// The path opens the parent's own pipe, not a copy: a read would take the
+// bytes from the process they are written for, such as the engine's
+// credential provider session, which would then wait for an answer that
+// never comes until its op timeout. tee(2) duplicates them instead. A pipe no
+// writer fills, such as the parent's standard input, is never waited on
+// longer than descriptorReadWait.
+func peekPipe(path string, limit int) ([]byte, error) {
+	source, err := unix.Open(path, unix.O_RDONLY|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = unix.Close(source) }()
+	var copied [2]int
+	if err := unix.Pipe2(copied[:], unix.O_NONBLOCK|unix.O_CLOEXEC); err != nil {
+		return nil, err
+	}
+	defer func() { _ = unix.Close(copied[0]); _ = unix.Close(copied[1]) }()
+	// The copy holds a default pipe's 64 KiB; a larger one, when the kernel
+	// grants it, takes more of a source pipe that holds more.
+	_, _ = unix.FcntlInt(uintptr(copied[1]), unix.F_SETPIPE_SZ, min(limit, maxPipeCopy))
+	deadline := time.Now().Add(descriptorReadWait)
+	for {
+		n, err := unix.Tee(source, copied[1], limit, unix.SPLICE_F_NONBLOCK)
+		switch {
+		case n > 0:
+			data := make([]byte, n)
+			for read := 0; read < len(data); {
+				got, err := unix.Read(copied[0], data[read:])
+				if got <= 0 {
+					return data[:read], err
+				}
+				read += got
+			}
+			return data, nil
+		case err == nil:
+			// Empty, and no writer is left.
+			return nil, nil
+		case !errors.Is(err, unix.EAGAIN):
+			return nil, err
+		case time.Now().After(deadline):
+			return nil, nil
+		}
+		time.Sleep(descriptorPollInterval)
+	}
 }
 
 // procPath returns /proc/<pid>/<sub>.
@@ -295,4 +356,50 @@ func readableRegion(line string) (start uint64, size int, ok bool) {
 		return 0, 0, false
 	}
 	return lo, int(hi - lo), true
+}
+
+// The descriptor probe copies what a pipe holds and leaves it there: the
+// process the bytes are written for still reads every one of them. A probe
+// that drained the engine's pipe to its credential provider would take an
+// answer the engine then waits for until its op timeout.
+func TestDescriptorProbeLeavesAPipeItsBytes(t *testing.T) {
+	t.Parallel()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = r.Close(); _ = w.Close() }()
+	line := custodyBearer + "\n"
+	if _, err := w.WriteString(line); err != nil {
+		t.Fatal(err)
+	}
+	// SyscallConn, not Fd, keeps r non-blocking, so the read below ends at
+	// its deadline when the probe took the bytes.
+	raw, err := r.SyscallConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fd uintptr
+	if err := raw.Control(func(descriptor uintptr) { fd = descriptor }); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	path := procPath(os.Getpid(), "fd/"+strconv.Itoa(int(fd)))
+	for range 2 {
+		data, err := readDescriptor(path, procBound)
+		if err != nil || string(data) != line {
+			t.Fatalf("readDescriptor = %q, %v; want %q", data, err, line)
+		}
+	}
+	got := make([]byte, len(line))
+	if _, err := io.ReadFull(r, got); err != nil || string(got) != line {
+		t.Fatalf("the pipe's reader read %q, %v after the probe; want %q", got, err, line)
+	}
+	// An empty pipe with a writer left is waited on for descriptorReadWait
+	// at most.
+	if data, err := readDescriptor(path, procBound); err != nil || len(data) != 0 {
+		t.Fatalf("readDescriptor of an empty pipe = %q, %v; want nothing", data, err)
+	}
 }
