@@ -25,7 +25,14 @@
     },
     {
       "id": "release-commit-then-tag",
-      "text": "putnami version tag --yes renders the line's changelog from the commits the host lists, prepends it to the line's CHANGELOG.md, commits it as chore(release): <line> <version> with the human's Co-Authored-By trailer, then creates the annotated tag on that commit with the changelog as its message. --push then pushes HEAD and the tag to origin."
+      "text": "putnami version tag --yes renders the line's changelog from the commits the host lists, writes it into the line's CHANGELOG.md, commits it as chore(release): <line> <version> with the human's Co-Authored-By trailer, then creates the annotated tag on that commit with the changelog as its message. --push then pushes HEAD and the tag to origin."
+    },
+    {
+      "id": "changelog-needs-no-edit",
+      "text": [
+        "The rendered changelog carries no tracker reference: #<number>, <owner>/<repository>#<number> and the word before them, such as issue, leave each commit subject, with the brackets that hold nothing else. After such a word the # is optional.",
+        "When CHANGELOG.md opens with a level-one heading, the release goes under that title and its introduction. A missing or empty file is created with the title # Changelog — <line>, or # Changelog for the root line."
+      ]
     },
     {
       "id": "release-is-reviewable-first",

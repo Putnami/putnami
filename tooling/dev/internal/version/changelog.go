@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -100,30 +101,70 @@ func changelogSectionFor(typ string, breaking bool) string {
 	return "Other"
 }
 
-// changelogBullet renders one commit: its subject and the short SHA that
-// identifies it, which is what a reader follows back to the change.
+var (
+	// trackerGroup matches parentheses or brackets that hold only references.
+	trackerGroup = regexp.MustCompile(`(?i)\s*[(\[]` + trackerReferences(`[0-9]+`) + `\s*[)\]]`)
+	// trackerOpening matches references that follow an opening bracket, with the
+	// separator after them.
+	trackerOpening = regexp.MustCompile(`(?i)([(\[])` + trackerReferences(`[0-9]{2,}`) + `(?:[\s,;:.]+|$)`)
+	// trackerInline matches references in the text, with the separator before
+	// them. Its group is the character after them.
+	trackerInline = regexp.MustCompile(`(?i)(?:^|[\s,;]+)` + trackerReferences(`[0-9]{2,}`) + `([\s).,:;\]]|$)`)
+)
+
+// trackerReferences matches a list of references whose number matches digits.
+// A reference is #<number> or <owner>/<repository>#<number>, or either one after
+// a word such as issue or epic. That word makes the # optional.
+func trackerReferences(digits string) string {
+	reference := `(?:(?:issues?|prs?|pull requests?|epics?|tickets?) ?#?` + digits +
+		`|(?:(?:issues?|prs?|pull requests?|epics?|tickets?) )?(?:[a-z0-9][\w.-]*/[\w.-]+)?#` + digits + `)`
+	return reference + `(?:(?:[,;]\s*|\s+|,?\s+and\s+)` + reference + `)*`
+}
+
+// withoutTrackerReferences removes the tracker references from a subject. A
+// number of one digit is a reference only inside brackets that hold nothing
+// else. Any other number, such as the one of PKCS#1 or of an anchor, stays.
+func withoutTrackerReferences(subject string) string {
+	out := trackerGroup.ReplaceAllString(subject, "")
+	out = trackerOpening.ReplaceAllString(out, "${1}")
+	for trackerInline.MatchString(out) {
+		out = trackerInline.ReplaceAllString(out, "${1}")
+	}
+	return strings.TrimSpace(out)
+}
+
+// changelogBullet renders one commit: its subject without tracker references
+// and the short SHA that identifies it, which is what a reader follows back to
+// the change.
 func changelogBullet(commit wire.LineCommit) string {
 	sha := commit.SHA
 	if len(sha) > 7 {
 		sha = sha[:7]
 	}
-	return fmt.Sprintf("- %s (%s)", commit.Subject, sha)
+	return fmt.Sprintf("- %s (%s)", withoutTrackerReferences(commit.Subject), sha)
 }
 
-// PrependChangelog writes notes at the top of the changelog at path, above
-// whatever is already there, and creates the file when it does not exist.
+// PrependChangelog writes notes into the changelog at path: under the title and
+// its introduction when the file opens with a level-one heading, and at the top
+// otherwise. A missing or empty file is created with title.
 //
-// Prepending rather than rewriting is what keeps the file a history: a release
-// adds its own entry and never restates the ones before it, so an entry a human
-// edited after the fact stays edited.
-func PrependChangelog(path, notes string) error {
+// The entries already in the file keep their bytes, so an entry a human edited
+// after the fact stays edited.
+func PrependChangelog(path, title, notes string) error {
 	existing, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("read %s: %w", path, err)
 	}
+	head, history := splitChangelog(strings.TrimLeft(string(existing), "\n"))
+	if head == "" && history == "" {
+		head = title
+	}
 	body := strings.TrimRight(notes, "\n") + "\n"
-	if len(strings.TrimSpace(string(existing))) > 0 {
-		body += "\n" + strings.TrimLeft(string(existing), "\n")
+	if head != "" {
+		body = head + "\n\n" + body
+	}
+	if history != "" {
+		body += "\n" + history
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create the changelog directory: %w", err)
@@ -132,4 +173,24 @@ func PrependChangelog(path, notes string) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
+}
+
+// markdownHeading matches the start of an ATX heading line.
+var markdownHeading = regexp.MustCompile(`(?m)^#{1,6}[ \t]`)
+
+// splitChangelog splits a changelog into its title with the introduction that
+// follows, and the entries below. A file that does not open with a level-one
+// heading has no title.
+func splitChangelog(content string) (head, history string) {
+	if strings.TrimSpace(content) == "" {
+		return "", ""
+	}
+	if !strings.HasPrefix(content, "# ") {
+		return "", content
+	}
+	end := len(content)
+	if next := markdownHeading.FindStringIndex(content[1:]); next != nil {
+		end = next[0] + 1
+	}
+	return strings.TrimRight(content[:end], "\r\n\t "), content[end:]
 }

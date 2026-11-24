@@ -102,7 +102,7 @@ func (c Command) tag(ctx context.Context, args []string) error {
 // pushes HEAD and the tag to origin.
 func (c Command) release(ctx context.Context, scopePath, version, tagName, notes string, push bool) error {
 	changelogPath := filepath.Join(c.Root, filepath.FromSlash(changelogRelPath(scopePath)))
-	if err := PrependChangelog(changelogPath, notes); err != nil {
+	if err := PrependChangelog(changelogPath, changelogTitle(scopePath), notes); err != nil {
 		return err
 	}
 	if err := c.runGit(ctx, "add", "--", changelogRelPath(scopePath)); err != nil {

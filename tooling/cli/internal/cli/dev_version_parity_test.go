@@ -46,6 +46,8 @@ import (
 //   - `version tag` under structured output no longer lists the core's
 //     structured-output commands after its refusal.
 //   - A usage error exits 2 where the core exited 1 (devVersionCase.usage).
+//   - A changelog the release creates opens with a title, and the line count
+//     git commit prints includes it (devVersionCase.created).
 //
 // Both sides normalize what depends on the moment a case runs: the release
 // date of a changelog, the release commit's ID that git prints, and the
@@ -65,6 +67,9 @@ type devVersionCase struct {
 	env func(t *testing.T, root string) []string
 	// usage marks an argument error: the core exited 1, the extension exits 2.
 	usage bool
+	// created is the line whose changelog the run creates, "" when it creates
+	// none.
+	created string
 	// wantExit is the exit code the extension must return. It is stated so
 	// a recording edited into another verdict shows here.
 	wantExit int
@@ -100,8 +105,8 @@ func devVersionCases() []devVersionCase {
 		{name: "tag existing tag", args: []string{"version", "tag", "ts/v0.4.0", "--scope", "typescript", "--yes"}, wantExit: 2},
 		{name: "tag bound to another commit", args: []string{"version", "tag", "--scope", "tooling", "--yes"}, env: bindDevVersionParent, wantExit: 2},
 		{name: "tag structured output", args: []string{"version", "tag", "--scope", "tooling", "--output=json"}, wantExit: 2},
-		{name: "tag yes", args: []string{"version", "tag", "--scope", "typescript", "--yes"}},
-		{name: "tag yes push", args: []string{"version", "tag", "--scope", "tooling", "--yes", "--push"}, before: addDevVersionOrigin},
+		{name: "tag yes", args: []string{"version", "tag", "--scope", "typescript", "--yes"}, created: "typescript"},
+		{name: "tag yes push", args: []string{"version", "tag", "--scope", "tooling", "--yes", "--push"}, before: addDevVersionOrigin, created: "tooling"},
 	}
 }
 
@@ -159,7 +164,21 @@ func devVersionExpected(t *testing.T, tc devVersionCase) devVersionAnswer {
 		stderr = append(stderr, strings.TrimPrefix(line, "putnami: "))
 	}
 	recorded.stderr = strings.Join(stderr, "")
+	if tc.created != "" {
+		heading := "file " + tc.created + "/CHANGELOG.md:\n"
+		recorded.repository = replaceDevVersionOnce(t, recorded.repository, heading, heading+"# Changelog — "+tc.created+"\n\n")
+		recorded.stdout = replaceDevVersionOnce(t, recorded.stdout, " 9 insertions(+)", " 11 insertions(+)")
+	}
 	return recorded
+}
+
+// replaceDevVersionOnce replaces the one occurrence of old in text.
+func replaceDevVersionOnce(t *testing.T, text, old, replacement string) string {
+	t.Helper()
+	if count := strings.Count(text, old); count != 1 {
+		t.Fatalf("the recording holds %q %d times, want 1:\n%s", old, count, text)
+	}
+	return strings.Replace(text, old, replacement, 1)
 }
 
 // TestDevVersionRecordingsCoverEveryCaseAndNothingElse keeps the recordings

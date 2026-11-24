@@ -100,6 +100,14 @@ func lineNames(lines []wire.VersionLine) []string {
 	return names
 }
 
+// changelogTitle is the title of a line's changelog.
+func changelogTitle(scopePath string) string {
+	if scopePath == "" {
+		return "# Changelog"
+	}
+	return "# Changelog — " + scopePath
+}
+
 // changelogRelPath is where a line's changelog lives: inside the line's scope
 // directory, or at the workspace root for the root line.
 func changelogRelPath(scopePath string) string {

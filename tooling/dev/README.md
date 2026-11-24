@@ -64,7 +64,7 @@ dependency of every language extension the repository loads by path.
 | Command | What it does |
 |---|---|
 | `putnami version get [--scope <line>]` | Prints each version line with the version HEAD has on it, or only the line `--scope` names. `--output=json` and `--output=jsonl` print one result envelope. |
-| `putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]` | Releases one line: writes the line's `CHANGELOG.md`, commits it, and puts an annotated tag on that commit. `--push` pushes HEAD and the tag. Without `--yes`, it only proposes the release. |
+| `putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]` | Releases one line: writes the release under the title of the line's `CHANGELOG.md`, commits it, and puts an annotated tag on that commit. `--push` pushes HEAD and the tag. Without `--yes`, it only proposes the release. |
 
 `putnami version` runs `get`. A workspace with more than one line names the
 line to release with `--scope`. A `<tag>` replaces the proposed release when

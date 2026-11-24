@@ -49,8 +49,8 @@ func TestTagCommitsTheChangelogThenTags(t *testing.T) {
 	if contents := git(t, dir, "tag", "-l", "--format=%(contents)", "tooling/v0.0.1"); contents != strings.TrimSpace(notes) {
 		t.Errorf("tag message %q, want the changelog %q", contents, notes)
 	}
-	if committed := git(t, dir, "show", "HEAD:tooling/CHANGELOG.md"); committed != strings.TrimSpace(notes) {
-		t.Errorf("committed changelog %q, want %q", committed, notes)
+	if committed := git(t, dir, "show", "HEAD:tooling/CHANGELOG.md"); committed != "# Changelog — tooling\n\n"+strings.TrimSpace(notes) {
+		t.Errorf("committed changelog %q, want its title then %q", committed, notes)
 	}
 	if status := git(t, dir, "status", "--porcelain"); status != "" {
 		t.Errorf("the release left %q in the tree", status)

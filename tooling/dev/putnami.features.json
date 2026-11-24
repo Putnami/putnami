@@ -136,6 +136,21 @@
           }
         },
         {
+          "id": "changelog-needs-no-edit",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-changelog-carries-no-tracker-reference",
+              "a-release-goes-under-the-title",
+              "a-missing-changelog-gets-its-title"
+            ]
+          }
+        },
+        {
           "id": "release-is-reviewable-first",
           "stage": "coded",
           "evidenceKinds": [
