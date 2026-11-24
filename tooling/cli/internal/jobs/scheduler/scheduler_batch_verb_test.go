@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -58,8 +57,15 @@ func makeDelegatedVerbPlan(t *testing.T, logPath string) (*workspace.Workspace, 
 // delegatedVerbScheduler is the one scheduler the delegated-verb cases run:
 // "a verb waits for its peers" is a property of takeAdmissiblePendingGroup and
 // the coordinator's readiness together, scheduler methods both.
-func delegatedVerbScheduler(ws *workspace.Workspace, planned []*ScheduledJob) *Scheduler {
-	return newScheduler(ws, planned, nil, SchedulerConfig{MaxParallel: 2}, &mockRenderer{}, nil)
+func delegatedVerbScheduler(ws *workspace.Workspace, planned []*ScheduledJob, serveSteps ...string) *Scheduler {
+	cfg := SchedulerConfig{MaxParallel: 2}
+	for _, key := range serveSteps {
+		if cfg.ServeSteps == nil {
+			cfg.ServeSteps = map[string]bool{}
+		}
+		cfg.ServeSteps[key] = true
+	}
+	return newScheduler(ws, planned, nil, cfg, &mockRenderer{}, nil)
 }
 
 func TestADelegatedVerbWaitsForItsPeersAndRunsOneCommand(t *testing.T) {
@@ -111,7 +117,7 @@ func TestALaterWaveOfADelegatedVerbRunsItsOwnCommand(t *testing.T) {
 	}
 	lintA.DependsOn = append(lintA.DependsOn, lintB.Key())
 
-	waves := newVerbWaves(planned)
+	waves := newVerbWaves(planned, nil)
 	if waves == nil || waves.verbs[lintB.Key()] == "" || waves.verbs[lintA.Key()] != "" {
 		t.Fatalf("first wave = %+v, want b's lint alone", waves)
 	}
@@ -130,7 +136,7 @@ func TestALaterWaveOfADelegatedVerbRunsItsOwnCommand(t *testing.T) {
 func TestACachedBatchNeverWaitsForItsPeers(t *testing.T) {
 	t.Parallel()
 	_, planned := makeBatchSchedulerFixture(t, "")
-	if waves := newVerbWaves(planned); waves != nil {
+	if waves := newVerbWaves(planned, nil); waves != nil {
 		t.Fatalf("a plan of cached batches has verb waves %+v, want none", waves)
 	}
 }
@@ -139,7 +145,7 @@ func TestAWaitingTaskRunsWhenNothingIsInFlight(t *testing.T) {
 	t.Parallel()
 	ws, planned := makeDelegatedVerbPlan(t, "")
 	s := delegatedVerbScheduler(ws, planned)
-	s.verbWaves = newVerbWaves(planned)
+	s.verbWaves = newVerbWaves(planned, nil)
 	var lintA *ScheduledJob
 	for _, job := range planned {
 		if job.JobDef.Batchable != nil && job.Project.Path == "a" {
@@ -264,12 +270,11 @@ func TestTwoVerbsWaitingOnEachOtherRunWhileAServeIsInFlight(t *testing.T) {
 			Cwd:           "{projectRoot}",
 		},
 	}
-	serve.JobDef.Traits.Workload = extensionproto.WorkloadServe
 	planned = append(planned, serve)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	result := delegatedVerbScheduler(ws, planned).Run(ctx)
+	result := delegatedVerbScheduler(ws, planned, serve.Key()).Run(ctx)
 	if !result.Success {
 		t.Fatalf("two waiting verbs beside a serve: %+v", result.Results)
 	}

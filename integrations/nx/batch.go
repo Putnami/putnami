@@ -42,10 +42,8 @@ func ReadBatch(report stacks.BatchReport) map[string]stacks.BatchOutcome {
 		named, anyFailed := false, false
 		var messages []string
 		for _, target := range targets {
-			// A target that runs its default configuration is named
-			// <project>:<target>:<configuration>.
-			key, section, ran := taskOf(sections, component+":"+target)
-			if failedTask(failed, key, ran) {
+			key, section, ran, isFailed := taskOutcome(sections, failed, component+":"+target)
+			if isFailed {
 				anyFailed, named = true, true
 				message := "nx run " + key + " failed"
 				if tail := lastLines(section, sectionLines); tail != "" {
@@ -66,36 +64,34 @@ func ReadBatch(report stacks.BatchReport) map[string]stacks.BatchOutcome {
 	return out
 }
 
-// taskOf answers the section of a target, named as the command names it or
-// with the configuration Nx resolved: its key, section and whether it ran.
-func taskOf(sections map[string]string, target string) (string, string, bool) {
+// taskOutcome answers a target's outcome: the task key it quotes, its
+// section, whether it ran and whether it failed. A target with a section of
+// its own name is that task alone: a sibling such as <target>:lib is another
+// task. Otherwise the target ran its default configuration,
+// <project>:<target>:<configuration>, and it fails when the summary lists any
+// such task as failed; it ran when any such task has a section.
+func taskOutcome(sections map[string]string, failed map[string]bool, target string) (string, string, bool, bool) {
 	if section, ok := sections[target]; ok {
-		return target, section, true
+		return target, section, true, failed[target]
 	}
+	if failed[target] {
+		return target, "", false, true
+	}
+	key, section, ran := target, "", false
 	// Sorted, so that the same output always quotes the same section.
-	for _, key := range slices.Sorted(maps.Keys(sections)) {
-		if strings.HasPrefix(key, target+":") {
-			return key, sections[key], true
+	for _, listed := range slices.Sorted(maps.Keys(failed)) {
+		if strings.HasPrefix(listed, target+":") {
+			section, ran := sections[listed]
+			return listed, section, ran, true
 		}
 	}
-	return target, "", false
-}
-
-// failedTask reports whether the summary lists the task as failed: key is
-// the task's section key, with the configuration Nx resolved, or the target
-// as the command names it when it has no section. A section key that holds a
-// configuration is listed as such; only a target with no section matches a
-// listed configuration by prefix.
-func failedTask(failed map[string]bool, key string, ran bool) bool {
-	if failed[key] || ran {
-		return failed[key]
-	}
-	for listed := range failed {
-		if strings.HasPrefix(listed, key+":") {
-			return true
+	for _, k := range slices.Sorted(maps.Keys(sections)) {
+		if strings.HasPrefix(k, target+":") {
+			key, section, ran = k, sections[k], true
+			break
 		}
 	}
-	return false
+	return key, section, ran, false
 }
 
 // readRunMany splits Nx's static output into each target's section, by

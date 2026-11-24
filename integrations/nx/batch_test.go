@@ -168,6 +168,20 @@ func TestReadBatchReadsOnlyTheFailedTasksAndTheExactSection(t *testing.T) {
 	}
 }
 
+func TestAFailedConfigurationFailsTheTargetBesideAPassingSibling(t *testing.T) {
+	// -t build: a's sibling build:assets passed, a's default configuration
+	// failed, and so did b's.
+	output := "> nx run a:\"build:assets\"\n\nok\n\n> nx run a:build:production\n\na boom\n\n> nx run b:build:production\n\nb boom\n\n" +
+		" NX   Ran target build for 2 projects\n\n   ✖  2/3 targets failed, including the following:\n\n" +
+		"      - nx run a:build:production\n      - nx run b:build:production\n"
+	got := ReadBatch(stacks.BatchReport{Components: []string{"a", "b"}, Command: []string{"npx", "--no", "nx", "run-many", "-t", "build", "-p", "a,b"}, Output: []byte(output)})
+	for _, c := range []string{"a", "b"} {
+		if o := got[c]; !o.Failed || !strings.Contains(o.Message, c+" boom") {
+			t.Errorf("%s = %+v, want its failed default configuration", c, o)
+		}
+	}
+}
+
 func TestASyncedTargetRunsAsItsOwnRunMany(t *testing.T) {
 	got := batchSteps("test", [][]string{runStep("test:lib"), runStep("e2e")})
 	want := [][]string{

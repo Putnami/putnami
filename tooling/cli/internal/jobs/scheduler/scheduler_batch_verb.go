@@ -3,8 +3,6 @@ package scheduler
 import (
 	"strings"
 	"sync"
-
-	extensionproto "go.putnami.dev/protocol/extension"
 )
 
 // A delegated verb runs as one tool command (ADR 0019 of tooling/stacks).
@@ -59,6 +57,10 @@ type verbWaves struct {
 	// interrupted: their completion never comes, so a wait must not count on
 	// it.
 	serving int
+	// serveSteps names, by job key, the plan's long-running serve steps
+	// (SchedulerConfig.ServeSteps), never the finite steps of a serve
+	// pipeline.
+	serveSteps map[string]bool
 }
 
 // track records jobs dispatched (delta 1) or completed (delta -1), counting
@@ -70,7 +72,7 @@ func (w *verbWaves) track(jobs []*ScheduledJob, delta int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	for _, job := range jobs {
-		if job != nil && job.JobDef != nil && job.JobDef.Traits.Workload == extensionproto.WorkloadServe {
+		if job != nil && w.serveSteps[job.Key()] {
 			w.serving += delta
 		}
 	}
@@ -88,7 +90,7 @@ func (w *verbWaves) serves() int {
 
 // newVerbWaves derives the first wave of each delegated verb of the plan. A
 // plan with no delegated batchable job answers nil, and costs one pass.
-func newVerbWaves(jobs []*ScheduledJob) *verbWaves {
+func newVerbWaves(jobs []*ScheduledJob, serveSteps map[string]bool) *verbWaves {
 	byKey := make(map[string]*ScheduledJob, len(jobs))
 	delegated := false
 	for _, job := range jobs {
@@ -135,7 +137,7 @@ func newVerbWaves(jobs []*ScheduledJob) *verbWaves {
 		ancestors[key] = out
 		return out
 	}
-	w := &verbWaves{verbs: map[string]string{}, unready: map[string]map[string]bool{}}
+	w := &verbWaves{verbs: map[string]string{}, unready: map[string]map[string]bool{}, serveSteps: serveSteps}
 	for _, job := range jobs {
 		verb, ok := delegatedVerb(job)
 		if !ok || verbsAbove(job.Key())[verb] {

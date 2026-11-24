@@ -33,10 +33,10 @@ type BatchReport struct {
 	Components []string
 	// Command is the step that failed, as it ran: the targets it names.
 	Command []string
-	// Started is when the command started: a report the tool wrote before is
-	// no report of this run.
+	// Started is when the failed step started. The files the stack names in
+	// BatchReports were removed just before it.
 	Started time.Time
-	// Output is the command's output, its tail when it is long.
+	// Output is the failed step's output, its tail when it is long.
 	Output []byte
 }
 
@@ -273,7 +273,9 @@ func (m *batchMember) expectedVersions() []Expected {
 		if err != nil {
 			return nil
 		}
-		out = append(out, expected)
+		// The version and how it reads, not the file that states it: two
+		// files that state one version run one command.
+		out = append(out, Expected{Version: expected.Version, Reading: expected.Reading})
 	}
 	return out
 }
@@ -335,15 +337,8 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 		}
 	}
 	stepRoot := RootStep{Dir: rootAbs, Project: first.in.projectAbs, Component: first.meta.Component, Env: env, Program: func(name string) string { return selected.Program(first.profile.Toolchain, name) }}
-	output := &tailBuffer{limit: batchOutputLimit}
-	started := time.Now()
-	// The tool's own reports of an earlier run are no reports of this one.
-	for _, name := range s.BatchReports {
-		if err := os.Remove(filepath.Join(rootAbs, filepath.FromSlash(name))); err != nil && !os.IsNotExist(err) {
-			failAll("%v", err)
-			return
-		}
-	}
+	var output *tailBuffer
+	var started time.Time
 	var stepErr error
 	var failedArgv []string
 	// later is true when a step failed before the last one: the steps after
@@ -363,6 +358,15 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 			}
 			argv = adapted
 		}
+		// The tool's own reports, and the output, of an earlier step or run
+		// are no reports of this step.
+		for _, name := range s.BatchReports {
+			if err := os.Remove(filepath.Join(rootAbs, filepath.FromSlash(name))); err != nil && !os.IsNotExist(err) {
+				failAll("%v", err)
+				return
+			}
+		}
+		output, started = &tailBuffer{limit: batchOutputLimit}, time.Now()
 		emit.Info("$ " + strings.Join(argv, " "))
 		cmd := exec.CommandContext(ctx, selected.ProgramIn(first.profile.Toolchain, argv[0], env), argv[1:]...) //nolint:gosec // the profile's own step
 		cmd.Dir = rootAbs

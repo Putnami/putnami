@@ -694,7 +694,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	// Build dependency state
 	schedulable := planner.SchedulableJobs(s.planned)
 	state := planner.NewDAGState(schedulable)
-	s.verbWaves = newVerbWaves(schedulable)
+	s.verbWaves = newVerbWaves(schedulable, s.cfg.ServeSteps)
 
 	results := make(map[string]*JobResult, len(s.planned))
 	hashes := make(map[string]string) // jobKey → cache hash

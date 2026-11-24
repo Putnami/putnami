@@ -252,6 +252,24 @@ func TestMembersWhoseExpectedVersionDiffersRunSeparately(t *testing.T) {
 	}
 }
 
+func TestMembersThatStateOneVersionInTwoFilesRunOneCommand(t *testing.T) {
+	root := t.TempDir()
+	stubBatchTool(t, root)
+	profile, err := Decode([]byte(strings.Replace(batchProfile, `"pattern"`, `"files": [{"path": "tool.version"}], "pattern"`, 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := batchStack(t, nil)
+	s.Profile = profile
+	writeFile(t, root, "tool.version", "1.0.0")
+	writeFile(t, root, "c/tool.version", "1.0.0")
+	runLintBatch(t, s, root)
+	log, _ := os.ReadFile(filepath.Join(root, "log"))
+	if lines := strings.Split(strings.TrimSpace(string(log)), "\n"); len(lines) != 1 {
+		t.Errorf("the tool ran %q, want one command: one version, two files", lines)
+	}
+}
+
 func TestExpandBatchStepRepeatsAComponentArgument(t *testing.T) {
 	step := []string{"nx", "run-many", "-t", "lint", "-p", "{components}", "--cwd={root}", "{component}:x"}
 	got := expandBatchStep([][]string{step, step}, "/w", []string{"a", "b"})
