@@ -283,10 +283,14 @@ type Scheduler struct {
 	// when no job in the plan has wall history.
 	criticalityCeilingByJob map[string]int
 	// batchCPUBudgetByJob fixes one physical ceiling for every member of a
-	// readyBatchKey-compatible planned class. A member receives the same ceiling
+	// readyBatch-compatible planned class. A member receives the same ceiling
 	// whether dispatch timing runs it alone, in a partial group, or with the full
 	// class. Initialized once before workers start.
 	batchCPUBudgetByJob map[string]int
+	// pendingBatches memoizes each pending job's batch key from the moment it
+	// becomes ready: see pendingBatch.
+	pendingBatchMu sync.Mutex
+	pendingBatches map[*ScheduledJob]readyBatchResult
 	// resourcePlanByJob fixes each task's subprocess ceiling and admission
 	// request before workers exist. resources is coordinator-owned and accounts
 	// only physical jobGroup dispatches, never logical batch members.
@@ -604,7 +608,7 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 			memoryFallback: fallback.memoryBytes,
 		}
 
-		key := s.readyBatchKey(job)
+		key, _ := s.readyBatch(job)
 		if key == "" {
 			continue
 		}
@@ -679,6 +683,9 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 
 	// Still the CALLER's context here, on purpose — see prepareRemote.
 	s.prepareRemote(ctx)
+	// The workspace membership every job context carries is resolved once for
+	// the run: it encodes the configuration of every project.
+	ctx = context.WithValue(ctx, workspaceMembershipKey{}, cachekey.NewWorkspaceMembership(s.ws))
 
 	// Build dependency state
 	state := planner.NewDAGState(planner.SchedulableJobs(s.planned))
@@ -715,6 +722,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	sortPendingLongestFirst(pending)
 	for _, job := range pending {
 		s.metrics.markReady(job.Key())
+		s.pendingBatch(job)
 	}
 	inFlight := 0
 	totalCompleted := 0
@@ -1012,6 +1020,7 @@ func (s *Scheduler) queueReady(
 			continue
 		}
 		s.metrics.markReady(job.Key())
+		s.pendingBatch(job)
 		pending = append(pending, job)
 		queued = true
 	}

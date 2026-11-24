@@ -307,7 +307,7 @@ func (rel *invocationRelation) jobLeaked(job *ScheduledJob) bool {
 //
 // This is the ONLY path a producer's events take. A batch replays its members'
 // streams straight to the renderer (scheduler_batch_exec.go), which would step
-// around the hold — but readyBatchKey admits only cacheable jobs, and a task
+// around the hold — but readyBatch admits only cacheable jobs, and a task
 // with an invocation-scoped output must set cache:false (the manifest's
 // `invocation-cache-conflict` rule), so a producer is always a singleton
 // dispatch.

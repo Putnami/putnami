@@ -401,7 +401,8 @@ func prepareJobInvocation(
 		return nil, nil, nil, runtimeErr
 	}
 
-	jobCtx := BuildJobContext(ws, job, commandParams, configDefaults, versions)
+	membership, _ := ctx.Value(workspaceMembershipKey{}).(*cachekey.WorkspaceMembership)
+	jobCtx := buildJobContext(ws, job, commandParams, configDefaults, versions, membership)
 	scratchLease, err := store.AcquireScratch(ws.Root)
 	if err != nil {
 		return nil, nil, nil, err
@@ -504,6 +505,12 @@ type serveStepKey struct{}
 // started, releases the step's serve keys (releaseServeOutputLocks) and
 // announces the spawned process group as the step's first event
 // (announceProcessGroup).
+// workspaceMembershipKey carries the workspace membership a scheduler run
+// resolved once (*cachekey.WorkspaceMembership), so every job context of the
+// run stamps it rather than encoding the configuration of every project again.
+// A job run outside a scheduler run carries none and resolves its own.
+type workspaceMembershipKey struct{}
+
 func withServeStep(ctx context.Context) context.Context {
 	return context.WithValue(ctx, serveStepKey{}, true)
 }

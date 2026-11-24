@@ -16,17 +16,12 @@ import (
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
-// readyBatchKey returns the content identity used to group already-ready jobs.
-// An empty key means the job keeps the historical singleton dispatch path.
-func (s *Scheduler) readyBatchKey(job *ScheduledJob) string {
-	key, _ := s.readyBatch(job)
-	return key
-}
-
-// readyBatch returns the job's batch key together with the project cap that
-// key folds (0 is unbounded). Returning both from one computation is what makes
-// the cap a group is filled to the cap its key was computed with: a group only
-// admits peers sharing the leader's key, so the leader's cap is the group's.
+// readyBatch returns the content identity used to group already-ready jobs,
+// together with the project cap that key folds (0 is unbounded). An empty key
+// means the job keeps the historical singleton dispatch path. Returning both
+// from one computation is what makes the cap a group is filled to the cap its
+// key was computed with: a group only admits peers sharing the leader's key,
+// so the leader's cap is the group's.
 func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 	if s.cfg.CacheVerification {
 		return "", 0
@@ -61,8 +56,11 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 		}
 	}
 
-	jobCtx := BuildJobContext(s.ws, job, s.taskParams, cachekey.JobConfigDefaults(s.ws, job), s.cfg.VersionInfo)
-	params, err := json.Marshal(jobCtx.Params)
+	// The parameter bag the job context delivers (BuildJobContext assigns the
+	// same cachekey.DeliveredJobParams to its Params), without building the
+	// rest of the context.
+	delivered := cachekey.DeliveredJobParams(job, s.taskParams, cachekey.JobConfigDefaults(s.ws, job))
+	params, err := json.Marshal(delivered)
 	if err != nil {
 		return "", 0
 	}
@@ -70,9 +68,8 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 	// the policy names. The key folds the resolved cap in the static cap's
 	// place, so an unset option keeps today's key byte for byte and two caps
 	// never share a batch. A cap of 1, or a value the plan refuses, keeps
-	// singleton dispatch. planner.ValidateBatchProjectLimits reads the same bag
-	// (cachekey.DeliveredJobParams, which BuildJobContext assigns to jobCtx.Params).
-	maxProjects, batches, err := cachekey.BatchProjectLimit(job.JobDef.Batchable, jobCtx.Params)
+	// singleton dispatch. planner.ValidateBatchProjectLimits reads the same bag.
+	maxProjects, batches, err := cachekey.BatchProjectLimit(job.JobDef.Batchable, delivered)
 	if err != nil || !batches {
 		return "", 0
 	}
@@ -109,6 +106,34 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 	if s.cfg.Debug {
 		slog.Debug("scheduler batch candidate", "job", job.Key(), "batchKey", key, "maxProjects", maxProjects)
 	}
+	return key, maxProjects
+}
+
+// readyBatchResult is a pending job's batch key and the project cap it folds.
+type readyBatchResult struct {
+	key         string
+	maxProjects int
+}
+
+// pendingBatch returns a pending job's batch key and cap, computed once.
+//
+// The key reads the job's files and resolves its parameters, and a dispatch
+// scan compares the key of every pending candidate with its leader's. Without
+// the memo, each scan recomputed the key of every candidate it passed over,
+// so a long pending queue of batchable jobs held the coordinator while its
+// workers waited. queueReady computes the key when the job becomes ready, the
+// moment the scan first read it before; the scan then only reads it.
+func (s *Scheduler) pendingBatch(job *ScheduledJob) (string, int) {
+	s.pendingBatchMu.Lock()
+	defer s.pendingBatchMu.Unlock()
+	if result, ok := s.pendingBatches[job]; ok {
+		return result.key, result.maxProjects
+	}
+	key, maxProjects := s.readyBatch(job)
+	if s.pendingBatches == nil {
+		s.pendingBatches = make(map[*ScheduledJob]readyBatchResult)
+	}
+	s.pendingBatches[job] = readyBatchResult{key: key, maxProjects: maxProjects}
 	return key, maxProjects
 }
 
@@ -183,7 +208,7 @@ func (s *Scheduler) takePendingGroup(pending []*ScheduledJob) (jobGroup, []*Sche
 	first := pending[0]
 	// Every candidate must share the leader's key, which folds the resolved
 	// cap, so the cap returned with that key is the group's cap.
-	key, maxProjects := s.readyBatch(first)
+	key, maxProjects := s.pendingBatch(first)
 	if key == "" {
 		return jobGroup{jobs: []*ScheduledJob{first}}, pending[1:]
 	}
@@ -198,7 +223,7 @@ func (s *Scheduler) takePendingGroup(pending []*ScheduledJob) (jobGroup, []*Sche
 		// one straggling subprocess.
 		for j := len(pending) - 1; j > 0 && len(group.jobs) < maxProjects; j-- {
 			candidate := pending[j]
-			if s.readyBatchKey(candidate) != key || batchProjectOverlaps(candidate, group.jobs) || !admitsClaim(candidate) {
+			if candidateKey, _ := s.pendingBatch(candidate); candidateKey != key || batchProjectOverlaps(candidate, group.jobs) || !admitsClaim(candidate) {
 				continue
 			}
 			group.jobs = append(group.jobs, candidate)
@@ -207,7 +232,7 @@ func (s *Scheduler) takePendingGroup(pending []*ScheduledJob) (jobGroup, []*Sche
 	} else {
 		for j := 1; j < len(pending); j++ {
 			candidate := pending[j]
-			if s.readyBatchKey(candidate) != key || batchProjectOverlaps(candidate, group.jobs) || !admitsClaim(candidate) {
+			if candidateKey, _ := s.pendingBatch(candidate); candidateKey != key || batchProjectOverlaps(candidate, group.jobs) || !admitsClaim(candidate) {
 				continue
 			}
 			group.jobs = append(group.jobs, candidate)
@@ -234,7 +259,7 @@ func (s *Scheduler) takePendingGroup(pending []*ScheduledJob) (jobGroup, []*Sche
 	// stats store every CriticalPathMs is zero and the historical yield-to-any
 	// behavior is unchanged.
 	for i := 1; i < len(pending); i++ {
-		if s.readyBatchKey(pending[i]) != "" {
+		if candidateKey, _ := s.pendingBatch(pending[i]); candidateKey != "" {
 			continue
 		}
 		if pending[i].CriticalPathMs < first.CriticalPathMs {

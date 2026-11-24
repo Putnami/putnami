@@ -269,8 +269,28 @@ func ApplyProjectedParamLayer(destination, layer extensionmodel.ParamMap) {
 // same workspace whichever run produced it, which is also what the contract
 // validates.
 func WorkspaceProjectsContext(ws *workspace.Workspace, versions RunVersions) []JobContextProjectRef {
+	return NewWorkspaceMembership(ws).Context(versions)
+}
+
+// WorkspaceMembership is the workspace membership of a job context, resolved
+// once: every member's references, configuration encoding included, less the
+// line version, which depends on the job (a cacheable job sees the tree
+// version). A run builds one and stamps each job's versions on it, so the
+// configuration of every project is encoded once per run rather than once per
+// job context.
+//
+// It is a snapshot: a project changed after NewWorkspaceMembership is not seen.
+// A run does not change its workspace's projects once it is planned.
+type WorkspaceMembership struct {
+	projects []*workspace.Project
+	refs     []JobContextProjectRef
+}
+
+// NewWorkspaceMembership resolves the membership of ws, in canonical
+// project-id order. A nil workspace has no member.
+func NewWorkspaceMembership(ws *workspace.Workspace) *WorkspaceMembership {
 	if ws == nil {
-		return nil
+		return &WorkspaceMembership{}
 	}
 	members := make([]*workspace.Project, 0, len(ws.Projects))
 	for _, project := range ws.Projects {
@@ -279,13 +299,12 @@ func WorkspaceProjectsContext(ws *workspace.Workspace, versions RunVersions) []J
 		}
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i].ID < members[j].ID })
-	out := make([]JobContextProjectRef, 0, len(members))
+	refs := make([]JobContextProjectRef, 0, len(members))
 	for _, project := range members {
-		out = append(out, JobContextProjectRef{
+		refs = append(refs, JobContextProjectRef{
 			ID:         project.ID,
 			Name:       project.Name,
 			SourceName: project.SourceName,
-			Version:    LineBaseVersion(versions, project),
 			Path:       project.Path,
 			FullPath:   filepath.Join(ws.Root, project.Path),
 			Config:     encodedProjectConfig(project),
@@ -300,8 +319,20 @@ func WorkspaceProjectsContext(ws *workspace.Workspace, versions RunVersions) []J
 			Dependencies: DirectDependencyIDs(ws, project),
 		})
 	}
-	if len(out) == 0 {
+	return &WorkspaceMembership{projects: members, refs: refs}
+}
+
+// Context returns the membership with each member's line version from
+// versions, or nil when the workspace has no member. The returned slice is the
+// caller's own; its members share the snapshot's slices and encoded
+// configurations, which no caller writes.
+func (m *WorkspaceMembership) Context(versions RunVersions) []JobContextProjectRef {
+	if m == nil || len(m.refs) == 0 {
 		return nil
+	}
+	out := slices.Clone(m.refs)
+	for i := range out {
+		out[i].Version = LineBaseVersion(versions, m.projects[i])
 	}
 	return out
 }

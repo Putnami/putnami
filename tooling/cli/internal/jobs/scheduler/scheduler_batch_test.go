@@ -146,6 +146,9 @@ func TestTakePendingGroupUsesResolvedConfigAndOptIn(t *testing.T) {
 	// Identical copied bytes are still a different resolved source: relative
 	// imports inside a project-local config can have different semantics.
 	writeTestFile(t, filepath.Join(ws.Root, jobs[1].Project.Path, "biome.json"), `{"formatter":{"enabled":true}}`)
+	// A pending job's key is computed once, when it becomes ready: each
+	// scenario below is a new set of ready jobs, whose keys are computed anew.
+	scheduler.pendingBatches = nil
 	group, rest = scheduler.takePendingGroup(jobs)
 	if len(group.jobs) != 1 || len(rest) != 1 {
 		t.Fatalf("different resolved configs grouped as %d + %d, want 1 + 1", len(group.jobs), len(rest))
@@ -164,6 +167,7 @@ func TestTakePendingGroupUsesResolvedConfigAndOptIn(t *testing.T) {
 
 	jobs[0].JobDef.Batchable = nil
 	jobs[1].JobDef.Batchable = nil
+	scheduler.pendingBatches = nil
 	group, rest = scheduler.takePendingGroup(jobs)
 	if len(group.jobs) != 1 || len(rest) != 1 {
 		t.Fatalf("manifest without trait changed singleton dispatch: %d + %d", len(group.jobs), len(rest))

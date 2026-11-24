@@ -90,6 +90,10 @@ func TestGoTestBatchesHonourTheWorkspaceProjectCap(t *testing.T) {
 	scheduler := newScheduler(ws, planned, nil, SchedulerConfig{}, &mockRenderer{}, nil)
 	groupOf := func(pending []*ScheduledJob) ([]string, []*ScheduledJob) {
 		t.Helper()
+		// The option moves between scenarios, and a pending job's key is
+		// computed once, when it becomes ready: each scenario's jobs are newly
+		// ready.
+		scheduler.pendingBatches = nil
 		group, rest := scheduler.takePendingGroup(pending)
 		return keysOf(group.jobs), rest
 	}
