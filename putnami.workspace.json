@@ -2,7 +2,8 @@
   "$schema": "https://putnami.dev/schemas/putnami-workspace.json",
   "disable": {
     "tags": [
-      "e2e"
+      "e2e",
+      "whole-repository"
     ]
   },
   "epicBranches": [

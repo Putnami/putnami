@@ -1,9 +1,27 @@
 # @putnami/cli-documents
 
-The gates that read this repository's own documents: the governance surface, the
-neutral-contributor recipe, the release plan and its recorded verdict, the
-public-cut candidate, and the shipped manifests. The Windows compile gate lives
-in [`@putnami/windows-vet`](../windows-vet/README.md).
+The gates that read this repository's whole candidate tree: the public-cut scan,
+and the release rehearsal with its release plan and recorded verdict. The gates
+that read a known set of documents, such as the governance surface and the
+neutral-contributor recipe, live in
+[`@putnami/cli-document-set`](../cli-document-set/README.md); the Windows
+compile gate lives in [`@putnami/windows-vet`](../windows-vet/README.md).
+
+## Runs on main
+
+The project carries the `whole-repository` tag, which `disable.tags` in
+`putnami.workspace.json` names, so `--impacted` and `--all` never select it: its
+`git:**` key would put it, and the prerequisite steps of every module it
+compiles against, in the gate of every change. The
+[whole-repository gates](../../.github/workflows/whole-repository-gates.yml)
+workflow runs it by name on every push to `main`, and so can you:
+
+```bash
+./putnamiw lint,test,build,validate --enforce-coverage --projects /tooling/cli-documents,/tooling/windows-vet
+```
+
+[ADR 0001](doc/adr/0001-whole-repository-gates-run-on-main.md) records the
+decision.
 
 ## Why this is a separate project
 
@@ -18,8 +36,8 @@ its own testdata, and a document edit runs this suite alone.
 The public-cut and rehearsal gates read the whole candidate repository, so this
 project declares `options.test.filePatterns: ["git:**"]`. The key covers tracked
 files and non-ignored additions using the scanner's own Git enumeration, raw
-bytes and symlink targets. A change in another project's document selects this
-project under `--impacted` and invalidates its verdict. Ignored local state in
+bytes and symlink targets. A change in another project's document invalidates
+its verdict. Ignored local state in
 `.context`, worktrees and caches is outside this declaration. The previous fixed
 document list could miss new inputs; a filesystem-wide glob would read ignored
 state the scanner never reads.

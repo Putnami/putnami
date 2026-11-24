@@ -5,6 +5,7 @@
   "owner": "cli",
   "projects": [
     "/tooling/cli",
+    "/tooling/cli-document-set",
     "/tooling/cli-documents",
     "/tooling/cli-model",
     "/tooling/install-scripts",
@@ -63,6 +64,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
           "producerProject": "/tooling/extension-sdk"
         },
         {
@@ -244,8 +250,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/agentcontext"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/agentcontext"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/architecture"
         },
         {
           "kind": "project-dependency",
@@ -254,8 +270,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/cache"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/cache"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -264,8 +290,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/ci"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/ci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/cli"
         },
         {
           "kind": "project-dependency",
@@ -274,8 +310,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/contracts"
         },
         {
           "kind": "project-dependency",
@@ -284,8 +330,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/diagnostic"
         },
         {
           "kind": "project-dependency",
@@ -294,8 +350,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/doctor"
         },
         {
           "kind": "project-dependency",
@@ -304,8 +370,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/extension"
         },
         {
           "kind": "project-dependency",
@@ -314,8 +390,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/gomod"
         },
         {
           "kind": "project-dependency",
@@ -324,8 +410,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/clientcontract"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/clientcontract"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/collaboration"
         },
         {
           "kind": "project-dependency",
@@ -334,8 +430,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/job"
         },
         {
           "kind": "project-dependency",
@@ -344,8 +450,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/put"
         },
         {
           "kind": "project-dependency",
@@ -354,8 +470,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/runner"
         },
         {
           "kind": "project-dependency",
@@ -364,8 +490,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",
@@ -374,8 +510,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/support"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/support"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/telemetry"
         },
         {
           "kind": "project-dependency",
@@ -384,8 +530,18 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/template"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/template"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/workspace"
         },
         {
           "kind": "project-dependency",

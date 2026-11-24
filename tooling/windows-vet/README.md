@@ -3,9 +3,27 @@
 The Windows compile gate (D-W11). `TestEveryGoWorkModuleVetsForWindows` runs
 `GOOS=windows GOARCH=amd64 go vet work` from the repository root. The `work`
 pattern matches every package of every `go.work` module, test files included, so
-a Unix-only symbol anywhere in the workspace fails the contributor gate without a
+a Unix-only symbol anywhere in the workspace fails the gate on `main` without a
 Windows host. The test also fails when a `go.work` module has no package that
 builds for Windows, since vet would then check nothing in it.
+
+## Runs on main
+
+The project carries the `whole-repository` tag, which `disable.tags` in
+`putnami.workspace.json` names, so `--impacted` and `--all` never select it: in
+the per-change gate, every Go change ran it and the prerequisite steps of every
+module it reads. The
+[whole-repository gates](../../.github/workflows/whole-repository-gates.yml)
+workflow runs it by name on every push to `main`. Before merging a change to
+platform-specific Go code, run it yourself:
+
+```bash
+./putnamiw test --projects /tooling/windows-vet
+```
+
+No repository-local mechanism vets only the changed modules: that would be a
+step of the Go extension's own jobs
+([ADR 0001 of `@putnami/cli-documents`](../cli-documents/doc/adr/0001-whole-repository-gates-run-on-main.md)).
 
 ## Why this is a separate project
 

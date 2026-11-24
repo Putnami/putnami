@@ -62,7 +62,7 @@ already knows it cannot keep.
 ### 4. The neutral contributor path is documented commands the tests execute
 
 The contributor path is one fenced block in `CONTRIBUTING.md`, between
-`neutral-contributor-ci` markers. `tooling/cli-documents/neutral_contributor_ci_test.go`
+`neutral-contributor-ci` markers. `tooling/cli-document-set/neutral_contributor_ci_test.go`
 reads that block and runs it:
 
 - in a workspace fixture with an empty artifact store and a lock that holds no

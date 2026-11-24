@@ -79,7 +79,11 @@ declared requirement — is covered by `git:**` in `options.test.filePatterns` i
 change to one cannot be answered from a cached run. The rehearsal lives in
 `@putnami/cli-documents` for that reason: a project declares cache-key inputs per
 command, so declaring the governance surface here would key the CLI's whole test
-suite on it.
+suite on it. Because that key covers every candidate file, the project carries
+the `whole-repository` tag and runs on `main` by name, not in the gate of each
+change
+([ADR 0001](../../cli-documents/doc/adr/0001-whole-repository-gates-run-on-main.md)):
+run the command above before merging a change to a verdict input.
 
 `TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs` enforces this. When
 you narrow that declaration, it fails if a requirement's target is uncovered.

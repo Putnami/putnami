@@ -1,4 +1,4 @@
-package documents
+package documentset
 
 import (
 	"encoding/json"
@@ -23,51 +23,67 @@ import (
 
 const cliProjectDir = cliModuleDir
 
-// documentsOwnedRepositoryFiles are the repository documents this project — and
-// only this project — reads. Keeping them out of @putnami/cli's declared test
-// inputs is what makes a documentation edit a cache hit for the CLI's 5 000-test
-// suite instead of a full re-run.
+// documentsOwnedRepositoryFiles are the repository documents the two document
+// projects — and only they — read, each with the project whose gates read it.
+// Keeping them out of @putnami/cli's declared test inputs is what makes a
+// documentation edit a cache hit for the CLI's 5 000-test suite instead of a
+// full re-run.
 //
-// A file read by a test on BOTH sides (putnami.workspace.json, putnami.ci.json,
+// The whole-tree gates of @putnami/cli-documents key on every candidate file;
+// the gates of this project key on the documents they name. A file read by a
+// test on BOTH sides (putnami.workspace.json, putnami.ci.json,
 // putnami.support.json, decisions.json, the agent-artifact trees) is absent
 // here on purpose: it is honestly declared twice, because two readers exist.
-var documentsOwnedRepositoryFiles = []string{
-	".github/PULL_REQUEST_TEMPLATE.md",
-	".gitignore",
-	"CODE_OF_CONDUCT.md",
-	"CONTRIBUTING.md",
-	"GOVERNANCE.md",
-	"LICENSE.md",
-	"README.md",
-	"RELEASE.md",
-	"RELEASING.md",
-	"SECURITY.md",
-	"tooling/extension-sdk/pkgmeta/platforms.go",
-	"protocols/cli/testdata/prior-releases/provenance.json",
-	"protocols/extension/testdata/prior-releases/provenance.json",
-	"protocols/support/README.md",
-	"tooling/CHANGELOG.md",
+var documentsOwnedRepositoryFiles = map[string]string{
+	".github/PULL_REQUEST_TEMPLATE.md": cliDocumentsProjectDir,
+	".gitignore":                       cliDocumentsProjectDir,
+	"CODE_OF_CONDUCT.md":               cliDocumentsProjectDir,
+	"CONTRIBUTING.md":                  documentSetProjectDir,
+	"GOVERNANCE.md":                    documentSetProjectDir,
+	"LICENSE.md":                       cliDocumentsProjectDir,
+	"README.md":                        documentSetProjectDir,
+	"RELEASE.md":                       cliDocumentsProjectDir,
+	"RELEASING.md":                     documentSetProjectDir,
+	"SECURITY.md":                      documentSetProjectDir,
+	"tooling/extension-sdk/pkgmeta/platforms.go":                  cliDocumentsProjectDir,
+	"protocols/cli/testdata/prior-releases/provenance.json":       cliDocumentsProjectDir,
+	"protocols/extension/testdata/prior-releases/provenance.json": cliDocumentsProjectDir,
+	"protocols/support/README.md":                                 documentSetProjectDir,
+	"sites/putnami.dev/doc/01-getting-started/index.md":           documentSetProjectDir,
+	"tooling/CHANGELOG.md":                                        cliDocumentsProjectDir,
 }
 
 // TestRepositoryDocumentsAreKeyedToThisProjectOnly is the regression guard for
 // the split. Before the split, every one of these files was a declared test input of
 // @putnami/cli, so editing CONTRIBUTING.md alone re-ran the whole CLI suite
 // twice per gate. Re-adding one there fails here, naming the file and the cost.
+// A document a gate of this project reads must also be a declared input of
+// this project, not only of the whole-tree project: that one
+// leaves the per-change gate, so its key keeps no per-change verdict fresh.
 func TestRepositoryDocumentsAreKeyedToThisProjectOnly(t *testing.T) {
 	t.Parallel()
-	documentsPatterns := declaredTestFilePatterns(t, cliDocumentsProjectDir)
 	cliPatterns := declaredTestFilePatterns(t, cliProjectDir)
+	readerPatterns := map[string][]string{
+		documentSetProjectDir:  declaredTestFilePatterns(t, documentSetProjectDir),
+		cliDocumentsProjectDir: declaredTestFilePatterns(t, cliDocumentsProjectDir),
+	}
 
-	for _, file := range documentsOwnedRepositoryFiles {
-		if !store.SelectsPath(projectRelativePath(cliDocumentsProjectDir, file), documentsPatterns) {
-			t.Errorf("%s is read by a gate in this project, but no declared test input of "+
-				"@putnami/cli-documents selects it, so a warm cache answers a changed document "+
-				"with the previous verdict.", file)
+	files := make([]string, 0, len(documentsOwnedRepositoryFiles))
+	for file := range documentsOwnedRepositoryFiles {
+		files = append(files, file)
+	}
+	sort.Strings(files)
+	for _, file := range files {
+		reader := documentsOwnedRepositoryFiles[file]
+		if !store.SelectsPath(projectRelativePath(reader, file), readerPatterns[reader]) {
+			t.Errorf("%s is read by a gate in %s, but no declared test input of that project "+
+				"selects it, so a warm cache answers a changed document with the previous verdict.",
+				file, reader)
 		}
 		if store.SelectsPath(projectRelativePath(cliProjectDir, file), cliPatterns) {
 			t.Errorf("%s is a declared test input of @putnami/cli again, so editing it re-runs "+
 				"the CLI's whole test suite. No test under tooling/cli reads it: move the "+
-				"reader here instead of re-declaring the document there.", file)
+				"reader to the document projects instead of re-declaring the document there.", file)
 		}
 	}
 }

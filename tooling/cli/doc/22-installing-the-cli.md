@@ -677,7 +677,7 @@ These platform differences are decisions, recorded in
 - **Evidence**: four test runs on a Windows Server 2022 host created for each
   run and deleted after it (D-W11). The last run had 0 product failures across
   145 Go test packages, and it passed the Go, TypeScript and junction-root
-  consumer flows. The contributor gate runs `GOOS=windows go vet` on every
+  consumer flows. The gate on `main` runs `GOOS=windows go vet` on every
   `go.work` module (D-W11). The [Evidence](#evidence) table names the test for
   each Windows claim.
 - **Not proven**: how Microsoft Defender treats the https forms of the one-line
@@ -978,7 +978,7 @@ map is served the same way: removing an entry is a pull request against
 | The first-use smoke fails under the leg that broke: a failed command of the block, a page that is not 200, a failed check, a failed Go command, a toolchain outside the Putnami home | `TestFirstUseSmokeFailsUnderTheLegThatBroke` |
 | The first-use smoke reads the first `bash` block of the page and refuses a page whose block does not install and then serve | `TestFirstUseSmokeReadsTheFirstBashBlockOfThePage` |
 | The bare image adds only `curl` and its certificates, runs as a non-root user and shares no host state; an image that holds `bun`, `git`, `node` or `go`, or a writable `PATH` directory, is refused | `TestFirstUseSmokeBuildsAnImageThatHoldsOnlyWhatTheInstallerNeeds`, `TestFirstUseSmokeRefusesAnImageThatIsNotBare` |
-| The README and the getting-started page print the block the first-use smoke runs | `tooling/cli-documents/first_use_block_test.go` — `TestTheFirstUseSmokeRunsTheBlockTheReadmeAndTheGettingStartedPagePrint` |
+| The README and the getting-started page print the block the first-use smoke runs | `tooling/cli-document-set/first_use_block_test.go` — `TestTheFirstUseSmokeRunsTheBlockTheReadmeAndTheGettingStartedPagePrint` |
 | The smoke's `run` leg passes a command that leaves its directory untouched, and fails one that writes there, exits non-zero, or has an invalid name | `TestSmokeRunsTheOptionalRunScenarioInAnUntouchedDirectory`, `TestSmokeFailsTheRunScenarioWhenTheCommandWritesIntoTheCallerDirectory`, `TestSmokeFailsTheRunScenarioWhenTheCommandFails`, `TestSmokeRejectsAnInvalidRunCommandBeforeFetchingTheChannel` |
 | The Windows smoke has the same `run` leg, with the same inputs, checks and error texts, and runs the one-liner as script text | `tooling/install-scripts/smoke_ps1_test.go`; on Windows, `smoke_ps1_windows_test.go` — `TestWindowsSmokePS1RunsTheOptionalRunLegInAnUntouchedDirectory`, `TestWindowsSmokePS1FailsTheRunLegWhenTheCommandWritesIntoTheCallerDirectory`, `TestWindowsSmokePS1FailsTheRunLegWhenTheCommandFails`, `TestWindowsSmokePS1RejectsAnInvalidRunCommandBeforeAnyRequest` |
 | The run form resolves, pins, then runs the command in the caller's directory: the command's output alone on stdout, the installer's on stderr, no footer, stdin never the pipe, the directory untouched | `tooling/install-scripts/run_command_test.go` — `TestRunResolvesPinsAndRunsTheCommandInTheCallerDirectory`, `TestRunWorksWhenPipedIntoBash` |

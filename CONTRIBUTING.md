@@ -172,7 +172,7 @@ sends no request to the Putnami registry, so you need network access, not an
 account.
 
 Those two commands are executable evidence, not a description of one.
-`tooling/cli-documents/neutral_contributor_ci_test.go` reads this exact block
+`tooling/cli-document-set/neutral_contributor_ci_test.go` reads this exact block
 out of this file and runs it against a workspace with:
 
 - every Putnami Cloud, cache, registry, and cloud-provider credential removed
@@ -248,6 +248,20 @@ names. `@putnami/database` plans no `test~test-env` task, so nothing provisions
 it a database and its suite would otherwise start its own container mid-test.
 The credentials are the fixture's own, so the job still holds nothing you do
 not.
+
+Two gates key on every file of a kind in the repository: the public-cut scan
+and the release rehearsal of `@putnami/cli-documents` read every candidate
+file, and the Windows compile gate `@putnami/windows-vet` vets every Go module.
+They carry the `whole-repository` tag, which `disable.tags` in
+`putnami.workspace.json` names, so `--impacted` never selects them and a pull
+request does not run them.
+[`.github/workflows/whole-repository-gates.yml`](.github/workflows/whole-repository-gates.yml)
+runs them by name on every push to `main`. Before merging a change to
+platform-specific Go code or to a release input, run them yourself:
+
+```bash
+./putnamiw lint,test,build,validate --enforce-coverage --projects /tooling/cli-documents,/tooling/windows-vet
+```
 
 ## Repository Layout
 

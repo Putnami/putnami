@@ -115,6 +115,7 @@ use (
 	./integrations/bazel
 	./integrations/moon
 	./tooling/cli
+	./tooling/cli-document-set
 	./tooling/cli-documents
 	./tooling/cli-model
 	./tooling/clientgen-extension

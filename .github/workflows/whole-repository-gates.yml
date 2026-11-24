@@ -1,0 +1,107 @@
+# Whole-repository gates — the gates that read the whole tree, on main.
+#
+# Two projects key on every file of a kind in the repository:
+#
+#   - @putnami/cli-documents, the public-cut scan and the release rehearsal,
+#     keys its tests on every candidate file (`git:**`);
+#   - @putnami/windows-vet, the Windows compile gate (D-W11), runs
+#     `GOOS=windows go vet work` over every go.work module and keys on every
+#     tracked Go source, module file and putnami.json.
+#
+# In the per-change gate, either one turned any change of that kind into a run
+# of its suite plus the prerequisite steps of every module it reads: a one-line
+# Go change planned 86 projects and 503 tasks for two real test runs. Both carry
+# the `whole-repository` tag, which `disable.tags` in putnami.workspace.json
+# names, so `--impacted` and `--all` never select them. This workflow runs them
+# by name, which a disabled tag does not filter, on every push to main
+# (decision whole-repository-gates-run-on-main,
+# tooling/cli-documents/doc/adr/0001-whole-repository-gates-run-on-main.md).
+#
+# Like the credential-free gate, the job reads no secret.
+name: Whole-repository gates
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to main supersedes the run of an older one: the newer tree holds
+# every change the older one did.
+concurrency:
+  group: whole-repository-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: cli-documents and windows-vet on main
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PUTNAMI_CLOUD_TOKEN: ''
+      PUTNAMI_CACHE_URL: ''
+      PUTNAMI_CACHE_TOKEN: ''
+      PUTNAMI_TOKEN: ''
+      CONFIG_SERVER_URL: ''
+      CONFIG_SERVER_TOKEN: ''
+      DO_NOT_TRACK: '1'
+    steps:
+      # The public-cut scan reads the Git enumeration of the candidate tree.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache: false
+
+      # Keep this Bun pin equal to package.json#packageManager, as in
+      # contributor-ci.yml: `putnami install` installs the workspace's tools.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Restore toolchain and dependency caches
+        id: dependency-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.putnami/cache/go
+            ~/.putnami/toolchains
+            ~/.putnami/artifacts
+            ~/.bun/install/cache
+            ~/.putnami/tools/go
+          key: putnami-${{ runner.os }}-${{ hashFiles('putnami.lock.json', 'go.work.sum', 'bun.lock', 'go/extension/tools/versions.json') }}
+          restore-keys: |
+            putnami-${{ runner.os }}-
+
+      - name: Install the workspace
+        run: ./putnamiw install
+
+      - name: Turn the remote cache off
+        run: |
+          echo '{"enabled": false}' > .putnami/cache.json
+
+      # Naming the projects is a direct target, which the workspace's
+      # disable.tags does not narrow. The planner still runs each prerequisite
+      # step, such as the client-generate of every module windows-vet reads.
+      - name: Run the whole-repository gates
+        run: >-
+          ./putnamiw lint,test,build,validate --enforce-coverage
+          --projects /tooling/cli-documents,/tooling/windows-vet
+
+      - name: Save toolchain and dependency caches
+        if: always() && steps.dependency-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.putnami/cache/go
+            ~/.putnami/toolchains
+            ~/.putnami/artifacts
+            ~/.bun/install/cache
+            ~/.putnami/tools/go
+          key: ${{ steps.dependency-cache.outputs.cache-primary-key }}

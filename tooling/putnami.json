@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-scope.json",
   "includes": [
     "cli",
+    "cli-document-set",
     "cli-documents",
     "cli-model",
     "clientgen-extension",

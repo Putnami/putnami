@@ -75,7 +75,7 @@ func TestPublicCutCandidateInputsInvalidateTheRecordedVerdict(t *testing.T) {
 		t.Fatal("unrelated non-ignored candidate document reused the old release key")
 	}
 	if !store.SelectsPath(projectRelativePath(cliDocumentsProjectDir, path), patterns) {
-		t.Fatal("candidate document does not select its declared reader under --impacted")
+		t.Fatal("candidate document is not a declared input of its reader, so it cannot change the release key")
 	}
 	files, err := publicCutTrackedFiles(root)
 	if err != nil {
