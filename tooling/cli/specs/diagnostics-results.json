@@ -139,7 +139,7 @@
       "id": "a-run-reports-its-orchestration-cost",
       "text": [
         "session.json and the result carry run.orchestration: the wall of each engine phase entered (workspace-load, runtime-sync, probe, selection, plan) and the processes started by kind (job, batch, control, cli, git, other) and git calls by subcommand, from the engine and from jobs built on the extension SDK.",
-        "A task record carries its key, lock wait and restore walls. The report fails no run; an unmeasured member is absent, never zero."
+        "A task record carries its key, lock wait and restore walls. The report fails no run; a wait or a CPU the platform does not measure is absent, never zero; a CPU part sums the processes that reported one."
       ]
     },
     {
