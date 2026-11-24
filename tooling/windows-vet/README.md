@@ -14,15 +14,18 @@ The project carries the `whole-repository` tag, which `disable.tags` in
 the per-change gate, every Go change ran it and the prerequisite steps of every
 module it reads. The
 [whole-repository gates](../../.github/workflows/whole-repository-gates.yml)
-workflow runs it by name on every push to `main`. Before merging a change to
-platform-specific Go code, run it yourself:
+workflow runs it by name on every push to `main`, and on a pull request that
+changes this project or a platform-specific Go file (`*_windows.go`,
+`*_unix.go`, `*_linux.go`, `*_darwin.go`, `*_bsd.go`). A Unix-only symbol can
+also sit in an unsuffixed file; before merging such a change, run it yourself:
 
 ```bash
 ./putnamiw test --projects /tooling/windows-vet
 ```
 
 No repository-local mechanism vets only the changed modules: that would be a
-step of the Go extension's own jobs
+step of the Go extension's own jobs, so the path filter is the per-change
+approximation
 ([ADR 0001 of `@putnami/cli-documents`](../cli-documents/doc/adr/0001-whole-repository-gates-run-on-main.md)).
 
 ## Why this is a separate project

@@ -677,8 +677,9 @@ These platform differences are decisions, recorded in
 - **Evidence**: four test runs on a Windows Server 2022 host created for each
   run and deleted after it (D-W11). The last run had 0 product failures across
   145 Go test packages, and it passed the Go, TypeScript and junction-root
-  consumer flows. The gate on `main` runs `GOOS=windows go vet` on every
-  `go.work` module (D-W11). The [Evidence](#evidence) table names the test for
+  consumer flows. `GOOS=windows go vet` of every `go.work` module runs on every
+  push to `main`, and on a pull request that changes a platform-specific Go
+  file (D-W11). The [Evidence](#evidence) table names the test for
   each Windows claim.
 - **Not proven**: how Microsoft Defender treats the https forms of the one-line
   install. [Install on Windows](#install-on-windows) describes the forms that

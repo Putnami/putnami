@@ -13,8 +13,10 @@
 # Go change planned 86 projects and 503 tasks for two real test runs. Both carry
 # the `whole-repository` tag, which `disable.tags` in putnami.workspace.json
 # names, so `--impacted` and `--all` never select them. This workflow runs them
-# by name, which a disabled tag does not filter, on every push to main
-# (decision whole-repository-gates-run-on-main,
+# by name, which a disabled tag does not filter, on every push to main, and on a
+# pull request that changes one of the paths below: the gates themselves, the
+# release inputs the rehearsal pins, or a platform-specific Go file, the usual
+# home of a Unix-only symbol (decision whole-repository-gates-run-on-main,
 # tooling/cli-documents/doc/adr/0001-whole-repository-gates-run-on-main.md).
 #
 # Like the credential-free gate, the job reads no secret.
@@ -23,20 +25,36 @@ name: Whole-repository gates
 on:
   push:
     branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - tooling/cli-documents/**
+      - tooling/windows-vet/**
+      - tooling/cli/internal/cli/testdata/release-plan.json
+      - tooling/cli/doc/reports/release-rehearsal.md
+      - '**/*.tsv'
+      - '**/*_windows.go'
+      - '**/*_unix.go'
+      - '**/*_linux.go'
+      - '**/*_darwin.go'
+      - '**/*_bsd.go'
+      - go.work
+      - .github/workflows/whole-repository-gates.yml
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# A newer push to main supersedes the run of an older one: the newer tree holds
-# every change the older one did.
+# A newer push to a pull request supersedes its older run. On main every push
+# keeps its own run, so a red run names the commit that turned it red.
 concurrency:
-  group: whole-repository-gates-${{ github.ref }}
-  cancel-in-progress: true
+  group: whole-repository-gates-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   gate:
-    name: cli-documents and windows-vet on main
+    name: cli-documents and windows-vet
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:

@@ -14,7 +14,8 @@ The project carries the `whole-repository` tag, which `disable.tags` in
 `git:**` key would put it, and the prerequisite steps of every module it
 compiles against, in the gate of every change. The
 [whole-repository gates](../../.github/workflows/whole-repository-gates.yml)
-workflow runs it by name on every push to `main`, and so can you:
+workflow runs it by name on every push to `main`, and on a pull request that
+changes this project or a release input. You can run it too:
 
 ```bash
 ./putnamiw lint,test,build,validate --enforce-coverage --projects /tooling/cli-documents,/tooling/windows-vet

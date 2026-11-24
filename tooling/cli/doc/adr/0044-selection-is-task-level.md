@@ -143,7 +143,9 @@ something. `impacted` and `why_impacted` name the same scopes as the run.
   test files. In Go that includes `lint-golangci-fix`, which reads them.
   Narrowing that is a manifest change.
 - A README still selects `@putnami/cli-documents`, which declares `git:**` as
-  a `test` input: it is the documentation drift gate.
+  a `test` input: it is the documentation drift gate. (Since
+  [its ADR 0001](../../../cli-documents/doc/adr/0001-whole-repository-gates-run-on-main.md)
+  that project runs on `main` by name and no longer in the per-change gate.)
 - A text file in a Go project selects only the tasks of the commands that
   project may run. One in `protocols/ci` planned 714 jobs across 153 projects
   for `lint,test,build,validate`, carried by another stack's Docker closure

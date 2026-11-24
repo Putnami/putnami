@@ -253,10 +253,10 @@ Two gates key on every file of a kind in the repository: the public-cut scan
 and the release rehearsal of `@putnami/cli-documents` read every candidate
 file, and the Windows compile gate `@putnami/windows-vet` vets every Go module.
 They carry the `whole-repository` tag, which `disable.tags` in
-`putnami.workspace.json` names, so `--impacted` never selects them and a pull
-request does not run them.
+`putnami.workspace.json` names, so `--impacted` never selects them.
 [`.github/workflows/whole-repository-gates.yml`](.github/workflows/whole-repository-gates.yml)
-runs them by name on every push to `main`. Before merging a change to
+runs them by name on every push to `main`, and on a pull request that changes
+them, a release input or a platform-specific Go file. Before merging a change to
 platform-specific Go code or to a release input, run them yourself:
 
 ```bash

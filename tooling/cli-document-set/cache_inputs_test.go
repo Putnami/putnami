@@ -23,17 +23,20 @@ import (
 
 const cliProjectDir = cliModuleDir
 
-// documentsOwnedRepositoryFiles are the repository documents the two document
-// projects — and only they — read, each with the project whose gates read it.
-// Keeping them out of @putnami/cli's declared test inputs is what makes a
-// documentation edit a cache hit for the CLI's 5 000-test suite instead of a
-// full re-run.
+// documentsOwnedRepositoryFiles are the repository files the two document
+// projects — and only they among the CLI's test projects — read, each with the
+// project that must key it. Keeping them out of @putnami/cli's declared test
+// inputs is what makes a documentation edit a cache hit for the CLI's 5 000-test
+// suite instead of a full re-run.
 //
-// The whole-tree gates of @putnami/cli-documents key on every candidate file;
-// the gates of this project key on the documents they name. A file read by a
-// test on BOTH sides (putnami.workspace.json, putnami.ci.json,
-// putnami.support.json, decisions.json, the agent-artifact trees) is absent
-// here on purpose: it is honestly declared twice, because two readers exist.
+// A file a gate of this project reads is attributed to this project, even when
+// a whole-tree gate of @putnami/cli-documents reads it too (CONTRIBUTING.md,
+// SECURITY.md): that project leaves the per-change gate, so only this
+// project's key keeps the per-change verdict fresh. The other files are read by
+// the whole-tree gates alone. A file a test of @putnami/cli also reads
+// (putnami.workspace.json, putnami.support.json, decisions.json, the
+// agent-artifact trees) is absent here on purpose: it is honestly declared
+// twice, because two readers exist.
 var documentsOwnedRepositoryFiles = map[string]string{
 	".github/PULL_REQUEST_TEMPLATE.md": cliDocumentsProjectDir,
 	".gitignore":                       cliDocumentsProjectDir,
@@ -49,7 +52,9 @@ var documentsOwnedRepositoryFiles = map[string]string{
 	"protocols/cli/testdata/prior-releases/provenance.json":       cliDocumentsProjectDir,
 	"protocols/extension/testdata/prior-releases/provenance.json": cliDocumentsProjectDir,
 	"protocols/support/README.md":                                 documentSetProjectDir,
+	"putnami.ci.json":                                             documentSetProjectDir,
 	"sites/putnami.dev/doc/01-getting-started/index.md":           documentSetProjectDir,
+	"tooling/cli/scripts/smoke-first-use.sh":                      documentSetProjectDir,
 	"tooling/CHANGELOG.md":                                        cliDocumentsProjectDir,
 }
 
@@ -217,4 +222,66 @@ func sortedLayers(options map[string]manifestOptionLayer) []string {
 	}
 	sort.Strings(layers)
 	return layers
+}
+
+// siteDocumentationTarget is the site path under which the moved-commands
+// check looks for the page the CLI cites.
+const siteDocumentationTarget = "public/docs"
+
+// TestPublishedDocumentationIsADeclaredInput keeps the declared Markdown inputs
+// equal to what TestCommandsThatLeftTheCoreURLNamesAPublishedHeading reads:
+// every Markdown file under every documentation folder the site copies under
+// public/docs. The declaration names those folders instead of every Markdown
+// file of the repository, so a folder the site starts to publish has to be
+// declared here too, or a warm cache answers its edit with the previous pass.
+func TestPublishedDocumentationIsADeclaredInput(t *testing.T) {
+	t.Parallel()
+	root := repositoryRoot(t)
+	patterns := declaredTestFilePatterns(t, documentSetProjectDir)
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(siteManifest)))
+	if err != nil {
+		t.Fatalf("read %s: %v", siteManifest, err)
+	}
+	var manifest struct {
+		Options struct {
+			Generate struct {
+				Assets []struct {
+					From string `json:"from"`
+					To   string `json:"to"`
+				} `json:"assets"`
+			} `json:"generate"`
+		} `json:"options"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("parse %s: %v", siteManifest, err)
+	}
+	checked := 0
+	for _, asset := range manifest.Options.Generate.Assets {
+		if asset.To != siteDocumentationTarget && !strings.HasPrefix(asset.To, siteDocumentationTarget+"/") {
+			continue
+		}
+		source := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(asset.From, "/")))
+		err := filepath.WalkDir(source, func(file string, entry fs.DirEntry, err error) error {
+			if err != nil || entry.IsDir() || filepath.Ext(file) != ".md" {
+				return err
+			}
+			rel, err := filepath.Rel(root, file)
+			if err != nil {
+				return err
+			}
+			checked++
+			if !store.SelectsPath(projectRelativePath(documentSetProjectDir, filepath.ToSlash(rel)), patterns) {
+				t.Errorf("%s is published under %s (asset %s), but no declared test input of "+
+					"@putnami/cli-document-set selects it; declare its folder in options.test.filePatterns",
+					filepath.ToSlash(rel), asset.To, asset.From)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", source, err)
+		}
+	}
+	if checked == 0 {
+		t.Fatalf("%s publishes no Markdown file under %s, so this check proves nothing", siteManifest, siteDocumentationTarget)
+	}
 }

@@ -2,6 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-24
+- **Amends**: decision D-W11 (`tooling/cli/decisions/D-W11.json`), where the
+  Windows vet runs
 - **Scope**: `@putnami/cli-documents`, `@putnami/cli-document-set`,
   `@putnami/windows-vet`, `disable.tags` in `putnami.workspace.json`,
   `.github/workflows/whole-repository-gates.yml`
@@ -33,7 +35,12 @@ manifests and `putnami.ci.json`.
 1. **The gates that read a known set move out.** They form
    `@putnami/cli-document-set` (`tooling/cli-document-set`), which keys its
    tests on the files they read, so a pull request runs them exactly when one
-   of those files changes.
+   of those files changes. Its Markdown key names the documents it reads and
+   the documentation folders the site publishes, not every Markdown file:
+   `TestPublishedDocumentationIsADeclaredInput` fails when the site publishes a
+   folder the key does not name. The project is a sibling, not a child, of
+   `tooling/cli-documents`: a nested project is in that project's scope, and
+   the scope boundary forbids its import of `/tooling/cli`.
 2. **The whole-tree gates leave the per-change gate.** `@putnami/cli-documents`
    keeps the public cut, the release rehearsal and the `cli/release-rehearsal`
    feature, and keeps `git:**`. It and `@putnami/windows-vet` carry the
@@ -43,17 +50,26 @@ manifests and `putnami.ci.json`.
    runs `lint,test,build,validate --projects /tooling/cli-documents,/tooling/windows-vet`
    on every push to `main`. A named project is a direct target, which
    `disable.tags` does not filter. Anyone can run the same command locally.
-4. **The Windows compile gate stays whole.** No repository-local mechanism vets
+4. **A pull request runs them when its paths say so.** The same workflow runs
+   on a pull request that changes the two projects, the release plan, the
+   recorded report, a public-cut `.tsv`, `go.work`, or a platform-specific Go
+   file (`*_windows.go`, `*_unix.go`, `*_linux.go`, `*_darwin.go`,
+   `*_bsd.go`). That filter lives in the workflow, not in the planner: the
+   gate the planner builds for a change never holds these projects.
+5. **The Windows compile gate stays whole.** No repository-local mechanism vets
    only the changed modules for Windows: a per-module vet would have to be a
    step of the Go extension's own jobs, which is out of this repository
-   configuration's reach. Until one exists, a pull request does not run D-W11.
+   configuration's reach. The path filter of decision 4 is the per-change
+   approximation; D-W11 records it.
 
 ## Consequences
 
-- A change that breaks the Windows build, the public-cut scan or the recorded
-  release verdict fails on `main`, not on its pull request. Run the command of
-  decision 3 before merging a change that touches platform-specific Go code or
-  a release input.
+- A change outside the paths of decision 4 that breaks the Windows build, the
+  public-cut scan or the recorded release verdict fails on `main`, not on its
+  pull request: a Unix-only symbol in an unsuffixed file, a new private name in
+  a document, a renamed internal symbol of `tooling/cli` that these gates
+  import. Each push to `main` keeps its own run, so the red run names the
+  commit. Run the command of decision 3 before merging such a change.
 - A recorded rehearsal verdict that drifts is caught at the next `main` run,
   in the same way: re-record it in the change that moves it.
 - `putnami.ci.json` declares no per-branch command set, so Putnami CI's native

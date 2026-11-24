@@ -126,7 +126,7 @@ jobs:
       # Empty means "unconfigured", which is exactly a contributor's state. The
       # hostile variant — pointing both endpoints at a server that refuses and
       # counts every request — belongs in
-      # tooling/cli/internal/cli/neutral_contributor_ci_test.go, where a test
+      # tooling/cli-document-set/neutral_contributor_ci_test.go, where a test
       # server can exist.
       PUTNAMI_CLOUD_TOKEN: ''
       PUTNAMI_CACHE_URL: ''

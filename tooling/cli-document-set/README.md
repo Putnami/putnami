@@ -18,8 +18,10 @@ the release rehearsal, read every candidate file, so that project keys on
 name, so they key on those files and stay in the gate of every change that
 touches one of them:
 
-- `git:../../**/*.md`: the documents above and the documentation folders the
-  site publishes, which the moved-commands check walks;
+- the documents above, and the documentation folders that
+  `sites/putnami.dev/putnami.json` publishes under `public/docs`, which the
+  moved-commands check walks (`TestPublishedDocumentationIsADeclaredInput`
+  fails when the site publishes a folder this list does not name);
 - `git:../../**/putnami.json` and `git:../../**/schema/config.json`: the
   manifests whose patterns the cache-input check reads, and the workloads the
   environment check follows;
@@ -27,8 +29,9 @@ touches one of them:
 - `putnami.ci.json`, `putnami.workspace.json`, the CLI's `go.mod` and the
   first-use smoke script.
 
-A change to anything else, such as a Dart sample or a Go source file, does not
-select this project.
+A change to anything else, such as a Dart sample or a Markdown file outside the
+published documentation, does not select this project. A Go source of the CLI or
+of a module it imports still does: the test binary compiles against them.
 
 ## How it reaches the CLI
 
