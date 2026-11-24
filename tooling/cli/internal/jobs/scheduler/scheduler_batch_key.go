@@ -121,17 +121,10 @@ type readyBatchResult struct {
 
 // pendingBatch returns a pending job's batch key and cap, computed once.
 //
-// The key reads the job's files and resolves its parameters, and a dispatch
-// scan compares the key of every pending candidate with its leader's. Without
-// the memo, each scan recomputed the key of every candidate it passed over,
-// so a long pending queue of batchable jobs held the coordinator while its
-// workers waited. queueReady computes the key when the job becomes ready, the
-// moment the scan first read it before; the scan then only reads it.
-//
-// The key therefore captures the tree when the job becomes ready. A file a
-// running job writes afterwards does not regroup a job already pending; before
-// the memo, the next scan could regroup it. Grouping only decides which ready
-// jobs share a subprocess: each member's cache key is computed on its own.
+// The key is computed once, when queueReady admits the job; a dispatch scan
+// only reads it. It captures the tree at that moment: a file written afterwards
+// does not regroup a pending job. Grouping only decides which ready jobs share
+// a subprocess: each member's cache key is computed on its own.
 func (s *Scheduler) pendingBatch(job *ScheduledJob) (string, int) {
 	s.pendingBatchMu.Lock()
 	defer s.pendingBatchMu.Unlock()
