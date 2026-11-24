@@ -25,6 +25,10 @@ import (
 // from one computation is what makes the cap a group is filled to the cap its
 // key was computed with: a group only admits peers sharing the leader's key,
 // so the leader's cap is the group's.
+//
+// The key reads the tree as it is when called: the job's input files and the
+// content of its config files. Dispatch reads it through pendingBatch, which
+// captures it when the job becomes ready.
 func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 	if s.cfg.CacheVerification {
 		return "", 0
@@ -126,6 +130,11 @@ type readyBatchResult struct {
 // so a long pending queue of batchable jobs held the coordinator while its
 // workers waited. queueReady computes the key when the job becomes ready, the
 // moment the scan first read it before; the scan then only reads it.
+//
+// The key therefore captures the tree when the job becomes ready. A file a
+// running job writes afterwards does not regroup a job already pending; before
+// the memo, the next scan could regroup it. Grouping only decides which ready
+// jobs share a subprocess: each member's cache key is computed on its own.
 func (s *Scheduler) pendingBatch(job *ScheduledJob) (string, int) {
 	s.pendingBatchMu.Lock()
 	defer s.pendingBatchMu.Unlock()
