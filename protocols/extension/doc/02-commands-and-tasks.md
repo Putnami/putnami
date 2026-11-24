@@ -871,8 +871,9 @@ path per project, giving each a distinct digest and silently disabling batching.
 
 The scheduler groups only jobs that are already ready and share the tool,
 resolved configuration file and content, toolchain version, task identity,
-effective parameters, synthesized execution environment, and policy bounds. It
-never waits for more jobs to join a cached batch.
+effective parameters (for a delegated task, all but the project's own layers
+of its extension, below), synthesized execution environment, and policy
+bounds. It never waits for more jobs to join a cached batch.
 
 A task whose cache is off may declare `batchable` too: a delegated stack's
 task, whose tool keeps its own cache, runs a verb as one tool command. Such a

@@ -144,10 +144,13 @@ func (s Stack) runBatch(ctx *pctx.Context, emit *jsonl.Emitter, task string) (st
 			m.finish(status, data)
 			continue
 		}
-		// One command per stack root and batch shape: the members' steps
+		// One command per stack root, toolchain and batch shape: the members' steps
 		// may differ only in the arguments that name their component, such
 		// as moon run api:test pricing:unit.
-		key := m.meta.Root + "\x00" + batchShape(m.task.Batch.Steps)
+		// The toolchain too: a project may state its own check or version,
+		// and one command runs one check.
+		toolchain, _ := json.Marshal(m.profile.Toolchain)
+		key := m.meta.Root + "\x00" + batchShape(m.task.Batch.Steps) + "\x00" + string(toolchain)
 		if _, ok := byRoot[key]; !ok {
 			roots = append(roots, key)
 		}

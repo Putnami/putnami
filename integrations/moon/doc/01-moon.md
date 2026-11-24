@@ -147,7 +147,9 @@ writes in `.moon/cache/runReport.json`: a target moon reports `passed` or
 end of the output moon kept for it under `.moon/cache/states`. When the
 command fails, a target the report does not name fails as not run, and a
 report that names no failed target fails every project. A task that runs
-alone, such as a retry, runs `moon run <project>:<task>`.
+alone, such as a retry, runs `moon run <project>:<task>`. A workspace synced
+before the projects of a verb ran as one command reports a stale sync in
+`putnami validate` until `putnami projects sync` writes the batch steps.
 
 A moon project at the workspace root, such as moon's `root`, becomes no
 Putnami project: a project there would own every file no deeper project

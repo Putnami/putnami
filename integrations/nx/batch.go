@@ -111,7 +111,12 @@ func readRunMany(output string) (map[string]string, map[string]bool) {
 		if m := sectionStart.FindStringSubmatch(line); m != nil {
 			flush()
 			inSummary = false
-			current = m[1]
+			// Nx quotes a target whose name holds a colon:
+			// > nx run a:"test:lib"; its summary does not.
+			current = strings.ReplaceAll(m[1], `"`, "")
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(line), "::endgroup::") {
 			continue
 		}
 		if summaryStart.MatchString(line) {

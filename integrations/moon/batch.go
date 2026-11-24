@@ -16,9 +16,6 @@ import (
 // one action per node of its pipeline, a task's with its target and status.
 const RunReport = ".moon/cache/runReport.json"
 
-// mtimeGranularity is the coarsest modification time a file system keeps.
-const mtimeGranularity = 2 * time.Second
-
 // outputLines is how many lines of the output moon kept for a failed task
 // its message quotes.
 const outputLines = 40
@@ -44,8 +41,8 @@ var runTaskLabel = regexp.MustCompile(`^Run(?:Interactive|Persistent)?Task\((.+)
 func ReadBatch(report stacks.BatchReport) map[string]stacks.BatchOutcome {
 	path := filepath.Join(report.Root, filepath.FromSlash(RunReport))
 	info, err := os.Stat(path)
-	// A file system may keep a modification time to the second, or two.
-	if err != nil || info.ModTime().Before(report.Started.Add(-mtimeGranularity)) {
+	// A file system may keep a modification time to the second.
+	if err != nil || info.ModTime().Before(report.Started.Truncate(time.Second)) {
 		return nil
 	}
 	data, err := os.ReadFile(path) //nolint:gosec // moon's own report under the stack root

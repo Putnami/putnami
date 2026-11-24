@@ -503,7 +503,7 @@ Batching preserves the scheduler's longest-first queue: compatible peers may
 join the job at the head of the ready queue, but a later batch never jumps
 ahead of earlier ordinary work. A lone batch candidate may yield to ready
 ordinary work when that work can unblock a compatible peer; the scheduler does
-not otherwise wait for a batch to fill.
+not otherwise wait for a cached batch to fill.
 
 Batching amortizes only the extension-process overhead `F` (fork/exec +
 extension boot + config + toolchain probe, ~0.18s/task). Each project still

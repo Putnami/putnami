@@ -141,6 +141,18 @@ func TestReadBatchReadsAConfigurationAndAGitHubGroup(t *testing.T) {
 	}
 }
 
+func TestReadBatchReadsAQuotedTarget(t *testing.T) {
+	output := "> nx run a:\"test:lib\"\n\nboom\n\n> nx run b:\"test:lib\"\n\nok\n\n" +
+		" NX   Ran target test:lib for 2 projects\n\n   ✖  1/2 targets failed, including the following:\n\n      - nx run a:test:lib\n"
+	got := ReadBatch(stacks.BatchReport{Components: []string{"a", "b"}, Command: []string{"npx", "--no", "nx", "run-many", "-t", "test:lib", "-p", "{components}"}, Output: []byte(output)})
+	if !got["a"].Failed || !strings.Contains(got["a"].Message, "boom") {
+		t.Errorf("a = %+v, want its failed section", got["a"])
+	}
+	if b, ok := got["b"]; !ok || b.Failed {
+		t.Errorf("b = %+v (%v), want the pass Nx reported", b, ok)
+	}
+}
+
 func TestASyncedTargetRunsAsItsOwnRunMany(t *testing.T) {
 	got := batchSteps("test", [][]string{runStep("test:lib"), runStep("e2e")})
 	want := [][]string{
