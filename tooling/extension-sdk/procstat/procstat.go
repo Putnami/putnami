@@ -199,6 +199,11 @@ func CombinedOutput(cmd *exec.Cmd, kind ...Kind) ([]byte, error) {
 	return out, err
 }
 
+// Record counts cmd after another runner started and waited for it, such as
+// a process tree: its start, and its CPU when its exit status was read. A
+// command that never started is not counted.
+func Record(cmd *exec.Cmd, kind ...Kind) { record(cmd, kind) }
+
 // record counts a command that exec ran to completion: one that never started
 // has no Process.
 func record(cmd *exec.Cmd, kind []Kind) {

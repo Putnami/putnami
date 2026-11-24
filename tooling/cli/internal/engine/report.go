@@ -104,6 +104,59 @@ func reportSchedulerTuning(w io.Writer, g *GlobalFlags, tuning *scheduler.Tuning
 	}
 }
 
+// reportOrchestration prints the run's orchestration report: the orchestration
+// CPU, its share of the run's CPU and its ms per task, the engine phases, and
+// the processes and git calls by origin. The numbers are the session's own
+// projection, so the printed report is the recorded one. It shows with
+// --trace-profile or in debug; quiet suppresses it.
+func reportOrchestration(w io.Writer, g *GlobalFlags, result *scheduler.SchedulerResult) {
+	if result == nil || result.Session == nil || g.Quiet || !(g.Debug || g.TraceProfile != "") {
+		return
+	}
+	report := machine.Run{Session: result.Session}.Summary(0).Orchestration
+	if report == nil {
+		return
+	}
+	if cpu := report.CPU; cpu != nil {
+		iox.Fprintf(w, "  Orchestration CPU: %s of %s (%d.%d%%) · %s per task",
+			formatDurationMs(cpu.TotalMs), formatDurationMs(cpu.RunMs),
+			cpu.SharePermille/10, cpu.SharePermille%10, formatDurationMs(cpu.PerTaskMs))
+		iox.Fprintf(w, " (engine %s · extensions %s · control %s · cli %s · git %s)\n",
+			formatDurationMs(cpu.EngineMs), formatDurationMs(cpu.ExtensionMs), formatDurationMs(cpu.ControlMs),
+			formatDurationMs(cpu.CLIMs), formatDurationMs(cpu.GitMs))
+		if cpu.UnreportedProcesses > 0 {
+			iox.Fprintf(w, "         %d job process(es) reported no CPU of their own\n", cpu.UnreportedProcesses)
+		}
+	}
+	if len(report.Phases) > 0 {
+		parts := make([]string, 0, len(report.Phases))
+		for _, phase := range report.Phases {
+			parts = append(parts, phase.Phase+" "+formatDurationMs(phase.WallMs))
+		}
+		iox.Fprintf(w, "  Engine phases: %s\n", strings.Join(parts, " · "))
+	}
+	for _, origin := range []string{protocolcli.OrchestrationOriginEngine, protocolcli.OrchestrationOriginJobs} {
+		var processes, git []string
+		for _, entry := range report.Processes {
+			if entry.Origin == origin {
+				processes = append(processes, fmt.Sprintf("%s %d", entry.Kind, entry.Count))
+			}
+		}
+		for _, entry := range report.Git {
+			if entry.Origin == origin {
+				git = append(git, fmt.Sprintf("%s %d", entry.Subcommand, entry.Count))
+			}
+		}
+		if len(processes) == 0 {
+			continue
+		}
+		iox.Fprintf(w, "  Processes (%s): %s\n", origin, strings.Join(processes, " · "))
+		if len(git) > 0 {
+			iox.Fprintf(w, "    git: %s\n", strings.Join(git, " · "))
+		}
+	}
+}
+
 // reportCacheSummary prints the local cache-serving leg first, including the
 // in-process and child-process work that otherwise sits between near-zero task
 // spans. When a remote provider participated, its economics follow on a

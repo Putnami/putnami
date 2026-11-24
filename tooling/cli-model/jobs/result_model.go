@@ -138,6 +138,9 @@ type TaskTiming struct {
 	// the first valid runtime event. Meaningful only when FirstEventObserved.
 	SpawnToFirstEvent  time.Duration
 	FirstEventObserved bool
+	// Waits is the wall the scheduler spent on the task outside its
+	// subprocess.
+	Waits TaskWaits
 }
 
 // TaskDiagnostic is one diagnostic attributed to a task.
@@ -525,6 +528,7 @@ func applyTaskSummary(task *TaskResult, job *ScheduledJob, result *JobResult) {
 		task.Timing = TaskTiming{
 			Duration:           result.Duration,
 			TaskWall:           result.TaskWall,
+			Waits:              result.Waits,
 			CPUTime:            result.CPUTime,
 			SpawnToFirstEvent:  result.SpawnToFirstEvent,
 			FirstEventObserved: result.FirstEventObserved,

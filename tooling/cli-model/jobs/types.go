@@ -42,6 +42,9 @@ type JobResult struct {
 	// Duration (the final subprocess attempt), it includes lookup/reuse,
 	// hooks, every retry attempt, and result publication.
 	TaskWall time.Duration `json:"-"`
+	// Waits is the wall the scheduler spent on the task outside its
+	// subprocess: its key, its lock waits, its restore.
+	Waits TaskWaits `json:"-"`
 	// CPUTime is the subprocess tree's consumed CPU time (user+system,
 	// including waited children). Zero when unavailable. Feeds the task stats
 	// history that drives learned CPU weights. For a batch member it is this
@@ -220,6 +223,9 @@ type SessionOutcome struct {
 	// renderers. Session reduction reads the same snapshot separately; keeping it
 	// here lets Finish emit session:end without widening the renderer interface.
 	Cache *CacheStatsSnapshot
+	// Orchestration is the run's orchestration report, settled like Cache and
+	// supplied to terminal renderers the same way.
+	Orchestration *OrchestrationSnapshot
 }
 
 // Renderer is the interface for rendering job execution output.

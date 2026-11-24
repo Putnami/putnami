@@ -17,6 +17,7 @@ import (
 
 	runner "go.putnami.dev/protocol/runner"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Snapshot retains content identity separately from Git and index context.
@@ -120,7 +121,7 @@ func sourceGitOptional(ctx context.Context, repo string, args ...string) ([]byte
 	cmd := exec.CommandContext(ctx, gitread.Executable(), append([]string{"-C", repo, "-c", "core.fsmonitor=false"}, args...)...)
 	var output boundedGitOutput
 	cmd.Stdout = &output
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd, procstat.Git); err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) && exitError.ExitCode() == 1 {
 			return nil, false, nil
@@ -190,7 +191,7 @@ func IgnoredPaths(ctx context.Context, repo string, paths []string) (map[string]
 	cmd.Stdin = &stdin
 	var output boundedGitOutput
 	cmd.Stdout = &output
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd, procstat.Git); err != nil {
 		var exitError *exec.ExitError
 		// Exit 1 is Git's documented "none of the paths are ignored".
 		if errors.As(err, &exitError) && exitError.ExitCode() == 1 {

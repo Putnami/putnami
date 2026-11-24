@@ -19,6 +19,7 @@ import (
 
 	"go.putnami.dev/sdk/extension/pinnedarchive"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -294,7 +295,7 @@ func getBinaryVersion(ctx context.Context, binaryPath string) string {
 	runcredential.MarkRepositoryCodeStarted(filepath.Base(binaryPath) + " --version")
 	cmd := exec.CommandContext(ctx, binaryPath, "--version")
 	cmd.Env = append(os.Environ(), launch.NoRelaunchEnv+"=1", launch.LaunchedEnv+"=")
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd)
 	if err != nil {
 		return "unknown"
 	}

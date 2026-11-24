@@ -24,6 +24,7 @@ import (
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/sdk/extension/envkeys"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -856,7 +857,7 @@ func runRuntimePrepareCommand(
 		cmd := exec.CommandContext(ctx, command, args...)
 		cmd.Dir = dir
 		cmd.Env = env
-		out, err := cmd.CombinedOutput()
+		out, err := procstat.CombinedOutput(cmd)
 		if err == nil || !isTextFileBusy(err) || attempt == attempts-1 {
 			return out, cmd.ProcessState, err
 		}
@@ -1233,7 +1234,7 @@ func startRuntimeHandshake(ctx context.Context, executable string, stdout, stder
 		cmd := exec.CommandContext(ctx, executable, "__putnami", "runtime-info")
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
-		err := cmd.Start()
+		err := procstat.Start(cmd, procstat.Control)
 		if err == nil || !isTextFileBusy(err) || attempt == attempts-1 {
 			return cmd, err
 		}
@@ -1271,7 +1272,7 @@ func runRuntimeHandshake(
 	// The waiter stops the deadline's watch as soon as Wait returns.
 	waited := make(chan error, 1)
 	go func() {
-		err := cmd.Wait()
+		err := procstat.Wait(cmd, procstat.Control)
 		deadline.Stop()
 		waited <- err
 	}()

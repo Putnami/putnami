@@ -11,6 +11,7 @@ import (
 	"time"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -245,7 +246,9 @@ func runShellCommand(ctx context.Context, hook workspaceHook, root string, verbo
 
 	// A hosted run hands its credential to no process started after this one.
 	runcredential.MarkRepositoryCodeStarted("hook " + hook.source)
-	if err := tree.Run(); err != nil {
+	runErr := tree.Run()
+	procstat.Record(cmd)
+	if err := runErr; err != nil {
 		switch {
 		case parent.Err() != nil:
 			// The run itself was stopped (Ctrl-C, or the after-hook cleanup

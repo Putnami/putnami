@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -120,7 +121,7 @@ func RunHostHook(ctx context.Context, args []string, env HostHookEnv) int {
 	// The child is repository code: the workspace's own putnamiw, or a CLI
 	// that loads the workspace's extensions.
 	runcredential.MarkRepositoryCodeStarted("host-hook runs a hook in the workspace of its event")
-	err = cmd.Run()
+	err = procstat.Run(cmd)
 	var exitErr *exec.ExitError
 	switch {
 	case err == nil:

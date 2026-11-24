@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -130,7 +131,7 @@ func fishCompletionPath() string {
 func writeCompletionFromBinary(ctx context.Context, binaryPath, shell, target string) error {
 	runcredential.MarkRepositoryCodeStarted(filepath.Base(binaryPath) + " completion " + shell)
 	cmd := exec.CommandContext(ctx, binaryPath, "completion", shell)
-	output, err := cmd.Output()
+	output, err := procstat.Output(cmd)
 	if err != nil {
 		ee := &exec.ExitError{}
 		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
@@ -171,7 +172,7 @@ func writeCompletionFromBinary(ctx context.Context, binaryPath, shell, target st
 
 func zshCompletionDuplicates(ctx context.Context) []string {
 	var paths []string
-	if out, err := exec.CommandContext(ctx, "zsh", "-c", `for d in $fpath; do [[ -f "$d/_putnami" ]] && print -r -- "$d/_putnami"; done`).Output(); err == nil {
+	if out, err := procstat.Output(exec.CommandContext(ctx, "zsh", "-c", `for d in $fpath; do [[ -f "$d/_putnami" ]] && print -r -- "$d/_putnami"; done`)); err == nil {
 		for _, line := range strings.Split(string(out), "\n") {
 			line = strings.TrimSpace(line)
 			if line != "" {

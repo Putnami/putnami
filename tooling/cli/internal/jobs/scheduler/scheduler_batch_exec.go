@@ -171,7 +171,7 @@ func (s *Scheduler) runBatchAttempt(ctx context.Context, work []taskWork) map[st
 		aggregateEvents = func(event RawJobEvent) { recorder.BatchJobEvent(leader, event) }
 	}
 	aggregate, err := runJob(
-		ctx,
+		withBatchProcess(ctx),
 		s.ws,
 		leader,
 		s.taskParams,

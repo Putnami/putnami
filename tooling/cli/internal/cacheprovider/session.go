@@ -35,6 +35,7 @@ import (
 
 	cache "go.putnami.dev/protocol/cache"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 )
 
@@ -198,13 +199,14 @@ func Spawn(ctx context.Context, spec LaunchSpec, opts ...Option) (*Session, erro
 	if err := tree.Start(); err != nil {
 		return nil, fmt.Errorf("start cache provider %s: %w", spec.Command, err)
 	}
+	procstat.Started(procstat.Control, cmd.Args)
 
 	s.cmd = cmd
 	s.stdin = stdin
 	s.stdout = stdout
 	s.tree = tree
 
-	go func() { s.waitCh <- cmd.Wait() }()
+	go func() { s.waitCh <- procstat.Wait(cmd, procstat.Control) }()
 	go s.readLoop()
 
 	return s, nil

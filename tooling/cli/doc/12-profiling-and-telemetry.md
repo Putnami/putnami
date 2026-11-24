@@ -101,6 +101,67 @@ later attempt is eventless; `taskWallMs` covers all attempts. Every planned job
 gets exactly one terminal row, including drained, stuck-DAG, and never-started
 cancellations.
 
+## Orchestration Cost
+
+A run reports where its orchestration time and CPU went, in `session.json` and
+in its `--output=json` result under `run.orchestration`. The report is
+information, in any workspace: it fails nothing.
+
+**Orchestration** is the CPU a run spends on anything but the tools its jobs
+run:
+
+- the CLI process that runs the engine, its own CPU;
+- each extension process without its children: a job built on the extension
+  SDK reports its own CPU in its result (`processReport.selfCpuMs`), apart from
+  the CPU of the processes it started;
+- the control processes: an extension process the engine starts for anything
+  but a job, such as a runtime handshake, the workspace probe, a hook or a
+  provider;
+- the CLI starts made by the engine or by a job, such as a registry credential;
+- git, started by the engine or by an SDK job.
+
+The tools a job runs, `go`, `bun`, `tsc` and what they start, are not
+orchestration, and neither is the git a tool runs itself, such as
+`go build -buildvcs`.
+
+| Member | Meaning |
+|---|---|
+| `run.orchestration.phases[]` | Wall of each engine phase the run entered: `workspace-load`, `runtime-sync`, `probe`, `selection`, `plan`. |
+| `run.orchestration.processes[]` | Processes started by `origin` (`engine`, or `jobs` built on the SDK) and `kind` (`job`, `batch`, `control`, `cli`, `git`, `other`), with the CPU of those that exited before the run ended. |
+| `run.orchestration.git[]` | Git calls by origin and subcommand (`rev-parse`, `ls-files`). |
+| `run.orchestration.cpu` | `engineMs`, `extensionMs`, `controlMs`, `cliMs`, `gitMs`, their sum `totalMs`, the run's whole CPU `runMs` (the CLI process and every child it waited for), `sharePermille` (`totalMs` over `runMs`, in thousandths) and `perTaskMs` (`totalMs` over the selected tasks). `unreportedProcesses` counts the job processes that reported no CPU of their own: a runtime not built on the SDK. |
+| `tasks[].orchestration` | Per task: `keyMs` (computing its cache key), `lockWaitMs` (waiting for a cache lease another process held, or for its task-output locks) and `restoreMs` (restoring a cache entry). A step the task never entered is absent. |
+
+The counts come from the processes themselves rather than from an outside
+poller: the engine and the SDK start every process through one ledger
+(`go.putnami.dev/sdk/extension/procstat`), and an SDK job writes its ledger in
+its result. They cover the CLI process since it started, so a watch session
+reports cumulative numbers. Process CPU is measured where the platform reports
+it (`getrusage` on Unix); elsewhere `cpu` is absent. A long-lived process still
+running when the run ends, such as a cache provider, is counted but its CPU is
+not.
+
+`--trace-profile`, and `--debug`, print the report after the scheduler summary:
+
+```text
+  Orchestration CPU: 23s of 1m35s (24.4%) · 1s per task (engine 14s · extensions 425ms · control 2s · cli 4s · git 466ms)
+  Engine phases: workspace-load 49ms · runtime-sync 15s · probe 3s · selection 4ms · plan 14ms
+  Processes (engine): job 12 · control 56 · git 35 · other 65
+    git: diff 1 · ls-files 12 · rev-parse 18 · show 1 · status 2 · symbolic-ref 1
+  Processes (jobs): cli 7 · git 1 · other 12
+    git: ls-files 1
+```
+
+### Checking the counts
+
+The process count can be checked against the kernel: trace a run with
+`strace -f -e trace=execve,clone,clone3,fork,vfork -o trace`, build the process
+tree from it, and count the `execve` calls whose parent is the CLI process or a
+job process. Those are the processes the report counts; a process a tool
+started is not. The git count can be checked with a `git` shim placed first on
+`PATH` that logs each call and runs the real git: a run's `git[]` entries add
+up to the shim's lines from the engine and the job processes.
+
 ## Cache Economics Benchmark
 
 `tooling/cli/scripts/bench-cache.sh` measures how the shared build CAS changes

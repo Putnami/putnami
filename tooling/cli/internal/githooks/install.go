@@ -10,6 +10,7 @@ import (
 
 	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Install writes putnami's git hook scripts to .git/hooks/. selfBinary is the
@@ -21,7 +22,7 @@ func Install(selfBinary string) {
 		return
 	}
 
-	out, err := exec.Command(gitread.Executable(), "rev-parse", "--show-toplevel").Output()
+	out, err := procstat.Output(exec.Command(gitread.Executable(), "rev-parse", "--show-toplevel"), procstat.Git)
 	if err != nil {
 		return // not a git repo
 	}

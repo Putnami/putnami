@@ -15,6 +15,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/commands/extensions"
@@ -598,7 +599,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 			cmd.Dir = cwd
 			cmd.Stdout = nil
 			cmd.Stderr = nil
-			if err := cmd.Run(); err == nil {
+			if err := procstat.Run(cmd, procstat.Git); err == nil {
 				iox.Fprintln(os.Stdout, "  ✓ Git repository initialized")
 			}
 		}

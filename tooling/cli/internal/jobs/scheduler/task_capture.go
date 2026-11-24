@@ -787,6 +787,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 	keyStarted := time.Now()
 	hash, err := cachekey.ComputeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
 	s.cacheStats.RecordLocalKeys(keyStarted, time.Now())
+	s.waits.key(job, keyStarted)
 	if err != nil || hash == "" {
 		if err != nil && !errors.Is(err, store.ErrInputSelector) {
 			if semanticErr := cachekey.ValidateUnkeyedInputSelectors(s.ws, job, s.commandParams, s.cache.InputResolver()); semanticErr != nil {
@@ -816,6 +817,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 	if err == nil && entry != nil {
 		if result := s.restoreDeclaredCacheHit(ctx, job, hash, entry, mu, hashes); result != nil {
 			s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
+			s.waits.restore(job, restoreStarted)
 			s.cacheStats.RecordLocalHit()
 			return hash, result, noop
 		}
@@ -831,6 +833,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 		if recorded := s.cache.LookupResultOnlyTaskEntry(entryKey); recorded != nil {
 			if result := s.serveStatusOnlyHit(job, hash, recorded, ReuseLocalCache, mu, hashes); result != nil {
 				s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
+				s.waits.restore(job, restoreStarted)
 				s.cacheStats.RecordLocalHit()
 				return hash, result, noop
 			}
@@ -839,9 +842,11 @@ func (s *Scheduler) lookupDeclaredEntry(
 	s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
 	s.cacheStats.RecordLocalMiss()
 
+	remoteStarted := time.Now()
 	if resultOnly {
 		if recorded, reuse := s.remote.RestoreTaskResult(ctx, entryKey, job, s.cache); recorded != nil {
 			if result := s.serveStatusOnlyHit(job, hash, recorded, reuse, mu, hashes); result != nil {
+				s.waits.restore(job, remoteStarted)
 				return hash, result, noop
 			}
 		}
@@ -855,6 +860,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 			// was fetched or published by the lease owner while it waited.
 			if result := s.restoreDeclaredCacheHit(ctx, job, hash, remoteEntry, mu, hashes); result != nil {
 				result.MarkReuse(reuse)
+				s.waits.restore(job, remoteStarted)
 				return hash, result, noop
 			}
 		}

@@ -39,7 +39,6 @@ func child(t *testing.T, name string) *exec.Cmd {
 }
 
 func TestTheLedgerCountsEachWrapperByKind(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "a-run-reports-its-orchestration-cost", "the-engine-and-sdk-jobs-count-their-processes-by-kind-and-git-by-subcommand")
 	before := Take()
 
 	if err := Run(child(t, "worker")); err != nil {
@@ -75,7 +74,6 @@ func TestTheLedgerCountsEachWrapperByKind(t *testing.T) {
 }
 
 func TestGitCallsCountBySubcommand(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "a-run-reports-its-orchestration-cost", "the-engine-and-sdk-jobs-count-their-processes-by-kind-and-git-by-subcommand")
 	before := Take()
 	Started(Git, []string{"git", "-C", "/repo", "-c", "core.fsmonitor=false", "rev-parse", "--git-common-dir"})
 	Started(Git, []string{"/usr/bin/git", "--no-pager", "ls-files", "-z"})
@@ -92,7 +90,6 @@ func TestGitCallsCountBySubcommand(t *testing.T) {
 }
 
 func TestClassifyNamesGitTheCLIAndOther(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "a-run-reports-its-orchestration-cost", "the-engine-and-sdk-jobs-count-their-processes-by-kind-and-git-by-subcommand")
 	for program, want := range map[string]Kind{
 		"git":                    Git,
 		"/usr/bin/git":           Git,
@@ -143,7 +140,6 @@ func TestTheReportCarriesTheProcessOwnCPUApartFromItsChildren(t *testing.T) {
 }
 
 func TestAbsorbSumsTheReportsOfJobProcesses(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "a-run-reports-its-orchestration-cost", "the-engine-and-sdk-jobs-count-their-processes-by-kind-and-git-by-subcommand")
 	before := TakeReported()
 	self := int64(40)
 	Absorb(&runtimeproto.ProcessReport{

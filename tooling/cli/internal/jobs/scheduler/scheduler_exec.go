@@ -168,7 +168,11 @@ func (s *Scheduler) executeJobGroup(
 		}
 		return s.lockTaskOutputs(ctx, lockJobs, s.preparationWritesProjectTree, true)
 	}
+	lockStarted := time.Now()
 	ctx, outputs, err := lock(ctx)
+	for i := range opened {
+		s.waits.lockWait(opened[i].job, lockStarted)
+	}
 	if err != nil {
 		for i := range opened {
 			result := spawnFailureResult(ctx, err)
@@ -914,7 +918,9 @@ func (s *Scheduler) lookupRestoreOrClaim(
 			s.memoizeKeylessIdentity(job, mu, hashes)
 			return "", nil, noop
 		}
+		keyStarted := time.Now()
 		hash, err := cachekey.ComputeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
+		s.waits.key(job, keyStarted)
 		if err != nil {
 			if !errors.Is(err, store.ErrInputSelector) {
 				if semanticErr := cachekey.ValidateUnkeyedInputSelectors(s.ws, job, s.commandParams, s.cache.InputResolver()); semanticErr != nil {
@@ -971,7 +977,9 @@ func (s *Scheduler) coalesceMiss(
 		if s.onCacheLeaseWait != nil {
 			s.onCacheLeaseWait(job)
 		}
+		waitStarted := time.Now()
 		err := coalescer.wait(ctx, hash, remaining)
+		s.waits.lockWait(job, waitStarted)
 		if err == nil {
 			if result := coalescer.restore(ctx, hash); result != nil {
 				// The entry was absent when this scheduler arrived and was

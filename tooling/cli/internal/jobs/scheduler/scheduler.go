@@ -102,6 +102,10 @@ type SchedulerConfig struct {
 	// carries it onto the session so the recorded document holds the whole run;
 	// it neither reads nor adds to it. Nil for a caller that recorded none.
 	Preparation *PreparationReport
+	// Orchestration times the engine phases of the run; the scheduler settles
+	// the run's orchestration report from it when the run ends. Nil for a
+	// caller that measures none: the session then carries no report.
+	Orchestration *OrchestrationClock
 }
 
 // SchedulerResult holds the outcome of a full scheduler run.
@@ -156,6 +160,9 @@ type Scheduler struct {
 	// runs. A configured remote cache shares this exact accumulator so the final
 	// snapshot cannot split one session across two independently-timed views.
 	cacheStats *cachekey.CacheStats
+	// waits holds each task's key, lock-wait and restore walls until its
+	// result is recorded.
+	waits taskWaitsLedger
 	// onCacheLeaseWait observes a genuine miss after this scheduler lost the
 	// per-key lease and immediately before it waits for the owner. Tests install
 	// it before Run; production leaves it nil.
@@ -983,6 +990,7 @@ func (s *Scheduler) recordCompletedGroup(
 	for _, done := range completed.jobs {
 		*totalCompleted++
 
+		s.waits.stampWaits(done.job, done.result)
 		mu.Lock()
 		results[done.job.Key()] = done.result
 		mu.Unlock()
@@ -1093,6 +1101,7 @@ func (s *Scheduler) finalizeRun(
 		}
 	}
 	outcome.Cache = cacheStats
+	outcome.Orchestration = s.cfg.Orchestration.Snapshot()
 	s.renderer.Finish(results, outcome)
 
 	// Persist the run's execution history so the next run's learned weights
@@ -1311,6 +1320,7 @@ func (s *Scheduler) drainInFlight(doneCh <-chan jobGroupDone, count int, results
 		completed := <-doneCh
 		s.releaseGroupResources(completed)
 		for _, done := range completed.jobs {
+			s.waits.stampWaits(done.job, done.result)
 			mu.Lock()
 			if _, exists := results[done.job.Key()]; !exists {
 				results[done.job.Key()] = done.result

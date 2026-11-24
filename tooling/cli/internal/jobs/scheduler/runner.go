@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,6 +22,7 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/envkeys"
 	"go.putnami.dev/sdk/extension/filelock"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -568,6 +570,41 @@ func announceProcessGroup(ctx context.Context, group int, onEvent EventHandler) 
 	})
 }
 
+// batchProcessKey marks a context whose job process runs a batch.
+type batchProcessKey struct{}
+
+// withBatchProcess marks ctx as the context of a batch's job process.
+func withBatchProcess(ctx context.Context) context.Context {
+	return context.WithValue(ctx, batchProcessKey{}, true)
+}
+
+// jobProcessKind is the kind a job process started under ctx counts as.
+func jobProcessKind(ctx context.Context) procstat.Kind {
+	if batch, _ := ctx.Value(batchProcessKey{}).(bool); batch {
+		return procstat.Batch
+	}
+	return procstat.Job
+}
+
+// takeProcessReport removes the process report from the result's data and
+// returns it. A report that does not decode is no report. The data map is
+// copied, never changed in place.
+func takeProcessReport(result *JobResult) *runtimeproto.ProcessReport {
+	if _, ok := result.Data[runtimeproto.ProcessReportResultDataKey]; !ok {
+		return nil
+	}
+	report, err := runtimeproto.ExtractProcessReport(result.Data)
+	if err != nil {
+		report = nil
+	}
+	result.Data = maps.Clone(result.Data)
+	delete(result.Data, runtimeproto.ProcessReportResultDataKey)
+	if len(result.Data) == 0 {
+		result.Data = nil
+	}
+	return report
+}
+
 // runJob is RunJob with the run-level process environment the scheduler owns.
 // extraEnv carries facts about HOW this process spawns the job — never task
 // inputs — so it reaches the subprocess and nothing else: not the job context,
@@ -666,6 +703,8 @@ func runJob(
 		}
 		return nil, fmt.Errorf("start subprocess %s: %w", inv.command, err)
 	}
+	processKind := jobProcessKind(ctx)
+	procstat.Started(processKind, cmd.Args)
 	// Closing the tree ends nothing on Unix, so runJob stops the tree itself
 	// before it returns (stopProcessGroup below); on Windows, closing also ends
 	// every process the job left behind.
@@ -740,6 +779,12 @@ func runJob(
 			result = &JobResult{Status: "failed"}
 		}
 	}
+	// The job process's own accounting joins the run's: what it started, and
+	// the CPU it spent itself. A process that wrote no report is counted as
+	// unreported, and the report leaves the result data so no cache entry
+	// replays it.
+	procstat.Exited(processKind, cmd.ProcessState)
+	procstat.Absorb(takeProcessReport(result))
 	result.Events = evResult.events
 	result.Duration = duration
 	result.SpawnToFirstEvent = spawnToFirstEvent

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 )
 
@@ -47,10 +48,11 @@ func spawn(spec LaunchSpec) (*process, error) {
 		_ = stdoutWriter.Close()
 		return nil, err
 	}
+	procstat.Started(procstat.Control, cmd.Args)
 	_ = stdoutWriter.Close()
 	p := &process{cmd: cmd, tree: tree, stdin: stdin, stdout: stdout, scanner: bufio.NewScanner(stdout), done: make(chan struct{})}
 	p.scanner.Buffer(make([]byte, 4096), protocolcli.SessionReportingLineBytes)
-	go func() { _ = cmd.Wait(); close(p.done) }()
+	go func() { _ = procstat.Wait(cmd, procstat.Control); close(p.done) }()
 	return p, nil
 }
 

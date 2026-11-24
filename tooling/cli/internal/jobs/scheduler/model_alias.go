@@ -150,6 +150,9 @@ const (
 // TaskTiming holds one task's measured durations.
 type TaskTiming = model.TaskTiming
 
+// TaskWaits is the wall the scheduler spent on a task outside its subprocess.
+type TaskWaits = model.TaskWaits
+
 // TaskDiagnostic is one diagnostic attributed to a task.
 type TaskDiagnostic = model.TaskDiagnostic
 
