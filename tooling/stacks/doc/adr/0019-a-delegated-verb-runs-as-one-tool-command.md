@@ -48,7 +48,9 @@ delegated task has its cache off.
   verb, the ready ones wait, as long as other work is in flight. The graph
   steps of a delegated stack end at different times, so without the wait one
   verb would run one command per wave of graph steps. When no work is in
-  flight, the ready tasks run at once.
+  flight, the ready tasks run at once. The batch key leaves out the project's
+  own option layers of the stack's extension: the stack reads each member's
+  from the project, and a sync writes them per project.
 - The shared invocation runs the toolchain check once, takes the stack root's
   lock once, removes each component's reports, runs the batch steps at the
   root, then answers one result per selected project id. The stack extension
@@ -63,8 +65,9 @@ delegated task has its cache off.
     and not listed passes.
   - A target the report does not name, when the command fails, fails as not
     run, naming the targets that failed. A command that fails and whose
-    report names no target fails every project with the step's message. A
-    command that passes passes every project.
+    report names no failed target fails every project with the step's
+    message: the report cannot say which one failed. A command that passes
+    passes every project.
 - Each project then reads its own JUnit and coverage reports into its own
   output directory, as one process per task reads them, and its result
   records `delegatedTo`.
@@ -106,8 +109,10 @@ delegated task has its cache off.
   tool's own rule, and a target the tool does not run fails as not run.
 - A run report or an output the tool changes its format of fails every
   project of a failing command with the step's message, never passes one.
-- The scheduler groups only tasks whose effective parameters match, so a
-  project whose options give its task other parameters, such as its own
-  reports, runs its own command.
+- The scheduler groups only tasks whose other parameters match, such as the
+  workspace's options and the command's flags.
+- A workspace synced before this change fails `putnami validate` with the
+  stack's stale-sync diagnostic until `putnami projects sync` writes the batch
+  beside the steps it wrote.
 - turbo, rush, pants and bazel keep one process per task until their profiles
   state `batch.steps`.
