@@ -205,24 +205,33 @@ func TestASyncedTargetRunsAsItsOwnRunMany(t *testing.T) {
 func TestReadBatchJudgesATargetByItsOwnRunsAlone(t *testing.T) {
 	type outcome string
 	const (
-		passed outcome = "passed"
-		failed outcome = "failed"
-		notRun outcome = "not run"
-		absent outcome = "absent"
+		passed  outcome = "passed"
+		failed  outcome = "failed"
+		notRun  outcome = "not run"
+		stopped outcome = "stopped"
+		absent  outcome = "absent"
 	)
 	for _, own := range []string{"a:build", "a:build:production", ""} {
-		for _, result := range []outcome{passed, failed, notRun} {
+		for _, result := range []outcome{passed, failed, notRun, stopped} {
 			for _, sibling := range []outcome{absent, passed, failed} {
-				if own == "" && result != notRun {
+				if own == "" && result != notRun && result != stopped {
 					continue
 				}
-				var out, failedList, notRunList strings.Builder
+				var out, failedList, notRunList, stoppedList strings.Builder
 				header := func(id, quoted string, o outcome) {
 					switch o {
 					case passed, failed:
 						out.WriteString("> nx run " + quoted + "\n\n" + id + " output\n\n")
+					case stopped:
+						// Nx 24 prints a stopped task's partial output as
+						// a section, unless it never started.
+						if own != "" {
+							out.WriteString("> nx run " + quoted + "\n\n" + id + " partial\n\n")
+						}
 					}
 					switch o {
+					case stopped:
+						stoppedList.WriteString("      - " + id + "\n")
 					case failed:
 						failedList.WriteString("      - nx run " + id + "\n")
 					case notRun:
@@ -238,7 +247,10 @@ func TestReadBatchJudgesATargetByItsOwnRunsAlone(t *testing.T) {
 				header("b:build", "b:build", failed)
 				out.WriteString(" NX   Ran target build for 2 projects\n\n   ✖  targets failed, including the following:\n\n" + failedList.String() + "\n")
 				if notRunList.Len() > 0 {
-					out.WriteString("   Tasks not run because their dependencies failed or --nx-bail=true:\n\n" + notRunList.String())
+					out.WriteString("   Tasks not run because their dependencies failed or --nx-bail=true:\n\n" + notRunList.String() + "\n")
+				}
+				if stoppedList.Len() > 0 {
+					out.WriteString("   Tasks stopped before they finished:\n\n" + stoppedList.String())
 				}
 				got := ReadBatch(stacks.BatchReport{Components: []string{"a", "b"}, Command: []string{"npx", "--no", "nx", "run-many", "-t", "build", "-p", "a,b"}, Output: []byte(out.String())})
 				name := fmt.Sprintf("own %q %s, sibling %s", own, result, sibling)
@@ -255,6 +267,10 @@ func TestReadBatchJudgesATargetByItsOwnRunsAlone(t *testing.T) {
 				case notRun:
 					if !a.Failed || !strings.Contains(a.Message, "did not run") {
 						t.Errorf("%s: a = %+v, want a failure as not run", name, a)
+					}
+				case stopped:
+					if !a.Failed || !strings.Contains(a.Message, "before it finished") {
+						t.Errorf("%s: a = %+v, want a failure as stopped", name, a)
 					}
 				}
 				if !got["b"].Failed {
@@ -278,5 +294,26 @@ func TestADependencyThatFailedBeforeTheTargetRanFailsIt(t *testing.T) {
 		if a := got["a"]; !a.Failed || !strings.Contains(a.Message, "did not run a:build") {
 			t.Errorf("%s: a = %+v, want a failure as not run", name, a)
 		}
+	}
+}
+
+func TestReadBatchReadsEachSummaryListByItsHeading(t *testing.T) {
+	run := func(summary string) map[string]stacks.BatchOutcome {
+		output := "> nx run a:build\n\na ok\n\n> nx run b:build\n\nb boom\n\n NX   Ran target build for 2 projects\n\n" + summary
+		return ReadBatch(stacks.BatchReport{Components: []string{"a", "b"}, Command: []string{"npx", "--no", "nx", "run-many", "-t", "build", "-p", "a,b"}, Output: []byte(output)})
+	}
+	failedB := "   ✖  targets failed, including the following:\n\n      - nx run b:build\n\n"
+	// A skipped task fails as not run.
+	if a := run(failedB + "   Skipped tasks:\n\n      - a:build\n")["a"]; !a.Failed || !strings.Contains(a.Message, "did not run a:build") {
+		t.Errorf("skipped: a = %+v, want a failure as not run", a)
+	}
+	// A heading of another list ends the list before it.
+	if a, ok := run(failedB + "   Hints for these tasks:\n\n      - a:build\n")["a"]; !ok || a.Failed {
+		t.Errorf("another list: a = %+v (%v), want the pass of its section", a, ok)
+	}
+	// A failed task with no section of its own, under a's target, is
+	// another target when a's own run printed a section.
+	if a, ok := run("   ✖  targets failed, including the following:\n\n      - nx run b:build\n      - nx run a:build:other\n")["a"]; !ok || a.Failed {
+		t.Errorf("an unknown sibling: a = %+v (%v), want the pass of its own run", a, ok)
 	}
 }

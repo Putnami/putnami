@@ -104,8 +104,17 @@ type runMany struct {
 	sections map[string]string
 	tasks    map[string]task
 	failed   map[string]bool
-	notRun   map[string]bool
+	// notRun maps each id Nx did not run, or stopped, to the list that
+	// names it.
+	notRun map[string]string
 }
+
+// The lists of tasks Nx did not finish.
+const (
+	notRunList  = "not run"
+	stoppedList = "stopped"
+	listFailed  = "failed"
+)
 
 // verdict is a target's outcome in one component.
 type verdict struct {
@@ -145,9 +154,14 @@ func (r runMany) judge(component, target string) verdict {
 			return verdict{failed: true, message: message}
 		}
 	}
+	// A task Nx lists as not run, or stopped, fails whatever section it
+	// printed: a stopped task prints its partial output as a section.
 	for _, id := range slices.Sorted(maps.Keys(r.notRun)) {
-		if belongs(id) && !runs[id] {
-			return verdict{failed: true, message: "nx did not run " + id + ": a task it depends on failed"}
+		if belongs(id) {
+			if r.notRun[id] == stoppedList {
+				return verdict{failed: true, message: "nx stopped " + id + " before it finished"}
+			}
+			return verdict{failed: true, message: "nx did not run " + id}
 		}
 	}
 	return verdict{passed: ranAlone}
@@ -157,11 +171,13 @@ func (r runMany) judge(component, target string) verdict {
 // names, and the ids the closing summaries list under a heading of failed
 // tasks or of tasks Nx did not run.
 func readRunMany(output string) runMany {
-	r := runMany{sections: map[string]string{}, tasks: map[string]task{}, failed: map[string]bool{}, notRun: map[string]bool{}}
+	r := runMany{sections: map[string]string{}, tasks: map[string]task{}, failed: map[string]bool{}, notRun: map[string]string{}}
 	var current string
 	var body []string
 	inSummary := false
-	var list map[string]bool
+	// list is the summary's list the current heading opened: listFailed,
+	// notRunList, stoppedList, or none.
+	var list string
 	flush := func() {
 		if current != "" {
 			r.sections[current] = strings.TrimSpace(strings.Join(body, "\n"))
@@ -184,7 +200,7 @@ func readRunMany(output string) runMany {
 		}
 		if summaryStart.MatchString(line) {
 			flush()
-			inSummary, list = true, nil
+			inSummary, list = true, ""
 			continue
 		}
 		if inSummary {
@@ -193,17 +209,24 @@ func readRunMany(output string) runMany {
 			if heading := strings.TrimSpace(line); strings.HasSuffix(heading, ":") {
 				lower := strings.ToLower(heading)
 				switch {
-				case strings.Contains(lower, "not run"), strings.Contains(lower, "skipped"), strings.Contains(lower, "stopped"):
-					list = r.notRun
+				case strings.Contains(lower, "stopped"):
+					list = stoppedList
+				case strings.Contains(lower, "not run"), strings.Contains(lower, "skipped"):
+					list = notRunList
 				case strings.Contains(lower, "fail"):
-					list = r.failed
+					list = listFailed
 				default:
-					list = nil
+					list = ""
 				}
 				continue
 			}
-			if m := failedItem.FindStringSubmatch(line); m != nil && list != nil {
-				list[m[1]] = true
+			if m := failedItem.FindStringSubmatch(line); m != nil {
+				switch list {
+				case listFailed:
+					r.failed[m[1]] = true
+				case notRunList, stoppedList:
+					r.notRun[m[1]] = list
+				}
 			}
 			continue
 		}
