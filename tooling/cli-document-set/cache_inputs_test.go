@@ -34,9 +34,10 @@ const cliProjectDir = cliModuleDir
 // SECURITY.md): that project leaves the per-change gate, so only this
 // project's key keeps the per-change verdict fresh. The other files are read by
 // the whole-tree gates alone. A file a test of @putnami/cli also reads
-// (putnami.workspace.json, putnami.support.json, decisions.json, the
-// agent-artifact trees) is absent here on purpose: it is honestly declared
-// twice, because two readers exist.
+// (putnami.workspace.json, putnami.ci.json, putnami.support.json,
+// decisions.json, the first-use smoke script, the agent-artifact trees) is
+// absent here on purpose: it is honestly declared twice, because two readers
+// exist.
 var documentsOwnedRepositoryFiles = map[string]string{
 	".github/PULL_REQUEST_TEMPLATE.md": cliDocumentsProjectDir,
 	".gitignore":                       cliDocumentsProjectDir,
@@ -52,9 +53,7 @@ var documentsOwnedRepositoryFiles = map[string]string{
 	"protocols/cli/testdata/prior-releases/provenance.json":       cliDocumentsProjectDir,
 	"protocols/extension/testdata/prior-releases/provenance.json": cliDocumentsProjectDir,
 	"protocols/support/README.md":                                 documentSetProjectDir,
-	"putnami.ci.json":                                             documentSetProjectDir,
 	"sites/putnami.dev/doc/01-getting-started/index.md":           documentSetProjectDir,
-	"tooling/cli/scripts/smoke-first-use.sh":                      documentSetProjectDir,
 	"tooling/CHANGELOG.md":                                        cliDocumentsProjectDir,
 }
 
