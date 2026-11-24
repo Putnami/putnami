@@ -147,7 +147,8 @@ func writeNxExtension(t *testing.T, root, runtime string) {
 // stubNx puts first on PATH an npx that answers npx --no -- nx --version with
 // the demo's Nx version, and npx --no nx --version with npm's version, as
 // npm's npx does. For npx --no nx run <project>:test, it writes the demo's
-// reports of that project. It logs each call with its working
+// reports of that project, and for npx --no nx run-many -t test -p <a>,<b>
+// the reports of each. It logs each call with its working
 // directory and returns the log.
 func stubNx(t *testing.T, demo map[string]map[string]string) string {
 	t.Helper()
@@ -187,6 +188,19 @@ case "$1" in
     mkdir -p "$dir/reports/coverage"
     cp '`+ci+`'/"$dir"/reports/junit.xml "$dir/reports/junit.xml"
     cp '`+ci+`'/"$dir"/reports/coverage/cobertura-coverage.xml "$dir/reports/coverage/cobertura-coverage.xml";;
+  run-many)
+    [ "$2" = "-t" ] && [ "$3" = "test" ] && [ "$4" = "-p" ] || exit 0
+    for project in $(echo "$5" | tr ',' ' '); do
+      case "$project" in
+        @demo/api) dir=apps/api;;
+        @demo/pricing) dir=packages/pricing;;
+        *) continue;;
+      esac
+      echo "> nx run $project:test"
+      mkdir -p "$dir/reports/coverage"
+      cp '`+ci+`'/"$dir"/reports/junit.xml "$dir/reports/junit.xml"
+      cp '`+ci+`'/"$dir"/reports/coverage/cobertura-coverage.xml "$dir/reports/coverage/cobertura-coverage.xml"
+    done;;
 esac
 `)
 	if err := os.Chmod(filepath.Join(bin, "npx"), 0o755); err != nil {
@@ -214,15 +228,27 @@ func nxTests(t *testing.T, root, base, log string) ([]string, string) {
 	var tested []string
 	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
 		dir, call, _ := strings.Cut(line, " npx ")
-		target, ok := strings.CutPrefix(call, "--no nx run ")
-		if !ok {
+		var targets []string
+		if many, ok := strings.CutPrefix(call, "--no nx run-many "); ok {
+			// One command over the verb's projects (stacks ADR 0019).
+			args := strings.Fields(many)
+			if len(args) < 4 || args[0] != "-t" || args[2] != "-p" {
+				t.Errorf("nx run-many ran %q, want -t <target> -p <projects>", many)
+				continue
+			}
+			for _, project := range strings.Split(args[3], ",") {
+				targets = append(targets, project+":"+args[1])
+			}
+		} else if target, ok := strings.CutPrefix(call, "--no nx run "); ok {
+			target, _, _ = strings.Cut(target, " ")
+			targets = append(targets, target)
+		} else {
 			continue
 		}
 		if real, _ := filepath.EvalSymlinks(dir); real != rootReal {
-			t.Errorf("nx run ran in %s, want the workspace root", dir)
+			t.Errorf("nx ran in %s, want the workspace root", dir)
 		}
-		target, _, _ = strings.Cut(target, " ")
-		tested = append(tested, target)
+		tested = append(tested, targets...)
 	}
 	slices.Sort(tested)
 	// Every task of the run is uncached: no lookup, so no hit and no miss,
@@ -310,6 +336,9 @@ func TestAChangeToOneNxProjectRunsItAndItsDependentsThroughNx(t *testing.T) {
 	tested, out := nxTests(t, root, base, log)
 	if want := []string{"@demo/api:test", "@demo/pricing:test"}; !slices.Equal(tested, want) {
 		t.Errorf("nx run tested %v, want %v: the changed project and its dependent\n%s", tested, want, out)
+	}
+	if logged, _ := os.ReadFile(log); strings.Count(string(logged), " run-many ") != 1 {
+		t.Errorf("the test verb ran %q, want one nx run-many over both projects", logged)
 	}
 	// The session records each test task's result as delegated to nx.
 	sessions, _ := filepath.Glob(filepath.Join(root, ".putnami", "sessions", "*", "events.jsonl"))
