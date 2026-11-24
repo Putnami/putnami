@@ -81,3 +81,40 @@ func TestCandidateCutKeyMovesWithTheMembership(t *testing.T) {
 		t.Error("a task keyed on the candidate cut moved its key over one membership")
 	}
 }
+
+// A run derives the membership digest once: every candidate-cut key of one
+// cache manager folds the digest of the run's first computation, so a run
+// encodes the configuration of every project once, not once per such task.
+func TestCandidateCutMembershipDigestIsDerivedOncePerRun(t *testing.T) {
+	t.Parallel()
+	root := candidateCutRepo(t)
+	ext := &extension.ExtensionDescription{Name: "@test/ext", Tasks: map[string]extension.TaskDefinition{"check": {}}}
+	def := extension.JobDefinition{
+		Name: "validate~check", ExtensionName: ext.Name, Cache: true,
+		TaskCachePolicy: &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{WorkspaceFiles: []string{"git:**"}}},
+	}
+	app := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
+	ws := testWorkspace(root, app)
+	job := &jobmodel.ScheduledJob{Project: app, Extension: ext,
+		Step: &extension.PipelineStep{ID: "check", Task: "check"}, JobDef: &def}
+	key := func(cache *store.CacheManager) string {
+		t.Helper()
+		hash, err := ComputeJobCacheHash(ws, job, nil, nil, cache, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return hash
+	}
+
+	run := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
+	first := key(run)
+	// Only a change no task of a run makes moves the digest: a new run sees it,
+	// the running one keeps the digest it derived.
+	ws.Projects = append(ws.Projects, &workspace.Project{ID: "/tool", Name: "tool", Path: "tool"})
+	if again := key(run); again != first {
+		t.Fatal("one run derived the membership digest twice")
+	}
+	if next := key(store.NewCacheManager(store.NewLocalStore(t.TempDir()))); next == first {
+		t.Fatal("a new run kept the previous run's membership digest")
+	}
+}
