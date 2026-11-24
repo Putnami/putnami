@@ -28,6 +28,7 @@ import (
 
 	"go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/cli/model/workspace"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -162,7 +163,7 @@ func RunPreBuildHook(
 
 	// A hosted run hands its credential to no process started after this one.
 	runcredential.MarkRepositoryCodeStarted("hook " + ext.Name + "/preBuild")
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd, procstat.Control); err != nil {
 		// A deadline that expires while the process starts is the same timeout.
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return nil, fmt.Errorf("hook %s/%s timed out after %dms", ext.Name, "preBuild", timeoutMs)
@@ -185,7 +186,7 @@ func RunPreBuildHook(
 	hookResult := <-resultCh
 	stderrText := <-stderrCh
 
-	waitErr := cmd.Wait()
+	waitErr := procstat.Wait(cmd, procstat.Control)
 	if waitErr != nil {
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("hook %s/%s timed out after %dms", ext.Name, "preBuild", timeoutMs)
@@ -313,7 +314,7 @@ func RunOnInstallHookWithWriters(
 
 	// A hosted run hands its credential to no process started after this one.
 	runcredential.MarkRepositoryCodeStarted("hook " + ext.Name + "/onInstall")
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd, procstat.Control); err != nil {
 		if ctx.Err() != nil {
 			return fmt.Errorf("hook %s/%s timed out after %dms", ext.Name, "onInstall", timeoutMs)
 		}

@@ -382,6 +382,11 @@ func (s *Scheduler) groupResourceRequest(jobs []*ScheduledJob) resourceRequest {
 
 func (s *Scheduler) releaseGroupResources(completed jobGroupDone) {
 	s.resources.release(completed.reservation)
+	jobs := make([]*ScheduledJob, len(completed.jobs))
+	for i, done := range completed.jobs {
+		jobs[i] = done.job
+	}
+	s.verbWaves.track(jobs, -1)
 }
 
 // takeAdmissiblePendingGroup preserves the existing longest-first candidate and
@@ -390,8 +395,20 @@ func (s *Scheduler) releaseGroupResources(completed jobGroupDone) {
 // consumed each newly released slot and starved the critical-path chain. The
 // coordinator therefore keeps DAG priority ahead of instantaneous utilization;
 // worker acquisition order still never chooses a winner.
-func (s *Scheduler) takeAdmissiblePendingGroup(pending []*ScheduledJob) (jobGroup, []*ScheduledJob, bool) {
+//
+// A delegated task that waits for its verb's peers (scheduler_batch_verb.go)
+// gives its turn to the first pending job that does not wait. When every
+// pending job waits, nothing is dispatched while work that ends is in flight
+// (inFlight: a serve, which runs until interrupted, does not count), since a
+// completion is what makes a peer ready; with nothing such in flight, the
+// queue's first job runs with the peers that are ready.
+func (s *Scheduler) takeAdmissiblePendingGroup(pending []*ScheduledJob, inFlight bool) (jobGroup, []*ScheduledJob, bool) {
 	if len(pending) == 0 {
+		return jobGroup{}, pending, false
+	}
+	if ordered, ok := s.withoutWaiting(pending); ok {
+		pending = ordered
+	} else if inFlight {
 		return jobGroup{}, pending, false
 	}
 	primary, rest := s.takePendingGroup(pending)

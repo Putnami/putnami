@@ -255,7 +255,8 @@ func (cm *CacheManager) lookupExtraFilesHash(workspaceRoot string, paths []strin
 // The memo lives as long as the manager, one per run, so a value derived from
 // files that may change between runs is derived again by the next run. No
 // invalidation reaches it, so it holds only values derived from what no task
-// of the run writes: repository history and installed extension trees.
+// of the run writes: repository history, installed extension trees, and the
+// workspace membership the run loaded.
 func (cm *CacheManager) Digest(key string, compute func() (string, error)) (string, error) {
 	if cm == nil {
 		return compute()

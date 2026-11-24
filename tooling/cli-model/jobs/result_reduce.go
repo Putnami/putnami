@@ -132,6 +132,10 @@ type SessionResult struct {
 	// no runtime, or when the composer recorded no attribution.
 	Preparation *PreparationSummary
 
+	// Orchestration is the run's orchestration report, carried from the
+	// session outcome. Nil for a run that measured none.
+	Orchestration *OrchestrationSnapshot
+
 	// Duration is the run's wall time.
 	Duration time.Duration
 	// ExecutedDurationMs is the sum of per-task subprocess durations over
@@ -302,6 +306,7 @@ func reduceSession(
 	result := reducer.Result()
 	result.Duration = duration
 	result.Cache = cache
+	result.Orchestration = outcome.Orchestration
 	return result
 }
 

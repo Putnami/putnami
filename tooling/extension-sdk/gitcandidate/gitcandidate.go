@@ -33,6 +33,8 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/sourcebinding"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Paths lists the candidate paths under root, slash-separated, relative to
@@ -43,7 +45,7 @@ import (
 func Paths(root string) ([]string, error) {
 	cmd := exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
 	cmd.Dir = root
-	data, err := cmd.Output()
+	data, err := procstat.Output(cmd, procstat.Git)
 	if err != nil {
 		return nil, fmt.Errorf("git ls-files: %w", err)
 	}
@@ -90,7 +92,7 @@ type indexModes struct {
 func readIndexModes(root string) (indexModes, error) {
 	cmd := exec.Command("git", "ls-files", "-z", "--stage")
 	cmd.Dir = root
-	data, err := cmd.Output()
+	data, err := procstat.Output(cmd, procstat.Git)
 	if err != nil {
 		return indexModes{}, fmt.Errorf("git ls-files --stage: %w", err)
 	}
@@ -184,7 +186,7 @@ func Open(root string) (*Tree, error) {
 func insideWorkTree(dir string) bool {
 	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
 	cmd.Dir = dir
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd, procstat.Git)
 	return err == nil && strings.TrimSpace(string(out)) == "true"
 }
 

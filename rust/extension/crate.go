@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/sdk/extension/dockerpublish"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/stacks"
 )
 
@@ -236,7 +237,7 @@ func gitList(dir string, selection ...string) (files []string, tracked bool, err
 	cmd.Env = append(os.Environ(), "LC_ALL=C")
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd)
 	if err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) && strings.Contains(stderr.String(), notARepository) {
@@ -518,7 +519,7 @@ func withPathDependencies(c context.Context, cargo, staged string, root stacks.R
 	cmd := exec.CommandContext(c, cargo, "metadata", "--no-deps", "--format-version", "1") //nolint:gosec // the selected toolchain
 	cmd.Dir = staged
 	cmd.Env = root.Env
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cargo metadata: %w", err)
 	}

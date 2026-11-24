@@ -21,6 +21,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
@@ -484,7 +485,7 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, error) {
 	cmd := exec.Command(gitread.Executable(), "rev-parse", "--show-toplevel")
 	cmd.Dir = dir
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd, procstat.Git)
 	if err != nil {
 		return nil, fmt.Errorf("resolve Git input repository: %w", err)
 	}

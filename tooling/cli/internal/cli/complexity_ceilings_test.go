@@ -88,7 +88,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  24,
-		funcs:  188,
+		funcs:  189,
 		why: "internal/engine: run assembly. Its functions are the run's stages (workspace probe, " +
 			"selection, planning, scheduling, finalization) and the seams where a run attaches " +
 			"what only the engine sees: the run report, the workspace map, the spec gate, the " +
@@ -113,8 +113,8 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "scheduler",
 		prefix: "internal/jobs/scheduler/scheduler",
-		files:  6,
-		funcs:  100,
+		files:  7,
+		funcs:  107,
 		why: "internal/jobs/scheduler/scheduler*.go: dispatch. Grants, batching, shared executions " +
 			"(one leader and its followers), task output locks and the job process environment. " +
 			"Every function here can touch a running job or a cache entry, so a raise adds a " +

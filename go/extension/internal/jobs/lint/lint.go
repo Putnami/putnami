@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Run executes the lint job.
@@ -105,7 +106,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 					ctx.Project.FullPath,
 					goBinary,
 				)
-				output, exitErr = cmd.CombinedOutput()
+				output, exitErr = procstat.CombinedOutput(cmd)
 
 				if exitErr == nil {
 					break
@@ -176,7 +177,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 				ctx.Project.FullPath,
 				goBinary,
 			)
-			output, err := cmd.CombinedOutput()
+			output, err := procstat.CombinedOutput(cmd)
 
 			if err == nil {
 				emit.PhaseEnd("staticcheck", "success")
@@ -422,7 +423,7 @@ func runFormatCheck(
 	cmd := exec.Command(binary, args...)
 	cmd.Dir = projectPath
 	cmd.Env = toolchain.WorkspaceBuildEnv(os.Environ(), projectPath, goBinary)
-	output, err := cmd.CombinedOutput()
+	output, err := procstat.CombinedOutput(cmd)
 	out := strings.TrimSpace(string(output))
 
 	files := parseUnformattedFiles(out)

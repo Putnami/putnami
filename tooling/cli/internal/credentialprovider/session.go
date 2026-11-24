@@ -28,6 +28,7 @@ import (
 
 	distribution "go.putnami.dev/protocol/distribution"
 	registry "go.putnami.dev/protocol/registry"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 )
 
@@ -159,6 +160,7 @@ func Spawn(ctx context.Context, spec LaunchSpec, stderr io.Writer) (*Session, er
 		_ = stdoutWriter.Close()
 		return nil, fmt.Errorf("start credential provider %s: %w", spec.Command, err)
 	}
+	procstat.Started(procstat.Control, cmd.Args)
 	// The provider holds its own copy of the write end.
 	_ = stdoutWriter.Close()
 	s.cmd, s.stdin, s.stdout, s.tree = cmd, stdin, stdout, tree
@@ -169,7 +171,7 @@ func Spawn(ctx context.Context, spec LaunchSpec, stderr io.Writer) (*Session, er
 	// the grace the session ends: the rest of the tree is killed while that
 	// process still keeps the group's ID taken, and the read end is closed.
 	go func() {
-		err := cmd.Wait()
+		err := procstat.Wait(cmd, procstat.Control)
 		select {
 		case <-s.readDone:
 		case <-time.After(exitDrainGrace):

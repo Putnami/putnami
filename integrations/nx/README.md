@@ -5,6 +5,7 @@ project with its edges, in the mode `putnami init --from nx` records.
 
 - **Delegate**: `putnami lint`, `putnami test` and `putnami build` run
   `nx run <project>:<target>` on each affected project at the workspace root,
+  the projects of one verb as one `nx run-many -t <target> -p <projects>`,
   read the reports its test configuration names, and leave caching, local or
   Nx Cloud, to Nx.
 - **Import**: a TypeScript project's build, test and lint targets whose

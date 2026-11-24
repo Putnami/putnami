@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Timeout bounds one git call: Run, RunCapture and RunCaptureEnv kill a call
@@ -48,7 +50,7 @@ func RunCaptureEnv(repoRoot string, env []string, args ...string) (string, strin
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd, procstat.Git); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", stderr.String(), fmt.Errorf("timed out after %s", Timeout)
 		}

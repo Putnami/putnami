@@ -15,6 +15,11 @@ type StepsOverride struct {
 	// Synced reports whether a task's steps are absent or the sync's own:
 	// the sync never writes over a project's own steps.
 	Synced func(steps any) bool
+	// Batch, when set, answers the batch steps that run a task's written
+	// steps over several components (ADR 0019); the sync writes them beside
+	// the steps, and removes them with them. Without it, a project whose
+	// steps the sync writes runs the task alone.
+	Batch func(task string, steps [][]string) [][]string
 }
 
 // Apply writes, in a putnami.json document, the steps of each owned task
@@ -46,15 +51,13 @@ func (o StepsOverride) Apply(doc map[string]any, steps map[string][][]string) {
 			if task == nil {
 				task = map[string]any{}
 			}
-			list := make([]any, len(s))
-			for i, step := range s {
-				args := make([]any, len(step))
-				for j, a := range step {
-					args[j] = a
+			task["steps"] = argLists(s)
+			delete(task, "batch")
+			if o.Batch != nil {
+				if batch := o.Batch(name, s); len(batch) > 0 {
+					task["batch"] = map[string]any{"steps": argLists(batch)}
 				}
-				list[i] = args
 			}
-			task["steps"] = list
 			if o.Dir != "" {
 				task["dir"] = o.Dir
 			}
@@ -67,6 +70,9 @@ func (o StepsOverride) Apply(doc map[string]any, steps map[string][][]string) {
 		if _, had := task["steps"]; had && o.Dir != "" && task["dir"] == o.Dir {
 			delete(task, "dir")
 		}
+		if _, had := task["steps"]; had {
+			delete(task, "batch")
+		}
 		delete(task, "steps")
 		if len(task) == 0 {
 			delete(tasks, name)
@@ -75,6 +81,19 @@ func (o StepsOverride) Apply(doc map[string]any, steps map[string][][]string) {
 	setObject(layer, "tasks", tasks)
 	setObject(options, o.Extension, layer)
 	setObject(doc, "options", options)
+}
+
+// argLists answers steps as the JSON document holds them.
+func argLists(steps [][]string) []any {
+	list := make([]any, len(steps))
+	for i, step := range steps {
+		args := make([]any, len(step))
+		for j, a := range step {
+			args[j] = a
+		}
+		list[i] = args
+	}
+	return list
 }
 
 // setObject sets the object at key, or removes it when it is empty.

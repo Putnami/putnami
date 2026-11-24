@@ -14,6 +14,8 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	registry "go.putnami.dev/protocol/registry"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // materializeTimeout bounds the credential call an install makes. It is shorter
@@ -164,7 +166,7 @@ func materializeNativeCredential(ctx context.Context, workspaceRoot, host string
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
+	err := procstat.Run(cmd, procstat.CLI)
 	if err == nil {
 		return Outcome{
 			Kind:    KindMaterialized,

@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/filelock"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -181,7 +182,7 @@ func RunCacheCommand(
 	}
 	// A hosted run hands its credential to no process started after this one.
 	runcredential.MarkRepositoryCodeStarted("job " + ext.Name + " " + command)
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd, procstat.Control); err != nil {
 		return 0, fmt.Errorf("start %s %s: %w", ext.Name, command, err)
 	}
 
@@ -193,7 +194,7 @@ func RunCacheCommand(
 	result := <-resultCh
 	stderrText := <-stderrCh
 
-	if err := cmd.Wait(); err != nil {
+	if err := procstat.Wait(cmd, procstat.Control); err != nil {
 		if ctx.Err() != nil {
 			return 0, fmt.Errorf("%s %s timed out after %dms", ext.Name, command, timeoutMs)
 		}
@@ -251,6 +252,9 @@ func StartDetachedCacheGC(
 	if err != nil {
 		return false
 	}
+	// A detached collection outlives the run: its start is counted, its CPU
+	// never.
+	procstat.Started(procstat.Control, cmd.Args)
 	_ = started.Process.Release()
 	return true
 }

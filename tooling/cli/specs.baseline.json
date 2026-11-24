@@ -88,6 +88,8 @@
     "cli/credential-provider#refusal-never-falls-back",
     "cli/deploy-environments#deploy-follows-the-environment-channel",
     "cli/diagnostics-results#a-retired-extension-is-named",
+    "cli/diagnostics-results#a-run-reports-its-orchestration-cost",
+    "cli/diagnostics-results#a-run-reports-its-orchestration-cpu",
     "cli/diagnostics-results#bounded-machine-detail",
     "cli/diagnostics-results#bounded-test-output",
     "cli/diagnostics-results#doctor-gate",

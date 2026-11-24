@@ -150,6 +150,7 @@ func (r Run) Summary(durationMs int64) protocolcli.RunSummary {
 	summary.Publications = r.publications()
 	summary.CPU = r.cpuBalance(summary.DurationMs)
 	summary.Cache = r.cacheSummary()
+	summary.Orchestration = orchestrationSummary(session.Orchestration, counts.Total)
 	return summary
 }
 
@@ -691,6 +692,7 @@ func TaskRecord(task Task) protocolcli.TaskRecord {
 	if task.Result.Timing.FirstEventObserved {
 		record.SpawnToFirstEventMs = millis(task.Result.Timing.SpawnToFirstEvent)
 	}
+	record.Orchestration = taskOrchestration(task.Result.Timing.Waits)
 	if record.Status != protocolcli.TaskStatusSuccess &&
 		(task.Result.Error != nil || record.Status == protocolcli.TaskStatusFailed) {
 		err := taskError(task.Result.Error)

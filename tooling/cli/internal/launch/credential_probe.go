@@ -10,6 +10,7 @@ import (
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
@@ -74,7 +75,7 @@ func credentialProbe(getenv func(string) string) func(ctx context.Context, path 
 		cmd.Env = probeEnv(getenv)
 		cmd.Stdout = out
 		cmd.WaitDelay = probeWaitDelay
-		if err := cmd.Run(); err != nil {
+		if err := procstat.Run(cmd); err != nil {
 			if ctx.Err() != nil {
 				return probeResult{}, fmt.Errorf("its help did not finish within %s: %w", probeTimeout, err)
 			}

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
@@ -72,6 +73,7 @@ func RunGroupCombined(ctx context.Context, dir string, env []string, name string
 	cmd.Stderr = &out
 	tree, done := configureGroupCancellation(cmd)
 	err := tree.Run()
+	procstat.Record(cmd)
 	done()
 	return out.Bytes(), err
 }
@@ -89,6 +91,7 @@ func RunGroupStreaming(ctx context.Context, dir string, env []string, name strin
 	cmd.Stderr = os.Stderr
 	tree, done := configureGroupCancellation(cmd)
 	err := tree.Run()
+	procstat.Record(cmd)
 	done()
 	return err
 }

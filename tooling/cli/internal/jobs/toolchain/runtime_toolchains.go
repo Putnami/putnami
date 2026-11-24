@@ -26,6 +26,7 @@ import (
 	"go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/envkeys"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey/framing"
 	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
@@ -924,10 +925,12 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.WaitDelay = toolVersionProbeWaitDelay
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd); err != nil {
 		return "", fmt.Errorf("probe failed to start: %w", err)
 	}
-	if timing, err := procdeadline.WaitUnderDeadline(cmd, deadline, cancel); err != nil {
+	timing, err := procdeadline.WaitUnderDeadline(cmd, deadline, cancel)
+	procstat.Exited(procstat.Classify(cmd.Path), cmd.ProcessState)
+	if err != nil {
 		if ctx.Err() == nil && errors.Is(context.Cause(probeCtx), procdeadline.ErrProcessDeadline) {
 			return "", probeTimeout(deadline, timing)
 		}

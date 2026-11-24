@@ -13,6 +13,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/sdk/extension/linetag"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // gitPushTimeout bounds a `git push` so a hung network operation (stalled TLS
@@ -225,7 +226,7 @@ func (c Command) gitTagExists(ctx context.Context, tagName string) (bool, error)
 	cmd := exec.CommandContext(ctx, "git", "-C", c.Root, "rev-parse", "-q", "--verify", "refs/tags/"+tagName)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		exitErr := &exec.ExitError{}
 		if errors.As(err, &exitErr) {
 			return false, nil
@@ -240,7 +241,7 @@ func (c Command) gitOutput(ctx context.Context, args ...string) (string, error) 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		return "", fmt.Errorf("git %s: %w: %s", args[0], err, strings.TrimSpace(stderr.String()))
 	}
 	return stdout.String(), nil
@@ -253,7 +254,7 @@ func (c Command) runGit(ctx context.Context, args ...string) error {
 	var stderr bytes.Buffer
 	cmd.Stdout = c.Stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		return fmt.Errorf("git %s: %w: %s", args[0], err, strings.TrimSpace(stderr.String()))
 	}
 	return nil

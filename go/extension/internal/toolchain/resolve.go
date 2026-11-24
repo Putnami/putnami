@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/sdk/extension/envkeys"
 	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/scratch"
 	"golang.org/x/mod/modfile"
 )
@@ -113,7 +114,7 @@ func toolVersionMatches(binary, tool, expected string) (bool, string, error) {
 	}
 	cmd := exec.Command(binary, args...)
 	cmd.Env = GoCommandEnv(os.Environ(), CurrentGoBinary())
-	out, err := cmd.CombinedOutput()
+	out, err := procstat.CombinedOutput(cmd)
 	reported := strings.TrimSpace(string(out))
 	if err != nil {
 		return false, reported, err
@@ -446,7 +447,7 @@ func probeLocalGoVersion(binary string) (string, error) {
 	cmd := exec.Command(binary, "env", "GOVERSION")
 	cmd.Dir = os.TempDir()
 	cmd.Env = setEnvValue(GoCommandEnv(os.Environ(), binary), goWorkEnvVar, "off")
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd)
 	reported := strings.TrimSpace(string(out))
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -522,7 +523,7 @@ func (e *errGoNotFound) Error() string {
 func localGoVersion(goBinary string) string {
 	cmd := exec.Command(goBinary, "env", "GOVERSION")
 	cmd.Env = GoCommandEnv(os.Environ(), goBinary)
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd)
 	if v := strings.TrimSpace(string(out)); err == nil && v != "" {
 		return v
 	}
@@ -657,7 +658,7 @@ func InstallTool(tool, goBinary, workspaceRoot string) (_ string, resultErr erro
 	// then panics type-checking newer workspace sources.
 	cmd.Stderr = os.Stderr
 
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		return "", err
 	}
 

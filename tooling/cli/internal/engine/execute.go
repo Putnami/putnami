@@ -333,7 +333,8 @@ func (e *Engine) executeSession(
 		ServeProcessEnv: req.ServeProcessEnv,
 		// Phase 1c/1d's runtime-preparation attribution rides to the session
 		// recorder here. The scheduler never adds to it; it only publishes it.
-		Preparation: req.preparation,
+		Preparation:   req.preparation,
+		Orchestration: req.orchestration,
 	}
 	attachResultFinalizers(&schedCfg, resultFinalizers)
 
@@ -503,6 +504,10 @@ func (e *Engine) executeSession(
 		// The summary is the only signal that the cache helped, so it shows
 		// whenever the cache did work, not just under verbose.
 		reportCacheSummary(os.Stderr, &req.Global, result.Cache)
+
+		// Where the run's orchestration time and CPU went, under the same
+		// switches as the critical path. It is information: it fails nothing.
+		reportOrchestration(os.Stderr, &req.Global, result)
 
 		// The size of the change and the mixed-intent warning come last, where
 		// a reader of the gate looks for its outcome. Both are information: the

@@ -19,6 +19,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/types"
 
 	"go.putnami.dev/sdk/extension/scratch"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // layerCompressionLevel is part of the image identity: changing it changes
@@ -260,7 +262,7 @@ func ExportDaemonImageToLayout(ref, dir string) (string, error) {
 		return "", err
 	}
 
-	output, err := exec.Command("docker", "save", "--output", tarPath, ref).CombinedOutput() //nolint:gosec // fixed local runtime command; ref is a discrete image-reference argument
+	output, err := procstat.CombinedOutput(exec.Command("docker", "save", "--output", tarPath, ref)) //nolint:gosec // fixed local runtime command; ref is a discrete image-reference argument
 	if err != nil {
 		return "", fmt.Errorf("exporting local runtime image: %w: %s", err, strings.TrimSpace(string(output)))
 	}

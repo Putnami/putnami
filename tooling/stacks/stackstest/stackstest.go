@@ -210,6 +210,14 @@ func checkTask(t testing.TB, doc manifest, s stacks.Stack, task string) {
 	if enabled := cacheEnabled(decl.Cache); enabled == s.Profile.Delegated {
 		t.Errorf("task %s: cache.enabled = %v, want %v for a profile whose delegated is %v", step.Task, enabled, !s.Profile.Delegated, s.Profile.Delegated)
 	}
+	// A task runs over several projects of its verb exactly when its profile
+	// task states a batch: then the manifest declares it batchable under the
+	// stack's id, with no cap, so the verb runs as one command (ADR 0019).
+	if batches := s.Profile.HasTask(task) && s.Profile.Tasks[task].Batch != nil; batches != (decl.Batchable != nil) {
+		t.Errorf("task %s: batchable = %v, want %v for a profile task whose batch is set: %v", step.Task, decl.Batchable != nil, batches, batches)
+	} else if b := decl.Batchable; b != nil && (b.Tool != s.Profile.ID || b.MaxProjects != 0 || b.MaxWorkers != 0) {
+		t.Errorf("task %s: batchable = %+v, want the tool %q with no cap", step.Task, *b, s.Profile.ID)
+	}
 	out, ok := decl.Declares.Outputs["reports"]
 	if !ok || out.Kind != "directory" || out.Root != "command-output" || out.Path != task {
 		t.Errorf("task %s declares no command-output directory %q for its reports: %+v", step.Task, task, out)
@@ -275,7 +283,12 @@ type manifest struct {
 			From  string   `json:"from"`
 			Files []string `json:"files"`
 		} `json:"inputs"`
-		Cache    json.RawMessage `json:"cache"`
+		Cache     json.RawMessage `json:"cache"`
+		Batchable *struct {
+			Tool        string `json:"tool"`
+			MaxProjects int    `json:"maxProjects"`
+			MaxWorkers  int    `json:"maxWorkers"`
+		} `json:"batchable"`
 		Declares struct {
 			Outputs map[string]struct {
 				Kind string `json:"kind"`

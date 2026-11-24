@@ -4,8 +4,9 @@
 as Putnami projects, in the mode the workspace adopted it in:
 
 - **delegate**: `putnami lint`, `putnami test` and `putnami build` run
-  `moon run <project>:<task>` on each affected project, read the reports its
-  options name, and leave caching to moon;
+  `moon run <project>:<task>` on each affected project, the projects of one
+  verb as one `moon run <a>:<task> <b>:<task>`, read the reports its options
+  name, and leave caching to moon;
 - **import**: a project whose language has a Putnami extension runs that
   extension under Putnami's runner and cache for each task it runs with the
   same tool; every other task, and every other project, stays delegated to

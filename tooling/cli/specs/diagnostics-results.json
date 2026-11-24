@@ -134,6 +134,20 @@
         "putnami install prints, as a warning and before it installs anything, the notice of each retired extension the workspace binds; the install goes on.",
         "Doctor reports doctor.retired_extension_bound for each one, with the notice as its message: the finding is advisory and scoped to the workspace root, and a workspace that binds no retired extension reports nothing."
       ]
+    },
+    {
+      "id": "a-run-reports-its-orchestration-cost",
+      "text": [
+        "session.json and the result carry run.orchestration: the wall of each engine phase entered (workspace-load, runtime-sync, probe, selection, plan) and the processes started by kind (job, batch, control, cli, git, other) and git calls by subcommand, from the engine and from jobs built on the extension SDK.",
+        "A task record carries its key, lock wait and restore walls. The report fails no run; a wait or a CPU the platform does not measure is absent, never zero; a CPU part sums the processes that reported one."
+      ]
+    },
+    {
+      "id": "a-run-reports-its-orchestration-cpu",
+      "text": [
+        "Orchestration CPU is the CPU of the engine process, of each extension process without its children, of control processes, of CLI starts made by jobs, and of git started by the engine or an SDK job, which reports its own CPU apart from its children's.",
+        "run.orchestration states it, its share of the run's CPU and its ms per selected task; the --trace-profile summary prints the three."
+      ]
     }
   ],
   "decisions": [

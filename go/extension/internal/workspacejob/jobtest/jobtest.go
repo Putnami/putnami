@@ -28,6 +28,7 @@ import (
 
 	"go.putnami.dev/go/extension/internal/workspacejob"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Event is one event a job emitted.
@@ -649,7 +650,7 @@ func serveGo(args []string) {
 	}
 	cmd := exec.Command(os.Getenv(realGo), args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		exit := &exec.ExitError{}
 		if errors.As(err, &exit) {
 			os.Exit(exit.ExitCode())

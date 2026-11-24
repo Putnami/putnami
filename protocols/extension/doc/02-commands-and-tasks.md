@@ -432,7 +432,7 @@ A task is an atomic executable unit — a subprocess with defined inputs, output
 | `inputs` | no | Input port declarations |
 | `outputs` | no | Output port declarations |
 | `cache` | no | Cache policy |
-| `batchable` | no | Opportunistic same-key batching policy for cacheable per-project tasks |
+| `batchable` | no | Same-key batching policy for per-project tasks: opportunistic for a cached task, one command per verb for a task whose cache is off |
 | `declares` | no | Task contract v3: exact outputs, effects, the publish channels a publish task serves, and source mutation |
 | `inputSchemaRef` | no | Reference to a contract schema for input validation |
 | `outputSchemaRef` | no | Reference to a contract schema for output validation |
@@ -810,7 +810,7 @@ default macOS filesystem.
 
 ### Batchable Tasks
 
-A cacheable per-project task can opt into opportunistic batching:
+A per-project task can opt into batching:
 
 ```json
 {
@@ -871,8 +871,21 @@ path per project, giving each a distinct digest and silently disabling batching.
 
 The scheduler groups only jobs that are already ready and share the tool,
 resolved configuration file and content, toolchain version, task identity,
-effective parameters, synthesized execution environment, and policy bounds. It
-never waits for more jobs to join a batch.
+effective parameters (for a delegated task, all but the project's own layers
+of its extension, below), synthesized execution environment, and policy
+bounds. It never waits for more jobs to join a cached batch.
+
+A task whose cache is off may declare `batchable` too: a delegated stack's
+task, whose tool keeps its own cache, runs a verb as one tool command. Such a
+batch waits for its peers. While a task of the same extension, task and tool
+is not ready yet, and no task of that verb is among its transitive
+prerequisites, the ready ones wait, as long as other work is in flight; with
+nothing in flight they run at once. A task of that verb that waits for another
+one's result joins a later command. Its batch key leaves out the project's own
+`options["<extension>"]` and `options["<extension>:<command>"]` layers: the
+stack reads each member's own from the project. Each member still returns its
+own result in `batchResults`, and nothing is cached
+([stacks ADR 0019](../../../tooling/stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md)).
 
 `configFiles` should list only **shared** candidates (workspace- or
 extension-scoped). Listing a per-project file that always exists at a distinct

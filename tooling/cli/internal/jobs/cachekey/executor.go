@@ -910,8 +910,13 @@ func ComputeJobCacheHashWith(
 	// config or an ignored scope manifest can change that membership without
 	// changing one candidate file, so the cut alone would replay a verdict
 	// about another set of projects.
+	//
+	// The membership is the run's workspace, which no task of the run writes,
+	// so the run derives its digest once.
 	if KeysOnCandidateCut(job) {
-		digest, err := workspaceMembershipDigest(ws)
+		digest, err := cache.Digest("workspace-membership\x00"+ws.Root, func() (string, error) {
+			return workspaceMembershipDigest(ws)
+		})
 		if err != nil {
 			return "", err
 		}

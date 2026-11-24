@@ -17,6 +17,7 @@ import (
 
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/oci"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // callTimeout bounds each docker call, and drainDelay how long its output may
@@ -64,11 +65,11 @@ func docker(emit *jsonl.Emitter, args ...string) error {
 	cmd.WaitDelay = drainDelay
 	if emit == nil {
 		cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
-		return cmd.Run()
+		return procstat.Run(cmd)
 	}
 	stdout, stderr := &lineLog{emit: emit, level: "info"}, &lineLog{emit: emit, level: "warn"}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
-	err := cmd.Run()
+	err := procstat.Run(cmd)
 	stdout.flush()
 	stderr.flush()
 	return err

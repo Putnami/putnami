@@ -35,6 +35,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Category is the diagnostic category every finding carries.
@@ -151,7 +153,7 @@ func fileExists(path string) bool {
 func ignoredDirectories(root string) map[string]bool {
 	cmd := exec.Command("git", "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z")
 	cmd.Dir = root
-	output, err := cmd.Output()
+	output, err := procstat.Output(cmd)
 	if err != nil {
 		return nil
 	}

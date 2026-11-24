@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/exec"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/tscscript"
 	"go.putnami.dev/typescript/extension/internal/parse"
 	"go.putnami.dev/typescript/extension/internal/project"
@@ -288,13 +289,13 @@ func installedTsc(projectPath, workspaceRoot string) (string, bool) {
 // holds a file Git tracks, which emptying it would delete. Outside a work
 // tree it checks nothing.
 func CheckTscOutputs(projectPath string, plan *TscPlan) error {
-	if err := osexec.Command("git", "-C", projectPath, "rev-parse", "--is-inside-work-tree").Run(); err != nil {
+	if err := procstat.Run(osexec.Command("git", "-C", projectPath, "rev-parse", "--is-inside-work-tree")); err != nil {
 		return nil
 	}
 	rel := slashRel(projectPath, plan.Config)
 	for i, output := range plan.Outputs() {
 		path := slashRel(projectPath, output)
-		tracked, err := osexec.Command("git", "-C", projectPath, "ls-files", "-z", "--", path).Output()
+		tracked, err := procstat.Output(osexec.Command("git", "-C", projectPath, "ls-files", "-z", "--", path))
 		if err != nil {
 			return fmt.Errorf("list the files Git tracks under %s: %w", path, err)
 		}
@@ -308,7 +309,7 @@ func CheckTscOutputs(projectPath string, plan *TscPlan) error {
 			// directory even before the directory exists.
 			probe = path + "/.putnami-ignore-probe"
 		}
-		err = osexec.Command("git", "-C", projectPath, "check-ignore", "-q", "--no-index", "--", probe).Run()
+		err = procstat.Run(osexec.Command("git", "-C", projectPath, "check-ignore", "-q", "--no-index", "--", probe))
 		var exit *osexec.ExitError
 		switch {
 		case err == nil:

@@ -267,6 +267,34 @@
             "doctor-is-quiet-without-a-retired-extension"
           ]
         }
+      },
+      {
+        "id": "a-run-reports-its-orchestration-cost",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-session-and-the-result-carry-the-engine-phases-and-the-task-waits",
+            "the-engine-and-sdk-jobs-count-their-processes-by-kind-and-git-by-subcommand"
+          ]
+        }
+      },
+      {
+        "id": "a-run-reports-its-orchestration-cpu",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-sdk-job-reports-its-own-cpu-apart-from-its-children",
+            "the-trace-profile-summary-prints-the-orchestration-cpu-share-and-ms-per-task"
+          ]
+        }
       }
     ]
   }

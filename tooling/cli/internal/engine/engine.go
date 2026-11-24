@@ -46,6 +46,7 @@ import (
 	"os"
 	"slices"
 	"sync/atomic"
+	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	protocoljob "go.putnami.dev/protocol/job"
@@ -284,6 +285,9 @@ type Request struct {
 	// adapter that builds a Request gets the attribution for free; nothing it can
 	// set changes it.
 	preparation *scheduler.PreparationReport
+	// orchestration times the engine phases of this run; the scheduler
+	// settles the run's orchestration report from it.
+	orchestration *scheduler.OrchestrationClock
 	// synchronizedExtensions are the extensions phase 1c synchronizes, whose
 	// runtime toolchain resolutions the report after the run reads (Run). Nil
 	// when the run ended before phase 1c.
@@ -599,6 +603,9 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	// before version discovery or repository lifecycle hooks can spawn.
 	ctx = scheduler.CaptureProcessCapabilities(ctx)
 	req := &request
+	// The run's orchestration report counts from here: the processes the
+	// version snapshot, the hooks and the providers start are the run's too.
+	req.orchestration = scheduler.NewOrchestrationClock()
 	req.versions, req.versionsErr = nil, nil
 	if req.ErrorOut == nil {
 		req.ErrorOut = os.Stderr
@@ -713,6 +720,9 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 
 // run is the lifecycle proper, between the before and after hooks.
 func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (SessionResult, error) {
+	// Each phase below records its wall on the run's orchestration report.
+	clock := req.orchestration
+	phaseStarted := time.Now()
 	// Phase 1: load the workspace and resolve extensions — once per run.
 	ws, discovered, code, err := loadRunWorkspace(req)
 	if code != ExitSuccess {
@@ -772,9 +782,11 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// the dependency fetch left out.
 	planningExtensions := scheduler.PathExtensionFetchPlan(ctx, req.WorkspaceRoot, req.planExtensions(discovered))
 	req.preparation, req.synchronizedExtensions = &scheduler.PreparationReport{}, planningExtensions
-	if err := scheduler.SynchronizeExtensionRuntimesForCommands(
-		ctx, ws, planningExtensions, req.Commands, req.preparation,
-	); err != nil {
+	clock.Phase(protocolcli.OrchestrationPhaseWorkspaceLoad, phaseStarted)
+	phaseStarted = time.Now()
+	err = scheduler.SynchronizeExtensionRuntimesForCommands(ctx, ws, planningExtensions, req.Commands, req.preparation)
+	clock.Phase(protocolcli.OrchestrationPhaseRuntimeSync, phaseStarted)
+	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: synchronize extension runtimes: %v\n", err)
 		return SessionResult{ExitCode: ExitError}, nil
 	}
@@ -786,9 +798,13 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// after runtime synchronization so a provider that IS demanded by this
 	// command is already resolved, and before selection so the provider view is
 	// in place for everything that reads the workspace.
-	if code := synchronizeWorkspaceProbe(ctx, req, ws, discovered); code != ExitSuccess {
+	phaseStarted = time.Now()
+	code = synchronizeWorkspaceProbe(ctx, req, ws, discovered)
+	clock.Phase(protocolcli.OrchestrationPhaseProbe, phaseStarted)
+	if code != ExitSuccess {
 		return SessionResult{ExitCode: code}, nil
 	}
+	phaseStarted = time.Now()
 	// One resolver answers the run's input selectors from here on. The
 	// descriptions phase 1c prepared come first, so an extension it prepared
 	// is not prepared again; any other one is prepared on its first call.
@@ -818,9 +834,11 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		req.Global.ImpactedStrict = true
 	}
 	selectedProjects, code := selectProjects(req, ws, extensions...)
+	clock.Phase(protocolcli.OrchestrationPhaseSelection, phaseStarted)
 	if code != ExitSuccess {
 		return SessionResult{ExitCode: code}, nil
 	}
+	phaseStarted = time.Now()
 
 	// The cache manager is built HERE, not in execute, and unconditionally.
 	// Two computations need it: the execution keys of this run, and the
@@ -993,6 +1011,8 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 			Jobs:      len(planned),
 		}
 	})
+
+	clock.Phase(protocolcli.OrchestrationPhasePlan, phaseStarted)
 
 	// Phase 4: execute.
 	fatalUnpublished := len(unpublished) > 0 && !req.previewsOnly()

@@ -48,6 +48,8 @@ import (
 	"time"
 
 	pdb "go.putnami.dev/protocol/database"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // nativeProviderID names the resource kind a native lease reclaims: a data
@@ -777,12 +779,12 @@ func nativeExec(ctx context.Context, c nativeCommand) (string, error) {
 		// The server pg_ctl leaves running keeps no handle on this process.
 		cmd.Stdout = nil
 		cmd.Stdin = nil
-		if err := cmd.Run(); err != nil {
+		if err := procstat.Run(cmd); err != nil {
 			return "", commandError(c.path, err, stderr.String())
 		}
 		return "", nil
 	}
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd)
 	if err != nil {
 		return "", commandError(c.path, err, stderr.String())
 	}

@@ -18,6 +18,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 )
 
@@ -224,12 +225,13 @@ func (rt *memberRuntime) start() error {
 	if err := tree.Start(); err != nil {
 		return fmt.Errorf("start %s %s: %w", rt.executable, rt.args[0], err)
 	}
+	procstat.Started(procstat.Classify(cmd.Path), cmd.Args)
 	rt.tree = tree
 	group := tree.ID()
 	leaderStart, _ := proctree.StartTime(group)
 	rt.observeProcess(group, leaderStart)
 	go func() {
-		err := cmd.Wait()
+		err := procstat.Wait(cmd)
 		stream.flush()
 		output.flush()
 		rt.serveRunEnded(err)

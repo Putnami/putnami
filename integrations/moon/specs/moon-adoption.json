@@ -83,6 +83,14 @@
       ]
     },
     {
+      "id": "a-delegated-verb-runs-one-moon-command",
+      "text": [
+        "Projects that run the same delegated task together run one moon run <a>:<task> <b>:<task> at the workspace root.",
+        "Each result is read from the .moon/cache/runReport.json that command writes: passed or cached passes, failed fails with moon's error and the end of the output moon kept.",
+        "When the command fails, a target the report does not name fails as not run, and a report that names none fails every project with stacks.step_failed."
+      ]
+    },
+    {
       "id": "reports-from-options",
       "text": [
         "The test task reads the JUnit and coverage reports the project's own options name under options[\"@putnami/moon\"].tasks.test.reports into the test and coverage summary, as the stack core reads any report.",
@@ -133,6 +141,7 @@
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
-    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md"
+    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md",
+    "tooling/stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md"
   ]
 }

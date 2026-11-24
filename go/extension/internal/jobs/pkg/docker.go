@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 
 	"go.putnami.dev/go/extension/internal/platform"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // dockerBaseImagePinned is the digest-pinned distroless base. The pin — not
@@ -320,7 +321,7 @@ func buildDockerImageWithBuilder(ctx *pctx.Context, emit *jsonl.Emitter, params 
 
 	buildCmd := exec.Command("docker", buildArgs...)
 	buildCmd.Stderr = os.Stderr
-	if err := buildCmd.Run(); err != nil {
+	if err := procstat.Run(buildCmd); err != nil {
 		emit.Diagnostic("error", "Docker build failed for "+fullImage, "", 0)
 		emit.PhaseEnd("package-docker", "failed")
 		return false
@@ -410,14 +411,14 @@ func loadIntoDaemon(emit *jsonl.Emitter, layoutDir, contentRef string, aliases [
 	// and is passed as a direct argument without a shell.
 	loadCmd := exec.Command("docker", "load", "-i", tarPath) //nolint:gosec
 	loadCmd.Stderr = os.Stderr
-	if err := loadCmd.Run(); err != nil {
+	if err := procstat.Run(loadCmd); err != nil {
 		emit.Diagnostic("error", "docker load failed for "+contentRef, "", 0)
 		return false
 	}
 	for _, alias := range aliases {
 		tagCmd := exec.Command("docker", "tag", contentRef, alias)
 		tagCmd.Stderr = os.Stderr
-		if err := tagCmd.Run(); err != nil {
+		if err := procstat.Run(tagCmd); err != nil {
 			emit.Diagnostic("error", "docker tag failed for "+alias, "", 0)
 			return false
 		}

@@ -104,6 +104,14 @@
       ]
     },
     {
+      "id": "a-delegated-verb-runs-one-nx-command",
+      "text": [
+        "Projects that run the same delegated target together run one nx run-many -t <target> -p <a>,<b> --outputStyle=static at the workspace root.",
+        "Each result is read from Nx's output: a target listed in the closing summary of failed targets fails with its > nx run <project>:<target> section; one with a section passes.",
+        "When the command fails, a target with no section fails as not run, and an output that names none fails every project with stacks.step_failed."
+      ]
+    },
+    {
       "id": "reports-from-project-options",
       "text": [
         "The sync writes, as the project's test reports, the JUnit file and the Cobertura or LCOV report its jest or vitest configuration names (jest-junit outputDirectory and outputName, coverageDirectory or reportsDirectory, <rootDir> as the project), at the workspace root for jest-junit under @nx/jest.",
@@ -183,6 +191,7 @@
     "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md",
     "integrations/nx/doc/adr/0004-an-nx-js-tsc-build-moves-when-the-tsc-build-reproduces-its-emit.md",
     "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md",
-    "integrations/nx/doc/adr/0005-a-named-target-runs-as-the-task-the-workspace-maps-it-to.md"
+    "integrations/nx/doc/adr/0005-a-named-target-runs-as-the-task-the-workspace-maps-it-to.md",
+    "tooling/stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md"
   ]
 }

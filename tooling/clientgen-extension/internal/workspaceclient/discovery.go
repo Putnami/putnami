@@ -19,6 +19,7 @@ import (
 
 	clientcontract "go.putnami.dev/protocol/clientcontract"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 type clientGenConfig struct {
@@ -263,7 +264,7 @@ func ignoredByRules(root string, rels []string) (map[string]bool, error) {
 	cmd := exec.Command("git", "check-ignore", "--no-index", "-z", "--stdin")
 	cmd.Dir = root
 	cmd.Stdin = strings.NewReader(strings.Join(rels, "\x00") + "\x00")
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd)
 	var exit *exec.ExitError
 	if errors.As(err, &exit) && exit.ExitCode() == 1 {
 		return map[string]bool{}, nil // No rule excludes any of them.

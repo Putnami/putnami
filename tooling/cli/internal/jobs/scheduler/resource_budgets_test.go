@@ -190,7 +190,7 @@ func TestCoordinatorAdmissionWaitsForResourceBudget(t *testing.T) {
 	}
 
 	pending := []*ScheduledJob{job}
-	group, rest, admitted := scheduler.takeAdmissiblePendingGroup(pending)
+	group, rest, admitted := scheduler.takeAdmissiblePendingGroup(pending, false)
 	if admitted {
 		t.Fatalf("claiming task was dispatched over an exhausted budget: %+v", group.jobs)
 	}
@@ -199,7 +199,7 @@ func TestCoordinatorAdmissionWaitsForResourceBudget(t *testing.T) {
 	}
 
 	scheduler.resources.release(held)
-	group, rest, admitted = scheduler.takeAdmissiblePendingGroup(pending)
+	group, rest, admitted = scheduler.takeAdmissiblePendingGroup(pending, false)
 	if !admitted || len(group.jobs) != 1 || group.jobs[0] != job {
 		t.Fatalf("released budget did not dispatch the waiting task: group=%+v admitted=%t", group.jobs, admitted)
 	}

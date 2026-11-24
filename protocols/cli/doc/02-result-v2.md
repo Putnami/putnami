@@ -656,6 +656,47 @@ report it; a surface reduced without the physical ledger (the `--output=jsonl`
 `session:end` record, and the `--output=json` envelope) simply omits it, which
 is the same "no measurement, no claim" rule the environment block follows.
 
+### Orchestration report
+
+`run.orchestration` is an additive optional object on the run summary. It says
+where the run spent time and CPU outside the tools its jobs run. It is
+information: no rule fails a run on it, and a member the producer could not
+measure is absent rather than zero.
+
+| Member | Meaning |
+|--------|---------|
+| `phases[]` | `{phase, wallMs}` for each engine phase the run entered: `workspace-load`, `runtime-sync`, `probe`, `selection`, `plan`, each listed once |
+| `processes[]` | `{origin, kind, count, cpuMs?}`: processes started by the `engine` or by `jobs` built on the extension SDK, by kind (`job`, `batch`, `control`, `cli`, `git`, `other`), one entry per pair |
+| `git[]` | `{origin, subcommand, count}`: git calls by subcommand, one entry per pair |
+| `cpu` | the orchestration CPU, below |
+
+`cpu.totalMs` is the sum of `engineMs` (the CLI process itself), `extensionMs`
+(what job processes reported for themselves, without their children),
+`controlMs` (extension processes the engine started for anything but a job,
+with the descendants they waited for), `cliMs` (CLI processes jobs started) and
+`gitMs` (git the engine or an SDK job started); `cli.result.count_mismatch`
+otherwise. `runMs` is the whole run: the CLI process and every child it waited
+for. `sharePermille` is `totalMs × 1000 / runMs`, truncating, present exactly
+when `runMs` is above 0; `perTaskMs` is `totalMs / counts.total`, truncating,
+and absent when the run selected no task. A `processes[].cpuMs` is absent when
+no process of that entry exited before the run ended, and 0 when some did in
+under a millisecond.
+`unreportedProcesses` counts the job and batch processes that reported no CPU of
+their own: a runtime not built on the extension SDK or on a version of it that
+reports, an interactive job, an SDK job that exited before writing its result,
+or a platform without `getrusage`. Their CPU is in no member.
+
+A task record carries `orchestration` with `keyMs`, `lockWaitMs` and
+`restoreMs`: the wall the scheduler spent computing its key, waiting for a cache
+lease or its task-output locks, and restoring an entry. A remote restore's
+`restoreMs` includes the remote lookup and the wait for the remote lease. A member is present
+when the task entered that step, even at 0 ms, and the object is absent when it
+entered none.
+
+A job process states its own part in its result data under `processReport`
+(`protocols/runtime`): `selfCpuMs`, `starts[]` by kind and `git[]` by
+subcommand. The engine sums those reports into the `jobs` origin.
+
 ### Dependency preparation
 
 `sessionFile.preparation` is an additive optional object: the stage that
@@ -1183,8 +1224,8 @@ it is never a task cache input. A submitting engine compares it with the
 request it submitted before it adopts an imported session as its verdict.
 
 `executions[]`, `tasks[].executionId`, `tasks[].inputDigest`, `environment`, `run.cpu`,
-`preparation`, `tree`, `placement`, `placement.provenance`, `parentSessionId`
-and `selection` are **additive**: every member an older reader knows keeps its name, its type and
+`run.orchestration`, `tasks[].orchestration`, `preparation`, `tree`, `placement`,
+`placement.provenance`, `parentSessionId` and `selection` are **additive**: every member an older reader knows keeps its name, its type and
 its meaning, so a session file written by a current CLI still parses as one
 written before. A reader that validates against the closed schema needs this
 version of `result-v2.json`, which is the same requirement any additive member

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
@@ -34,7 +35,7 @@ type LoadReader struct {
 
 func NativeLoadReader() LoadReader {
 	return LoadReader{OS: runtime.GOOS, ReadFile: os.ReadFile,
-		Command: func(name string, args ...string) ([]byte, error) { return exec.Command(name, args...).Output() },
+		Command: func(name string, args ...string) ([]byte, error) { return procstat.Output(exec.Command(name, args...)) },
 		NumCPU:  runtime.NumCPU}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 )
@@ -99,6 +100,123 @@ type LintSummary struct {
 	Warnings int `json:"warnings,omitempty"`
 	// Infos is the number of info-severity findings.
 	Infos int `json:"infos,omitempty"`
+}
+
+// ProcessReportEnv is the variable a CLI that reads ProcessReport sets to "1"
+// in a job's environment. A runtime writes the report only when it is set.
+const ProcessReportEnv = "PUTNAMI_PROCESS_REPORT"
+
+// ProcessReportResultDataKey is the result-data location of a job process's
+// own accounting: the CPU it spent itself and the processes it started. A
+// runtime that does not measure them omits the key; it never reports zeros it
+// did not observe.
+const ProcessReportResultDataKey = "processReport"
+
+// Process kinds. A job process starts git, the Putnami CLI, or any other
+// program; the CLI's own engine also starts jobs, batches and control
+// processes (an extension process started for anything but a job), so the
+// vocabulary is shared by both ledgers.
+const (
+	ProcessKindJob     = "job"
+	ProcessKindBatch   = "batch"
+	ProcessKindControl = "control"
+	ProcessKindCLI     = "cli"
+	ProcessKindGit     = "git"
+	ProcessKindOther   = "other"
+)
+
+// ProcessKinds is the closed process-kind vocabulary, in canonical order.
+var ProcessKinds = []string{
+	ProcessKindJob, ProcessKindBatch, ProcessKindControl, ProcessKindCLI, ProcessKindGit, ProcessKindOther,
+}
+
+// ProcessReport is a job process's own accounting, carried in the result
+// event's data under ProcessReportResultDataKey.
+type ProcessReport struct {
+	// SelfCPUMs is the CPU, user plus system, the job process spent itself,
+	// without its children. Absent where the platform does not measure it.
+	SelfCPUMs *int64 `json:"selfCpuMs,omitempty"`
+	// Starts are the processes the job process started, one entry per kind it
+	// started at least once, in ProcessKinds order.
+	Starts []ProcessStarts `json:"starts,omitempty"`
+	// Git are its git calls by subcommand, sorted by subcommand.
+	Git []GitCalls `json:"git,omitempty"`
+}
+
+// ProcessStarts counts the processes of one kind and the CPU they spent, each
+// with its own waited-for descendants, as their exit status accounted it.
+type ProcessStarts struct {
+	// Kind is one of ProcessKinds.
+	Kind string `json:"kind"`
+	// Count is how many processes of this kind were started, at least 1.
+	Count int64 `json:"count"`
+	// CPUMs is the CPU of those that exited and were measured. Absent when none
+	// was; 0 when some were and spent under a millisecond.
+	CPUMs *int64 `json:"cpuMs,omitempty"`
+}
+
+// GitCalls counts the git calls of one subcommand ("rev-parse", "ls-files").
+// A call that names no subcommand counts under its first argument
+// ("--version").
+type GitCalls struct {
+	Subcommand string `json:"subcommand"`
+	Count      int64  `json:"count"`
+}
+
+// ExtractProcessReport decodes the process report from a result event's data.
+// A missing report is nil without an error.
+func ExtractProcessReport(data map[string]any) (*ProcessReport, error) {
+	value, ok := data[ProcessReportResultDataKey]
+	if !ok || value == nil {
+		return nil, nil
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	var report ProcessReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return nil, err
+	}
+	return &report, ValidateProcessReport(&report)
+}
+
+// ValidateProcessReport refuses a negative count or CPU, a kind outside
+// ProcessKinds, and a kind or subcommand listed twice.
+func ValidateProcessReport(report *ProcessReport) error {
+	if report == nil {
+		return nil
+	}
+	if report.SelfCPUMs != nil && *report.SelfCPUMs < 0 {
+		return fmt.Errorf("processReport.selfCpuMs is negative")
+	}
+	kinds := map[string]bool{}
+	for _, start := range report.Starts {
+		if !slices.Contains(ProcessKinds, start.Kind) {
+			return fmt.Errorf("processReport.starts names unknown kind %q", start.Kind)
+		}
+		if kinds[start.Kind] {
+			return fmt.Errorf("processReport.starts lists kind %q twice", start.Kind)
+		}
+		kinds[start.Kind] = true
+		if start.Count < 1 || (start.CPUMs != nil && *start.CPUMs < 0) {
+			return fmt.Errorf("processReport.starts[%s] has a count below 1 or a negative CPU", start.Kind)
+		}
+	}
+	subcommands := map[string]bool{}
+	for _, call := range report.Git {
+		if call.Subcommand == "" {
+			return fmt.Errorf("processReport.git names an empty subcommand")
+		}
+		if subcommands[call.Subcommand] {
+			return fmt.Errorf("processReport.git lists subcommand %q twice", call.Subcommand)
+		}
+		subcommands[call.Subcommand] = true
+		if call.Count < 1 {
+			return fmt.Errorf("processReport.git[%s] has a count below 1", call.Subcommand)
+		}
+	}
+	return nil
 }
 
 // Artifact kinds with defined semantics. Extensions may emit other

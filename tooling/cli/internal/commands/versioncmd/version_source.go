@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -135,7 +136,7 @@ func buildStampedCLI(ctx context.Context, moduleDir, versionVar, version string)
 	cmd.Env = shared.GoCommandEnv(moduleDir)
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		cleanup()
 		return "", noop, fmt.Errorf("go build ./cmd/putnami: %w", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/sdk/extension/uvtoolchain"
 )
@@ -59,7 +60,7 @@ func UVVersion(path string) (string, error) {
 	cmd := exec.CommandContext(ctx, path, uvVersionArgs...)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd)
 	if ctx.Err() != nil {
 		return "", fmt.Errorf("uv self version did not answer within %s", uvVersionTimeout)
 	}

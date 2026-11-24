@@ -183,6 +183,9 @@ func adoptSharedResult(leader *JobResult) *JobResult {
 	// TaskWall is the scheduler-level wall around THIS task and closeTask sets
 	// it; the leader's would describe a different span.
 	adopted.TaskWall = 0
+	// Waits are the leader's key, lock and restore walls; the follower's own
+	// are stamped when its row is recorded.
+	adopted.Waits = TaskWaits{}
 	// SourceMutated is a verdict about this task's own keyed source inputs,
 	// recomputed by finalizeExecutedJob when the task rewrites sources.
 	adopted.SourceMutated = false

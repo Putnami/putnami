@@ -81,6 +81,8 @@ This is the read-only form of the same engine. Use it in review, or run it under
 
 `--profile` selects the *deployment* profile (`dev` | `test` | `production`) described here. It is unrelated to performance profiling: the Chrome-trace output flag is `--trace-profile <path>`. If you pass a file path to `--profile` you will get a usage error pointing you at `--trace-profile`.
 
+`--trace-profile` also prints where the run's orchestration went: the CPU of the engine, of the extension processes without their children, of control processes, CLI starts and git, its share of the run's CPU and its cost per task, the engine phases, and the processes and git calls by kind. The same report is recorded in the session under `run.orchestration`; it is information and fails nothing.
+
 ## Deterministic and reviewable
 
 The preflight report is a pure function of the committed tree, the profile, and a single injected clock (used only to evaluate waiver expiry). It reads only committed artifacts, never runtime state or the network, and never a resolved config value — evidence names *where* to look, never *what* was found. The same tree always produces the same report, so a gate result is reproducible in review and in CI.

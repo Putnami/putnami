@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // appleGitTrampoline is the git macOS ships in /usr/bin. It runs no git
@@ -73,7 +75,7 @@ func fileExists(path string) bool {
 func developerGit() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "/usr/bin/xcrun", "--find", "git").Output()
+	out, err := procstat.Output(exec.CommandContext(ctx, "/usr/bin/xcrun", "--find", "git"))
 	if err != nil {
 		return ""
 	}

@@ -18,6 +18,7 @@ import (
 
 	capabilityproto "go.putnami.dev/protocol/capabilities"
 	sdkgit "go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // ErrTreeObjectTooLarge identifies a bounded historical blob read that would
@@ -269,7 +270,7 @@ func treeBlobDigests(repoRoot string, objectIDs []string) (map[string]string, er
 	}
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd); err != nil {
 		return nil, fmt.Errorf("hash tree blobs: start git: %w", err)
 	}
 	waited := false
@@ -278,7 +279,7 @@ func treeBlobDigests(repoRoot string, objectIDs []string) (map[string]string, er
 			return
 		}
 		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
+		_ = procstat.Wait(cmd)
 	}()
 
 	reader := bufio.NewReader(stdout)
@@ -305,7 +306,7 @@ func treeBlobDigests(repoRoot string, objectIDs []string) (map[string]string, er
 		}
 		digests[expected] = "sha256:" + hex.EncodeToString(hash.Sum(nil))
 	}
-	err = cmd.Wait()
+	err = procstat.Wait(cmd)
 	waited = true
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {

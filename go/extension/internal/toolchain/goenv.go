@@ -12,6 +12,7 @@ import (
 
 	"go.putnami.dev/sdk/extension/envkeys"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 const (
@@ -566,7 +567,7 @@ func goEnvFileFlags(env []string, goBinary string) string {
 	cmd := exec.Command(goBinary, "env", "GOFLAGS")
 	cmd.Env = env
 	var flags string
-	if out, err := cmd.Output(); err == nil {
+	if out, err := procstat.Output(cmd); err == nil {
 		flags = strings.TrimSpace(string(out))
 	}
 	goEnvFlagsCache[key] = flags

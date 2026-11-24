@@ -49,6 +49,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/infra"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -1064,7 +1065,7 @@ func selectContextProjects(ws *workspace.Workspace, args []string) ([]*workspace
 // commits, or not a git checkout). The value is stable across a fixed tree and
 // still resolves outside a repository.
 func resolveWorkspaceRevision(wsRoot string) string {
-	out, err := exec.Command(gitread.Executable(), "-C", wsRoot, "rev-parse", "HEAD").Output()
+	out, err := procstat.Output(exec.Command(gitread.Executable(), "-C", wsRoot, "rev-parse", "HEAD"), procstat.Git)
 	if err != nil {
 		return "unknown"
 	}

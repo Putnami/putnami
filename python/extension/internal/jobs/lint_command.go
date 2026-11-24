@@ -3,6 +3,8 @@ package jobs
 import (
 	"bytes"
 	"os/exec"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // ruffSingleRun executes a solo ruff invocation. Keeping the command boundary
@@ -25,7 +27,7 @@ func runRuffSingle(name string, args []string, dir string, env []string) ([]byte
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
 	cmd.Env = env
-	return cmd.CombinedOutput()
+	return procstat.CombinedOutput(cmd)
 }
 
 func runRuffSingleCheck(name string, args []string, dir string, env []string) (ruffCheckResult, error) {
@@ -36,6 +38,6 @@ func runRuffSingleCheck(name string, args []string, dir string, env []string) (r
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	err := cmd.Run()
+	err := procstat.Run(cmd)
 	return ruffCheckResult{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}, err
 }

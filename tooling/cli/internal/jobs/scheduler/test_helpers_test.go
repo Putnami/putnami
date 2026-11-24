@@ -523,3 +523,10 @@ func provisionFixture(args []string) error {
 	}
 	return os.WriteFile(args[2], []byte(filepath.Base(filepath.Dir(args[1]))+"\n"), 0o644)
 }
+
+// readyBatchKey is the batch key readyBatch computes now, without the pending
+// memo: the cases that pin what a key folds read it fresh.
+func (s *Scheduler) readyBatchKey(job *ScheduledJob) string {
+	key, _ := s.readyBatch(job)
+	return key
+}

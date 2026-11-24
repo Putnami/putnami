@@ -10,6 +10,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 	protocoljob "go.putnami.dev/protocol/job"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/useragent"
@@ -241,6 +242,20 @@ func BuildJobContext(
 	configDefaults map[string]any,
 	versions cachekey.RunVersions,
 ) *JobCommandContext {
+	return buildJobContext(ws, job, commandParams, configDefaults, versions, nil)
+}
+
+// buildJobContext is BuildJobContext with the run's resolved workspace
+// membership. A nil membership resolves the workspace's own, which encodes the
+// configuration of every project: a run passes the one it resolved once.
+func buildJobContext(
+	ws *workspace.Workspace,
+	job *ScheduledJob,
+	commandParams extension.ParamMap,
+	configDefaults extension.ParamMap,
+	versions cachekey.RunVersions,
+	membership *cachekey.WorkspaceMembership,
+) *JobCommandContext {
 	cmdName := jobCommandName(job)
 	identity := job.TypedIdentity()
 	versions = versionsSeenBy(job, versions,
@@ -312,7 +327,10 @@ func BuildJobContext(
 	// workspace-wide CLAIM is `selection`, which every document already carries;
 	// what this member decides is whether it can SEE the workspace at all, and
 	// that is not a property of the task's activation.
-	ctx.WorkspaceProjects = cachekey.WorkspaceProjectsContext(ws, versions)
+	if membership == nil {
+		membership = cachekey.NewWorkspaceMembership(ws)
+	}
+	ctx.WorkspaceProjects = membership.Context(versions)
 	// An empty workspace writes "workspaceProjects": [] so a reader can tell
 	// "no projects" from a CLI too old to write the member.
 	if ctx.WorkspaceProjects == nil {

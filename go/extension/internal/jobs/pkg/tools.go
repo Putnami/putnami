@@ -20,6 +20,7 @@ import (
 	"go.putnami.dev/go/extension/internal/platform"
 	"go.putnami.dev/go/extension/internal/toolchain"
 	"go.putnami.dev/go/extension/tools"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // stagedToolsDir is the archive-relative directory carrying the prebuilt pinned
@@ -194,7 +195,7 @@ func moduleCacheProxy(modCache string) string {
 func goEnvValue(goBinary string, env []string, name string) string {
 	cmd := exec.Command(goBinary, "env", name)
 	cmd.Env = env
-	out, err := cmd.Output()
+	out, err := procstat.Output(cmd)
 	if err != nil {
 		return ""
 	}
@@ -217,7 +218,7 @@ func buildPinnedTool(build pinnedToolBuild, goBinary string, target platform.Tar
 	// while the task diagnostic read only "exit status 1".
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		return "", fmt.Errorf("build %s for %s/%s: %w%s%s",
 			tool, target.GOOS, target.GOARCH, err, goFailureDetail(stderr.Bytes()), build.offlineHint())
 	}

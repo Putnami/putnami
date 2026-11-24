@@ -17,6 +17,7 @@ import (
 	"time"
 
 	pexec "go.putnami.dev/sdk/extension/exec"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/typescript/extension/internal/project"
 )
 
@@ -333,7 +334,7 @@ func scanModules(bunBin, typescript, projectPath string, modules []string) (map[
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return nil, fmt.Errorf("node-target check: reading the modules timed out after %s", bunAPICheckTimeout)
 		}

@@ -32,6 +32,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/genresult"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // describeMaxRuntime caps how long we wait on the describe binary. The cap
@@ -640,7 +641,7 @@ func compileHostBinary(ctx *pctx.Context, projectPath string) (string, func(), e
 	// The environment resolves the workspace go.work explicitly, over an
 	// inherited GOWORK=off.
 	cmd.Env = buildEnv
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := procstat.CombinedOutput(cmd); err != nil {
 		return fail(fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out))))
 	}
 	return outPath, release, nil
@@ -767,12 +768,12 @@ func runDescribeBinary(binPath, projectPath, genDir, fwVersion string, maxRuntim
 	cmd.Stderr = output
 	cmd.WaitDelay = describePipeDrainDelay
 
-	if err := cmd.Start(); err != nil {
+	if err := procstat.Start(cmd); err != nil {
 		return "", fmt.Errorf("start describe binary: %w", err)
 	}
 
 	waitDone := make(chan error, 1)
-	go func() { waitDone <- cmd.Wait() }()
+	go func() { waitDone <- procstat.Wait(cmd) }()
 
 	select {
 	case <-readyCh:

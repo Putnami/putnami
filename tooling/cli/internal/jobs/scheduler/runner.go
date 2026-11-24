@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,7 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/envkeys"
 	"go.putnami.dev/sdk/extension/filelock"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -401,7 +403,8 @@ func prepareJobInvocation(
 		return nil, nil, nil, runtimeErr
 	}
 
-	jobCtx := BuildJobContext(ws, job, commandParams, configDefaults, versions)
+	membership, _ := ctx.Value(workspaceMembershipKey{}).(*cachekey.WorkspaceMembership)
+	jobCtx := buildJobContext(ws, job, commandParams, configDefaults, versions, membership)
 	scratchLease, err := store.AcquireScratch(ws.Root)
 	if err != nil {
 		return nil, nil, nil, err
@@ -497,6 +500,12 @@ func RunJob(
 	return runJob(ctx, ws, job, commandParams, configDefaults, versions, nil, onEvent)
 }
 
+// workspaceMembershipKey carries the workspace membership a scheduler run
+// resolved once (*cachekey.WorkspaceMembership), so every job context of the
+// run stamps it rather than encoding the configuration of every project again.
+// A job run outside a scheduler run carries none and resolves its own.
+type workspaceMembershipKey struct{}
+
 // serveStepKey marks a context under which runJob runs a serve-workload step.
 type serveStepKey struct{}
 
@@ -561,6 +570,44 @@ func announceProcessGroup(ctx context.Context, group int, onEvent EventHandler) 
 	})
 }
 
+// batchProcessKey marks a context whose job process runs a batch.
+type batchProcessKey struct{}
+
+// withBatchProcess marks ctx as the context of a batch's job process.
+func withBatchProcess(ctx context.Context) context.Context {
+	return context.WithValue(ctx, batchProcessKey{}, true)
+}
+
+// jobProcessKind is the kind a job process started under ctx counts as.
+func jobProcessKind(ctx context.Context) procstat.Kind {
+	if batch, _ := ctx.Value(batchProcessKey{}).(bool); batch {
+		return procstat.Batch
+	}
+	return procstat.Job
+}
+
+// processReportReader takes the process report out of a job's result event
+// before anything reads the event: the live stream, the retained events a
+// cache entry stores, and the result. A report is about this spawn alone, so a
+// replay must never carry it.
+type processReportReader struct {
+	report *runtimeproto.ProcessReport
+}
+
+// mapper wraps next with the removal of the report from a result event.
+func (r *processReportReader) mapper(next eventMapper) eventMapper {
+	return func(event RawJobEvent) RawJobEvent {
+		if next != nil {
+			event = next(event)
+		}
+		event, report := takeProcessReport(event)
+		if report != nil {
+			r.report = report
+		}
+		return event
+	}
+}
+
 // runJob is RunJob with the run-level process environment the scheduler owns.
 // extraEnv carries facts about HOW this process spawns the job — never task
 // inputs — so it reaches the subprocess and nothing else: not the job context,
@@ -581,6 +628,9 @@ func runJob(
 	ctx = CaptureProcessCapabilities(ctx)
 	onEvent = processCapabilityEventSink(ctx, job, onEvent)
 	start := time.Now()
+	// The job may write its process report: this CLI reads it (runtimeproto
+	// ProcessReportEnv). Like extraEnv, a fact about this spawn, never an input.
+	extraEnv = append(slices.Clone(extraEnv), runtimeproto.ProcessReportEnv+"=1")
 
 	ctx, cancel, inv, err := prepareJobInvocation(ctx, ws, job, commandParams, configDefaults, versions, extraEnv)
 	if err != nil {
@@ -659,6 +709,8 @@ func runJob(
 		}
 		return nil, fmt.Errorf("start subprocess %s: %w", inv.command, err)
 	}
+	processKind := jobProcessKind(ctx)
+	procstat.Started(processKind, cmd.Args)
 	// Closing the tree ends nothing on Unix, so runJob stops the tree itself
 	// before it returns (stopProcessGroup below); on Windows, closing also ends
 	// every process the job left behind.
@@ -674,6 +726,7 @@ func runJob(
 	waitCh := make(chan error, 1)
 	var spawnToFirstEvent time.Duration
 	firstEventObserved := false
+	reports := &processReportReader{}
 	observeValidEvent := func() {
 		if !firstEventObserved {
 			spawnToFirstEvent = time.Since(spawnedAt)
@@ -685,7 +738,7 @@ func runJob(
 		events, result := readJSONLEventsObserved(
 			stdout,
 			onEvent,
-			workspacePathEventMapper(ws.Root, inv.projRoot, inv.cwd),
+			reports.mapper(workspacePathEventMapper(ws.Root, inv.projRoot, inv.cwd)),
 			observeValidEvent,
 		)
 		eventsCh <- jobReadResult{events: events, result: result}
@@ -733,6 +786,12 @@ func runJob(
 			result = &JobResult{Status: "failed"}
 		}
 	}
+	// The job process's own accounting joins the run's: what it started, and
+	// the CPU it spent itself. A process that wrote no report is counted as
+	// unreported. The reader took the report out of the result event before
+	// the live stream, the retained events or the result saw it.
+	procstat.Exited(processKind, cmd.ProcessState)
+	procstat.Absorb(reports.report)
 	result.Events = evResult.events
 	result.Duration = duration
 	result.SpawnToFirstEvent = spawnToFirstEvent

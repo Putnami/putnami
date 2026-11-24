@@ -11,6 +11,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -234,7 +235,7 @@ func (p *ExecProbeProvider) exchange(executable string, controlArgs []string, pa
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd, procstat.Control); err != nil {
 		// The deadline is checked first: a killed process reports a generic
 		// signal error, and reporting that instead of the timeout would send
 		// the user looking for a crash that never happened.

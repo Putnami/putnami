@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // uvVersion returns the release the uv program at path reports. It is a seam
@@ -25,7 +26,7 @@ var uvCommandRun = func(uv string, args []string, dir string, env []string) ([]b
 	cmd := exec.Command(uv, args...)
 	cmd.Dir = dir
 	cmd.Env = env
-	return cmd.CombinedOutput()
+	return procstat.CombinedOutput(cmd)
 }
 
 // WorkspaceInstall syncs the UV workspace, declares the uv release it runs in

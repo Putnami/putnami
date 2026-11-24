@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -186,7 +187,7 @@ func addDetachedWorktree(ctx context.Context, repoRoot, target, head string) err
 	// "git", not gitread.Executable: the checkout runs repository hooks and
 	// filters, which keep the environment the macOS trampoline gives them.
 	command := exec.CommandContext(ctx, "git", "-C", repoRoot, "worktree", "add", "--detach", target, head)
-	if output, err := command.CombinedOutput(); err != nil {
+	if output, err := procstat.CombinedOutput(command, procstat.Git); err != nil {
 		return fmt.Errorf("create detached cache-verification worktree: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 	return nil
@@ -195,7 +196,7 @@ func addDetachedWorktree(ctx context.Context, repoRoot, target, head string) err
 func removeDetachedWorktrees(ctx context.Context, repoRoot string, targets []string) {
 	for _, target := range targets {
 		command := exec.CommandContext(ctx, gitread.Executable(), "-C", repoRoot, "worktree", "remove", "--force", target)
-		_ = command.Run()
+		_ = procstat.Run(command, procstat.Git)
 	}
 }
 

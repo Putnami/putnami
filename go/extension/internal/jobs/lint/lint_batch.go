@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/go/extension/internal/parse"
 	"go.putnami.dev/go/extension/internal/toolchain"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Batch lint reuses one golangci-lint process across several compatible
@@ -544,7 +545,7 @@ var runGolangciCommand = func(binary string, args []string, dir string) ([]byte,
 	cmd := exec.Command(binary, args...)
 	cmd.Dir = dir
 	cmd.Env = toolchain.WorkspaceBuildEnv(os.Environ(), dir, toolchain.CurrentGoBinary())
-	return cmd.CombinedOutput()
+	return procstat.CombinedOutput(cmd)
 }
 
 // golangciRetryDelay backs off between ETXTBSY retries; overridable in tests.

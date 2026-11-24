@@ -45,6 +45,8 @@ import (
 	"time"
 
 	registry "go.putnami.dev/protocol/registry"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // cloudTokenTimeout bounds the cloud-CLI credential call so a hung or missing
@@ -146,7 +148,7 @@ func resolveTokenWithCLI(parent context.Context, host, executable string, noRela
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd, procstat.CLI); err != nil {
 		return "", strings.TrimSpace(stderr.String())
 	}
 

@@ -451,9 +451,10 @@ The scheduler tracks unresolved dependency counts for each job:
 
 ### Opportunistic task batching
 
-Cacheable per-project tasks can opt into same-key batching through the extension
-manifest's `batchable` policy. The coordinator groups jobs only when at least
-two compatible peers are already ready; it never waits on a coalescing window.
+Per-project tasks can opt into same-key batching through the extension
+manifest's `batchable` policy. For a cached task, the coordinator groups jobs
+only when at least two compatible peers are already ready; it never waits on a
+coalescing window.
 The group shares one extension invocation, whose `batchResults` are split back
 into normal per-project results, cache entries, session rows, and dependency
 outcomes.
@@ -488,11 +489,21 @@ failures stay isolated (the loop records the failure and continues); only a
 whole-batch timeout or crash fails peers together, which the bound and the
 scheduler's one-shot batch retry contain.
 
+A batchable task whose cache is off is a delegated tool's, such as moon's or
+Nx's, and runs a verb as one tool command
+([stacks ADR 0019](../../stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md)).
+Its group has no project cap unless the policy states one, and it waits for
+its peers: while a task of the same extension, task and tool is not ready yet,
+and depends on no task of that verb, the ready ones wait, as long as other
+work is in flight. Its batch key leaves out the project's own option layers of
+its extension, which the stack reads from each project itself. Nothing is
+cached, and each member still gets its own result.
+
 Batching preserves the scheduler's longest-first queue: compatible peers may
 join the job at the head of the ready queue, but a later batch never jumps
 ahead of earlier ordinary work. A lone batch candidate may yield to ready
 ordinary work when that work can unblock a compatible peer; the scheduler does
-not otherwise wait for a batch to fill.
+not otherwise wait for a cached batch to fill.
 
 Batching amortizes only the extension-process overhead `F` (fork/exec +
 extension boot + config + toolchain probe, ~0.18s/task). Each project still

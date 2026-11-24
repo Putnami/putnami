@@ -26,6 +26,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 //go:embed extract.mjs
@@ -312,7 +314,7 @@ func runScript(bun string, input []byte) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procstat.Run(cmd); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return nil, fmt.Errorf("read the API: bun timed out after %s", readTimeout)
 		}

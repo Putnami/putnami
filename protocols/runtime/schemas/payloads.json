@@ -61,6 +61,36 @@
         "infos": { "type": "integer", "minimum": 0 }
       }
     },
+    "ProcessReport": {
+      "description": "A job process's own accounting, carried in result data under 'processReport': the CPU it spent itself, without its children, the processes it started by kind, and its git calls by subcommand. A runtime that does not measure them omits the member.",
+      "type": "object",
+      "properties": {
+        "selfCpuMs": { "type": "integer", "minimum": 0, "description": "User plus system CPU of the job process itself, without its children. Absent where the platform does not measure it." },
+        "starts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "count"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["job", "batch", "control", "cli", "git", "other"] },
+              "count": { "type": "integer", "minimum": 1 },
+              "cpuMs": { "type": "integer", "minimum": 0, "description": "CPU of the processes of this kind that exited, each with its waited-for descendants." }
+            }
+          }
+        },
+        "git": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["subcommand", "count"],
+            "properties": {
+              "subcommand": { "type": "string", "minLength": 1 },
+              "count": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
     "PublishRecord": {
       "description": "Published-artifact metadata, carried as extra top-level fields on a kind='published' artifact event.",
       "type": "object",

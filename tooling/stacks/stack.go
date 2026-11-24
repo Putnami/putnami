@@ -134,6 +134,15 @@ type Stack struct {
 	// RunWith and RunFiltered read the adapted last step. Nil runs each step
 	// as the profile states it.
 	Step func(ctx context.Context, task string, meta Metadata, root RootStep, step []string, info func(string)) ([]string, error)
+	// ReadBatch reads the tool's report once a batch command failed
+	// (ADR 0019): each component it names, with its outcome. A component it
+	// does not name did not run; a report that names none fails every
+	// component with the command's error. Nil names none.
+	ReadBatch func(report BatchReport) map[string]BatchOutcome
+	// BatchReports are the files, under the stack root, where the tool writes
+	// the report ReadBatch reads: a batch removes them under the root's lock
+	// before its command, so a report of an earlier run is never read.
+	BatchReports []string
 	// Commands are the extension's own runtime commands, by name: a step
 	// runs one as {runtime} <name> <args>. A name is neither a task nor a
 	// control call.

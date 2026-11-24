@@ -19,6 +19,8 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	distribution "go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/sdk/extension/ownerperm"
+
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 const (
@@ -222,7 +224,7 @@ func (c *Client) call(ctx context.Context, operation string, request any, consum
 	stderr := newCappedBuffer(maxStderrBytes)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
-	err = cmd.Run()
+	err = procstat.Run(cmd, procstat.CLI)
 	if callErr := callCtx.Err(); callErr != nil {
 		if errors.Is(callErr, context.Canceled) {
 			return fmt.Errorf("release-set provider %s canceled: %w", operation, callErr)

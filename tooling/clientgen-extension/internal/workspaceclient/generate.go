@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/putnamihome"
 )
 
@@ -55,7 +56,7 @@ func GenerateGo(workspaceRoot string, generation GoGeneration) error {
 	command := exec.Command(executable, goGeneratorArguments(generation)...)
 	command.Dir = generation.Output
 	command.Env = replaceEnvironmentValue(os.Environ(), "PUTNAMI_WORKSPACE_ROOT", workspaceRoot)
-	if output, err := command.CombinedOutput(); err != nil {
+	if output, err := procstat.CombinedOutput(command); err != nil {
 		return fmt.Errorf("go client generation into %s failed: %w\n%s", generation.Output, err, output)
 	}
 	return nil
@@ -100,7 +101,7 @@ func GenerateTypeScript(workspaceRoot string, generation TypeScriptGeneration) e
 	}
 	command.Dir = generation.Project
 	command.Env = typescriptEmitterEnvironment(replaceEnvironmentValue(os.Environ(), "PUTNAMI_WORKSPACE_ROOT", workspaceRoot))
-	if output, err := command.CombinedOutput(); err != nil {
+	if output, err := procstat.CombinedOutput(command); err != nil {
 		return fmt.Errorf("typescript client generation for %s failed: %w\n%s", generation.Project, err, output)
 	}
 	return requireGeneratedTypeScriptClient(shim, generation)

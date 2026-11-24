@@ -102,6 +102,10 @@ type SchedulerConfig struct {
 	// carries it onto the session so the recorded document holds the whole run;
 	// it neither reads nor adds to it. Nil for a caller that recorded none.
 	Preparation *PreparationReport
+	// Orchestration times the engine phases of the run; the scheduler settles
+	// the run's orchestration report from it when the run ends. Nil for a
+	// caller that measures none: the session then carries no report.
+	Orchestration *OrchestrationClock
 }
 
 // SchedulerResult holds the outcome of a full scheduler run.
@@ -156,6 +160,9 @@ type Scheduler struct {
 	// runs. A configured remote cache shares this exact accumulator so the final
 	// snapshot cannot split one session across two independently-timed views.
 	cacheStats *cachekey.CacheStats
+	// waits holds each task's key, lock-wait and restore walls until its
+	// result is recorded.
+	waits taskWaitsLedger
 	// onCacheLeaseWait observes a genuine miss after this scheduler lost the
 	// per-key lease and immediately before it waits for the owner. Tests install
 	// it before Run; production leaves it nil.
@@ -283,10 +290,18 @@ type Scheduler struct {
 	// when no job in the plan has wall history.
 	criticalityCeilingByJob map[string]int
 	// batchCPUBudgetByJob fixes one physical ceiling for every member of a
-	// readyBatchKey-compatible planned class. A member receives the same ceiling
+	// readyBatch-compatible planned class. A member receives the same ceiling
 	// whether dispatch timing runs it alone, in a partial group, or with the full
 	// class. Initialized once before workers start.
 	batchCPUBudgetByJob map[string]int
+	// pendingBatches memoizes each pending job's batch key from the moment it
+	// becomes ready: see pendingBatch.
+	pendingBatchMu sync.Mutex
+	pendingBatches map[*ScheduledJob]readyBatchResult
+	// verbWaves holds a delegated verb's ready tasks for its first-wave peers,
+	// so the verb runs as one tool command (scheduler_batch_verb.go). Nil when
+	// the plan holds no delegated batchable task.
+	verbWaves *verbWaves
 	// resourcePlanByJob fixes each task's subprocess ceiling and admission
 	// request before workers exist. resources is coordinator-owned and accounts
 	// only physical jobGroup dispatches, never logical batch members.
@@ -604,7 +619,7 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 			memoryFallback: fallback.memoryBytes,
 		}
 
-		key := s.readyBatchKey(job)
+		key, _ := s.readyBatch(job)
 		if key == "" {
 			continue
 		}
@@ -679,9 +694,14 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 
 	// Still the CALLER's context here, on purpose — see prepareRemote.
 	s.prepareRemote(ctx)
+	// The workspace membership every job context carries is resolved once for
+	// the run: it encodes the configuration of every project.
+	ctx = context.WithValue(ctx, workspaceMembershipKey{}, cachekey.NewWorkspaceMembership(s.ws))
 
 	// Build dependency state
-	state := planner.NewDAGState(planner.SchedulableJobs(s.planned))
+	schedulable := planner.SchedulableJobs(s.planned)
+	state := planner.NewDAGState(schedulable)
+	s.verbWaves = newVerbWaves(schedulable, s.cfg.ServeSteps)
 
 	results := make(map[string]*JobResult, len(s.planned))
 	hashes := make(map[string]string) // jobKey → cache hash
@@ -715,6 +735,8 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	sortPendingLongestFirst(pending)
 	for _, job := range pending {
 		s.metrics.markReady(job.Key())
+		s.verbWaves.ready(job)
+		s.pendingBatch(job)
 	}
 	inFlight := 0
 	totalCompleted := 0
@@ -722,13 +744,14 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	for totalCompleted < state.Size() {
 		// Try to send pending jobs to workers without blocking
 		for len(pending) > 0 && inFlight < maxWorkers {
-			group, rest, admitted := s.takeAdmissiblePendingGroup(pending)
+			group, rest, admitted := s.takeAdmissiblePendingGroup(pending, inFlight > s.verbWaves.serves())
 			if !admitted {
 				goto waitForDone
 			}
 			select {
 			case readyCh <- group:
 				s.resources.record(group)
+				s.verbWaves.track(group.jobs, 1)
 				pending = rest
 				inFlight++
 			default:
@@ -761,8 +784,9 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 			}
 			completed = wait.completed
 		} else if len(pending) > 0 {
-			// Workers haven't started yet, send to channel
-			group, rest, admitted := s.takeAdmissiblePendingGroup(pending)
+			// Workers haven't started yet, send to channel. Nothing is in
+			// flight, so no task waits for its verb's peers.
+			group, rest, admitted := s.takeAdmissiblePendingGroup(pending, false)
 			if !admitted {
 				// Every request is clamped to the empty pool's capacity, so this
 				// can only mean corrupt internal accounting. Fail closed instead
@@ -773,6 +797,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 			select {
 			case readyCh <- group:
 				s.resources.record(group)
+				s.verbWaves.track(group.jobs, 1)
 				pending = rest
 				inFlight++
 				continue
@@ -975,6 +1000,7 @@ func (s *Scheduler) recordCompletedGroup(
 	for _, done := range completed.jobs {
 		*totalCompleted++
 
+		s.waits.stampWaits(done.job, done.result)
 		mu.Lock()
 		results[done.job.Key()] = done.result
 		mu.Unlock()
@@ -1007,11 +1033,13 @@ func (s *Scheduler) queueReady(
 ) []*ScheduledJob {
 	queued := false
 	for _, job := range newlyReady {
+		s.verbWaves.ready(job)
 		if s.shouldSkip(job, results, mu) {
 			s.skipJob(job, state, results, mu, totalCompleted)
 			continue
 		}
 		s.metrics.markReady(job.Key())
+		s.pendingBatch(job)
 		pending = append(pending, job)
 		queued = true
 	}
@@ -1084,6 +1112,7 @@ func (s *Scheduler) finalizeRun(
 		}
 	}
 	outcome.Cache = cacheStats
+	outcome.Orchestration = s.cfg.Orchestration.Snapshot()
 	s.renderer.Finish(results, outcome)
 
 	// Persist the run's execution history so the next run's learned weights
@@ -1136,7 +1165,7 @@ func (s *Scheduler) waitForWorker(
 		}
 	}
 
-	group, rest, admitted := s.takeAdmissiblePendingGroup(pending)
+	group, rest, admitted := s.takeAdmissiblePendingGroup(pending, inFlight > s.verbWaves.serves())
 	if !admitted {
 		select {
 		case completed := <-doneCh:
@@ -1148,6 +1177,7 @@ func (s *Scheduler) waitForWorker(
 	select {
 	case readyCh <- group:
 		s.resources.record(group)
+		s.verbWaves.track(group.jobs, 1)
 		return coordinatorWaitResult{pending: rest, sent: true}
 	case completed := <-doneCh:
 		s.resources.release(group.reservation)
@@ -1302,6 +1332,7 @@ func (s *Scheduler) drainInFlight(doneCh <-chan jobGroupDone, count int, results
 		completed := <-doneCh
 		s.releaseGroupResources(completed)
 		for _, done := range completed.jobs {
+			s.waits.stampWaits(done.job, done.result)
 			mu.Lock()
 			if _, exists := results[done.job.Key()]; !exists {
 				results[done.job.Key()] = done.result
@@ -1322,6 +1353,7 @@ func (s *Scheduler) drainInFlight(doneCh <-chan jobGroupDone, count int, results
 // provisioning task's failure as the reason this task never ran against a
 // resource that does not exist.
 func (s *Scheduler) skipJob(job *ScheduledJob, state *planner.DAGState, results map[string]*JobResult, mu *sync.Mutex, totalCompleted *int) {
+	s.verbWaves.ready(job)
 	cause := s.invocations.blockedError(job)
 	if cause == nil {
 		cause = &JobError{Message: "dependency failed"}

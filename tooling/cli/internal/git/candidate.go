@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // CandidatePaths lists the current cut: tracked paths plus non-ignored new
@@ -22,7 +23,7 @@ func CandidatePaths(root string, prefixes ...string) ([]string, error) {
 	args := append([]string{"ls-files", "-z", "--cached", "--others", "--exclude-standard"}, literalPathspecs(prefixes)...)
 	cmd := exec.Command(gitread.Executable(), args...)
 	cmd.Dir = root
-	data, err := cmd.Output()
+	data, err := procstat.Output(cmd, procstat.Git)
 	if err != nil {
 		return nil, fmt.Errorf("git ls-files: %w", err)
 	}

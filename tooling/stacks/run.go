@@ -20,6 +20,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Diagnostic codes of the task runner.
@@ -65,6 +66,12 @@ func (s Stack) RunFiltered(task string, filter func(ctx *pctx.Context, root Root
 
 func (s Stack) runWith(task string, extra func(ctx *pctx.Context, root RootStep, lastStep []string) []string, filters bool) func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
+		// The scheduler hands a batch's leader every project of the verb
+		// (ADR 0019). A task whose last step takes extra arguments runs
+		// one component at a time.
+		if extra == nil && len(ctx.SelectedProjects) > 0 && s.batches(task) {
+			return s.runBatch(ctx, emit, task)
+		}
 		output, err := outputFlag(args)
 		if err != nil {
 			return statusFailed, nil, err
@@ -766,7 +773,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		cmd.Env = env
 		cmd.Stdout = in.stdout
 		cmd.Stderr = in.stdout
-		if err := cmd.Run(); err != nil {
+		if err := procstat.Run(cmd); err != nil {
 			stepErr = failWith(emit, CodeStepFailed, "%s: %v", strings.Join(argv, " "), err)
 			break
 		}
@@ -782,7 +789,7 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		cmd.Env = env
 		cmd.Stdout = in.stdout
 		cmd.Stderr = in.stdout
-		if err := cmd.Run(); err != nil {
+		if err := procstat.Run(cmd); err != nil {
 			if stepErr == nil {
 				stepErr = failWith(emit, CodeStepFailed, "%s: %v", strings.Join(argv, " "), err)
 			} else {
@@ -801,7 +808,13 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	if err := copyArtifacts(artifacts, meta.Component, in.projectAbs, rootAbs, outDir); err != nil {
 		return statusFailed, nil, err
 	}
+	return s.readTaskReports(in, meta, profile, t, rootAbs, outDir, stepErr, filtered, emit)
+}
 
+// readTaskReports reads a task's reports into its output directory once its
+// steps ran, and answers its result: the steps' failure, the reports' failed
+// cases or diagnostics, else a pass. A batch reads each component's this way.
+func (s Stack) readTaskReports(in runInput, meta Metadata, profile Profile, t Task, rootAbs, outDir string, stepErr error, filtered bool, emit reporter) (string, map[string]any, error) {
 	copied := 0
 	// locate answers the directory a report pattern is relative to, and the
 	// pattern below it.
@@ -904,7 +917,7 @@ func hasCoverageSupport(ctx context.Context, program string, args []string, dir 
 	cmd := exec.CommandContext(ctx, program, args...) //nolint:gosec // the profile's own probe
 	cmd.Dir = dir
 	cmd.Env = env
-	return cmd.Run() == nil
+	return procstat.Run(cmd) == nil
 }
 
 // runtimePath is what {runtime} expands to: Stack.Runtime, else the running

@@ -167,6 +167,20 @@
           }
         },
         {
+          "id": "a-delegated-verb-runs-one-nx-command",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-verb-runs-one-nx-run-many-over-its-projects",
+              "a-failing-project-fails-alone-with-nxs-output"
+            ]
+          }
+        },
+        {
           "id": "reports-from-project-options",
           "stage": "coded",
           "evidenceKinds": [

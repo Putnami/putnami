@@ -14,6 +14,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -164,7 +165,7 @@ func invokeProvider(ctx context.Context, workspaceRoot string, candidate provide
 	for key, value := range candidate.declaration.Env {
 		cmd.Env = append(cmd.Env, key+"="+extension.ExpandTemplateVars(value, vars))
 	}
-	stdout, err := cmd.Output()
+	stdout, err := procstat.Output(cmd, procstat.Control)
 	if err != nil {
 		// Only an exit error proves the process started; every other error is
 		// a start failure, after which nothing can have run.

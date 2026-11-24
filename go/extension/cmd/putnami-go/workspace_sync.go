@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/go/extension/internal/toolchain"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // The Go workspace-sync task.
@@ -318,7 +319,7 @@ var goModTidy = func(goBinary, dir string) ([]byte, error) {
 	// proxy as a doomed 404. WorkspaceBuildEnv strips the leaked entry
 	// and re-points GOWORK at the governing go.work.
 	cmd.Env = toolchain.WorkspaceBuildEnv(os.Environ(), dir, goBinary)
-	return cmd.CombinedOutput()
+	return procstat.CombinedOutput(cmd)
 }
 
 // settleGoModules tidies each module whose go.mod gained workspace replaces and

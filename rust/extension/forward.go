@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // drainGrace is how long the output of a program may keep arriving after it
@@ -32,7 +33,7 @@ func runForwarding(cmd *exec.Cmd, emit *jsonl.Emitter, stderrCopy io.Writer) err
 	}
 	cmd.Stdout = stdoutWrite
 	cmd.Stderr = stderrWrite
-	err = cmd.Start()
+	err = procstat.Start(cmd)
 	_ = stdoutWrite.Close()
 	_ = stderrWrite.Close()
 	if err != nil {
@@ -48,7 +49,7 @@ func runForwarding(cmd *exec.Cmd, emit *jsonl.Emitter, stderrCopy io.Writer) err
 	pipes.Add(2)
 	go jsonl.ForwardPipe(emit, stdoutRead, "info", &pipes)
 	go jsonl.ForwardPipe(emit, stderr, "warn", &pipes)
-	err = cmd.Wait()
+	err = procstat.Wait(cmd)
 	forwarded := make(chan struct{})
 	go func() {
 		pipes.Wait()
