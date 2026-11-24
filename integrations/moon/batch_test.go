@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
@@ -114,21 +113,25 @@ func TestAFailingProjectFailsAloneWithMoonsMessage(t *testing.T) {
 	}
 }
 
-func TestAReportOlderThanTheCommandIsNoReport(t *testing.T) {
-	root := t.TempDir()
-	stackstest.WriteFile(t, root, RunReport, `{"actions":[{"label":"RunTask(api:build)","status":"failed"}]}`)
-	report := stacks.BatchReport{Root: root, Components: []string{"api"}, Command: []string{"moon", "run", "api:build"}, Started: time.Now().Add(time.Hour)}
-	if got := ReadBatch(report); got != nil {
-		t.Errorf("a stale report reads %v, want none", got)
-	}
-	report.Started = time.Now().Add(-time.Hour)
-	if got := ReadBatch(report); !got["api"].Failed {
-		t.Errorf("a fresh report reads %v, want api failed", got)
-	}
-	if err := os.Remove(filepath.Join(root, RunReport)); err != nil {
+func TestAnEarlierRunReportIsNeverRead(t *testing.T) {
+	d := readDemo(t)
+	stubMoon(t)
+	root := repository(t, d, ModeDelegate, false)
+	if _, err := Sync(context.Background(), root); err != nil {
 		t.Fatal(err)
 	}
-	if got := ReadBatch(report); got != nil {
-		t.Errorf("no report reads %v, want none", got)
+	// An earlier run left its report; this one fails before it writes one.
+	stackstest.WriteFile(t, root, RunReport, `{"actions":[`+
+		`{"label":"RunTask(api:build)","status":"failed","node":{"action":"run-task","params":{"target":"api:build"}}},`+
+		`{"label":"RunTask(pricing:build)","status":"passed","node":{"action":"run-task","params":{"target":"pricing:build"}}}]}`)
+	t.Setenv("STUB_EXIT", "1")
+	results := runBatchJob(t, root, stacks.TaskBuild, "apps/api", "packages/pricing")
+	for dir, r := range results {
+		if r.Status != "FAILED" || len(r.Diagnostics) != 1 || !strings.Contains(r.Diagnostics[0].Description, "exit status 1") {
+			t.Errorf("%s = %+v, want the command's failure, not the earlier report's", dir, r)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, RunReport)); !os.IsNotExist(err) {
+		t.Errorf("the earlier report is still there: %v", err)
 	}
 }

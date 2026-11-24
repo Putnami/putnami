@@ -139,6 +139,10 @@ type Stack struct {
 	// does not name did not run; a report that names none fails every
 	// component with the command's error. Nil names none.
 	ReadBatch func(report BatchReport) map[string]BatchOutcome
+	// BatchReports are the files, under the stack root, where the tool writes
+	// the report ReadBatch reads: a batch removes them under the root's lock
+	// before its command, so a report of an earlier run is never read.
+	BatchReports []string
 	// Commands are the extension's own runtime commands, by name: a step
 	// runs one as {runtime} <name> <args>. A name is neither a task nor a
 	// control call.

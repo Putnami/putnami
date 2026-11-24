@@ -153,6 +153,21 @@ func TestReadBatchReadsAQuotedTarget(t *testing.T) {
 	}
 }
 
+func TestReadBatchReadsOnlyTheFailedTasksAndTheExactSection(t *testing.T) {
+	// a:test passed; its dependency a:test:lib failed, and b:test did not run.
+	output := "> nx run a:\"test:lib\"\n\nlib boom\n\n> nx run a:test\n\nok\n\n" +
+		" NX   Ran target test for 2 projects\n\n" +
+		"   ✖  1/3 targets failed, including the following:\n\n      - nx run a:test:lib\n\n" +
+		"   Tasks not run because their dependencies failed or --nx-bail=true:\n\n      - b:test\n"
+	got := ReadBatch(stacks.BatchReport{Components: []string{"a", "b"}, Command: []string{"npx", "--no", "nx", "run-many", "-t", "test", "-p", "a,b"}, Output: []byte(output)})
+	if a, ok := got["a"]; !ok || a.Failed {
+		t.Errorf("a = %+v (%v), want the pass of its own a:test section", a, ok)
+	}
+	if _, ok := got["b"]; ok {
+		t.Errorf("b = %+v, want it not named: Nx did not run it", got["b"])
+	}
+}
+
 func TestASyncedTargetRunsAsItsOwnRunMany(t *testing.T) {
 	got := batchSteps("test", [][]string{runStep("test:lib"), runStep("e2e")})
 	want := [][]string{

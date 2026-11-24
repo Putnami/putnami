@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -203,5 +204,76 @@ func TestADelegatedVerbSharesItsKeyAcrossTheProjectsOwnOptions(t *testing.T) {
 	a, _ = s.readyBatch(lints[0])
 	if b, _ = s.readyBatch(lints[1]); a == "" || a == b {
 		t.Error("a delegated verb ignores the command's own project layer")
+	}
+}
+
+func TestTwoVerbsWaitingOnEachOtherRunWhileAServeIsInFlight(t *testing.T) {
+	t.Parallel()
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh unavailable")
+	}
+	logPath := filepath.Join(t.TempDir(), "invocations")
+	ws, lints := makeBatchSchedulerFixture(t, logPath)
+	// lint and test are two delegated verbs. b's lint waits for a's test and
+	// b's test for a's lint: each verb's ready task waits for a peer that
+	// waits on the other verb.
+	var planned []*ScheduledJob
+	tests := map[string]*ScheduledJob{}
+	for _, lint := range lints {
+		lint.JobDef.Cache = false
+		lint.JobDef.TaskCachePolicy = nil
+		test := *lint
+		def := *lint.JobDef
+		test.JobDef = &def
+		test.JobDef.Name = "test~check"
+		test.JobDef.CommandName = "test"
+		test.JobDef.StepID = "check"
+		test.Step = &extension.PipelineStep{ID: "check", Task: "lint-all"}
+		tests[lint.Project.Path] = &test
+		planned = append(planned, lint, &test)
+	}
+	for _, job := range planned {
+		if job.Project.Path != "b" {
+			continue
+		}
+		other := "test~check"
+		if job.JobDef.Name == "test~check" {
+			other = "lint~check-only"
+		}
+		for _, peer := range planned {
+			if peer.Project.Path == "a" && peer.JobDef.Name == other {
+				job.DependsOn = append(job.DependsOn, peer.Key())
+			}
+		}
+	}
+	// A serve dispatched first runs until a task of either verb ran.
+	serveCommand := filepath.Join(ws.Root, "serve.sh")
+	writeExecutable(t, serveCommand, "#!/bin/sh\nwhile [ ! -s "+shellQuote(logPath)+" ]; do sleep 0.1; done\n"+
+		"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"OK\"}}'\n")
+	serve := &ScheduledJob{
+		Project:        lints[0].Project,
+		Extension:      lints[0].Extension,
+		Step:           &extension.PipelineStep{ID: "serve", Task: "serve"},
+		CriticalPathMs: 1_000_000,
+		JobDef: &extension.JobDefinition{
+			ExtensionName: lints[0].Extension.Name,
+			Name:          "serve~serve",
+			CommandName:   "serve",
+			StepID:        "serve",
+			Command:       serveCommand,
+			Cwd:           "{projectRoot}",
+		},
+	}
+	serve.JobDef.Traits.Workload = extensionproto.WorkloadServe
+	planned = append(planned, serve)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	result := delegatedVerbScheduler(ws, planned).Run(ctx)
+	if !result.Success {
+		t.Fatalf("two waiting verbs beside a serve: %+v", result.Results)
+	}
+	if len(result.Results) != len(planned) {
+		t.Fatalf("result rows = %d, want %d", len(result.Results), len(planned))
 	}
 }

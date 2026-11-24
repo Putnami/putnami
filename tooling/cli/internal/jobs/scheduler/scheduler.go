@@ -737,13 +737,14 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	for totalCompleted < state.Size() {
 		// Try to send pending jobs to workers without blocking
 		for len(pending) > 0 && inFlight < maxWorkers {
-			group, rest, admitted := s.takeAdmissiblePendingGroup(pending, inFlight > 0)
+			group, rest, admitted := s.takeAdmissiblePendingGroup(pending, inFlight > s.verbWaves.serves())
 			if !admitted {
 				goto waitForDone
 			}
 			select {
 			case readyCh <- group:
 				s.resources.record(group)
+				s.verbWaves.track(group.jobs, 1)
 				pending = rest
 				inFlight++
 			default:
@@ -789,6 +790,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 			select {
 			case readyCh <- group:
 				s.resources.record(group)
+				s.verbWaves.track(group.jobs, 1)
 				pending = rest
 				inFlight++
 				continue
@@ -1154,7 +1156,7 @@ func (s *Scheduler) waitForWorker(
 		}
 	}
 
-	group, rest, admitted := s.takeAdmissiblePendingGroup(pending, inFlight > 0)
+	group, rest, admitted := s.takeAdmissiblePendingGroup(pending, inFlight > s.verbWaves.serves())
 	if !admitted {
 		select {
 		case completed := <-doneCh:
@@ -1166,6 +1168,7 @@ func (s *Scheduler) waitForWorker(
 	select {
 	case readyCh <- group:
 		s.resources.record(group)
+		s.verbWaves.track(group.jobs, 1)
 		return coordinatorWaitResult{pending: rest, sent: true}
 	case completed := <-doneCh:
 		s.resources.release(group.reservation)

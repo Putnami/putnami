@@ -149,7 +149,10 @@ func (s Stack) runBatch(ctx *pctx.Context, emit *jsonl.Emitter, task string) (st
 		// as moon run api:test pricing:unit.
 		// The toolchain too: a project may state its own check or version,
 		// and one command runs one check.
-		toolchain, _ := json.Marshal(m.profile.Toolchain)
+		toolchain, _ := json.Marshal(struct {
+			Toolchain Toolchain
+			Expected  []Expected
+		}{m.profile.Toolchain, m.expectedVersions()})
 		key := m.meta.Root + "\x00" + batchShape(m.task.Batch.Steps) + "\x00" + string(toolchain)
 		if _, ok := byRoot[key]; !ok {
 			roots = append(roots, key)
@@ -256,6 +259,25 @@ func (s Stack) selectedMetadata(ctx *pctx.Context) map[string]json.RawMessage {
 	return out
 }
 
+// expectedVersions are the versions the member's toolchain checks expect,
+// which a version file in its own directory may state; nil when one cannot be
+// read, which the member's own check then reports.
+func (m *batchMember) expectedVersions() []Expected {
+	projectRel, err := filepath.Rel(m.in.workspaceRoot, m.in.projectAbs)
+	if err != nil {
+		return nil
+	}
+	var out []Expected
+	for _, check := range m.profile.Toolchain.Checks() {
+		expected, err := check.ExpectedVersion(m.in.workspaceRoot, filepath.ToSlash(projectRel), m.meta.Root)
+		if err != nil {
+			return nil
+		}
+		out = append(out, expected)
+	}
+	return out
+}
+
 func (m *batchMember) collector(emit *jsonl.Emitter) *collector {
 	if m.report == nil {
 		m.report = &collector{component: m.ref.Path, info: emit.Info}
@@ -315,8 +337,18 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 	stepRoot := RootStep{Dir: rootAbs, Project: first.in.projectAbs, Component: first.meta.Component, Env: env, Program: func(name string) string { return selected.Program(first.profile.Toolchain, name) }}
 	output := &tailBuffer{limit: batchOutputLimit}
 	started := time.Now()
+	// The tool's own reports of an earlier run are no reports of this one.
+	for _, name := range s.BatchReports {
+		if err := os.Remove(filepath.Join(rootAbs, filepath.FromSlash(name))); err != nil && !os.IsNotExist(err) {
+			failAll("%v", err)
+			return
+		}
+	}
 	var stepErr error
 	var failedArgv []string
+	// later is true when a step failed before the last one: the steps after
+	// it ran on no component.
+	later := false
 	for i := range first.task.Batch.Steps {
 		perMember := make([][]string, len(members))
 		for k, m := range members {
@@ -340,6 +372,7 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 		cmd.Stderr = writer
 		if err := cmd.Run(); err != nil {
 			stepErr, failedArgv = err, argv
+			later = i < len(first.task.Batch.Steps)-1
 			break
 		}
 	}
@@ -379,6 +412,9 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 				message = fmt.Sprintf("%s failed", m.meta.Component)
 			}
 			memberErr = failWith(m.report, CodeStepFailed, "%s", message)
+		case later:
+			// It passed the step that failed, and never ran the next ones.
+			memberErr = failWith(m.report, CodeStepFailed, "the steps after %s did not run %s: it failed on %s", command, m.meta.Component, strings.Join(failed, ", "))
 		}
 		status, data, _ := s.readTaskReports(m.in, m.meta, m.profile, m.task, rootAbs, m.outDir, memberErr, false, m.report)
 		m.finish(status, data)

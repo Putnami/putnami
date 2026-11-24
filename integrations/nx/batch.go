@@ -1,7 +1,9 @@
 package nx
 
 import (
+	"maps"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.putnami.dev/tooling/stacks"
@@ -43,7 +45,7 @@ func ReadBatch(report stacks.BatchReport) map[string]stacks.BatchOutcome {
 			// A target that runs its default configuration is named
 			// <project>:<target>:<configuration>.
 			key, section, ran := taskOf(sections, component+":"+target)
-			if failedTask(failed, component+":"+target) {
+			if failedTask(failed, key, ran) {
 				anyFailed, named = true, true
 				message := "nx run " + key + " failed"
 				if tail := lastLines(section, sectionLines); tail != "" {
@@ -70,22 +72,26 @@ func taskOf(sections map[string]string, target string) (string, string, bool) {
 	if section, ok := sections[target]; ok {
 		return target, section, true
 	}
-	for key, section := range sections {
+	// Sorted, so that the same output always quotes the same section.
+	for _, key := range slices.Sorted(maps.Keys(sections)) {
 		if strings.HasPrefix(key, target+":") {
-			return key, section, true
+			return key, sections[key], true
 		}
 	}
 	return target, "", false
 }
 
-// failedTask reports whether the summary lists the target as failed, with or
-// without its configuration.
-func failedTask(failed map[string]bool, target string) bool {
-	if failed[target] {
-		return true
+// failedTask reports whether the summary lists the task as failed: key is
+// the task's section key, with the configuration Nx resolved, or the target
+// as the command names it when it has no section. A section key that holds a
+// configuration is listed as such; only a target with no section matches a
+// listed configuration by prefix.
+func failedTask(failed map[string]bool, key string, ran bool) bool {
+	if failed[key] || ran {
+		return failed[key]
 	}
-	for key := range failed {
-		if strings.HasPrefix(key, target+":") {
+	for listed := range failed {
+		if strings.HasPrefix(listed, key+":") {
 			return true
 		}
 	}
@@ -99,7 +105,7 @@ func readRunMany(output string) (map[string]string, map[string]bool) {
 	failed := map[string]bool{}
 	var current string
 	var body []string
-	inSummary := false
+	inSummary, inFailed := false, false
 	flush := func() {
 		if current != "" {
 			sections[current] = strings.TrimSpace(strings.Join(body, "\n"))
@@ -121,11 +127,18 @@ func readRunMany(output string) (map[string]string, map[string]bool) {
 		}
 		if summaryStart.MatchString(line) {
 			flush()
-			inSummary = true
+			inSummary, inFailed = true, false
 			continue
 		}
 		if inSummary {
-			if m := failedItem.FindStringSubmatch(line); m != nil {
+			// Only the block of failed tasks: the tasks Nx did not run are
+			// listed the same way under their own heading.
+			if heading := strings.TrimSpace(line); strings.HasSuffix(heading, ":") {
+				lower := strings.ToLower(heading)
+				inFailed = strings.Contains(lower, "fail") && !strings.Contains(lower, "not run")
+				continue
+			}
+			if m := failedItem.FindStringSubmatch(line); m != nil && inFailed {
 				failed[m[1]] = true
 			}
 			continue

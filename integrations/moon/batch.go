@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"go.putnami.dev/tooling/stacks"
 )
@@ -37,14 +36,11 @@ var runTaskLabel = regexp.MustCompile(`^Run(?:Interactive|Persistent)?Task\((.+)
 // ReadBatch reads the run report a failed moon run of several projects wrote
 // (ADR 0019 of tooling/stacks): each component's target the command named,
 // passed or cached, or failed with moon's error and the end of the output
-// moon kept for it. A report older than the command is no report of it.
+// moon kept for it.
 func ReadBatch(report stacks.BatchReport) map[string]stacks.BatchOutcome {
+	// The core removes the run report before the command (BatchReports), so
+	// a report here is this command's.
 	path := filepath.Join(report.Root, filepath.FromSlash(RunReport))
-	info, err := os.Stat(path)
-	// A file system may keep a modification time to the second.
-	if err != nil || info.ModTime().Before(report.Started.Truncate(time.Second)) {
-		return nil
-	}
 	data, err := os.ReadFile(path) //nolint:gosec // moon's own report under the stack root
 	if err != nil {
 		return nil

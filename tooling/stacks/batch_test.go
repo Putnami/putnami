@@ -170,6 +170,30 @@ func TestAFailedBatchWhoseReportNamesNoFailureFailsEveryProject(t *testing.T) {
 	}
 }
 
+func TestAComponentThatPassedAnEarlierStepFailsWhenALaterOneNeverRan(t *testing.T) {
+	root := t.TempDir()
+	stubBatchTool(t, root)
+	t.Setenv("STUB_EXIT", "1")
+	s := batchStack(t, func(BatchReport) map[string]BatchOutcome {
+		return map[string]BatchOutcome{"a": {Failed: true, Message: "a failed"}, "b": {}, "c": {}}
+	})
+	lint := s.Profile.Tasks[TaskLint]
+	lint.Batch = &Batch{Steps: [][]string{{"tool", "first", "{component}"}, {"tool", "second", "{component}"}}}
+	s.Profile.Tasks[TaskLint] = lint
+	results := runLintBatch(t, s, root)
+	if log, _ := os.ReadFile(filepath.Join(root, "log")); strings.Contains(string(log), "second") {
+		t.Fatalf("the second step ran after the first failed: %s", log)
+	}
+	for _, id := range []string{"/b", "/c"} {
+		if r := results[id]; r.Status != statusFailed || len(r.Diagnostics) != 1 || !strings.Contains(r.Diagnostics[0].Description, "did not run") {
+			t.Errorf("%s = %+v, want a failure: its second step never ran", id, r)
+		}
+	}
+	if a := results["/a"]; a.Status != statusFailed || a.Diagnostics[0].Description != "a failed" {
+		t.Errorf("a = %+v, want the tool's message", a)
+	}
+}
+
 func TestAJobWithoutASelectionRunsItsOwnSteps(t *testing.T) {
 	root := t.TempDir()
 	stubBatchTool(t, root)
@@ -205,6 +229,26 @@ func TestABatchIsADelegatedTaskAtTheStackRoot(t *testing.T) {
 		if _, err := Decode(data); err == nil || !strings.Contains(err.Error(), "tasks.lint.batch.steps") {
 			t.Errorf("%s: Decode = %v, want a tasks.lint.batch.steps error", name, err)
 		}
+	}
+}
+
+func TestMembersWhoseExpectedVersionDiffersRunSeparately(t *testing.T) {
+	root := t.TempDir()
+	stubBatchTool(t, root)
+	profile, err := Decode([]byte(strings.Replace(batchProfile, `"pattern"`, `"files": [{"path": "tool.version"}], "pattern"`, 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := batchStack(t, nil)
+	s.Profile = profile
+	writeFile(t, root, "tool.version", "1.0.0")
+	// c's own directory states another version: its check is its own.
+	writeFile(t, root, "c/tool.version", "1.0")
+	t.Setenv("STUB_EXIT", "0")
+	runLintBatch(t, s, root)
+	log, _ := os.ReadFile(filepath.Join(root, "log"))
+	if lines := strings.Split(strings.TrimSpace(string(log)), "\n"); len(lines) != 2 {
+		t.Errorf("the tool ran %q, want one command for a and b and one for c", lines)
 	}
 }
 

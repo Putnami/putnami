@@ -3,6 +3,8 @@ package scheduler
 import (
 	"strings"
 	"sync"
+
+	extensionproto "go.putnami.dev/protocol/extension"
 )
 
 // A delegated verb runs as one tool command (ADR 0019 of tooling/stacks).
@@ -20,12 +22,14 @@ import (
 // is what one command can run, since a later task waits for an earlier one's
 // result. A ready first-wave task waits while a first-wave peer is not ready
 // yet, and the coordinator dispatches other work meanwhile. It never waits
-// when nothing else is in flight: then no completion could make a peer ready
-// (takeAdmissiblePendingGroup).
+// when nothing else that ends is in flight: then no completion could make a
+// peer ready (takeAdmissiblePendingGroup). A serve runs until interrupted, so
+// it does not count.
 //
 // No deadlock follows from the wait. A first-wave peer depends on no task of
 // its verb, so its readiness never needs the waiting task to run; and a wait
-// never outlives the work in flight.
+// never outlives the work in flight that ends, so two verbs waiting on each
+// other's tasks run once that work is done.
 
 // delegatedVerb answers the verb a job's wait reads: the extension, the task
 // and the tool, for a batchable job whose cache is off. A cached batchable job
@@ -51,6 +55,35 @@ type verbWaves struct {
 	verbs map[string]string
 	// unready maps a verb to the keys of its first-wave jobs not ready yet.
 	unready map[string]map[string]bool
+	// serving counts the dispatched jobs that serve a workload until
+	// interrupted: their completion never comes, so a wait must not count on
+	// it.
+	serving int
+}
+
+// track records jobs dispatched (delta 1) or completed (delta -1), counting
+// those that serve a workload.
+func (w *verbWaves) track(jobs []*ScheduledJob, delta int) {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for _, job := range jobs {
+		if job != nil && job.JobDef != nil && job.JobDef.Traits.Workload == extensionproto.WorkloadServe {
+			w.serving += delta
+		}
+	}
+}
+
+// serves is the number of dispatched jobs that serve a workload.
+func (w *verbWaves) serves() int {
+	if w == nil {
+		return 0
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.serving
 }
 
 // newVerbWaves derives the first wave of each delegated verb of the plan. A

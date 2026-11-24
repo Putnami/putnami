@@ -62,7 +62,7 @@ func Stack() (stacks.Stack, error) {
 	if err != nil {
 		return stacks.Stack{}, fmt.Errorf("profile.json: %w", err)
 	}
-	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, ReadBatch: ReadBatch}, nil
+	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, ReadBatch: ReadBatch, BatchReports: []string{RunReport}}, nil
 }
 
 // Mode reads the adoption mode of the workspace at root, from its
