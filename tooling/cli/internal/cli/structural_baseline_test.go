@@ -141,7 +141,7 @@ var structuralPins = []structuralPin{
 		name:  "test-only newScheduler constructions",
 		token: "newScheduler(",
 		scope: testFiles,
-		want:  62,
+		want:  63,
 		why: "all in internal/jobs/scheduler/*_test.go, exercising the scheduler directly. Pinned separately " +
 			"so they can never inflate the production count above. An earlier change removes the inferred " +
 			"capture lifecycle but retains its supported scheduler coverage under explicit task " +
@@ -205,7 +205,10 @@ var structuralPins = []structuralPin{
 			"is computed once, and the dispatch groups stay the same\" is a property of pendingBatch and " +
 			"takePendingGroup together, both scheduler methods, and of nothing smaller; its two cases " +
 			"share ONE construction site, and the batch cases that now drop the memo between scenarios " +
-			"construct no new scheduler",
+			"construct no new scheduler. 62\u219263 is scheduler_batch_verb_test.go: \"a delegated verb's " +
+			"ready tasks wait for their first-wave peers and run as one command\" is a property of " +
+			"takeAdmissiblePendingGroup and the coordinator's readiness together, scheduler methods both, " +
+			"and of nothing smaller; its cases share ONE construction site",
 	},
 	{
 		name:  "production planner.Plan call sites",

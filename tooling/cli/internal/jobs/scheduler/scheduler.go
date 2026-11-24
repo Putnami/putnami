@@ -291,6 +291,10 @@ type Scheduler struct {
 	// becomes ready: see pendingBatch.
 	pendingBatchMu sync.Mutex
 	pendingBatches map[*ScheduledJob]readyBatchResult
+	// verbWaves holds a delegated verb's ready tasks for its first-wave peers,
+	// so the verb runs as one tool command (scheduler_batch_verb.go). Nil when
+	// the plan holds no delegated batchable task.
+	verbWaves *verbWaves
 	// resourcePlanByJob fixes each task's subprocess ceiling and admission
 	// request before workers exist. resources is coordinator-owned and accounts
 	// only physical jobGroup dispatches, never logical batch members.
@@ -688,7 +692,9 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	ctx = context.WithValue(ctx, workspaceMembershipKey{}, cachekey.NewWorkspaceMembership(s.ws))
 
 	// Build dependency state
-	state := planner.NewDAGState(planner.SchedulableJobs(s.planned))
+	schedulable := planner.SchedulableJobs(s.planned)
+	state := planner.NewDAGState(schedulable)
+	s.verbWaves = newVerbWaves(schedulable)
 
 	results := make(map[string]*JobResult, len(s.planned))
 	hashes := make(map[string]string) // jobKey → cache hash
@@ -722,6 +728,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	sortPendingLongestFirst(pending)
 	for _, job := range pending {
 		s.metrics.markReady(job.Key())
+		s.verbWaves.ready(job)
 		s.pendingBatch(job)
 	}
 	inFlight := 0
@@ -730,7 +737,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	for totalCompleted < state.Size() {
 		// Try to send pending jobs to workers without blocking
 		for len(pending) > 0 && inFlight < maxWorkers {
-			group, rest, admitted := s.takeAdmissiblePendingGroup(pending)
+			group, rest, admitted := s.takeAdmissiblePendingGroup(pending, inFlight > 0)
 			if !admitted {
 				goto waitForDone
 			}
@@ -769,8 +776,9 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 			}
 			completed = wait.completed
 		} else if len(pending) > 0 {
-			// Workers haven't started yet, send to channel
-			group, rest, admitted := s.takeAdmissiblePendingGroup(pending)
+			// Workers haven't started yet, send to channel. Nothing is in
+			// flight, so no task waits for its verb's peers.
+			group, rest, admitted := s.takeAdmissiblePendingGroup(pending, false)
 			if !admitted {
 				// Every request is clamped to the empty pool's capacity, so this
 				// can only mean corrupt internal accounting. Fail closed instead
@@ -1015,6 +1023,7 @@ func (s *Scheduler) queueReady(
 ) []*ScheduledJob {
 	queued := false
 	for _, job := range newlyReady {
+		s.verbWaves.ready(job)
 		if s.shouldSkip(job, results, mu) {
 			s.skipJob(job, state, results, mu, totalCompleted)
 			continue
@@ -1145,7 +1154,7 @@ func (s *Scheduler) waitForWorker(
 		}
 	}
 
-	group, rest, admitted := s.takeAdmissiblePendingGroup(pending)
+	group, rest, admitted := s.takeAdmissiblePendingGroup(pending, inFlight > 0)
 	if !admitted {
 		select {
 		case completed := <-doneCh:
@@ -1331,6 +1340,7 @@ func (s *Scheduler) drainInFlight(doneCh <-chan jobGroupDone, count int, results
 // provisioning task's failure as the reason this task never ran against a
 // resource that does not exist.
 func (s *Scheduler) skipJob(job *ScheduledJob, state *planner.DAGState, results map[string]*JobResult, mu *sync.Mutex, totalCompleted *int) {
+	s.verbWaves.ready(job)
 	cause := s.invocations.blockedError(job)
 	if cause == nil {
 		cause = &JobError{Message: "dependency failed"}

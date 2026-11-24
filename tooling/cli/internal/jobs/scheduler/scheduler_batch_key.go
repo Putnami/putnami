@@ -17,6 +17,9 @@ import (
 )
 
 // readyBatch returns the content identity used to group already-ready jobs,
+// cached or not: a batchable task whose cache is off is a delegated tool's,
+// which runs a verb as one command and waits for its peers
+// (scheduler_batch_verb.go),
 // together with the project cap that key folds (0 is unbounded). An empty key
 // means the job keeps the historical singleton dispatch path. Returning both
 // from one computation is what makes the cap a group is filled to the cap its
@@ -27,7 +30,7 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 		return "", 0
 	}
 	if job == nil || job.JobDef == nil || job.Extension == nil ||
-		job.Project == nil || job.JobDef.Batchable == nil || !job.JobDef.Cache ||
+		job.Project == nil || job.JobDef.Batchable == nil ||
 		strings.TrimSpace(job.JobDef.Batchable.Tool) == "" {
 		return "", 0
 	}

@@ -113,8 +113,8 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "scheduler",
 		prefix: "internal/jobs/scheduler/scheduler",
-		files:  6,
-		funcs:  100,
+		files:  7,
+		funcs:  105,
 		why: "internal/jobs/scheduler/scheduler*.go: dispatch. Grants, batching, shared executions " +
 			"(one leader and its followers), task output locks and the job process environment. " +
 			"Every function here can touch a running job or a cache entry, so a raise adds a " +

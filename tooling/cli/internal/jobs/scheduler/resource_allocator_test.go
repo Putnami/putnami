@@ -168,7 +168,7 @@ func TestCoordinatorAdmissionWaitsForLongestFirstCapacity(t *testing.T) {
 	}
 
 	pending := []*ScheduledJob{long, short}
-	group, rest, admitted := scheduler.takeAdmissiblePendingGroup(pending)
+	group, rest, admitted := scheduler.takeAdmissiblePendingGroup(pending, false)
 	if admitted || len(group.jobs) != 0 {
 		t.Fatalf("admitted group = %+v admitted=%t, want the blocked long pole to retain priority", group.jobs, admitted)
 	}
