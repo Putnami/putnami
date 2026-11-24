@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
@@ -95,17 +96,8 @@ func TestMaterializeTaskOutput_ConcurrentSameDestination(t *testing.T) {
 				return
 			default:
 			}
-			before, err := os.Lstat(dest)
-			if err != nil || !before.IsDir() {
-				continue // absent: the legitimate two-syscall swap window
-			}
-			n, ok := countTreeFiles(dest)
+			n, ok := sampleLiveTree(dest)
 			if !ok {
-				continue
-			}
-			// Same inode before and after ⇒ this sample observed one live
-			// destination tree throughout, not a tree being reclaimed.
-			if after, err := os.Lstat(dest); err != nil || !os.SameFile(before, after) {
 				continue
 			}
 			observed.Add(1)
@@ -270,26 +262,38 @@ func TestTaskEntry_GCEvictsUnprotectedEntries(t *testing.T) {
 	}
 }
 
-// countTreeFiles reports the number of regular files under dir. ok is false when
-// the path does not currently exist or is not a directory — the legitimate swap
-// window — so the caller can distinguish "absent" from "present but partial".
-func countTreeFiles(dir string) (int, bool) {
-	info, err := os.Lstat(dir)
-	if err != nil || !info.IsDir() {
+// sampleLiveTree counts the files of the tree at dest. It reports false when
+// dest is absent, or when a swap replaced the tree while it was read.
+//
+// It holds the tree open and reads it through that handle. A filesystem can give
+// the inode number of a reclaimed directory to the next staged tree, so equal
+// numbers before and after a read by path do not prove one tree stayed at dest.
+// The number of a directory held open is never given to another.
+func sampleLiveTree(dest string) (int, bool) {
+	tree, err := os.OpenRoot(dest)
+	if err != nil {
+		return 0, false // absent: the legitimate two-syscall swap window
+	}
+	defer tree.Close()
+	opened, err := tree.Stat(".")
+	if err != nil {
 		return 0, false
 	}
 	count := 0
-	err = filepath.Walk(dir, func(_ string, info os.FileInfo, err error) error {
+	err = fs.WalkDir(tree.FS(), ".", func(_ string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() {
+		if !d.IsDir() {
 			count++
 		}
 		return nil
 	})
 	if err != nil {
 		return 0, false // raced a swap mid-walk; not an observation
+	}
+	if live, err := os.Lstat(dest); err != nil || !os.SameFile(opened, live) {
+		return 0, false
 	}
 	return count, true
 }
