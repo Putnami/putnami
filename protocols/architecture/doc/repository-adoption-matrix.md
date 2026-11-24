@@ -196,6 +196,7 @@ contracts only.
 | Project | Name | Authority it carries |
 |---|---|---|
 | `/tooling/cli` | `@putnami/cli` | Workspace resolution, the planner and scheduler, caching, command dispatch, and the `/tooling/doc` reference. |
+| `/tooling/cli-document-set` | `@putnami/cli-document-set` | The gates over a known set of this repository's documents: the governance surface, the contributor recipe, the first-use block, the project manifests and the shipped manifests. A separate project so that the documents they name key only these tests. |
 | `/tooling/cli-documents` | `@putnami/cli-documents` | The gates over the whole candidate tree: the public-cut scan, the release plan and its verdict. A separate project so that their repository-wide inputs key only these tests; it runs on `main` by name. |
 | `/tooling/cli-model` | `@putnami/cli-model` | The CLI's data model — the workspace graph, extension descriptions, job definitions — extracted so it can be depended on without the orchestrator. It is an unpublished internal companion and no workspace project may import it. |
 | `/tooling/install-scripts` | `@putnami/install-scripts` | The tests of the CLI's install and smoke scripts. A separate project so that its key holds the scripts and the install pages, not the CLI's sources. |
