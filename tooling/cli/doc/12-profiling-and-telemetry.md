@@ -154,13 +154,21 @@ not.
 
 ### Checking the counts
 
-The process count can be checked against the kernel: trace a run with
-`strace -f -e trace=execve,clone,clone3,fork,vfork -o trace`, build the process
-tree from it, and count the `execve` calls whose parent is the CLI process or a
-job process. Those are the processes the report counts; a process a tool
-started is not. The git count can be checked with a `git` shim placed first on
-`PATH` that logs each call and runs the real git: a run's `git[]` entries add
-up to the shim's lines from the engine and the job processes.
+`tooling/cli/scripts/check-orchestration-counts.sh <putnami arguments>` runs
+`./putnamiw` under `strace -f`, with a `git` shim first on `PATH` that logs each
+call and runs the real git, and prints the counts each side saw:
+
+```bash
+tooling/cli/scripts/check-orchestration-counts.sh lint,test,build --projects /protocols/runtime --no-cache
+```
+
+From the trace it counts the processes whose first `execve` happens while their
+parent is the CLI process or a job process (a child of the CLI started with
+`--putnamiContext`), and compares them with `processes[]`; from the shim it
+counts the git calls of those processes and compares them with `git[]`. A
+process a tool started is in neither. The calls the CLI makes after the session
+is settled, such as the git reads of the run report, are in the trace and not
+in the report.
 
 ## Cache Economics Benchmark
 
