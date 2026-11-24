@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
@@ -74,4 +75,33 @@ func TestDrift_ProcessKinds(t *testing.T) {
 	}
 	kinds := schema.Defs["ProcessReport"].Properties["starts"].Items.Properties["kind"].Enum
 	assertEnumSync(t, "process kind", kinds, ProcessKinds)
+}
+
+func TestTheTypedPayloadFixtureCarriesAValidProcessReport(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("fixtures", "valid", "typed-payloads.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := 0
+	for _, line := range strings.Split(string(raw), "\n") {
+		if !strings.Contains(line, ProcessReportResultDataKey) {
+			continue
+		}
+		var event struct {
+			Data struct {
+				Data map[string]any `json:"data"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatal(err)
+		}
+		report, err := ExtractProcessReport(event.Data.Data)
+		if err != nil || report == nil {
+			t.Fatalf("fixture report = %#v, %v", report, err)
+		}
+		found++
+	}
+	if found != 1 {
+		t.Fatalf("fixtures with a process report = %d, want 1", found)
+	}
 }

@@ -102,10 +102,8 @@ type LintSummary struct {
 	Infos int `json:"infos,omitempty"`
 }
 
-// ProcessReportEnv is the variable a CLI that reads ProcessReport sets in a
-// job's environment. A runtime writes the report only when it is set, so an
-// older CLI, which would keep the report in the task's result data and its
-// cache entry, never receives one.
+// ProcessReportEnv is the variable a CLI that reads ProcessReport sets to "1"
+// in a job's environment. A runtime writes the report only when it is set.
 const ProcessReportEnv = "PUTNAMI_PROCESS_REPORT"
 
 // ProcessReportResultDataKey is the result-data location of a job process's

@@ -7,8 +7,9 @@
 # `strace -f`, with a git shim first on PATH that logs each call with the pid
 # of its caller and execs the real git. The script then compares the
 # processes the CLI process and its job processes started, and the git calls
-# among them, as strace saw them, with the run's
-# run.orchestration (tooling/cli/doc/12-profiling-and-telemetry.md). It prints
+# among them (the starts whose program is git), as strace saw them, with the
+# run's run.orchestration (tooling/cli/doc/12-profiling-and-telemetry.md). The
+# shim log only bounds the engine's git calls from above. It prints
 # one JSON document; it fails only when the run cannot be traced.
 set -euo pipefail
 

@@ -72,6 +72,15 @@ Verb-specific outcomes also travel as **typed payloads** so consumers can aggreg
   after immutable storage plus a `released` or `already-current` answer on
   **every** listed channel; dry-run, partial failure, provider failure, or a CAS
   `conflict` on any one channel must omit it.
+- `result.data.processReport` — `{ selfCpuMs?, starts?, git? }`: the job
+  process's own accounting, the CPU it spent without its children, the
+  processes it started by kind (`{kind, count, cpuMs?}`) and its git calls by
+  subcommand (`{subcommand, count}`). The key is reserved: a runtime writes it
+  only when the CLI sets `PUTNAMI_PROCESS_REPORT=1` in the job's environment,
+  and the CLI removes it from every runtime's result before it records or caches
+  the result, then sums it into the run's `run.orchestration`
+  ([result v2](../../cli/doc/02-result-v2.md)). A runtime that does not measure
+  a member omits it.
 - Compiled binaries are emitted as `artifact` events with kind `binary`; published artifacts carry the `PublishRecord` fields (`registry`, `name`, `version`, `dryRun`) as extras on a kind `published` artifact event.
 - A publisher reports each artifact it published with a kind `published-member`
   artifact event carrying `ecosystem`, `coordinate`, `version`,

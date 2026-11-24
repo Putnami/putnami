@@ -110,6 +110,26 @@ func TestClassifyNamesGitTheCLIAndOther(t *testing.T) {
 	}
 }
 
+func TestGitSubcommandSkipsTheGlobalOptionsAndNeverNamesNothing(t *testing.T) {
+	for _, tc := range []struct {
+		argv []string
+		want string
+	}{
+		{[]string{"git", "-C", "/repo", "rev-parse", "HEAD"}, "rev-parse"},
+		{[]string{"git", "-c", "core.x=y", "--git-dir=/g", "ls-files"}, "ls-files"},
+		{[]string{"git", "--attr-source", "HEAD", "check-attr", "-a", "f"}, "check-attr"},
+		{[]string{"git", "--super-prefix", "x", "diff"}, "diff"},
+		{[]string{"git", "--no-pager", "log"}, "log"},
+		{[]string{"git", "--version"}, "--version"},
+		{[]string{"git", ""}, "git"},
+		{[]string{"git", "-C", "/repo", ""}, "git"},
+	} {
+		if got := GitSubcommand(tc.argv); got != tc.want {
+			t.Errorf("GitSubcommand(%q) = %q, want %q", tc.argv, got, tc.want)
+		}
+	}
+}
+
 func TestTheReportCarriesTheProcessOwnCPUApartFromItsChildren(t *testing.T) {
 	spectest.Proves(t, "cli/diagnostics-results", "a-run-reports-its-orchestration-cpu", "an-sdk-job-reports-its-own-cpu-apart-from-its-children")
 	if err := Run(child(t, "worker")); err != nil {

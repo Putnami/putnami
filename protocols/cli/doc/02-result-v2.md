@@ -682,11 +682,14 @@ and absent when the run selected no task. A `processes[].cpuMs` is absent when
 no process of that entry exited before the run ended, and 0 when some did in
 under a millisecond.
 `unreportedProcesses` counts the job and batch processes that reported no CPU of
-their own, a runtime not built on the extension SDK: their CPU is in no member.
+their own: a runtime not built on the extension SDK or on a version of it that
+reports, an interactive job, an SDK job that exited before writing its result,
+or a platform without `getrusage`. Their CPU is in no member.
 
 A task record carries `orchestration` with `keyMs`, `lockWaitMs` and
 `restoreMs`: the wall the scheduler spent computing its key, waiting for a cache
-lease or its task-output locks, and restoring an entry. A member is present
+lease or its task-output locks, and restoring an entry. A remote restore's
+`restoreMs` includes the remote lookup and the wait for the remote lease. A member is present
 when the task entered that step, even at 0 ms, and the object is absent when it
 entered none.
 
@@ -1221,8 +1224,8 @@ it is never a task cache input. A submitting engine compares it with the
 request it submitted before it adopts an imported session as its verdict.
 
 `executions[]`, `tasks[].executionId`, `tasks[].inputDigest`, `environment`, `run.cpu`,
-`preparation`, `tree`, `placement`, `placement.provenance`, `parentSessionId`
-and `selection` are **additive**: every member an older reader knows keeps its name, its type and
+`run.orchestration`, `tasks[].orchestration`, `preparation`, `tree`, `placement`,
+`placement.provenance`, `parentSessionId` and `selection` are **additive**: every member an older reader knows keeps its name, its type and
 its meaning, so a session file written by a current CLI still parses as one
 written before. A reader that validates against the closed schema needs this
 version of `result-v2.json`, which is the same requirement any additive member

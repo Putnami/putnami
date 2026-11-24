@@ -705,7 +705,7 @@ type OrchestrationCPU struct {
 	// with the descendants it waited for.
 	ControlMs int64 `json:"controlMs"`
 	// CLIMs is the CPU of the CLI processes jobs started. A CLI process the
-	// engine starts, such as a hook, is counted in processes and not here.
+	// engine starts is counted in processes and not here.
 	CLIMs int64 `json:"cliMs"`
 	// GitMs is the CPU of the git processes the engine or a job started.
 	GitMs int64 `json:"gitMs"`
@@ -721,8 +721,10 @@ type OrchestrationCPU struct {
 	// run selected no task.
 	PerTaskMs *int64 `json:"perTaskMs,omitempty"`
 	// UnreportedProcesses counts the job and batch processes that reported no
-	// CPU of their own: a runtime not built on the extension SDK. Their CPU is
-	// in no member above, and absent when every one reported.
+	// CPU of their own: a runtime not built on the extension SDK or on a
+	// version of it that reports, an interactive job, an SDK job that exited
+	// before writing its result, or a platform without getrusage. Their CPU is
+	// in no member above. Absent when every one reported.
 	UnreportedProcesses int64 `json:"unreportedProcesses,omitempty"`
 }
 
@@ -735,7 +737,8 @@ type TaskOrchestration struct {
 	// LockWaitMs is the wall spent waiting for a cache lease another process
 	// held, or for the task-output locks.
 	LockWaitMs *int64 `json:"lockWaitMs,omitempty"`
-	// RestoreMs is the wall spent restoring a cache entry.
+	// RestoreMs is the wall spent restoring a cache entry; for a remote entry
+	// it includes the remote lookup and the wait for the remote lease.
 	RestoreMs *int64 `json:"restoreMs,omitempty"`
 }
 

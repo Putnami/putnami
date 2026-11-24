@@ -89,8 +89,8 @@ func (l ProcessLedger) Of(kind string) ProcessCount {
 
 // OrchestrationCPU is the orchestration CPU of s: the engine, the extension
 // processes without their children, the control processes, the CLI starts
-// made by jobs, and the git calls of both origins. A CLI the engine starts,
-// such as a workspace hook, is counted among its processes and not here.
+// made by jobs, and the git calls of both origins. A CLI the engine starts is
+// counted among its processes and not here.
 func (s *OrchestrationSnapshot) OrchestrationCPU() (engine, extension, control, cli, git time.Duration) {
 	return s.EngineCPU, s.ExtensionCPU,
 		s.Engine.Of("control").CPU,

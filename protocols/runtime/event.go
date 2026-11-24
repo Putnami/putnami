@@ -182,7 +182,10 @@ type ResultData struct {
 	// lintSummary, and the Distribution-owned releaseSet publish outcome — see
 	// payloads.go) plus any producer-specific extras a consumer must ignore when
 	// it does not recognize them. Release-set fields are never declared here;
-	// their sole authority is go.putnami.dev/protocol/distribution.
+	// their sole authority is go.putnami.dev/protocol/distribution. The key
+	// ProcessReportResultDataKey is reserved for the job process's own
+	// accounting, written only when ProcessReportEnv is set; the CLI removes it
+	// from every runtime's result.
 	Data map[string]any `json:"data,omitempty"`
 	// Error is the structured failure detail, present when Status is
 	// ResultFailed.

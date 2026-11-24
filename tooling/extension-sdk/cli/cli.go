@@ -142,8 +142,7 @@ func Run(job JobFunc, opts ...RunOption) {
 // written only when the engine set runtime.ProcessReportEnv. data is copied,
 // never changed.
 func withProcessReport(data map[string]any) map[string]any {
-	// A CLI that reads the report says so; an older one would keep it in the
-	// task's result data and its cache entry.
+	// The report is written only for a CLI that asks for it.
 	if os.Getenv(runtime.ProcessReportEnv) != "1" {
 		return data
 	}

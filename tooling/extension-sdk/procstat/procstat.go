@@ -120,27 +120,39 @@ func Classify(program string) Kind {
 	return Other
 }
 
+// gitValueOptions are the global git options whose value is the next
+// argument.
+var gitValueOptions = map[string]bool{
+	"-C": true, "-c": true, "--git-dir": true, "--work-tree": true, "--namespace": true,
+	"--exec-path": true, "--config-env": true, "--attr-source": true, "--super-prefix": true,
+}
+
 // GitSubcommand names the subcommand of a git argument vector, the program
 // first: the first argument after the global options ("-C <dir>", "-c
 // <name=value>", "--git-dir=<dir>"). A vector that names none counts under its
-// first argument, and an empty one under "git".
+// first argument, and a vector with no argument, or an empty subcommand,
+// under "git".
 func GitSubcommand(argv []string) string {
 	if len(argv) < 2 {
 		return "git"
 	}
 	args := argv[1:]
+	name := args[0]
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		switch {
-		case arg == "-C" || arg == "-c" || arg == "--git-dir" || arg == "--work-tree" ||
-			arg == "--namespace" || arg == "--exec-path" || arg == "--config-env":
+		if gitValueOptions[arg] {
 			i++
-		case strings.HasPrefix(arg, "-"):
-		default:
-			return arg
+			continue
+		}
+		if !strings.HasPrefix(arg, "-") {
+			name = arg
+			break
 		}
 	}
-	return args[0]
+	if name == "" {
+		return "git"
+	}
+	return name
 }
 
 // kindOf is the explicit kind when one is given, otherwise the program's.
