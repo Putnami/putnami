@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -155,6 +157,32 @@ func TestPendingBatchMemoKeepsTheDispatchGroups(t *testing.T) {
 	}
 	if batched == 0 {
 		t.Fatalf("fixture plan formed no batch group: %v", got)
+	}
+}
+
+// queueReady computes a job's batch key when the job becomes ready, from the
+// parameter bag its job context delivers.
+func TestQueueReadyComputesTheBatchKeyFromTheDeliveredParams(t *testing.T) {
+	ws, jobs := makeBatchSchedulerFixture(t, "")
+	scheduler := newBatchMemoScheduler(ws, jobs)
+	scheduler.metrics = newSchedulerMetrics() // Run sets it up
+	var mu sync.Mutex
+	completed := 0
+	state := planner.NewDAGState(planner.SchedulableJobs(jobs))
+	pending := scheduler.queueReady(nil, jobs, state, map[string]*JobResult{}, &mu, &completed)
+	if len(pending) != len(jobs) {
+		t.Fatalf("queued %d jobs, want %d", len(pending), len(jobs))
+	}
+	for _, job := range jobs {
+		memo, ok := scheduler.pendingBatches[job]
+		if !ok || memo.key == "" {
+			t.Fatalf("%s: no batch key computed when it became ready", job.Key())
+		}
+		defaults := cachekey.JobConfigDefaults(ws, job)
+		delivered := BuildJobContext(ws, job, scheduler.taskParams, defaults, scheduler.cfg.VersionInfo).Params
+		if !reflect.DeepEqual(cachekey.DeliveredJobParams(job, scheduler.taskParams, defaults), delivered) {
+			t.Fatalf("%s: the batch key reads another bag than the job context delivers", job.Key())
+		}
 	}
 }
 

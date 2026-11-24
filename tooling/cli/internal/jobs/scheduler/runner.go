@@ -498,6 +498,12 @@ func RunJob(
 	return runJob(ctx, ws, job, commandParams, configDefaults, versions, nil, onEvent)
 }
 
+// workspaceMembershipKey carries the workspace membership a scheduler run
+// resolved once (*cachekey.WorkspaceMembership), so every job context of the
+// run stamps it rather than encoding the configuration of every project again.
+// A job run outside a scheduler run carries none and resolves its own.
+type workspaceMembershipKey struct{}
+
 // serveStepKey marks a context under which runJob runs a serve-workload step.
 type serveStepKey struct{}
 
@@ -505,12 +511,6 @@ type serveStepKey struct{}
 // started, releases the step's serve keys (releaseServeOutputLocks) and
 // announces the spawned process group as the step's first event
 // (announceProcessGroup).
-// workspaceMembershipKey carries the workspace membership a scheduler run
-// resolved once (*cachekey.WorkspaceMembership), so every job context of the
-// run stamps it rather than encoding the configuration of every project again.
-// A job run outside a scheduler run carries none and resolves its own.
-type workspaceMembershipKey struct{}
-
 func withServeStep(ctx context.Context) context.Context {
 	return context.WithValue(ctx, serveStepKey{}, true)
 }
