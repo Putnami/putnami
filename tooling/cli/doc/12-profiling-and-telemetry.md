@@ -140,7 +140,8 @@ its bootstrap included; a later run in the same process, as `cache verify` and
 an impact plan start, covers its own share only. Process CPU is measured where the platform reports
 it (`getrusage` on Unix); elsewhere `cpu` is absent. A long-lived process still
 running when the run ends, such as a cache provider, is counted but its CPU is
-not.
+not. The `sysctl` probes the CLI runs on macOS to read the machine go around
+the ledger and are not counted.
 
 `--trace-profile`, and `--debug`, print the report after the scheduler summary:
 
@@ -165,9 +166,10 @@ tooling/cli/scripts/check-orchestration-counts.sh lint,test,build --projects /pr
 
 From the trace it counts the processes whose first `execve` happens while their
 parent is the CLI process or a job process (a child of the CLI started with
-`--putnamiContext`), and compares them with `processes[]`; from the shim it
-counts the git calls of those processes and compares them with `git[]`. A
-process a tool started is in neither. The processes the CLI starts after the
+`--putnamiContext`), and compares them with `processes[]`; those whose
+program is `git` it compares with `git[]`, and the shim log bounds the engine's
+git calls from above. A process is a pid and the clone that returned it, since
+a long run reuses pids. A process a tool started is in neither. The processes the CLI starts after the
 session is settled, such as the git reads of the run report, are left out by
 their trace time.
 

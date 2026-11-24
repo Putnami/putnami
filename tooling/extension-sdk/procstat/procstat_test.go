@@ -158,6 +158,12 @@ func TestAbsorbSumsTheReportsOfJobProcesses(t *testing.T) {
 	if got := after.Of(Other).CPU - before.Of(Other).CPU; got.Milliseconds() != 900 {
 		t.Errorf("other cpu = %s, want 900ms", got)
 	}
+	if got := after.Of(Git).Measured - before.Of(Git).Measured; got != 1 {
+		t.Errorf("git measured = %d, want 1", got)
+	}
+	if got := after.Of(Other).Measured - before.Of(Other).Measured; got != 1 {
+		t.Errorf("other measured = %d, want 1", got)
+	}
 	if got := after.Git["rev-parse"] - before.Git["rev-parse"]; got != 3 {
 		t.Errorf("rev-parse = %d, want 3", got)
 	}

@@ -6,8 +6,8 @@
 # The arguments are passed to ./putnamiw. The run executes under
 # `strace -f`, with a git shim first on PATH that logs each call with the pid
 # of its caller and execs the real git. The script then compares the
-# processes the CLI process and its job processes started, as strace saw them,
-# and the git calls they made, as the shim saw them, with the run's
+# processes the CLI process and its job processes started, and the git calls
+# among them, as strace saw them, with the run's
 # run.orchestration (tooling/cli/doc/12-profiling-and-telemetry.md). It prints
 # one JSON document; it fails only when the run cannot be traced.
 set -euo pipefail

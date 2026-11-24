@@ -47,6 +47,9 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) (for
 	}
 	procstat.Started(procstat.Job, cmd.Args)
 	err = procstat.Wait(cmd, procstat.Job)
+	// An interactive job owns the terminal and sends no result, so it
+	// reports no processes: it counts as unreported.
+	procstat.Absorb(nil)
 	hold.release()
 	return hold.forced(), err
 }

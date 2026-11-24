@@ -12,11 +12,13 @@ A process the report counts is one the CLI process started (origin engine) or
 one a job process started (origin jobs): a new process whose first successful
 execve happens while its parent is the CLI process or a job process, before
 the session was settled (its endTime, read against the trace's -ttt
-timestamps). A job
-process is a child of the CLI process started with --putnamiContext. A process
-a tool started is not counted, nor the execve a process makes over itself.
+timestamps). A job process is a child of the CLI process started with
+--putnamiContext. A process a tool started is not counted, nor the execve a
+process makes over itself. A git call is such a start whose program is git;
+the shim log, which has no time, gives an upper bound for the engine's.
 """
 
+import bisect
 import json
 import re
 import sys
@@ -76,71 +78,85 @@ def argv(args):
 
 def main():
     strace_file, shim_log, session_file = sys.argv[1:4]
-    tgid = {}      # thread id -> process id
-    parent = {}    # process id -> parent process id
-    image = {}     # process id -> argv of its current image
-    execed = set()  # processes that made a successful execve since they started
-    root = None
-    engine_ready = False  # the traced root runs the CLI, not the wrapper
-    starts = []    # (parent pid, child pid, argv) for each process's first execve
-
     with open(session_file, encoding="utf-8") as handle:
         session = json.load(handle)
     settled = None
     if session.get("endTime"):
         settled = datetime.fromisoformat(session["endTime"].replace("Z", "+00:00")).timestamp()
-    events = list(parse(strace_file))
-    # A vfork child runs, and execs, before its parent's clone returns, so the
-    # process tree is read whole before any start is attributed.
-    for pid, _, name, args, result in events:
-        proc = tgid.setdefault(pid, pid)
+
+    # A long run reuses process ids, so a process is a pid and its birth: the
+    # clone that returned that pid. A vfork child runs, and execs, before its
+    # parent's clone returns, so a birth starts at the clone call, and the
+    # births are read whole before any execve is attributed.
+    births = {}    # pid -> [(clone start, caller thread id, is a thread)]
+    execs = []     # (pid, time, argv) for each successful execve
+    root = None
+    for pid, stamp, name, args, result in parse(strace_file):
         if root is None:
-            root = proc
+            root = pid
         if name in ("clone", "clone3", "fork", "vfork") and result is not None and result > 0:
-            if "CLONE_THREAD" in args:
-                tgid[result] = proc
-            else:
-                tgid[result] = result
-                parent[result] = proc
-    for pid, stamp, name, args, result in events:
-        proc = tgid.get(pid, pid)
-        if name != "execve" or result != 0:
-            continue
+            births.setdefault(result, []).append((stamp or 0.0, pid, "CLONE_THREAD" in args))
+        elif name == "execve" and result == 0:
+            execs.append((pid, stamp or 0.0, argv(args) or [first_arg(args)]))
+    for entries in births.values():
+        entries.sort(key=lambda entry: entry[0])
+    starts_of = {pid: [entry[0] for entry in entries] for pid, entries in births.items()}
+
+    def identity(tid, when):
+        """The process (pid, birth index) thread tid belonged to at a time."""
+        while True:
+            index = bisect.bisect_right(starts_of.get(tid, []), when) - 1
+            if index < 0:
+                return (tid, -1)
+            stamp, caller, thread = births[tid][index]
+            if not thread:
+                return (tid, index)
+            tid, when = caller, stamp
+
+    def parent_of(proc):
+        pid, index = proc
+        if index < 0:
+            return None
+        stamp, caller, _ = births[pid][index]
+        return identity(caller, stamp)
+
+    root_proc = (root, -1)
+    engine_ready = False  # the traced root runs the CLI, not the wrapper
+    execed = set()
+    starts = []    # (parent, child, argv) for each process's first execve
+    for tid, stamp, vector in execs:
+        proc = identity(tid, stamp)
         # What the CLI starts after the session is settled, such as the git
         # reads of the run report, is not in the session's report.
-        if settled is not None and stamp is not None and stamp > settled:
+        if settled is not None and stamp > settled:
             continue
-        vector = argv(args) or [first_arg(args)]
-        if proc == root and first_arg(args).rsplit("/", 1)[-1] == "putnami":
+        if proc == root_proc and vector and vector[0].rsplit("/", 1)[-1] == "putnami":
             engine_ready = True
+        owner = parent_of(proc)
         # A process the wrapper started before it became the CLI is not the
-        # run's.
-        if proc not in execed and proc != root and (parent.get(proc) != root or engine_ready):
-            starts.append((parent.get(proc), proc, vector))
+        # run's, nor the execve a process makes over itself.
+        if proc not in execed and proc != root_proc and (owner != root_proc or engine_ready):
+            starts.append((owner, proc, vector))
         execed.add(proc)
-        image[proc] = vector
 
-    # The engine is the process whose image is the putnami binary running the
-    # gate: the last image the traced root took, which the wrapper execs.
-    engine = root
+    # The engine is the traced root: the wrapper execs the putnami binary.
+    engine = root_proc
     jobs = {child for owner, child, vector in starts if owner == engine and "--putnamiContext" in vector}
-
     from_engine = [s for s in starts if s[0] == engine]
     from_jobs = [s for s in starts if s[0] in jobs]
 
-    counted = {child for _, child, _ in from_engine + from_jobs}
-    shim = Counter()
+    def is_git(vector):
+        return bool(vector) and vector[0].rsplit("/", 1)[-1] == "git"
+
+    git_engine = sum(1 for _, _, vector in from_engine if is_git(vector))
+    git_jobs = sum(1 for _, _, vector in from_jobs if is_git(vector))
+    # The shim log has no time, so it bounds the engine's git calls from above.
+    shim_engine = 0
     with open(shim_log, encoding="utf-8", errors="replace") as handle:
         for line in handle:
-            fields = line.strip().split(" ", 2)
-            if len(fields) < 2 or not fields[0].isdigit() or not fields[1].isdigit():
-                continue
-            caller, call = int(fields[0]), int(fields[1])
-            if call not in counted:
-                continue
-            origin = "engine" if caller == engine else "jobs" if caller in jobs else None
-            if origin:
-                shim[origin] += 1
+            fields = line.split(" ", 2)
+            if fields and fields[0].isdigit() and int(fields[0]) == root:
+                shim_engine += 1
 
     orchestration = session["run"].get("orchestration") or {}
     reported = Counter()
@@ -155,15 +171,16 @@ def main():
         ("processes from the engine", len(from_engine), reported["engine"]),
         ("processes from jobs", len(from_jobs), reported["jobs"]),
         ("processes, total", len(from_engine) + len(from_jobs), reported["engine"] + reported["jobs"]),
-        ("git calls from the engine", shim["engine"], reported_git["engine"]),
-        ("git calls from jobs", shim["jobs"], reported_git["jobs"]),
-        ("git calls, total", shim["engine"] + shim["jobs"], reported_git["engine"] + reported_git["jobs"]),
+        ("git calls from the engine", git_engine, reported_git["engine"]),
+        ("git calls from jobs", git_jobs, reported_git["jobs"]),
+        ("git calls, total", git_engine + git_jobs, reported_git["engine"] + reported_git["jobs"]),
     ):
         gap = (counted - observed) / observed * 100 if observed else 0.0
         rows.append({"measure": label, "observed": observed, "reported": counted, "gapPercent": round(gap, 2)})
 
     kinds = Counter(vector[0].rsplit("/", 1)[-1] if vector else "?" for _, _, vector in from_engine)
-    print(json.dumps({"enginePid": engine, "jobProcesses": len(jobs), "rows": rows,
+    print(json.dumps({"enginePid": root, "jobProcesses": len(jobs), "rows": rows,
+                      "engineGitCallsInShimLog": shim_engine,
                       "engineChildrenByProgram": kinds.most_common(12)}, indent=2))
 
 

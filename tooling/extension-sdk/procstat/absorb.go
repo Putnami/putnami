@@ -81,7 +81,7 @@ func TakeReported() Reported {
 	for i, kind := range Kinds {
 		out.Kinds[i] = KindCount{Kind: kind}
 		if entry := reported.kinds[kind]; entry != nil {
-			out.Kinds[i].Starts, out.Kinds[i].CPU = entry.Starts, entry.CPU
+			out.Kinds[i] = *entry
 		}
 	}
 	for subcommand, calls := range reported.git {

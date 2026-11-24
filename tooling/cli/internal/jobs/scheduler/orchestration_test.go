@@ -50,6 +50,9 @@ func TestRunJob_CountsTheJobAndAbsorbsItsProcessReport(t *testing.T) {
 	if got := jobsAfter.Git["orchestration-fixture"] - jobsBefore.Git["orchestration-fixture"]; got != 2 {
 		t.Errorf("reported git calls = %d, want 2", got)
 	}
+	if got := jobsAfter.Of(procstat.Git).Measured - jobsBefore.Of(procstat.Git).Measured; got != 1 {
+		t.Errorf("reported git measured = %d, want 1: the report's cpuMs counts", got)
+	}
 	if got := jobsAfter.SelfCPU - jobsBefore.SelfCPU; got < 7*time.Millisecond {
 		t.Errorf("reported self cpu grew by %s, want at least 7ms", got)
 	}
