@@ -26,6 +26,10 @@ func ReadCloudManifestOptions(workspaceRoot string) (map[string]any, error) {
 	return readManifestCloudOptions(workspaceRoot)
 }
 
+// ErrWorkspaceNotConfigured says that a directory carries no Cloud link. A link
+// that is present and wrong is another error.
+var ErrWorkspaceNotConfigured = NewError("workspace not configured; run `putnami cloud setup --workspace <id>` first", ExitUsage)
+
 // ReadCloudWorkspaceConfig resolves the workspace's Cloud link and returns the
 // decoded @putnami/cloud options in the same pass. It prefers the link committed
 // to putnami.workspace.json / putnami.json and falls back to the cached
@@ -43,7 +47,7 @@ func ReadCloudWorkspaceConfig(workspaceRoot string) (CloudWorkspaceConfig, error
 	data, err := os.ReadFile(file)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return CloudWorkspaceConfig{}, NewError("workspace not configured; run `putnami cloud setup --workspace <id>` first", ExitUsage)
+			return CloudWorkspaceConfig{}, ErrWorkspaceNotConfigured
 		}
 		return CloudWorkspaceConfig{}, err
 	}
@@ -54,10 +58,10 @@ func ReadCloudWorkspaceConfig(workspaceRoot string) (CloudWorkspaceConfig, error
 	// "no link" so the user gets the actionable not-configured message and
 	// fails fast, rather than a cryptic parse error or a hang.
 	if len(strings.TrimSpace(string(data))) == 0 {
-		return CloudWorkspaceConfig{}, NewError("workspace not configured; run `putnami cloud setup --workspace <id>` first", ExitUsage)
+		return CloudWorkspaceConfig{}, ErrWorkspaceNotConfigured
 	}
 	if err := json.Unmarshal(data, &link); err != nil {
-		return CloudWorkspaceConfig{}, NewError("workspace not configured; run `putnami cloud setup --workspace <id>` first", ExitUsage)
+		return CloudWorkspaceConfig{}, ErrWorkspaceNotConfigured
 	}
 	if StringValue(link["workspace_id"]) == "" {
 		return CloudWorkspaceConfig{}, NewError("cloud-link.json missing workspace_id; run `putnami cloud setup --workspace <id>`", ExitUsage)

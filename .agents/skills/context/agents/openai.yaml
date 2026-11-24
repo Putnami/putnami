@@ -1,4 +1,4 @@
 interface:
   display_name: "Context"
-  short_description: "What a change touches"
-  default_prompt: "Use $context to tell what this change touches."
+  short_description: "What a change touches, why its CI failed"
+  default_prompt: "Use $context to tell what this change touches or why its CI failed."

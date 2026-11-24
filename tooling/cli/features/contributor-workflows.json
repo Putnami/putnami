@@ -224,6 +224,19 @@
         }
       },
       {
+        "id": "context-why-ci-failed",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-context-skill-reads-the-ci-of-a-change"
+          ]
+        }
+      },
+      {
         "id": "spec-without-a-workspace",
         "stage": "coded",
         "evidenceKinds": [

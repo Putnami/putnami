@@ -44,6 +44,9 @@ type ciStubResponse struct {
 	status int
 	body   any
 	sse    string
+	// text answers text/plain with header, for a log.
+	text   string
+	header http.Header
 }
 
 func (s *ciFakeServer) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -102,6 +105,18 @@ func (s *ciFakeServer) RoundTrip(req *http.Request) (*http.Response, error) {
 		return ciStubReply(stub.status, stub.body), nil
 	}
 	if stub, ok := s.responses[key]; ok {
+		if stub.text != "" || stub.header != nil {
+			header := http.Header{"Content-Type": []string{"text/plain; charset=utf-8"}}
+			for name, values := range stub.header {
+				header[http.CanonicalHeaderKey(name)] = values
+			}
+			return &http.Response{
+				StatusCode: stub.status,
+				Status:     http.StatusText(stub.status),
+				Header:     header,
+				Body:       io.NopCloser(strings.NewReader(stub.text)),
+			}, nil
+		}
 		if stub.sse != "" {
 			return &http.Response{
 				StatusCode: stub.status,

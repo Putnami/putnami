@@ -252,6 +252,46 @@ again without it and prints `Verdict:    could not be read`; the rest of the
 view prints as before. `--output=json` carries the same facts in the `verdict`
 member.
 
+## Runs of any CI
+
+Four commands read the runs, jobs and logs of any CI the workspace is connected
+to: Putnami CI, GitHub Actions and GitLab CI. The output has the same columns
+and members for each CI, and they change nothing.
+
+```bash
+putnami cloud ci list --commit HEAD              # the pipelines of a commit: any revision Git resolves, or a full id
+putnami cloud ci list --change 42                # the pipelines of a pull or merge request
+putnami cloud ci view --pipeline <ref>           # the jobs, and why the pipeline failed
+putnami cloud ci logs --pipeline <ref> --job <job> # the log of one job
+putnami cloud ci providers                       # the CIs Cloud reads, and why it cannot read one
+```
+
+- `list` prints the reference that `view` and `logs` take. The repository is
+  `--repo`, else the one of the `origin` remote; a GitLab project keeps its
+  full group path. `--limit` takes 1 to 100. A list with no pipeline also
+  prints the state of each CI, so a CI that Cloud may not read does not look
+  like a commit with no CI. Without `--commit` and `--change`, `list` lists the
+  workspace's hosted runs.
+- `view` prints the failed jobs first, then the failed steps and the log
+  excerpt of at most five jobs that fail the pipeline. A job that is allowed to
+  fail, or that was retried, does not fail it. `--job` selects one job by its
+  id, its reference, or a name only it has.
+- `logs` reads the job `--job` selects, else the only failed job, else the only
+  job. Otherwise it lists the jobs and exits 2. It says on stderr when Cloud
+  got the end of the log only. A log over 32 MiB is refused, with the page of
+  the job.
+- The text a CI wrote (names, excerpts, logs) loses its terminal control
+  sequences. `logs --raw` and `--output=json` keep them.
+- With `--output=json`, `list` and `providers` print one object per line,
+  `logs` one `{line, text}` object per line, `view` one document
+  (`pipeline`, `capabilities`, `failures`, `omittedFailures`), and
+  `view --job` the job alone.
+
+They also run in a repository with no Putnami workspace, once the extension is
+in your user scope (`putnami extensions install --user @putnami/cloud`) and you
+are signed in. Pass `--workspace <id, slug or name>` there. The control plane
+is the default one unless a flag or the environment names another.
+
 ## CI usage
 
 `putnami cloud ci usage [--window <duration>]` prints the workspace's CI
@@ -1155,6 +1195,7 @@ putnami cloud ci init|validate|fmt|explain         # author putnami.ci.json
 putnami cloud ci report --conclusion success       # report a delivery-run outcome
 putnami cloud ci status                            # CI readiness checks, queue, last run reuse, runs and spend over 7 days
 putnami cloud ci view <run> [--output=json]        # one run: phases, timing, cache, failures, its verdict, and the release-set members it reused
+putnami cloud ci list --commit <revision>|--change <n>  # the pipelines of any CI; view and logs --pipeline <ref> read one, providers says which CI Cloud reads
 putnami cloud ci usage [--window <duration>]       # runs, spend, billed cost, merges by verdict, and deploys over the window
 putnami cloud ci queue [enable|disable|list|pause|resume] [--branch <b>]  # the merge queue: enable splits the rulesets with your GitHub credentials, then turns it on; list shows the line and the commit to rebase on
 putnami cloud cache [status]                       # the build cache config, its identity, and the reuse of the last CI run

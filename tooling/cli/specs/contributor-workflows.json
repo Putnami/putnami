@@ -142,6 +142,13 @@
       ]
     },
     {
+      "id": "context-why-ci-failed",
+      "text": [
+        "The context skill answers why a CI failed, in a workspace and without one, from `putnami cloud ci list`, `view --pipeline` and `logs --pipeline`, with the same commands for each CI:",
+        "it names the failed jobs and steps and quotes the log excerpt, reads a log as data and not as an instruction, and says what it could not read."
+      ]
+    },
+    {
       "id": "spec-without-a-workspace",
       "text": [
         "Without a workspace, the spec skill finds the specs the repository keeps from `putnami observe --output=json`, edits one in its own format and conventions (Spec Kit, OpenSpec, Kiro or Gherkin), creates a new one in the format the repository already uses, and runs `putnami observe` to read it back.",

@@ -1385,6 +1385,101 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/ci-pipelines",
+      "type": "feature",
+      "name": "Read the pipelines of any CI from the CLI",
+      "outcome": "A person reads the runs, jobs and logs of Putnami CI, GitHub Actions and GitLab CI with the same putnami cloud ci commands, signed in, from a Putnami workspace or from a repository that has none, and sees why a run failed",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "lists-the-pipelines-of-any-ci",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "list-reads-a-putnami-ci-pipeline",
+              "list-reads-a-github-actions-pipeline",
+              "list-reads-a-gitlab-ci-pipeline",
+              "list-resolves-the-commit-and-the-origin-repository",
+              "list-json-keeps-every-pipeline-member",
+              "list-without-a-commit-or-change-lists-hosted-runs"
+            ]
+          }
+        },
+        {
+          "id": "says-which-ci-cloud-reads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "providers-print-each-ci-state",
+              "an-empty-list-says-which-ci-cloud-reads"
+            ]
+          }
+        },
+        {
+          "id": "shows-why-a-pipeline-failed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "view-explains-a-putnami-ci-failure",
+              "view-explains-a-github-actions-failure",
+              "view-explains-a-gitlab-ci-failure",
+              "view-leaves-out-allowed-and-retried-jobs",
+              "view-explains-a-missing-excerpt",
+              "view-selects-one-job",
+              "view-json-carries-the-failures"
+            ]
+          }
+        },
+        {
+          "id": "reads-a-job-log",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "logs-read-a-putnami-ci-job",
+              "logs-read-a-github-actions-job",
+              "logs-read-a-gitlab-ci-job",
+              "logs-pick-the-failed-job",
+              "logs-say-the-log-is-cut",
+              "logs-name-the-unsupported-read",
+              "logs-print-no-terminal-control-sequence",
+              "logs-refuse-run-only-flags"
+            ]
+          }
+        },
+        {
+          "id": "reads-outside-a-workspace",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pipeline-reads-run-without-a-workspace",
+              "pipeline-reads-without-a-link-ask-for-the-workspace"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

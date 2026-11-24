@@ -732,11 +732,11 @@ The second command writes five skills to `~/.claude/skills` for Claude Code and 
 
 | Skill | What it does without a workspace |
 |---|---|
-| `context` | Answers "what does this change touch?" from `putnami observe --output=json`: the changed components, the ones that depend on them, their tests and coverage when reports exist, and the specs they keep. |
+| `context` | Answers "what does this change touch?" from `putnami observe --output=json`: the changed components, the ones that depend on them, their tests and coverage when reports exist, and the specs they keep. It also answers "why did the CI fail?" from `putnami cloud ci list`, `view --pipeline` and `logs --pipeline`, which read Putnami CI, GitHub Actions and GitLab CI. This needs `putnami extensions install --user @putnami/cloud`, a `putnami cloud login`, and your Putnami Cloud workspace in `--workspace`. |
 | `spec` | Adds or changes a requirement in the Spec Kit, OpenSpec, Kiro or Gherkin spec your repository keeps, in that format, then runs `putnami observe` to read it back. |
 | `build`, `check`, `design` | Say in one line that they need a Putnami workspace, and stop. |
 
-Ask your agent "what does this change touch?" or "add a requirement to the export spec". `putnami observe` lists the specs it reads in its summary and in the `specs` member of its JSON document, so a requirement the agent adds shows up on the next CI run too.
+Ask your agent "what does this change touch?", "why did the CI fail?" or "add a requirement to the export spec". `putnami observe` lists the specs it reads in its summary and in the `specs` member of its JSON document, so a requirement the agent adds shows up on the next CI run too.
 
 Inside a Putnami workspace, each of these skills follows the copy the workspace pins instead.
 

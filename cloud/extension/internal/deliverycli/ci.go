@@ -515,7 +515,9 @@ func CI(params map[string]any, args []string, workspaceRoot string, env map[stri
 	case "enable", "disable", "subscription":
 		return ciSubscriptionCommand(params, clicore.FirstPositional(args), workspaceRoot, env, ioctx)
 	case "list":
-		return ciList(params, workspaceRoot, env, ioctx)
+		return ciList(params, args, workspaceRoot, env, ioctx)
+	case "providers":
+		return ciProviders(params, workspaceRoot, env, ioctx)
 	case "view":
 		return ciView(params, args, workspaceRoot, env, ioctx)
 	case "start":
@@ -561,11 +563,15 @@ func ciHelp(params map[string]any, ioctx clicore.IO) error {
 		{"command": "cloud ci enable|disable|subscription", "description": "manage the live CI subscription; enable accepts --runner-channel stable|canary"},
 		{"command": "cloud channels follow <namespace> stable|canary", "description": "change a producer track; an rs_ id pins an exact release and --runner-channel changes the runner atomically"},
 		{"command": "cloud ci list", "description": "list workspace CI runs, newest first (--limit N, default 20, 0 for the whole window; filtered by the server with --repo/--branch/--sha/--ref/--pr/--status/--phase/--age)"},
+		{"command": "cloud ci list --commit <revision> | --change <n>", "description": "list the pipelines of any CI (Putnami CI, GitHub Actions, GitLab CI) for a commit, or a pull or merge request, with the reference view and logs take (--repo, default the origin remote's; --limit 1 to 100)"},
+		{"command": "cloud ci providers", "description": "the CIs Cloud reads for the workspace, and why it cannot read one"},
 		{"command": "cloud ci view <run>", "description": "show one run with its per-phase attempts and its verdict in brief, and — when it failed — the failing step, the failing tasks, and their file:line diagnostics; for a run that reused release-set members, the channel, source revision and members it reused"},
+		{"command": "cloud ci view --pipeline <ref> [--job <job>]", "description": "show one pipeline of any CI: its jobs, failed ones first, and the failed steps and log excerpt of the jobs that fail it; --job shows one job, by id, reference or name"},
 		{"command": "cloud ci start --repo <o/r> --sha <sha> --reason <why>", "description": "manually start a run for a pushed SHA (--ref/--branch/--pr/--phases/--size/--max-parallel/--no-cache optional)"},
 		{"command": "cloud ci cancel <run> --reason <why>", "description": "idempotently cancel a run"},
 		{"command": "cloud ci retry <run> --reason <why>", "description": "retry a run (whole run, or --phase <p>, with --size/--no-cache/--max-parallel)"},
 		{"command": "cloud ci logs <run>", "description": "read a run's logs, rendered for humans (--raw for the runner's protocol records); --follow tails live (--phase/--project/--q/--level/--from/--to/--cursor/--limit)"},
+		{"command": "cloud ci logs --pipeline <ref> [--job <job>]", "description": "print one job's log, of any CI: the selected job, else the only failed one, else the only one (--raw keeps the terminal control sequences)"},
 		{"command": "cloud ci status", "description": "CI readiness checks, queue, last run reuse, and runs and spend over 7 days"},
 		{"command": "cloud ci usage", "description": "aggregate the workspace's runs over a window (--window <dur>, default 168h) by substrate, profile, source, gate wall, estimated spend, billed cost per day, merges by verdict with the verified share, and deploys per day"},
 		{"command": "cloud ci insights <run>", "description": "one run's contracted gate report — CPU balance sheet, cache economics, scheduler shape, per-command and per-job detail (--output=json for the whole document)"},
@@ -595,6 +601,7 @@ func ciHelp(params map[string]any, ioctx clicore.IO) error {
 		ioctx.Stdout(fmt.Sprintf("  putnami %-70s %s", c["command"], c["description"]))
 	}
 	ioctx.Stdout("")
+	ioctx.Stdout("list --commit/--change, providers, view --pipeline and logs --pipeline read any CI, and run outside a Putnami workspace with --workspace.")
 	ioctx.Stdout("<run> takes any unambiguous run-id prefix, not the full 64 characters; `list` prints ids at that width.")
 	ioctx.Stdout("`logs --level` matches each entry's OWN findings, not the severity of the pipe that carried them.")
 	ioctx.Stdout("`view <run>` on a failed run lists each failed task with its error, diagnostics and last output lines, derived by the control plane from the")
@@ -692,7 +699,10 @@ func (f ciListFilters) any() bool {
 	return f != ciListFilters{}
 }
 
-func ciList(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {
+func ciList(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {
+	if ciListsPipelines(params) {
+		return ciPipelineList(params, args, workspaceRoot, env, ioctx)
+	}
 	filters, err := parseCIListFilters(params)
 	if err != nil {
 		return err
@@ -990,6 +1000,12 @@ func ciFilterByPhase(reqCtx context.Context, ctx *clicore.WorkspaceContext, runs
 // --- view ---
 
 func ciView(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {
+	if ciPipelineRef(params) != "" {
+		return ciPipelineView(params, args, workspaceRoot, env, ioctx)
+	}
+	if err := ciRefuseFlags(params, "a run id: it selects a job of --pipeline", "job"); err != nil {
+		return err
+	}
 	run := ciRunID(args)
 	if run == "" {
 		return clicore.NewError("cloud ci view requires a run id: `putnami cloud ci view <run>`", clicore.ExitUsage)
@@ -1359,6 +1375,12 @@ func ciRetryMessage(phase string, resp *CIRunResponse) string {
 // --- logs ---
 
 func ciLogs(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {
+	if ciPipelineRef(params) != "" {
+		return ciPipelineLogs(params, args, workspaceRoot, env, ioctx)
+	}
+	if err := ciRefuseFlags(params, "a run id: it selects a job of --pipeline", "job"); err != nil {
+		return err
+	}
 	run := ciRunID(args)
 	if run == "" {
 		return clicore.NewError("cloud ci logs requires a run id: `putnami cloud ci logs <run>`", clicore.ExitUsage)
@@ -2663,6 +2685,15 @@ func ciRequestContext(ioctx clicore.IO) (context.Context, context.CancelFunc) {
 func ciCall[T any, R any](reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, target string,
 	call func(context.Context, *deliveryapiclient.DeliveryClient) (*R, error),
 ) (*T, error) {
+	return ciCallWith[T](reqCtx, ctx, verb, call, func(err error) error {
+		return ciCallError(reqCtx, verb, target, err)
+	})
+}
+
+// ciCallWith is ciCall with the caller's own rendering of a failed call.
+func ciCallWith[T any, R any](reqCtx context.Context, ctx *clicore.WorkspaceContext, verb string,
+	call func(context.Context, *deliveryapiclient.DeliveryClient) (*R, error), failure func(error) error,
+) (*T, error) {
 	api, err := newDeliveryAPIClient(ctx)
 	if err != nil {
 		return nil, err
@@ -2671,7 +2702,7 @@ func ciCall[T any, R any](reqCtx context.Context, ctx *clicore.WorkspaceContext,
 		return call(callCtx, api)
 	})
 	if err != nil {
-		return nil, ciCallError(reqCtx, verb, target, err)
+		return nil, failure(err)
 	}
 	var out T
 	if resp != nil {

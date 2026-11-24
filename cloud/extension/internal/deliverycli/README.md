@@ -7,6 +7,12 @@ The aggregator in [`internal/cloudcli`](../cloudcli) imports it.
 - `putnami cloud ci ...` (`ci.go`): run operations, recovery modes and the
   subscription. `putnami cloud ci report` (`report.go`) submits a delivery-run
   conclusion.
+- `putnami cloud ci list --commit|--change`, `providers`, `view --pipeline` and
+  `logs --pipeline` (`ci_pipelines.go`): the runs, jobs and logs of any CI, over
+  Delivery's neutral routes. The provider is a value they print: no code
+  branches on it. They run without a Cloud link when `--workspace` names the
+  workspace. Text a CI wrote goes through `ciPlain` before it reaches a
+  terminal.
 - `putnami cloud ci init|validate|fmt|explain` (`ci_contract.go`): write,
   check, format and explain `putnami.ci.json`. They parse it with the pinned
   [`go.putnami.dev/protocol/ci`](../../../../protocols/ci) module. `validate`

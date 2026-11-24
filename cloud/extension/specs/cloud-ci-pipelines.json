@@ -1,0 +1,55 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/ci-pipelines",
+  "outcomes": [
+    "A person reads the runs, jobs and logs of Putnami CI, GitHub Actions and GitLab CI with the same putnami cloud ci commands, signed in, from a Putnami workspace or from a repository that has none, and sees why a run failed"
+  ],
+  "nonGoals": [
+    "Starting, cancelling or rerunning a pipeline of another CI: the reads change nothing",
+    "Artifacts, and the steps of a job that did not fail",
+    "A call to GitHub or GitLab from the CLI: Delivery reads them, and the CLI branches on no CI",
+    "Opening the log of a job to a delegated or machine session: Delivery decides who reads it"
+  ],
+  "requirements": [
+    {
+      "id": "lists-the-pipelines-of-any-ci",
+      "text": [
+        "putnami cloud ci list --commit <revision> or --change <number> prints the pipelines of each CI in the same columns, with the reference the other commands take; structured output prints one pipeline per line, every member kept.",
+        "--commit takes any revision Git resolves; the repository is --repo, else the origin remote's, with a GitLab project's full group path.",
+        "Without both flags, list keeps reading the workspace's hosted runs."
+      ]
+    },
+    {
+      "id": "says-which-ci-cloud-reads",
+      "text": [
+        "putnami cloud ci providers prints each CI's state, and the reason when Cloud cannot read it.",
+        "A list that finds no pipeline prints those states too, so a CI that Cloud may not read does not look like a commit with no CI."
+      ]
+    },
+    {
+      "id": "shows-why-a-pipeline-failed",
+      "text": [
+        "putnami cloud ci view --pipeline <ref> prints the jobs, failed ones first, then the failed steps and kept log excerpt of at most five jobs that fail the pipeline, and how many it left out.",
+        "A job allowed to fail or retried does not fail it; an excerpt that is missing is said with its reason.",
+        "--job selects one job by reference, id or name and refuses a name jobs share.",
+        "Structured output carries the pipeline, capabilities and failures, or the one job."
+      ]
+    },
+    {
+      "id": "reads-a-job-log",
+      "text": [
+        "putnami cloud ci logs --pipeline <ref> prints the log of the job --job selects, else of the only failed job, else of the only job; otherwise it lists the jobs and refuses.",
+        "It says on stderr when it got the end of the log only, and names a refused or unreadable log with the job's page.",
+        "Text drops terminal control sequences, --raw keeps them, structured output prints one line per object; other run flags are refused."
+      ]
+    },
+    {
+      "id": "reads-outside-a-workspace",
+      "text": [
+        "list --commit or --change, providers, view --pipeline and logs --pipeline run in a repository with no Putnami workspace: --workspace names the Cloud workspace, and the control plane is the default one unless a flag or the environment names another.",
+        "With no link and no --workspace, the command refuses before any read and names --workspace."
+      ]
+    }
+  ]
+}

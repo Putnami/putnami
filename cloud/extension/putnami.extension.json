@@ -302,9 +302,10 @@
           ]
         },
         "ci": {
-          "description": "Operate workspace CI runs and recovery (list, view <run>, logs <run>, start, cancel <run>, retry <run>, status, usage, repair, pause|drain|resume), turn a branch's merge queue on or off (queue [enable|disable]), report an outcome (report), and author putnami.ci.json (init, validate, fmt, explain). Run ids abbreviate: any unambiguous prefix works wherever <run> appears, and `list` prints ids at that width. `putnami cloud ci help` prints every verb with its flags.",
+          "description": "Read the runs, jobs and logs of any CI (list --commit|--change, providers, view --pipeline, logs --pipeline), also outside a Putnami workspace with --workspace, operate workspace CI runs and recovery (list, view <run>, logs <run>, start, cancel <run>, retry <run>, status, usage, repair, pause|drain|resume), turn a branch's merge queue on or off (queue [enable|disable]), report an outcome (report), and author putnami.ci.json (init, validate, fmt, explain). Run ids abbreviate: any unambiguous prefix works wherever <run> appears, and `list` prints ids at that width. `putnami cloud ci help` prints every verb with its flags.",
           "command": "cloud-ci",
           "interactive": true,
+          "workspace": "optional",
           "examples": [
             {
               "command": "putnami cloud ci list",
@@ -313,6 +314,22 @@
             {
               "command": "putnami cloud ci view 3cb50fe5ff0e",
               "description": "One run: timing, cache, phases, its verdict, the release-set members it reused, and — when it failed — the failing tasks and their file:line diagnostics"
+            },
+            {
+              "command": "putnami cloud ci list --commit HEAD",
+              "description": "The pipelines of any CI (Putnami CI, GitHub Actions, GitLab CI) for a commit; --change <n> for a pull or merge request"
+            },
+            {
+              "command": "putnami cloud ci view --pipeline <ref>",
+              "description": "Why a pipeline of any CI failed: its failed jobs, their failed steps and their log excerpts"
+            },
+            {
+              "command": "putnami cloud ci logs --pipeline <ref> --job test",
+              "description": "The log of one job of any CI"
+            },
+            {
+              "command": "putnami cloud ci providers --workspace acme",
+              "description": "The CIs Cloud reads for a workspace, from a repository with no Putnami workspace"
             },
             {
               "command": "putnami cloud ci logs 3cb50fe5ff0e --level error",
@@ -1371,7 +1388,7 @@
       "activationFiles": [
         "putnami.extension.json"
       ],
-      "description": "Operate workspace CI runs and recovery (status, list, view, start, cancel, retry, logs, usage, insights, repair, pause, drain, resume), turn a branch's merge queue on or off (queue), report a run outcome (report), and author putnami.ci.json (init, validate, fmt, explain).",
+      "description": "Read the runs, jobs and logs of any CI (list --commit|--change, providers, view --pipeline, logs --pipeline), operate workspace CI runs and recovery (status, list, view, start, cancel, retry, logs, usage, insights, repair, pause, drain, resume), turn a branch's merge queue on or off (queue), report a run outcome (report), and author putnami.ci.json (init, validate, fmt, explain).",
       "flags": {
         "strict": {
           "type": "boolean",
@@ -1409,7 +1426,7 @@
         },
         "repo": {
           "type": "string",
-          "description": "list, start: repository owner/name. Required by start."
+          "description": "list, start: repository owner/name, or a GitLab project's full path. Required by start; list --commit and --change default to the origin remote's."
         },
         "branch": {
           "type": "string",
@@ -1466,7 +1483,7 @@
         },
         "raw": {
           "type": "boolean",
-          "description": "logs: print the runner's protocol records verbatim instead of the human rendering."
+          "description": "logs: print the runner's protocol records verbatim instead of the human rendering; with --pipeline, keep the log's terminal control sequences."
         },
         "follow": {
           "type": "boolean",
@@ -1496,13 +1513,29 @@
           "type": "string",
           "description": "logs: opaque log pagination cursor."
         },
+        "commit": {
+          "type": "string",
+          "description": "list: the commit whose pipelines to list, of any CI: any revision Git resolves, or a full commit id."
+        },
+        "change": {
+          "type": "string",
+          "description": "list: the pull or merge request whose pipelines to list, of any CI, by its number."
+        },
+        "pipeline": {
+          "type": "string",
+          "description": "view, logs: a pipeline of any CI, by the reference list prints, instead of a hosted run id."
+        },
+        "job": {
+          "type": "string",
+          "description": "view, logs with --pipeline: one job, by its id, its reference, or a name only it has."
+        },
         "against": {
           "type": "string",
           "description": "timings: a second run id. Prints why each task of the run executed instead of being served by the cache: no cache key, a key that differs from the other run's, or the same key with no entry."
         },
         "limit": {
           "type": "string",
-          "description": "list, logs, timings: maximum rows to print — runs for list (default 20; --limit 0 prints the whole window), log entries per page for logs, task rows for timings (default 40; --limit 0 prints every row, and --output=json emits the whole table unless --limit asks for fewer)."
+          "description": "list, logs, timings: maximum rows to print — runs for list (default 20; --limit 0 prints the whole window; 1 to 100 pipelines with --commit or --change), log entries per page for logs, task rows for timings (default 40; --limit 0 prints every row, and --output=json emits the whole table unless --limit asks for fewer)."
         },
         "cancel-running": {
           "type": "boolean",

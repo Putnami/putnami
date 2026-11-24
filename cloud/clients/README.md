@@ -29,8 +29,8 @@ oci-server, put-server, runtime-api and source-api.
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
 file, except the ones named below. `delivery-api` comes from the later version
-`0.0.0-20261123111359-587eb29f5`, published on 2026-11-23, archive digest
-`sha256:7b962ef088c65103e2dc061272450a14d5d3a109f1da4520b5e6eb8111cd65f8`. It
+`0.0.0-20261124070607-1640bdd74`, published on 2026-11-24, archive digest
+`sha256:de91a8bcc858944fb33a1f9799b1b71f01aa8d8952863092abdcd58ca01cd28f`. It
 carries the CI run of a records submission (`ciSystem`, `runId`, `runAttempt`
 and `runUrl` of `SubmitRequest`), which `putnami cloud evidence-report` sends,
 and its read (`CIRunResponse.ci`). It also carries the merge queue setting and entries
@@ -40,7 +40,10 @@ report (`cases` and `omittedCases` of `ProjectTests`), which
 `putnami cloud evidence-report` sends, the level 3 preview a report batch answers
 (`ReportBatchResponse.level3Preview`) and the provider of a CI run
 (`CIRunResponse.provider`). Its queue descriptions say the entries of a deeper
-queue build side by side. `source-api` comes from the later version
+queue build side by side, and an entry says what holds it and whether it lands
+alone. It carries the reads of any CI (`/v1/workspaces/{workspace}/ci/providers`
+and `/v1/workspaces/{workspace}/ci/pipelines`, with the jobs, steps, log and
+artifacts of a pipeline), which `putnami cloud ci` calls. `source-api` comes from the later version
 `0.0.0-20261115110438-6cf844fba`, published on 2026-11-15, archive digest
 `sha256:7edc53105fab142c91a4c50d2b3aef6df3d8c6121a305c9013a0abf45a40bbf9`. It
 adds the collaboration routes under `source/proposals`, `source/tasks` and

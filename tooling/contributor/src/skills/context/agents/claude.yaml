@@ -1,4 +1,4 @@
 name: context
-description: Answer what a change touches, from the workspace or, without one, from putnami observe
+description: Answer what a change touches, from the workspace or, without one, from putnami observe, and why its CI failed, whatever CI ran it
 allowed-tools: Bash, Read, Grep, Glob
 argument-hint: "[<path>|<question>]"
