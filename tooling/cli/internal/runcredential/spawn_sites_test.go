@@ -727,8 +727,8 @@ func scanSpawnSites(t *testing.T, root string) (map[string][]token.Pos, map[stri
 //     and gitread.Executable asks /usr/bin/xcrun for the git to run on macOS;
 //   - proctree.StartTime starts ps with fixed arguments on a system without
 //     /proc;
-//   - a gittest command, runner or assertion starts the git of a test fixture,
-//     which only test support calls.
+//   - a gittest command, runner, assertion or repository starts the git of a
+//     test fixture, which only test support calls.
 //
 // TestEveryDependencySpawnHelperIsInventoried keeps the SDK entries complete.
 var spawnCalls = map[string]map[string]bool{
@@ -747,7 +747,7 @@ var spawnCalls = map[string]map[string]bool{
 		"UpstreamRef": true,
 	},
 	"go.putnami.dev/sdk/extension/gittest": {
-		"AssertMachineIndependent": true, "Command": true, "Describe": true, "Run": true,
+		"AssertMachineIndependent": true, "Command": true, "Describe": true, "Repo": true, "Run": true,
 	},
 	"go.putnami.dev/sdk/extension/releaseset":      {"NewClient": true},
 	"go.putnami.dev/sdk/extension/linetag":         {"LastRelease": true},

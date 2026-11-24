@@ -16,43 +16,18 @@ import (
 	"go.putnami.dev/sdk/extension/gittest"
 )
 
+// initGitRepo returns a repository with one commit on main: README.md,
+// committed as "initial". It is a copy of the repository gittest builds once
+// per test binary.
 func initGitRepo(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
-
-	cmds := [][]string{
-		{"init"},
-		{"config", "user.email", "test@test.com"},
-		{"config", "user.name", "Test"},
-		{"config", "commit.gpgsign", "false"},
-		{"checkout", "-b", "main"},
-	}
-	for _, args := range cmds {
-		cmd := gittest.Command(dir, args...)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-
-	// Create initial commit
-	file := filepath.Join(dir, "README.md")
-	if err := os.WriteFile(file, []byte("# Test"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cmd := gittest.Command(dir, "add", ".")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git add: %v\n%s", err, out)
-	}
-	cmd = gittest.Command(dir, "commit", "-m", "initial")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git commit: %v\n%s", err, out)
-	}
-
-	return dir
+	return gittest.Repo(t)
 }
 
-func TestInitGitRepoIsTheSameOnAForeignMachine(t *testing.T) {
-	gittest.AssertMachineIndependent(t, func() string { return initGitRepo(t) })
+// TestCommitHelpersAreTheSameOnAForeignMachine checks the commit helpers of
+// this package on a copy of gittest.Repo. The gittest tests check that the
+// repository it copies builds the same on a foreign machine.
+func TestCommitHelpersAreTheSameOnAForeignMachine(t *testing.T) {
 	gittest.AssertMachineIndependent(t, func() string {
 		dir := initGitRepo(t)
 		writeCommit(t, dir, "second.txt", "feat: second")
