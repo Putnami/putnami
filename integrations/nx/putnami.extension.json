@@ -200,7 +200,7 @@
       }
     },
     "lint-run": {
-      "description": "Run npx --no nx run <project>:lint at the workspace root for one project, after the Nx version check. Putnami's cache is off: Nx's cache decides what reruns.",
+      "description": "Run npx --no nx run <project>:lint at the workspace root for one project, after the Nx version check. The projects of one verb run as one npx --no nx run-many -t <target> -p <a>,<b>, each result read from Nx's output. Putnami's cache is off: Nx's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -235,6 +235,9 @@
       "cache": {
         "enabled": false
       },
+      "batchable": {
+        "tool": "nx"
+      },
       "declares": {
         "outputs": {
           "reports": {
@@ -252,7 +255,7 @@
       }
     },
     "test-run": {
-      "description": "Run npx --no nx run <project>:test at the workspace root for one project, after the Nx version check; then read the JUnit and coverage reports the sync names in the project's options from its test configuration, removed before the run. A failed case or a step that exits non-zero fails the task. Putnami's cache is off: Nx's cache decides what reruns.",
+      "description": "Run npx --no nx run <project>:test at the workspace root for one project, after the Nx version check; then read the JUnit and coverage reports the sync names in the project's options from its test configuration, removed before the run. A failed case or a step that exits non-zero fails the task. The projects of one verb run as one npx --no nx run-many -t <target> -p <a>,<b>, each result read from Nx's output. Putnami's cache is off: Nx's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -287,6 +290,9 @@
       "cache": {
         "enabled": false
       },
+      "batchable": {
+        "tool": "nx"
+      },
       "declares": {
         "outputs": {
           "reports": {
@@ -304,7 +310,7 @@
       }
     },
     "build-run": {
-      "description": "Run npx --no nx run <project>:build at the workspace root for one project, after the Nx version check; Nx's dependsOn runs the upstream targets. Putnami's cache is off: Nx's cache decides what reruns.",
+      "description": "Run npx --no nx run <project>:build at the workspace root for one project, after the Nx version check; Nx's dependsOn runs the upstream targets. The projects of one verb run as one npx --no nx run-many -t <target> -p <a>,<b>, each result read from Nx's output. Putnami's cache is off: Nx's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -338,6 +344,9 @@
       },
       "cache": {
         "enabled": false
+      },
+      "batchable": {
+        "tool": "nx"
       },
       "declares": {
         "outputs": {

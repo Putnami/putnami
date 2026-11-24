@@ -83,7 +83,7 @@ const (
 
 // nxSteps are the steps overrides the sync owns: nx run on each target the
 // workspace maps to a task.
-var nxSteps = stacks.StepsOverride{Extension: ExtensionName, Tasks: lifecycleTasks, Synced: syncShaped}
+var nxSteps = stacks.StepsOverride{Extension: ExtensionName, Tasks: lifecycleTasks, Synced: syncShaped, Batch: batchSteps}
 
 // syncShaped reports whether steps are absent or the ones the sync writes:
 // each the runStep of a target.

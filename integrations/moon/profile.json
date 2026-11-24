@@ -18,6 +18,11 @@
       "steps": [
         ["moon", "run", "{component}:lint"]
       ],
+      "batch": {
+        "steps": [
+          ["moon", "run", "{component}:lint"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     },
@@ -25,6 +30,11 @@
       "steps": [
         ["moon", "run", "{component}:test"]
       ],
+      "batch": {
+        "steps": [
+          ["moon", "run", "{component}:test"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     },
@@ -32,6 +42,11 @@
       "steps": [
         ["moon", "run", "{component}:build"]
       ],
+      "batch": {
+        "steps": [
+          ["moon", "run", "{component}:build"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     }

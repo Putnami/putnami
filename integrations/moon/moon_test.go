@@ -205,7 +205,7 @@ func TestTheSyncWritesEachMoonProjectPutnamiJSON(t *testing.T) {
 			"options": map[string]any{ExtensionName: map[string]any{"graphSync": true, "filePatterns": inputs, "tasks": map[string]any{"test": map[string]any{"reports": map[string]any{"junit": []any{"reports/junit.xml"}}}}}}},
 		"apps/web": {"$schema": stacks.ProjectSchema, "tags": []any{"moon"}, "extensions": []any{ExtensionName}, "disable": map[string]any{"jobs": []any{"build", "test"}}, "options": marked},
 		"packages/pricing": {"$schema": stacks.ProjectSchema, "tags": []any{"moon"}, "extensions": []any{ExtensionName}, "disable": map[string]any{"jobs": []any{"lint"}},
-			"options": map[string]any{ExtensionName: map[string]any{"graphSync": true, "filePatterns": inputs, "tasks": map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}}}},
+			"options": map[string]any{ExtensionName: map[string]any{"graphSync": true, "filePatterns": inputs, "tasks": map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}, "batch": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}}}}},
 		"tools/legacy": {"name": "legacy", "tags": []any{"team"}, "extensions": []any{"@acme/lint"}, "dependencies": []any{"@acme/design"}},
 	}
 	for dir, doc := range want {
@@ -319,7 +319,7 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 	if !reflect.DeepEqual(pricing["extensions"], []any{ExtensionName, "@putnami/rust"}) ||
 		!reflect.DeepEqual(pricing["disable"], map[string]any{"jobs": []any{"lint", "@putnami/moon:build", "@putnami/rust:test"}}) ||
 		!reflect.DeepEqual(pricing["options"], map[string]any{ExtensionName: map[string]any{"graphSync": true, "filePatterns": inputs,
-			"tasks": map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}}}) {
+			"tasks": map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}, "batch": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}}}}) {
 		t.Errorf("packages/pricing = %v", pricing)
 	}
 	// D-066: api has no tsconfig*.json, so the import writes one.
@@ -365,7 +365,8 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 }
 
 // stubMoon puts first on PATH a moon that prints its version and, for run,
-// writes the JUnit report of its project when STUB_JUNIT names one, then
+// copies STUB_REPORT to its run report when set and writes the JUnit report
+// of its project when STUB_JUNIT names one, then
 // exits with STUB_EXIT. It logs each call, with its working directory, to
 // $STUB_LOG.
 func stubMoon(t *testing.T) {
@@ -374,6 +375,7 @@ func stubMoon(t *testing.T) {
 	script := `#!/bin/sh
 echo "$(pwd) moon $*" >> "$STUB_LOG"
 case "$1" in --version) echo "moon ${STUB_VERSION:-` + version + `}"; exit 0;; esac
+if [ -n "$STUB_REPORT" ]; then mkdir -p .moon/cache; cp "$STUB_REPORT" .moon/cache/runReport.json; fi
 if [ -n "$STUB_JUNIT" ]; then mkdir -p "$(dirname "$STUB_JUNIT")"; printf '%s' '<testsuites><testsuite name="api" tests="2" failures="0"><testcase classname="api" name="a"/><testcase classname="api" name="b"/></testsuite></testsuites>' > "$STUB_JUNIT"; fi
 exit "${STUB_EXIT:-0}"
 `
@@ -734,7 +736,7 @@ func TestAnImportKeepsOnMoonATaskThatRunsAnotherTool(t *testing.T) {
 		t.Fatal(err)
 	}
 	pricing = readProjectFile(t, root, "packages/pricing")
-	if steps := pricing["options"].(map[string]any)[ExtensionName].(map[string]any)["tasks"]; !reflect.DeepEqual(steps, map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}) {
+	if steps := pricing["options"].(map[string]any)[ExtensionName].(map[string]any)["tasks"]; !reflect.DeepEqual(steps, map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}, "batch": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}}) {
 		t.Errorf("pricing's kept unit task steps = %v", steps)
 	}
 	// The check sees a task that changed its tool.

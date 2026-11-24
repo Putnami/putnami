@@ -96,7 +96,8 @@ func repository(t *testing.T, d demo, mode string, extensions ...string) string 
 
 // stubNx puts first on PATH an npx that answers npx --no -- nx --version with
 // the demo's Nx version and, for npx --no nx run <project>:test, writes the
-// demo's reports of that project. Like npm's npx, it answers
+// demo's reports of that project; for nx run-many, it prints the file
+// STUB_OUTPUT names. Like npm's npx, it answers
 // npx --no nx --version with npm's version. It logs each call, with its working
 // directory, to $STUB_LOG.
 func stubNx(t *testing.T, d demo) {
@@ -137,6 +138,9 @@ case "$1" in
     mkdir -p "$dir/reports/coverage"
     cp "` + reports + `/$dir/reports/junit.xml" "$dir/reports/junit.xml"
     cp "` + reports + `/$dir/reports/coverage/cobertura-coverage.xml" "$dir/reports/coverage/cobertura-coverage.xml"
+    exit "${STUB_EXIT:-0}";;
+  run-many)
+    [ -z "$STUB_OUTPUT" ] || cat "$STUB_OUTPUT"
     exit "${STUB_EXIT:-0}";;
 esac
 `

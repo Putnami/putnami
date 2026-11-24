@@ -1,7 +1,8 @@
 // Package nx is @putnami/nx, the stack extension that adopts a Nx
 // repository: each Nx project is a Putnami project with its edges. In
 // delegate mode each build, test and lint task runs nx run <project>:<target>
-// at the workspace root and Nx keeps its cache; in import mode a TypeScript
+// at the workspace root, the projects of one verb run as one nx run-many
+// (ADR 0019 of tooling/stacks), and Nx keeps its cache; in import mode a TypeScript
 // project's targets run as @putnami/typescript tasks and every other target
 // keeps running through Nx. The stack core is go.putnami.dev/tooling/stacks
 // and the Nx detector is the one of putnami observe.
@@ -33,7 +34,7 @@ func Stack() (stacks.Stack, error) {
 	if err != nil {
 		return stacks.Stack{}, fmt.Errorf("profile.json: %w", err)
 	}
-	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect}, nil
+	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, ReadBatch: ReadBatch}, nil
 }
 
 // Detect names the Nx projects among the candidate paths with the Nx

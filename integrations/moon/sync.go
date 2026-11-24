@@ -371,7 +371,14 @@ func movedOrder(p detect.Project, plan importPlan, mapped map[string]string, byI
 
 // moonSteps are the steps overrides the sync owns: moon run on the task a
 // command maps to by tag.
-var moonSteps = stacks.StepsOverride{Extension: ExtensionName, Tasks: Commands, Synced: syncShaped}
+var moonSteps = stacks.StepsOverride{Extension: ExtensionName, Tasks: Commands, Synced: syncShaped, Batch: batchSteps}
+
+// batchSteps are the batch steps of the steps the sync writes: moon run
+// repeats the target of each component, so one command runs every project of
+// the verb whatever its moon task is named.
+func batchSteps(_ string, steps [][]string) [][]string {
+	return steps
+}
 
 // syncShaped reports whether steps are absent or the one step the sync
 // writes: moon run {component}:<task>.

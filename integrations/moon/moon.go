@@ -1,8 +1,9 @@
 // Package moon is @putnami/moon, the integration of a moon repository: it
 // runs the projects of a moon workspace as Putnami projects, with the stack
 // core of go.putnami.dev/tooling/stacks and the moon detector of putnami
-// observe, in the mode the workspace adopted it in. In delegate mode every
-// task runs moon on one project, and moon keeps its own cache: the manifest
+// observe, in the mode the workspace adopted it in. In delegate mode a task
+// runs moon on its project, the projects of one verb run as one moon run
+// (ADR 0019 of tooling/stacks), and moon keeps its own cache: the manifest
 // disables Putnami's. In import mode a project whose language has a Putnami
 // extension runs that extension instead, for each task it runs with the same
 // tool, and every other task and project stays delegated to moon.
@@ -61,7 +62,7 @@ func Stack() (stacks.Stack, error) {
 	if err != nil {
 		return stacks.Stack{}, fmt.Errorf("profile.json: %w", err)
 	}
-	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect}, nil
+	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, ReadBatch: ReadBatch}, nil
 }
 
 // Mode reads the adoption mode of the workspace at root, from its

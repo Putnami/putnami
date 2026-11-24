@@ -19,6 +19,11 @@
       "steps": [
         ["npx", "--no", "nx", "run", "{component}:lint", "--outputStyle=static"]
       ],
+      "batch": {
+        "steps": [
+          ["npx", "--no", "nx", "run-many", "-t", "lint", "-p", "{components}", "--outputStyle=static"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     },
@@ -26,6 +31,11 @@
       "steps": [
         ["npx", "--no", "nx", "run", "{component}:test", "--outputStyle=static"]
       ],
+      "batch": {
+        "steps": [
+          ["npx", "--no", "nx", "run-many", "-t", "test", "-p", "{components}", "--outputStyle=static"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     },
@@ -33,6 +43,11 @@
       "steps": [
         ["npx", "--no", "nx", "run", "{component}:build", "--outputStyle=static"]
       ],
+      "batch": {
+        "steps": [
+          ["npx", "--no", "nx", "run-many", "-t", "build", "-p", "{components}", "--outputStyle=static"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     }

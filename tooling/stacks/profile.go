@@ -195,7 +195,23 @@ type Task struct {
 	// ReportSteps run after the steps whatever their outcome: they write the
 	// reports a runner that fails on a failed case leaves to a converter.
 	ReportSteps [][]string `json:"reportSteps,omitempty"`
+	// Batch runs the task once over several components of a delegated stack
+	// (ADR 0019): the scheduler groups the projects of one verb, and the
+	// stack reads each one's result from the tool's report.
+	Batch *Batch `json:"batch,omitempty"`
 }
+
+// Batch is how a delegated task runs over several components at once.
+type Batch struct {
+	// Steps are the argument vectors run at the stack root. An argument that
+	// holds {component} is repeated once per component, in the order of the
+	// selection; {components} is the components joined with commas; {root}
+	// is the stack root.
+	Steps [][]string `json:"steps"`
+}
+
+// BatchPlaceholder is the components of a batch, joined with commas.
+const BatchPlaceholder = "{components}"
 
 // Target is one target of a task, or one per file a pattern matches.
 type Target struct {
@@ -350,6 +366,9 @@ func (p Profile) Validate() error {
 		}
 		if err := task.validate(p.Inputs); err != nil {
 			return fmt.Errorf("tasks.%s.%w", name, err)
+		}
+		if err := task.validateBatch(p.Delegated); err != nil {
+			return fmt.Errorf("tasks.%s.batch.%w", name, err)
 		}
 	}
 	for _, name := range p.VariantNames() {
@@ -522,6 +541,48 @@ func (t Task) validate(sets map[string][]string) error {
 				}
 			}
 		}
+	}
+	return nil
+}
+
+// validateBatch checks a task's batch: a delegated task's, run at the stack
+// root, and a plain command with no artifact, target, coverage fallback or
+// report step, which read one component at a time.
+func (t Task) validateBatch(delegated bool) error {
+	b := t.Batch
+	if b == nil {
+		return nil
+	}
+	switch {
+	case !delegated:
+		return errors.New("steps: only a delegated profile runs a task over several components")
+	case t.Dir != DirRoot:
+		return errors.New("steps: a batch runs at the stack root: set the task's dir to root")
+	case len(t.Artifacts) > 0, len(t.Targets) > 0, t.WithoutCoverage != nil, len(t.ReportSteps) > 0:
+		return errors.New("steps: a task with artifacts, targets, withoutCoverage or reportSteps runs one component at a time")
+	}
+	if len(b.Steps) == 0 {
+		return errors.New("steps: a batch runs at least one step")
+	}
+	names := false
+	for i, step := range b.Steps {
+		if len(step) == 0 || step[0] == "" {
+			return fmt.Errorf("steps[%d]: a step names a program", i)
+		}
+		for _, arg := range step {
+			for _, ph := range placeholderExpr.FindAllString(arg, -1) {
+				switch ph {
+				case "{component}", BatchPlaceholder:
+					names = true
+				case "{root}":
+				default:
+					return fmt.Errorf("steps[%d]: %s is no batch placeholder; use {root}, {component} or %s", i, ph, BatchPlaceholder)
+				}
+			}
+		}
+	}
+	if !names {
+		return fmt.Errorf("steps: no step names {component} or %s", BatchPlaceholder)
 	}
 	return nil
 }
@@ -813,17 +874,24 @@ func (p Profile) merge(override json.RawMessage, kind string) (Profile, error) {
 	return out, nil
 }
 
-// dropStaleFallbacks removes the withoutCoverage of a task whose steps the
-// override replaces: those steps are not the ones the fallback stands for.
+// dropStaleFallbacks removes the withoutCoverage and the batch of a task whose
+// steps the override replaces: those steps are not the ones the fallback or
+// the batch stands for, so the task runs its new steps alone unless the
+// override states its batch too.
 func dropStaleFallbacks(merged, over map[string]any) {
 	overTasks, _ := over["tasks"].(map[string]any)
 	mergedTasks, _ := merged["tasks"].(map[string]any)
 	for name, value := range overTasks {
 		task, _ := value.(map[string]any)
 		_, replaced := task["steps"]
-		_, restated := task["withoutCoverage"]
-		if target, ok := mergedTasks[name].(map[string]any); ok && replaced && !restated {
-			delete(target, "withoutCoverage")
+		target, ok := mergedTasks[name].(map[string]any)
+		if !ok || !replaced {
+			continue
+		}
+		for _, member := range []string{"withoutCoverage", "batch"} {
+			if _, restated := task[member]; !restated {
+				delete(target, member)
+			}
 		}
 	}
 }

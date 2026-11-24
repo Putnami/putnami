@@ -221,7 +221,7 @@
       }
     },
     "lint-run": {
-      "description": "Run moon run <project>:<task> at the workspace root for one project, after the moon version check, where <task> is the moon task named or tagged lint. Putnami's cache is off: moon's cache decides what reruns.",
+      "description": "Run moon run <project>:<task> at the workspace root for one project, after the moon version check, where <task> is the moon task named or tagged lint. The projects of one verb run as one moon run <a>:<task> <b>:<task>, each result read from moon's run report. Putnami's cache is off: moon's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -256,6 +256,9 @@
       "cache": {
         "enabled": false
       },
+      "batchable": {
+        "tool": "moon"
+      },
       "declares": {
         "outputs": {
           "reports": {
@@ -273,7 +276,7 @@
       }
     },
     "test-run": {
-      "description": "Run moon run <project>:<task> at the workspace root for one project, after the moon version check, where <task> is the moon task named or tagged test; then read the JUnit and coverage reports the project's options name. A failed case, a step that exits non-zero, or a named report that is missing fails the task. Putnami's cache is off: moon's cache decides what reruns.",
+      "description": "Run moon run <project>:<task> at the workspace root for one project, after the moon version check, where <task> is the moon task named or tagged test; then read the JUnit and coverage reports the project's options name. A failed case, a step that exits non-zero, or a named report that is missing fails the task. The projects of one verb run as one moon run <a>:<task> <b>:<task>, each result read from moon's run report. Putnami's cache is off: moon's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -308,6 +311,9 @@
       "cache": {
         "enabled": false
       },
+      "batchable": {
+        "tool": "moon"
+      },
       "declares": {
         "outputs": {
           "reports": {
@@ -325,7 +331,7 @@
       }
     },
     "build-run": {
-      "description": "Run moon run <project>:<task> at the workspace root for one project, after the moon version check, where <task> is the moon task named or tagged build. Putnami's cache is off: moon's cache decides what reruns.",
+      "description": "Run moon run <project>:<task> at the workspace root for one project, after the moon version check, where <task> is the moon task named or tagged build. The projects of one verb run as one moon run <a>:<task> <b>:<task>, each result read from moon's run report. Putnami's cache is off: moon's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -359,6 +365,9 @@
       },
       "cache": {
         "enabled": false
+      },
+      "batchable": {
+        "tool": "moon"
       },
       "declares": {
         "outputs": {
