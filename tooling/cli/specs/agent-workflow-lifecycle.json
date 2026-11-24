@@ -142,6 +142,13 @@
       ]
     },
     {
+      "id": "host-hooks-async",
+      "text": [
+        "A Claude Code hook that declares async is written with \"async\": true, and the host runs it in the background: the turn does not wait for it.",
+        "A wake hook is written with \"asyncRewake\": true, and an ordinary hook with neither."
+      ]
+    },
+    {
       "id": "user-scope-skills",
       "text": [
         "`extensions install --user <name>` writes only the skills the extension's `agentContent.userScope` names, under the user's home (`.claude/skills/<skill>`, `.agents/skills/<skill>`), from the content its pin binds, under the workspace's ownership rules: a file it did not write or that was edited is kept and reported, and one collision writes nothing.",
@@ -185,6 +192,7 @@
     "tooling/cli/doc/adr/0047-extension-owned-agent-content.md",
     "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md",
     "tooling/cli/doc/adr/0081-the-core-writes-declared-host-hooks.md",
+    "protocols/extension/doc/adr/0020-a-host-hook-may-run-at-the-prompt-in-the-background.md",
     "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

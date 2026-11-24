@@ -261,6 +261,19 @@
         }
       },
       {
+        "id": "host-hooks-async",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-async-hook-runs-in-the-background"
+          ]
+        }
+      },
+      {
         "id": "user-scope-skills",
         "stage": "coded",
         "evidenceKinds": [

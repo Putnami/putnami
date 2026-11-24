@@ -114,6 +114,7 @@
         "model": { "type": "string", "maxLength": 128, "description": "One line." },
         "branch": { "type": "string", "maxLength": 256, "description": "One line." },
         "lastMessage": { "type": "string", "maxLength": 4096 },
+        "lastPrompt": { "type": "string", "maxLength": 4096, "description": "The last request the person sent the session. Sent only to a provider that declares it; absent keeps the request the provider holds." },
         "error": { "type": "string", "maxLength": 1024, "description": "Only when state is failed." },
         "waitUntil": { "$ref": "collaboration.json#/$defs/timestamp", "description": "Required when state is waiting, and only then." },
         "plan": { "$ref": "#/$defs/plan", "description": "Replaces the mission's plan. Absent keeps it; an empty list of steps clears it." },

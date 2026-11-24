@@ -1118,3 +1118,33 @@ func TestPrepare_SendsADeclaredSessionURL(t *testing.T) {
 		}
 	}
 }
+
+// TestPrepare_SendsADeclaredLastPrompt: a sync's lastPrompt reaches a
+// provider whose sync operation declares it, and the CLI removes it from a
+// request to a provider that declares only the other members, leaving the
+// rest of the sync as it was.
+func TestPrepare_SendsADeclaredLastPrompt(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "declared-last-prompt", "the-cli-drops-an-undeclared-last-prompt")
+	spectest.Proves(t, "collaboration/provider-contract", "declared-last-prompt", "the-cli-sends-a-declared-last-prompt")
+	sync := `{"session":{"engine":"claude-code","id":"s1"},"mission":{"repository":"putnami/putnami","key":"issue-1412"},` +
+		`"event":"stop","state":"handed_back","observedAt":"2026-11-24T09:00:00Z","lastMessage":"Done.","lastPrompt":"Fix the build.\nThen push."}`
+	declared := routeSync(t, sync, collab.MissionMembers...)
+	var sent collab.MissionsSyncInput
+	if err := json.Unmarshal(declared.Arguments, &sent); err != nil {
+		t.Fatal(err)
+	}
+	if sent.LastPrompt != "Fix the build.\nThen push." {
+		t.Fatalf("a provider that declares lastPrompt received %q in %s", sent.LastPrompt, declared.Arguments)
+	}
+	undeclared := routeSync(t, sync, collab.MissionMemberMissedSyncs, collab.MissionMemberSessionURL)
+	if strings.Contains(string(undeclared.Arguments), "lastPrompt") {
+		t.Fatalf("a provider that does not declare lastPrompt received it: %s", undeclared.Arguments)
+	}
+	sent = collab.MissionsSyncInput{}
+	if err := json.Unmarshal(undeclared.Arguments, &sent); err != nil {
+		t.Fatal(err)
+	}
+	if sent.LastMessage != "Done." || sent.Mission.Key != "issue-1412" {
+		t.Fatalf("the rest of the sync changed: %+v", sent)
+	}
+}

@@ -334,6 +334,13 @@ carries such a member and could not tell which request members the provider
 reads, so it refuses the stamp instead. The floor binds a manifest wherever it
 loads from. Only a manifest whose provider operation declares members is
 stamped 24.
+Contract `25` (`PromptHostHooksContract`) is additive for a host hook at
+Claude Code's `UserPromptSubmit` event or one that declares `async`. From 25
+on, the CLI accepts the event and writes an async hook with `"async": true`,
+so Claude Code runs it in the background and the turn does not wait for it. A
+reader below 25 would refuse the event or the member, or write the hook in
+the foreground, so it refuses the stamp instead. The floor binds a manifest
+wherever it loads from. Only a manifest with such a hook is stamped 25.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

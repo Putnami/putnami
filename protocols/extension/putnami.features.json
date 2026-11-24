@@ -333,7 +333,9 @@
               "changed-files-below-contract-16-do-not-load",
               "host-hooks-require-contract-17",
               "host-hooks-below-contract-17-do-not-load",
-              "a-closure-command-dependency-requires-contract-22"
+              "a-closure-command-dependency-requires-contract-22",
+              "prompt-host-hooks-require-contract-25",
+              "prompt-host-hooks-below-contract-25-do-not-load"
             ]
           }
         },
@@ -348,7 +350,8 @@
             "checks": [
               "host-hook-counter-examples-report-exact-codes",
               "host-hook-hosts-and-events-are-closed",
-              "a-host-hook-refuses-an-unknown-member"
+              "a-host-hook-refuses-an-unknown-member",
+              "only-a-claude-code-hook-runs-in-the-background"
             ]
           }
         },

@@ -2,6 +2,7 @@ package agentctx
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -836,6 +837,45 @@ func TestHostHookGuardsMapExitCodes(t *testing.T) {
 		}
 		if got, err := os.ReadFile(seen); err != nil || string(got) != "1" {
 			t.Errorf("%s hook: the launcher saw %s %q (%v), want 1", tc.guardName, shared.NoAutoInstallEnv, got, err)
+		}
+	}
+}
+
+// An async hook is written to run in the background, with the exit guard of
+// an ordinary hook; a wake hook keeps asyncRewake, and an ordinary hook
+// carries neither member.
+func TestHostHookAsyncRunsInTheBackground(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "host-hooks-async", "an-async-hook-runs-in-the-background")
+	path := []string{"agent", "hook"}
+	group := renderHostHookGroup(extproto.HostClaudeCode, "putnami", path,
+		extproto.HostHookEntry{Event: extproto.HostHookEventUserPromptSubmit, Args: []string{"--engine", "claude-code"}, Async: true, TimeoutSeconds: 30})
+	if group.Matcher != "" {
+		t.Fatalf("a prompt hook has matcher %q", group.Matcher)
+	}
+	handler := group.Hooks[0]
+	if want := "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine claude-code || true"; handler.Command != want || !handler.Async || handler.AsyncRewake {
+		t.Fatalf("async handler = %+v, want command %q with async only", handler, want)
+	}
+	data, err := json.Marshal(handler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte(`"async":true`)) || bytes.Contains(data, []byte("asyncRewake")) {
+		t.Fatalf("async handler JSON = %s", data)
+	}
+	for _, entry := range []extproto.HostHookEntry{
+		{Event: "Stop", TimeoutSeconds: 30},
+		{Event: "Stop", Args: []string{"--idle-wake"}, Wake: true, TimeoutSeconds: 660},
+	} {
+		data, err := json.Marshal(renderHostHookGroup(extproto.HostClaudeCode, "putnami", path, entry).Hooks[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Contains(data, []byte(`"async"`)) {
+			t.Fatalf("a hook without async writes it: %s", data)
+		}
+		if got := bytes.Contains(data, []byte(`"asyncRewake":true`)); got != entry.Wake {
+			t.Fatalf("asyncRewake written = %v for wake %v: %s", got, entry.Wake, data)
 		}
 	}
 }

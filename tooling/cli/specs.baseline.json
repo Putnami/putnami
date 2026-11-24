@@ -8,6 +8,7 @@
     "cli/agent-workflow-lifecycle#extension-agent-content-integrity",
     "cli/agent-workflow-lifecycle#host-hook-relay",
     "cli/agent-workflow-lifecycle#host-hook-relay-passthrough",
+    "cli/agent-workflow-lifecycle#host-hooks-async",
     "cli/agent-workflow-lifecycle#host-hooks-exit-guard",
     "cli/agent-workflow-lifecycle#host-hooks-ownership-by-command",
     "cli/agent-workflow-lifecycle#host-hooks-user-files",

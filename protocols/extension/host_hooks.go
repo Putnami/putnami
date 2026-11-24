@@ -40,10 +40,15 @@ const (
 // HostHookEventPostToolUse is the one event that takes a tool matcher.
 const HostHookEventPostToolUse = "PostToolUse"
 
+// HostHookEventUserPromptSubmit is the Claude Code event that hands a hook the
+// person's request before the turn starts. A hook there requires
+// protocolcli.PromptHostHooksContract.
+const HostHookEventUserPromptSubmit = "UserPromptSubmit"
+
 // hostHookEvents is the closed list of events each host runs a hook at, in the
 // order the CLI writes new event keys.
 var hostHookEvents = map[string][]string{
-	HostClaudeCode: {"SessionStart", HostHookEventPostToolUse, "Stop", "StopFailure", "SessionEnd"},
+	HostClaudeCode: {"SessionStart", HostHookEventUserPromptSubmit, HostHookEventPostToolUse, "Stop", "StopFailure", "SessionEnd"},
 	HostCodex:      {"SessionStart", HostHookEventPostToolUse, "Stop"},
 }
 
@@ -112,6 +117,12 @@ type HostHookEntry struct {
 	// Claude Code supports it. Every other exit code, and every exit code of an
 	// entry without Wake, leaves the session as it is.
 	Wake bool `json:"wake,omitempty"`
+	// Async asks the host to run the hook in the background: the session
+	// goes on at once, and the hook's output and exit code change nothing.
+	// Only Claude Code supports it, and a wake entry, which already runs in
+	// the background, does not declare it. It requires
+	// protocolcli.PromptHostHooksContract.
+	Async bool `json:"async,omitempty"`
 	// TimeoutSeconds is how long the host lets the hook run, 1 to
 	// MaxHostHookTimeoutSeconds.
 	TimeoutSeconds int `json:"timeoutSeconds"`
@@ -122,6 +133,23 @@ type HostHookEntry struct {
 // absent.
 func DeclaresHostHooks(m *Manifest) bool {
 	return m != nil && m.HostHooks != nil
+}
+
+// DeclaresPromptHostHooks reports whether a host hook of the manifest runs at
+// UserPromptSubmit or declares async: the vocabulary of
+// protocolcli.PromptHostHooksContract.
+func DeclaresPromptHostHooks(m *Manifest) bool {
+	if !DeclaresHostHooks(m) {
+		return false
+	}
+	for _, entries := range m.HostHooks.Hosts {
+		for _, entry := range entries {
+			if entry.Event == HostHookEventUserPromptSubmit || entry.Async {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 var (
@@ -296,6 +324,14 @@ func validateHostHookEntry(host string, events []string, field string, entry Hos
 		diags = append(diags, diag.Errorf("invalid-host-hook-wake", field+".wake",
 			"only %s starts a turn from a hook; host %s cannot wake", HostClaudeCode, host))
 	}
+	switch {
+	case entry.Async && host != HostClaudeCode:
+		diags = append(diags, diag.Errorf("invalid-host-hook-async", field+".async",
+			"only %s runs a hook in the background; host %s cannot", HostClaudeCode, host))
+	case entry.Async && entry.Wake:
+		diags = append(diags, diag.Errorf("invalid-host-hook-async", field+".async",
+			"a wake hook already runs in the background; declare wake or async, not both"))
+	}
 	if entry.TimeoutSeconds < 1 || entry.TimeoutSeconds > MaxHostHookTimeoutSeconds {
 		diags = append(diags, diag.Errorf("invalid-host-hook-timeout", field+".timeoutSeconds",
 			"timeoutSeconds must be from 1 to %d, got %d", MaxHostHookTimeoutSeconds, entry.TimeoutSeconds))
@@ -324,6 +360,6 @@ func validateHostHookNames(field string, names []string, format *regexp.Regexp, 
 // hostHookEntryKey identifies what a hook does, without its timeout: two
 // entries with the same key would run the same command at the same point.
 func hostHookEntryKey(entry HostHookEntry) string {
-	return fmt.Sprintf("%s\x00%s\x00%s\x00%t", entry.Event,
-		strings.Join(entry.Tools, "\x01"), strings.Join(entry.Args, "\x01"), entry.Wake)
+	return fmt.Sprintf("%s\x00%s\x00%s\x00%t\x00%t", entry.Event,
+		strings.Join(entry.Tools, "\x01"), strings.Join(entry.Args, "\x01"), entry.Wake, entry.Async)
 }

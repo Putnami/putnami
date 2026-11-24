@@ -226,10 +226,18 @@ func TestTheManifestOffersMemoryAndMissions(t *testing.T) {
 			t.Errorf("%s v%d %s has a handler and is not declared", key.Contract, key.Version, key.Operation)
 		}
 	}
+	// agency-api's sync route takes no last_prompt yet, so sync declares
+	// every mission member but lastPrompt, and the CLI drops that one.
+	var syncMembers []string
+	for _, member := range collab.MissionMembers {
+		if member != collab.MissionMemberLastPrompt {
+			syncMembers = append(syncMembers, member)
+		}
+	}
 	for _, version := range []int{1, 2} {
 		missions, _ := offer.Operations(collab.ContractMissions, version)
-		if got := missions[collab.OperationSync].Members(); !slices.Equal(got, collab.MissionMembers) {
-			t.Errorf("missions v%d sync declares %v, want %v", version, got, collab.MissionMembers)
+		if got := missions[collab.OperationSync].Members(); !slices.Equal(got, syncMembers) {
+			t.Errorf("missions v%d sync declares %v, want %v", version, got, syncMembers)
 		}
 		if got := missions[collab.OperationStatus].Members(); !slices.Equal(got, collab.MissionStatusMembers) {
 			t.Errorf("missions v%d status declares %v, want %v", version, got, collab.MissionStatusMembers)

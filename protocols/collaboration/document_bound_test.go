@@ -189,6 +189,7 @@ func maximalSyncInput() *MissionsSyncInput {
 	}
 	sessionURL := "https://claude.ai/code/" + strings.Repeat("s", MaxSessionURLLength-len("https://claude.ai/code/"))
 	input.SessionURL = &sessionURL
+	input.LastPrompt = fill(MaxLastPromptLength)
 	for i := range MaxListMembers {
 		input.Delivered = append(input.Delivered, maximalID(i))
 	}

@@ -59,6 +59,11 @@ type sessionCache struct {
 	// carried none or cleared it: a sync sends the address only when it
 	// differs from this one.
 	SessionURL string `json:"session_url,omitempty"`
+	// LastPrompt is the person's last request, cut to
+	// collab.MaxLastPromptLength characters, and PromptSent whether an ok sync
+	// carried it: a sync sends it until one did.
+	LastPrompt string `json:"last_prompt,omitempty"`
+	PromptSent bool   `json:"prompt_sent,omitempty"`
 
 	Mission sessionMissionState `json:"mission"`
 

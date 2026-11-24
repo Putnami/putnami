@@ -166,14 +166,15 @@
     {
       "id": "later-rungs-raise-the-contract-floor",
       "text": [
-        "A step that gates on or binds the run's changed files requires contract 16, a hostHooks member contract 17, and a dependency on a command across the dependency closure, ^command, contract 22, each only when used.",
+        "A step that gates on or binds the run's changed files requires contract 16, a hostHooks member contract 17, a dependency on a command across the dependency closure, ^command, contract 22, and a host hook at UserPromptSubmit or one that declares async contract 25, each only when used.",
         "A manifest stamped below the rung its vocabulary requires does not load."
       ]
     },
     {
       "id": "host-hooks-are-closed-and-bounded",
       "text": [
-        "A hostHooks member names only the hosts claude-code and codex, and only the events that host runs a hook at; PostToolUse alone takes a tool matcher.",
+        "A hostHooks member names only the hosts claude-code and codex, and only the events that host runs a hook at, UserPromptSubmit for claude-code alone; PostToolUse alone takes a tool matcher.",
+        "Only a claude-code hook declares async, and never with wake: it runs in the background.",
         "A timeout is at most 3600 seconds, and every name, argument and matcher list is bounded.",
         "The strict parser refuses an unknown member, and each counter-example reports its exact code."
       ]
@@ -217,6 +218,7 @@
     "protocols/extension/doc/adr/0012-a-provisioned-candidate-names-the-pinned-archive-executable.md",
     "protocols/extension/doc/adr/0013-a-default-that-takes-positionals-requires-contract-15.md",
     "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md",
+    "protocols/extension/doc/adr/0020-a-host-hook-may-run-at-the-prompt-in-the-background.md",
     "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md",
     "protocols/collaboration/doc/adr/0007-a-declared-result-member-may-join-version-1.md"
   ]

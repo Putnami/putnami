@@ -60,7 +60,7 @@ when it resolves a binding:
   catalog lists for the operation: on `tasks.get`, the result members
   `parentProgress`, `blockedBy`, `blocking` and `comments`
   ([task context](01-operations.md#task-context)); on `missions.sync`, the
-  request members `missedSyncs` and `sessionUrl`, and on `missions.status`,
+  request members `lastPrompt`, `missedSyncs` and `sessionUrl`, and on `missions.status`,
   the result member `missedSyncs`; on `proposals.find`, `upsert`, `status`,
   `merge` and `automerge`, the result member `pageUrl`, the link to the
   proposal's change in your own console. Return a listed result member only

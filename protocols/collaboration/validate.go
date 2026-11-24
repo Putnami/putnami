@@ -38,6 +38,7 @@ const (
 	MaxModelLength        = 128
 	MaxBranchLength       = 256
 	MaxLastMessageLength  = 4096
+	MaxLastPromptLength   = 4096
 	MaxErrorLength        = 1024
 	MaxPlanStepTextLength = 300
 	MaxSyncDecisions      = 20
@@ -1244,6 +1245,7 @@ func (c *checker) syncInput(in *MissionsSyncInput) {
 	c.bounded("model", in.Model, MaxModelLength, false)
 	c.bounded("branch", in.Branch, MaxBranchLength, false)
 	c.text("lastMessage", in.LastMessage, MaxLastMessageLength, false)
+	c.text("lastPrompt", in.LastPrompt, MaxLastPromptLength, false)
 	c.sessionOutcome("", in.State, in.Error, in.WaitUntil)
 	if in.Plan != nil {
 		c.plan("plan", *in.Plan)

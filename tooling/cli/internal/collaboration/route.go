@@ -112,6 +112,9 @@ func dropUndeclaredMembers(input any, declared []string) {
 	if !slices.Contains(declared, collab.MissionMemberSessionURL) {
 		in.SessionURL = nil
 	}
+	if !slices.Contains(declared, collab.MissionMemberLastPrompt) {
+		in.LastPrompt = ""
+	}
 }
 
 // requestPrecondition names the write precondition a request carries — an

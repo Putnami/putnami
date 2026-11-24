@@ -345,7 +345,14 @@ const CommandLayerInputsContract = 23
 // stamp instead.
 const ProviderMembersContract = 24
 
+// PromptHostHooksContract is required by a manifest with a host hook at
+// Claude Code's UserPromptSubmit event or a host hook that declares async. A
+// reader at this contract accepts the event and writes an async hook to run
+// in the background, so an older reader, which would refuse the event or the
+// member, or write the hook in the foreground, refuses the stamp instead.
+const PromptHostHooksContract = 25
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = ProviderMembersContract
+const LatestContract = PromptHostHooksContract

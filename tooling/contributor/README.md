@@ -147,7 +147,8 @@ Each hook runs `putnami host-hook agent hook`: the relay serves the event from
 the workspace of its `cwd`, in a repository where you ran Putnami,
 and the executable serves `agent hook`. When both
 files run the same event, the first hook claims it and the second does
-nothing ([ADR 0016](doc/adr/0016-an-event-two-hook-sources-send-is-handled-once.md)):
+nothing ([ADR 0016](doc/adr/0016-an-event-two-hook-sources-send-is-handled-once.md));
+a request takes no claim, since recording it twice changes nothing:
 
 - At session start, the agent receives its mission sheet and the owner's
   waiting messages.
@@ -176,6 +177,15 @@ nothing ([ADR 0016](doc/adr/0016-an-event-two-hook-sources-send-is-handled-once.
   one once when it is gone, as when Remote Control disconnects
   ([collaboration ADR 0012](../../protocols/collaboration/doc/adr/0012-a-sync-carries-the-sessions-web-address.md)).
   A Codex session sends none.
+- A Claude Code session sends the person's last request as `lastPrompt`, so
+  the mission shows the question next to the agent's last message. A hook at
+  `UserPromptSubmit`, which Claude Code runs in the background, keeps the
+  request, cut at 4096 characters, in place of the one before; the next sync
+  sends it once, and again to a mission the session moves to. An empty request sends nothing, and a message the hook
+  delivered is not taken for the person's request
+  ([collaboration ADR 0013](../../protocols/collaboration/doc/adr/0013-a-sync-carries-the-persons-last-request.md)).
+  The CLI sends it only to a missions provider that declares the member;
+  `@putnami/cloud` does not yet. A Codex session sends none.
 
 A session reports to `branch:<branch>` until `putnami agent attach --issue <n>`
 makes `issue-<n>` the mission of the checkout's branch. Each Stop and each

@@ -87,6 +87,15 @@
       ]
     },
     {
+      "id": "last-prompt",
+      "text": [
+        "A Claude Code UserPromptSubmit hook, run in the background, records the person's request, cut at 4096 characters, in place of the last one; no git, no sync.",
+        "An empty request, or one that renders a message the session delivered, records nothing.",
+        "The next sync sends it as lastPrompt; after an ok answer none goes until a new request or another mission. Codex sends none.",
+        "A sync refused as invalid while it carries lastPrompt goes once without it."
+      ]
+    },
+    {
       "id": "missed-syncs",
       "text": [
         "The session cache counts the syncs that failed since the last one that succeeded, with the reason and time of the last one.",
@@ -151,7 +160,8 @@
       "text": [
         "agent hook claims each event before it handles it: the digest of the engine, the idle-wake flag and the payload bytes names a marker created exclusively in the session directory.",
         "A hook that finds a marker younger than 60 seconds prints nothing and exits 0, so an event two hook sources send is handled once.",
-        "A claim removes older markers, and a marker it cannot write is logged and the event handled."
+        "A claim removes older markers, and a marker it cannot write is logged and the event handled.",
+        "UserPromptSubmit takes no claim: a request recorded twice changes nothing."
       ]
     },
     {
@@ -173,6 +183,7 @@
     "tooling/contributor/doc/adr/0007-the-contributor-declares-agent-session-hooks.md",
     "tooling/contributor/doc/adr/0018-a-plan-change-syncs-within-the-turn.md",
     "protocols/collaboration/doc/adr/0012-a-sync-carries-the-sessions-web-address.md",
+    "protocols/collaboration/doc/adr/0013-a-sync-carries-the-persons-last-request.md",
     "protocols/collaboration/doc/adr/0009-a-declared-request-member-may-join-version-1.md"
   ]
 }

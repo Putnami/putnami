@@ -1,6 +1,8 @@
 # ADR 0016 — An event two hook sources send is handled once
 
-- **Status**: accepted
+- **Status**: accepted; amended by
+  [collaboration ADR 0013](../../../../protocols/collaboration/doc/adr/0013-a-sync-carries-the-persons-last-request.md),
+  decision 2: a `UserPromptSubmit` event takes no claim
 - **Date**: 2026-11-17
 - **Scope**: `@putnami/contributor` (`internal/agentsession`, `agent hook`)
 - **Amends**: [ADR 0007](0007-the-contributor-declares-agent-session-hooks.md),

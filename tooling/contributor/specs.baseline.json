@@ -11,6 +11,7 @@
     "tooling/agent-session-hooks#host-channel",
     "tooling/agent-session-hooks#identity-refresh",
     "tooling/agent-session-hooks#idle-wake",
+    "tooling/agent-session-hooks#last-prompt",
     "tooling/agent-session-hooks#missed-syncs",
     "tooling/agent-session-hooks#mission-target",
     "tooling/agent-session-hooks#mission-title",

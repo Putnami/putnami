@@ -10,7 +10,7 @@ import (
 )
 
 // TestOnlyDeclaredOperationsListMembers: tasks.get lists the context members,
-// missions.sync lists missedSyncs and sessionUrl, missions.status lists
+// missions.sync lists lastPrompt, missedSyncs and sessionUrl, missions.status lists
 // missedSyncs, the proposals
 // operations that answer a proposal list pageUrl, each in canonical order,
 // and no other operation of any contract lists a member.
@@ -19,6 +19,7 @@ func TestOnlyDeclaredOperationsListMembers(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "declared-missed-syncs", "only-missions-sync-and-status-declare-missed-syncs")
 	spectest.Proves(t, "collaboration/provider-contract", "declared-page-url", "only-the-operations-that-answer-a-proposal-declare-page-url")
 	spectest.Proves(t, "collaboration/provider-contract", "declared-session-url", "only-missions-sync-declares-session-url")
+	spectest.Proves(t, "collaboration/provider-contract", "declared-last-prompt", "only-missions-sync-declares-last-prompt")
 	for _, vocabulary := range [][]string{TaskContextMembers, MissionMembers, MissionStatusMembers, ProposalMembers} {
 		if !slices.IsSorted(vocabulary) {
 			t.Errorf("member vocabulary %v is not in canonical order", vocabulary)

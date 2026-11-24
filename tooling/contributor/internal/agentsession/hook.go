@@ -33,13 +33,14 @@ const (
 	sessionEventEnd         = "session_end"
 	sessionEventStage       = "stage"
 
-	// The hook events of both engines; StopFailure and SessionEnd are Claude
-	// Code's only.
-	hookEventSessionStart = "SessionStart"
-	hookEventPostToolUse  = "PostToolUse"
-	hookEventStop         = "Stop"
-	hookEventStopFailure  = "StopFailure"
-	hookEventSessionEnd   = "SessionEnd"
+	// The hook events of both engines; UserPromptSubmit, StopFailure and
+	// SessionEnd are Claude Code's only.
+	hookEventSessionStart     = "SessionStart"
+	hookEventUserPromptSubmit = "UserPromptSubmit"
+	hookEventPostToolUse      = "PostToolUse"
+	hookEventStop             = "Stop"
+	hookEventStopFailure      = "StopFailure"
+	hookEventSessionEnd       = "SessionEnd"
 
 	// ExitWake is the exit code of an idle wake that brings a message. The
 	// hook entry the CLI writes turns it into the host's own wake code.
@@ -109,6 +110,8 @@ type hookInput struct {
 	// PromptID names the user prompt the turn answers: Claude Code's, absent
 	// before the first prompt.
 	PromptID string `json:"prompt_id"`
+	// Prompt is the person's request at UserPromptSubmit.
+	Prompt string `json:"prompt"`
 	// AgentID marks a hook that runs for a subagent's tool call, under the
 	// parent's session id.
 	AgentID      string `json:"agent_id"`
@@ -187,7 +190,10 @@ func Hook(ctx context.Context, e *Env, args []string, stdin io.Reader, stdout, s
 		e.log(engine, event, err)
 		return 0
 	}
-	if !e.claimEvent(engine, idleWake, payload) {
+	// A request carries no id of its own, so the same request sent twice
+	// within the claim window would look like one event sent by two hook
+	// sources: it takes no claim. Recording it twice changes nothing.
+	if input.Event != hookEventUserPromptSubmit && !e.claimEvent(engine, idleWake, payload) {
 		// Another hook source sent this event, and that hook handles it.
 		return 0
 	}
@@ -344,6 +350,8 @@ func (e *Env) handleHookEvent(ctx context.Context, engine string, input hookInpu
 	switch input.Event {
 	case hookEventSessionStart:
 		return e.hookSessionStart(ctx, engine, input)
+	case hookEventUserPromptSubmit:
+		return nil, pendingDelivery{}, e.hookUserPromptSubmit(engine, input)
 	case hookEventPostToolUse:
 		return nil, pendingDelivery{}, e.hookPostToolUse(ctx, engine, input)
 	case hookEventStop:
@@ -457,8 +465,9 @@ func (e *Env) openSession(cache *sessionCache, engine string, input hookInput, i
 
 // refreshMissionKey reads the mission declared for the cached checkout and
 // branch: a file read, no git. A new key starts a new mission, and the next
-// sync sends it the session's plan, unless empty: the provider may retire the
-// mission the session left, plan included.
+// sync sends it the session's plan, unless empty, and the person's last
+// request: the provider may retire the mission the session left, plan
+// included.
 func refreshMissionKey(cache *sessionCache, dir string) {
 	key := ""
 	if cache.Root != "" {
@@ -467,6 +476,7 @@ func refreshMissionKey(cache *sessionCache, dir string) {
 	if key != cache.Mission.Key {
 		cache.Mission = sessionMissionState{Key: key}
 		cache.PlanSynced = ""
+		cache.PromptSent = false
 	}
 }
 
@@ -565,7 +575,12 @@ func sessionStartSystemMessage(syncErr error, retired []string) string {
 // hookLockWait, so a tool call uses it only to merge the answer of the sync
 // it sent, never to record its plan change.
 func lockedUpdate(files sessionFiles, change func(*sessionCache) (*sessionCache, error)) error {
-	lock, err := files.lockWithin(hookLockWait)
+	return lockedUpdateWithin(files, hookLockWait, change)
+}
+
+// lockedUpdateWithin is lockedUpdate with its own wait for the session lock.
+func lockedUpdateWithin(files sessionFiles, wait time.Duration, change func(*sessionCache) (*sessionCache, error)) error {
+	lock, err := files.lockWithin(wait)
 	if err != nil {
 		return err
 	}

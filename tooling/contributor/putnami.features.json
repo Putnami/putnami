@@ -397,6 +397,24 @@
           }
         },
         {
+          "id": "last-prompt",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-prompt-reaches-the-next-sync",
+              "a-prompt-is-cut-at-4096-characters",
+              "an-empty-prompt-sends-nothing",
+              "a-new-prompt-replaces-the-last-one",
+              "a-delivered-message-is-not-the-persons-prompt",
+              "a-sync-refused-for-the-prompt-goes-once-without-it"
+            ]
+          }
+        },
+        {
           "id": "missed-syncs",
           "stage": "coded",
           "evidenceKinds": [

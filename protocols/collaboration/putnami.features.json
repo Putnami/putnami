@@ -440,6 +440,22 @@
           }
         },
         {
+          "id": "declared-last-prompt",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-missions-sync-declares-last-prompt",
+              "a-last-prompt-is-bounded-text",
+              "the-cli-drops-an-undeclared-last-prompt",
+              "the-cli-sends-a-declared-last-prompt"
+            ]
+          }
+        },
+        {
           "id": "scenarios-normalize-requests",
           "stage": "coded",
           "evidenceKinds": [

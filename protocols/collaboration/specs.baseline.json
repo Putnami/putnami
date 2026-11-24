@@ -6,6 +6,7 @@
     "collaboration/provider-contract#bounded-documents",
     "collaboration/provider-contract#bounded-pages",
     "collaboration/provider-contract#callers-never-repeat-an-unresolved-write",
+    "collaboration/provider-contract#declared-last-prompt",
     "collaboration/provider-contract#declared-missed-syncs",
     "collaboration/provider-contract#declared-page-url",
     "collaboration/provider-contract#declared-session-url",

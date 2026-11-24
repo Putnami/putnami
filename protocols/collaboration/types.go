@@ -1061,6 +1061,11 @@ type MissionsSyncInput struct {
 	// declared member (MissionMemberSessionURL): the CLI sends it only to a
 	// provider whose sync operation declares it (ADR 0012).
 	SessionURL *string `json:"sessionUrl,omitempty"`
+	// LastPrompt is the last request the person sent the session, at most
+	// MaxLastPromptLength characters. Absent keeps the request the provider
+	// holds. It is a declared member (MissionMemberLastPrompt): the CLI sends
+	// it only to a provider whose sync operation declares it (ADR 0013).
+	LastPrompt string `json:"lastPrompt,omitempty"`
 }
 
 // ProposalMemberPageURL is the declared member of the proposals operations
@@ -1080,10 +1085,14 @@ const MissionMemberMissedSyncs = "missedSyncs"
 // carries the session's web address (ADR 0012).
 const MissionMemberSessionURL = "sessionUrl"
 
+// MissionMemberLastPrompt is the declared member of missions.sync that
+// carries the person's last request (ADR 0013).
+const MissionMemberLastPrompt = "lastPrompt"
+
 // MissionMembers is the closed vocabulary of the declared members of
 // missions.sync, in canonical order. It holds every declared member of the
 // missions contract.
-var MissionMembers = []string{MissionMemberMissedSyncs, MissionMemberSessionURL}
+var MissionMembers = []string{MissionMemberLastPrompt, MissionMemberMissedSyncs, MissionMemberSessionURL}
 
 // MissionStatusMembers is the closed vocabulary of the declared members of
 // missions.status, in canonical order: the members of MissionMembers a

@@ -99,8 +99,9 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: ProviderMembersContract for a provider operation that declares
-// members, DependencyClosureContract for a command that depends on a
+// the manifest: PromptHostHooksContract for a host hook at UserPromptSubmit or
+// one that declares async, ProviderMembersContract for a provider operation
+// that declares members, DependencyClosureContract for a command that depends on a
 // command across its project's dependency closure, BuildGraphEdgesContract for
 // a workspace adapter that declares buildGraphEdges, UserScopeSkillsContract for agent content that names
 // user-scope skills, ProviderContract for a providers section, StepDependencyContract
@@ -232,6 +233,12 @@ func RequiredLoadContract(m *Manifest) int {
 	// manifest loads from.
 	if DeclaresProviderMembers(m) {
 		required = max(required, protocolcli.ProviderMembersContract)
+	}
+	// A hook at the prompt, or one that runs in the background, reaches the
+	// agent host only through a reader that accepts the event and writes the
+	// hook in the background, whatever origin the manifest loads from.
+	if DeclaresPromptHostHooks(m) {
+		required = max(required, protocolcli.PromptHostHooksContract)
 	}
 	return required
 }

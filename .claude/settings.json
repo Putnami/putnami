@@ -90,6 +90,18 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw host-hook agent hook --engine claude-code || true",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
     ]
   }
 }

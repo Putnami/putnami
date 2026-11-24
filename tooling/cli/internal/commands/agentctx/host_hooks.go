@@ -481,11 +481,15 @@ type hostHookHandlerJSON struct {
 	Type        string `json:"type"`
 	Command     string `json:"command"`
 	Timeout     int    `json:"timeout"`
+	Async       bool   `json:"async,omitempty"`
 	AsyncRewake bool   `json:"asyncRewake,omitempty"`
 }
 
 // renderHostHookGroup renders one declared hook for host, started with
 // launcher through the host-hook relay, with the first-use install turned off.
+// An async hook runs in the background ("async"), and a wake hook in the
+// background with a wake on exit 2 ("asyncRewake"); validation keeps both off
+// Codex.
 func renderHostHookGroup(host, launcher string, path []string, entry extproto.HostHookEntry) hostHookGroupJSON {
 	words := append([]string{hostHookEnvironment, launcher, hostHookRelay}, path...)
 	words = append(words, entry.Args...)
@@ -501,6 +505,7 @@ func renderHostHookGroup(host, launcher string, path []string, entry extproto.Ho
 			Type:        "command",
 			Command:     command,
 			Timeout:     entry.TimeoutSeconds,
+			Async:       entry.Async,
 			AsyncRewake: entry.Wake,
 		}},
 	}

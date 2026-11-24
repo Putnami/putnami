@@ -201,7 +201,7 @@ operation must declare `workspaceSelection`.
 
 | Operation | Access | Required | Destructive | Preconditions | Host-only | Request | Result |
 |---|---|---|---|---|---|---|---|
-| `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies`, `stage`, `usage`, `missedSyncs` (declared), `sessionUrl` (declared) | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
+| `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies`, `stage`, `usage`, `missedSyncs` (declared), `sessionUrl` (declared), `lastPrompt` (declared) | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
 | `ask` | mutating | yes | no | — | no | `mission`, `question`, `context`, `options`, `recommendation`, `blocks`, `idempotencyKey` | `decision`, `replayed` |
 | `reply` | mutating | yes | no | — | no | `message`, `reply` | `message`, `replayed` |
 | `status` | read | no | no | — | no | `mission`, `page` | `mission`, `sessions`, `page` |
@@ -283,6 +283,13 @@ address where the owner opens the session on its host's web interface, an
 absolute `https` address of at most 512 characters with no credentials. An
 absent one keeps the address the provider holds, and an empty string clears
 it. The CLI sends it, empty included, only to a provider whose `sync`
+operation names it under `members`.
+
+`lastPrompt` is a declared member of `sync` only
+([ADR 0013](adr/0013-a-sync-carries-the-persons-last-request.md)): the last
+request the person sent the session, at most 4096 characters, so a reader
+sees the question next to the agent's `lastMessage`. An absent one keeps the
+request the provider holds. The CLI sends it only to a provider whose `sync`
 operation names it under `members`.
 
 - `delivered` (at most 100) lists the inbox messages the host gave the agent;

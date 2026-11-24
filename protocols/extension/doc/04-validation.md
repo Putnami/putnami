@@ -208,10 +208,11 @@ the command's exit code reaches the host unchanged.
 | `requires.contract` names a collaboration contract: lowercase letters, digits and hyphens | `required-field`, `invalid-host-hooks-contract` |
 | `command` names a group and an interactive subcommand of this manifest, and any nested subcommand under it | `required-field`, `invalid-host-hooks-command` |
 | A host is `claude-code` or `codex`, and lists at least one hook | `unknown-host-hooks-host`, `empty-host-hooks` |
-| An event is one its host runs: `SessionStart`, `PostToolUse`, `Stop`, `StopFailure` and `SessionEnd` for Claude Code; `SessionStart`, `PostToolUse` and `Stop` for Codex | `unknown-host-hook-event` |
+| An event is one its host runs: `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Stop`, `StopFailure` and `SessionEnd` for Claude Code; `SessionStart`, `PostToolUse` and `Stop` for Codex | `unknown-host-hook-event` |
 | Only `PostToolUse` names `tools` (host tool names), and it names at least one; no name repeats | `invalid-host-hook-matcher` |
 | Every argument is letters, digits and `_ . / : = -`, so the shell reads it as written | `invalid-host-hook-args` |
 | Only a Claude Code hook declares `wake` | `invalid-host-hook-wake` |
+| Only a Claude Code hook declares `async`, which runs it in the background, and never with `wake` | `invalid-host-hook-async` |
 | `timeoutSeconds` is from 1 to 3600 | `invalid-host-hook-timeout` |
 | No two hooks of a host run the same command at the same point | `duplicate-host-hook` |
 
@@ -302,9 +303,10 @@ a workspace adapter that declares `buildGraphEdges`, or
 `protocols/cli.DependencyClosureContract` (22) for a command `dependsOn` entry
 that names a command across the project's dependency closure
 (`^client-generate`), `protocols/cli.CommandLayerInputsContract` (23) for
-a pipeline step that declares `commandLayerInputs`, or
+a pipeline step that declares `commandLayerInputs`,
 `protocols/cli.ProviderMembersContract` (24) for a provider operation that
-declares `members`. Rung 6 named the
+declares `members`, or `protocols/cli.PromptHostHooksContract` (25) for a
+host hook at `UserPromptSubmit` or one that declares `async`. Rung 6 named the
 `go-embed:build` and `go-embed:test` selectors the CLI expanded itself; rung
 14 retires it.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
@@ -378,10 +380,15 @@ name and plan nothing. An entry that holds
 that rung too. A manifest that declares `providers` requires contract 19
 wherever it loads from: a reader at 19 calls each declared operation through
 the provider wire, and an older reader would load the extension with no
-provider. `RequiredLoadContract` includes that rung as well. A manifest that
+provider. `RequiredLoadContract` includes that rung as well. A manifest with
+a host hook at `UserPromptSubmit` or one that declares `async` requires
+contract 25 wherever it loads from: a reader at 25 accepts the event and
+writes an async hook to run in the background, and an older reader would
+refuse the event or the member, or run the hook in the foreground.
+`RequiredLoadContract` includes that rung too. A manifest that
 still carries the deleted `tools` section loads leniently with no provider,
 and strict validation refuses the member. The reader loads every stamp from
-the one the manifest's vocabulary requires up to `protocols/cli.LatestContract` (24):
+the one the manifest's vocabulary requires up to `protocols/cli.LatestContract` (25):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|

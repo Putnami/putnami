@@ -29,8 +29,8 @@ func TestReadProviderOffer_DeclaredSessionURL(t *testing.T) {
 		t.Fatalf("declared sessionUrl was refused: %v", diags)
 	}
 	ops, _ := offer.Operations(ContractMissions, 1)
-	if got := ops[OperationSync].Members(); !slices.Equal(got, []string{MissionMemberMissedSyncs, MissionMemberSessionURL}) {
-		t.Errorf("sync offers members %v, want [missedSyncs sessionUrl]", got)
+	if got := ops[OperationSync].Members(); !slices.Equal(got, []string{MissionMemberLastPrompt, MissionMemberMissedSyncs, MissionMemberSessionURL}) {
+		t.Errorf("sync offers members %v, want [lastPrompt missedSyncs sessionUrl]", got)
 	}
 	misplaced, _ := ReadProviderOffer(declare(OperationStatus, []string{MissionMemberSessionURL}))
 	if len(misplaced.Versions(ContractMissions)) != 0 {
