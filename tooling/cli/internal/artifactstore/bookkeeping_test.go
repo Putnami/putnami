@@ -19,6 +19,9 @@ func TestIsBookkeepingNamesTheSidecarAndItsTemporaryFiles(t *testing.T) {
 		".lastused":              false,
 		"implementationdigest":   true,
 		"implementationdigest-1": true,
+		"runtimeinfo":            true,
+		"runtimeinfo-1234567890": true,
+		"runtimeinfox":           false,
 		"implementation":         false,
 		"implementationdigestx":  false,
 	} {

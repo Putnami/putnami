@@ -46,6 +46,7 @@ type GCResult struct {
 	EvictedIdle   int // evicted for exceeding MaxIdle
 	EvictedBudget int // evicted to get under MaxBytes
 	SweptStaging  int // stale tmp/staging-* dirs removed
+	SweptRecords  int // records idle past MaxIdle removed
 	FreedBytes    int64
 	TotalBytes    int64 // total before eviction
 }
@@ -186,6 +187,7 @@ func (s *Store) GC(opts GCOptions) (*GCResult, error) {
 	}
 
 	res.SweptStaging = s.sweepStaging(now, grace)
+	res.SweptRecords = s.sweepRecords(now, maxIdle)
 	removeEmptyShards(shaRoot)
 	s.pruneDigestLocks()
 	return res, nil
@@ -413,7 +415,7 @@ func readUsed(dir string) (time.Time, bool) {
 }
 
 // dirBytes sums the sizes of all regular files under dir, excluding the
-// lastused recency sidecar and the implementationdigest record (bookkeeping,
+// lastused recency sidecar and the implementationdigest and runtimeinfo records (bookkeeping,
 // not artifact payload) so the budget accounts for the bytes a re-fetch would
 // actually have to recreate.
 func dirBytes(dir string) int64 {
@@ -422,7 +424,7 @@ func dirBytes(dir string) int64 {
 		if err != nil || d.IsDir() {
 			return nil
 		}
-		if d.Name() == lastUsedFile || d.Name() == implementationFile {
+		if d.Name() == lastUsedFile || d.Name() == implementationFile || d.Name() == runtimeInfoFile {
 			return nil
 		}
 		if info, err := d.Info(); err == nil {

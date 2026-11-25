@@ -1106,7 +1106,7 @@ func TestRuntimeHandshakeRetriesTransientTextFileBusy(t *testing.T) {
 		closed <- writer.Close()
 	}()
 
-	err = runRuntimeHandshake(context.Background(), executable, ext, nil, (&handshakeClockProbe{}).clock)
+	_, err = runRuntimeHandshake(context.Background(), executable, ext, nil, (&handshakeClockProbe{}).clock)
 	if closeErr := <-closed; closeErr != nil {
 		t.Fatalf("close held executable: %v", closeErr)
 	}
@@ -1409,7 +1409,7 @@ func TestRuntimeHandshakeTimeoutIsItsOwnVerdict(t *testing.T) {
 				probe.onArm = cancel
 			}
 
-			err := runRuntimeHandshake(ctx, executable, ext, nil, probe.clock)
+			_, err := runRuntimeHandshake(ctx, executable, ext, nil, probe.clock)
 
 			if len(probe.armedPids) == 0 {
 				t.Fatalf("clock never armed; handshake error = %v", err)

@@ -1,7 +1,8 @@
 // Package inputresolve expands the input selectors a run reads: it asks the
 // extension that lists a selector in runtime.inputSelectors, through the
 // workspace protocol's input-resolve call, and keeps each answer for the
-// length of the process while the digest of its basis holds.
+// length of the process, and in a record for the next runs, while the digest
+// of its basis holds.
 //
 // The core knows no selector. An extension answers which files a selector
 // reads in a project and the basis it computed them from
@@ -48,6 +49,9 @@ type Resolver struct {
 	// newProvider builds an extension's provider on its first call.
 	newProvider func(name string) provider
 
+	// records are the answers kept between runs; nil keeps none.
+	records *records
+
 	mu        sync.Mutex
 	providers map[string]provider
 	answers   map[string]kept
@@ -74,7 +78,7 @@ func New(ctx context.Context, ws *workspace.Workspace, extensions []*extension.E
 			byName[ext.Name] = ext
 		}
 	}
-	return newResolver(ws.Root, extensions, func(name string) provider {
+	resolver := newResolver(ws.Root, extensions, func(name string) provider {
 		ext := byName[name]
 		return &workspace.ExecProbeProvider{
 			Extension:         ext.Name,
@@ -84,6 +88,8 @@ func New(ctx context.Context, ws *workspace.Workspace, extensions []*extension.E
 			PreparedBeforeRun: !extension.StartsRepositoryCode(ws.Root, ext),
 		}
 	})
+	resolver.records = newRecords(store.ResolveArtifactStoreRoot(ws.Root), ws.Root, byName, ws.ProbeDigest)
+	return resolver
 }
 
 // newResolver is New with the provider of each extension built by
@@ -153,6 +159,9 @@ func (r *Resolver) ResolveInput(query store.InputQuery) (store.InputExpansion, e
 	if expansion, ok := r.exact(key, query.Dir); ok {
 		return expansion, nil
 	}
+	if expansion, ok := r.recorded(query.Extension, key, query.Dir); ok {
+		return expansion, nil
+	}
 	// An answer that lists a file removed before its basis is digested is
 	// stale: ask again, and keep the last answer whatever it lists.
 	for attempt := 1; ; attempt++ {
@@ -165,7 +174,7 @@ func (r *Resolver) ResolveInput(query store.InputQuery) (store.InputExpansion, e
 			return store.InputExpansion{}, fmt.Errorf("%w: %s answers %s in %s: %s",
 				store.ErrInputSelector, query.Extension, query.Selector, asked.Project, answer.Error)
 		}
-		expansion, recorded, err := r.keep(key, query.Dir, answer, attempt == staleAnswerAsks)
+		expansion, recorded, err := r.keep(query.Extension, key, query.Dir, answer, attempt == staleAnswerAsks)
 		if err != nil {
 			return store.InputExpansion{}, fmt.Errorf("%w: %s %s in %s: %w", store.ErrInputSelector, query.Extension, query.Selector, asked.Project, err)
 		}
@@ -225,9 +234,13 @@ func (r *Resolver) prime(name string, inputs []pendingInput) {
 	defer call.Unlock()
 	var ask []pendingInput
 	for _, input := range inputs {
-		if !r.holds(input.key) {
-			ask = append(ask, input)
+		if r.holds(input.key) {
+			continue
 		}
+		if _, ok := r.recorded(name, input.key, input.dir); ok {
+			continue
+		}
+		ask = append(ask, input)
 	}
 	if len(ask) == 0 {
 		return
@@ -242,7 +255,7 @@ func (r *Resolver) prime(name string, inputs []pendingInput) {
 	}
 	for i, answer := range answers {
 		if answer.Error == "" {
-			_, _, _ = r.keep(ask[i].key, ask[i].dir, answer, false)
+			_, _, _ = r.keep(name, ask[i].key, ask[i].dir, answer, false)
 		}
 	}
 }
@@ -340,9 +353,31 @@ func (r *Resolver) exact(key, dir string) (store.InputExpansion, bool) {
 // each answer lists a file that is gone once its basis is digested.
 const staleAnswerAsks = 3
 
+// recorded returns the answer the records hold for key, and keeps it, when
+// the digest of its basis under dir holds and every file it lists is there.
+func (r *Resolver) recorded(extensionName, key, dir string) (store.InputExpansion, bool) {
+	answer, ok := r.records.read(extensionName, key)
+	if !ok {
+		return store.InputExpansion{}, false
+	}
+	digest, err := wsproto.InputBasisDigest(dir, answer.expansion.Basis)
+	if err != nil || digest != answer.digest {
+		return store.InputExpansion{}, false
+	}
+	for _, rel := range answer.expansion.Files {
+		if _, err := os.Lstat(filepath.Join(dir, filepath.FromSlash(rel))); err != nil {
+			return store.InputExpansion{}, false
+		}
+	}
+	r.mu.Lock()
+	r.answers[key] = answer
+	r.mu.Unlock()
+	return answer.expansion, true
+}
+
 // keep records an answer that is not an error at key with the digest of its
-// basis under dir, and returns it as an expansion, with whether it recorded
-// it.
+// basis under dir, in the resolver and in the records of extensionName, and
+// returns it as an expansion, with whether it recorded it.
 //
 // The digest reads the tree after the extension listed it. A listed file that
 // is gone by then was removed in between, as a write through a temporary file
@@ -351,7 +386,7 @@ const staleAnswerAsks = 3
 // file that stays missing, and the key that reads the answer reports it. A
 // path of the basis that is gone when the digest reads it makes the answer
 // stale alike, and an error once evenStale.
-func (r *Resolver) keep(key, dir string, answer wsproto.InputResolveAnswer, evenStale bool) (store.InputExpansion, bool, error) {
+func (r *Resolver) keep(extensionName, key, dir string, answer wsproto.InputResolveAnswer, evenStale bool) (store.InputExpansion, bool, error) {
 	expansion := store.InputExpansion{Files: slices.Clone(answer.Files), Basis: answer.Basis}
 	digest, err := wsproto.InputBasisDigest(dir, answer.Basis)
 	if err != nil {
@@ -372,6 +407,7 @@ func (r *Resolver) keep(key, dir string, answer wsproto.InputResolveAnswer, even
 	r.mu.Lock()
 	r.answers[key] = kept{expansion: expansion, digest: digest}
 	r.mu.Unlock()
+	r.records.write(extensionName, key, kept{expansion: expansion, digest: digest})
 	return expansion, true, nil
 }
 

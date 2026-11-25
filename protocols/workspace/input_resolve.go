@@ -7,7 +7,10 @@
 // files each selector reads now, and the extension answers with those files
 // and the basis it computed them from. The basis is a list of pattern sets in
 // the file-pattern grammar; InputBasisDigest hashes the tree as the basis
-// selects it, so a consumer can keep an answer while that digest holds.
+// selects it, so a consumer can keep an answer while that digest holds, in
+// one run or between runs. An answer is therefore a function of the tree its
+// basis selects, the request and the extension's implementation alone: it
+// never depends on the environment, the time or the machine.
 //
 // Every path of the exchange is relative to the asked project directory,
 // except the project itself, which is relative to the workspace root. The

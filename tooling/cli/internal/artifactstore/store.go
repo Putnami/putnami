@@ -17,11 +17,14 @@
 //	  sha256/<digest[:2]>/<digest>/      extracted tree; manifest at the dir root
 //	    lastused                         recency sidecar for GC (unix-nano)
 //	    implementationdigest             implementation digest derived from the payload
+//	    runtimeinfo                      runtime-info answer of an executable in the entry
 //	  cli/<sha>/putnami                  prebuilt CLI, by binary digest
 //	  cli-source/<key>/putnami           CLI built from a source workspace, by source key
 //	  roots/<id> → <workspace>           GC roots: workspaces whose links pin entries
 //	  tmp/                               staging (same volume → intra-device rename)
 //	  locks/<digest>.lock                per-digest computation ownership
+//	  toolchain-probes/<key>             runtime toolchain probe answer, by binary identity
+//	  input-resolve/<k[:2]>/<key>        input-resolve answer, by workspace, implementation and request
 //	  .lock                              advisory flock (admit=shared, GC=exclusive)
 package artifactstore
 
@@ -47,6 +50,7 @@ const (
 	// one per source key: <root>/cli-source/<key>/putnami.
 	cliSourceDirName = "cli-source"
 	lastUsedFile     = "lastused"
+
 	// dirPerm is intentionally tighter than the build store's 0o755: these
 	// directories hold executed binaries, i.e. a code-execution boundary.
 	dirPerm os.FileMode = 0o700
@@ -103,10 +107,11 @@ func (s *Store) Touch(digest string) {
 
 // IsBookkeeping reports whether name, an entry at the root of an artifact
 // directory, is store bookkeeping rather than artifact payload: the lastused
-// recency sidecar, the implementationdigest record, and the temporary files
-// their writers rename into place (Touch writes "lastused-<random>", the
-// putnamiw wrapper writes ".lastused.<pid>", Implementation writes
-// "implementationdigest-<random>"). The store writes these names into the
+// recency sidecar, the implementationdigest and runtimeinfo records, and the
+// temporary files their writers rename into place (Touch writes
+// "lastused-<random>", the putnamiw wrapper writes ".lastused.<pid>",
+// Implementation writes "implementationdigest-<random>", RecordRuntimeInfo
+// writes "runtimeinfo-<random>"). The store writes these names into the
 // entries it serves, so a reader that copies or hashes an artifact's payload
 // out of the store, such as rendering a template into a project, skips them.
 // An artifact never ships a root file under these names.
@@ -115,7 +120,9 @@ func IsBookkeeping(name string) bool {
 		strings.HasPrefix(name, lastUsedFile+"-") ||
 		strings.HasPrefix(name, "."+lastUsedFile+".") ||
 		name == implementationFile ||
-		strings.HasPrefix(name, implementationFile+"-")
+		strings.HasPrefix(name, implementationFile+"-") ||
+		name == runtimeInfoFile ||
+		strings.HasPrefix(name, runtimeInfoFile+"-")
 }
 
 // isHexDigest reports whether d is a 64-char lowercase-hex SHA-256 — the exact

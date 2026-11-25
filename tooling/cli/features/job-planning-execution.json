@@ -764,6 +764,25 @@
         }
       },
       {
+        "id": "unchanged-planning-reads-records",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-recorded-handshake-starts-no-runtime",
+            "a-changed-runtime-is-handshaken-again",
+            "a-probe-runs-once-per-binary-identity",
+            "a-changed-binary-is-probed-again",
+            "a-recorded-input-answer-is-read-again",
+            "a-changed-extension-or-request-asks-again",
+            "planning-an-unchanged-workspace-starts-only-git"
+          ]
+        }
+      },
+      {
         "id": "go-embed-cache-inputs",
         "stage": "coded",
         "evidenceKinds": [

@@ -5,6 +5,8 @@
 - **Amended**: 2026-11-11, §5: change impact reads a selector only in a
   project the planner may run the command that names it in, and a selector
   of a `workspace-once` command in no project.
+- **Amended by**: [ADR 0102](0102-planning-reads-recorded-facts.md), §1:
+  an answer the resolver keeps is also recorded between runs.
 - **Scope**: `@putnami/cli` (`internal/jobs/inputresolve`,
   `internal/jobs/cachekey`, `internal/jobs/scheduler`, `internal/store`,
   `internal/workspace`, `internal/engine`, `internal/runnerprovider`), CLI

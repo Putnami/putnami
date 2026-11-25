@@ -4,6 +4,7 @@ package store
 
 import (
 	"os"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 )
@@ -21,4 +22,14 @@ func exchangePaths(a, b string) error {
 		return &os.LinkError{Op: "exchange", Old: a, New: b, Err: err}
 	}
 	return nil
+}
+
+// fileChangeTime returns the change time, device, inode and link count of
+// the file info describes, for FileIdentityOf.
+func fileChangeTime(info os.FileInfo) (ctime int64, dev, ino, links uint64, ok bool) {
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return 0, 0, 0, 0, false
+	}
+	return st.Ctim.Nano(), uint64(st.Dev), uint64(st.Ino), uint64(st.Nlink), true //nolint:unconvert // Dev, Ino and Nlink differ in width across architectures
 }

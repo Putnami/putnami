@@ -232,7 +232,7 @@ func TestProvisionUnpacksAVerifiedArchiveAndReusesIt(t *testing.T) {
 			if got, err := ProvisionedExecutable(workspaceRoot, "tool", target.Entry, ""); err != nil || got != executable {
 				t.Fatalf("ProvisionedExecutable = %q, %v; want the executable Provision installed, %q", got, err, executable)
 			}
-			if got, want, err := probeRuntimeToolchainVersion(context.Background(), executable, target.Toolchain.Probe, "1.2.3", os.Environ()); err != nil || got != want {
+			if got, want, err := probeRuntimeToolchainVersion(context.Background(), "", executable, target.Toolchain.Probe, "1.2.3", os.Environ()); err != nil || got != want {
 				t.Fatalf("the installed executable answers %q, %v; want %q", got, err, want)
 			}
 			if n := requests.Load(); n != 1 {

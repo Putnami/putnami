@@ -2,6 +2,10 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-22
+- **Amended**: 2026-11-25, consequences: a consumer may keep an answer between
+  runs, so an answer depends on the tree its basis selects, the request and
+  the extension's implementation, never on the environment
+  ([CLI ADR 0102](../../../../tooling/cli/doc/adr/0102-planning-reads-recorded-facts.md)).
 - **Scope**: `go.putnami.dev/protocol/workspace` (`protocols/workspace`): the
   input-resolve exchange and `InputBasisDigest`; `runtime.inputSelectors` in
   `go.putnami.dev/protocol/extension`
@@ -60,8 +64,11 @@ language.
   or the core.
 - Every consumer of a selection reads one answer: the files, the basis sets that
   bound it, or the error.
-- A consumer keeps an answer across a run and asks again only for an input
-  whose basis digest changed.
+- A consumer keeps an answer across a run, and may keep it between runs, and
+  asks again only for an input whose basis digest changed. An answer is
+  therefore a function of the tree its basis selects, the request and the
+  extension's implementation: it never depends on the environment, the time
+  or the machine.
 - The digest records only what the basis selects: a basis that misses a path
   the answer read makes the answer stale without a digest change. The
   extension's tests own that coverage.

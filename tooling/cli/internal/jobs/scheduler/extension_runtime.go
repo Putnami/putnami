@@ -232,8 +232,9 @@ func loadSourceBuiltRuntimes(
 // the source build (extension.FromSourceBuild), to the one artifacts holds
 // under the digest of its tested inputs (sourceBuiltRuntimeDigest). It runs no
 // prepare command and no toolchain probe, and records no repository code: the
-// one process it starts is the runtime-info handshake of that runtime. A
-// runtime the store lacks is an error, because this run never prepares one.
+// one process it starts is the runtime-info handshake of that runtime, and
+// none when the store recorded one for it (verifyRuntimeHandshake). A runtime
+// the store lacks is an error, because this run never prepares one.
 func loadSourceBuiltRuntime(
 	ctx context.Context,
 	workspaceRoot string,
@@ -262,7 +263,7 @@ func loadSourceBuiltRuntime(
 			"extension %q runtime prepared by the source build is unavailable: %v", ext.Name, err)
 	}
 	spans.since(PreparationVerification, verifying)
-	if err := validateRuntimeHandshake(ctx, executable, ext, spans); err != nil {
+	if err := verifyRuntimeHandshake(ctx, artifacts, executable, ext, spans); err != nil {
 		return err
 	}
 	ext.RuntimeExecutable = executable
@@ -711,7 +712,7 @@ func prepareOrLoadExtensionRuntimeWithDigestAndEnv(
 				unsuffixedRuntimeHint(root, def.Executable, runtime.GOOS))
 		}
 		spans.since(PreparationVerification, verifying)
-		if err := validateRuntimeHandshake(ctx, executable, ext, spans); err != nil {
+		if err := verifyRuntimeHandshake(ctx, artifacts, executable, ext, spans); err != nil {
 			return "", err
 		}
 		return executable, nil
@@ -838,7 +839,7 @@ func prepareOrLoadExtensionRuntimeWithDigestAndEnv(
 			"prepared extension %q runtime disappeared: %v", ext.Name, err)
 	}
 	spans.since(PreparationVerification, verifying)
-	if err := validateRuntimeHandshake(ctx, executable, ext, spans); err != nil {
+	if err := verifyRuntimeHandshake(ctx, artifacts, executable, ext, spans); err != nil {
 		return "", err
 	}
 	return executable, nil
@@ -1205,7 +1206,45 @@ func validateRuntimeHandshake(
 	ext *extension.ExtensionDescription,
 	spans *preparationSpans,
 ) error {
-	return runRuntimeHandshake(ctx, executable, ext, spans, hostHandshakeDeadline)
+	_, err := runRuntimeHandshake(ctx, executable, ext, spans, hostHandshakeDeadline)
+	return err
+}
+
+// verifyRuntimeHandshake is validateRuntimeHandshake for a runtime the run
+// loads from artifacts, which may be nil. An executable inside a published
+// entry whose runtimeinfo record names it with its current file identity
+// (artifactstore.Store.RecordedRuntimeInfo) and states the identity ext
+// expects starts no process: the entry's payload never changes, so the
+// answer it recorded is the answer the runtime gives. Any other executable is
+// handshaken, and a handshake that passes is recorded for the next load under
+// the file identity taken before it started, unless the file changed while it
+// ran. A failed handshake records nothing.
+func verifyRuntimeHandshake(
+	ctx context.Context,
+	artifacts *artifactstore.Store,
+	executable string,
+	ext *extension.ExtensionDescription,
+	spans *preparationSpans,
+) error {
+	var key artifactstore.RuntimeInfoKey
+	keyed := false
+	if artifacts != nil {
+		key, keyed = artifacts.RuntimeInfoKeyOf(executable)
+	}
+	if keyed {
+		if recorded, ok := artifacts.RecordedRuntimeInfo(key); ok &&
+			checkRuntimeInfo(recorded, executable, ext) == nil {
+			return nil
+		}
+	}
+	answer, err := runRuntimeHandshake(ctx, executable, ext, spans, hostHandshakeDeadline)
+	if err != nil {
+		return err
+	}
+	if keyed {
+		artifacts.RecordRuntimeInfo(ctx, executable, key, answer)
+	}
+	return nil
 }
 
 // startRuntimeHandshake starts `executable __putnami runtime-info`, retrying
@@ -1248,19 +1287,21 @@ func startRuntimeHandshake(ctx context.Context, executable string, stdout, stder
 	panic("unreachable runtime handshake start retry loop")
 }
 
+// runRuntimeHandshake starts the handshake of executable under clock and
+// returns the runtime's answer once checkRuntimeInfo admits it.
 func runRuntimeHandshake(
 	ctx context.Context,
 	executable string,
 	ext *extension.ExtensionDescription,
 	spans *preparationSpans,
 	clock runtimeHandshakeClock,
-) error {
+) ([]byte, error) {
 	started := time.Now()
 	var stdout, stderr bytes.Buffer
 	cmd, err := startRuntimeHandshake(ctx, executable, &stdout, &stderr)
 	defer func() { spans.add(PreparationVerification, time.Since(started), spawnCPU(cmd.ProcessState)) }()
 	if err != nil {
-		return runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
+		return nil, runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
 			"extension %q runtime-info failed: %v: stderr=%q: %s",
 			ext.Name, err, strings.TrimSpace(stderr.String()), describeRuntimeExecutable(executable))
 	}
@@ -1292,18 +1333,29 @@ func runRuntimeHandshake(
 		// A canceled caller context kills the process too. That is an
 		// interruption, not a runtime that ran out of time.
 		if deadlineFired && ctx.Err() == nil {
-			return runtimeHandshakeTimeout(ext, executable, starting, timing,
+			return nil, runtimeHandshakeTimeout(ext, executable, starting, timing,
 				spawnCPU(cmd.ProcessState), strings.TrimSpace(stderr.String()))
 		}
-		return runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
+		return nil, runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
 			"extension %q runtime-info failed: %v: stderr=%q: %s",
 			ext.Name, runErr, strings.TrimSpace(stderr.String()), describeRuntimeExecutable(executable))
 	}
 	if stdout.Len() > 64*1024 {
-		return runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
+		return nil, runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
 			"extension %q runtime-info exceeded 64 KiB", ext.Name)
 	}
-	decoder := json.NewDecoder(bytes.NewReader(stdout.Bytes()))
+	if err := checkRuntimeInfo(stdout.Bytes(), executable, ext); err != nil {
+		return nil, err
+	}
+	return stdout.Bytes(), nil
+}
+
+// checkRuntimeInfo admits answer, a runtime-info answer of executable, when it
+// is one JSON document of the runtime protocol that states the identity ext
+// expects: its name and version, this host's platform, this CLI's contract,
+// runtime protocol and ABI.
+func checkRuntimeInfo(answer []byte, executable string, ext *extension.ExtensionDescription) error {
+	decoder := json.NewDecoder(bytes.NewReader(answer))
 	decoder.DisallowUnknownFields()
 	var info runtimeproto.Info
 	if err := decoder.Decode(&info); err != nil {

@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"go.putnami.dev/tooling/cli/internal/store"
 )
 
 func writeFile(t *testing.T, path, content string, mode os.FileMode) {
@@ -137,12 +139,17 @@ func TestStoreNormalize_StripsHostLocalBookkeeping(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, implementationFile)); err != nil {
 		t.Fatalf("test setup: expected an implementation record: %v", err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, runtimeInfoFile), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, store.ToolchainProbeDir, "key"), "{}", 0o600)
+	writeFile(t, filepath.Join(root, store.InputResolveDir, "ke", "key"), "{}", 0o600)
 
 	if err := s.Normalize(); err != nil {
 		t.Fatalf("Normalize: %v", err)
 	}
 
-	for _, leftover := range []string{tmpDirName, digestLocks, lockFile} {
+	for _, leftover := range []string{tmpDirName, digestLocks, lockFile, store.ToolchainProbeDir, store.InputResolveDir} {
 		if _, err := os.Lstat(filepath.Join(root, leftover)); !os.IsNotExist(err) {
 			t.Errorf("%s survived Normalize (err=%v)", leftover, err)
 		}
@@ -152,6 +159,9 @@ func TestStoreNormalize_StripsHostLocalBookkeeping(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(dir, implementationFile)); !os.IsNotExist(err) {
 		t.Errorf("the implementation record survived Normalize (err=%v)", err)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, runtimeInfoFile)); !os.IsNotExist(err) {
+		t.Errorf("the runtime-info record survived Normalize (err=%v)", err)
 	}
 
 	// Everything that remains, including the store's own shard directories, is

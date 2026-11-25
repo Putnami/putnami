@@ -12,3 +12,9 @@ import (
 func exchangePaths(a, b string) error {
 	return &os.LinkError{Op: "exchange", Old: a, New: b, Err: errors.ErrUnsupported}
 }
+
+// fileChangeTime returns the change time, device, inode and link count of
+// the file info describes, for FileIdentityOf.
+func fileChangeTime(os.FileInfo) (ctime int64, dev, ino, links uint64, ok bool) {
+	return 0, 0, 0, 0, false
+}

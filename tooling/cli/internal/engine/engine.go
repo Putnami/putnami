@@ -611,6 +611,10 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	// The run's orchestration report counts from here: the processes the
 	// version snapshot, the hooks and the providers start are the run's too.
 	req.orchestration = scheduler.NewOrchestrationClock()
+	// The toolchain probe answers kept in memory last for this run alone: a
+	// later run in the same process reads the records the probes left, or
+	// probes again.
+	toolchain.ForgetProbeAnswers()
 	req.versions, req.versionsErr = nil, nil
 	req.storeRoot = &store.RunStoreRoot{}
 	if req.ErrorOut == nil {

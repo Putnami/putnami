@@ -429,14 +429,14 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 				// rejection reasons reach the user only through this warning. They
 				// never enter the resolution or its identity.
 				if requirement.Optional {
-					slog.Warn("runtime toolchain: optional toolchain is unavailable; no candidate matched the locked version",
+					slog.Warn("runtime toolchain: optional toolchain is unavailable; no candidate matched the locked version", //nolint:gosec // G706: each probe answer in detail is one line of at most 64 bytes, and slog quotes attribute values
 						"extension", ext.Name, "toolchain", ref, "version", entry.Version, "rejections", detail)
 				} else {
 					// Installing the pinned toolchain can be what the provisioning
 					// run is about to do, so nothing is wrong yet. Once the run
 					// ended, ReportProvisionedRuntimeToolchains probes again and
 					// warns only about a toolchain that is still missing.
-					slog.Debug("runtime toolchain: "+ToolchainProvisioningCommand+" starts before the pinned toolchain is installed; no candidate matched the locked version",
+					slog.Debug("runtime toolchain: "+ToolchainProvisioningCommand+" starts before the pinned toolchain is installed; no candidate matched the locked version", //nolint:gosec // G706: each probe answer in detail is one line of at most 64 bytes, and slog quotes attribute values
 						"extension", ext.Name, "toolchain", ref, "version", entry.Version, "rejections", detail)
 				}
 				ext.RuntimeToolchains[ref] = unavailableRuntimeToolchainResolution(requirement, entry)
@@ -617,6 +617,12 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 	rejections := make([]runtimeToolchainRejection, 0, len(requirement.Candidates))
 	candidateEnv := runtimeToolchainCandidateEnv(workspaceRoot, base)
 	insideWorkspace := hostedWorkspaceProgram(workspaceRoot)
+	storeRoot := store.ResolveArtifactStoreRoot(workspaceRoot)
+	toolchainsRoot := filepath.Join(PutnamiHome(workspaceRoot, candidateEnv), "toolchains")
+	resolvedToolchainsRoot, rootErr := filepath.EvalSymlinks(toolchainsRoot)
+	if rootErr != nil {
+		resolvedToolchainsRoot = ""
+	}
 	for index, candidate := range requirement.Candidates {
 		if ctx.Err() != nil {
 			return model.RuntimeToolchainResolution{}, rejections, false
@@ -647,7 +653,17 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 			reject("not executable")
 			continue
 		}
-		got, want, err := probeRuntimeToolchainVersion(ctx, realExecutable, requirement.Probe, version, base)
+		// Only a release the Putnami home's toolchains hold answers from a
+		// record: the candidate and the file it resolves to both lie there.
+		// Any other candidate, such as a shim or a dispatcher whose answer
+		// follows its configuration, or a link from the toolchains to one, is
+		// probed once per run.
+		recordRoot := ""
+		if resolvedToolchainsRoot != "" && underDirectory(toolchainsRoot, executable) &&
+			underDirectory(resolvedToolchainsRoot, realExecutable) {
+			recordRoot = storeRoot
+		}
+		got, want, err := probeRuntimeToolchainVersion(ctx, recordRoot, realExecutable, requirement.Probe, version, base)
 		if err != nil {
 			rejections = append(rejections, runtimeToolchainRejection{candidate: label, reason: err.Error(), err: err})
 			continue
@@ -675,18 +691,38 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 // variables probe unsets removed, the variables it sets added with {version}
 // expanded to version, and the executable's directory first on PATH. It
 // returns the probe's answer and the answer version requires.
-func probeRuntimeToolchainVersion(ctx context.Context, executable string, probe extensionproto.RuntimeToolchainProbe, version string, base []string) (got, want string, err error) {
+//
+// The answer is read once per binary identity (identifyProbe): from the
+// process's memo, or from the record under storeRoot, the artifact store
+// root, which may be empty to read and write no record. A probe that
+// succeeded is kept; one that failed is not.
+func probeRuntimeToolchainVersion(ctx context.Context, storeRoot, executable string, probe extensionproto.RuntimeToolchainProbe, version string, base []string) (got, want string, err error) {
+	want = strings.ReplaceAll(probe.Expect, extensionproto.RuntimeToolchainVersionToken, version)
 	probeEnv := append([]string(nil), base...)
-	for _, name := range probe.Unset {
+	unset := slices.Sorted(slices.Values(probe.Unset))
+	for _, name := range unset {
 		probeEnv = envkeys.Host.Remove(probeEnv, name)
 	}
+	set := make([]string, 0, len(probe.Environment))
 	for name, value := range probe.Environment {
-		probeEnv = envkeys.Host.Set(probeEnv, name, strings.ReplaceAll(value, extensionproto.RuntimeToolchainVersionToken, version))
+		expanded := strings.ReplaceAll(value, extensionproto.RuntimeToolchainVersionToken, version)
+		probeEnv = envkeys.Host.Set(probeEnv, name, expanded)
+		set = append(set, name+"="+expanded)
 	}
+	slices.Sort(set)
 	probeEnv = PrependPathWith(envkeys.Host, probeEnv, filepath.Dir(executable))
+	identity, keep := identifyProbe(executable, probe.Args, set, unset, probeEnv)
+	if keep {
+		if answer, ok := recordedProbeAnswer(storeRoot, identity); ok {
+			return answer, want, nil
+		}
+	}
 	got, err = probeRuntimeToolchain(ctx, executable, probe.Args, probeEnv,
 		procdeadline.HostProcessDeadline(runtimeToolchainProbeTimeout(ctx)))
-	return got, strings.ReplaceAll(probe.Expect, extensionproto.RuntimeToolchainVersionToken, version), err
+	if err == nil && keep {
+		recordProbeAnswer(storeRoot, identity, got)
+	}
+	return got, want, err
 }
 
 // describeRuntimeToolchainCandidate names a candidate by its 1-based position,
@@ -793,6 +829,12 @@ func runtimeToolchainCandidatePath(workspaceRoot, lock string, entry lockfile.Lo
 		path = filepath.Join(PutnamiHome(workspaceRoot, base), rel)
 	}
 	return WithExecutableSuffix(runtime.GOOS, path)
+}
+
+// underDirectory reports whether path, cleaned and as written, lies below dir.
+func underDirectory(dir, path string) bool {
+	rel, err := filepath.Rel(filepath.Clean(dir), filepath.Clean(path))
+	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
 
 // WithExecutableSuffix adds ".exe" to a Windows path that has no extension. An

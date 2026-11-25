@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 )
 
@@ -127,8 +128,8 @@ var extensionCases = []extensionCase{
 		files:       goFiles,
 		setup:       [][]string{{"projects", "sync"}},
 		command:     []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:        "engine job 9 · control 2 · git 18 · other 1 | engine git diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs cli 5 · git 2 | jobs git ls-files 2",
-		plan:        "engine control 1 · git 9 · other 1 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:        "engine job 9 · git 18 | engine git diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs cli 5 · git 2 | jobs git ls-files 2",
+		plan:        "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
 		name:        "typescript",
@@ -141,8 +142,8 @@ var extensionCases = []extensionCase{
 		files:      typescriptFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:       "engine job 8 · control 2 · git 25 · other 2 | engine git diff 1 · for-each-ref 1 · ls-files 11 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 7 | jobs git check-ignore 2 · ls-files 4 · rev-parse 1",
-		plan:       "engine control 1 · git 9 · other 2 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 8 · control 1 · git 25 | engine git diff 1 · for-each-ref 1 · ls-files 11 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 7 | jobs git check-ignore 2 · ls-files 4 · rev-parse 1",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
 		name:       "sdd",
@@ -151,8 +152,8 @@ var extensionCases = []extensionCase{
 		files:      sddFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 13 · control 1 · git 30 · other 1 | engine git diff 1 · for-each-ref 1 · ls-files 13 · rev-parse 10 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 9 | jobs git ls-files 7 · rev-parse 2",
-		plan:       "engine control 1 · git 9 · other 1 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 13 · git 30 | engine git diff 1 · for-each-ref 1 · ls-files 13 · rev-parse 10 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 9 | jobs git ls-files 7 · rev-parse 2",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
 		name:        "clientgen",
@@ -168,8 +169,8 @@ var extensionCases = []extensionCase{
 		files:      clientgenFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"client-generate", "--projects", "client", "--max-parallel", "1"},
-		cold:       "engine job 1 · control 3 · git 16 · other 3 | engine git diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		plan:       "engine control 1 · git 9 · other 2 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 1 · control 1 · git 16 | engine git diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
 		name:        "rust",
@@ -180,8 +181,8 @@ var extensionCases = []extensionCase{
 		files:       rustFiles,
 		setup:       [][]string{{"projects", "sync"}},
 		command:     []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:        "engine job 4 · control 2 · git 18 · other 1 | engine git diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git ls-files 1",
-		plan:        "engine control 1 · git 9 · other 1 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:        "engine job 4 · git 18 | engine git diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git ls-files 1",
+		plan:        "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 }
 
@@ -191,6 +192,9 @@ var extensionCases = []extensionCase{
 // in a run that executes every task, and in planning the unchanged workspace.
 func TestTheExtensionCounts(t *testing.T) {
 	clitest.RequireShell(t)
+	// The cases share one Putnami home, so its copies are made once.
+	home := t.TempDir()
+	held := 0
 	for _, tc := range extensionCases {
 		t.Run(tc.name, func(t *testing.T) {
 			for name, value := range clitest.OuterRunEnvironment {
@@ -202,8 +206,10 @@ func TestTheExtensionCounts(t *testing.T) {
 			// The engine probes each candidate of a pinned toolchain until one
 			// answers with the pinned release: the pinned Go through GOROOT and
 			// the case's pinned tools first on PATH make the first candidate
-			// answer, whatever else the host's PATH holds.
-			goroot := goRoot(t)
+			// answer, whatever else the host's PATH holds. Both sit in the
+			// cases' own Putnami home, whose toolchains answer from a record
+			// once probed, whichever directory the host keeps them in.
+			goroot, tools := putnamiHome(t, home, goRoot(t), tools)
 			t.Setenv("GOROOT", goroot)
 			dirs := []string{filepath.Join(goroot, "bin")}
 			for _, tool := range tools {
@@ -239,7 +245,17 @@ func TestTheExtensionCounts(t *testing.T) {
 					t.Errorf("%s:\n got  %s\n want %s\n%s", check.name, check.got, check.want, countsHint)
 				}
 			}
+			if plan.Ledger() == tc.plan {
+				held++
+			}
 		})
+	}
+	// Each extension's plan holds its git calls alone: the handshakes, the
+	// toolchain probes and the workspace probe are read from what the runs
+	// before recorded. The proof needs a case that ran.
+	if held > 0 {
+		spectest.Proves(t, "cli/job-planning-execution", "unchanged-planning-reads-records",
+			"planning-an-unchanged-workspace-starts-only-git")
 	}
 }
 
@@ -269,6 +285,93 @@ func requireOffline(t *testing.T, tc extensionCase) (tools []string) {
 		}
 	}
 	return tools
+}
+
+// putnamiHome sets PUTNAMI_HOME to home, a Putnami home whose tools are the
+// machine's and whose toolchains hold the pinned Go at goroot and the pinned
+// Bun among tools at the paths a provisioned release takes, and points the
+// artifact store, and the records a run keeps there, at home too. The Go and
+// Bun executables are copies, so each is a release of the home's own; the
+// rest of the Go root is linked. A home a case already filled is reused. It
+// returns the Go root and the tools by their paths in that home.
+func putnamiHome(t *testing.T, home, goroot string, tools []string) (string, []string) {
+	t.Helper()
+	var lock struct {
+		Toolchains map[string]struct{ Version string } `json:"toolchains"`
+	}
+	readJSON(t, "putnami.lock.json", &lock)
+	if machineTools := toolsRoot(t); machineTools != "" {
+		if _, err := os.Stat(machineTools); err == nil {
+			linkOnce(t, machineTools, filepath.Join(home, "tools"))
+		}
+	}
+	homeGoroot := filepath.Join(home, "toolchains", "go", "go-"+lock.Toolchains["go"].Version, "go")
+	entries, err := os.ReadDir(goroot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.Name() != "bin" {
+			linkOnce(t, filepath.Join(goroot, entry.Name()), filepath.Join(homeGoroot, entry.Name()))
+			continue
+		}
+		bins, err := os.ReadDir(filepath.Join(goroot, "bin"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, bin := range bins {
+			source, target := filepath.Join(goroot, "bin", bin.Name()), filepath.Join(homeGoroot, "bin", bin.Name())
+			if bin.Name() == "go" {
+				copyOnce(t, source, target)
+			} else {
+				linkOnce(t, source, target)
+			}
+		}
+	}
+	homeTools := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		if filepath.Base(tool) == "bun" {
+			homeBun := filepath.Join(home, "toolchains", "bun", "bun-"+lock.Toolchains["bun"].Version, "bin", "bun")
+			copyOnce(t, tool, homeBun)
+			tool = homeBun
+		}
+		homeTools = append(homeTools, tool)
+	}
+	t.Setenv("PUTNAMI_HOME", home)
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(home, "artifacts"))
+	return homeGoroot, homeTools
+}
+
+// linkOnce links path to target unless path exists.
+func linkOnce(t *testing.T, target, path string) {
+	t.Helper()
+	if _, err := os.Lstat(path); err == nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// copyOnce copies the executable at source to path unless path exists.
+func copyOnce(t *testing.T, source, path string) {
+	t.Helper()
+	if _, err := os.Lstat(path); err == nil {
+		return
+	}
+	data, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o755); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // toolsRoot is the root of the tools extensions provision on this machine.

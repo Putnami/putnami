@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"go.putnami.dev/tooling/cli/internal/store"
 )
 
 // NormalizedTime is the modification time stamped on every file and directory
@@ -127,6 +129,10 @@ func NormalizeTree(root string) error {
 //   - the per-entry `implementationdigest` records, which exist only where a
 //     run computed a cache key, so their presence is host history. The
 //     consuming machine derives them again from the payload.
+//   - the `toolchain-probes` records and the per-entry `runtimeinfo` records,
+//     which name the file identity of an executable on this host, and the
+//     `input-resolve` records, which name a workspace on this host. The
+//     consuming machine asks again and records its own.
 //
 // NEVER call this on a live store: deleting .lock while other processes hold it
 // breaks the lock identity that keeps GC from reaping an in-flight admit, and
@@ -142,7 +148,7 @@ func (s *Store) Normalize() error {
 		}
 		return fmt.Errorf("normalize: stat %s: %w", s.root, err)
 	}
-	for _, name := range []string{tmpDirName, digestLocks, lockFile} {
+	for _, name := range []string{tmpDirName, digestLocks, lockFile, store.ToolchainProbeDir, store.InputResolveDir} {
 		if err := os.RemoveAll(filepath.Join(s.root, name)); err != nil {
 			return fmt.Errorf("normalize: drop artifact-store %s: %w", name, err)
 		}
@@ -151,7 +157,7 @@ func (s *Store) Normalize() error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() || (d.Name() != lastUsedFile && d.Name() != implementationFile) {
+		if d.IsDir() || (d.Name() != lastUsedFile && d.Name() != implementationFile && d.Name() != runtimeInfoFile) {
 			return nil
 		}
 		return os.Remove(path)

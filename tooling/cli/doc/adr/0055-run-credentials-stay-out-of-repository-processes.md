@@ -312,8 +312,9 @@ construction: the tree under test built it.
   workspace lock instead of a probe. It loads the runtime the store holds under
   that digest. It runs no prepare command and no toolchain probe for it, and
   records no repository code. Before the provider, it starts only that runtime:
-  its `runtime-info` handshake and, when the extension declares one, its
-  workspace probe.
+  its `runtime-info` handshake, unless the store recorded one for it
+  ([ADR 0102](0102-planning-reads-recorded-facts.md)), and, when the extension
+  declares one, its workspace probe.
 - The run then starts the provider before repository code and hands it the
   credential, as it does for a store extension (§4). A runtime the store lacks
   is not prepared: an input changed after the source build, the build did not
