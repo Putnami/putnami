@@ -189,7 +189,7 @@ sends no request to the Putnami registry, so you need network access, not an
 account.
 
 Those two commands are executable evidence, not a description of one.
-`tooling/cli-documents/neutral_contributor_ci_test.go` reads this exact block
+`tooling/cli-document-set/neutral_contributor_ci_test.go` reads this exact block
 out of this file and runs it against a workspace with:
 
 - every Putnami Cloud, cache, registry, and cloud-provider credential removed

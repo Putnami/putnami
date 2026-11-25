@@ -1,9 +1,12 @@
 # @putnami/cli-documents
 
-The gates that read this repository's own documents: the governance surface, the
-neutral-contributor recipe, the release plan and its recorded verdict, the
-public-cut candidate, and the shipped manifests. The Windows compile gate lives
-in [`@putnami/windows-vet`](../windows-vet/README.md).
+The gates that read this repository's whole candidate tree: the public-cut scan,
+and the release rehearsal with its release plan and recorded verdict. The gates
+that read a known set of documents, such as the governance surface and the
+neutral-contributor recipe, live in
+[`@putnami/cli-document-set`](../cli-document-set/README.md), which keys on those
+documents alone; the Windows compile gate lives in
+[`@putnami/windows-vet`](../windows-vet/README.md).
 
 ## Why this is a separate project
 

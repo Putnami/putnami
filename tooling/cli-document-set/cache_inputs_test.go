@@ -1,4 +1,4 @@
-package documents
+package documentset
 
 import (
 	"encoding/json"
@@ -23,51 +23,71 @@ import (
 
 const cliProjectDir = cliModuleDir
 
-// documentsOwnedRepositoryFiles are the repository documents this project — and
-// only this project — reads. Keeping them out of @putnami/cli's declared test
+// documentsOwnedRepositoryFiles are the repository files the two document
+// projects — and only they among the CLI's test projects — read, each with the
+// project that must key it. Keeping them out of @putnami/cli's declared test
 // inputs is what makes a documentation edit a cache hit for the CLI's 5 000-test
 // suite instead of a full re-run.
 //
-// A file read by a test on BOTH sides (putnami.workspace.json, putnami.ci.json,
-// putnami.support.json, decisions.json, the agent-artifact trees) is absent
-// here on purpose: it is honestly declared twice, because two readers exist.
-var documentsOwnedRepositoryFiles = []string{
-	".github/PULL_REQUEST_TEMPLATE.md",
-	".gitignore",
-	"CODE_OF_CONDUCT.md",
-	"CONTRIBUTING.md",
-	"GOVERNANCE.md",
-	"LICENSE.md",
-	"README.md",
-	"RELEASE.md",
-	"RELEASING.md",
-	"SECURITY.md",
-	"tooling/extension-sdk/pkgmeta/platforms.go",
-	"protocols/cli/testdata/prior-releases/provenance.json",
-	"protocols/extension/testdata/prior-releases/provenance.json",
-	"protocols/support/README.md",
-	"tooling/CHANGELOG.md",
+// A file a gate of this project reads is attributed to this project, even when
+// a whole-tree gate of @putnami/cli-documents reads it too (CONTRIBUTING.md,
+// SECURITY.md): each project's key must cover what its own gates read, whatever
+// another project declares. The other files are read by
+// the whole-tree gates alone. A file a test of @putnami/cli also reads
+// (putnami.workspace.json, putnami.ci.json, putnami.support.json,
+// decisions.json, the first-use smoke script, the agent-artifact trees) is
+// absent here on purpose: it is honestly declared twice, because two readers
+// exist.
+var documentsOwnedRepositoryFiles = map[string]string{
+	".github/PULL_REQUEST_TEMPLATE.md": cliDocumentsProjectDir,
+	".gitignore":                       cliDocumentsProjectDir,
+	"CODE_OF_CONDUCT.md":               cliDocumentsProjectDir,
+	"CONTRIBUTING.md":                  documentSetProjectDir,
+	"GOVERNANCE.md":                    documentSetProjectDir,
+	"LICENSE.md":                       cliDocumentsProjectDir,
+	"README.md":                        documentSetProjectDir,
+	"RELEASE.md":                       cliDocumentsProjectDir,
+	"RELEASING.md":                     documentSetProjectDir,
+	"SECURITY.md":                      documentSetProjectDir,
+	"tooling/extension-sdk/pkgmeta/platforms.go":                  cliDocumentsProjectDir,
+	"protocols/cli/testdata/prior-releases/provenance.json":       cliDocumentsProjectDir,
+	"protocols/extension/testdata/prior-releases/provenance.json": cliDocumentsProjectDir,
+	"protocols/support/README.md":                                 documentSetProjectDir,
+	"sites/putnami.dev/doc/01-getting-started/index.md":           documentSetProjectDir,
+	"tooling/CHANGELOG.md":                                        cliDocumentsProjectDir,
 }
 
 // TestRepositoryDocumentsAreKeyedToThisProjectOnly is the regression guard for
 // the split. Before the split, every one of these files was a declared test input of
 // @putnami/cli, so editing CONTRIBUTING.md alone re-ran the whole CLI suite
 // twice per gate. Re-adding one there fails here, naming the file and the cost.
+// A document a gate of this project reads must also be a declared input of
+// this project, not only of the whole-tree project: a key answers for its own
+// project's verdict alone.
 func TestRepositoryDocumentsAreKeyedToThisProjectOnly(t *testing.T) {
 	t.Parallel()
-	documentsPatterns := declaredTestFilePatterns(t, cliDocumentsProjectDir)
 	cliPatterns := declaredTestFilePatterns(t, cliProjectDir)
+	readerPatterns := map[string][]string{
+		documentSetProjectDir:  declaredTestFilePatterns(t, documentSetProjectDir),
+		cliDocumentsProjectDir: declaredTestFilePatterns(t, cliDocumentsProjectDir),
+	}
 
-	for _, file := range documentsOwnedRepositoryFiles {
-		if !store.SelectsPath(projectRelativePath(cliDocumentsProjectDir, file), documentsPatterns) {
-			t.Errorf("%s is read by a gate in this project, but no declared test input of "+
-				"@putnami/cli-documents selects it, so a warm cache answers a changed document "+
-				"with the previous verdict.", file)
+	files := make([]string, 0, len(documentsOwnedRepositoryFiles))
+	for file := range documentsOwnedRepositoryFiles {
+		files = append(files, file)
+	}
+	sort.Strings(files)
+	for _, file := range files {
+		reader := documentsOwnedRepositoryFiles[file]
+		if !store.SelectsPath(projectRelativePath(reader, file), readerPatterns[reader]) {
+			t.Errorf("%s is read by a gate in %s, but no declared test input of that project "+
+				"selects it, so a warm cache answers a changed document with the previous verdict.",
+				file, reader)
 		}
 		if store.SelectsPath(projectRelativePath(cliProjectDir, file), cliPatterns) {
 			t.Errorf("%s is a declared test input of @putnami/cli again, so editing it re-runs "+
 				"the CLI's whole test suite. No test under tooling/cli reads it: move the "+
-				"reader here instead of re-declaring the document there.", file)
+				"reader to the document projects instead of re-declaring the document there.", file)
 		}
 	}
 }
@@ -201,4 +221,66 @@ func sortedLayers(options map[string]manifestOptionLayer) []string {
 	}
 	sort.Strings(layers)
 	return layers
+}
+
+// siteDocumentationTarget is the site path under which the moved-commands
+// check looks for the page the CLI cites.
+const siteDocumentationTarget = "public/docs"
+
+// TestPublishedDocumentationIsADeclaredInput keeps the declared Markdown inputs
+// equal to what TestCommandsThatLeftTheCoreURLNamesAPublishedHeading reads:
+// every Markdown file under every documentation folder the site copies under
+// public/docs. The declaration names those folders instead of every Markdown
+// file of the repository, so a folder the site starts to publish has to be
+// declared here too, or a warm cache answers its edit with the previous pass.
+func TestPublishedDocumentationIsADeclaredInput(t *testing.T) {
+	t.Parallel()
+	root := repositoryRoot(t)
+	patterns := declaredTestFilePatterns(t, documentSetProjectDir)
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(siteManifest)))
+	if err != nil {
+		t.Fatalf("read %s: %v", siteManifest, err)
+	}
+	var manifest struct {
+		Options struct {
+			Generate struct {
+				Assets []struct {
+					From string `json:"from"`
+					To   string `json:"to"`
+				} `json:"assets"`
+			} `json:"generate"`
+		} `json:"options"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("parse %s: %v", siteManifest, err)
+	}
+	checked := 0
+	for _, asset := range manifest.Options.Generate.Assets {
+		if asset.To != siteDocumentationTarget && !strings.HasPrefix(asset.To, siteDocumentationTarget+"/") {
+			continue
+		}
+		source := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(asset.From, "/")))
+		err := filepath.WalkDir(source, func(file string, entry fs.DirEntry, err error) error {
+			if err != nil || entry.IsDir() || filepath.Ext(file) != ".md" {
+				return err
+			}
+			rel, err := filepath.Rel(root, file)
+			if err != nil {
+				return err
+			}
+			checked++
+			if !store.SelectsPath(projectRelativePath(documentSetProjectDir, filepath.ToSlash(rel)), patterns) {
+				t.Errorf("%s is published under %s (asset %s), but no declared test input of "+
+					"@putnami/cli-document-set selects it; declare its folder in options.test.filePatterns",
+					filepath.ToSlash(rel), asset.To, asset.From)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", source, err)
+		}
+	}
+	if checked == 0 {
+		t.Fatalf("%s publishes no Markdown file under %s, so this check proves nothing", siteManifest, siteDocumentationTarget)
+	}
 }

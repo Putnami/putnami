@@ -1,4 +1,4 @@
-package documents
+package documentset
 
 import (
 	"context"
@@ -121,7 +121,7 @@ func TestNeutralContributorRecipeRunsWithoutCredentials(t *testing.T) {
 // contributor cannot be gated on something they cannot run.
 func TestNeutralContributorRecipeMatchesRepositoryCIJob(t *testing.T) {
 	t.Parallel()
-	repoRoot := publicCutRepositoryRoot(t)
+	repoRoot := repositoryRoot(t)
 	documented := neutralContributorGateTasks(t)
 	// `validate-workspace` is not named: the @putnami/sdd manifest's `alsoRuns`
 	// plans it with `validate`, and that extension owns both commands.
@@ -174,7 +174,7 @@ func TestNeutralContributorRecipeMatchesRepositoryCIJob(t *testing.T) {
 // public governance record.
 func TestGovernanceRecordAnswersItsQuestions(t *testing.T) {
 	t.Parallel()
-	repoRoot := publicCutRepositoryRoot(t)
+	repoRoot := repositoryRoot(t)
 	documents := make(map[string]string, len(governanceQuestions))
 	for _, question := range governanceQuestions {
 		if _, loaded := documents[question.path]; loaded {
@@ -327,7 +327,7 @@ func missingGovernanceAnswers(documents map[string]string) []string {
 // vector per documented command, with the `./putnamiw` word removed.
 func neutralContributorRecipe(t *testing.T) [][]string {
 	t.Helper()
-	document := readCloudlessFile(t, filepath.Join(publicCutRepositoryRoot(t), contributorGuideRepoPath))
+	document := readCloudlessFile(t, filepath.Join(repositoryRoot(t), contributorGuideRepoPath))
 	commands, err := parseNeutralContributorRecipe(document)
 	if err != nil {
 		t.Fatalf("read the documented contributor path from %s: %v", contributorGuideRepoPath, err)
