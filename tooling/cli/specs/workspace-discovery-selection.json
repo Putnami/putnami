@@ -45,7 +45,7 @@
       "id": "a-hosted-run-compares-runtimes-prepared-before-it",
       "text": [
         "`putnami extensions prepare` admits, for each path extension whose runtime inputs differ at the merge base an --impacted run compares against, the runtimes of the tree and of that base, best effort.",
-        "A hosted run compares only runtimes the store holds under the digests their locks give, and prepares none."
+        "A hosted run of a source workspace answers equal locked digests unchanged, otherwise compares only runtimes the store holds under them, compares nothing elsewhere, and prepares none."
       ]
     },
     {

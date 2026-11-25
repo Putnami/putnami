@@ -110,8 +110,10 @@ left to a later decision.
   keeps it for every later run against that base. Measured on this repository
   with 28 compared extensions: about 10 seconds with a warm artifact store,
   about 50 with an empty one and a warm Go build cache.
-- A hosted run cuts off only the extensions whose runtimes its store holds;
-  ADR 0104 has `putnami extensions prepare` admit them before the run.
+- ADR 0104 lets a hosted run of a workspace that builds its own CLI answer
+  equal locked digests unchanged, and otherwise compare the runtimes
+  `putnami extensions prepare` admitted before the run; elsewhere a hosted run
+  compares nothing.
 - `projects why` and `why_impacted` answer a change to a project as a whole,
   with no diff to compare runtimes against, so they still name the
   extension-consumer edges this decision cuts off on an actual diff.

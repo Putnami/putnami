@@ -44,12 +44,13 @@ const (
 // The base runtime comes from the files of diffBase, written as raw blobs, and
 // lands in the same artifact store, under the digest of the base's inputs, so
 // a later run against the same base finds it. A run that holds the run
-// credential never prepares one: it executes no repository code during the run
-// (ADR 0055), so it only looks the base runtime up in the store, and an
-// extension whose base runtime is not there keeps its edge; it looks the head runtime up the same
-// way. Two runtimes whose locked prepare toolchains differ never compare
-// unchanged. Every failure keeps the edge too: selection may only shrink on a
-// proof.
+// credential prepares neither runtime: it executes no repository code during
+// the run (ADR 0055). It compares only in a workspace that builds its own CLI,
+// answers equal locked digests unchanged, and otherwise looks both runtimes up
+// in the store, where `putnami extensions prepare` admitted them before the run
+// (ADR 0104); an extension either is missing for keeps its edge. Two runtimes
+// whose locked prepare toolchains differ never compare unchanged. Every failure
+// keeps the edge too: selection may only shrink on a proof.
 func CompareExtensionRuntimes(
 	ctx context.Context,
 	ws *workspace.Workspace,
@@ -88,9 +89,8 @@ func CompareExtensionRuntimes(
 	if err != nil {
 		root = ws.Root
 	}
-	// A hosted run can only compare what the source build prepared and the
-	// store holds: it answers the others before writing the base tree, and
-	// writes nothing when none is left.
+	// A hosted run answers, before writing the base tree, every extension it
+	// cannot compare, and writes none when no extension is left.
 	headDigests := make([]string, len(compared))
 	if hosted {
 		// Only a source workspace's store holds runtimes this tree's own
@@ -109,6 +109,9 @@ func CompareExtensionRuntimes(
 				continue
 			}
 			headDigests[i] = digest
+		}
+		if !answersPending(answers) {
+			return answers
 		}
 	}
 	baseRoot, cleanup, err := checkoutBase(root, diffBase)
@@ -221,6 +224,16 @@ func compareOneRuntime(
 		return false, runtimeReasonDiffers
 	}
 	return true, ""
+}
+
+// answersPending reports whether any answer still lacks a reason.
+func answersPending(answers []workspace.RuntimeComparison) bool {
+	for _, answer := range answers {
+		if answer.Reason == "" {
+			return true
+		}
+	}
+	return false
 }
 
 // sourcePreparedExtensionsByProject maps each project of ws to the extension

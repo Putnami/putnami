@@ -296,7 +296,7 @@ func TestPrepareComparisonRuntimes_LetsAHostedRunCompare(t *testing.T) {
 }
 
 // An extension whose runtime inputs are the same at the base is not prepared:
-// its runtime edge does not fire.
+// a hosted run answers it unchanged from the two digests alone.
 func TestPrepareComparisonRuntimes_SkipsAnUnchangedExtension(t *testing.T) {
 	ws, ext, base := runtimeComparisonRepo(t)
 	notes, err := PrepareComparisonRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, base)
