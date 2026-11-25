@@ -407,8 +407,8 @@
     {
       "id": "the-scheduler-admits-the-cpu-it-grants",
       "text": [
-        "After a cache miss, a task with history reserves its measured occupancy, at most its ceiling; a task with none one CPU. A hit or serve step reserves none. A waiter starts while any CPU is free.",
-        "A task with history is granted its ceiling raised to the CPUs running ceilings leave free; a task with none the whole capacity.",
+        "After a cache miss, a task with history reserves its measured occupancy, at least one CPU, at most its ceiling; one with none one CPU. A hit or serve reserves none. A waiter starts while any CPU is free.",
+        "A task with history is granted its ceiling raised to the CPUs running ceilings leave free; one with none the whole capacity. A weight scales occupancy before the critical-path lift.",
         "auto and max run one worker per CPU of capacity, eco half, and a serve step adds one."
       ]
     }

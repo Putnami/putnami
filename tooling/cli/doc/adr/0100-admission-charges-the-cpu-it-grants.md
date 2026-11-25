@@ -137,9 +137,11 @@ samples and an admission trace:
 1. **Admission charges measured occupancy.** Admission counts thousandths of a
    CPU. A task with history is charged the occupancy it measured, CPU over
    wall time, at its granted ceiling when its history holds an observation
-   there, scaled by its weight, at least a tenth of a CPU and at most its
-   ceiling. A ceiling the critical-path lift raised is charged whole. A task
-   with no history is still charged one CPU, scaled by its weight.
+   there, scaled by its weight, at least one CPU and at most its ceiling: a
+   task measured below one CPU still holds a worker, and the measurements
+   below ran with that floor. A ceiling the critical-path lift raised is
+   charged whole. A task with no history is still charged one CPU, scaled by
+   its weight.
 2. **A waiting subprocess starts while any CPU is unreserved.** The first
    waiter is still never overtaken, but it starts once CPU is free even when
    its charge exceeds what is free; the charges then exceed the capacity by
@@ -148,14 +150,17 @@ samples and an admission trace:
    ceiling is raised to the CPUs the ceilings of the running subprocesses
    leave free, so the last task of a run has the whole machine. The raise is
    not charged: it replaces the rule of decision 1 above that ceilings never
-   sum above the CPU capacity, as a ceiling a task fills only while it runs
-   alone. Only the planned, unweighted ceiling teaches the history its floor.
+   sum above the CPU capacity, as a ceiling the task keeps after peers start,
+   though it fills it only while CPU is free. Only the planned, unweighted
+   ceiling teaches the history its floor.
 4. **A task with no history keeps decision 2 of the original decision.** It
    is granted the whole capacity and charged one CPU: no cold rule measured
    below keeps the load under 1.5 times the CPUs without lengthening the full
-   gate.
-5. A request that charges no CPU, a dispatch's claims or a serve step, is
-   admitted whatever the CPU charges, as before.
+   gate. Those rules were measured before every tool a job starts honored its
+   grant (#1504); measuring them again belongs to #1450.
+5. A request that charges no CPU, a dispatch's claims or a serve step, fits
+   whatever the CPU charges, as before; a waiting one still starts in rank
+   order, behind a waiter that cannot start yet.
 
 ### Measurements
 
@@ -227,7 +232,7 @@ The runs, their reports, sessions, task histories and load samples are in
   only raise; it records an observation at the ceiling it was granted, and
   its history's ceiling floor stays the planned one.
 - The charges may exceed the CPU capacity by less than one waiter's charge,
-  and the ceilings granted by the CPUs left free.
+  and the ceilings may exceed it by the CPUs granted while they were free.
 - From an empty history the full gate still holds a load of about 3.5 times
   the CPUs: a cold task is granted the whole machine until its first run is
   measured.
