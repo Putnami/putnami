@@ -65,9 +65,9 @@
       "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the pants:lint, pants:test and pants:build selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task, the graph task included, sets cache.enabled to false."
     },
     {
-      "id": "tools-take-the-cpu-budget",
+      "id": "pants-keeps-its-own-width",
       "text": [
-        "A Pants command takes the job's CPU budget as PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM and PANTS_RULE_THREADS_CORE, unless the environment sets them or pants.toml sets either option."
+        "A Pants command takes no CPU budget: no Pants option variable is set from it, and no argument names {cpus}. pantsd recomputes its graph when one of its options changes between runs, and Pants refuses a rule_threads_core below 2, so Pants keeps the width its pants.toml or its defaults give."
       ]
     }
   ],

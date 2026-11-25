@@ -2,6 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-25
+- **Amended**: 2026-11-25: Pants takes no budget.
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), the stack extensions and
   the delegated integrations that run on it, and the SDK's `cpubudget`
   package
@@ -47,7 +48,11 @@ with a tool's thread cap. Neither the variables nor `{cpus}` reach the cache key
 
 A control that would turn parallelism on, rather than bound it, is not bound:
 Maven's `-T`, Rails' `PARALLEL_WORKERS`. A control that also bounds remote
-work, Bazel's `--jobs`, is not bound either; `--local_cpu_resources` is.
+work, Bazel's `--jobs`, is not bound either; `--local_cpu_resources` is. An
+option whose change makes a long-lived daemon rebuild its state between runs
+is not bound: pantsd recomputes its graph when one of Pants' options changes,
+and the budget changes from run to run; Pants keeps the width its own
+configuration gives.
 
 ## Rejected alternatives
 
@@ -58,6 +63,12 @@ work, Bazel's `--jobs`, is not bound either; `--local_cpu_resources` is.
   has its own files, includes and per-profile sections; a pattern that only
   detects the setting keeps the project's choice whole with a few lines of
   profile.
+- **Bind Pants' `process_execution_local_parallelism` and
+  `rule_threads_core`.** This decision bound them as first accepted. Pants
+  refuses a `rule_threads_core` below 2, so a budget of 1 failed every Pants
+  verb, and a value that changes between runs made the next request of pantsd
+  recompute its graph: 0.44 to 0.74 s against 0.12 to 0.14 s unchanged,
+  measured on 16 Go packages with Pants 2.31.0.
 - **Pass `-p` and `-parallel` to `go test`.** The scheduler already exports
   `GOMAXPROCS`, which sets both defaults; the flags would add the budget to
   Go's own test-result cache key and replace an operator's `GOMAXPROCS`.

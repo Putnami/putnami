@@ -79,12 +79,12 @@
           }
         },
         {
-          "id": "tools-take-the-cpu-budget",
+          "id": "pants-keeps-its-own-width",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-tools-take-a-budget-of-2"]
+            "checks": ["a-pants-command-takes-no-budget"]
           }
         }
       ]

@@ -317,7 +317,6 @@ receive from a budget of 2.
 | moon | the delegated tool | `MOON_CONCURRENCY` | none |
 | rush | the delegated tool | `RUSH_PARALLELISM` | none |
 | turbo | the delegated tool | `TURBO_CONCURRENCY`, read by turbo 2.5 and later | `concurrency` in `turbo.json` |
-| pants | the delegated tool | `PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM`, `PANTS_RULE_THREADS_CORE` | either option in `pants.toml` |
 | bazel | bazel build, bazel test | `--local_cpu_resources={cpus}` | `--local_cpu_resources` or `--local_resources` in `.bazelrc` |
 
 These tools take no budget, and run with their own width:
@@ -328,6 +327,8 @@ These tools take no budget, and run with their own width:
   `parallelize(workers:)`, and would turn parallel tests on in a suite that
   keeps them off.
 - Bazel's `--jobs`, which also bounds remote execution.
+- Pants: its options belong to pantsd, which recomputes its graph when one
+  changes between runs, and it refuses a `rule_threads_core` below 2.
 - `dart analyze`, `dart compile`, `flutter build`, swift-format, and the
   parallel test runners of an Xcode scheme have no control a step can set.
 - RSpec, Minitest outside Rails, PHPUnit and Composer run in one process.
