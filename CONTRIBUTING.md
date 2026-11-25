@@ -119,6 +119,23 @@ Developer Tools app starts from that scan. `spctl developer-mode
 enable-terminal` adds Terminal to the list; add other apps with the + button.
 Hosted Linux CI runs no such scan.
 
+#### Orchestration counts
+
+The tests in `tooling/cli/internal/cli/e2e/orchestration` hold what a run of the
+real CLI starts, exactly, read from its `run.orchestration` report: for the
+engine, and for the Go, TypeScript, sdd, clientgen and Rust extensions.
+They count the git calls per job, the processes that planning an unchanged
+workspace starts, the CLI starts per job and the extension processes per run.
+A further test holds the engine's CPU per task on plans of trivial tasks and
+fails when it grows with the plan. These tests run when this repository
+changes, never in a consumer workspace.
+
+A change that moves a count changes its number in the same pull request, and
+the number only goes down. A count that rises is a regression to fix, not a
+number to raise. The [profiling guide](tooling/cli/doc/12-profiling-and-telemetry.md#orchestration-counts)
+says what each count is and how it is lowered. Wall times are not tested here;
+they are read from the tooling bench.
+
 ### 4. Commit and Open a PR
 
 Write clear commit messages. PR titles follow [Conventional Commits](https://www.conventionalcommits.org/):

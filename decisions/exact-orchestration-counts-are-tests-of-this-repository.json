@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "exact-orchestration-counts-are-tests-of-this-repository",
+  "statement": "exact orchestration counts and the engine's CPU per trivial task are held by tests of this repository, never in a consumer workspace; a change that moves a count updates its number in the same pull request, and a number only goes down",
+  "settled": "2026-11-24",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

@@ -173,6 +173,92 @@ a long run reuses pids. A process a tool started is in neither. The processes th
 session is settled, such as the git reads of the run report, are left out by
 their trace time.
 
+## Orchestration Counts
+
+The tests in `tooling/cli/internal/cli/e2e/orchestration` hold the orchestration
+counts of this repository exactly. They are tests of this repository: they run
+when Putnami changes, never in a consumer workspace, and no consumer pull request
+fails because of them. Wall times are not tested; they are read from the tooling
+bench.
+
+Each test runs the real CLI in a fixture workspace and reads the counts from its
+`run.orchestration` report (`clitest.RunCounts`). The engine's fixture
+(`clitest.CountsFixture`) runs trivial `/bin/sh` tasks, so what it starts is the
+engine's alone. Each extension's fixture loads the extension from this tree with
+one small project it serves, and runs on one worker, so its tasks run in the
+same order every time. The Go and TypeScript fixtures declare this repository's
+registries: a job that resolves a registry credential starts the CLI that
+spawned it, the test binary, which answers with no token, so the start is
+counted and nothing leaves the host.
+
+The counts are the same on a developer's machine, in a Putnami job and in CI:
+
+- Each test unsets every variable an outer run may set, each `PUTNAMI_*`
+  variable but `PUTNAMI_HOME`, `CI` and the `GITHUB_*` variables
+  (`clitest.UnsetHostRunEnvironment`). The extension cases set the values an
+  outer run would first, so a variable the helper misses fails them.
+- The engine probes each candidate of a pinned toolchain until one answers
+  with the pinned release, and each probe is an `other` process. An extension
+  case sets `GOROOT` to the Go release this repository builds with and puts its
+  pinned tools first on `PATH`, so the first candidate answers whatever else
+  the host's `PATH` holds, and the probes are counted exactly.
+- Nothing leaves the host. A case is skipped when a program it runs is not on
+  `PATH`, when a path of this tree it reads is not installed, or when a tool its
+  extensions would otherwise download is neither where they look for it first
+  nor under the machine's Putnami home: Go's lint tools, Rust's
+  `cargo-nextest` and `cargo-llvm-cov` (on `PATH` first, as `@putnami/rust`
+  looks for them), and the pinned Bun (the `bun` on `PATH` when it is that
+  release). The Python extension holds no count: its test task resolves pytest
+  and ruff from the network.
+
+Where the cases run: in Contributor CI, the engine tests and the sdd case run
+on every pull request; the Go case runs when the restored tool cache holds
+`~/.putnami/tools/go`; the TypeScript and clientgen cases run once the gate's
+install has provisioned the pinned Bun and the repository's `node_modules`; the
+Rust case is skipped, since that workflow installs no Rust toolchain. It runs
+where `cargo` and the Rust test tools are on the machine.
+
+The sources, manifests, prepare scripts and embedded profiles of the counted
+extensions are inputs of `@putnami/cli`'s test task, so a pull request that
+changes one runs these tests again. The counted extensions are Go, TypeScript,
+sdd, clientgen and Rust, with `@putnami/dev`, which the Go, TypeScript and Rust
+fixtures load. The other extensions built here hold no count yet:
+`@putnami/analytics`, `@putnami/application`, `@putnami/bazel`,
+`@putnami/cloud`, `@putnami/contributor`, `@putnami/dart`, `@putnami/dotnet`,
+`@putnami/events`, `@putnami/github-collaboration`,
+`@putnami/gitlab-collaboration`, `@putnami/java`, `@putnami/jira-collaboration`,
+`@putnami/linear-collaboration`, `@putnami/local-collaboration`,
+`@putnami/memory-store`, `@putnami/moon`, `@putnami/nx`, `@putnami/observe`,
+`@putnami/pants`, `@putnami/php`, `@putnami/python`, `@putnami/ruby`,
+`@putnami/rush`, `@putnami/scaffold`, `@putnami/swift`, `@putnami/turbo`,
+`@putnami/web` and the sample `sample/shell-extension`.
+
+| Count | What it is | How it is lowered |
+|---|---|---|
+| Git calls per job | The engine's git calls on runs of 6 and 15 tasks, whose difference is the engine's git calls per job times 9; the git calls of the SDK jobs, by subcommand. | The engine reads the tree once per run and hands its facts to jobs in the job context; a job reads them there instead of running git. |
+| Processes started by planning an unchanged workspace | Every process `--dry-run` starts on the workspace: git, toolchain probes, control processes. A plan reports no `run.orchestration`, so the test reads the process-wide ledger around it (`clitest.PlanCounts`). The engine's fixture also holds a whole run of the unchanged workspace, every task found in the cache. | A probe or a read that does not depend on the change is answered from what the run already knows, or from state kept between runs. |
+| CLI starts per job | The `putnami` processes the SDK jobs start, such as the registry credential a Go job materializes. | The engine materializes what jobs ask the CLI for once per run and hands it to them. |
+| Extension processes per run | The job, batch and control processes the engine starts. | Ready tasks share a batch process, or one extension process runs many jobs. |
+| Engine CPU per task | The CLI process's own CPU per task on 300 and on 1,200 trivial batchable tasks run with `--no-cache` on four workers, the least of three runs after a first one. The test fails when it grows 1.5 times from the smaller plan to the larger, and, as a backstop, at four times its recorded value on the larger. | Work the engine repeats per task or per pending candidate is done once per run, or once per job. |
+
+Each extension case holds two ledgers, one line each: the run with
+`--no-cache`, every task executed, and the plan of the unchanged workspace. A
+ledger names every process kind the engine started, its git calls by
+subcommand, then the CLI starts and git calls of the jobs. The tools jobs run
+(`go`, `bun`, `cargo`) are the jobs' work and are left out.
+
+A pull request that changes a count changes its number in the same pull request,
+and the number only goes down. When a test fails, it prints the ledger it got:
+a lower count replaces the recorded one; a higher count is a regression to fix.
+The growth of the engine's CPU per task does not depend on the host: an engine
+whose work per task is the same on any plan reads below 1.4 on a 4-core Linux
+container, most often below 1.0, and work repeated for each pending task reads
+1.6 to 2.3. The test runs the engine with `GOMAXPROCS` 4, since a Putnami job
+sets it to its CPU budget and the engine's CPU depends on it. The recorded value is measured with
+coverage on a 4-core Linux container; a change that lowers it lowers the
+recorded value. The race detector multiplies the CPU, so a run with `-race`
+skips that test.
+
 ## Cache Economics Benchmark
 
 `tooling/cli/scripts/bench-cache.sh` measures how the shared build CAS changes
