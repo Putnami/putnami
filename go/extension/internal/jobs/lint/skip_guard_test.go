@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
@@ -148,4 +149,28 @@ func emittedMetrics(t *testing.T, fn func()) map[string]float64 {
 		}
 	}
 	return metrics
+}
+
+// The lint task's skip guard, solo and in a batch, scans a directory Git
+// ignores and skips a build output directory the key never reads, with no git
+// on PATH: it reads the lint key's files, not a tree fact.
+func TestTheSkipGuardStartsNoGitSoloOrInABatch(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-jobs-read-the-tree-from-their-context",
+		"the-skip-guard-reads-what-the-lint-key-holds")
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "a", ".gitignore"), "build/\n")
+	mustWrite(t, filepath.Join(root, "a", "go.mod"), "module a\n")
+	mustWrite(t, filepath.Join(root, "a", "build", "x_test.go"), unguardedSkipTest)
+	mustWrite(t, filepath.Join(root, "a", "dist", "x_test.go"), unguardedSkipTest)
+	t.Setenv("PATH", t.TempDir())
+
+	diagnostics := skipGuardDiagnostics(root, filepath.Join(root, "a"))
+	if len(diagnostics) != 1 || diagnostics[0].File != "a/build/x_test.go" {
+		t.Fatalf("solo diagnostics = %+v, want the ignored build/x_test.go alone", diagnostics)
+	}
+	result := batchProjectResult{ProjectID: "a", Status: "OK"}
+	addSkipGuardDiagnostics(&result, root, filepath.Join(root, "a"))
+	if result.Status != "FAILED" || len(result.Diagnostics) != 1 || result.Diagnostics[0].File != "a/build/x_test.go" {
+		t.Fatalf("batch result = %+v, want the ignored build/x_test.go alone", result)
+	}
 }

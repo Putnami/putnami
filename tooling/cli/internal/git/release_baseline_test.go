@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gittest"
+	"go.putnami.dev/sdk/extension/linetag"
 )
 
 const apiPattern = "api/v{version}"
@@ -211,4 +213,51 @@ func TestReadReleaseBaselineReadsTheProjectPathLiterally(t *testing.T) {
 	if got := baselineOf(t, filepath.Join(root, "a*"), "v{version}"); got.Object != "tree "+want {
 		t.Fatalf("baseline = %+v, want tree %s", got, want)
 	}
+}
+
+// The object a release baseline names is read from the commit the line's last
+// release resolved to, not through the tag's name: a tag moved right after
+// that read leaves the object, Breaking and the commit the baseline names on
+// the released commit, so the key's object and the files a job receives
+// describe one commit.
+func TestReleaseBaselineObjectIsReadFromTheReleaseCommit(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "release-baseline-files-follow-the-tag-commit",
+		"the-baseline-object-is-read-from-the-release-commit")
+	root, api := releasedAPIRepo(t)
+	released := strings.TrimSpace(gitOut(t, root, "rev-parse", "api/v0.1.0^{commit}"))
+	want := "tree " + strings.TrimSpace(gitOut(t, root, "rev-parse", released+":api"))
+	writeCommit(t, root, "api/b.go", "feat(api)!: more")
+	saved := lastRelease
+	t.Cleanup(func() { lastRelease = saved })
+	lastRelease = func(dir, pattern string) (linetag.Release, bool, error) {
+		release, ok, err := saved(dir, pattern)
+		// The tag moves to HEAD, whose api directory differs and whose
+		// commit declares a break, once the release is resolved.
+		gitDo(t, root, "tag", "-f", "-a", "api/v0.1.0", "-m", "moved")
+		return release, ok, err
+	}
+	baseline := baselineOf(t, api, apiPattern)
+	if baseline.Commit != released || baseline.Object != want {
+		t.Fatalf("baseline = %+v, want the released commit %s and its object %q", baseline, released, want)
+	}
+	if !baseline.Breaking {
+		t.Errorf("baseline = %+v, want the break of the commit since the released one", baseline)
+	}
+	if got, err := objectAtCommit(api, released, ""); err != nil ||
+		got != "tree "+strings.TrimSpace(gitOut(t, root, "rev-parse", released+"^{tree}")) {
+		t.Errorf("objectAtCommit(root) = %q, %v; want the released commit's tree", got, err)
+	}
+	if got, err := objectAtCommit(api, released, "absent"); err != nil || got != "" {
+		t.Errorf("objectAtCommit(absent) = %q, %v; want no object", got, err)
+	}
+}
+
+// gitOut runs one git command in dir and returns its stdout.
+func gitOut(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	out, err := gittest.Command(dir, args...).Output()
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return string(out)
 }

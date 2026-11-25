@@ -2,12 +2,11 @@ package skipguard
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"go.putnami.dev/sdk/extension/gittest"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // testFile wraps body in a test function of a file that imports testing plus
@@ -252,17 +251,25 @@ func TestScanProject(t *testing.T) {
 	}
 }
 
-// ignoringProject is a git repository that ignores build/ and holds an
-// unguarded skip in a_test.go and another under build/.
-func ignoringProject(t *testing.T) string {
-	t.Helper()
+// The guard reads what the lint key holds and asks Git nothing: a directory
+// Git ignores is scanned, as go test ./... runs it, while the directories the
+// key's file walk never enters (out, dist, node_modules, vendor) and the
+// dot directories (.gen, .putnami) are not. Git is off PATH.
+func TestScanProjectReadsWhatTheLintKeyHolds(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-jobs-read-the-tree-from-their-context",
+		"the-skip-guard-reads-what-the-lint-key-holds")
+	t.Setenv("PATH", t.TempDir())
 	root := t.TempDir()
 	unguarded := testFile(`t.Skip("later")`)
 	for rel, content := range map[string][]byte{
-		".gitignore":        []byte("build/\n"),
-		"go.mod":            []byte("module sample\n"),
-		"a_test.go":         unguarded,
-		"build/gen_test.go": unguarded,
+		".gitignore":             []byte("build/\nbin/\n"),
+		"go.mod":                 []byte("module sample\n"),
+		"a_test.go":              unguarded,
+		"build/gen_test.go":      unguarded,
+		"out/x_test.go":          unguarded,
+		"dist/x_test.go":         unguarded,
+		"node_modules/x_test.go": unguarded,
+		".gen/x_test.go":         unguarded,
 	} {
 		path := filepath.Join(root, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -272,30 +279,16 @@ func ignoringProject(t *testing.T) string {
 			t.Fatal(err)
 		}
 	}
-	if output, err := gittest.Command(root, "init", "-q").CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v: %s", err, output)
-	}
-	return root
-}
-
-func TestIgnoringProjectIsTheSameOnAForeignMachine(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
-	gittest.AssertMachineIndependent(t, func() string { return ignoringProject(t) })
-}
-
-func TestScanProjectSkipsDirectoriesGitIgnores(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
-	root := ignoringProject(t)
-
 	findings, err := ScanProject(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(findings) != 1 || filepath.Base(findings[0].File) != "a_test.go" {
-		t.Fatalf("findings = %+v, want a_test.go only", findings)
+	files := make([]string, 0, len(findings))
+	for _, finding := range findings {
+		rel, _ := filepath.Rel(root, finding.File)
+		files = append(files, filepath.ToSlash(rel))
+	}
+	if got := strings.Join(files, ","); got != "a_test.go,build/gen_test.go" {
+		t.Fatalf("scanned %q, want a_test.go and the ignored build/gen_test.go", got)
 	}
 }

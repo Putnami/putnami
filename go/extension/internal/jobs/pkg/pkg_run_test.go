@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 
 	"go.putnami.dev/protocol/features/spectest"
+	job "go.putnami.dev/protocol/job"
 )
 
 // --- resolveVersion ---
@@ -708,4 +710,44 @@ func readPackageMetadata(workspaceRoot, projectPath string) (*pkgmeta.PackageMet
 		return nil, err
 	}
 	return &metadata, nil
+}
+
+// The package version comes from the job context whenever the orchestrator
+// wrote it, and no git runs: the git on PATH answers a commit, and only a
+// context the orchestrator did not write gets it.
+func TestThePackageVersionReadsTheContext(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-jobs-read-the-tree-from-their-context", "the-package-version-reads-the-context")
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake git is a shell script")
+	}
+	bin := t.TempDir()
+	calls := filepath.Join(t.TempDir(), "calls")
+	script := "#!/bin/sh\necho \"$@\" >> " + calls + "\ncase \"$*\" in *rev-parse*) echo f00dcafe ;; esac\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	dir := t.TempDir()
+	for name, testCase := range map[string]struct {
+		version *pctx.Version
+		want    string
+	}{
+		"a full version":                  {&pctx.Version{Base: "1.2.0", Full: "1.2.1-abc1234", Suffix: "abc1234"}, "1.2.1-abc1234"},
+		"a suffix without a full version": {&pctx.Version{Base: "1.2.0", Suffix: "abc1234"}, "1.2.0-abc1234"},
+		"the tree version":                {&pctx.Version{Base: "0.0.0"}, "1.2.0"},
+		"no version":                      {nil, "1.2.0-nogit"},
+	} {
+		ctx := &pctx.Context{ProtocolVersion: job.ProtocolVersion2, WorkspaceRoot: dir, Version: testCase.version}
+		if got := packageVersion(ctx, "1.2.0"); got != testCase.want {
+			t.Errorf("%s: version = %q, want %q", name, got, testCase.want)
+		}
+	}
+	if data, err := os.ReadFile(calls); err == nil {
+		t.Fatalf("a context the orchestrator wrote ran git: %s", data)
+	}
+	// A direct invocation, whose context the orchestrator did not write, asks
+	// the git on PATH.
+	if got := packageVersion(&pctx.Context{WorkspaceRoot: dir}, "1.2.0"); got != "1.2.0-f00dcafe" {
+		t.Fatalf("direct invocation: version = %q, want the commit git answers", got)
+	}
 }

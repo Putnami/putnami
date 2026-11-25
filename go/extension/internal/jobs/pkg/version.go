@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 
+	"go.putnami.dev/go/extension/internal/releaseversion"
+	job "go.putnami.dev/protocol/job"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/procstat"
@@ -45,15 +47,37 @@ func resolveVersion(ctx *pctx.Context) (baseVersion, packageName string) {
 	return
 }
 
-// resolveSuffix returns the version suffix to append after the base semver.
-// The CLI orchestrator computes the suffix once at command start and writes
-// it into ctx.Version.Suffix, so all jobs share the same value even if some
-// build/codegen step has since dirtied the working tree. Falls back to a
-// per-call git read only when the context is missing the field (e.g. direct
-// extension invocation outside the CLI).
+// packageVersion is the version the package carries: the full version the
+// orchestrator computed for the project's line, or baseVersion followed by
+// the suffix resolveSuffix gives, when there is one.
+func packageVersion(ctx *pctx.Context, baseVersion string) string {
+	if ctx.Version != nil && ctx.Version.Full != "" {
+		return releaseversion.Select(ctx.Version, baseVersion)
+	}
+	if suffix := resolveSuffix(ctx); suffix != "" {
+		return baseVersion + "-" + suffix
+	}
+	return baseVersion
+}
+
+// resolveSuffix returns the version suffix to append after the base semver
+// when the context carries no full version. The orchestrator computes the
+// run's version once at command start and writes it to the job context, so
+// every job shares one value even when a build step has since dirtied the
+// working tree, and no job asks Git:
+//   - a context with a version gives its suffix, empty when it has none;
+//   - a context the orchestrator wrote without a version (job context version
+//     2) says it read none, outside a work tree or when Git failed, and gives
+//     "nogit", what Git answers there.
+//
+// Only a context the orchestrator did not write, a direct extension
+// invocation, asks Git.
 func resolveSuffix(ctx *pctx.Context) string {
-	if ctx.Version != nil && ctx.Version.Suffix != "" {
+	if ctx.Version != nil {
 		return ctx.Version.Suffix
+	}
+	if ctx.ProtocolVersion >= job.ProtocolVersion2 {
+		return "nogit"
 	}
 	return gitSuffix(ctx.WorkspaceRoot)
 }

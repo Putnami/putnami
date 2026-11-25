@@ -893,6 +893,20 @@
         }
       },
       {
+        "id": "release-baseline-files-follow-the-tag-commit",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-baseline-object-is-read-from-the-release-commit",
+            "a-failed-extraction-keeps-the-key-and-is-logged"
+          ]
+        }
+      },
+      {
         "id": "executed-directory-output-starts-empty",
         "stage": "coded",
         "evidenceKinds": [

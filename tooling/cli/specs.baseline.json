@@ -247,6 +247,7 @@
     "cli/job-planning-execution#publish-tasks-declare-their-channels",
     "cli/job-planning-execution#recursive-activation-project-ownership",
     "cli/job-planning-execution#release-baseline-cache-key",
+    "cli/job-planning-execution#release-baseline-files-follow-the-tag-commit",
     "cli/job-planning-execution#release-set-attribution-opt-in",
     "cli/job-planning-execution#release-set-channel-advance",
     "cli/job-planning-execution#release-set-members-by-ecosystem",

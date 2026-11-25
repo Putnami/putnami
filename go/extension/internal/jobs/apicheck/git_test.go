@@ -17,7 +17,7 @@ func TestATreeListingTellsRegularFilesAndReadsAPathLiterally(t *testing.T) {
 	f.commit("chore: a link and a name a glob would match")
 	f.git("tag", "lib/v0.5.0")
 
-	entries, err := treeAtTag(f.project, "lib/v0.5.0", ".", treeListing{recursive: true})
+	entries, err := treeAtTag(f.project, "refs/tags/lib/v0.5.0", ".", treeListing{recursive: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestATreeListingTellsRegularFilesAndReadsAPathLiterally(t *testing.T) {
 		}
 	}
 
-	entries, err = treeAtTag(f.project, "lib/v0.5.0", "[x].json", treeListing{sized: true})
+	entries, err = treeAtTag(f.project, "refs/tags/lib/v0.5.0", "[x].json", treeListing{sized: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,10 +61,10 @@ func TestAWideTreeListingReadsNoBlob(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := treeAtTag(project, firstTag, "greet.go", treeListing{sized: true}); err == nil {
+	if _, err := treeAtTag(project, "refs/tags/"+firstTag, "greet.go", treeListing{sized: true}); err == nil {
 		t.Fatal("a sized listing read a blob the clone does not hold")
 	}
-	entries, err := treeAtTag(project, firstTag, ".", treeListing{recursive: true})
+	entries, err := treeAtTag(project, "refs/tags/"+firstTag, ".", treeListing{recursive: true})
 	if err != nil {
 		t.Fatalf("the wide listing read a blob: %v", err)
 	}

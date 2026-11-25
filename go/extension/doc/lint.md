@@ -188,8 +188,13 @@ The receiver is any `*testing.T`, `*testing.B`, `*testing.F` or `testing.TB`
 parameter, and a suite's `T()` call. A skip in a subtest or a helper counts by
 its own conditions, so a helper that always skips is refused. A
 `//go:build ignore` file is never compiled, so the guard does not read it. The
-guard reads the files the task's cache key reads: it skips `testdata`, `vendor`, nested
-modules and the directories git ignores.
+guard reads a subset of the files the task's cache key reads: it skips
+`testdata`, `vendor`, `node_modules`, `out`, `dist`, dot and underscore
+directories and nested modules and projects, which the key's file walk never
+enters or Go never builds, and follows no ignore rule. It starts no git, and a
+directory git ignores is scanned, as `go test ./...` runs it: building a
+project, which fills `bin/`, `dist/` or `.gen/`, moves neither the key nor the
+verdict ([ADR 0016](adr/0016-a-go-job-reads-the-tree-from-its-context.md)).
 
 A skip that stays on purpose carries a reviewed exception, on the same line or
 on a comment line of its own just above:

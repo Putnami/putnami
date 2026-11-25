@@ -2,7 +2,10 @@
 
 - **Status**: accepted, amended by CLI
   [ADR 0062](../../../../tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md):
-  the task is now cached, keyed on the release baseline the CLI reads from git
+  the task is now cached, keyed on the release baseline the CLI reads from git;
+  amended by job protocol
+  [ADR 0002](../../../../protocols/job/doc/adr/0002-a-job-reads-the-tree-facts-its-key-holds.md):
+  the files at the tag come from the job context
 - **Scope**: `@putnami/go` (`go/extension`), the `validate-api` task
 
 ## Context
@@ -27,9 +30,14 @@ a separate command.
 **The check reads exported declarations with `go/parser` and compares their
 written forms. It never compiles, type-checks or downloads a module.**
 
-- `internal/apisurface` reads the files at the tag (`git ls-tree` and one
-  `git cat-file --batch`) and in the working tree, and keeps the exported
-  declarations of every importable package.
+- `internal/apisurface` reads the files at the tag and in the working tree,
+  and keeps the exported declarations of every importable package. The task
+  declares the `releaseBaselineFiles` runtime input, so the CLI extracts the
+  regular files the tag holds at the project directory, once per tag commit
+  for every planned project of the line, and the job context names that
+  directory: the check reads the files there and starts no git. Without the
+  context's release baseline it reads them from git (`git ls-tree` and one
+  `git cat-file --batch`). Either way only regular files exist at the tag.
 - Types are rendered with `go/types.ExprString`, which formats an expression
   without type-checking it. Before the comparison, a rendering drops parameter
   names, writes each package qualifier as its import path, replaces type
@@ -47,13 +55,23 @@ written forms. It never compiles, type-checks or downloads a module.**
 - Two spellings of one type that the normalizations cover compare equal
   (`TestARenamedImportIsCompatible`, `TestPredeclaredAliasesAreCompatible`,
   `TestRenamedParametersAreCompatible`).
-- Only the files the surface reads are loaded from the tag
-  (`TestOnlyTheFilesTheSurfaceReadsAreLoadedFromTheTag`).
+- Reading git, only the files the surface reads are loaded from the tag
+  (`TestOnlyTheFilesTheSurfaceReadsAreLoadedFromTheTag`). Reading the context,
+  the check opens only those files of the extracted directory, and its report
+  is the one git gives (`TestTheContextBaselineGivesTheReportGitGives`).
 
 ## Consequences
 
 - The check runs offline, in well under a second on this repository, and adds
   no dependency.
+- The extraction writes every regular file the tag holds at the project
+  directory, test data and vendored code included, and does so for a project
+  the support catalog then skips: the CLI extracts before the job reads the
+  catalog. In a partial clone it fetches each of those blobs. That cost is paid
+  once per run and tag commit for all the projects of a line, and the run
+  removes the directory when it ends; the git reading paid a listing and a
+  `cat-file` per checked project and loaded only the files the surface reads.
+  It is the price of a job that starts no git.
 - Known false positives, each listed in [doc/validate.md](../validate.md#limits):
   a method moved to an embedded type, an equivalent alias or another spelling of
   one type, an unnamed import of a package whose name differs from its path, a

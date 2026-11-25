@@ -1,8 +1,12 @@
 package scheduler
 
 import (
+	"bytes"
+	"log/slog"
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
@@ -230,4 +234,57 @@ func TestTheBaselineFilesAreExtractedOnlyWhenAskedFor(t *testing.T) {
 	if entries, _ := filepath.Glob(filepath.Join(store.ResolveScratchRoot(root), "release-baselines-*")); len(entries) != 1 {
 		t.Fatalf("extractions = %v, want the one the task asked for", entries)
 	}
+}
+
+// An extraction of the baseline's files that fails keeps the task's key, which
+// holds the baseline and not the files: the failure is logged, the context
+// carries no release baseline, and the job reads Git.
+func TestAFailedExtractionKeepsTheKeyAndIsLogged(t *testing.T) {
+	spectest.Proves(t, treeFactsFeature, "release-baseline-files-follow-the-tag-commit", "a-failed-extraction-keeps-the-key-and-is-logged")
+	root := treeFactsRepo(t)
+	treeKeyedGit(t, root, "tag", "-a", "v1.0.0", "-m", "release 1.0.0")
+	ws := treeFactsWorkspace(root)
+	job := treeFactsJob(ws.ProjectByID("/app"), extproto.RuntimeInputReleaseBaseline, extproto.RuntimeInputReleaseBaselineFiles)
+	want := treeFactKeyOf(t, ws, job, newTreeFactsCache(t))
+
+	// A file where the run's scratch directory goes makes every extraction fail.
+	scratch := store.ResolveScratchRoot(root)
+	writeFileAt(t, scratch, "not a directory\n")
+	logged := &lockedBuffer{}
+	saved := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(logged, nil)))
+	t.Cleanup(func() { slog.SetDefault(saved) })
+
+	cache := newTreeFactsCache(t)
+	facts := cachekey.RunTreeFacts(cache, root)
+	facts.SetPlanned(ws, []*jobmodel.ScheduledJob{job})
+	t.Cleanup(facts.Close)
+	if got := treeFactKeyOf(t, ws, job, cache); got != want {
+		t.Errorf("the key moved with a failed extraction (%s != %s)", got, want)
+	}
+	if tree := jobTree(facts, ws, job); tree != nil && tree.ReleaseBaseline != nil {
+		t.Fatalf("tree = %+v, want no release baseline after a failed extraction", tree)
+	}
+	if !strings.Contains(logged.String(), "release baseline files not extracted") || !strings.Contains(logged.String(), "v1.0.0") {
+		t.Errorf("log = %q, want the failed extraction named with its tag", logged.String())
+	}
+}
+
+// lockedBuffer is a buffer the default logger can write from tests running in
+// parallel.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }

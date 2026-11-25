@@ -23,7 +23,6 @@ import (
 
 	"go.putnami.dev/go/extension/internal/platform"
 	"go.putnami.dev/go/extension/internal/releaseplan"
-	"go.putnami.dev/go/extension/internal/releaseversion"
 )
 
 // Run executes the package job.
@@ -76,10 +75,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	}
 
 	baseVersion, packageName := resolveVersion(ctx)
-	version := releaseversion.Select(ctx.Version, baseVersion)
-	if ctx.Version == nil || ctx.Version.Full == "" {
-		version = baseVersion + "-" + resolveSuffix(ctx)
-	}
+	version := packageVersion(ctx, baseVersion)
 	goVersion := version
 	if plannedGo != nil {
 		// Release-set versions are already exact ecosystem versions. They must

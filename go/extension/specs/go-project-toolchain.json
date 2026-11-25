@@ -238,6 +238,14 @@
       ]
     },
     {
+      "id": "go-jobs-read-the-tree-from-their-context",
+      "text": [
+        "The skip guard reads only files the lint key holds and asks Git nothing. The API check reads its line's release baseline and the files its last tag holds from the job context its task declares them in; without them it asks Git.",
+        "The API check reads only the regular files the tag holds, from either source.",
+        "The package task reads its version from a job context the orchestrator wrote and starts no Git, even when it carries none; only a direct invocation asks Git."
+      ]
+    },
+    {
       "id": "image-input-producers",
       "text": [
         "Image packaging materializes the project's declared build producers before assembly, including when the image is selected through an upstream package dependency;",
@@ -462,6 +470,7 @@
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
     "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0089-test-outcomes-are-summaries-transcripts-are-session-detail.md",
-    "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md"
+    "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md",
+    "go/extension/doc/adr/0016-a-go-job-reads-the-tree-from-its-context.md"
   ]
 }

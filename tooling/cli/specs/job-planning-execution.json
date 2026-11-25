@@ -230,6 +230,10 @@
       "text": "A task that declares the trackedFiles, ignoredDirectories or repository runtime input keys on that fact, bounded to its project's directory or the workspace for a workspace task, and its job context carries the same value. A task that declares none gets no fact and keeps its key. A run reads each fact once, and extracts a line's last tag once per tag commit for the projects that declare releaseBaselineFiles, which moves no key."
     },
     {
+      "id": "release-baseline-files-follow-the-tag-commit",
+      "text": "A release baseline names the object its tag held at the project directory when the line's last release was read, read from that release's commit, so a tag moved during the run cannot pair a key with other files. An extraction of the baseline's files that fails keeps the task's key, since the key holds the baseline and not the files: the failure is logged, the context carries no release baseline, and the job reads Git."
+    },
+    {
       "id": "executed-directory-output-starts-empty",
       "text": "Before a task executes, the engine empties each literal-path directory output that is required, under the command-output root, or declares emptied, keeping ceded and preserved subpaths and the build stamp. A hit whose entry records such an output empty empties it too, or executes the task when it cannot. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. Other outputs are not emptied. A key marker keeps entries stored without emptying from being served."
     },

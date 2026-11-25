@@ -19,21 +19,20 @@
 package apicheck
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"go.putnami.dev/go/extension/internal/apisurface"
 	protocolcli "go.putnami.dev/protocol/cli"
+	job "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
-	"go.putnami.dev/sdk/extension/linetag"
+	"go.putnami.dev/sdk/extension/treefacts"
 )
 
 // Code is the diagnostic code of an incompatible API change.
@@ -108,13 +107,16 @@ func (r *Report) surfaceReported() bool {
 
 // Run is the task body: it checks the project and reports each incompatible
 // change as an error diagnostic, or as information when a commit declares the
-// break.
+// break. The release baseline and the files its tag holds are read from the
+// job context when it carries them (the task declares the releaseBaseline and
+// releaseBaselineFiles runtime inputs), and from Git otherwise.
 func Run(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	emit.PhaseStart(phase)
 	options, err := optionsFromParams(ctx.Params)
 	var report *Report
 	if err == nil {
-		report, err = Check(ctx.WorkspaceRoot, ctx.Project.FullPath, ctx.Project.Name, ctx.Project.Tags, options)
+		fact, _ := treefacts.From(ctx).ReleaseBaseline()
+		report, err = CheckBaseline(ctx.WorkspaceRoot, ctx.Project.FullPath, ctx.Project.Name, ctx.Project.Tags, options, fact)
 	}
 	if err != nil {
 		emit.PhaseEnd(phase, "failed")
@@ -124,14 +126,23 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string
 }
 
 // Check compares the exported API of the project in projectDir with its
-// line's last tag, and its command-surface document when options declare
+// line's last tag, read from Git; it is CheckBaseline without a release
+// baseline from the job context.
+func Check(workspaceRoot, projectDir, name string, tags []string, options Options) (*Report, error) {
+	return CheckBaseline(workspaceRoot, projectDir, name, tags, options, nil)
+}
+
+// CheckBaseline compares the exported API of the project in projectDir with
+// its line's last tag, and its command-surface document when options declare
 // one. When they declare none, it still reads the declaration at the tag and
 // warns when there was one. name is the project's resolved name: its
 // support-catalog identity, and the module path used when the project has no
 // go.mod. tags are the project's resolved tags as the job context carries
 // them, nil when it carries none: they decide whether the support catalog
-// lists the project as a protocol or as a package.
-func Check(workspaceRoot, projectDir, name string, tags []string, options Options) (*Report, error) {
+// lists the project as a protocol or as a package. fact is the release
+// baseline the job context carries, with the directory of the files its tag
+// holds; nil reads the baseline and the files from Git.
+func CheckBaseline(workspaceRoot, projectDir, name string, tags []string, options Options, fact *job.ReleaseBaseline) (*Report, error) {
 	var surfacePath string
 	if options.CommandSurface != "" {
 		var err error
@@ -149,8 +160,9 @@ func Check(workspaceRoot, projectDir, name string, tags []string, options Option
 	if skip != "" {
 		return &Report{Skip: skip}, nil
 	}
-	// The working tree's document is read before git is: a declared document
-	// that is missing or malformed fails the check whatever the history holds.
+	// The working tree's document is read before the history is: a declared
+	// document that is missing or malformed fails the check whatever the
+	// history holds.
 	var surface *protocolcli.CommandSurface
 	if surfacePath != "" {
 		if surface, err = readSurfaceInTree(projectDir, surfacePath); err != nil {
@@ -158,41 +170,35 @@ func Check(workspaceRoot, projectDir, name string, tags []string, options Option
 		}
 	}
 
-	state, err := readRepoState(projectDir)
-	if errors.Is(err, errNotARepository) {
+	var base baseline
+	if fact != nil {
+		base, err = contextBaseline(fact)
+	} else {
+		base, err = gitBaseline(workspaceRoot, projectDir)
+	}
+	if err != nil {
+		return nil, err
+	}
+	switch base.state {
+	case job.ReleaseBaselineUnmanaged:
 		return &Report{Warning: "the workspace is not in a git repository, so it has no tags to compare with " +
 			"and the API is not compared; run the check in a git checkout"}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if !state.hasHead {
+	case job.ReleaseBaselineNoCommit:
 		return &Report{Note: "the repository has no commit: there is no tagged API to compare with"}, nil
-	}
-	pattern := linePattern(workspaceRoot, projectDir)
-	if state.shallow {
+	case job.ReleaseBaselineShallow:
 		return &Report{Warning: fmt.Sprintf("the clone is shallow, so the tags and history of line %s are incomplete "+
-			"and the API is not compared; fetch the full history to run the check", pattern)}, nil
-	}
-	release, ok, err := linetag.LastRelease(projectDir, pattern)
-	if err != nil {
-		return nil, err
-	}
-	tag := release.Tag
-	if !ok {
-		tagged, err := hasTags(projectDir)
-		if err != nil {
-			return nil, err
-		}
-		if tagged {
+			"and the API is not compared; fetch the full history to run the check", base.pattern)}, nil
+	case job.ReleaseBaselineUntagged:
+		if base.hasTags {
 			return &Report{Warning: fmt.Sprintf("no release tag of line %s is reachable from HEAD, though the repository has other tags, "+
 				"so the API is not compared; fetch the line's tags if it has released. A tag with a pre-release "+
-				"or any other text in place of MAJOR.MINOR.PATCH is not a release", pattern)}, nil
+				"or any other text in place of MAJOR.MINOR.PATCH is not a release", base.pattern)}, nil
 		}
-		return &Report{Note: fmt.Sprintf("no release tag of line %s is reachable from HEAD: there is no released API to compare with", pattern)}, nil
+		return &Report{Note: fmt.Sprintf("no release tag of line %s is reachable from HEAD: there is no released API to compare with", base.pattern)}, nil
 	}
+	tag := base.tag
 
-	oldFiles, err := filesAtTag(projectDir, tag)
+	oldFiles, err := base.release.files()
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +216,7 @@ func Check(workspaceRoot, projectDir, name string, tags []string, options Option
 	}
 	report := &Report{Tag: tag, Packages: len(old.Packages), Changes: apisurface.Incompatible(old, current), CommandSurface: surfacePath}
 	if surface != nil {
-		released, err := readReleasedSurface(projectDir, tag)
+		released, err := readReleasedSurface(base.release, tag)
 		if err != nil {
 			return nil, err
 		}
@@ -221,7 +227,7 @@ func Check(workspaceRoot, projectDir, name string, tags []string, options Option
 	} else {
 		// The declaration at the tag still counts when the working tree
 		// declares none: removing the option warns.
-		report.ReleasedSurface, report.SurfaceWarning, err = droppedSurface(projectDir, tag)
+		report.ReleasedSurface, report.SurfaceWarning, err = droppedSurface(base.release, tag)
 		if err != nil {
 			return nil, err
 		}
@@ -229,15 +235,17 @@ func Check(workspaceRoot, projectDir, name string, tags []string, options Option
 	if len(report.Changes) == 0 && len(report.CommandChanges) == 0 {
 		return report, nil
 	}
-	commits, err := commitsSince(projectDir, tag)
-	if err != nil {
+	if report.Breaking, err = base.breaking(); err != nil {
 		return nil, err
 	}
-	report.Breaking = slices.ContainsFunc(commits, func(c commit) bool {
-		parsed, ok := protocolcli.ParseConventionalCommit(c.subject, c.body)
-		return ok && parsed.Breaking
-	})
 	return report, nil
+}
+
+// declaresBreak reports whether a commit declares a breaking change, with "!"
+// or a BREAKING CHANGE: footer.
+func declaresBreak(c commit) bool {
+	parsed, ok := protocolcli.ParseConventionalCommit(c.subject, c.body)
+	return ok && parsed.Breaking
 }
 
 // filesInTree returns the Go files and go.mod files of the working tree under

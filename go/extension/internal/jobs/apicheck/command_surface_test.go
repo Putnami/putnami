@@ -305,7 +305,10 @@ func TestAMalformedCommandSurfaceFailsTheCheck(t *testing.T) {
 	}
 }
 
-func TestACommandSurfaceAtTheTagMustBeARegularFileWithinTheBound(t *testing.T) {
+// The check reads only the regular files the tag holds, as the job context's
+// extraction holds them: a document the tag holds as a symbolic link is not
+// held, and one over the bound is refused unread.
+func TestACommandSurfaceAtTheTagIsARegularFileWithinTheBound(t *testing.T) {
 	t.Parallel()
 	link := newFixture(t, catalog("package", "stable"))
 	declareSurface(link, surfaceFile)
@@ -319,9 +322,10 @@ func TestACommandSurfaceAtTheTagMustBeARegularFileWithinTheBound(t *testing.T) {
 		t.Fatal(err)
 	}
 	link.write(surfaceLocation, surfaceDocument(t, loudFlag()))
-	if _, err := Check(link.root, link.project, projectName, link.tags, link.options); err == nil ||
-		!strings.Contains(err.Error(), "command-surface.json at lib/v0.5.0 is not a regular file") {
-		t.Fatalf("err = %v, want the linked document refused", err)
+	report, err := Check(link.root, link.project, projectName, link.tags, link.options)
+	if err != nil || report.SurfaceWarning != "the project declares the command surface command-surface.json at lib/v0.5.0, "+
+		"but the tag does not hold it, so the command surface is not compared" {
+		t.Fatalf("report = %+v, %v; want the linked document read as absent", report, err)
 	}
 
 	large := newFixture(t, catalog("package", "stable"))
@@ -611,19 +615,6 @@ func TestAnUnreadableDeclarationAtTheTagWarns(t *testing.T) {
 			prepare: func(f *fixture) { f.write(config, `{"options":{"validate":{"command-surface":"../out.json"}}}`) },
 			want:    `option command-surface is "../out.json" at lib/v0.5.0, not the path of a file of the project, so the command surface is not compared`,
 			dropped: `the project declared the command surface "../out.json" at lib/v0.5.0 and declares none now, so the command surface is not compared`,
-		},
-		{
-			name: "a symbolic link",
-			prepare: func(f *fixture) {
-				f.write("lib/greet/real.json", `{}`)
-				if err := os.Remove(filepath.Join(f.root, config)); err != nil {
-					f.t.Fatal(err)
-				}
-				if err := os.Symlink("real.json", filepath.Join(f.root, config)); err != nil {
-					f.t.Fatal(err)
-				}
-			},
-			want: "the project's putnami.json at lib/v0.5.0 is not a regular file, so the command surface is not compared",
 		},
 		{
 			name:    "over the bound",

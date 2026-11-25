@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"log/slog"
 	"path/filepath"
 
 	extproto "go.putnami.dev/protocol/extension"
@@ -46,8 +47,10 @@ func jobTree(facts *cachekey.TreeFacts, ws *workspace.Workspace, job *ScheduledJ
 				Tag:      baseline.Tag,
 				Breaking: baseline.Breaking,
 			}
-			// The files are extracted only for a task that asks for them; a
-			// directory that cannot be named leaves the whole fact out.
+			// The files are extracted only for a task that asks for them. An
+			// extraction that fails keeps the key, which holds the baseline
+			// and not the files, and leaves the whole fact out, so the job
+			// reads Git (protocols/job ADR 0002 point 6); it is logged.
 			files := cachekey.DeclaresRuntimeInput(job, extproto.RuntimeInputReleaseBaselineFiles)
 			extracted, err := "", error(nil)
 			if files {
@@ -56,6 +59,9 @@ func jobTree(facts *cachekey.TreeFacts, ws *workspace.Workspace, job *ScheduledJ
 			if err == nil {
 				fact.Directory = extracted
 				tree.ReleaseBaseline, carries = fact, true
+			} else {
+				slog.Warn("release baseline files not extracted; the job reads Git instead",
+					"project", job.Project.Name, "tag", baseline.Tag, "error", err)
 			}
 		}
 	}

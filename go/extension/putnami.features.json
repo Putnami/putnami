@@ -229,6 +229,21 @@
           }
         },
         {
+          "id": "go-jobs-read-the-tree-from-their-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-skip-guard-reads-what-the-lint-key-holds",
+              "the-api-check-reads-the-release-baseline-from-the-context",
+              "the-package-version-reads-the-context"
+            ]
+          }
+        },
+        {
           "id": "managed-toolchain",
           "stage": "coded",
           "evidenceKinds": [

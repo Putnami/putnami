@@ -95,7 +95,15 @@ must not decide it. The context is the other way a fact reaches a job.
    refused repository included, the task's key fails and the task runs
    uncached (ADR 0062 point 2), and the context omits the fact. Only a
    workspace outside every repository is an answer: `unmanaged`, with empty
-   listings.
+   listings. Extracting a release baseline's files is not a read of the key:
+   the key holds the baseline, which was read, and the object the tag holds
+   at the project directory, which names the files. An extraction that fails
+   therefore keeps the key; the CLI logs the failure and the context omits
+   `releaseBaseline` whole, so the job reads Git as it would without the
+   member. That reading resolves the line's last release again, by the tag's
+   name: a tag moved between the key's read and the job's stores a verdict of
+   the new commit under the key of the old one, as every job that reads Git
+   for its baseline does.
 7. **The member is additive.** `tree` is an optional v2 member (ADR 0001). The
    SDK accessor answers from it when present and falls back to Git when it is
    absent, except for the release baseline, whose reader keeps its own Git
@@ -103,6 +111,12 @@ must not decide it. The context is the other way a fact reaches a job.
    does not know (`TaskRuntimeIdentity`), so an extension built on the new SDK runs there as
    it runs today, asking Git. The names need no CLI contract rung: on an older
    CLI the key holds no more and no less than it does today.
+8. **The files are those of the commit the baseline names.** The object the
+   key holds and the files extracted are both read from the commit the line's
+   last tag pointed at when the baseline was read, never through the tag's
+   name again, so a tag moved during the run cannot pair a key with the
+   context's files of another commit. A job that reads Git instead of its
+   context (point 6) resolves the tag itself and is not covered.
 
 ## Rejected alternatives
 

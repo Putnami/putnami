@@ -2714,6 +2714,23 @@ func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
 	}
 }
 
+// TestTheSkipGuardTasksDeclareNoTreeFact holds the golangci-lint tasks, which
+// run the skip guard, to a key of ordinary source patterns: the guard reads a
+// subset of those files and asks Git nothing, so the tasks declare no tree
+// fact, and a build output directory, which a fresh clone lacks, moves no key.
+func TestTheSkipGuardTasksDeclareNoTreeFact(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-jobs-read-the-tree-from-their-context",
+		"the-skip-guard-reads-what-the-lint-key-holds")
+	tasks := loadExtensionManifest(t).Tasks
+	for _, name := range []string{"lint-golangci-readonly", "lint-golangci-fix"} {
+		for _, fact := range []string{proto.RuntimeInputIgnoredDirectories, proto.RuntimeInputTrackedFiles, proto.RuntimeInputRepository} {
+			if _, ok := tasks[name].Inputs[fact]; ok {
+				t.Errorf("%s declares the tree fact %s, want none", name, fact)
+			}
+		}
+	}
+}
+
 // TestValidateAPIIsKeyedOnTheReleaseBaseline holds the validate-api
 // declaration to what the check reads. The working tree side is the project's
 // non-test Go files with the files their embed directives select, its go.mod
@@ -2721,7 +2738,8 @@ func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
 // node_modules, out, dist and vendor, and so does the check), the root
 // support catalog and the command-surface option in both spellings; the
 // history side is the releaseBaseline runtime input, which the CLI reads from
-// git. The check writes nothing, and a skip is as cacheable as a verdict, so
+// git, and releaseBaselineFiles, which hands the job the files the tag holds
+// and moves no key. The check writes nothing, and a skip is as cacheable as a verdict, so
 // the task is noOutput and deterministic. Declaring the input requires
 // contract 7, and the manifest is stamped with it.
 func TestValidateAPIIsKeyedOnTheReleaseBaseline(t *testing.T) {
@@ -2736,6 +2754,10 @@ func TestValidateAPIIsKeyedOnTheReleaseBaseline(t *testing.T) {
 		"command-surface":                 {From: proto.TaskInputFromParams},
 		"commandSurface":                  {From: proto.TaskInputFromParams},
 		proto.RuntimeInputReleaseBaseline: {From: proto.TaskInputFromRuntime},
+		// The files of the baseline add nothing to the key (the CLI's
+		// TestReleaseBaselineFilesMovesNoKey): the key stays the one the
+		// inputs above give (ADR 0062), and the context names their directory.
+		proto.RuntimeInputReleaseBaselineFiles: {From: proto.TaskInputFromRuntime},
 	}
 	if !reflect.DeepEqual(task.Inputs, want) {
 		t.Errorf("validate-api inputs = %+v\nwant %+v", task.Inputs, want)

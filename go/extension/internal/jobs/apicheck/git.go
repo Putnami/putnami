@@ -105,8 +105,8 @@ func hasTags(dir string) (bool, error) {
 // cache key does not read it (unkeyedDirectory) are left out as well, so both
 // sides compare the same packages. Symbolic links and submodules are not files
 // of the package and are left out.
-func filesAtTag(dir, tag string) ([]apisurface.File, error) {
-	entries, err := treeAtTag(dir, tag, ".", treeListing{recursive: true})
+func filesAtTag(dir, rev string) ([]apisurface.File, error) {
+	entries, err := treeAtTag(dir, rev, ".", treeListing{recursive: true})
 	if err != nil {
 		return nil, err
 	}
@@ -159,9 +159,9 @@ type treeListing struct {
 	sized bool
 }
 
-// treeAtTag returns the entries of tag's tree that `git ls-tree` lists at
-// pathspec, read literally and relative to dir.
-func treeAtTag(dir, tag, pathspec string, listing treeListing) ([]treeEntry, error) {
+// treeAtTag returns the entries of the tree of rev, a tag's commit, that
+// `git ls-tree` lists at pathspec, read literally and relative to dir.
+func treeAtTag(dir, rev, pathspec string, listing treeListing) ([]treeEntry, error) {
 	args := []string{"ls-tree", "-z"}
 	if listing.recursive {
 		args = append(args, "-r")
@@ -169,7 +169,7 @@ func treeAtTag(dir, tag, pathspec string, listing treeListing) ([]treeEntry, err
 	if listing.sized {
 		args = append(args, "-l")
 	}
-	args = append(args, "refs/tags/"+tag, "--", pathspec)
+	args = append(args, rev, "--", pathspec)
 	output, stderr, err := gitCapture(dir, append(os.Environ(), "GIT_LITERAL_PATHSPECS=1"), nil, args...)
 	if err != nil {
 		return nil, fmt.Errorf("git ls-tree (in %s): %w: %s", dir, err, strings.TrimSpace(stderr))
@@ -246,11 +246,11 @@ type commit struct {
 	body    string
 }
 
-// commitsSince returns the commits after tag up to HEAD that touch dir,
+// commitsSince returns the commits after rev, a tag's commit, up to HEAD that touch dir,
 // newest first.
-func commitsSince(dir, tag string) ([]commit, error) {
+func commitsSince(dir, rev string) ([]commit, error) {
 	output, err := gitOutput(dir, "log", "--format="+commitRecordSeparator+"%s%x00%b",
-		"--no-show-signature", "refs/tags/"+tag+"..HEAD", "--", ".")
+		"--no-show-signature", rev+"..HEAD", "--", ".")
 	if err != nil {
 		return nil, err
 	}

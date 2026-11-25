@@ -30,6 +30,7 @@
     "go/go-project-toolchain#go-answers-its-toolchain-pin",
     "go/go-project-toolchain#go-ecosystem-profile",
     "go/go-project-toolchain#go-generated-tree-sources",
+    "go/go-project-toolchain#go-jobs-read-the-tree-from-their-context",
     "go/go-project-toolchain#go-pin-reuses-the-machine-record",
     "go/go-project-toolchain#grpc-inventory-checked-before-promotion",
     "go/go-project-toolchain#hosted-run-dependencies",

@@ -21,7 +21,6 @@
 package skipguard
 
 import (
-	"bytes"
 	"go/ast"
 	"go/build/constraint"
 	"go/parser"
@@ -29,14 +28,11 @@ import (
 	"go/types"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
-
-	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Category is the diagnostic category every finding carries.
@@ -69,17 +65,20 @@ var ciEnvironment = map[string]bool{
 var guardIdentifier = regexp.MustCompile(`^CI$|[a-z_]CI$|(?i:^(is|in|on|under|running)_?ci$)|(?i:flak)`)
 
 // skippedDirectories are never scanned: Go ignores testdata, vendor and
-// directories whose name starts with "." or "_".
-var skippedDirectories = map[string]bool{"testdata": true, "vendor": true, "node_modules": true}
+// directories whose name starts with "." or "_", and the lint key's file walk
+// never enters node_modules, out, dist or vendor (nor .git and .putnami,
+// which the dot rule covers).
+var skippedDirectories = map[string]bool{"testdata": true, "vendor": true, "node_modules": true, "out": true, "dist": true}
 
 // ScanProject scans every _test.go file under root, without entering a nested
 // module (a directory with its own go.mod), a nested Putnami project or a
-// directory git ignores. The task's cache key leaves ignored directories out,
-// so the lint must not read them either. Findings are sorted by file and
-// position.
+// directory in skippedDirectories. It reads a subset of the files the lint
+// task's key holds, whose patterns follow no ignore rule, so it asks Git
+// nothing: a directory Git ignores is scanned as `go test ./...` runs it, and
+// a build output directory moves neither the key nor the verdict. Findings
+// are sorted by file and position.
 func ScanProject(root string) ([]Finding, error) {
 	var findings []Finding
-	ignored := ignoredDirectories(root)
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			if path == root {
@@ -94,9 +93,6 @@ func ScanProject(root string) ([]Finding, error) {
 			name := entry.Name()
 			if skippedDirectories[name] || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") ||
 				fileExists(filepath.Join(path, "go.mod")) || fileExists(filepath.Join(path, "putnami.json")) {
-				return filepath.SkipDir
-			}
-			if rel, relErr := filepath.Rel(root, path); relErr == nil && ignored[filepath.ToSlash(rel)] {
 				return filepath.SkipDir
 			}
 			return nil
@@ -126,25 +122,6 @@ func ScanProject(root string) ([]Finding, error) {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
-}
-
-// ignoredDirectories returns the directories under root that git ignores
-// entirely, as slash-separated paths relative to root. Outside a git
-// repository, or without git, it returns nil and nothing is ignored.
-func ignoredDirectories(root string) map[string]bool {
-	cmd := exec.Command("git", "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z")
-	cmd.Dir = root
-	output, err := procstat.Output(cmd)
-	if err != nil {
-		return nil
-	}
-	dirs := make(map[string]bool)
-	for _, entry := range bytes.Split(output, []byte{0}) {
-		if name := string(entry); strings.HasSuffix(name, "/") {
-			dirs[strings.TrimSuffix(name, "/")] = true
-		}
-	}
-	return dirs
 }
 
 // ScanFile scans one Go test file. A file that does not parse yields no

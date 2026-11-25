@@ -70,6 +70,10 @@ func (b ReleaseBaseline) Value() string {
 	return string(data)
 }
 
+// lastRelease resolves a line's last release. It is a variable only so a test
+// can move a tag between that read and the reads that follow it.
+var lastRelease = linetag.LastRelease
+
 // ReadReleaseBaseline reads the release baseline of the project in dir, whose
 // version line renders its tags with tagPattern.
 //
@@ -116,7 +120,7 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 		return baseline, nil
 	}
 
-	last, ok, err := linetag.LastRelease(dir, tagPattern)
+	last, ok, err := lastRelease(dir, tagPattern)
 	if err != nil {
 		return ReleaseBaseline{}, err
 	}
@@ -131,7 +135,10 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 
 	baseline.State, baseline.Tag = ReleaseBaselineTagged, last.Tag
 	baseline.Commit, baseline.Prefix = last.Commit, prefix
-	if baseline.Object, err = objectAtTag(dir, last.Tag, prefix); err != nil {
+	// The object is read from the commit LastRelease returned, never through
+	// the tag's name, so the key's object, Breaking and the files a job
+	// receives all describe one commit even when the tag moves meanwhile.
+	if baseline.Object, err = objectAtCommit(dir, last.Commit, prefix); err != nil {
 		return ReleaseBaseline{}, err
 	}
 	commits, err := gitread.CommitsSince(dir, last.Commit, []string{"."})
@@ -147,21 +154,20 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 	return baseline, nil
 }
 
-// objectAtTag returns the type and ID of the object tag holds at prefix, a
-// slash path relative to the work tree's root without a trailing slash; empty
-// when prefix is absent at tag. The empty prefix is the root, whose object is
-// the tag's tree.
-func objectAtTag(dir, tag, prefix string) (string, error) {
-	ref := "refs/tags/" + tag
+// objectAtCommit returns the type and ID of the object commit holds at
+// prefix, a slash path relative to the work tree's root without a trailing
+// slash; empty when prefix is absent at commit. The empty prefix is the root,
+// whose object is the commit's tree.
+func objectAtCommit(dir, commit, prefix string) (string, error) {
 	if prefix == "" {
-		output, err := gitread.Run(dir, "rev-parse", "--verify", "--end-of-options", ref+"^{tree}")
+		output, err := gitread.Run(dir, "rev-parse", "--verify", "--end-of-options", commit+"^{tree}")
 		if err != nil {
-			return "", fmt.Errorf("read the tree of %s: %w", tag, err)
+			return "", fmt.Errorf("read the tree of %s: %w", commit, err)
 		}
 		return "tree " + strings.TrimSpace(output), nil
 	}
 	output, stderr, err := gitread.RunCaptureEnv(dir, append(os.Environ(), "GIT_LITERAL_PATHSPECS=1"),
-		"ls-tree", "-z", "--full-tree", ref, "--", prefix)
+		"ls-tree", "-z", "--full-tree", commit, "--", prefix)
 	if err != nil {
 		return "", fmt.Errorf("git ls-tree (in %s): %w: %s", dir, err, strings.TrimSpace(stderr))
 	}

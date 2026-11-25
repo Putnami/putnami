@@ -246,16 +246,16 @@ type releasedSurface struct {
 	warning string
 }
 
-// readReleasedSurface reads the command surface the project released at tag.
-// The path comes from the project's putnami.json at tag, not from the current
-// option, so a document that moves in the same change is still compared with
-// the released one. A document the tag declares but does not hold, or holds
-// in a later protocol version than this reader knows, is a warning: nothing
-// can be compared, and no marker could make it comparable. A released
-// document that is not a regular file, is over the bound or is malformed is an
+// readReleasedSurface reads the command surface the project released at tag,
+// through r. The path comes from the project's putnami.json at tag, not from
+// the current option, so a document that moves in the same change is still
+// compared with the released one. A document the tag declares but does not
+// hold as a regular file, or holds in a later protocol version than this
+// reader knows, is a warning: nothing can be compared, and no marker could
+// make it comparable. A released document over the bound or malformed is an
 // error.
-func readReleasedSurface(dir, tag string) (releasedSurface, error) {
-	option, warning, err := surfaceOptionAtTag(dir, tag)
+func readReleasedSurface(r release, tag string) (releasedSurface, error) {
+	option, warning, err := surfaceOptionAtTag(r, tag)
 	if err != nil || warning != "" {
 		return releasedSurface{warning: warning}, err
 	}
@@ -268,7 +268,7 @@ func readReleasedSurface(dir, tag string) (releasedSurface, error) {
 			commandSurfaceOption, option, tag)}, nil
 	}
 	released := releasedSurface{path: rel}
-	entry, found, err := entryAtTag(dir, tag, rel)
+	file, found, err := r.file(rel)
 	if err != nil {
 		return releasedSurface{}, err
 	}
@@ -276,17 +276,14 @@ func readReleasedSurface(dir, tag string) (releasedSurface, error) {
 		released.warning = fmt.Sprintf("the project declares the command surface %s at %s, but the tag does not hold it, so the command surface is not compared", rel, tag)
 		return released, nil
 	}
-	if !entry.regular {
-		return releasedSurface{}, fmt.Errorf("the command surface %s at %s is not a regular file", rel, tag)
+	if file.size > protocolcli.CommandSurfaceMaxBytes {
+		return releasedSurface{}, fmt.Errorf("the command surface %s at %s is %d bytes, over the limit of %d", rel, tag, file.size, protocolcli.CommandSurfaceMaxBytes)
 	}
-	if entry.size > protocolcli.CommandSurfaceMaxBytes {
-		return releasedSurface{}, fmt.Errorf("the command surface %s at %s is %d bytes, over the limit of %d", rel, tag, entry.size, protocolcli.CommandSurfaceMaxBytes)
-	}
-	contents, err := readBlobs(dir, []string{entry.object})
+	contents, err := file.read()
 	if err != nil {
 		return releasedSurface{}, err
 	}
-	surface, err := protocolcli.ParseCommandSurface(contents[0])
+	surface, err := protocolcli.ParseCommandSurface(contents)
 	if errors.Is(err, protocolcli.ErrUnknownCommandSurfaceVersion) {
 		released.warning = fmt.Sprintf("the command surface %s at %s is not compared: %v; update @putnami/go to read it", rel, tag, err)
 		return released, nil
@@ -306,8 +303,8 @@ func readReleasedSurface(dir, tag string) (releasedSurface, error) {
 // a file of the project. A putnami.json at tag that the check cannot read
 // gives its warning too, since the check cannot tell what it declared. A tag
 // that declares no document gives neither.
-func droppedSurface(dir, tag string) (rel, warning string, err error) {
-	option, warning, err := surfaceOptionAtTag(dir, tag)
+func droppedSurface(r release, tag string) (rel, warning string, err error) {
+	option, warning, err := surfaceOptionAtTag(r, tag)
 	if err != nil || warning != "" || option == "" {
 		return "", warning, err
 	}
@@ -320,27 +317,25 @@ func droppedSurface(dir, tag string) (rel, warning string, err error) {
 }
 
 // surfaceOptionAtTag returns the command-surface option the project's
-// putnami.json declares at tag; empty when it declares none or the tag has no
-// putnami.json. A putnami.json the check cannot read gives a warning.
-func surfaceOptionAtTag(dir, tag string) (option, warning string, err error) {
-	entry, found, err := entryAtTag(dir, tag, wsproto.ConfigFilename)
+// putnami.json declares at tag; empty when it declares none or the tag holds
+// no putnami.json as a regular file. A putnami.json the check cannot read
+// gives a warning.
+func surfaceOptionAtTag(r release, tag string) (option, warning string, err error) {
+	file, found, err := r.file(wsproto.ConfigFilename)
 	if err != nil || !found {
 		return "", "", err
 	}
 	unreadable := func(reason string) (string, string, error) {
 		return "", fmt.Sprintf("the project's %s at %s %s, so the command surface is not compared", wsproto.ConfigFilename, tag, reason), nil
 	}
-	if !entry.regular {
-		return unreadable("is not a regular file")
+	if file.size > projectConfigMaxBytes {
+		return unreadable(fmt.Sprintf("is %d bytes, over the limit of %d", file.size, projectConfigMaxBytes))
 	}
-	if entry.size > projectConfigMaxBytes {
-		return unreadable(fmt.Sprintf("is %d bytes, over the limit of %d", entry.size, projectConfigMaxBytes))
-	}
-	contents, err := readBlobs(dir, []string{entry.object})
+	contents, err := file.read()
 	if err != nil {
 		return "", "", err
 	}
-	option, err = declaredSurfaceOption(contents[0])
+	option, err = declaredSurfaceOption(contents)
 	if err != nil {
 		return unreadable(err.Error())
 	}
@@ -371,8 +366,8 @@ func declaredSurfaceOption(data []byte) (string, error) {
 
 // entryAtTag returns the entry at rel, relative to dir, as tag holds it, with
 // its size. It returns false when the tag has no entry at that path.
-func entryAtTag(dir, tag, rel string) (treeEntry, bool, error) {
-	entries, err := treeAtTag(dir, tag, rel, treeListing{sized: true})
+func entryAtTag(dir, rev, rel string) (treeEntry, bool, error) {
+	entries, err := treeAtTag(dir, rev, rel, treeListing{sized: true})
 	if err != nil {
 		return treeEntry{}, false, err
 	}

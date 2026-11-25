@@ -292,3 +292,31 @@ func TestReleaseBaselineFilesMovesNoKey(t *testing.T) {
 		t.Fatalf("releaseBaselineFiles moved the key (%s != %s)", a, b)
 	}
 }
+
+// A lint keyed on the Go lint tasks' source patterns keeps its key when the
+// project builds into its ignored output directories: the key's file walk
+// never enters dist, its patterns leave .gen out, bin holds no Go file, and
+// the task declares no tree fact that lists the directories Git ignores.
+func TestABuildOutputDirectoryDoesNotMoveTheGoLintKey(t *testing.T) {
+	root := treeFactsRepo(t)
+	writeFileAt(t, filepath.Join(root, ".gitignore"), "dist/\nbin/\n.gen/\n")
+	ws := treeFactsWorkspace(root)
+	ext := &extension.ExtensionDescription{Name: "@test/ext", Tasks: map[string]extension.TaskDefinition{"check": {}}}
+	def := extension.JobDefinition{
+		Name: "lint~check", ExtensionName: ext.Name, Cache: true,
+		TaskCachePolicy: &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{
+			Files: []string{"**/*.go", "!**/.gen/**", "go.mod"}}},
+	}
+	job := &jobmodel.ScheduledJob{Project: ws.ProjectByID("/app"), Extension: ext,
+		Step: &extension.PipelineStep{ID: "check", Task: "check"}, JobDef: &def}
+	if err := os.RemoveAll(filepath.Join(root, "app", "dist")); err != nil {
+		t.Fatal(err)
+	}
+	fresh := keyOf(t, ws, job, newRunCache(t))
+	writeFileAt(t, filepath.Join(root, "app", "dist", "gen.go"), "package dist\n")
+	writeFileAt(t, filepath.Join(root, "app", ".gen", "api", "api.go"), "package api\n")
+	writeFileAt(t, filepath.Join(root, "app", "bin", "app"), "binary\n")
+	if built := keyOf(t, ws, job, newRunCache(t)); built != fresh {
+		t.Fatalf("building into dist, .gen and bin moved the lint key (%s != %s)", built, fresh)
+	}
+}

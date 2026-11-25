@@ -272,6 +272,16 @@ The task is cached. Its key holds what the verdict reads:
   at the project directory, and whether a commit since that tag that touches
   the project declares a breaking change.
 
+The task also declares the `releaseBaselineFiles` runtime input, which adds
+nothing to the key: the CLI extracts the regular files the release tag holds
+at the project directory, once per tag for every project of the line, and the
+job context names that directory. The check reads the baseline and those files
+from its context and starts no git; with a CLI that does not carry them, it
+reads git. It reads only the regular files the tag holds either way: a
+symbolic link or a submodule at the tag is absent, so a `putnami.json` the tag
+holds as a link declares no command surface and gives the note of a tag
+without one.
+
 The project's file patterns skip directories whose name starts with `.`, where
 a run writes its generated files, and the CLI's file walk never enters
 `node_modules`, `out`, `dist` or `vendor`. The check reads no Go file under any

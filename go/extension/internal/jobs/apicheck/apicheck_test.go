@@ -747,7 +747,7 @@ func TestOnlyTheFilesTheSurfaceReadsAreLoadedFromTheTag(t *testing.T) {
 	f.commit("chore: more files")
 	f.git("tag", "lib/v0.5.0")
 
-	files, err := filesAtTag(f.project, "lib/v0.5.0")
+	files, err := filesAtTag(f.project, "refs/tags/lib/v0.5.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -778,7 +778,7 @@ func TestAPackageUnderADirectoryTheKeyDoesNotReadIsNotCompared(t *testing.T) {
 	f.commit("feat: format packages")
 	f.git("tag", "lib/v0.5.0")
 
-	files, err := filesAtTag(f.project, "lib/v0.5.0")
+	files, err := filesAtTag(f.project, "refs/tags/lib/v0.5.0")
 	if err != nil {
 		t.Fatal(err)
 	}
