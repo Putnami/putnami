@@ -284,7 +284,7 @@ func loadSpecRepository(ws *workspace.Workspace, selection Selection) (*specRepo
 	sort.Strings(report.ExternalRecords)
 	repository := &specRepository{
 		workspace:    ws,
-		revision:     worktreeFeatureRevision(ws.Root),
+		revision:     specRevision(ws),
 		discovery:    discovery,
 		selection:    report,
 		scope:        scope,
@@ -1049,4 +1049,14 @@ func validSpecSelector(selector string) bool {
 		}
 	}
 	return true
+}
+
+// specRevision is the revision a spec report names: the worktree, labeled
+// with the HEAD commit except in the view of a cached task, whose report names
+// no commit.
+func specRevision(ws *workspace.Workspace) featureengine.Revision {
+	if ws.NamesNoCommit {
+		return featureengine.Revision{Kind: featureengine.RevisionKindWorktree}
+	}
+	return worktreeFeatureRevision(ws.Root)
 }

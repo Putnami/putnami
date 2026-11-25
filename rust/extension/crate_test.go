@@ -16,6 +16,7 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	job "go.putnami.dev/protocol/job"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
@@ -523,5 +524,35 @@ func TestAProjectNamedWithUppercaseLettersPublishesALowercaseImage(t *testing.T)
 	}
 	if _, err := os.Stat(filepath.Join(pkgmeta.PackageOutputDir(root, "tools/gen", channelArchives), "Acme-Gen-linux-x64.tar.gz")); err != nil {
 		t.Errorf("archive: %v", err)
+	}
+}
+
+// A job whose context carries the candidate cut of the stack root stages it
+// without Git: the cut decides what reaches the copy, so an ignored file the
+// cut does not list stays out.
+func TestTheStagedCopyReadsTheCutFromTheContextWithoutGit(t *testing.T) {
+	spectest.Proves(t, feature, "publish-sends-the-staged-crate", "publish-sends-a-crate-at-the-release-version")
+	root := fixture(t)
+	stackstest.WriteFile(t, root, "tools/gen/server.pem", "private")
+	stackstest.WriteFile(t, root, "tools/gen/src/added.rs", "// not committed, not ignored\n")
+	t.Setenv("PATH", t.TempDir())
+	ctx := &pctx.Context{WorkspaceRoot: root, Tree: &job.Tree{Directory: "tools/gen",
+		CandidateDirectories: []string{"tools/gen"},
+		CandidateFiles: []job.CandidateFile{
+			{Path: "tools/gen/Cargo.toml", Mode: job.CandidateModeRegular},
+			{Path: "tools/gen/src/added.rs", Mode: job.CandidateModeUntracked},
+			{Path: "tools/gen/src/main.rs", Mode: job.CandidateModeRegular},
+		}}}
+	staged := t.TempDir()
+	if err := copyStackRoot(ctx, filepath.Join(root, "tools/gen"), staged, testVersion); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(staged, "server.pem")); err == nil {
+		t.Error("the copy holds a file the cut does not list")
+	}
+	for _, kept := range []string{"Cargo.toml", "src/added.rs", "src/main.rs"} {
+		if _, err := os.Stat(filepath.Join(staged, kept)); err != nil {
+			t.Errorf("the copy misses %s: %v", kept, err)
+		}
 	}
 }

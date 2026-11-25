@@ -109,7 +109,8 @@ func TestJobFailsWhenTheProjectCannotBeRead(t *testing.T) {
 
 // TestInputsKeyTheCandidateCutTheCheckReads pins the declaration a lint-docs
 // task copies: its workspace port is the `git:**` input that holds the
-// candidate cut the check reads, and its parameter port is the one Job reads.
+// candidate cut the check reads, its runtime port hands Job that cut from its
+// context, and its parameter port is the one Job reads.
 func TestInputsKeyTheCandidateCutTheCheckReads(t *testing.T) {
 	inputs := Inputs()
 	repository := inputs["repository"]
@@ -123,7 +124,10 @@ func TestInputsKeyTheCandidateCutTheCheckReads(t *testing.T) {
 	if readme.From != "project" || len(readme.Files) != 1 || readme.Files[0] != "README.md" {
 		t.Errorf("readme port = %+v, want the project input README.md", readme)
 	}
-	if len(inputs) != 3 {
-		t.Errorf("Inputs() = %v, want the ports repository, readme and %s", inputs, Param)
+	if port, ok := inputs["workspaceCandidateFiles"]; !ok || port.From != "runtime" {
+		t.Errorf("workspaceCandidateFiles port = %+v, want the runtime input that hands Job the cut", port)
+	}
+	if len(inputs) != 4 {
+		t.Errorf("Inputs() = %v, want the ports repository, readme, workspaceCandidateFiles and %s", inputs, Param)
 	}
 }

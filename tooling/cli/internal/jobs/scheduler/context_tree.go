@@ -3,6 +3,7 @@ package scheduler
 import (
 	"log/slog"
 	"path/filepath"
+	"strings"
 
 	extproto "go.putnami.dev/protocol/extension"
 	protocoljob "go.putnami.dev/protocol/job"
@@ -12,9 +13,11 @@ import (
 
 // jobTree returns the tree facts job's task declares, each the value its key
 // holds (cachekey.TreeFacts, the run's one read), or nil when it declares none
-// (protocols/job ADR 0002). A fact Git cannot answer is left out: the task's
-// key failed on it, so the task runs uncached, and the job asks Git itself.
-func jobTree(facts *cachekey.TreeFacts, ws *workspace.Workspace, job *ScheduledJob) *protocoljob.Tree {
+// (protocols/job ADR 0002 and ADR 0003). A fact Git cannot answer is left out:
+// the task's key failed on it, so the task runs uncached, and the job asks Git
+// itself. selection is the job's resolved selection: the change history is the
+// one of its impacted baseline, written only to an uncached job.
+func jobTree(facts *cachekey.TreeFacts, ws *workspace.Workspace, job *ScheduledJob, selection *protocoljob.Selection) *protocoljob.Tree {
 	if facts == nil {
 		return nil
 	}
@@ -63,6 +66,24 @@ func jobTree(facts *cachekey.TreeFacts, ws *workspace.Workspace, job *ScheduledJ
 				slog.Warn("release baseline files not extracted; the job reads Git instead",
 					"project", job.Project.Name, "tag", baseline.Tag, "error", err)
 			}
+		}
+	}
+	if cachekey.DeclaresRuntimeInput(job, extproto.RuntimeInputCandidateFiles) {
+		directories := cachekey.CandidateDirectories(ws, job)
+		if files, found, err := facts.CandidatesUnder(job.Key(), directories); err == nil && found {
+			tree.CandidateDirectories, tree.CandidateFiles, carries = directories, files, true
+		}
+	}
+	if cachekey.DeclaresRuntimeInput(job, extproto.RuntimeInputWorkspaceCandidateFiles) {
+		if listing, err := facts.WorkspaceCandidates(job.Key()); err == nil && listing != nil {
+			tree.WorkspaceCandidates, carries = listing, true
+		}
+	}
+	// A commit is state no key names: history reaches no cached job.
+	if cachekey.DeclaresRuntimeInput(job, extproto.RuntimeInputChangeHistory) && job.JobDef != nil && !job.JobDef.Cache &&
+		selection != nil && selection.Mode == protocoljob.SelectionModeImpacted && strings.TrimSpace(selection.Baseline) != "" {
+		if history, err := facts.ChangeHistory(strings.TrimSpace(selection.Baseline)); err == nil {
+			tree.ChangeHistory, carries = history, true
 		}
 	}
 	if !carries {

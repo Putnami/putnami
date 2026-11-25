@@ -8,6 +8,7 @@ require (
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
+	go.putnami.dev/protocol/job v0.0.0
 	go.putnami.dev/sdk/extension v0.0.0
 )
 
@@ -27,7 +28,6 @@ require (
 	go.putnami.dev/protocol/http-routes v0.0.0 // indirect
 	go.putnami.dev/protocol/identity v0.0.0 // indirect
 	go.putnami.dev/protocol/infra v0.0.0 // indirect
-	go.putnami.dev/protocol/job v0.0.0 // indirect
 	go.putnami.dev/protocol/migration v0.0.0 // indirect
 	go.putnami.dev/protocol/platform v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect

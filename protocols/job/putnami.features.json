@@ -99,6 +99,19 @@
           }
         },
         {
+          "id": "candidate-cut-and-history-are-answers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-candidate-listing-file-matches-its-digest"
+            ]
+          }
+        },
+        {
           "id": "the-cli-produces-a-conforming-context",
           "stage": "coded",
           "evidenceKinds": [

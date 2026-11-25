@@ -158,6 +158,19 @@ func (f *Facts) ReleaseBaseline() (*job.ReleaseBaseline, bool) {
 	return f.tree.ReleaseBaseline, true
 }
 
+// ChangeHistory returns the history of the change since the run's impacted
+// baseline the context carries, and false when it carries none: the task did
+// not declare `changeHistory`, its cache is enabled, the run has no impacted
+// baseline, or the orchestrator could not read it (doc/adr/0003 of the job
+// protocol). As for the release baseline there is no fallback here: a job
+// without the member reads history as it did before the member existed.
+func (f *Facts) ChangeHistory() (*job.ChangeHistory, bool) {
+	if f == nil || f.tree == nil || f.tree.ChangeHistory == nil {
+		return nil, false
+	}
+	return f.tree.ChangeHistory, true
+}
+
 // RepositoryState is the state of the repository holding dir and the
 // absolute root of its work tree: outside a work tree, then without a commit,
 // then shallow, else complete. The root is empty outside a work tree. A Git

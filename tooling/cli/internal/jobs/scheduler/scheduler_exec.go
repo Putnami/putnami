@@ -864,14 +864,14 @@ func (s *Scheduler) finalizeExecutedJob(
 	// input digest those paths can move is dropped before its result is
 	// published, so a task that reads them keys the bytes it reads
 	// (cachekey/key_movement.go).
-	s.cache.InvalidateFileHashesUnder(cachekey.DeclaredOutputPaths(s.outputRoots(), job, result))
+	s.invalidateWritten(cachekey.DeclaredOutputPaths(s.outputRoots(), job, result))
 
 	// A task that may have rewritten the worktree's sources invalidates the
 	// memoized input digests for every later job. When caching is active,
 	// recompute its keyed project-source digest: only unchanged source bytes
 	// prove that a stored green verdict can be reused without skipping edits.
 	if result.Status == "success" && cachekey.RewritesSourceTree(job) && s.cache != nil {
-		s.cache.InvalidateFileHashes()
+		s.invalidateEverything()
 		if cacheEnabled && cacheHash != "" {
 			afterSourceHash, err := sourceInputDigest(s.ws, job, s.commandParams, s.cache)
 			result.SourceMutated = sourceInputHash == "" || err != nil ||

@@ -38,6 +38,10 @@
       "text": "Only a version 2 document carries tree facts: the directory they cover, the repository state, the tracked files, the ignored directories and the release baseline. A listing is sorted, unique and at or below the directory, and an empty listing is an answer that stays an empty listing when the document is written again, while an absent fact stays absent. A tree without a fact, a null listing, an unknown state, and a release baseline member its state does not allow are refused."
     },
     {
+      "id": "candidate-cut-and-history-are-answers",
+      "text": "A version 2 tree also carries the candidate cut and the change history. The cut names its directories and lists each path below one with a known mode, sorted and unique; the workspace's cut is a file of the run named with the SHA-256 its reader checks. The history names the baseline, and either a shallow clone alone or the merge base and the commits. A cut without directories, a null cut, an unknown mode, a stray path, a relative file, a bad digest or a history without commits are refused."
+    },
+    {
       "id": "the-cli-produces-a-conforming-context",
       "text": "The context the CLI builds for a job passes the strict reader as version 2. It carries the plan node's typed identity and key, the run's resolved selection byte for byte and no staging tree, and a numeric string parameter still reads as its number on the consumer side."
     }

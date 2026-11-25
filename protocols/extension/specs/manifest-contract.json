@@ -200,6 +200,10 @@
         "A command-group subcommand may declare `workspaceState`, whose one value is `none`: the subcommand reads no installed workspace state, so the CLI runs it without the implicit first-use install and without the generated-client restore.",
         "The strict parser and the schema refuse any other value (invalid-enum), and the member needs no contract increment: a CLI that drops it runs the bootstrap, which is the behavior before the member."
       ]
+    },
+    {
+      "id": "a-tree-fact-input-binds-its-task",
+      "text": "A task that declares the workspaceCandidateFiles runtime input keys the workspace's whole candidate cut through a workspace git:** input, and a task that declares the changeHistory runtime input is never cached: a manifest that breaks either rule is refused."
     }
   ],
   "decisions": [

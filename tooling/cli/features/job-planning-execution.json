@@ -907,6 +907,22 @@
         }
       },
       {
+        "id": "candidate-cut-and-history-follow-the-key",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-candidate-cut-is-keyed-and-carried",
+            "the-workspace-cut-is-one-file-of-the-run",
+            "history-reaches-only-an-uncached-job",
+            "a-write-of-the-run-reads-the-cut-again"
+          ]
+        }
+      },
+      {
         "id": "executed-directory-output-starts-empty",
         "stage": "coded",
         "evidenceKinds": [

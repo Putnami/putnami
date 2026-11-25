@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	job "go.putnami.dev/protocol/job"
+
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/sdk/extension/gitread"
@@ -73,6 +75,14 @@ type BreakingCommit struct {
 // of ProposalMessageEnv and baseline the run's impacted baseline; either may be
 // empty.
 func BuildBreakingMarkerResult(root, message, baseline string) (BreakingMarkerReport, error) {
+	return BuildBreakingMarkerResultFrom(nil, root, message, baseline)
+}
+
+// BuildBreakingMarkerResultFrom is BuildBreakingMarkerResult reading the
+// commits from history, the change history the job context carries for the
+// same baseline (go.putnami.dev/protocol/job, doc/adr/0003), and from Git when
+// history is nil or names another baseline.
+func BuildBreakingMarkerResultFrom(history *job.ChangeHistory, root, message, baseline string) (BreakingMarkerReport, error) {
 	var report BreakingMarkerReport
 	if strings.TrimSpace(message) == "" {
 		report.Note = "no proposal message to compare: " + ProposalMessageEnv + " is unset or blank"
@@ -92,16 +102,23 @@ func BuildBreakingMarkerResult(root, message, baseline string) (BreakingMarkerRe
 				"run with --impacted against a base branch this clone holds", ProposalMessageEnv), protocolcli.ErrInvalidConfig), report)
 	}
 	report.Baseline = baseline
-	shallow, err := gitread.IsShallow(root)
-	if err != nil {
-		return report, protocolcli.WithResultData(fmt.Errorf("breaking marker: %w", err), report)
+	if history != nil && history.Baseline != baseline {
+		history = nil
+	}
+	shallow := history != nil && history.Shallow
+	if history == nil {
+		var err error
+		shallow, err = gitread.IsShallow(root)
+		if err != nil {
+			return report, protocolcli.WithResultData(fmt.Errorf("breaking marker: %w", err), report)
+		}
 	}
 	if shallow {
 		return report, protocolcli.WithResultData(protocolcli.Classify(fmt.Errorf(
 			"breaking marker: the repository is a shallow clone, so the commits since %s may stop at the clone depth "+
 				"and hide a breaking change; fetch the whole history", baseline), protocolcli.ErrInvalidConfig), report)
 	}
-	commits, err := gitread.CommitsSince(root, baseline, nil)
+	commits, err := changeCommits(history, root, baseline)
 	if err != nil {
 		return report, protocolcli.WithResultData(fmt.Errorf("breaking marker: %w", err), report)
 	}
@@ -165,4 +182,17 @@ func shortCommit(sha string) string {
 		return sha[:12]
 	}
 	return sha
+}
+
+// changeCommits returns the commits of baseline..HEAD, newest first: from
+// history when the job context carries it, from Git otherwise.
+func changeCommits(history *job.ChangeHistory, root, baseline string) ([]gitread.Commit, error) {
+	if history == nil {
+		return gitread.CommitsSince(root, baseline, nil)
+	}
+	commits := make([]gitread.Commit, 0, len(history.Commits))
+	for _, commit := range history.Commits {
+		commits = append(commits, gitread.Commit{SHA: commit.SHA, Subject: commit.Subject, Body: commit.Body})
+	}
+	return commits, nil
 }

@@ -815,6 +815,9 @@
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "candidateFiles": {
+          "from": "runtime"
+        },
         "repository": {
           "from": "project",
           "files": [
@@ -846,6 +849,9 @@
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "candidateFiles": {
+          "from": "runtime"
+        },
         "repository": {
           "from": "project",
           "files": [
@@ -877,6 +883,9 @@
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "changeHistory": {
+          "from": "runtime"
+        },
         "PUTNAMI_PROPOSAL_MESSAGE": {
           "from": "env"
         }
@@ -925,6 +934,9 @@
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "candidateFiles": {
+          "from": "runtime"
+        },
         "repository": {
           "from": "project",
           "files": [
@@ -961,6 +973,9 @@
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "candidateFiles": {
+          "from": "runtime"
+        },
         "repository": {
           "from": "project",
           "files": [
@@ -989,6 +1004,11 @@
       "args": [
         "feature-coverage-ratchet-validate"
       ],
+      "inputs": {
+        "changeHistory": {
+          "from": "runtime"
+        }
+      },
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
       "outputs": {
@@ -1011,6 +1031,9 @@
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "candidateFiles": {
+          "from": "runtime"
+        },
         "repository": {
           "from": "project",
           "files": [
@@ -1042,6 +1065,9 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "workspaceCandidateFiles": {
+          "from": "runtime"
+        },
         "manifest": {
           "from": "project",
           "files": [

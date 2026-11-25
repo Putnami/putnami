@@ -218,6 +218,7 @@
       "cwd": "{workspaceRoot}",
       "timeoutMs": 900000,
       "inputs": {
+        "candidateFiles": { "from": "runtime" },
         "repository": {
           "from": "project",
           "files": ["git:**"]

@@ -851,7 +851,7 @@ func ComputeJobCacheHashWith(
 	}
 	// The tree facts the task declared, from the run's one read; the job
 	// context carries the same values (protocols/job ADR 0002).
-	facts, err := treeFactIdentity(ws, job, cache)
+	facts, err := treeFactIdentity(ws, job, cache, nil)
 	if err != nil {
 		return "", fmt.Errorf("cache key for %s: %w", job.Key(), err)
 	}

@@ -24,14 +24,16 @@ const Param = "docs-links"
 // check reads the workspace's candidate cut and nothing else, so the task
 // declares the workspace input `git:**` and is cached on it: deleting a link
 // target, renaming it or editing a heading an anchor names moves the key, and
-// an ignored file does not.
+// an ignored file does not. The task also declares the runtime input
+// `workspaceCandidateFiles`, so the job reads that cut from its context and
+// starts no Git (go.putnami.dev/protocol/job, doc/adr/0003).
 func Job(markers ...string) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 		if !ctx.Params.Bool(Param, true) {
 			return "SKIP", nil, nil
 		}
 		emit.PhaseStart(Code)
-		findings, err := CheckProject(ctx.WorkspaceRoot, ctx.Project.FullPath, markers...)
+		findings, err := CheckProjectFrom(ctx, ctx.WorkspaceRoot, ctx.Project.FullPath, markers...)
 		if err != nil {
 			emit.PhaseEnd(Code, "failed")
 			return "FAILED", nil, protocolcli.Classify(fmt.Errorf("check documentation links: %w", err),
@@ -59,12 +61,15 @@ func Job(markers ...string) cli.JobFunc {
 //   - readme, the project input README.md, names the document the check starts
 //     from. A project side left empty would key on every file under the
 //     project, ignored build output included;
+//   - workspaceCandidateFiles, the runtime input that hands the job the cut
+//     repository keys, from its context;
 //   - docs-links, the parameter that turns the check off.
 func Inputs() map[string]proto.TaskInputPort {
 	return map[string]proto.TaskInputPort{
 		"readme":     {From: proto.TaskInputFromProject, Files: []string{"README.md"}},
 		"repository": {From: proto.TaskInputFromWorkspace, Files: []string{"git:**"}},
-		Param:        {From: proto.TaskInputFromParams},
+		proto.RuntimeInputWorkspaceCandidateFiles: {From: proto.TaskInputFromRuntime},
+		Param: {From: proto.TaskInputFromParams},
 	}
 }
 

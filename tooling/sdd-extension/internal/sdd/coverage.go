@@ -112,7 +112,7 @@ func BuildFeatureCoverageResult(ws *workspace.Workspace, workspaceOptions map[st
 	report.Adopted = adopted
 	report.Debt = append(report.Debt, debt...)
 
-	reader, err := featureengine.NewTaskReader(ws.Root)
+	reader, err := featureengine.NewTaskReaderFrom(ws.Tree, ws.Root)
 	if err != nil {
 		return report, fmt.Errorf("feature coverage: %w", err)
 	}

@@ -122,6 +122,8 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Cwd:       "{projectRoot}",
 			TimeoutMs: 120000,
 			Inputs: map[string]proto.TaskInputPort{
+				// The workspace's cut the repository port keys, read from one file of the run.
+				"workspaceCandidateFiles": {From: "runtime"},
 				// The read set: manifests and evidence at every root, the
 				// capability manifests evidence reaches, and every file a source
 				// binding hashes. Workspace-scoped, so one digest of the cut
@@ -304,7 +306,9 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			// keys an empty project side on every file under the root, ignored
 			// build output included.
 			Inputs: map[string]proto.TaskInputPort{
-				"repository": {From: "project", Files: []string{"git:**"}},
+				// The cut the port keys, which the job reads from its context.
+				"candidateFiles": {From: "runtime"},
+				"repository":     {From: "project", Files: []string{"git:**"}},
 			},
 			// It reads arbitrary committed files a repository's own globs name,
 			// so it is serialized after the tasks that REWRITE the tree: a
@@ -329,7 +333,9 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Cwd:       "{workspaceRoot}",
 			TimeoutMs: 120000,
 			Inputs: map[string]proto.TaskInputPort{
-				"repository": {From: "project", Files: []string{"git:**"}},
+				// The cut the port keys, which the job reads from its context.
+				"candidateFiles": {From: "runtime"},
+				"repository":     {From: "project", Files: []string{"git:**"}},
 			},
 			// Serialized after the tasks that rewrite the tree, like
 			// decisions-validate: a formatter reflowing an index while this task
@@ -356,7 +362,9 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			// putnami.workspace.json with the debt list. The port is
 			// project-scoped for the reason decisions-validate gives.
 			Inputs: map[string]proto.TaskInputPort{
-				"repository": {From: "project", Files: []string{"git:**"}},
+				// The cut the port keys, which the job reads from its context.
+				"candidateFiles": {From: "runtime"},
+				"repository":     {From: "project", Files: []string{"git:**"}},
 			},
 			// Serialized after the tasks that rewrite the tree, like
 			// decisions-validate: a formatter reflowing a manifest while this
@@ -378,9 +386,12 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Args:      []string{"feature-coverage-ratchet-validate"},
 			Cwd:       "{workspaceRoot}",
 			TimeoutMs: 120000,
-			// No port and no sources read: the current list arrives on the job
-			// context, and the other is read from a commit, which no task of the
+			// No sources read: the current list arrives on the job context, and
+			// the other in its change history, read from a commit no task of the
 			// run rewrites.
+			Inputs: map[string]proto.TaskInputPort{
+				"changeHistory": {From: "runtime"},
+			},
 			Cache: sdkmanifest.NoCache(),
 			Outputs: map[string]proto.TaskOutputPort{
 				"data": {Description: "Feature-coverage ratchet report: whether the gate is adopted, the baseline, the merge base, the current and merge-base debt lists, the new entries, and diagnostics in list order."},
@@ -430,7 +441,9 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Cwd:       "{workspaceRoot}",
 			TimeoutMs: 120000,
 			Inputs: map[string]proto.TaskInputPort{
-				"repository": {From: "project", Files: []string{"git:**"}},
+				// The cut the port keys, which the job reads from its context.
+				"candidateFiles": {From: "runtime"},
+				"repository":     {From: "project", Files: []string{"git:**"}},
 			},
 			// Serialized after the tasks that rewrite the tree, like
 			// recipes-validate: a formatter rewriting a README while this task
@@ -458,6 +471,8 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			// the task is never cached; it states the contract with the runner
 			// that sets the variable.
 			Inputs: map[string]proto.TaskInputPort{
+				// The commits since the baseline, from the job context.
+				"changeHistory":            {From: "runtime"},
 				"PUTNAMI_PROPOSAL_MESSAGE": {From: "env"},
 			},
 			// No sources read: it reads commits, which no task of the run
@@ -514,7 +529,9 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			// writer left the tree unchanged by rehashing its project-side
 			// key patterns after the run, and only then replays its result.
 			Inputs: map[string]proto.TaskInputPort{
-				"repository": {From: "project", Files: []string{"git:**"}},
+				// The cut the port keys, which the job reads from its context.
+				"candidateFiles": {From: "runtime"},
+				"repository":     {From: "project", Files: []string{"git:**"}},
 			},
 			Cache: cacheEnabledNoOutput(),
 			Outputs: map[string]proto.TaskOutputPort{
@@ -882,8 +899,9 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 		t.Errorf("task \"features-validate\" cache = %+v, want enabled with noOutput: its key holds the candidate cut it reads", features.Cache)
 	}
 	wantFeatures := map[string]proto.TaskInputPort{
-		"repository": {From: "workspace", Files: []string{"git:**"}},
-		"manifest":   {From: "project", Files: []string{"putnami.features.json", "features/*.json"}},
+		"repository":              {From: "workspace", Files: []string{"git:**"}},
+		"manifest":                {From: "project", Files: []string{"putnami.features.json", "features/*.json"}},
+		"workspaceCandidateFiles": {From: "runtime"},
 	}
 	if !reflect.DeepEqual(features.Inputs, wantFeatures) {
 		t.Errorf("task \"features-validate\" inputs = %+v, want %+v", features.Inputs, wantFeatures)
@@ -899,7 +917,10 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 		if !task.Cache.IsEnabled() || !task.Cache.NoOutput {
 			t.Errorf("task %q cache = %+v, want enabled with noOutput: its key holds the candidate cut it reads", name, task.Cache)
 		}
-		want := map[string]proto.TaskInputPort{"repository": {From: "project", Files: []string{"git:**"}}}
+		want := map[string]proto.TaskInputPort{
+			"repository":     {From: "project", Files: []string{"git:**"}},
+			"candidateFiles": {From: "runtime"},
+		}
 		if !reflect.DeepEqual(task.Inputs, want) {
 			t.Errorf("task %q inputs = %+v, want %+v", name, task.Inputs, want)
 		}
@@ -958,8 +979,9 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 // tasks whose read set no key can hold. Both read PUTNAMI_PROPOSAL_MESSAGE, and
 // the breaking-marker step also the commits since the run's impacted baseline;
 // none of it is in the candidate cut, and a replayed verdict would approve a
-// message or a range this run never read. So each task is uncached, and its
-// sole port names the variable it reads.
+// message or a range this run never read. So each task is uncached, a port
+// names the variable it reads, and the breaking-marker step declares the
+// change history it reads from its context.
 func TestTheProposalMessageStepsAreNeverServedFromCache(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "squash-keeps-the-breaking-marker", "the-step-is-never-served-from-cache")
 	spectest.Proves(t, "tooling/specification-driven-development", "squash-names-no-agent", "the-step-is-never-served-from-cache")
@@ -978,6 +1000,9 @@ func TestTheProposalMessageStepsAreNeverServedFromCache(t *testing.T) {
 			t.Errorf("task %q description = %q, want it to say why it is uncached", name, task.Description)
 		}
 		want := map[string]proto.TaskInputPort{"PUTNAMI_PROPOSAL_MESSAGE": {From: "env"}}
+		if name == "breaking-marker-validate" {
+			want["changeHistory"] = proto.TaskInputPort{From: "runtime"}
+		}
 		if !reflect.DeepEqual(task.Inputs, want) {
 			t.Errorf("task %q inputs = %+v, want %+v", name, task.Inputs, want)
 		}
@@ -988,7 +1013,8 @@ func TestTheProposalMessageStepsAreNeverServedFromCache(t *testing.T) {
 // ratchet uncached. It reads the debt list at the merge base of the run's
 // impacted baseline, and the candidate cut holds neither the baseline nor the
 // history, so a replayed verdict would approve a list this run never compared.
-// It declares no port: the current list arrives on the job context.
+// Its one port is the change history: the current list arrives on the job
+// context.
 func TestTheCoverageRatchetIsNeverServedFromCache(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "coverage-debt-only-shrinks", "the-step-is-never-served-from-cache")
 	m := committedManifest(t)
@@ -1003,8 +1029,9 @@ func TestTheCoverageRatchetIsNeverServedFromCache(t *testing.T) {
 	if !strings.Contains(task.Description, "Uncached on purpose") {
 		t.Errorf("description = %q, want it to say why it is uncached", task.Description)
 	}
-	if len(task.Inputs) != 0 || len(task.Reads) != 0 {
-		t.Errorf("inputs = %+v, reads = %+v, want none", task.Inputs, task.Reads)
+	want := map[string]proto.TaskInputPort{"changeHistory": {From: "runtime"}}
+	if !reflect.DeepEqual(task.Inputs, want) || len(task.Reads) != 0 {
+		t.Errorf("inputs = %+v, reads = %+v, want only the change history", task.Inputs, task.Reads)
 	}
 	// The coverage gate keeps its key on the candidate cut:
 	// TestCachePolicyMatchesTheDeclaredReadSet pins that key.

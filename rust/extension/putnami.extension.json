@@ -416,6 +416,9 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "workspaceCandidateFiles": {
+          "from": "runtime"
+        },
         "readme": {
           "from": "project",
           "files": [
@@ -850,6 +853,11 @@
       ],
       "cwd": "{projectRoot}",
       "timeoutMs": 600000,
+      "inputs": {
+        "candidateFiles": {
+          "from": "runtime"
+        }
+      },
       "cache": false,
       "declares": {
         "outputs": {

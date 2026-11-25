@@ -8,7 +8,7 @@ import (
 )
 
 // countsHint is what a failing count says: how to change its number.
-const countsHint = "a pull request that changes this count changes the number in the same pull request, and a number only goes down; tooling/cli/doc/12-profiling-and-telemetry.md says what each count is and how it is lowered"
+const countsHint = "a pull request that changes this count changes the number in the same pull request; a case's total only goes down, and every count only goes down, except an engine count that takes over a read the jobs made, once per run, by no more than the jobs' count falls; tooling/cli/doc/12-profiling-and-telemetry.md says what each count is and how it is lowered"
 
 // TestTheEngineCounts holds what the engine starts on a workspace whose jobs
 // start nothing: one job process per executed task, the git calls of a run

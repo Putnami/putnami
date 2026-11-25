@@ -149,6 +149,12 @@ func globDoubleStar(dir, pattern string) []string {
 //     wsproto.SelectsPath states. The empty pattern set never selects one. An
 //     input selector that lists one selects it: the extension read it.
 func collectFiles(dir string, patterns []string, expander InputExpander) ([]fileEntry, error) {
+	return collectFilesWith(nil, dir, patterns, expander)
+}
+
+// collectFilesWith is collectFiles, listing a whole work tree's candidate cut
+// from cut when it reads one (collectGitFilesWith).
+func collectFilesWith(cut CandidateSource, dir string, patterns []string, expander InputExpander) ([]fileEntry, error) {
 	dir, err := gitInputDirectory(dir, patterns)
 	if err != nil {
 		return nil, err
@@ -164,7 +170,7 @@ func collectFiles(dir string, patterns []string, expander InputExpander) ([]file
 	if err != nil {
 		return nil, err
 	}
-	files, err := collectPatternFiles(dir, others)
+	files, err := collectPatternFilesWith(cut, dir, others)
 	if err != nil {
 		if len(selectors) > 0 {
 			return nil, fmt.Errorf("%w: input selection unavailable: %w", ErrInputSelector, err)
@@ -209,9 +215,11 @@ func splitInputSelectors(patterns []string) (selectors, others []string, err err
 	return selectors, others, nil
 }
 
-// collectPatternFiles returns, unsorted, the files the ordinary and Git
-// candidate includes of patterns select under dir, less the exclusions.
-func collectPatternFiles(dir string, patterns []string) ([]fileEntry, error) {
+// collectPatternFilesWith returns, unsorted, the files the ordinary and Git
+// candidate includes of patterns select under dir, less the exclusions,
+// listing a whole work tree's candidate cut from cut when it reads one
+// (collectGitFilesWith).
+func collectPatternFilesWith(cut CandidateSource, dir string, patterns []string) ([]fileEntry, error) {
 	includes, excludes := wsproto.SplitFilePatterns(patterns)
 	var ordinaryPatterns, gitPatterns []string
 	for _, pattern := range includes {
@@ -223,7 +231,7 @@ func collectPatternFiles(dir string, patterns []string) ([]fileEntry, error) {
 	}
 	files := collectOrdinaryFiles(dir, ordinaryPatterns, excludes)
 	if len(gitPatterns) > 0 {
-		candidates, err := collectGitFiles(dir, gitPatterns, excludes)
+		candidates, err := collectGitFilesWith(cut, dir, gitPatterns, excludes)
 		if err != nil {
 			return nil, err
 		}
@@ -468,7 +476,7 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 	return dir, nil
 }
 
-// collectGitFiles enumerates only candidate names, never walks ignored local
+// collectGitFilesWith enumerates only candidate names, never walks ignored local
 // directories, and uses Lstat so a link's target text is the input. The scanner
 // reads exactly this candidate surface, including tracked ignored files.
 //
@@ -483,22 +491,42 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 // does not list the whole repository. The bounded listing holds every path the
 // whole one would select, so the key reads the same files and hashes the same
 // bytes; a pattern such as `git:**` has no prefix and lists the whole cut.
-func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, error) {
-	cmd := exec.Command(gitread.Executable(), "rev-parse", "--show-toplevel")
-	cmd.Dir = dir
-	out, err := procstat.Output(cmd, procstat.Git)
-	if err != nil {
-		return nil, fmt.Errorf("resolve Git input repository: %w", err)
+//
+// When every include lists the whole
+// cut, as `git:**` does, and cut reads the cut of dir, it lists the paths and
+// their index modes from that read, which starts no Git: the run's one read of
+// the workspace's cut, read again after a write of the run
+// (go.putnami.dev/protocol/job, doc/adr/0003). The paths are then relative to
+// dir; the selection, the refusals and the digest are the ones the Git
+// listing gives.
+func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []string) ([]fileEntry, error) {
+	var root string
+	var paths []string
+	var index gitutil.IndexModes
+	read, fromCut := CandidateCut{}, false
+	if cut != nil && wholeCut(includes) {
+		read, fromCut = cut(dir)
 	}
-	root := strings.TrimSuffix(string(out), "\n")
-	prefixes := gitInputPrefixes(root, dir, includes)
-	paths, err := candidatePaths(root, prefixes...)
-	if err != nil {
-		return nil, err
-	}
-	index, err := gitutil.ReadIndexModes(root, prefixes...)
-	if err != nil {
-		return nil, err
+	if fromCut {
+		root, paths = dir, read.Paths
+		index = gitutil.IndexModes{Modes: read.Modes, Unmerged: read.Unmerged}
+	} else {
+		cmd := exec.Command(gitread.Executable(), "rev-parse", "--show-toplevel")
+		cmd.Dir = dir
+		out, err := procstat.Output(cmd, procstat.Git)
+		if err != nil {
+			return nil, fmt.Errorf("resolve Git input repository: %w", err)
+		}
+		root = strings.TrimSuffix(string(out), "\n")
+		prefixes := gitInputPrefixes(root, dir, includes)
+		paths, err = candidatePaths(root, prefixes...)
+		if err != nil {
+			return nil, err
+		}
+		index, err = gitutil.ReadIndexModes(root, prefixes...)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var files []fileEntry
 	for _, path := range paths {
@@ -528,6 +556,32 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 		files = append(files, fileEntry{path: full, info: info, gitCandidate: true, indexMode: index.Modes[path]})
 	}
 	return files, nil
+}
+
+// CandidateCut is one read of the candidate cut of a work tree's directory:
+// its paths relative to that directory in slash form, as `git ls-files
+// --cached --others --exclude-standard` lists them, and the index modes of the
+// tracked ones, as gitutil.ReadIndexModes reads them.
+type CandidateCut struct {
+	Paths    []string
+	Modes    map[string]string
+	Unmerged map[string]bool
+}
+
+// CandidateSource answers the candidate cut of dir from a read the run
+// already holds, and false when it holds none for dir: a key then lists the
+// cut with Git.
+type CandidateSource func(dir string) (CandidateCut, bool)
+
+// wholeCut reports whether every include lists the whole cut: `git:**`, which
+// gitInputPrefixes bounds by no prefix.
+func wholeCut(includes []string) bool {
+	for _, include := range includes {
+		if pattern, _ := wsproto.GitFilePattern(include); pattern != "**" {
+			return false
+		}
+	}
+	return len(includes) > 0
 }
 
 // candidatePaths is gitutil.CandidatePaths. It is a variable only so a test
@@ -1125,6 +1179,12 @@ const unreadableSentinel = "__unreadable__"
 //
 // expander expands the input selectors patterns name.
 func hashFiles(dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, error) {
+	return hashFilesWith(nil, dir, patterns, expander, scope)
+}
+
+// hashFilesWith is hashFiles, listing a whole work tree's candidate cut from
+// cut when it reads one (collectGitFilesWith).
+func hashFilesWith(cut CandidateSource, dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, error) {
 	projectDir := dir
 	dir, err := gitInputDirectory(dir, patterns)
 	if err != nil {
@@ -1133,7 +1193,7 @@ func hashFiles(dir string, patterns []string, expander InputExpander, scope Proj
 	var files []fileEntry
 	var digests [][]byte
 	for attempt := 1; ; attempt++ {
-		files, err = collectFiles(dir, patterns, expander)
+		files, err = collectFilesWith(cut, dir, patterns, expander)
 		if err != nil {
 			return "", err
 		}

@@ -409,6 +409,19 @@
               "workspace-state-needs-no-contract-increment"
             ]
           }
+        },
+        {
+          "id": "a-tree-fact-input-binds-its-task",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-workspace-cut-needs-a-workspace-git-input-and-history-an-uncached-task"
+            ]
+          }
         }
       ]
     }

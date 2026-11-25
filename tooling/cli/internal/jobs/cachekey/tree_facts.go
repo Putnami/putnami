@@ -14,6 +14,8 @@ import (
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	extproto "go.putnami.dev/protocol/extension"
+	protocoljob "go.putnami.dev/protocol/job"
+	wsproto "go.putnami.dev/protocol/workspace"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -49,6 +51,45 @@ type TreeFacts struct {
 	// lineDirectories lists, for a version line, the directories of the run's
 	// projects of that line that declare releaseBaseline. SetPlanned fills it.
 	lineDirectories map[string][]string
+
+	// cutMu guards the candidate cut: the current read, whether a write of
+	// the run has made it stale, and the read each job's key took.
+	cutMu    sync.Mutex
+	cut      *cutRead
+	cutStale bool
+	cutSeq   int
+	jobCuts  map[string]*cutRead
+	// putnamiOnce asks Git once whether its rules exclude the workspace's
+	// .putnami directory as a whole (putnamigit.IgnoresDirectory).
+	putnamiOnce    sync.Once
+	putnamiIgnored bool
+
+	historyMu sync.Mutex
+	histories map[string]*onceHistory
+}
+
+// cutRead is one read of the workspace's candidate cut, and what is derived
+// from it once: its encoding, its digest and the listing file of the run.
+type cutRead struct {
+	seq        int
+	files      []protocoljob.CandidateFile
+	err        error
+	sourceOnce sync.Once
+	source     store.CandidateCut
+
+	encodeOnce    sync.Once
+	encoded       []byte
+	encodedDigest string
+	encodeErr     error
+	listingOnce   sync.Once
+	listing       *protocoljob.CandidateListing
+	listingErr    error
+}
+
+type onceHistory struct {
+	once    sync.Once
+	history *protocoljob.ChangeHistory
+	err     error
 }
 
 type onceList struct {
@@ -75,20 +116,30 @@ var (
 	trackedPaths       = putnamigit.TrackedPaths
 	ignoredDirectories = putnamigit.IgnoredDirectories
 	writeFilesAtCommit = putnamigit.WriteFilesAtCommit
+	candidateFiles     = putnamigit.CandidateFiles
+	ignoresDirectory   = putnamigit.IgnoresDirectory
+	readChangeHistory  = putnamigit.ReadChangeHistory
 )
 
 // RunTreeFacts returns the run's tree facts for the workspace at root: one
 // object per cache manager, so every key and every job context of the run
 // share its reads. A nil manager returns a new object.
 func RunTreeFacts(cache *store.CacheManager, root string) *TreeFacts {
-	facts, _ := cache.Value("tree-facts\x00"+root, func() any { return NewTreeFacts(root) }).(*TreeFacts)
+	facts, _ := cache.Value("tree-facts\x00"+root, func() any {
+		facts := NewTreeFacts(root)
+		// A key's `git:**` digest of the workspace lists the cut from the same
+		// read (protocols/job ADR 0003).
+		cache.SetCandidateSource(facts.CandidateSource())
+		return facts
+	}).(*TreeFacts)
 	return facts
 }
 
 // NewTreeFacts returns an empty reader of the tree facts of the workspace at
 // root.
 func NewTreeFacts(root string) *TreeFacts {
-	return &TreeFacts{root: root, baselines: map[string]*onceBaseline{}, extractions: map[string]*onceExtraction{}}
+	return &TreeFacts{root: root, baselines: map[string]*onceBaseline{}, extractions: map[string]*onceExtraction{},
+		histories: map[string]*onceHistory{}, jobCuts: map[string]*cutRead{}}
 }
 
 // Tracked returns every path the Git index tracks under the workspace root,
@@ -140,7 +191,221 @@ func (t *TreeFacts) Prime(planned []*jobmodel.ScheduledJob) {
 		if DeclaresRuntimeInput(job, extproto.RuntimeInputRepository) || DeclaresRuntimeInput(job, extproto.RuntimeInputReleaseBaseline) {
 			_, _, _ = t.Repository()
 		}
+		if DeclaresRuntimeInput(job, extproto.RuntimeInputCandidateFiles) ||
+			DeclaresRuntimeInput(job, extproto.RuntimeInputWorkspaceCandidateFiles) {
+			_ = t.currentCut()
+		}
 	}
+}
+
+// currentCut returns the current read of the workspace's candidate cut
+// (putnamigit.CandidateFiles), reading it again when a write of the run made
+// the last read stale (InvalidateCut). Outside every repository its error is a
+// *gitread.UnmanagedError (putnamigit.OutsideRepository).
+func (t *TreeFacts) currentCut() *cutRead {
+	t.cutMu.Lock()
+	defer t.cutMu.Unlock()
+	if t.cut == nil || t.cutStale {
+		t.cutSeq++
+		read := &cutRead{seq: t.cutSeq}
+		read.files, read.err = candidateFiles(t.root)
+		t.cut, t.cutStale = read, false
+	}
+	return t.cut
+}
+
+// keyCut is the read a key of the job takes: the current one, recorded so the
+// job's context carries the read its key holds (contextCut).
+func (t *TreeFacts) keyCut(jobKey string) *cutRead {
+	read := t.currentCut()
+	t.cutMu.Lock()
+	t.jobCuts[jobKey] = read
+	t.cutMu.Unlock()
+	return read
+}
+
+// contextCut is the read the job's context carries: the one its key took
+// last, or the current read for a job whose key took none, such as an
+// uncached one.
+func (t *TreeFacts) contextCut(jobKey string) *cutRead {
+	t.cutMu.Lock()
+	read, ok := t.jobCuts[jobKey]
+	t.cutMu.Unlock()
+	if ok {
+		return read
+	}
+	return t.currentCut()
+}
+
+// InvalidateCut marks the read of the candidate cut stale when a task of the
+// run wrote one of paths, absolute paths under the workspace: a file it
+// created or removed may change what the cut lists, so the next key or
+// context reads the cut again. A path under the workspace's .putnami
+// directory, where the store and every command output live, leaves the cut as
+// it is when Git's rules exclude that directory as a whole and the cut lists
+// nothing below it; Git is asked once per run, at the first such write. A task
+// that may have rewritten anything passes the workspace root.
+func (t *TreeFacts) InvalidateCut(paths []string) {
+	if t == nil {
+		return
+	}
+	putnami := filepath.Join(t.root, ".putnami")
+	t.cutMu.Lock()
+	defer t.cutMu.Unlock()
+	if t.cut == nil {
+		return
+	}
+	for _, path := range paths {
+		rel, err := filepath.Rel(t.root, path)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		if (path == putnami || strings.HasPrefix(path, putnami+string(filepath.Separator))) && t.putnamiExcluded() {
+			continue
+		}
+		t.cutStale = true
+		return
+	}
+}
+
+// atTopLevel reports whether the workspace root is the top of its work tree,
+// where its own .git lies. A `git:**` digest covers the repository (tooling/cli
+// ADR 0041) and the cut covers the workspace: the two agree only there.
+func (t *TreeFacts) atTopLevel() bool {
+	if t.root == "" || os.Getenv("GIT_DIR") != "" || os.Getenv("GIT_WORK_TREE") != "" {
+		return false
+	}
+	_, err := os.Lstat(filepath.Join(t.root, ".git"))
+	return err == nil
+}
+
+// putnamiExcluded reports whether a write under the workspace's .putnami
+// directory leaves the cut as it is: Git's rules exclude the directory as a
+// whole, and the current read lists nothing below it. The caller holds cutMu.
+func (t *TreeFacts) putnamiExcluded() bool {
+	t.putnamiOnce.Do(func() { t.putnamiIgnored = ignoresDirectory(t.root, ".putnami") })
+	return t.putnamiIgnored && !slices.ContainsFunc(t.cut.files, func(file protocoljob.CandidateFile) bool {
+		return file.Path == ".putnami" || strings.HasPrefix(file.Path, ".putnami/")
+	})
+}
+
+// CandidateSource answers the keys of the run the workspace's candidate cut
+// from the current read (store.CandidateSource), so a `git:**` digest of the
+// workspace starts no Git and lists what the facts of the run list. It
+// answers only for the workspace root when it is the top of its work tree, and
+// nothing when the read failed or the workspace is outside every repository:
+// the key then asks Git.
+func (t *TreeFacts) CandidateSource() store.CandidateSource {
+	resolved, err := filepath.EvalSymlinks(t.root)
+	if err != nil {
+		resolved = t.root
+	}
+	return func(dir string) (store.CandidateCut, bool) {
+		if !t.atTopLevel() || (filepath.Clean(dir) != filepath.Clean(t.root) && filepath.Clean(dir) != resolved) {
+			return store.CandidateCut{}, false
+		}
+		read := t.currentCut()
+		if read.err != nil {
+			return store.CandidateCut{}, false
+		}
+		read.sourceOnce.Do(func() {
+			cut := store.CandidateCut{Paths: make([]string, 0, len(read.files)), Modes: map[string]string{}, Unmerged: map[string]bool{}}
+			for _, file := range read.files {
+				cut.Paths = append(cut.Paths, file.Path)
+				switch file.Mode {
+				case protocoljob.CandidateModeUntracked:
+				case protocoljob.CandidateModeUnmerged:
+					cut.Unmerged[file.Path] = true
+				default:
+					cut.Modes[file.Path] = file.Mode
+				}
+			}
+			read.source = cut
+		})
+		return read.source, true
+	}
+}
+
+// under is the candidateFiles fact of directories in the read: the cut's
+// paths at or below one of them, in the cut's order. found is false outside
+// every repository, where there is no cut.
+func (r *cutRead) under(directories []string) (files []protocoljob.CandidateFile, found bool, err error) {
+	if putnamigit.OutsideRepository(r.err) {
+		return nil, false, nil
+	}
+	if r.err != nil {
+		return nil, false, r.err
+	}
+	files = []protocoljob.CandidateFile{}
+	for _, file := range r.files {
+		for _, directory := range directories {
+			if directory == "." || file.Path == directory || strings.HasPrefix(file.Path, directory+"/") {
+				files = append(files, file)
+				break
+			}
+		}
+	}
+	return files, true, nil
+}
+
+// encodedFiles is the workspace's cut of the read as a listing file holds it, and
+// the digest of those bytes, encoded once. found is false outside every
+// repository.
+func (r *cutRead) encodedFiles() (data []byte, digest string, found bool, err error) {
+	files, found, err := r.under([]string{"."})
+	if err != nil || !found {
+		return nil, "", found, err
+	}
+	r.encodeOnce.Do(func() { r.encoded, r.encodedDigest, r.encodeErr = protocoljob.EncodeCandidateFiles(files) })
+	return r.encoded, r.encodedDigest, true, r.encodeErr
+}
+
+// CandidatesUnder is the candidateFiles fact of directories the context of
+// the job keyed jobKey carries (contextCut).
+func (t *TreeFacts) CandidatesUnder(jobKey string, directories []string) ([]protocoljob.CandidateFile, bool, error) {
+	return t.contextCut(jobKey).under(directories)
+}
+
+// WorkspaceCandidates is the workspaceCandidateFiles fact the context of the
+// job keyed jobKey carries: the file of the run that holds the workspace's cut
+// of its read, written once per read, and its digest. It is nil outside every
+// repository.
+func (t *TreeFacts) WorkspaceCandidates(jobKey string) (*protocoljob.CandidateListing, error) {
+	read := t.contextCut(jobKey)
+	data, digest, found, err := read.encodedFiles()
+	if err != nil || !found {
+		return nil, err
+	}
+	read.listingOnce.Do(func() {
+		dir, err := t.runDirectory()
+		if err != nil {
+			read.listingErr = err
+			return
+		}
+		file := filepath.Join(dir, fmt.Sprintf("workspace-candidates-%d.json", read.seq))
+		if err := os.WriteFile(file, data, 0o644); err != nil { //nolint:gosec // a file of the run that jobs read
+			read.listingErr = fmt.Errorf("write the workspace's candidate cut: %w", err)
+			return
+		}
+		read.listing = &protocoljob.CandidateListing{File: file, Digest: digest}
+	})
+	return read.listing, read.listingErr
+}
+
+// ChangeHistory is the changeHistory fact of baseline, the run's impacted
+// baseline, read once per baseline (putnamigit.ReadChangeHistory).
+func (t *TreeFacts) ChangeHistory(baseline string) (*protocoljob.ChangeHistory, error) {
+	t.historyMu.Lock()
+	entry, ok := t.histories[baseline]
+	if !ok {
+		entry = &onceHistory{}
+		t.histories[baseline] = entry
+	}
+	t.historyMu.Unlock()
+	entry.once.Do(func() {
+		entry.history, entry.err = readChangeHistory(t.root, baseline, wsproto.WorkspaceConfigFilename)
+	})
+	return entry.history, entry.err
 }
 
 // Repository returns the repository state and the root of its work tree,
@@ -253,22 +518,13 @@ func (t *TreeFacts) extraction(key string, extract func(target string) error) (s
 	}
 	t.extractMu.Unlock()
 	entry.once.Do(func() {
-		t.extractMu.Lock()
-		if t.extractRoot == "" {
-			scratch := store.ResolveScratchRoot(t.root)
-			err := os.MkdirAll(scratch, 0o755)
-			if err == nil {
-				t.extractRoot, err = os.MkdirTemp(scratch, "release-baselines-")
-			}
-			if err != nil {
-				t.extractMu.Unlock()
-				entry.err = fmt.Errorf("create the release baseline directory: %w", err)
-				return
-			}
+		root, err := t.runDirectory()
+		if err != nil {
+			entry.err = err
+			return
 		}
 		sum := sha256.Sum256([]byte(key))
-		target := filepath.Join(t.extractRoot, hex.EncodeToString(sum[:8]))
-		t.extractMu.Unlock()
+		target := filepath.Join(root, hex.EncodeToString(sum[:8]))
 		if err := os.MkdirAll(target, 0o755); err != nil {
 			entry.err = err
 			return
@@ -276,6 +532,26 @@ func (t *TreeFacts) extraction(key string, extract func(target string) error) (s
 		entry.dir, entry.err = target, extract(target)
 	})
 	return entry.dir, entry.err
+}
+
+// runDirectory is the directory of the run the tree facts write files under
+// (release baseline extractions, the workspace's cut), created once and
+// removed by Close.
+func (t *TreeFacts) runDirectory() (string, error) {
+	t.extractMu.Lock()
+	defer t.extractMu.Unlock()
+	if t.extractRoot == "" {
+		scratch := store.ResolveScratchRoot(t.root)
+		err := os.MkdirAll(scratch, 0o755)
+		if err == nil {
+			t.extractRoot, err = os.MkdirTemp(scratch, "tree-facts-")
+		}
+		if err != nil {
+			t.extractRoot = ""
+			return "", fmt.Errorf("create the tree facts directory of the run: %w", err)
+		}
+	}
+	return t.extractRoot, nil
 }
 
 // extract writes into target the regular files commit holds at prefixes
@@ -309,6 +585,11 @@ func (t *TreeFacts) Close() {
 	t.extractRoot = ""
 	t.extractions = map[string]*onceExtraction{}
 	t.extractMu.Unlock()
+	// The listing files were in the removed directory: a later context reads
+	// and writes the cut again.
+	t.cutMu.Lock()
+	t.cut, t.cutStale, t.jobCuts = nil, false, map[string]*cutRead{}
+	t.cutMu.Unlock()
 	if root != "" {
 		_ = os.RemoveAll(root)
 	}
@@ -321,12 +602,42 @@ func DeclaresRuntimeInput(job *jobmodel.ScheduledJob, name string) bool {
 		job.JobDef.TaskCachePolicy.Key != nil && slices.Contains(job.JobDef.TaskCachePolicy.Key.Runtime, name)
 }
 
-// treeFactInputs are the runtime inputs that name a tree fact, beside
-// releaseBaseline, which releaseBaselineIdentity keys.
+// treeFactInputs are the runtime inputs that name a keyed tree fact, beside
+// releaseBaseline, which releaseBaselineIdentity keys. changeHistory and
+// releaseBaselineFiles add nothing to a key.
 var treeFactInputs = []string{
+	extproto.RuntimeInputCandidateFiles,
 	extproto.RuntimeInputIgnoredDirectories,
 	extproto.RuntimeInputRepository,
 	extproto.RuntimeInputTrackedFiles,
+	extproto.RuntimeInputWorkspaceCandidateFiles,
+}
+
+// CandidateDirectories are the directories the candidateFiles fact of job
+// covers, relative to the workspace root in slash form, sorted and unique:
+// its own directory (TreeDirectory), and each member of its project's
+// dependency closure when a closure input holds a `git:` pattern
+// (protocols/job ADR 0003).
+func CandidateDirectories(ws *workspace.Workspace, job *jobmodel.ScheduledJob) []string {
+	directories := []string{TreeDirectory(job)}
+	if ws != nil && job != nil && job.Project != nil && slices.ContainsFunc(closureKeyPatterns(job), func(pattern string) bool {
+		_, ok := wsproto.GitFilePattern(pattern)
+		return ok
+	}) {
+		for _, member := range ProjectDependencyClosure(ws, job.Project) {
+			dir := path.Clean(filepath.ToSlash(member.Path))
+			if dir == "" || dir == "/" {
+				dir = "."
+			}
+			directories = append(directories, dir)
+		}
+	}
+	slices.Sort(directories)
+	directories = slices.Compact(directories)
+	if slices.Contains(directories, ".") {
+		return []string{"."}
+	}
+	return directories
 }
 
 // TreeDirectory is the directory the tree facts of job cover, relative to the
@@ -385,9 +696,9 @@ func (t *TreeFacts) TrackedUnder(directory string) ([]string, error) {
 // their `name=value` cache-key pairs, sorted by name. A listing is keyed by
 // the digest of its paths, the repository by its state. A Git failure is the
 // key's error, so the task runs uncached (ADR 0062 point 2).
-func treeFactIdentity(ws *workspace.Workspace, job *jobmodel.ScheduledJob, cache *store.CacheManager) ([]string, error) {
+// facts is the run's read, or nil for the one RunTreeFacts gives cache.
+func treeFactIdentity(ws *workspace.Workspace, job *jobmodel.ScheduledJob, cache *store.CacheManager, facts *TreeFacts) ([]string, error) {
 	var identity []string
-	var facts *TreeFacts
 	directory := TreeDirectory(job)
 	for _, name := range treeFactInputs {
 		if !DeclaresRuntimeInput(job, name) {
@@ -415,6 +726,26 @@ func treeFactIdentity(ws *workspace.Workspace, job *jobmodel.ScheduledJob, cache
 				return nil, err
 			}
 			identity = append(identity, name+"="+listingDigest(directory, paths))
+		case extproto.RuntimeInputCandidateFiles:
+			directories := CandidateDirectories(ws, job)
+			files, found, err := facts.keyCut(job.Key()).under(directories)
+			if err != nil {
+				return nil, fmt.Errorf("read the candidate cut: %w", err)
+			}
+			if !found {
+				identity = append(identity, name+"="+protocoljob.RepositoryUnmanaged)
+				continue
+			}
+			identity = append(identity, name+"="+candidatesDigest(directories, files))
+		case extproto.RuntimeInputWorkspaceCandidateFiles:
+			_, digest, found, err := facts.keyCut(job.Key()).encodedFiles()
+			if err != nil {
+				return nil, fmt.Errorf("read the candidate cut: %w", err)
+			}
+			if !found {
+				digest = protocoljob.RepositoryUnmanaged
+			}
+			identity = append(identity, name+"="+digest)
 		}
 	}
 	return identity, nil
@@ -428,6 +759,20 @@ func listingDigest(directory string, paths []string) string {
 	for _, p := range paths {
 		h.Write([]byte{0})
 		h.Write([]byte(p))
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// candidatesDigest is the key value of a candidate cut: the directories it
+// covers, then each path and its mode, NUL-separated.
+func candidatesDigest(directories []string, files []protocoljob.CandidateFile) string {
+	h := sha256.New()
+	h.Write([]byte(strings.Join(directories, "\x00")))
+	for _, file := range files {
+		h.Write([]byte{1})
+		h.Write([]byte(file.Path))
+		h.Write([]byte{0})
+		h.Write([]byte(file.Mode))
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

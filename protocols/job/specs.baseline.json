@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "job/execution-context#candidate-cut-and-history-are-answers",
     "job/execution-context#every-reject-branch-has-a-fixture",
     "job/execution-context#parameters-resolve-alike",
     "job/execution-context#strict-producers-lenient-consumers",

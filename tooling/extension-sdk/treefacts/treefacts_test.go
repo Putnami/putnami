@@ -93,3 +93,21 @@ func TestFactsFallBackToGit(t *testing.T) {
 		t.Errorf("TrackedFiles of a refused repository = %v with no error", tracked)
 	}
 }
+
+// The change history is the context's alone: without the member there is no
+// answer, and with it the job reads it without Git.
+func TestChangeHistoryAnswersFromTheContextOnly(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	if _, ok := From(&job.Context{WorkspaceRoot: t.TempDir()}).ChangeHistory(); ok {
+		t.Error("a context without a tree answered a change history")
+	}
+	history := &job.ChangeHistory{Baseline: "main", Shallow: true}
+	got, ok := From(&job.Context{WorkspaceRoot: t.TempDir(), Tree: &job.Tree{Directory: ".", ChangeHistory: history}}).ChangeHistory()
+	if !ok || got != history {
+		t.Errorf("ChangeHistory() = %v, %v", got, ok)
+	}
+	var nilFacts *Facts
+	if _, ok := nilFacts.ChangeHistory(); ok {
+		t.Error("nil facts answered a change history")
+	}
+}

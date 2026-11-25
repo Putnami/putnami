@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"go.putnami.dev/protocol/features/spectest"
+	job "go.putnami.dev/protocol/job"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/dockertest"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -712,7 +713,7 @@ func TestANestedDirectoryTheKeyDoesNotWalkShipsOnlyItsGitCandidates(t *testing.T
 		}
 	}
 	project := filepath.Join(root, "apps/shop")
-	filter, err := newTreeFilter(project)
+	filter, err := newTreeFilter(nil, project)
 	if err != nil || filter.candidates == nil {
 		t.Fatalf("filter: %+v %v", filter, err)
 	}
@@ -735,11 +736,49 @@ func TestANestedDirectoryTheKeyDoesNotWalkShipsOnlyItsGitCandidates(t *testing.T
 		}
 	}
 	staging := t.TempDir()
-	if err := copyTree(project, staging); err != nil {
+	if err := copyTree(nil, project, staging); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(staging, "src/shop/static/dist/bundle.js")); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("the staged build reads an unkeyed file: %v", err)
+	}
+}
+
+// A job whose context carries the candidate cut of the project ships the same
+// files without Git: a file under a directory the key does not walk ships only
+// when the cut lists it.
+func TestTheCandidateCutComesFromTheContextWithoutGit(t *testing.T) {
+	spectest.Proves(t, imageFeature, "image-ships-the-application-files", "the-image-cache-key-covers-the-files-it-ships")
+	root, _ := shopWorkspace(t)
+	for _, rel := range []string{"src/shop/vendor/lib.py", "src/shop/out/data.json", "src/shop/vendor/ignored.py"} {
+		writeImageFile(t, root, "apps/shop/"+rel, "x\n")
+	}
+	t.Setenv("PATH", t.TempDir())
+	ctx := &pctx.Context{WorkspaceRoot: root, Tree: &job.Tree{Directory: "apps/shop",
+		CandidateDirectories: []string{"apps/shop"},
+		CandidateFiles: []job.CandidateFile{
+			{Path: "apps/shop/src/shop/out/data.json", Mode: "untracked"},
+			{Path: "apps/shop/src/shop/vendor/lib.py", Mode: "100644"},
+		}}}
+	project := filepath.Join(root, "apps/shop")
+	filter, err := newTreeFilter(ctx, project)
+	if err != nil || filter.candidates == nil {
+		t.Fatalf("filter: %+v %v", filter, err)
+	}
+	files, err := treeFiles(project, ImageAppDir, filter.skip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shipped := map[string]bool{}
+	for _, file := range files {
+		shipped[strings.TrimPrefix(file.Path, ImageAppDir+"/")] = true
+	}
+	for rel, want := range map[string]bool{
+		"src/shop/vendor/lib.py": true, "src/shop/out/data.json": true, "src/shop/vendor/ignored.py": false, "src/main.py": true,
+	} {
+		if shipped[rel] != want {
+			t.Errorf("%s shipped = %v, want %v", rel, shipped[rel], want)
+		}
 	}
 }
 

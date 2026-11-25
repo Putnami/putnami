@@ -257,9 +257,11 @@ ledger names every process kind the engine started, its git calls by
 subcommand, then the CLI starts and git calls of the jobs. The tools jobs run
 (`go`, `bun`, `cargo`) are the jobs' work and are left out.
 
-A pull request that changes a count changes its number in the same pull request,
-and the number only goes down. When a test fails, it prints the ledger it got:
-a lower count replaces the recorded one; a higher count is a regression to fix.
+A pull request that changes a count changes its number in the same pull request.
+A case's total only goes down, and so does every count, except an engine count
+that takes over a read the jobs made: it may rise, once per run, by no more than
+the jobs' count falls. When a test fails, it prints the ledger it got: a lower
+count replaces the recorded one; a higher count is a regression to fix.
 The growth of the engine's CPU per task does not depend on the host: an engine
 whose work per task is the same on any plan reads below 1.4 on a 4-core Linux
 container, most often below 1.0, and work repeated for each pending task reads

@@ -179,7 +179,7 @@ func assembleImage(ctx *pctx.Context, flags map[string]string, emit *jsonl.Emitt
 		return fail(code, err)
 	}
 
-	spec, err := imageSpec(sitePackages, projectRoot, base, platform, entrypoint)
+	spec, err := imageSpec(ctx, sitePackages, projectRoot, base, platform, entrypoint)
 	if err != nil {
 		return fail(CodeImageFailed, err)
 	}
@@ -463,7 +463,7 @@ func stageLocalRequirements(ctx *pctx.Context, locals []localRequirement, stagin
 		}
 		target := filepath.Join(staging, filepath.FromSlash(rel))
 		if !staged[rel] {
-			if err := copyTree(filepath.Join(wsRoot, filepath.FromSlash(rel)), target); err != nil {
+			if err := copyTree(ctx, filepath.Join(wsRoot, filepath.FromSlash(rel)), target); err != nil {
 				return nil, err
 			}
 			staged[rel] = true
@@ -509,9 +509,11 @@ type treeFilter struct {
 	candidates map[string]bool
 }
 
-// newTreeFilter reads the Git candidates of the tree at root.
-func newTreeFilter(root string) (treeFilter, error) {
-	tree, err := gitcandidate.Open(root)
+// newTreeFilter reads the Git candidates of the tree at root: from the job
+// context ctx when its task declared the candidate cut, which covers the
+// project and its dependency closure, and from Git otherwise.
+func newTreeFilter(ctx *pctx.Context, root string) (treeFilter, error) {
+	tree, err := gitcandidate.OpenFrom(ctx, root)
 	if err != nil || tree == nil {
 		return treeFilter{}, err
 	}
@@ -560,8 +562,8 @@ func TestFile(name string) bool {
 }
 
 // copyTree copies a tree without the entries its filter leaves out.
-func copyTree(source, target string) error {
-	filter, err := newTreeFilter(source)
+func copyTree(ctx *pctx.Context, source, target string) error {
+	filter, err := newTreeFilter(ctx, source)
 	if err != nil {
 		return err
 	}
@@ -618,12 +620,12 @@ func fileMode(info fs.FileInfo) fs.FileMode {
 
 // imageSpec describes the application's image: a layer of the installed
 // dependencies and a layer of the application files.
-func imageSpec(sitePackages, projectRoot, base, platform, entrypoint string) (oci.Spec, error) {
+func imageSpec(ctx *pctx.Context, sitePackages, projectRoot, base, platform, entrypoint string) (oci.Spec, error) {
 	dependencies, err := treeFiles(sitePackages, ImageSitePackages, func(string, fs.DirEntry) bool { return false })
 	if err != nil {
 		return oci.Spec{}, err
 	}
-	filter, err := newTreeFilter(projectRoot)
+	filter, err := newTreeFilter(ctx, projectRoot)
 	if err != nil {
 		return oci.Spec{}, err
 	}

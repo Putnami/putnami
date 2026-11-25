@@ -78,7 +78,7 @@ func (s *Scheduler) restampSourceBinding(job *ScheduledJob) {
 	)
 	s.versionFilesMu.Unlock()
 	s.cacheStats.RecordLocalBindings(started, time.Now(), spawned)
-	s.cache.InvalidateFileHashesUnder([]string{
+	s.invalidateWritten([]string{
 		filepath.Join(s.ws.Root, job.Project.Path, filepath.FromSlash(versionStampRelPath)),
 	})
 }

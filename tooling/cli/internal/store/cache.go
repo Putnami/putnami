@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"go.putnami.dev/sdk/extension/gitread"
 )
@@ -17,7 +18,10 @@ import (
 // transparent caching. It handles cache key computation, hit/miss
 // detection, result restoration, and output storage.
 type CacheManager struct {
-	store           *LocalStore
+	store *LocalStore
+	// candidates is the run's read of the workspace's candidate cut
+	// (SetCandidateSource), nil when the run holds none.
+	candidates      atomic.Pointer[CandidateSource]
 	fileHashes      inputHashMemo     // memoizes file hashes: "dir|patterns|scope" → hash
 	extraFileHashes inputHashMemo     // memoizes extra-file hashes: workspace root and sorted paths, NUL-joined → hash
 	sourceStates    map[string]string // memoizes SourceState: workspace root → state
@@ -159,7 +163,13 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 		return cached, nil
 	}
 
-	hash, err := memoizedHashFiles(dir, patterns, expander, scope)
+	var hash string
+	var err error
+	if cut := cm.candidateSource(); cut != nil {
+		hash, err = hashFilesWith(cut, dir, patterns, expander, scope)
+	} else {
+		hash, err = memoizedHashFiles(dir, patterns, expander, scope)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -188,6 +198,27 @@ func (cm *CacheManager) HashFiles(dir string, patterns []string, expander InputE
 		return "", fmt.Errorf("cache manager is nil")
 	}
 	return cm.lookupFileHash(dir, patterns, expander, scope)
+}
+
+// SetCandidateSource makes the keys of the run list a whole work tree's
+// candidate cut from source, the run's read of it, instead of asking Git
+// (CandidateSource). The source answers the current read, which a write of the
+// run makes stale as it drops the memoized digests the write can move.
+func (cm *CacheManager) SetCandidateSource(source CandidateSource) {
+	if cm == nil {
+		return
+	}
+	cm.candidates.Store(&source)
+}
+
+func (cm *CacheManager) candidateSource() CandidateSource {
+	if cm == nil {
+		return nil
+	}
+	if source := cm.candidates.Load(); source != nil {
+		return *source
+	}
+	return nil
 }
 
 // InvalidateFileHashes drops every memoized input digest, project files and
