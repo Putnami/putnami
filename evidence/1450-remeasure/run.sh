@@ -5,7 +5,7 @@
 #   warm      : tasks.json restored from <history-file>, --no-cache
 #   unchanged : tasks.json left as is, cache on
 # SELECTION=<a>,<b> in the environment replaces --all with --projects <a>,<b>.
-# Waits for the one-minute load to fall below 1.0, samples /proc/loadavg every
+# Waits for the one-minute load to fall below $LOAD_GATE (default 1.0), samples /proc/loadavg every
 # 15 s from just before the start to the end, and copies the run's report and
 # session.json into runs/<label>/.
 set -u
@@ -14,7 +14,8 @@ EVID=$(cd "$(dirname "$0")" && pwd)
 OUT="$EVID/runs/$LABEL"; mkdir -p "$OUT"
 LOGDIR=${LOGDIR:-/tmp/1450-logs}; mkdir -p "$LOGDIR"
 
-until awk '{exit !($1 < 1.0)}' /proc/loadavg; do sleep 5; done
+LOAD_GATE=${LOAD_GATE:-1.0}
+until awk -v g="$LOAD_GATE" '{exit !($1 < g)}' /proc/loadavg; do sleep 5; done
 
 cd "$WT"
 case "$MODE" in
