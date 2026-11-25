@@ -344,10 +344,20 @@ func runEngine(t *testing.T, self, wsRoot, cleanHome string, hosted bool, extraE
 
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
-	err := cmd.Run()
+	// A process the run started that outlives it and holds its output does
+	// not keep the wait open.
+	cmd.WaitDelay = engineDumpGrace
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start engine: %v", err)
+	}
+	err := waitEngine(cmd, engineDeadline)
 	code := 0
 	if err != nil {
 		var exitErr *exec.ExitError
+		var hang *engineHangError
+		if errors.As(err, &hang) {
+			t.Fatalf("%v\noutput:\n%s", err, out.String())
+		}
 		if errors.As(err, &exitErr) {
 			code = exitErr.ExitCode()
 		} else {

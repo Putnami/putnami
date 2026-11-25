@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -498,6 +499,10 @@ func writePublicationE2EFixture(t *testing.T) *publicationE2EFixture {
 	return fx
 }
 
+// runtimeBuildDeadline bounds the build of one extension runtime: well under
+// the package's test timeout, with room for a loaded machine.
+const runtimeBuildDeadline = 4 * time.Minute
+
 // buildExtensionRuntimes builds the TypeScript and Go extension runtimes from
 // their sources, as their prepare steps do, stamped e2eRuntimeVersion, into
 // the extensions of store, warms them (warmRuntime), and returns their paths.
@@ -514,10 +519,16 @@ func buildExtensionRuntimes(t *testing.T, store string) (tsRuntime, goRuntime st
 	tsRuntime = filepath.Join(store, "extensions", "typescript@"+e2eRuntimeVersion, "compiled", "putnami-ts")
 	goRuntime = filepath.Join(store, "extensions", "go@"+e2eRuntimeVersion, "compiled", "putnami-go")
 	build := func(source, pkg, output string) error {
-		cmd := exec.Command(goBinary, "build", "-o", output, "-ldflags", "-X main.runtimeVersion="+e2eRuntimeVersion, pkg)
+		ctx, cancel := context.WithTimeout(context.Background(), runtimeBuildDeadline)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, goBinary, "build", "-o", output, "-ldflags", "-X main.runtimeVersion="+e2eRuntimeVersion, pkg)
 		cmd.Dir = filepath.Join(root, source)
 		cmd.Env = append(os.Environ(), "GOWORK=off", "CGO_ENABLED=0")
+		cmd.WaitDelay = engineDumpGrace
 		if out, err := cmd.CombinedOutput(); err != nil {
+			if ctx.Err() != nil {
+				return fmt.Errorf("build %s: not built within %s: %w\n%s", source, runtimeBuildDeadline, err, out)
+			}
 			return fmt.Errorf("build %s: %w\n%s", source, err, out)
 		}
 		return nil

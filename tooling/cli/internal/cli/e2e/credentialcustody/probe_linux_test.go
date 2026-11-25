@@ -133,8 +133,9 @@ func probeProcMem(role string, pid int) finding {
 }
 
 // probeProcFD lists the parent's /proc/<pid>/fd and reads what it can of each
-// descriptor, in case one still holds the credential pipe. Capture closed that
-// descriptor, and procguard denies the listing, so this finds nothing.
+// descriptor, in case one still holds the credential pipe, without draining
+// any of them (readDescriptor). Capture closed that descriptor, and procguard
+// denies the listing, so this finds nothing.
 func probeProcFD(role string, pid int) finding {
 	f := finding{Role: role, Probe: "proc-fd-parent", Checked: true}
 	entries, err := os.ReadDir(procPath(pid, "fd"))
@@ -177,8 +178,7 @@ func probePtrace(role string, pid int) finding {
 	}
 	// Unexpected: we attached to the credential holder. Read its memory so the
 	// finding names the leak, then detach so the parent runs on.
-	var status syscall.WaitStatus
-	_, _ = syscall.Wait4(pid, &status, 0, nil)
+	awaitAttachStop(pid)
 	if mem, err := os.Open(procPath(pid, "mem")); err == nil {
 		buf := make([]byte, procBound)
 		foundSet := map[string]bool{}
@@ -217,10 +217,27 @@ func probePtrace(role string, pid int) finding {
 // no data yet.
 const descriptorReadWait = 100 * time.Millisecond
 
+// descriptorPollInterval is how often readDescriptor looks again at an empty
+// pipe before descriptorReadWait ends.
+const descriptorPollInterval = 5 * time.Millisecond
+
+// spliceNonblock is SPLICE_F_NONBLOCK: tee(2) does not wait for data.
+const spliceNonblock = 0x2
+
+// F_GETPIPE_SZ and F_SETPIPE_SZ read and set the capacity of a pipe.
+const (
+	fSetPipeSize = 1031
+	fGetPipeSize = 1032
+)
+
 // readDescriptor reads at most limit bytes of what the /proc descriptor link
-// path opens: a regular file, or a pipe without blocking. A pipe of a readable
-// parent that no writer fills, such as its standard input, would otherwise
-// hold the probe, and the parent with it, forever. It reads nothing else.
+// path opens: a regular file, through a description of its own, or a pipe,
+// without blocking and without draining it. It reads nothing else. A pipe of a
+// readable parent that no writer fills, such as its standard input, would
+// otherwise hold the probe, and the parent with it, forever; and a read would
+// take bytes from the parent's live pipes, such as the request and answer
+// lines of its credential provider session, which would then never reach
+// their reader.
 func readDescriptor(path string, limit int) ([]byte, error) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -236,13 +253,85 @@ func readDescriptor(path string, limit int) ([]byte, error) {
 	}
 	defer func() { _ = file.Close() }()
 	if mode&os.ModeNamedPipe != 0 {
-		_ = file.SetReadDeadline(time.Now().Add(descriptorReadWait))
+		return peekPipe(file, limit)
 	}
 	data, err := io.ReadAll(io.LimitReader(file, int64(limit)))
 	if len(data) > 0 {
 		return data, nil
 	}
 	return nil, err
+}
+
+// peekPipe returns a copy of at most limit bytes the pipe holds, taken with
+// tee(2) into a pipe of the probe's own, so every byte stays in the pipe for
+// its reader. It waits descriptorReadWait at most for a pipe that holds
+// nothing yet, and returns io.EOF for an empty pipe no writer holds.
+func peekPipe(pipe *os.File, limit int) ([]byte, error) {
+	source, err := rawFD(pipe)
+	if err != nil {
+		return nil, err
+	}
+	copyReader, copyWriter, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = copyReader.Close() }()
+	sink, err := rawFD(copyWriter)
+	if err != nil {
+		_ = copyWriter.Close()
+		return nil, err
+	}
+	// tee copies no more than its target holds: the copy gets the source's
+	// capacity, so it can take everything the source holds.
+	if size, _, errno := syscall.Syscall(syscall.SYS_FCNTL, uintptr(source), fGetPipeSize, 0); errno == 0 {
+		_, _, _ = syscall.Syscall(syscall.SYS_FCNTL, uintptr(sink), fSetPipeSize, size)
+	}
+	deadline := time.Now().Add(descriptorReadWait)
+	for {
+		n, err := syscall.Tee(source, sink, limit, spliceNonblock)
+		switch {
+		case n > 0:
+			_ = copyWriter.Close()
+			return io.ReadAll(io.LimitReader(copyReader, int64(limit)))
+		case err == nil:
+			_ = copyWriter.Close()
+			return nil, io.EOF
+		case err != syscall.EAGAIN || time.Now().After(deadline):
+			_ = copyWriter.Close()
+			return nil, err
+		}
+		time.Sleep(descriptorPollInterval)
+	}
+}
+
+// rawFD is file's descriptor, left in the mode it was opened in (os.File.Fd
+// would make it blocking). file stays open while its caller uses it.
+func rawFD(file *os.File) (int, error) {
+	conn, err := file.SyscallConn()
+	if err != nil {
+		return 0, err
+	}
+	fd := -1
+	if err := conn.Control(func(raw uintptr) { fd = int(raw) }); err != nil {
+		return 0, err
+	}
+	return fd, nil
+}
+
+// awaitAttachStop waits until the tracee pid reports the SIGSTOP its attach
+// sent. A signal it reports first is handed back to it as it continues: the
+// SIGSTOP stays pending until the tracer sees it, and a detach that left it
+// pending would stop the parent for good.
+func awaitAttachStop(pid int) {
+	for {
+		var status syscall.WaitStatus
+		if _, err := syscall.Wait4(pid, &status, 0, nil); err != nil || !status.Stopped() || status.StopSignal() == syscall.SIGSTOP {
+			return
+		}
+		if err := syscall.PtraceCont(pid, int(status.StopSignal())); err != nil {
+			return
+		}
+	}
 }
 
 // procPath returns /proc/<pid>/<sub>.
