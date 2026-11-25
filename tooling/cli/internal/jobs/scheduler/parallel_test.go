@@ -1,12 +1,14 @@
 package scheduler
 
 import (
+	"fmt"
 	"os"
 	"slices"
 	"strings"
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -22,18 +24,46 @@ func TestResolveMaxWorkers_ExplicitNumericWins(t *testing.T) {
 	}
 }
 
-func TestResolveMaxWorkers_DefaultAutoUsesLogicalCPUHeadroom(t *testing.T) {
+func TestResolveMaxWorkers_DefaultAutoRunsOneWorkerPerCPU(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "the-worker-count-follows-the-cpu-capacity")
 	planned := makePlannedJobs(100, "build~generate")
 	got := workersFor(SchedulerConfig{}, planned, 10, 0)
-	if got != 30 {
-		t.Fatalf("workers = %d, want 30 for light auto plan", got)
+	if got != 10 {
+		t.Fatalf("workers = %d, want one per CPU of capacity", got)
+	}
+}
+
+func TestResolveMaxWorkers_QuotaSetsTheCapacity(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "the-worker-count-follows-the-cpu-capacity")
+	planned := makePlannedJobs(100, "build~generate")
+	d := resolveParallelDecisionWithHardware(SchedulerConfig{}, planned, 10, 4, 0)
+	if d.Workers != 4 || d.CPUCapacity != 4 || d.LogicalCPU != 10 {
+		t.Fatalf("decision = %+v, want 4 workers on a 4-core quota of 10 logical CPUs", d)
+	}
+}
+
+func TestResolveMaxWorkers_EachServeStepAddsAWorker(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "the-worker-count-follows-the-cpu-capacity")
+	var planned []*ScheduledJob
+	serves := map[string]bool{}
+	for i := range 10 {
+		job := statJob(fmt.Sprintf("/p%d", i), "build~generate")
+		planned = append(planned, job)
+		if i < 5 {
+			serves[job.Key()] = true
+		}
+	}
+	for mode, want := range map[string]int{parallelModeAuto: 9, parallelModeEco: 7} {
+		if got := workersFor(SchedulerConfig{MaxParallelMode: mode, ServeSteps: serves}, planned, 4, 0); got != want {
+			t.Fatalf("%s: workers = %d, want the capacity's workers plus 5 serves = %d", mode, got, want)
+		}
 	}
 }
 
 func TestResolveMaxWorkers_NormalizesModeAndCPU(t *testing.T) {
 	planned := makePlannedJobs(100, "build~generate")
 	got := workersFor(SchedulerConfig{MaxParallelMode: " unknown "}, planned, 0, 0)
-	if got != 3 {
+	if got != 1 {
 		t.Fatalf("workers = %d, want auto mode on one logical CPU", got)
 	}
 }
@@ -44,9 +74,9 @@ func TestResolveMaxWorkers_Modes(t *testing.T) {
 		mode string
 		want int
 	}{
-		{parallelModeEco, 8},
-		{parallelModeAuto, 30},
-		{parallelModeMax, 30},
+		{parallelModeEco, 5},
+		{parallelModeAuto, 10},
+		{parallelModeMax, 10},
 	}
 	for _, tt := range tests {
 		t.Run(tt.mode, func(t *testing.T) {
@@ -58,35 +88,19 @@ func TestResolveMaxWorkers_Modes(t *testing.T) {
 	}
 }
 
-func TestResolveMaxWorkers_HeavyPlanBacksOffAuto(t *testing.T) {
-	planned := makePlannedJobs(100, "test~test")
-	got := workersFor(SchedulerConfig{MaxParallelMode: parallelModeAuto}, planned, 10, 0)
-	if got != 15 {
-		t.Fatalf("workers = %d, want 15", got)
+func TestResolveMaxWorkers_PlanMixKeepsOneWorkerPerCPU(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "the-worker-count-follows-the-cpu-capacity")
+	plans := map[string][]*ScheduledJob{
+		"heavy": makePlannedJobs(100, "test~test"),
+		"mixed": append(makePlannedJobs(30, "test~test"), makePlannedJobs(70, "build~generate")...),
+		"light": makePlannedJobs(100, "build~generate"),
 	}
-}
-
-func TestResolveMaxWorkers_HeavyPlanBacksOffMax(t *testing.T) {
-	planned := makePlannedJobs(100, "test~test")
-	got := workersFor(SchedulerConfig{MaxParallelMode: parallelModeMax}, planned, 10, 0)
-	if got != 20 {
-		t.Fatalf("workers = %d, want 20", got)
-	}
-}
-
-func TestResolveMaxWorkers_MixedPlanKeepsAutoBase(t *testing.T) {
-	planned := append(makePlannedJobs(50, "test~test"), makePlannedJobs(50, "build~generate")...)
-	got := workersFor(SchedulerConfig{MaxParallelMode: parallelModeAuto}, planned, 10, 0)
-	if got != 20 {
-		t.Fatalf("workers = %d, want base auto workers for mixed plan", got)
-	}
-}
-
-func TestResolveMaxWorkers_MixedHeavyPlanBacksOffMax(t *testing.T) {
-	planned := append(makePlannedJobs(30, "test~test"), makePlannedJobs(70, "build~generate")...)
-	got := workersFor(SchedulerConfig{MaxParallelMode: parallelModeMax}, planned, 10, 0)
-	if got != 20 {
-		t.Fatalf("workers = %d, want bounded max workers for mixed heavy plan", got)
+	for name, planned := range plans {
+		for _, mode := range []string{parallelModeAuto, parallelModeMax} {
+			if got := workersFor(SchedulerConfig{MaxParallelMode: mode}, planned, 10, 0); got != 10 {
+				t.Fatalf("%s plan, %s mode: workers = %d, want 10", name, mode, got)
+			}
+		}
 	}
 }
 
@@ -314,7 +328,7 @@ func TestMemoryWorkerCapDisabledWithoutMemory(t *testing.T) {
 
 func TestResolveParallelDecision_AutoFieldsWithMemoryCap(t *testing.T) {
 	planned := makePlannedJobs(100, "lint~golangci-lint")
-	d := resolveParallelDecisionWithHardware(SchedulerConfig{MaxParallelMode: parallelModeAuto}, planned, 10, 4*1024*1024*1024)
+	d := resolveParallelDecisionWithHardware(SchedulerConfig{MaxParallelMode: parallelModeAuto}, planned, 10, 0, 4*1024*1024*1024)
 
 	if d.Mode != parallelModeAuto {
 		t.Errorf("mode = %q, want %q", d.Mode, parallelModeAuto)
@@ -347,7 +361,7 @@ func TestResolveParallelDecision_AutoFieldsWithMemoryCap(t *testing.T) {
 
 func TestResolveParallelDecision_NumericOverridesTuning(t *testing.T) {
 	planned := makePlannedJobs(20, "build~generate")
-	d := resolveParallelDecisionWithHardware(SchedulerConfig{MaxParallel: 5}, planned, 0, 0)
+	d := resolveParallelDecisionWithHardware(SchedulerConfig{MaxParallel: 5}, planned, 0, 0, 0)
 
 	if d.Mode != parallelModeNumeric {
 		t.Errorf("mode = %q, want %q", d.Mode, parallelModeNumeric)
@@ -365,10 +379,10 @@ func TestResolveParallelDecision_NumericOverridesTuning(t *testing.T) {
 
 func TestResolveParallelDecision_UncappedReportsNoCap(t *testing.T) {
 	planned := makePlannedJobs(100, "build~generate")
-	d := resolveParallelDecisionWithHardware(SchedulerConfig{MaxParallelMode: parallelModeAuto}, planned, 10, 0)
+	d := resolveParallelDecisionWithHardware(SchedulerConfig{MaxParallelMode: parallelModeAuto}, planned, 10, 0, 0)
 
-	if d.Workers != 30 {
-		t.Errorf("workers = %d, want 30", d.Workers)
+	if d.Workers != 10 {
+		t.Errorf("workers = %d, want 10", d.Workers)
 	}
 	if d.MemoryTotalMiB != 0 {
 		t.Errorf("memoryTotalMiB = %d, want 0 when memory unknown", d.MemoryTotalMiB)
@@ -388,7 +402,7 @@ func TestUsableMemoryKeepsAFixedQuarterHeadroom(t *testing.T) {
 // workersFor resolves just the selected worker count, the value most of these
 // tests assert on.
 func workersFor(cfg SchedulerConfig, planned []*ScheduledJob, logicalCPU int, totalMemoryBytes uint64) int {
-	return resolveParallelDecisionWithHardware(cfg, planned, logicalCPU, totalMemoryBytes).Workers
+	return resolveParallelDecisionWithHardware(cfg, planned, logicalCPU, 0, totalMemoryBytes).Workers
 }
 
 // declaredHeavySteps mirrors the `heavy: true` steps the SHIPPED first-party

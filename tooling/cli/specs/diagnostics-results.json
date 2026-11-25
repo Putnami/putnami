@@ -148,6 +148,14 @@
         "Orchestration CPU is the CPU of the engine process, of each extension process without its children, of control processes, of CLI starts made by jobs, and of git started by the engine or an SDK job, which reports its own CPU apart from its children's.",
         "run.orchestration states it, its share of the run's CPU and its ms per selected task; the --trace-profile summary prints the three."
       ]
+    },
+    {
+      "id": "a-run-reports-the-cpu-it-grants-and-the-machine-load",
+      "text": [
+        "run.orchestration.capacity carries the CPU capacity, the worker count, and samples from the run's start to its end of the sum of the CPU ceilings of the subprocesses running, serve steps aside, and of the machine's one-minute load average, with their peaks.",
+        "A load the platform does not report is absent.",
+        "The --trace-profile summary prints the capacity, the workers and both peaks."
+      ]
     }
   ],
   "decisions": [

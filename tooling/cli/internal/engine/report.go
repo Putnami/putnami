@@ -132,6 +132,13 @@ func reportOrchestration(w io.Writer, g *GlobalFlags, result *scheduler.Schedule
 			iox.Fprintf(w, "         %d job process(es) reported no CPU of their own\n", cpu.UnreportedProcesses)
 		}
 	}
+	if capacity := report.Capacity; capacity != nil {
+		iox.Fprintf(w, "  Capacity: %d cpus · %d workers · granted peak %d cpus", capacity.CPUs, capacity.Workers, capacity.PeakGrantedCPUs)
+		if peak := capacity.PeakLoadCenti; peak != nil {
+			iox.Fprintf(w, " · load1 peak %d.%02d (%.2fx cpus)", *peak/100, *peak%100, float64(*peak)/100/float64(capacity.CPUs))
+		}
+		iox.Fprintf(w, " · %d samples every %s\n", len(capacity.Samples), formatDurationMs(capacity.IntervalMs))
+	}
 	if len(report.Phases) > 0 {
 		parts := make([]string, 0, len(report.Phases))
 		for _, phase := range report.Phases {

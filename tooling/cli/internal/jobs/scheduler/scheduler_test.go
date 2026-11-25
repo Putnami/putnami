@@ -726,7 +726,7 @@ func TestScheduler_CoalescedWaiterReclaimsAbandonedLease(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	result, release := scheduler.coalesceMiss(ctx, job, hash, schedulerLeaseTestCoalescer{cache: waiter})
+	result, release := scheduler.coalesceMiss(ctx, job, hash, schedulerLeaseTestCoalescer{cache: waiter}, nil)
 	if result != nil {
 		t.Fatalf("abandoned lease restored result = %+v, want local execution fallback", result)
 	}
@@ -753,7 +753,7 @@ func TestScheduler_CoalescedWaiterFallsBackAfterJobTimeout(t *testing.T) {
 	scheduler := &Scheduler{cache: waiter, cfg: SchedulerConfig{}}
 	job := &ScheduledJob{ExpectedWallMs: 1000, JobDef: &extension.JobDefinition{TimeoutMs: 40}}
 	started := time.Now()
-	result, release := scheduler.coalesceMiss(context.Background(), job, hash, schedulerLeaseTestCoalescer{cache: waiter})
+	result, release := scheduler.coalesceMiss(context.Background(), job, hash, schedulerLeaseTestCoalescer{cache: waiter}, nil)
 	defer release()
 	if result != nil {
 		t.Fatalf("timed-out waiter restored result = %+v, want local execution fallback", result)
@@ -781,7 +781,7 @@ func TestScheduler_CoalescingHonorsCoalescingFloor(t *testing.T) {
 		JobDef:         &extension.JobDefinition{TimeoutMs: 2000},
 	}
 	started := time.Now()
-	result, release := scheduler.coalesceMiss(context.Background(), job, hash, schedulerLeaseTestCoalescer{cache: cheap})
+	result, release := scheduler.coalesceMiss(context.Background(), job, hash, schedulerLeaseTestCoalescer{cache: cheap}, nil)
 	defer release()
 	if result != nil {
 		t.Fatalf("cheap job restored result = %+v, want independent execution", result)

@@ -60,9 +60,8 @@ func normalizeCPUBudgetPolicy(value string) cpuBudgetPolicy {
 //     to do and cannot on its own lift a long pole out of a starved fixed point;
 //   - the configured/learned weight scales the result as a relative multiplier.
 //
-// A task with no history receives the whole machine. Cold history previously
-// let a long pole draw one core from a busy live cohort and made the first run
-// several times slower. That conservative fallback is not persisted as proven
+// A task with no history receives the whole machine, and admission charges
+// it one CPU (bootstrapCPUCharge). That grant is not persisted as proven
 // concurrency; the next run uses the first execution's measured evidence.
 type cpuAllocator struct {
 	mu       sync.Mutex
@@ -88,9 +87,9 @@ func newCPUAllocator(totalCPU int, policy cpuBudgetPolicy) *cpuAllocator {
 	return &cpuAllocator{totalCPU: totalCPU, policy: normalizeCPUBudgetPolicy(string(policy))}
 }
 
-// recommend returns a deterministic ceiling for one task-history record.
-// Invalid or stale values degrade to neutral inputs, and the machine size is
-// always the final cap.
+// recommend returns a deterministic ceiling for one task-history record, or
+// the whole machine for a task with none. Invalid or stale values degrade to
+// neutral inputs, and the machine size is always the final cap.
 func (a *cpuAllocator) recommend(
 	weight, expectedCPUMs, expectedWallMs float64,
 	historicalCeiling, criticalityCeiling int,
@@ -135,26 +134,33 @@ func (a *cpuAllocator) recommend(
 	// stable point is a starved long pole: a task held at one core reports one
 	// core of demand forever. Taking the maximum keeps every measured demand
 	// honored while letting the chain that bounds the run reach for the
-	// machine. Over-granting a CEILING is close to free — the task simply does
-	// not use it, and admission still bounds real concurrent pressure — while
-	// under-granting the long pole costs makespan one for one.
-	effectiveCeiling := unweightedCeiling
+	// machine. Admission charges the lifted ceiling, so the cores it adds are
+	// taken from work in the long pole's shadow, which finishes before the run
+	// ends whatever it is granted.
+	//
+	// The weight scales the occupancy answer before the lift, so a weight never
+	// multiplies the lift: the lift is already a share of the machine.
+	demand := weightedCores(unweightedCeiling, weight, a.totalCPU)
 	if a.policy == cpuBudgetPolicyCriticalPath {
-		effectiveCeiling = max(effectiveCeiling, min(criticalityCeiling, a.totalCPU))
-	}
-	demand := float64(effectiveCeiling) * weight
-	if demand >= float64(a.totalCPU) {
-		return cpuRecommendation{
-			budget:            a.totalCPU,
-			unweightedCeiling: unweightedCeiling,
-			fromHistory:       true,
-		}
+		demand = max(demand, min(criticalityCeiling, a.totalCPU))
 	}
 	return cpuRecommendation{
-		budget:            max(int(math.Ceil(demand)), 1),
+		budget:            min(max(demand, 1), a.totalCPU),
 		unweightedCeiling: unweightedCeiling,
 		fromHistory:       true,
 	}
+}
+
+// weightedCores is ceiling × weight in whole CPUs, at most limit. The product
+// is rounded to a thousandth of a CPU before it is rounded up, in integers, so
+// float error never adds a CPU: a weight of 29/7 over a ceiling of 7 is 29.
+func weightedCores(ceiling int, weight float64, limit int) int {
+	product := float64(ceiling) * weight
+	if product >= float64(limit) {
+		return limit
+	}
+	milli := int64(math.Round(product * 1000))
+	return int((milli + 999) / 1000)
 }
 
 // criticalityDecay shapes how fast the makespan lift falls off behind the long
@@ -206,9 +212,8 @@ func planCriticalityCeilings(planned []*ScheduledJob, totalCPU, workers int) map
 	// over 408 tasks, its longest being 2.5% of total wall — no lift, occupancy governs).
 	//
 	// The comparison ignores dependencies, so it is optimistic about the
-	// remainder draining: it errs toward lifting. That is the intended bias —
-	// over-granting a ceiling is nearly free, under-granting the long pole
-	// costs makespan one for one.
+	// remainder draining: it errs toward lifting, since under-granting the
+	// long pole costs makespan one for one.
 	if float64(longest) <= float64(total-longest)/float64(max(workers, 1)) {
 		return nil
 	}

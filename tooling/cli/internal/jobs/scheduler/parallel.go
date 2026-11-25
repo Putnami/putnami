@@ -7,27 +7,33 @@ const (
 	parallelModeAuto    = "auto"
 	parallelModeMax     = "max"
 	parallelModeNumeric = "numeric"
-
-	mixedHeavyPlanPermille = 300
-	heavyPlanPermille      = 650
 )
 
+// resolveParallelDecisionWithHardware sizes the worker pool. CPU capacity is
+// the logical CPUs clamped to cpuQuota, the cgroup bandwidth limit in cores (0
+// when there is none). Every finite dispatch reserves at least one CPU of that
+// capacity, so auto and max run one worker per CPU of capacity and eco half of
+// them, and each serve step adds one; an explicit count wins, and usable
+// memory may lower the capacity's share.
 func resolveParallelDecisionWithHardware(
 	cfg SchedulerConfig,
 	planned []*ScheduledJob,
-	logicalCPU int,
+	logicalCPU, cpuQuota int,
 	totalMemoryBytes uint64,
 ) ParallelDecision {
 	if logicalCPU < 1 {
 		logicalCPU = 1
 	}
+	capacity := logicalCPU
+	if cpuQuota > 0 {
+		capacity = min(capacity, cpuQuota)
+	}
 
-	// Compute the heavy-job share once; three tuning steps below consume it.
 	heavyPermille := heavyJobPermille(planned)
 
 	decision := ParallelDecision{
 		LogicalCPU:       logicalCPU,
-		CPUCapacity:      logicalCPU,
+		CPUCapacity:      capacity,
 		MemoryTotalMiB:   int(totalMemoryBytes / (1024 * 1024)),
 		MemoryUsableMiB:  int(usableMemoryBytes(totalMemoryBytes) / (1024 * 1024)),
 		PlannedJobs:      len(planned),
@@ -42,14 +48,10 @@ func resolveParallelDecisionWithHardware(
 	}
 
 	mode := normalizeParallelMode(cfg.MaxParallelMode)
-	workers := baseWorkersForMode(mode, logicalCPU)
-	workers = adjustWorkersForPlan(mode, workers, logicalCPU, heavyPermille)
+	workers := workersForCapacity(mode, capacity)
 
 	// The cap is computed against USABLE memory, not the machine total, so it
-	// agrees with the resource pool the coordinator admits against. This lowers
-	// the cap by the headroom fraction on a memory-bound host, and it is a second
-	// reduction on top of admission itself — both bound the same plan, and only
-	// the tighter one is ever visible in a run.
+	// agrees with the resource pool the coordinator admits against.
 	if cap := memoryWorkerCap(mode, usableMemoryBytes(totalMemoryBytes), heavyPermille); cap > 0 {
 		decision.MemoryCapWorkers = cap
 		if workers > cap {
@@ -58,8 +60,21 @@ func resolveParallelDecisionWithHardware(
 	}
 
 	decision.Mode = mode
-	decision.Workers = clampWorkers(workers, len(planned))
+	decision.Workers = clampWorkers(workers+serveStepCount(cfg, planned), len(planned))
 	return decision
+}
+
+// serveStepCount is the planned serve steps (SchedulerConfig.ServeSteps). A
+// serve step holds its worker until the run is interrupted and reserves no
+// CPU, so each one adds a worker beside those the capacity sizes.
+func serveStepCount(cfg SchedulerConfig, planned []*ScheduledJob) int {
+	count := 0
+	for _, job := range planned {
+		if job != nil && cfg.ServeSteps[job.Key()] {
+			count++
+		}
+	}
+	return count
 }
 
 func normalizeParallelMode(mode string) string {
@@ -72,38 +87,13 @@ func normalizeParallelMode(mode string) string {
 	}
 }
 
-func baseWorkersForMode(mode string, logicalCPU int) int {
-	switch mode {
-	case parallelModeEco:
-		return maxInt(1, minInt(8, (logicalCPU+1)/2))
-	case parallelModeMax:
-		return maxInt(1, logicalCPU*3)
-	default:
-		return maxInt(1, logicalCPU*2)
+// workersForCapacity is the worker count of a mode for a CPU capacity: a
+// worker beyond the capacity would wait for admission, never run.
+func workersForCapacity(mode string, capacity int) int {
+	if mode == parallelModeEco {
+		return max(1, (capacity+1)/2)
 	}
-}
-
-func adjustWorkersForPlan(mode string, workers, logicalCPU, heavyPermille int) int {
-	switch mode {
-	case parallelModeEco:
-		if heavyPermille < 200 {
-			return maxInt(workers, minInt(logicalCPU, 8))
-		}
-		return workers
-	case parallelModeMax:
-		if heavyPermille >= mixedHeavyPlanPermille {
-			return maxInt(logicalCPU, logicalCPU*2)
-		}
-		return workers
-	default:
-		if heavyPermille >= heavyPlanPermille {
-			return maxInt(logicalCPU, logicalCPU+logicalCPU/2)
-		}
-		if heavyPermille < 200 {
-			return maxInt(workers, logicalCPU*3)
-		}
-		return workers
-	}
+	return max(1, capacity)
 }
 
 func heavyJobPermille(planned []*ScheduledJob) int {
@@ -167,13 +157,6 @@ func clampWorkers(workers, plannedCount int) int {
 		return 1
 	}
 	return workers
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func maxInt(a, b int) int {

@@ -284,7 +284,11 @@ func TestTaskStats_LearnedWeightChangeDoesNotRatchetHistoricalDemand(t *testing.
 	t.Parallel()
 	store := loadTaskStats(t.TempDir())
 	job := statJob("/cli", "lint")
-	store.entries[taskStatKey(job)] = &taskStat{CPUMs: 4_000, WallMs: 4_000, Samples: 1}
+	// One observation measured four CPUs busy: the learned weight may lift the
+	// ceiling that far.
+	store.entries[taskStatKey(job)] = &taskStat{CPUMs: 4_000, WallMs: 4_000, Samples: 1, Observations: map[string]*taskResourceObservation{
+		taskObservationKey(4, 1): {CPUMs: 4_000, WallMs: 1_000, GrantedConcurrency: 4, BatchSize: 1, Samples: 1},
+	}}
 	for _, key := range []string{"/a|lint", "/b|lint"} {
 		store.entries[key] = &taskStat{CPUMs: 1_000, WallMs: 1_000, Samples: 1}
 	}
@@ -419,9 +423,11 @@ func TestApplyTaskTuning_LearnedBoostAgainstPeers(t *testing.T) {
 	planned := []*ScheduledJob{expensive, statJob("/a", "lint")}
 	applyTaskTuning(planned, store)
 
-	// Median cpu across {2000 ×4, 80000} = 2000 → raw boost 40, capped at 8.
-	if planned[0].LearnedCPUWeight != learnedWeightCap {
-		t.Fatalf("learned weight = %v, want cap %v", planned[0].LearnedCPUWeight, learnedWeightCap)
+	// Median cpu across {2000 ×4, 80000} = 2000 → raw boost 40, capped at 8,
+	// then at the task's measured use: one CPU busy under a ceiling of 6 lifts
+	// nothing.
+	if planned[0].LearnedCPUWeight != 1 {
+		t.Fatalf("learned weight = %v, want 1: the task never used more than its ceiling", planned[0].LearnedCPUWeight)
 	}
 	if planned[0].ExpectedWallMs != 80000 {
 		t.Fatalf("expected wall = %d, want 80000", planned[0].ExpectedWallMs)
@@ -435,6 +441,28 @@ func TestApplyTaskTuning_LearnedBoostAgainstPeers(t *testing.T) {
 	// A median-priced peer gets no boost.
 	if planned[1].LearnedCPUWeight != 0 {
 		t.Fatalf("peer learned weight = %v, want 0 (no boost)", planned[1].LearnedCPUWeight)
+	}
+}
+
+func TestApplyTaskTuning_LearnedWeightLiftsOnlyToMeasuredUse(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	store := loadTaskStats(t.TempDir())
+	for _, id := range []string{"/a", "/b", "/c"} {
+		store.record(statJob(id, "test"), successResult(time.Second, time.Second))
+	}
+	busy := statJob("/busy", "test")
+	store.entries[taskStatKey(busy)] = &taskStat{CPUMs: 8_000, WallMs: 8_000, Samples: 1, Observations: map[string]*taskResourceObservation{
+		taskObservationKey(4, 1): {CPUMs: 3_000, WallMs: 1_000, GrantedConcurrency: 4, BatchSize: 1, Samples: 1},
+	}}
+	idle := statJob("/idle", "test")
+	store.entries[taskStatKey(idle)] = &taskStat{CPUMs: 8_000, WallMs: 11_000, Samples: 1}
+	applyTaskTuning([]*ScheduledJob{busy, idle}, store)
+	if busy.LearnedCPUWeight != 3 {
+		t.Fatalf("busy learned weight = %v, want 3: its observation used 3 CPUs", busy.LearnedCPUWeight)
+	}
+	if idle.LearnedCPUWeight != 1 {
+		t.Fatalf("idle learned weight = %v, want 1: 0.7 CPU busy lifts nothing", idle.LearnedCPUWeight)
 	}
 }
 
@@ -796,5 +824,26 @@ func TestTaskStats_AnEarlierStoreIsIgnored(t *testing.T) {
 	}
 	if entries := loadTaskStats(root).entries; len(entries) != 0 {
 		t.Fatalf("a version 3 store kept %d entries, want none", len(entries))
+	}
+}
+
+// TestApplyTaskTuning_LearnedWeightAddsNoCPUByRounding: a learned weight that
+// lifts a ceiling of 7 to a measured 29 CPUs grants 29 on a 32-CPU machine,
+// although 7 × 29/7 is a hair above 29 in floating point.
+func TestApplyTaskTuning_LearnedWeightAddsNoCPUByRounding(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	store := loadTaskStats(t.TempDir())
+	for _, id := range []string{"/a", "/b", "/c"} {
+		store.record(statJob(id, "test"), successResult(time.Second, time.Second))
+	}
+	busy := statJob("/busy", "test")
+	store.entries[taskStatKey(busy)] = &taskStat{CPUMs: 70_000, WallMs: 10_000, Samples: 1, MaxUnweightedConcurrency: 7, Observations: map[string]*taskResourceObservation{
+		taskObservationKey(32, 1): {CPUMs: 29_000, WallMs: 1_000, GrantedConcurrency: 32, BatchSize: 1, Samples: 1},
+	}}
+	applyTaskTuning([]*ScheduledJob{busy}, store)
+	got := newCPUAllocator(32, "").recommend(busy.EffectiveCPUWeight(), busy.ExpectedCPUWorkMs, float64(busy.ExpectedWallMs), busy.HistoricalCPUCeiling, 0)
+	if got.budget != 29 {
+		t.Fatalf("budget = %d with learned weight %v, want the measured 29 CPUs", got.budget, busy.LearnedCPUWeight)
 	}
 }

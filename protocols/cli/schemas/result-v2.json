@@ -559,7 +559,33 @@
         "phases": { "type": "array", "items": { "$ref": "#/$defs/orchestrationPhase" } },
         "processes": { "type": "array", "items": { "$ref": "#/$defs/orchestrationProcesses" } },
         "git": { "type": "array", "items": { "$ref": "#/$defs/orchestrationGitCalls" } },
-        "cpu": { "$ref": "#/$defs/orchestrationCpu" }
+        "cpu": { "$ref": "#/$defs/orchestrationCpu" },
+        "capacity": { "$ref": "#/$defs/runCapacity" }
+      }
+    },
+    "capacitySample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["atMs", "grantedCpus"],
+      "description": "One reading of a run's CPU pressure.",
+      "properties": {
+        "atMs": { "type": "integer", "minimum": 0, "description": "Time since the run started." },
+        "grantedCpus": { "type": "integer", "minimum": 0, "description": "Sum of the CPU ceilings of the subprocesses running, serve steps aside: a serve step reserves no CPU." },
+        "loadCenti": { "type": "integer", "minimum": 0, "description": "The machine's one-minute load average times 100, rounded. Absent where the platform reports none." }
+      }
+    },
+    "runCapacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpus", "workers", "intervalMs", "peakGrantedCpus", "samples"],
+      "description": "The CPU ceilings a run granted against its CPU capacity, and the machine's one-minute load, sampled over the run. peakGrantedCpus is at least every sample's grantedCpus; peakLoadCenti, present exactly when a sample carries loadCenti, is their largest.",
+      "properties": {
+        "cpus": { "type": "integer", "minimum": 1, "description": "CPU capacity admission charges ceilings against: the logical CPUs, clamped to a cgroup bandwidth quota." },
+        "workers": { "type": "integer", "minimum": 1 },
+        "intervalMs": { "type": "integer", "minimum": 1, "description": "Spacing of the samples; it doubles each time a long run fills the bound on samples, which then keeps every other one." },
+        "peakGrantedCpus": { "type": "integer", "minimum": 0, "description": "Largest sum of running ceilings the run reached, sampled or not." },
+        "peakLoadCenti": { "type": "integer", "minimum": 0 },
+        "samples": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/capacitySample" }, "description": "In time order, the first at the run's start and the last at its end." }
       }
     },
     "runSummary": {

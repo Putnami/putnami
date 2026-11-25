@@ -68,7 +68,7 @@ func lookupSourceBound(t *testing.T, f *captureFixture, job *ScheduledJob) (stri
 	t.Helper()
 	var mu sync.Mutex
 	hashes := map[string]string{}
-	hash, result, release := f.sched.lookupDeclaredEntry(t.Context(), job, nil, &mu, hashes)
+	hash, result, release := f.sched.lookupDeclaredEntry(t.Context(), job, nil, &mu, hashes, nil)
 	release()
 	return hash, result, hashes
 }

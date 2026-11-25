@@ -1519,6 +1519,21 @@
             "a-contract-edit-moves-the-keys-of-the-consumer-jobs"
           ]
         }
+      },
+      {
+        "id": "the-scheduler-admits-the-cpu-it-grants",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "admission-charges-the-granted-ceiling",
+            "a-cold-task-is-granted-the-machine-and-charged-one-cpu",
+            "the-worker-count-follows-the-cpu-capacity"
+          ]
+        }
       }
     ]
   }

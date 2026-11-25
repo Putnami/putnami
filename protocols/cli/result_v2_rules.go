@@ -199,11 +199,27 @@ var (
 		opt("unreportedProcesses", intAtLeast(1)),
 	}
 
+	capacitySampleFields = []field{
+		req("atMs", intAtLeast(0)),
+		req("grantedCpus", intAtLeast(0)),
+		opt("loadCenti", intAtLeast(0)),
+	}
+
+	runCapacityFields = []field{
+		req("cpus", intAtLeast(1)),
+		req("workers", intAtLeast(1)),
+		req("intervalMs", intAtLeast(1)),
+		req("peakGrantedCpus", intAtLeast(0)),
+		opt("peakLoadCenti", intAtLeast(0)),
+		req("samples", nonEmptyArrayOf(capacitySample)),
+	}
+
 	runOrchestrationFields = []field{
 		opt("phases", arrayOf(orchestrationPhase)),
 		opt("processes", arrayOf(orchestrationProcesses)),
 		opt("git", arrayOf(orchestrationGitCalls)),
 		opt("cpu", orchestrationCPU),
+		opt("capacity", runCapacity),
 	}
 
 	runSummaryFields = []field{
@@ -629,6 +645,8 @@ var v2FieldSets = map[string][]field{
 	"orchestrationGitCalls":    orchestrationGitCallsFields,
 	"orchestrationCpu":         orchestrationCPUFields,
 	"runOrchestration":         runOrchestrationFields,
+	"runCapacity":              runCapacityFields,
+	"capacitySample":           capacitySampleFields,
 	"runSummary":               runSummaryFields,
 	"streamRunSummary":         streamRunSummaryFields,
 	"cgroupThrottle":           cgroupThrottleFields,
@@ -866,6 +884,39 @@ func orchestrationCPU(v *validator, path string, value any) {
 	// the truncated thousandths: 0 is a measured share, never an absent one.
 	if (run > 0) != hasShare || (hasShare && share != total*1000/run) {
 		v.add(ViolationCountMismatch, join(path, "sharePermille"))
+	}
+}
+
+func capacitySample(v *validator, path string, value any) {
+	object(v, path, value, capacitySampleFields)
+}
+
+// runCapacity validates the capacity report and its two ties to its samples:
+// peakGrantedCpus is at least every sample's grantedCpus, and peakLoadCenti,
+// present exactly when a sample carries loadCenti, is their largest.
+func runCapacity(v *validator, path string, value any) {
+	obj := object(v, path, value, runCapacityFields)
+	if obj == nil {
+		return
+	}
+	samples, _ := obj["samples"].([]any)
+	peakGranted, hasPeakGranted := childInt(obj, "peakGrantedCpus")
+	peakLoad, hasPeakLoad := childInt(obj, "peakLoadCenti")
+	maxLoad, anyLoad := int64(0), false
+	for i, item := range samples {
+		sample, _ := item.(map[string]any)
+		if sample == nil {
+			continue
+		}
+		if granted, ok := childInt(sample, "grantedCpus"); ok && hasPeakGranted && granted > peakGranted {
+			v.add(ViolationCountMismatch, join(path, "samples["+strconv.Itoa(i)+"].grantedCpus"))
+		}
+		if load, ok := childInt(sample, "loadCenti"); ok {
+			maxLoad, anyLoad = max(maxLoad, load), true
+		}
+	}
+	if anyLoad != hasPeakLoad || (hasPeakLoad && peakLoad != maxLoad) {
+		v.add(ViolationCountMismatch, join(path, "peakLoadCenti"))
 	}
 }
 

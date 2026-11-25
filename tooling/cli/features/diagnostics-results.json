@@ -295,6 +295,20 @@
             "the-trace-profile-summary-prints-the-orchestration-cpu-share-and-ms-per-task"
           ]
         }
+      },
+      {
+        "id": "a-run-reports-the-cpu-it-grants-and-the-machine-load",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-capacity-report-samples-the-granted-cpus-and-the-load",
+            "the-trace-profile-summary-prints-the-capacity-peaks"
+          ]
+        }
       }
     ]
   }

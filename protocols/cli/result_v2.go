@@ -658,6 +658,45 @@ type RunOrchestration struct {
 	// CPU is the orchestration CPU, absent where the platform measures no
 	// process CPU.
 	CPU *OrchestrationCPU `json:"cpu,omitempty"`
+	// Capacity is the CPU the scheduler granted against its capacity and the
+	// machine load, sampled over the run. Absent when the scheduler did not
+	// run.
+	Capacity *RunCapacity `json:"capacity,omitempty"`
+}
+
+// RunCapacity is the CPU ceilings a run granted against its CPU capacity, and
+// the machine's one-minute load, sampled over the run.
+type RunCapacity struct {
+	// CPUs is the CPU capacity admission charges ceilings against: the logical
+	// CPUs, clamped to a cgroup bandwidth quota.
+	CPUs int `json:"cpus"`
+	// Workers is the scheduler's worker count.
+	Workers int `json:"workers"`
+	// IntervalMs is the spacing of Samples. It doubles each time a long run
+	// fills the bound on samples, which then keeps every other one.
+	IntervalMs int64 `json:"intervalMs"`
+	// PeakGrantedCPUs is the largest sum of the CPU ceilings of running
+	// subprocesses the run reached, sampled or not. It is at least the
+	// grantedCpus of every sample.
+	PeakGrantedCPUs int `json:"peakGrantedCpus"`
+	// PeakLoadCenti is the largest loadCenti of Samples, present exactly when
+	// one sample carries a load.
+	PeakLoadCenti *int64 `json:"peakLoadCenti,omitempty"`
+	// Samples are in time order, the first at the run's start and the last at
+	// its end.
+	Samples []CapacitySample `json:"samples"`
+}
+
+// CapacitySample is one reading of a run's CPU pressure.
+type CapacitySample struct {
+	// AtMs is the time since the run started.
+	AtMs int64 `json:"atMs"`
+	// GrantedCPUs is the sum of the CPU ceilings of the subprocesses running,
+	// serve steps aside: a serve step reserves no CPU.
+	GrantedCPUs int `json:"grantedCpus"`
+	// LoadCenti is the machine's one-minute load average times 100, rounded.
+	// Absent where the platform reports no load average.
+	LoadCenti *int64 `json:"loadCenti,omitempty"`
 }
 
 // OrchestrationPhase is the wall of one engine phase.

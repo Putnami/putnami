@@ -1,13 +1,15 @@
 package scheduler
 
 import (
+	"context"
 	"math"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 )
 
 const (
-	firstColdBootstrapCPU         = 1
 	lightBootstrapMemoryMiB       = 512
 	heavyBootstrapMemoryMiB       = 1280
 	memoryHeadroomNumerator       = 3
@@ -15,10 +17,9 @@ const (
 	maxResourceReservationRecords = 1024
 )
 
-// resourceRequest is the scheduler reservation for one physical subprocess.
-// It is deliberately distinct from cpuRecommendation.budget: the latter is a
-// tool-native ceiling exported to the child, while this request is the amount
-// of stable machine capacity the coordinator admits concurrently.
+// resourceRequest is the scheduler reservation for one physical subprocess:
+// the CPU ceiling it is granted, which is exported to the child, and the memory
+// the coordinator admits concurrently.
 type resourceRequest struct {
 	cpu         int
 	memoryBytes uint64
@@ -39,11 +40,11 @@ type resourceReservation struct {
 
 type scheduledResourcePlan struct {
 	recommendation cpuRecommendation
-	ceiling        int
-	// cpu is the task's admission demand — measured occupancy where a profile
-	// exists, the first-cold bootstrap charge otherwise. It is deliberately not
-	// the ceiling; see profiledCPURequest.
-	cpu int
+	// ceiling is the CPU the task's subprocess is granted.
+	ceiling int
+	// charge is the CPU admission reserves for it: the ceiling for a task with
+	// history, the first-cold charge otherwise (planCharge).
+	charge int
 	// memoryFallback is the first-cold physical-process envelope. There is no
 	// per-task memory estimate beside it on purpose: learned memory depends on
 	// the batch size a group actually has, which only groupResourceRequest
@@ -52,10 +53,17 @@ type scheduledResourcePlan struct {
 	memoryFallback uint64
 }
 
-// resourcePool is coordinator-owned. No worker acquires from it, so readiness
-// priority and packing cannot race on goroutine timing. Every successful claim
-// travels on jobGroup and comes back on jobGroupDone for exactly-once release.
+// resourcePool holds two kinds of reservation. The coordinator takes a
+// dispatch's named claims (tryAcquire): they travel on jobGroup and come back
+// on jobGroupDone for exactly-once release. A worker takes the CPU and memory
+// of a subprocess when it starts and releases them when it ends
+// (acquireExecution): a cache hit, which starts none, holds neither. Waiting
+// executions are served in priority order, the first never overtaken, so
+// goroutine timing cannot choose who runs first; a holder waits for nothing,
+// so no wait can deadlock.
 type resourcePool struct {
+	mu             sync.Mutex
+	waiters        []*executionWaiter
 	cpuCapacity    int
 	memoryCapacity uint64
 	cpuUsed        int
@@ -100,17 +108,48 @@ func resourceReservationKey(jobs []*ScheduledJob) string {
 	return strings.Join(keys, ",")
 }
 
-func (p *resourcePool) record(group jobGroup) {
-	if p == nil || !group.reservation.acquired {
-		return
+// executionRank orders waiting executions as the coordinator orders pending
+// jobs (sortPendingLongestFirst): the longest critical path first, then the
+// longest expected wall, then the key.
+type executionRank struct {
+	criticalPathMs, expectedWallMs int64
+	key                            string
+}
+
+func (r executionRank) before(other executionRank) bool {
+	if r.criticalPathMs != other.criticalPathMs {
+		return r.criticalPathMs > other.criticalPathMs
 	}
-	p.grants[resourceReservationKey(group.jobs)] = group.reservation.request
+	if r.expectedWallMs != other.expectedWallMs {
+		return r.expectedWallMs > other.expectedWallMs
+	}
+	return r.key < other.key
+}
+
+// rankOf is the rank of a physical execution: its highest-ranked member.
+func rankOf(jobs []*ScheduledJob) executionRank {
+	var rank executionRank
+	for i, job := range jobs {
+		member := executionRank{criticalPathMs: job.CriticalPathMs, expectedWallMs: job.ExpectedWallMs, key: job.Key()}
+		if i == 0 || member.before(rank) {
+			rank = member
+		}
+	}
+	return rank
+}
+
+type executionWaiter struct {
+	request resourceRequest
+	rank    executionRank
+	granted chan resourceReservation
 }
 
 func (p *resourcePool) grantsSnapshot() []JobResourceReservation {
 	if p == nil || len(p.grants) == 0 {
 		return nil
 	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	keys := make([]string, 0, len(p.grants))
 	for key := range p.grants {
 		keys = append(keys, key)
@@ -131,8 +170,10 @@ func (p *resourcePool) grantsSnapshot() []JobResourceReservation {
 	return out
 }
 
+// normalize clamps a request to what the pool can ever admit. A CPU of zero
+// stays zero: a serve step reserves none (groupResourceRequest).
 func (p *resourcePool) normalize(request resourceRequest) resourceRequest {
-	request.cpu = min(max(request.cpu, 1), p.cpuCapacity)
+	request.cpu = min(max(request.cpu, 0), p.cpuCapacity)
 	if p.memoryCapacity > 0 {
 		request.memoryBytes = min(request.memoryBytes, p.memoryCapacity)
 	} else {
@@ -190,7 +231,12 @@ func (p *resourcePool) tryAcquire(request resourceRequest) (resourceReservation,
 	if p == nil {
 		return resourceReservation{}, true
 	}
-	request = p.normalize(request)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.tryAcquireLocked(p.normalize(request))
+}
+
+func (p *resourcePool) tryAcquireLocked(request resourceRequest) (resourceReservation, bool) {
 	if request.cpu > p.cpuCapacity-p.cpuUsed {
 		return resourceReservation{}, false
 	}
@@ -214,10 +260,110 @@ func (p *resourcePool) tryAcquire(request resourceRequest) (resourceReservation,
 	return resourceReservation{id: p.nextID, request: request, acquired: true}, true
 }
 
+// acquireExecution waits until the CPU and memory of one subprocess fit, in
+// rank order, and takes them. It answers false, holding nothing, when ctx ends
+// first.
+func (p *resourcePool) acquireExecution(ctx context.Context, request resourceRequest, rank executionRank) (resourceReservation, bool) {
+	if p == nil {
+		return resourceReservation{}, true
+	}
+	request.claims = nil
+	p.mu.Lock()
+	waiter := &executionWaiter{request: p.normalize(request), rank: rank, granted: make(chan resourceReservation, 1)}
+	at := sort.Search(len(p.waiters), func(i int) bool { return waiter.rank.before(p.waiters[i].rank) })
+	p.waiters = slices.Insert(p.waiters, at, waiter)
+	p.grantWaitersLocked()
+	p.mu.Unlock()
+
+	select {
+	case reservation := <-waiter.granted:
+		return reservation, true
+	case <-ctx.Done():
+	}
+	p.mu.Lock()
+	if index := slices.Index(p.waiters, waiter); index >= 0 {
+		p.waiters = slices.Delete(p.waiters, index, index+1)
+		p.grantWaitersLocked()
+		p.mu.Unlock()
+		return resourceReservation{}, false
+	}
+	p.mu.Unlock()
+	// Granted while ctx ended: the caller holds it and releases it.
+	return <-waiter.granted, true
+}
+
+// grantWaitersLocked grants waiting executions in rank order while the first
+// fits; it never lets a later waiter overtake one that does not fit yet.
+func (p *resourcePool) grantWaitersLocked() {
+	for len(p.waiters) > 0 {
+		waiter := p.waiters[0]
+		reservation, ok := p.tryAcquireLocked(waiter.request)
+		if !ok {
+			return
+		}
+		p.waiters = p.waiters[1:]
+		waiter.granted <- reservation
+	}
+}
+
+// resize sets a held execution reservation to request without waiting. What
+// the request lowers is freed, and granted to the waiters it fits. What it
+// raises is taken only when it fits at once and no execution waits, since the
+// holder may own a cache lease and must neither wait nor overtake a waiter;
+// otherwise the reservation keeps what it holds of it. It answers whether the
+// reservation now covers request. A released reservation is left alone.
+func (p *resourcePool) resize(reservation *resourceReservation, request resourceRequest) bool {
+	if p == nil || reservation == nil || !reservation.acquired {
+		return false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	held, ok := p.live[reservation.id]
+	if !ok {
+		return false
+	}
+	request = p.normalize(request)
+	next := held
+	next.cpu = min(request.cpu, held.cpu)
+	next.memoryBytes = min(request.memoryBytes, held.memoryBytes)
+	p.cpuUsed = max(p.cpuUsed-(held.cpu-next.cpu), 0)
+	p.memoryUsed -= min(held.memoryBytes-next.memoryBytes, p.memoryUsed)
+	growCPU := request.cpu - next.cpu
+	growMemory := request.memoryBytes - next.memoryBytes
+	fits := growCPU <= p.cpuCapacity-p.cpuUsed &&
+		(p.memoryCapacity == 0 || growMemory <= p.memoryCapacity-p.memoryUsed)
+	covered := growCPU == 0 && growMemory == 0
+	if !covered && fits && len(p.waiters) == 0 {
+		next.cpu += growCPU
+		next.memoryBytes += growMemory
+		p.cpuUsed += growCPU
+		p.memoryUsed += growMemory
+		covered = true
+	}
+	p.live[reservation.id] = next
+	reservation.request = next
+	p.grantWaitersLocked()
+	return covered
+}
+
+// recordGrant lists what an execution reserved in the run's reservation
+// telemetry, under key.
+func (p *resourcePool) recordGrant(key string, request resourceRequest) {
+	if p == nil {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.grants[key] = request
+}
+
 func (p *resourcePool) release(reservation resourceReservation) {
 	if p == nil || !reservation.acquired {
 		return
 	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	defer p.grantWaitersLocked()
 	request, ok := p.live[reservation.id]
 	if !ok {
 		return
@@ -244,33 +390,42 @@ func usableMemoryBytes(capacity uint64) uint64 {
 	return capacity / memoryHeadroomDenominator * memoryHeadroomNumerator
 }
 
-func bootstrapResourceRequest(job *ScheduledJob, totalCPU int, usableMemory uint64) resourceRequest {
-	// Without a task profile, `heavy` is useful memory-risk evidence but not a
-	// measurement of CPU occupancy. Charging every first-cold process one CPU
-	// keeps the fallback neutral and lets the pool scale with a 2-core CI runner
-	// as well as a larger workstation. An explicit cpuWeight below may raise the
-	// charge; regular-cold runs replace it with measured CPU/wall occupancy.
-	cpu := firstColdBootstrapCPU
+// planCharge is the CPU admission reserves for a task granted ceiling. A task
+// with history is charged its ceiling. A task with none is granted the whole
+// machine and charged one CPU, scaled by its configured weight: until every
+// tool a job starts honors its grant, charging a cold task more than it fills
+// leaves CPUs idle on a fresh checkout.
+func planCharge(job *ScheduledJob, recommendation cpuRecommendation, ceiling, totalCPU int) int {
+	if recommendation.fromHistory {
+		return ceiling
+	}
+	return bootstrapCPUCharge(job, totalCPU)
+}
+
+// bootstrapCPUCharge is the first-cold CPU charge: one CPU, raised by a
+// configured weight, capped by the machine.
+func bootstrapCPUCharge(job *ScheduledJob, totalCPU int) int {
+	totalCPU = max(totalCPU, 1)
+	charge := 1.0
+	if weight := job.EffectiveCPUWeight(); weight > 1 && !math.IsNaN(weight) && !math.IsInf(weight, 0) {
+		charge = math.Ceil(weight)
+	}
+	return int(min(charge, float64(totalCPU)))
+}
+
+// bootstrapMemoryBytes is the first-cold physical-process memory envelope:
+// 512 MiB for a light step, 1280 MiB for a declared-heavy one, clamped to
+// usable memory.
+func bootstrapMemoryBytes(job *ScheduledJob, usableMemory uint64) uint64 {
 	memoryMiB := lightBootstrapMemoryMiB
 	if isHeavyJob(job) {
 		memoryMiB = heavyBootstrapMemoryMiB
 	}
-	weight := job.EffectiveCPUWeight()
-	if weight > 1 && !math.IsNaN(weight) && !math.IsInf(weight, 0) {
-		if float64(cpu)*weight >= float64(max(totalCPU, 1)) {
-			cpu = max(totalCPU, 1)
-		} else {
-			cpu = int(math.Ceil(float64(cpu) * weight))
-		}
-	}
-	request := resourceRequest{
-		cpu:         min(max(cpu, 1), max(totalCPU, 1)),
-		memoryBytes: uint64(memoryMiB) * 1024 * 1024,
-	}
+	memory := uint64(memoryMiB) * 1024 * 1024
 	if usableMemory > 0 {
-		request.memoryBytes = min(request.memoryBytes, usableMemory)
+		memory = min(memory, usableMemory)
 	}
-	return request
+	return memory
 }
 
 // profiledMemoryRequest estimates peak RSS at ceiling from the nearest
@@ -309,32 +464,6 @@ func profiledMemoryRequest(
 	return uint64(estimated), max(observation.BatchSize, 1)
 }
 
-// profiledCPURequest is admission demand, not the subprocess ceiling. It uses
-// measured occupancy directly so a task may keep a deterministic ceiling of 8
-// for burst headroom while reserving only 2 CPUs after consuming 1.5. Applying
-// cpuWeight again here would double-count the weight that shaped the observed
-// execution; weight still controls the ceiling, while admission follows the
-// work the process actually demonstrated. Sparse evidence gets a small safety
-// margin, and v1/v2 aggregate CPU/wall is the conservative fallback when no
-// concurrency-conditioned observation exists.
-func profiledCPURequest(profile taskResourceProfile, ceiling int, aggregateCPUMs, aggregateWallMs float64) int {
-	cpuMs, wallMs, confidence := aggregateCPUMs, aggregateWallMs, 0.0
-	if observation, ok := profile.NearestObservation(ceiling, 1); ok && observation.WallMs > 0 {
-		cpuMs, wallMs = observation.CPUMs, observation.WallMs
-		confidence = min(max(observation.Confidence, 0), 1)
-	}
-	if !validResourceFloat(cpuMs) || !validResourceFloat(wallMs) || wallMs <= 0 {
-		return 1
-	}
-	margin := 1 + (1-confidence)*0.25
-	demand := math.Ceil(cpuMs / wallMs * margin)
-	if demand >= float64(max(ceiling, 1)) {
-		return max(ceiling, 1)
-	}
-	request := int(demand)
-	return min(max(request, 1), max(ceiling, 1))
-}
-
 func (s *Scheduler) groupResourceRequest(jobs []*ScheduledJob) resourceRequest {
 	// Named external claims are summed, not shared: see groupResourceClaims.
 	request := resourceRequest{cpu: 1, claims: groupResourceClaims(jobs)}
@@ -349,14 +478,15 @@ func (s *Scheduler) groupResourceRequest(jobs []*ScheduledJob) resourceRequest {
 		if !ok {
 			continue
 		}
-		// CPU demand shares one tool-native pool, so take its maximum. Bootstrap
+		// The members share one tool-native pool and one ceiling, so the CPU is
+		// its maximum. Bootstrap
 		// memory is likewise one physical-process class envelope. Learned singleton
 		// observations remain additive, while a learned batch RSS is already the
 		// WHOLE process: divide that envelope by its observed member count before
 		// summing logical members, then retain at least one full envelope for fixed
 		// process memory. A singleton consequently keeps the full envelope, while a
 		// repeated N-way batch does not multiply the same physical RSS by N.
-		request.cpu = max(request.cpu, plan.cpu)
+		request.cpu = max(request.cpu, plan.charge)
 		fallback := resourceRequest{memoryBytes: plan.memoryFallback}
 		memberMemory, observedBatchSize := profiledMemoryRequest(
 			job.ResourceProfile,
@@ -377,7 +507,34 @@ func (s *Scheduler) groupResourceRequest(jobs []*ScheduledJob) resourceRequest {
 		}
 	}
 	request.memoryBytes = max(request.memoryBytes, maxPhysicalMemory)
+	// A serve step runs until the run is interrupted, so a CPU it held would
+	// never come back to the finite tasks that wait for it: it reserves none,
+	// and keeps its ceiling.
+	if s.allServeSteps(jobs) {
+		request.cpu = 0
+	}
 	return request
+}
+
+// allServeSteps reports whether every job is a serve step
+// (SchedulerConfig.ServeSteps).
+func (s *Scheduler) allServeSteps(jobs []*ScheduledJob) bool {
+	if len(jobs) == 0 || len(s.cfg.ServeSteps) == 0 {
+		return false
+	}
+	for _, job := range jobs {
+		if !s.cfg.ServeSteps[job.Key()] {
+			return false
+		}
+	}
+	return true
+}
+
+// dispatchRequest is what the coordinator reserves for a dispatch: its named
+// claims. Its CPU and memory are taken when a subprocess starts
+// (acquireExecution), so a cache hit holds none.
+func dispatchRequest(jobs []*ScheduledJob) resourceRequest {
+	return resourceRequest{claims: groupResourceClaims(jobs)}
 }
 
 func (s *Scheduler) releaseGroupResources(completed jobGroupDone) {
@@ -412,7 +569,7 @@ func (s *Scheduler) takeAdmissiblePendingGroup(pending []*ScheduledJob, inFlight
 		return jobGroup{}, pending, false
 	}
 	primary, rest := s.takePendingGroup(pending)
-	if reservation, ok := s.resources.tryAcquire(s.groupResourceRequest(primary.jobs)); ok {
+	if reservation, ok := s.resources.tryAcquire(dispatchRequest(primary.jobs)); ok {
 		primary.reservation = reservation
 		return primary, rest, true
 	}

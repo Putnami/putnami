@@ -399,6 +399,14 @@
         "With the shipped Go and TypeScript extensions, a test, serve or build of a consumer selected alone plans the generation of every client in its dependency closure, a library client with no test file included.",
         "The consumer's jobs that compile the client reach it over functional edges, and its key folds the provider's contract digest: a contract edit moves their keys, so no verdict stored against the previous client is replayed."
       ]
+    },
+    {
+      "id": "the-scheduler-admits-the-cpu-it-grants",
+      "text": [
+        "A task with history reserves its granted CPU ceiling after a cache miss, before its lease and locks, so such ceilings never sum above the CPU capacity; a cache hit and a serve step reserve none.",
+        "A task with no history is granted the whole capacity and reserves one CPU, scaled by its configured weight. A weight scales occupancy before the critical-path lift; a learned weight lifts no ceiling above measured use.",
+        "auto and max run one worker per CPU of capacity, eco half, and a serve step adds one."
+      ]
     }
   ],
   "decisions": [
@@ -433,6 +441,7 @@
     "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md",
     "tooling/cli/doc/adr/0089-a-step-may-read-no-command-option-layer.md",
     "tooling/cli/doc/adr/0097-a-project-names-what-a-command-waits-for.md",
+    "tooling/cli/doc/adr/0100-admission-charges-the-cpu-it-grants.md",
     "tooling/cli/doc/adr/0102-planning-reads-recorded-facts.md"
   ]
 }

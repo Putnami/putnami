@@ -5,6 +5,8 @@ import (
 	"math"
 	"sync"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // grant mirrors what the scheduler does at dispatch: take the deterministic
@@ -23,9 +25,10 @@ func grant(
 
 func TestCPUAllocator_ColdTaskGetsWholeMachine(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-cold-task-is-granted-the-machine-and-charged-one-cpu")
 	a := newCPUAllocator(10, "")
-	if got := grant(a, "p:lint", 1, 0, 0, 0, 0).budget; got != 10 {
-		t.Fatalf("budget = %d, want 10 for a task without history", got)
+	if got := grant(a, "p:lint", 1, 0, 0, 0, 0); got.budget != 10 || got.fromHistory {
+		t.Fatalf("recommendation = %+v, want the whole machine, not from history", got)
 	}
 }
 
@@ -124,7 +127,7 @@ func TestCPUAllocator_StaleHistoryIsSanitizedAndCapped(t *testing.T) {
 		t.Fatalf("budget = %d, want invalid historical concurrency ignored", got)
 	}
 	if got := grant(a, "invalid", math.NaN(), math.Inf(1), math.Inf(1), -1, 0).budget; got != 6 {
-		t.Fatalf("budget = %d, want invalid empty history to use cold fallback 6", got)
+		t.Fatalf("budget = %d, want invalid empty history to use the whole machine 6", got)
 	}
 }
 
@@ -251,14 +254,25 @@ func TestCPUAllocator_CriticalityNeverLowersMeasuredDemand(t *testing.T) {
 	}
 }
 
-func TestCPUAllocator_CriticalPathStillHonoursWeightAndMachineCap(t *testing.T) {
+func TestCPUAllocator_WeightScalesOccupancyNotTheLift(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
 	a := newCPUAllocator(10, cpuBudgetPolicyCriticalPath)
-	if got := a.recommend(4, 1_000, 1_000, 0, 2).budget; got != 8 {
-		t.Fatalf("weighted ceiling = %d, want criticality 2 x weight 4", got)
+	if got := a.recommend(4, 1_000, 1_000, 0, 2).budget; got != 4 {
+		t.Fatalf("weighted ceiling = %d, want occupancy 1 x weight 4 over the lift 2", got)
 	}
-	if got := a.recommend(4, 1_000, 1_000, 0, 6).budget; got != 10 {
+	if got := a.recommend(2, 1_000, 1_000, 0, 6).budget; got != 6 {
+		t.Fatalf("weighted ceiling = %d, want the lift 6, never 6 x weight 2", got)
+	}
+	if got := a.recommend(16, 1_000, 1_000, 0, 6).budget; got != 10 {
 		t.Fatalf("weighted ceiling = %d, want the machine cap 10", got)
+	}
+	big := newCPUAllocator(8, cpuBudgetPolicyCriticalPath)
+	if got := big.recommend(2, 4_000, 1_000, 0, 4).budget; got != 8 {
+		t.Fatalf("weighted ceiling = %d, want occupancy 4 x weight 2", got)
+	}
+	if got := big.recommend(2, 2_000, 1_000, 0, 4).budget; got != 4 {
+		t.Fatalf("weighted ceiling = %d, want occupancy 2 x weight 2 = the lift 4, not 8", got)
 	}
 }
 

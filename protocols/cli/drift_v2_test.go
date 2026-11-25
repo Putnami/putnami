@@ -145,6 +145,8 @@ var v2StructDefs = map[string]any{
 	"orchestrationGitCalls":    OrchestrationGitCalls{},
 	"orchestrationCpu":         OrchestrationCPU{},
 	"runOrchestration":         RunOrchestration{},
+	"runCapacity":              RunCapacity{},
+	"capacitySample":           CapacitySample{},
 	"runSummary":               RunSummary{},
 	"streamRunSummary":         StreamRunSummary{},
 	"cgroupThrottle":           CgroupThrottle{},

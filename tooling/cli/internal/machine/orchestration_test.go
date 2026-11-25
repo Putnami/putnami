@@ -133,3 +133,57 @@ func TestTaskRecord_CarriesTheStepsATaskEntered(t *testing.T) {
 		t.Errorf("a task that entered no step = %+v, want none", none.Orchestration)
 	}
 }
+
+func TestSummary_CarriesTheCapacitySamples(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "a-run-reports-the-cpu-it-grants-and-the-machine-load", "the-capacity-report-samples-the-granted-cpus-and-the-load")
+	session := &jobs.SessionResult{
+		Status: jobs.TaskCounts{Succeeded: 2},
+		Orchestration: &jobs.OrchestrationSnapshot{Capacity: &jobs.CapacityReport{
+			CPUs: 4, Workers: 4, Interval: 5 * time.Second, PeakGrantedCPU: 4,
+			Samples: []jobs.CapacitySample{
+				{At: 0, GrantedCPU: 0, Load: 1.204, LoadKnown: true},
+				{At: 5 * time.Second, GrantedCPU: 3, Load: 5.126, LoadKnown: true},
+				{At: 6200 * time.Millisecond, GrantedCPU: 0},
+			},
+		}},
+	}
+	summary := Run{Session: session}.Summary(6200)
+	got := summary.Orchestration
+	if got == nil || got.Capacity == nil {
+		t.Fatalf("orchestration = %+v, want a capacity report", got)
+	}
+	ms := func(v int64) *int64 { return &v }
+	want := protocolcli.RunCapacity{
+		CPUs: 4, Workers: 4, IntervalMs: 5000, PeakGrantedCPUs: 4, PeakLoadCenti: ms(513),
+		Samples: []protocolcli.CapacitySample{
+			{AtMs: 0, GrantedCPUs: 0, LoadCenti: ms(120)},
+			{AtMs: 5000, GrantedCPUs: 3, LoadCenti: ms(513)},
+			{AtMs: 6200, GrantedCPUs: 0},
+		},
+	}
+	if !reflect.DeepEqual(*got.Capacity, want) {
+		t.Errorf("capacity = %+v, want %+v", *got.Capacity, want)
+	}
+	envelope := struct {
+		ProtocolVersion int                    `json:"protocolVersion"`
+		Command         string                 `json:"command"`
+		Status          string                 `json:"status"`
+		ExitCode        int                    `json:"exitCode"`
+		Run             protocolcli.RunSummary `json:"run"`
+	}{2, "build", "success", 0, summary}
+	data, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if violations := protocolcli.ValidateDocument(protocolcli.DocumentResultEnvelope, data); len(violations) != 0 {
+		t.Fatalf("violations = %v", violations)
+	}
+
+	unknown := &jobs.SessionResult{Orchestration: &jobs.OrchestrationSnapshot{Capacity: &jobs.CapacityReport{
+		CPUs: 2, Workers: 2, Interval: time.Second, Samples: []jobs.CapacitySample{{GrantedCPU: 1}},
+	}}}
+	capacity := Run{Session: unknown}.Summary(0).Orchestration.Capacity
+	if capacity == nil || capacity.PeakLoadCenti != nil || capacity.Samples[0].LoadCenti != nil || capacity.PeakGrantedCPUs != 1 {
+		t.Errorf("a platform without a load average = %+v, want no load and the sampled peak", capacity)
+	}
+}

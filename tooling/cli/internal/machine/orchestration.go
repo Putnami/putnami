@@ -1,6 +1,7 @@
 package machine
 
 import (
+	"math"
 	"slices"
 	"time"
 
@@ -76,7 +77,8 @@ func orchestrationSummary(snapshot *jobs.OrchestrationSnapshot, tasks int) *prot
 		cpu.UnreportedProcesses = nonNegative64(snapshot.UnreportedProcesses)
 		out.CPU = cpu
 	}
-	if len(out.Phases) == 0 && len(out.Processes) == 0 && len(out.Git) == 0 && out.CPU == nil {
+	out.Capacity = capacitySummary(snapshot.Capacity)
+	if len(out.Phases) == 0 && len(out.Processes) == 0 && len(out.Git) == 0 && out.CPU == nil && out.Capacity == nil {
 		return nil
 	}
 	return out
@@ -100,4 +102,33 @@ func taskOrchestration(waits jobs.TaskWaits) *protocolcli.TaskOrchestration {
 		LockWaitMs: ms(waits.LockObserved, waits.LockWait),
 		RestoreMs:  ms(waits.RestoreObserved, waits.Restore),
 	}
+}
+
+// capacitySummary projects the scheduler's capacity samples onto
+// run.orchestration.capacity. A report with no sample has none.
+func capacitySummary(report *jobs.CapacityReport) *protocolcli.RunCapacity {
+	if report == nil || len(report.Samples) == 0 {
+		return nil
+	}
+	out := &protocolcli.RunCapacity{
+		CPUs:            max(report.CPUs, 1),
+		Workers:         max(report.Workers, 1),
+		IntervalMs:      max(millis(report.Interval), 1),
+		PeakGrantedCPUs: max(report.PeakGrantedCPU, 0),
+		Samples:         make([]protocolcli.CapacitySample, 0, len(report.Samples)),
+	}
+	for _, sample := range report.Samples {
+		entry := protocolcli.CapacitySample{AtMs: max(millis(sample.At), 0), GrantedCPUs: max(sample.GrantedCPU, 0)}
+		out.PeakGrantedCPUs = max(out.PeakGrantedCPUs, entry.GrantedCPUs)
+		if sample.LoadKnown && sample.Load >= 0 && !math.IsNaN(sample.Load) && !math.IsInf(sample.Load, 0) {
+			load := int64(math.Round(sample.Load * 100))
+			entry.LoadCenti = &load
+			if out.PeakLoadCenti == nil || load > *out.PeakLoadCenti {
+				peak := load
+				out.PeakLoadCenti = &peak
+			}
+		}
+		out.Samples = append(out.Samples, entry)
+	}
+	return out
 }

@@ -41,9 +41,13 @@ func (p *rendezvousProbeProvider) Probe(wsproto.ProbeRequest) (wsproto.ProbeResu
 
 func TestParallelProbesMergeDeterministically(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-initialization", "parallel-probes", "parallel-probes-merge-deterministically")
+	// The probes run in parallel up to GOMAXPROCS, which the scheduler sets to
+	// this test's CPU grant; the merge is proven with three probes whatever the
+	// grant.
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(3))
 	workers := probeWorkerCount(3)
 	if workers < 2 {
-		t.Skipf("host grants %d workspace probe worker", workers)
+		t.Fatalf("probe workers = %d at GOMAXPROCS 3, want parallel probes", workers)
 	}
 
 	root := t.TempDir()

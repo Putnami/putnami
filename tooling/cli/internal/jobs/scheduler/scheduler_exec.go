@@ -138,8 +138,18 @@ func (s *Scheduler) executeJobGroup(
 
 	completed := make([]jobDone, 0, len(group))
 	opened := make([]taskWork, 0, len(group))
+	// The members that miss the cache take their CPU and memory between the
+	// lookup and the lease claim (groupAdmission), before their locks, their
+	// hooks and their preparation: a lease owner already holds the CPU it runs
+	// on, and a worker waiting for CPU holds nothing another task or session
+	// waits for. The reservation covers the members that execute and those not
+	// yet looked up, and shrinks as members hit the cache, so a hit ends
+	// holding none. A serve step reserves no CPU (groupResourceRequest).
+	admission := newGroupAdmission(s, group)
+	defer admission.release()
 	for _, job := range group {
-		item, terminal := s.openTask(ctx, job, mu, hashes)
+		item, terminal := s.openTask(ctx, job, mu, hashes, admission)
+		admission.settle(job, item != nil && item.sharedResult == nil)
 		if item == nil {
 			completed = append(completed, terminal)
 			continue
@@ -149,6 +159,21 @@ func (s *Scheduler) executeJobGroup(
 	if len(opened) == 0 {
 		return completed
 	}
+
+	// The reservation now covers exactly the members that execute. When none
+	// of them claimed a lease (no cache, or a lease wait that timed out), it is
+	// taken here, still before their locks. A follower of a plan-level shared
+	// node runs no subprocess and reserves nothing.
+	if !admission.execute(ctx) {
+		for i := range opened {
+			result := spawnFailureResult(ctx, ctx.Err())
+			result.CacheKey = opened[i].cacheHash
+			result.TaskWall = time.Since(opened[i].started)
+			completed = append(completed, s.abandonTask(opened[i], result))
+		}
+		return completed
+	}
+	reservesCPU := admission.reservesCPU()
 
 	// Every member that reached execution takes its task-output locks here, in
 	// ONE sorted acquisition for the whole group, after every lock-free wait of
@@ -205,7 +230,15 @@ func (s *Scheduler) executeJobGroup(
 	}
 	s.acquireGroupCPUBudget(work)
 
+	// The capacity report counts the ceiling granted, wherever admission
+	// charged CPU for it.
+	granted := 0
+	if reservesCPU {
+		granted = work[0].job.CPUBudget
+	}
+	s.capacity.grant(granted)
 	runs := s.runWorkItems(ctx, work)
+	s.capacity.release(granted)
 	for i := range work {
 		completed = append(completed, s.closeTask(ctx, work[i], runs[work[i].job.Key()], mu, hashes))
 	}
@@ -223,6 +256,7 @@ func (s *Scheduler) openTask(
 	job *ScheduledJob,
 	mu *sync.Mutex,
 	hashes map[string]string,
+	admission *groupAdmission,
 ) (*taskWork, jobDone) {
 	started := time.Now()
 
@@ -245,7 +279,7 @@ func (s *Scheduler) openTask(
 	}
 
 	cacheEnabled := cachekey.IsCacheEnabled(job, s.bypass)
-	cacheHash, cachedResult, release := s.lookupRestoreOrClaim(ctx, job, cacheEnabled, mu, hashes)
+	cacheHash, cachedResult, release := s.lookupRestoreOrClaim(ctx, job, cacheEnabled, mu, hashes, admission)
 	if cachedResult != nil {
 		cachedResult.CacheKey = cacheHash
 		cachedResult.TaskWall = time.Since(started)
@@ -265,6 +299,12 @@ func (s *Scheduler) openTask(
 	shared := s.enterSharedExecution(job)
 	var sharedResult *JobResult
 	if shared != nil && !shared.leader {
+		// A follower never batches, so the reservation is its own: it gives
+		// it back while its leader runs.
+		admission.release()
+		if s.onSharedFollowerWait != nil {
+			s.onSharedFollowerWait(job)
+		}
 		sharedResult = adoptSharedResult(shared.await(ctx))
 		shared.adopted = sharedResult != nil
 	}
@@ -887,6 +927,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 	cacheEnabled bool,
 	mu *sync.Mutex,
 	hashes map[string]string,
+	admission *groupAdmission,
 ) (string, *JobResult, func()) {
 	noop := func() {}
 	if s.cache == nil {
@@ -941,7 +982,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 		}
 		return hash, nil, noop
 	}
-	return s.lookupDeclaredEntry(ctx, job, hashCopy, mu, hashes)
+	return s.lookupDeclaredEntry(ctx, job, hashCopy, mu, hashes, admission)
 }
 
 // cacheCoalescer is the three store operations the claim-or-wait loop needs,
@@ -965,16 +1006,24 @@ func (s *Scheduler) coalesceMiss(
 	job *ScheduledJob,
 	hash string,
 	coalescer cacheCoalescer,
+	admission *groupAdmission,
 ) (*JobResult, func()) {
 	noop := func() {}
 	estimatedCost := time.Duration(job.ExpectedWallMs) * time.Millisecond
 	waitDeadline := time.Now().Add(s.cacheLeaseWaitTimeout(job))
 
 	for ctx.Err() == nil {
+		// The CPU comes before the lease: an owner never waits for CPU while
+		// another task or session waits for its lease (groupAdmission).
+		if !admission.acquire(ctx) {
+			return nil, noop
+		}
 		winner, release := coalescer.claim(hash, estimatedCost)
 		if winner {
+			admission.pin()
 			return nil, release
 		}
+		admission.yield()
 
 		remaining := time.Until(waitDeadline)
 		if remaining <= 0 {

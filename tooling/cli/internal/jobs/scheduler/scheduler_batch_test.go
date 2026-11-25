@@ -289,8 +289,8 @@ func TestBatchClassCPUBudgetStableAcrossSingletonAndRuntimeCohorts(t *testing.T)
 			t.Fatalf("fixed class budget for %s = %d, want 6", job.Key(), got)
 		}
 	}
-	if got := scheduler.resourcePlanByJob[planned[0].Key()].cpu; got != 4 {
-		t.Fatalf("class-shaped CPU reservation = %d, want observed occupancy 4 at ceiling 6", got)
+	if got := scheduler.groupResourceRequest(planned[:1]).cpu; got != 6 {
+		t.Fatalf("class-shaped CPU reservation = %d, want the granted class ceiling 6", got)
 	}
 
 	// A dispatch that happens to contain only the lightest member still uses the

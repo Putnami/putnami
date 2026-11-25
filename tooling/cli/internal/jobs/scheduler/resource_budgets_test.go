@@ -167,7 +167,7 @@ func TestGroupResourceRequestCarriesClaims(t *testing.T) {
 	job := claimingJob("/app", "test", "db-connections", 230)
 	scheduler := &Scheduler{
 		resources:         newResourcePool(8, 0, map[string]int{"db-connections": 400}),
-		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 2, cpu: 2}},
+		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 2, charge: 2}},
 	}
 	if got := scheduler.groupResourceRequest([]*ScheduledJob{job}).claims["db-connections"]; got != 230 {
 		t.Fatalf("group request claim = %d, want 230", got)
@@ -182,7 +182,7 @@ func TestCoordinatorAdmissionWaitsForResourceBudget(t *testing.T) {
 	job := claimingJob("/app", "test", "db-connections", 230)
 	scheduler := &Scheduler{
 		resources:         newResourcePool(8, 0, map[string]int{"db-connections": 400}),
-		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 1, cpu: 1}},
+		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 1, charge: 1}},
 	}
 	held, ok := scheduler.resources.tryAcquire(resourceRequest{cpu: 1, claims: map[string]int{"db-connections": 230}})
 	if !ok {

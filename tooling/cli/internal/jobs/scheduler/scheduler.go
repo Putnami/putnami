@@ -180,6 +180,14 @@ type Scheduler struct {
 	// per-key lease and immediately before it waits for the owner. Tests install
 	// it before Run; production leaves it nil.
 	onCacheLeaseWait func(*ScheduledJob)
+	// onResourcePool observes the run's CPU and memory pool once Run created
+	// it, before the first dispatch. Tests install it before Run; production
+	// leaves it nil.
+	onResourcePool func(*resourcePool)
+	// onSharedFollowerWait observes a follower of a plan-level shared node
+	// immediately before it waits for its leader. Tests install it before
+	// Run; production leaves it nil.
+	onSharedFollowerWait func(*ScheduledJob)
 	// outputLocks excludes other sessions of this workspace from the outputs a
 	// task writes, and from the resources it reads while it reads them
 	// (task_output_lock.go). Nil takes no lock.
@@ -315,11 +323,14 @@ type Scheduler struct {
 	// so the verb runs as one tool command (scheduler_batch_verb.go). Nil when
 	// the plan holds no delegated batchable task.
 	verbWaves *verbWaves
-	// resourcePlanByJob fixes each task's subprocess ceiling and admission
-	// request before workers exist. resources is coordinator-owned and accounts
+	// resourcePlanByJob fixes each task's subprocess ceiling, which admission
+	// charges, before workers exist. resources is coordinator-owned and accounts
 	// only physical jobGroup dispatches, never logical batch members.
 	resourcePlanByJob map[string]scheduledResourcePlan
 	resources         *resourcePool
+	// capacity samples the CPU granted to running subprocesses and the machine
+	// load over the run. Nil outside Run.
+	capacity *capacitySampler
 
 	// taskStats is the machine-local execution history (CPU and wall time per
 	// project+job). Loaded per Run, updated by real executions, saved after
@@ -597,10 +608,19 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 		machineCPU = min(machineCPU, quota)
 	}
 	s.cpuAlloc = newCPUAllocator(machineCPU, cpuBudgetPolicy(s.cfg.CPUBudgetPolicy))
-	s.criticalityCeilingByJob = planCriticalityCeilings(s.planned, machineCPU, decision.Workers)
+	// Serve steps hold workers of their own and reserve no CPU, so the
+	// capacity is shared among the other workers.
+	finiteWorkers := decision.Workers
+	if finiteWorkers > 0 {
+		finiteWorkers = max(finiteWorkers-serveStepCount(s.cfg, s.planned), 1)
+	}
+	s.criticalityCeilingByJob = planCriticalityCeilings(s.planned, machineCPU, finiteWorkers)
 	memoryCapacity := uint64(max(decision.MemoryTotalMiB, 0)) * 1024 * 1024
 	usableMemory := usableMemoryBytes(memoryCapacity)
 	s.resources = newResourcePool(machineCPU, usableMemory, s.cfg.ResourceBudgets)
+	if s.onResourcePool != nil {
+		s.onResourcePool(s.resources)
+	}
 	s.prepareRun()
 
 	// Fix one ceiling for each planned compatibility class before dispatch
@@ -621,21 +641,11 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 			job.HistoricalCPUCeiling,
 			s.criticalityCeilingByJob[job.Key()],
 		)
-		fallback := bootstrapResourceRequest(job, machineCPU, usableMemory)
-		admissionCPU := fallback.cpu
-		if recommendation.fromHistory {
-			admissionCPU = profiledCPURequest(
-				job.ResourceProfile,
-				recommendation.budget,
-				job.ExpectedCPUWorkMs,
-				float64(job.ExpectedWallMs),
-			)
-		}
 		s.resourcePlanByJob[job.Key()] = scheduledResourcePlan{
 			recommendation: recommendation,
 			ceiling:        recommendation.budget,
-			cpu:            admissionCPU,
-			memoryFallback: fallback.memoryBytes,
+			charge:         planCharge(job, recommendation, recommendation.budget, machineCPU),
+			memoryFallback: bootstrapMemoryBytes(job, usableMemory),
 		}
 
 		key, _ := s.readyBatch(job)
@@ -651,14 +661,7 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 			s.batchCPUBudgetByJob[jobKey] = classBudget[key]
 			plan := s.resourcePlanByJob[jobKey]
 			plan.ceiling = classBudget[key]
-			if plan.recommendation.fromHistory {
-				plan.cpu = profiledCPURequest(
-					job.ResourceProfile,
-					plan.ceiling,
-					job.ExpectedCPUWorkMs,
-					float64(job.ExpectedWallMs),
-				)
-			}
+			plan.charge = planCharge(job, plan.recommendation, plan.ceiling, machineCPU)
 			s.resourcePlanByJob[jobKey] = plan
 		}
 	}
@@ -710,6 +713,8 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	start := time.Now()
 	decision := s.beginRun()
 	maxWorkers := decision.Workers
+	s.capacity = newCapacitySampler(decision.CPUCapacity, decision.Workers)
+	s.capacity.start()
 
 	// Still the CALLER's context here, on purpose — see prepareRemote.
 	s.prepareRemote(ctx)
@@ -783,7 +788,6 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 			}
 			select {
 			case readyCh <- group:
-				s.resources.record(group)
 				s.verbWaves.track(group.jobs, 1)
 				pending = rest
 				inFlight++
@@ -829,7 +833,6 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 			}
 			select {
 			case readyCh <- group:
-				s.resources.record(group)
 				s.verbWaves.track(group.jobs, 1)
 				pending = rest
 				inFlight++
@@ -916,11 +919,8 @@ func (s *Scheduler) beginRun() ParallelDecision {
 
 	memoryCapacity, _, _ := s.environmentBegin.EffectiveMemoryBytes()
 	decision := resolveParallelDecisionWithHardware(
-		s.cfg, s.planned, runtime.NumCPU(), memoryCapacity,
+		s.cfg, s.planned, runtime.NumCPU(), s.environmentBegin.CPUBandwidthCores(), memoryCapacity,
 	)
-	if quota := s.environmentBegin.CPUBandwidthCores(); quota > 0 {
-		decision.CPUCapacity = min(decision.CPUCapacity, quota)
-	}
 	s.workerCount = decision.Workers
 	s.metrics = newSchedulerMetrics()
 
@@ -1146,6 +1146,9 @@ func (s *Scheduler) finalizeRun(
 	}
 	outcome.Cache = cacheStats
 	outcome.Orchestration = s.cfg.Orchestration.Snapshot()
+	if capacity := s.capacity.finish(); outcome.Orchestration != nil {
+		outcome.Orchestration.Capacity = capacity
+	}
 	s.renderer.Finish(results, outcome)
 
 	// Persist the run's execution history so the next run's learned weights
@@ -1209,7 +1212,6 @@ func (s *Scheduler) waitForWorker(
 	}
 	select {
 	case readyCh <- group:
-		s.resources.record(group)
 		s.verbWaves.track(group.jobs, 1)
 		return coordinatorWaitResult{pending: rest, sent: true}
 	case completed := <-doneCh:

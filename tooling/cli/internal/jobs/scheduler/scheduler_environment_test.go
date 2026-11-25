@@ -42,7 +42,7 @@ func TestPrepareScheduling_ClampsAllocatorToCapturedCgroupQuota(t *testing.T) {
 	if !ok {
 		t.Fatal("opening memory capacity did not resolve")
 	}
-	decision := resolveParallelDecisionWithHardware(SchedulerConfig{}, nil, 12, memoryCapacity)
+	decision := resolveParallelDecisionWithHardware(SchedulerConfig{}, nil, 12, 0, memoryCapacity)
 	scheduler.prepareScheduling(decision)
 
 	if got := scheduler.cpuAlloc.totalCPU; got != 2 {

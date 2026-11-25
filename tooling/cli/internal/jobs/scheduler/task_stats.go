@@ -429,8 +429,31 @@ func applyTaskTuning(planned []*ScheduledJob, stats *taskStatsStore) {
 		if boost <= 1 {
 			continue
 		}
-		job.LearnedCPUWeight = min(boost, learnedWeightCap)
+		job.LearnedCPUWeight = min(boost, learnedWeightCap, measuredLiftCap(stat))
 	}
+}
+
+// measuredLiftCap bounds a learned weight by the task's own measured use:
+// admission charges the ceiling it grants, so the weight may lift the
+// history-derived ceiling up to the highest occupancy the task's history
+// recorded (its moving average or any of its observations), rounded up, and
+// no further. A value of 1 or below leaves the ceiling where history put it.
+func measuredLiftCap(stat *taskStat) float64 {
+	occupancy := func(cpuMs, wallMs float64) float64 {
+		if wallMs <= 0 || !validResourceFloat(cpuMs) || !validResourceFloat(wallMs) {
+			return 0
+		}
+		return cpuMs / wallMs
+	}
+	ceiling := float64(max(stat.MaxUnweightedConcurrency, 1))
+	ceiling = max(ceiling, math.Ceil(max(1, occupancy(stat.CPUMs, stat.WallMs))))
+	measured := math.Ceil(occupancy(stat.CPUMs, stat.WallMs))
+	for _, observation := range stat.Observations {
+		if observation != nil {
+			measured = max(measured, math.Ceil(occupancy(observation.CPUMs, observation.WallMs)))
+		}
+	}
+	return max(measured/ceiling, 1)
 }
 
 func resourceProfileFromStat(stat *taskStat) taskResourceProfile {

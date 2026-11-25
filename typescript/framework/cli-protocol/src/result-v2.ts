@@ -591,6 +591,32 @@ export interface RunOrchestration {
   processes?: OrchestrationProcesses[];
   git?: OrchestrationGitCalls[];
   cpu?: OrchestrationCPU;
+  capacity?: RunCapacity;
+}
+
+/** One reading of a run's CPU pressure. */
+export interface CapacitySample {
+  /** Time since the run started. */
+  atMs: number;
+  /** Sum of the CPU ceilings of the subprocesses running, serve steps aside: a serve step reserves no CPU. */
+  grantedCpus: number;
+  /** The machine's one-minute load average times 100, rounded; absent where the platform reports none. */
+  loadCenti?: number;
+}
+
+/**
+ * The CPU ceilings a run granted against its CPU capacity, and the machine's
+ * one-minute load, sampled over the run. `peakGrantedCpus` is at least every
+ * sample's `grantedCpus`; `peakLoadCenti`, present exactly when a sample
+ * carries `loadCenti`, is their largest.
+ */
+export interface RunCapacity {
+  cpus: number;
+  workers: number;
+  intervalMs: number;
+  peakGrantedCpus: number;
+  peakLoadCenti?: number;
+  samples: CapacitySample[];
 }
 
 /**
@@ -1924,11 +1950,65 @@ const orchestrationCPU: Check = (v, path, value) => {
   }
 };
 
+const capacitySampleFields: Field[] = [
+  req('atMs', intAtLeast(0)),
+  req('grantedCpus', intAtLeast(0)),
+  opt('loadCenti', intAtLeast(0)),
+];
+
+const capacitySample: Check = (v, path, value) => {
+  object(v, path, value, capacitySampleFields);
+};
+
+const runCapacityFields: Field[] = [
+  req('cpus', intAtLeast(1)),
+  req('workers', intAtLeast(1)),
+  req('intervalMs', intAtLeast(1)),
+  req('peakGrantedCpus', intAtLeast(0)),
+  opt('peakLoadCenti', intAtLeast(0)),
+  req('samples', nonEmptyArrayOf(capacitySample)),
+];
+
+/**
+ * Validates the capacity report and its two ties to its samples:
+ * `peakGrantedCpus` is at least every sample's `grantedCpus`, and
+ * `peakLoadCenti`, present exactly when a sample carries `loadCenti`, is their
+ * largest.
+ */
+const runCapacity: Check = (v, path, value) => {
+  const obj = object(v, path, value, runCapacityFields);
+  if (obj === undefined) {
+    return;
+  }
+  const samples = Array.isArray(obj['samples']) ? obj['samples'] : [];
+  const peakGranted = childInt(obj, 'peakGrantedCpus');
+  const peakLoad = childInt(obj, 'peakLoadCenti');
+  let maxLoad: number | undefined;
+  samples.forEach((item, index) => {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+      return;
+    }
+    const sample = item as JsonObject;
+    const granted = childInt(sample, 'grantedCpus');
+    if (granted !== undefined && peakGranted !== undefined && granted > peakGranted) {
+      v.add(VIOLATION_CODE.countMismatch, join(path, `samples[${index}].grantedCpus`));
+    }
+    const load = childInt(sample, 'loadCenti');
+    if (load !== undefined) {
+      maxLoad = maxLoad === undefined ? load : Math.max(maxLoad, load);
+    }
+  });
+  if ((maxLoad !== undefined) !== (peakLoad !== undefined) || (peakLoad !== undefined && peakLoad !== maxLoad)) {
+    v.add(VIOLATION_CODE.countMismatch, join(path, 'peakLoadCenti'));
+  }
+};
+
 const runOrchestrationFields: Field[] = [
   opt('phases', arrayOf(orchestrationPhase)),
   opt('processes', arrayOf(orchestrationProcesses)),
   opt('git', arrayOf(orchestrationGitCalls)),
   opt('cpu', orchestrationCPU),
+  opt('capacity', runCapacity),
 ];
 
 /**
@@ -3167,6 +3247,8 @@ export const V2_FIELD_NAMES: Record<string, { members: string[]; required: strin
       ['orchestrationGitCalls', orchestrationGitCallsFields],
       ['orchestrationCpu', orchestrationCPUFields],
       ['runOrchestration', runOrchestrationFields],
+      ['runCapacity', runCapacityFields],
+      ['capacitySample', capacitySampleFields],
       ['runSummary', runSummaryFields],
       ['streamRunSummary', streamRunSummaryFields],
       ['cgroupThrottle', cgroupThrottleFields],

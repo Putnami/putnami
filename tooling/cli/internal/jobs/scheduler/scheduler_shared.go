@@ -146,8 +146,8 @@ func (l *sharedExecutionLease) expectedCapture() (*cache.Manifest, bool) {
 // Waiting here cannot deadlock the pool. A follower exists only because a
 // leader already took the slot, and a leader takes the slot on the worker that
 // is running it, so at most workers-1 goroutines can ever be parked on a leader
-// that is itself making progress. A follower holds no CPU grant while it waits:
-// enterSharedExecution is consulted before the group's budget is acquired.
+// that is itself making progress. A follower holds no CPU while it waits: it
+// gives back the reservation it took before its lease claim (groupAdmission).
 func (l *sharedExecutionLease) await(ctx context.Context) *JobResult {
 	if l == nil || l.leader {
 		return nil

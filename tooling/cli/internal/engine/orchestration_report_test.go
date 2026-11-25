@@ -73,3 +73,21 @@ func TestReportOrchestration_SilentWithoutProfileQuietOrReport(t *testing.T) {
 		t.Errorf("a run without a report printed %q", buf.String())
 	}
 }
+
+func TestReportOrchestration_ProfilePrintsTheCapacityPeaks(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "a-run-reports-the-cpu-it-grants-and-the-machine-load", "the-trace-profile-summary-prints-the-capacity-peaks")
+	result := sampleOrchestration()
+	result.Session.Orchestration.Capacity = &jobs.CapacityReport{
+		CPUs: 4, Workers: 4, Interval: 5 * time.Second, PeakGrantedCPU: 4,
+		Samples: []jobs.CapacitySample{
+			{At: 0, Load: 1.2, LoadKnown: true},
+			{At: 5 * time.Second, GrantedCPU: 4, Load: 5.32, LoadKnown: true},
+		},
+	}
+	var buf bytes.Buffer
+	reportOrchestration(&buf, &GlobalFlags{TraceProfile: "trace.json"}, result)
+	want := "Capacity: 4 cpus · 4 workers · granted peak 4 cpus · load1 peak 5.32 (1.33x cpus) · 2 samples every 5s"
+	if !strings.Contains(buf.String(), want) {
+		t.Errorf("report lacks %q:\n%s", want, buf.String())
+	}
+}

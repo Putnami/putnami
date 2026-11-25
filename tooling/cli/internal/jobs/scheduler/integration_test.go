@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
@@ -323,6 +324,7 @@ func testSummaryFromResultEvent(t *testing.T, event RawJobEvent) map[string]any 
 }
 
 func TestPlanSchedule_DynamicCPUBudgets(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
 	ws, ext := makeIntegrationWorkspace(t)
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
 
@@ -365,5 +367,13 @@ func TestPlanSchedule_DynamicCPUBudgets(t *testing.T) {
 	}
 	if got := len(result2.Tuning.CPUBudgets); got != 0 {
 		t.Fatalf("cache hits consumed %d CPU budgets, want 0", got)
+	}
+	// Admission charged CPU for every execution of run 1 and for no cache hit
+	// of run 2: a hit reserves nothing from the pool.
+	if got := len(result.Tuning.ResourceReservations); got != 4 {
+		t.Fatalf("run 1 reserved CPU for %d executions, want 4", got)
+	}
+	if got := result2.Tuning.ResourceReservations; len(got) != 0 {
+		t.Fatalf("cache hits reserved CPU: %+v", got)
 	}
 }

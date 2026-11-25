@@ -75,6 +75,9 @@ type OrchestrationSnapshot struct {
 	ExtensionCPU time.Duration
 	// UnreportedProcesses counts the job processes that reported no CPU.
 	UnreportedProcesses int64
+	// Capacity is the CPU the run granted and the machine load over the run;
+	// nil when the scheduler sampled none.
+	Capacity *CapacityReport
 }
 
 // Of returns the entry of kind in l.
@@ -96,4 +99,33 @@ func (s *OrchestrationSnapshot) OrchestrationCPU() (engine, extension, control, 
 		s.Engine.Of("control").CPU,
 		s.Jobs.Of("cli").CPU,
 		s.Engine.Of("git").CPU + s.Jobs.Of("git").CPU
+}
+
+// CapacitySample is one reading of a run's CPU pressure.
+type CapacitySample struct {
+	// At is the time since the run started.
+	At time.Duration
+	// GrantedCPU is the sum of the CPU ceilings of the subprocesses running,
+	// serve steps aside: a serve step reserves no CPU.
+	GrantedCPU int
+	// Load is the machine's one-minute load average, meaningful only when
+	// LoadKnown.
+	Load      float64
+	LoadKnown bool
+}
+
+// CapacityReport is the CPU a run granted against its capacity and the
+// machine load, sampled over the run.
+type CapacityReport struct {
+	// CPUs is the CPU capacity admission charges grants against; Workers the
+	// worker count.
+	CPUs, Workers int
+	// Interval is the spacing of Samples.
+	Interval time.Duration
+	// Samples are in time order, the first at the run's start and the last at
+	// its end.
+	Samples []CapacitySample
+	// PeakGrantedCPU is the largest sum of running ceilings the run reached,
+	// sampled or not.
+	PeakGrantedCPU int
 }

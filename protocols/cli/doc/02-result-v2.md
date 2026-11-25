@@ -669,6 +669,7 @@ measure is absent rather than zero.
 | `processes[]` | `{origin, kind, count, cpuMs?}`: processes started by the `engine` or by `jobs` built on the extension SDK, by kind (`job`, `batch`, `control`, `cli`, `git`, `other`), one entry per pair |
 | `git[]` | `{origin, subcommand, count}`: git calls by subcommand, one entry per pair |
 | `cpu` | the orchestration CPU, below |
+| `capacity` | the CPU ceilings the scheduler granted and the machine load over the run, below |
 
 `cpu.totalMs` is the sum of `engineMs` (the CLI process itself), `extensionMs`
 (what job processes reported for themselves, without their children),
@@ -685,6 +686,19 @@ under a millisecond.
 their own: a runtime not built on the extension SDK or on a version of it that
 reports, an interactive job, or an SDK job that exited before writing its
 result. Their CPU is in no member.
+
+`capacity` states the CPU capacity admission charges ceilings against
+(`cpus`: the logical CPUs clamped to a cgroup bandwidth quota), the `workers`
+count, and `samples[]` taken every `intervalMs` from the run's start to its
+end: `{atMs, grantedCpus, loadCenti?}`, where `grantedCpus` is the sum of the
+CPU ceilings of the subprocesses running, serve steps aside since they reserve
+no CPU, and `loadCenti` the machine's
+one-minute load average times 100, rounded, absent where the platform reports
+none. A run keeps at most 512 samples: when it fills them, it keeps every other
+one and doubles `intervalMs`. `peakGrantedCpus` is the largest sum of running
+ceilings the run reached, sampled or not, so at least every sample's
+`grantedCpus`; `peakLoadCenti` is the largest `loadCenti`, present exactly when
+a sample carries one; `cli.result.count_mismatch` otherwise.
 
 A task record carries `orchestration` with `keyMs`, `lockWaitMs` and
 `restoreMs`: the wall the scheduler spent computing its key, waiting for a cache

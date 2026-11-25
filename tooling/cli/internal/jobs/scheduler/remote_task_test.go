@@ -492,7 +492,7 @@ func matrixFixture(t *testing.T, server *fakeCacheServer) (*captureFixture, *rem
 func (f *captureFixture) declaredLookup(ctx context.Context, job *ScheduledJob) (string, *JobResult) {
 	var mu sync.Mutex
 	hashes := map[string]string{}
-	hash, result, release := f.sched.lookupDeclaredEntry(ctx, job, nil, &mu, hashes)
+	hash, result, release := f.sched.lookupDeclaredEntry(ctx, job, nil, &mu, hashes, nil)
 	release()
 	return hash, result
 }
@@ -1125,7 +1125,7 @@ func TestDeclaredCoalescerServesTheWinnersEntry(t *testing.T) {
 		gate: waiterGate,
 	}
 	go func() {
-		gotResult, release := f.sched.coalesceMiss(context.Background(), job, hash, coalescer)
+		gotResult, release := f.sched.coalesceMiss(context.Background(), job, hash, coalescer, nil)
 		release()
 		done <- outcome{result: gotResult}
 	}()

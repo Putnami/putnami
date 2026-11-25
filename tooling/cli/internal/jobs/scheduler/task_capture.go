@@ -781,6 +781,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 	hashCopy map[string]string,
 	mu *sync.Mutex,
 	hashes map[string]string,
+	admission *groupAdmission,
 ) (string, *JobResult, func()) {
 	noop := func() {}
 
@@ -877,7 +878,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 		return hash, replayed, noop
 	}
 
-	result, release := s.coalesceMiss(ctx, job, entryKey, declaredCoalescer{scheduler: s, job: job, key: hash, mu: mu, hashes: hashes})
+	result, release := s.coalesceMiss(ctx, job, entryKey, declaredCoalescer{scheduler: s, job: job, key: hash, mu: mu, hashes: hashes}, admission)
 	return hash, result, release
 }
 
