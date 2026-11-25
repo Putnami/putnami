@@ -307,6 +307,17 @@ defaults are) is the language extension's, the graph is core's.
   `releaseBaselineFiles`. Absent for a task that declares no fact. A tree
   with no fact, a null listing, an unknown state, and a baseline member its
   state does not allow are refused (`job.invalid_value`, `job.missing_field`).
+  [ADR 0003](doc/adr/0003-a-job-reads-the-candidate-cut-and-the-change-history-from-its-context.md)
+  adds three facts: `candidateDirectories` and `candidateFiles`, the
+  candidate cut of a `git:` input at or below those directories, each entry a
+  `{path, mode}` whose mode is the index mode (`100644`, `100755`, `120000`,
+  `160000`), `untracked` or `unmerged`; `workspaceCandidates`, the absolute
+  `file` of the run that holds the workspace's cut in the same shape and the
+  SHA-256 `digest` of its bytes (`ReadCandidateListing` refuses a file that
+  does not match); and `changeHistory`, for an uncached task only: the
+  impacted `baseline`, and either `shallow` alone or the `mergeBase`, the
+  `commits` of `baseline..HEAD` newest first, and the `workspaceConfig` the
+  merge base holds.
 
 A v1 document may not carry v2 members (`job.unexpected_field`): a v1
 consumer would ignore exactly the members a v2 consumer would trust.

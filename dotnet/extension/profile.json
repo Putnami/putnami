@@ -1,5 +1,6 @@
 {
   "id": "dotnet",
+  "cpuEnv": ["DOTNET_PROCESSOR_COUNT"],
   "markers": ["*.csproj", "*.fsproj", "*.vbproj"],
   "toolchain": {
     "command": ["dotnet", "--version"],

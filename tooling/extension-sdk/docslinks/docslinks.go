@@ -44,6 +44,7 @@ import (
 	"strings"
 	"unicode"
 
+	job "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/sdk/extension/gitcandidate"
@@ -103,8 +104,15 @@ type Reader struct {
 // error, never an empty workspace. markers name the files that, besides
 // putnami.json and go.mod, make a nested directory a project of its own.
 func NewReader(root string, markers ...string) (*Reader, error) {
+	return NewReaderFrom(nil, root, markers...)
+}
+
+// NewReaderFrom is NewReader for the job whose context is ctx: the cut comes
+// from the context when its task declared it (gitcandidate.OpenFrom), and
+// from Git otherwise.
+func NewReaderFrom(ctx *job.Context, root string, markers ...string) (*Reader, error) {
 	root = filepath.Clean(root)
-	tree, err := gitcandidate.Open(root)
+	tree, err := gitcandidate.OpenFrom(ctx, root)
 	if err != nil {
 		return nil, fmt.Errorf("list the candidate files of %s: %w", root, err)
 	}
@@ -482,7 +490,13 @@ func (r *Reader) Check(files []string) ([]Finding, error) {
 // CheckProject checks the documents ProjectDocuments returns for root, a
 // project inside workspaceRoot. markers are those of NewReader.
 func CheckProject(workspaceRoot, root string, markers ...string) ([]Finding, error) {
-	r, err := NewReader(workspaceRoot, markers...)
+	return CheckProjectFrom(nil, workspaceRoot, root, markers...)
+}
+
+// CheckProjectFrom is CheckProject for the job whose context is ctx: the cut
+// comes from the context when its task declared it, and from Git otherwise.
+func CheckProjectFrom(ctx *job.Context, workspaceRoot, root string, markers ...string) ([]Finding, error) {
+	r, err := NewReaderFrom(ctx, workspaceRoot, markers...)
 	if err != nil {
 		return nil, err
 	}

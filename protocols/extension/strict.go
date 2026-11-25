@@ -375,6 +375,8 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 		diags = append(diags, validateResourceClaims(field+".resources", task.Resources)...)
 	}
 
+	diags = append(diags, ValidateTreeFactInputs(m)...)
+
 	// v3 task contract, through the same harness a conformance fixture and the
 	// extension SDK's authoring gate run: exact paths, one owner per output,
 	// honest effects. Returns nothing for a manifest whose tasks carry no

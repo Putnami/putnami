@@ -163,6 +163,9 @@ type Tree struct {
 	unkeyable []string
 	// links caches the target text of each symbolic link read.
 	links map[string]string
+	// index holds the index modes of the cut when the job context gave them
+	// (OpenFrom); nil, Fingerprint reads the index.
+	index *indexModes
 }
 
 // Open returns the candidate cut of root. It returns nil and no error when
@@ -358,9 +361,15 @@ func (t *Tree) Fingerprint() (string, error) {
 	if len(t.unkeyable) > 0 {
 		return "", fmt.Errorf("git candidate %q is not a regular file or a symbolic link, so no `git:` key holds it", t.unkeyable[0])
 	}
-	index, err := readIndexModes(t.root)
-	if err != nil {
-		return "", err
+	var index indexModes
+	if t.index != nil {
+		index = *t.index
+	} else {
+		read, err := readIndexModes(t.root)
+		if err != nil {
+			return "", err
+		}
+		index = read
 	}
 	if len(index.Unmerged) > 0 {
 		unmerged := make([]string, 0, len(index.Unmerged))

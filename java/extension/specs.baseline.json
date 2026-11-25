@@ -20,6 +20,7 @@
     "java/stack-extension#serve-runs-the-application",
     "java/stack-extension#tasks-run-the-profile",
     "java/stack-extension#toolchain-is-provided",
+    "java/stack-extension#tools-take-the-cpu-budget",
     "java/stack-extension#variants-follow-the-build",
     "java/stack-extension#workspace-install-offline-installs-nothing",
     "java/stack-extension#workspace-install-prepares-each-build"

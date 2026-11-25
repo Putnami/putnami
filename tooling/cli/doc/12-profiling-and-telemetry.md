@@ -185,7 +185,11 @@ bench.
 Each test runs the real CLI in a fixture workspace and reads the counts from its
 `run.orchestration` report (`clitest.RunCounts`). The engine's fixture
 (`clitest.CountsFixture`) runs trivial `/bin/sh` tasks, so what it starts is the
-engine's alone. Each extension's fixture loads the extension from this tree with
+engine's alone. Its writing variant (`clitest.WritingCountsFixture`) keys each
+task on its project's Git candidates and writes a report under the ignored
+`.putnami`, so its git calls show that such a write lists no candidate again
+([ADR 0106](adr/0106-a-write-under-an-excluded-putnami-keeps-the-candidate-digests.md)).
+Each extension's fixture loads the extension from this tree with
 one small project it serves, and runs on one worker from no task history
 (`clitest.ForgetTaskHistory`), so its tasks run in the same order every time:
 with a history, ready tasks dispatch longest first by the durations earlier
@@ -257,9 +261,11 @@ ledger names every process kind the engine started, its git calls by
 subcommand, then the CLI starts and git calls of the jobs. The tools jobs run
 (`go`, `bun`, `cargo`) are the jobs' work and are left out.
 
-A pull request that changes a count changes its number in the same pull request,
-and the number only goes down. When a test fails, it prints the ledger it got:
-a lower count replaces the recorded one; a higher count is a regression to fix.
+A pull request that changes a count changes its number in the same pull request.
+A case's total only goes down, and so does every count, except an engine count
+that takes over a read the jobs made: it may rise, once per run, by no more than
+the jobs' count falls. When a test fails, it prints the ledger it got: a lower
+count replaces the recorded one; a higher count is a regression to fix.
 The growth of the engine's CPU per task does not depend on the host: an engine
 whose work per task is the same on any plan reads below 1.4 on a 4-core Linux
 container, most often below 1.0, and work repeated for each pending task reads

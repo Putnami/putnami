@@ -1337,3 +1337,46 @@ func TestThePortConfigKeysTheImageThroughTheCompileStep(t *testing.T) {
 		}
 	}
 }
+
+// TestTasksDeclareTheTreeFactsTheyRead pins the tree facts each task reads
+// from its job context (go.putnami.dev/protocol/job ADR 0002): a fact a task
+// reads and does not declare would answer from git, and one it declares and
+// does not read moves its key for nothing. The lint tasks declare none: the
+// skip guard reads the files their key holds (doc/adr/0014). validate-api keeps the release
+// baseline of tooling/cli ADR 0062: releaseBaselineFiles adds nothing to a
+// key, and candidateFiles adds the working tree's candidate cut.
+func TestTasksDeclareTheTreeFactsTheyRead(t *testing.T) {
+	facts := map[string]bool{
+		proto.RuntimeInputTrackedFiles: true, proto.RuntimeInputIgnoredDirectories: true,
+		proto.RuntimeInputRepository: true, proto.RuntimeInputReleaseBaseline: true,
+		proto.RuntimeInputReleaseBaselineFiles: true, proto.RuntimeInputCandidateFiles: true,
+		proto.RuntimeInputWorkspaceCandidateFiles: true,
+	}
+	want := map[string][]string{
+		"build-tsc":    {proto.RuntimeInputTrackedFiles},
+		"lint-docs":    {proto.RuntimeInputWorkspaceCandidateFiles},
+		"validate-api": {proto.RuntimeInputCandidateFiles, proto.RuntimeInputReleaseBaseline, proto.RuntimeInputReleaseBaselineFiles},
+	}
+	m := loadExtensionManifest(t)
+	// validate-api keeps every other input of its key.
+	var inputs []string
+	for input := range m.Tasks["validate-api"].Inputs {
+		inputs = append(inputs, input)
+	}
+	slices.Sort(inputs)
+	if want := []string{"candidateFiles", "parser", "releaseBaseline", "releaseBaselineFiles", "sources", "support-catalog"}; !slices.Equal(inputs, want) {
+		t.Errorf("validate-api declares the inputs %v, want %v", inputs, want)
+	}
+	for name, task := range m.Tasks {
+		var got []string
+		for input, port := range task.Inputs {
+			if port.From == proto.TaskInputFromRuntime && facts[input] {
+				got = append(got, input)
+			}
+		}
+		slices.Sort(got)
+		if !slices.Equal(got, want[name]) {
+			t.Errorf("%s declares the tree facts %v, want %v", name, got, want[name])
+		}
+	}
+}

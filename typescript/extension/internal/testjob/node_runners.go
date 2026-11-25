@@ -9,8 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/hostenv"
 )
@@ -59,6 +61,10 @@ func runNodeSuite(command Command, projectPath, outputPath string, params TestPa
 		args = vitestArgs(filepath.Join(outputPath, JUnitFile), coverageDir, coverage, params)
 	} else {
 		args = jestArgs(jestResult, coverageDir, coverage, params)
+	}
+
+	if workers := nodeWorkers(projectPath); workers != "" {
+		args = append(args, "--maxWorkers="+workers)
 	}
 
 	result, err := execRunFunc(command.Program, append([]string{command.Script}, args...),
@@ -321,4 +327,37 @@ func firstLine(text string) string {
 
 func stripANSI(text string) string {
 	return ansiRe.ReplaceAllString(text, "")
+}
+
+// nodeWorkerSettings are the names under which a Vitest or Jest configuration
+// sets its worker count.
+var nodeWorkerSettings = []string{"maxWorkers", "maxThreads", "maxForks"}
+
+// nodeWorkers is the --maxWorkers a Vitest or Jest suite takes: the job's CPU
+// budget, or "" without one, or when the project's own configuration (a
+// vitest, vite or jest config file, or package.json's jest block) sets its
+// worker count, which then stands.
+func nodeWorkers(projectPath string) string {
+	budget := cpubudget.Get()
+	if budget == 0 {
+		return ""
+	}
+	configs, _ := filepath.Glob(filepath.Join(projectPath, "*.config.*"))
+	configs = append(configs, filepath.Join(projectPath, "package.json"))
+	for _, path := range configs {
+		base := filepath.Base(path)
+		if base != "package.json" && !strings.HasPrefix(base, "vitest.") && !strings.HasPrefix(base, "vite.") && !strings.HasPrefix(base, "jest.") {
+			continue
+		}
+		data, err := os.ReadFile(path) //nolint:gosec // a configuration file of the project
+		if err != nil {
+			continue
+		}
+		for _, name := range nodeWorkerSettings {
+			if strings.Contains(string(data), name) {
+				return ""
+			}
+		}
+	}
+	return strconv.Itoa(budget)
 }

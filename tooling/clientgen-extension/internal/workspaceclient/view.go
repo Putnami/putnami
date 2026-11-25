@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/gitcandidate"
 )
 
@@ -134,14 +135,16 @@ func (v workspaceView) members() ([]string, error) {
 	return v.projects, v.membershipErr
 }
 
-// committedView is the check's view: the candidate cut of the workspace when
+// committedViewFrom is the check's view: the candidate cut of the workspace when
 // it is a Git work tree, the disk otherwise, and the members the orchestrator
 // resolved. Membership comes from putnami.workspace.json and the scope
 // manifests its includes name, which the cut holds; a member directory that
 // holds no candidate has nothing the check could read. An enumeration that
 // fails inside a Git work tree is an error, never an empty workspace.
-func committedView(workspaceRoot string, members []string) (workspaceView, error) {
-	tree, err := gitcandidate.Open(workspaceRoot)
+// The cut comes from the job context ctx when its task declared it
+// (gitcandidate.OpenFrom), and from Git otherwise.
+func committedViewFrom(ctx *pctx.Context, workspaceRoot string, members []string) (workspaceView, error) {
+	tree, err := gitcandidate.OpenFrom(ctx, workspaceRoot)
 	if err != nil {
 		return workspaceView{}, fmt.Errorf("list the candidate files of the workspace: %w", err)
 	}

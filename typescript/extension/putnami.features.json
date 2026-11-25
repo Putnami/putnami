@@ -1226,6 +1226,19 @@
               "package-refuses-a-tsc-project"
             ]
           }
+        },
+        {
+          "id": "tools-take-the-cpu-budget",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bun-and-the-node-runners-take-a-budget-of-2"
+            ]
+          }
         }
       ]
     }

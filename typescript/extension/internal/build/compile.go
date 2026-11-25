@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/exec"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 // execRunFunc is the function used to run subprocesses. It defaults to exec.Run
@@ -288,7 +289,7 @@ func RunCompile(bunBin, projectPath, outputPath string, entrypoint string, targe
 
 		args := buildCompileArgs(config, entry, outputFile, target, bytecode)
 
-		result, err := execRunFunc(bunBin, args, exec.Dir(workDir), exec.Env(compileEnv()), exec.Timeout(5*time.Minute))
+		result, err := execRunFunc(bunBin, args, exec.Dir(workDir), exec.Env(toolchain.BunEnv(compileEnv())), exec.Timeout(5*time.Minute))
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("Compile failed for %s [%s]: %v", entrypoint, target, err))
 			continue

@@ -30,10 +30,13 @@ import (
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	job "go.putnami.dev/protocol/job"
 	supportproto "go.putnami.dev/protocol/support"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/gitcandidate"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/linetag"
+	"go.putnami.dev/sdk/extension/treefacts"
 	"go.putnami.dev/typescript/extension/internal/apisurface"
 	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
@@ -106,7 +109,9 @@ type Report struct {
 // break.
 func Run(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	emit.PhaseStart(phase)
-	report, err := Check(ctx.WorkspaceRoot, ctx.Project.FullPath, ctx.Project.Name, ctx.Project.Tags)
+	baseline, _ := treefacts.From(ctx).ReleaseBaseline()
+	report, err := Check(ctx.WorkspaceRoot, ctx.Project.FullPath, ctx.Project.Name, ctx.Project.Tags, baseline,
+		contextCandidates(ctx, ctx.Project.FullPath))
 	if err != nil {
 		emit.PhaseEnd(phase, "failed")
 		return "FAILED", nil, fmt.Errorf("check the API of %s: %w", ctx.Project.Name, err)
@@ -119,8 +124,14 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string
 // identity, and the name its entry points are reported under. tags are the
 // project's resolved tags as the job context carries them, nil when it carries
 // none: they decide whether the support catalog lists the project as a
-// protocol or as a package.
-func Check(workspaceRoot, projectDir, name string, tags []string) (*Report, error) {
+// protocol or as a package. baseline is the project's release baseline as the
+// job context carries it (the `releaseBaseline` runtime input), nil when it
+// carries none: the check then reads the repository state, the line's last
+// release and the commits since it from git. candidates are the working
+// tree's candidate paths under projectDir, relative to it, as the job context
+// carries them (the `candidateFiles` runtime input), nil when it carries none:
+// the check then lists them with git.
+func Check(workspaceRoot, projectDir, name string, tags []string, baseline *job.ReleaseBaseline, candidates []string) (*Report, error) {
 	skip, err := notChecked(workspaceRoot, name, tags)
 	if err != nil {
 		return nil, protocolcli.Classify(err, protocolcli.ErrInvalidConfig)
@@ -129,42 +140,22 @@ func Check(workspaceRoot, projectDir, name string, tags []string) (*Report, erro
 		return &Report{Skip: skip}, nil
 	}
 
-	state, err := readRepoState(projectDir)
-	if errors.Is(err, errNotARepository) {
-		return &Report{Warning: "the workspace is not in a git repository, so it has no tags to compare with " +
-			"and the API is not compared; run the check in a git checkout"}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if !state.hasHead {
-		return &Report{Note: "the repository has no commit: there is no tagged API to compare with"}, nil
-	}
-	pattern := linePattern(workspaceRoot, projectDir)
-	if state.shallow {
-		return &Report{Warning: fmt.Sprintf("the clone is shallow, so the tags and history of line %s are incomplete "+
-			"and the API is not compared; fetch the full history to run the check", pattern)}, nil
-	}
-	release, ok, err := linetag.LastRelease(projectDir, pattern)
-	if err != nil {
-		return nil, err
-	}
-	tag := release.Tag
-	if !ok {
-		tagged, err := hasTags(projectDir)
-		if err != nil {
-			return nil, err
+	var release lastRelease
+	if baseline != nil {
+		var report *Report
+		if release, report = releaseFromBaseline(baseline); report != nil {
+			return report, nil
 		}
-		if tagged {
-			return &Report{Warning: fmt.Sprintf("no release tag of line %s is reachable from HEAD, though the repository has other tags, "+
-				"so the API is not compared; fetch the line's tags if it has released. A tag with a pre-release "+
-				"or any other text in place of MAJOR.MINOR.PATCH is not a release", pattern)}, nil
+	} else {
+		var report *Report
+		if release, report, err = releaseFromGit(workspaceRoot, projectDir); err != nil || report != nil {
+			return report, err
 		}
-		return &Report{Note: fmt.Sprintf("no release tag of line %s is reachable from HEAD: there is no released API to compare with", pattern)}, nil
 	}
+	tag := release.tag
 
 	_, statErr := os.Stat(filepath.Join(workspaceRoot, supportproto.CatalogFilename))
-	released, moved, report, err := releasedSide(projectDir, tag, name, statErr == nil)
+	released, moved, report, err := releasedSide(projectDir, tag, name, statErr == nil, release.directory)
 	if err != nil || report != nil {
 		return report, err
 	}
@@ -172,7 +163,7 @@ func Check(workspaceRoot, projectDir, name string, tags []string) (*Report, erro
 		return &Report{Warning: fmt.Sprintf("the %s at %s declares no entry point: no \"exports\", \"main\", \"module\" or \"types\" names a file, "+
 			"so the package has no API the check reads and nothing is compared", apisurface.ManifestFilename, tag)}, nil
 	}
-	current, err := currentSide(projectDir)
+	current, err := currentSide(projectDir, candidates)
 	if err != nil {
 		return nil, err
 	}
@@ -214,10 +205,16 @@ func Check(workspaceRoot, projectDir, name string, tags []string) (*Report, erro
 		return report, nil
 	}
 	// The commits that touch the package: its directory, and the one that held
-	// it at the tag when it moved since.
-	commits, err := commitsSince(projectDir, tag, ".")
-	if err != nil {
-		return nil, err
+	// it at the tag when it moved since. The baseline answers for the
+	// directory; only a former directory is read from git.
+	if release.breaking != nil {
+		report.Breaking = *release.breaking
+	}
+	var commits []commit
+	if release.breaking == nil {
+		if commits, err = commitsSince(projectDir, tag, "."); err != nil {
+			return nil, err
+		}
 	}
 	if moved.dir != "" {
 		before, err := commitsSince(moved.top, tag, moved.dir)
@@ -226,11 +223,116 @@ func Check(workspaceRoot, projectDir, name string, tags []string) (*Report, erro
 		}
 		commits = append(commits, before...)
 	}
-	report.Breaking = slices.ContainsFunc(commits, func(c commit) bool {
+	report.Breaking = report.Breaking || slices.ContainsFunc(commits, func(c commit) bool {
 		parsed, ok := protocolcli.ParseConventionalCommit(c.subject, c.body)
 		return ok && parsed.Breaking
 	})
 	return report, nil
+}
+
+// contextCandidates returns the candidate cut of dir the job context carries,
+// as slash paths relative to dir, or nil when it carries none, or when dir lies
+// in a repository nested in the workspace's, whose files the context's cut
+// does not list.
+func contextCandidates(ctx *pctx.Context, dir string) []string {
+	if ctx == nil || ctx.Tree == nil || (ctx.Tree.CandidateFiles == nil && ctx.Tree.WorkspaceCandidates == nil) {
+		return nil
+	}
+	if treefacts.NestedRepository(ctx.WorkspaceRoot, dir) {
+		return nil
+	}
+	tree, err := gitcandidate.OpenFrom(ctx, dir)
+	if err != nil || tree == nil {
+		return nil
+	}
+	return append([]string{}, tree.Paths()...)
+}
+
+// lastRelease is the line's last release the check compares with.
+type lastRelease struct {
+	tag string
+	// directory holds the files tag holds at the project directory, read from
+	// the release baseline; empty when the check reads them from git.
+	directory string
+	// breaking is whether a commit since tag that touches the project
+	// directory declares a breaking change, read from the release baseline;
+	// nil when the check reads the commits from git.
+	breaking *bool
+}
+
+// releaseFromBaseline answers the line's last release from the release
+// baseline the job context carries, or the report of a checkout that has
+// none to compare with. It starts no git.
+func releaseFromBaseline(baseline *job.ReleaseBaseline) (lastRelease, *Report) {
+	switch baseline.State {
+	case job.ReleaseBaselineUnmanaged:
+		return lastRelease{}, notARepository()
+	case job.ReleaseBaselineNoCommit:
+		return lastRelease{}, noCommit()
+	case job.ReleaseBaselineShallow:
+		return lastRelease{}, shallowClone(baseline.Pattern)
+	case job.ReleaseBaselineTagged:
+		breaking := baseline.Breaking
+		return lastRelease{tag: baseline.Tag, directory: baseline.Directory, breaking: &breaking}, nil
+	default:
+		return lastRelease{}, untagged(baseline.Pattern, baseline.HasTags)
+	}
+}
+
+// releaseFromGit answers the line's last release from git, or the report of
+// a checkout that has none to compare with.
+func releaseFromGit(workspaceRoot, projectDir string) (lastRelease, *Report, error) {
+	state, err := readRepoState(projectDir)
+	if errors.Is(err, errNotARepository) {
+		return lastRelease{}, notARepository(), nil
+	}
+	if err != nil {
+		return lastRelease{}, nil, err
+	}
+	if !state.hasHead {
+		return lastRelease{}, noCommit(), nil
+	}
+	pattern := linePattern(workspaceRoot, projectDir)
+	if state.shallow {
+		return lastRelease{}, shallowClone(pattern), nil
+	}
+	release, ok, err := linetag.LastRelease(projectDir, pattern)
+	if err != nil {
+		return lastRelease{}, nil, err
+	}
+	if !ok {
+		tagged, err := hasTags(projectDir)
+		if err != nil {
+			return lastRelease{}, nil, err
+		}
+		return lastRelease{}, untagged(pattern, tagged), nil
+	}
+	return lastRelease{tag: release.Tag}, nil, nil
+}
+
+func notARepository() *Report {
+	return &Report{Warning: "the workspace is not in a git repository, so it has no tags to compare with " +
+		"and the API is not compared; run the check in a git checkout"}
+}
+
+func noCommit() *Report {
+	return &Report{Note: "the repository has no commit: there is no tagged API to compare with"}
+}
+
+func shallowClone(pattern string) *Report {
+	return &Report{Warning: fmt.Sprintf("the clone is shallow, so the tags and history of line %s are incomplete "+
+		"and the API is not compared; fetch the full history to run the check", pattern)}
+}
+
+// untagged is the report of a line with no release: a warning when the
+// repository has tags of another line, which may hide the line's own.
+func untagged(pattern string, hasTags bool) *Report {
+	if hasTags {
+		return &Report{Warning: fmt.Sprintf("no release tag of line %s is reachable from HEAD, though the repository has other tags, "+
+			"so the API is not compared; fetch the line's tags if it has released. A tag with a pre-release "+
+			"or any other text in place of MAJOR.MINOR.PATCH is not a release", pattern)}
+	}
+	return &Report{Note: fmt.Sprintf("no release tag of line %s is reachable from HEAD: there is no released API to compare with", pattern)}
 }
 
 // movedPackage locates a package whose directory moved since the tag: the
@@ -251,7 +353,18 @@ type movedPackage struct {
 // package.json of the tag that declares it. listed says a support catalog
 // lists the package as stable; such a package with no baseline is a warning,
 // because it may have released from a place the check did not find.
-func releasedSide(projectDir, tag, name string, listed bool) (*apisurface.Side, movedPackage, *Report, error) {
+//
+// baselineDir, when set, is the directory the release baseline extracted the
+// tag's files of the project directory into: the package is read from it,
+// with no git. A baseline directory without a package.json reads the tag from
+// git, as a package that moved does.
+func releasedSide(projectDir, tag, name string, listed bool, baselineDir string) (*apisurface.Side, movedPackage, *Report, error) {
+	if baselineDir != "" {
+		side, report, found, err := releasedAtDirectory(baselineDir, tag)
+		if err != nil || found {
+			return side, movedPackage{}, report, err
+		}
+	}
 	root, prefix := projectDir, ""
 	var moved movedPackage
 	entries, err := treeAtTag(projectDir, tag, ".", treeListing{recursive: true})
@@ -320,6 +433,67 @@ func releasedSide(projectDir, tag, name string, listed bool) (*apisurface.Side, 
 	return &apisurface.Side{Files: files, Entries: points, Imports: apisurface.ImportAliases(contents[0])}, moved, nil, nil
 }
 
+// releasedAtDirectory reads the package from dir, which holds the regular
+// files the tag holds at the project directory, as releasedSide reads it from
+// the tag. found is false when dir holds no package.json.
+func releasedAtDirectory(dir, tag string) (side *apisurface.Side, report *Report, found bool, err error) {
+	var names []string
+	err = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.Type().IsRegular() {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		names = append(names, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		return nil, nil, false, fmt.Errorf("read the release baseline of %s: %w", tag, err)
+	}
+	// Byte order of the slash paths is the order git lists a tree in.
+	slices.Sort(names)
+	if !slices.Contains(names, apisurface.ManifestFilename) {
+		return nil, nil, false, nil
+	}
+	unreadable := func(reason string) (*apisurface.Side, *Report, bool, error) {
+		return nil, &Report{Warning: fmt.Sprintf("the project's %s at %s %s, so the API is not compared",
+			apisurface.ManifestFilename, tag, reason)}, true, nil
+	}
+	manifestPath := filepath.Join(dir, apisurface.ManifestFilename)
+	info, err := os.Stat(manifestPath)
+	if err != nil {
+		return nil, nil, true, fmt.Errorf("read the release baseline of %s: %w", tag, err)
+	}
+	if info.Size() > manifestMaxBytes {
+		return unreadable(fmt.Sprintf("is %d bytes, over the limit of %d", info.Size(), manifestMaxBytes))
+	}
+	manifest, err := os.ReadFile(manifestPath) //nolint:gosec // the baseline directory plus one fixed filename
+	if err != nil {
+		return nil, nil, true, fmt.Errorf("read the release baseline of %s: %w", tag, err)
+	}
+	var files []apisurface.File
+	for _, name := range names {
+		if !apisurface.IsSource(name) {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(name))) //nolint:gosec // a file of the baseline directory
+		if err != nil {
+			return nil, nil, true, fmt.Errorf("read the release baseline of %s: %w", tag, err)
+		}
+		files = append(files, apisurface.File{Path: name, Data: data})
+	}
+	points, err := apisurface.EntryPoints(manifest, paths(files))
+	if err != nil {
+		return unreadable(err.Error())
+	}
+	return &apisurface.Side{Files: files, Entries: points, Imports: apisurface.ImportAliases(manifest)}, nil, true, nil
+}
+
 // findManifest returns the package.json at the top of a listing.
 func findManifest(entries []treeEntry) *treeEntry {
 	for i := range entries {
@@ -374,8 +548,8 @@ func packageAtTag(projectDir, tag, name string) (top string, found []string, err
 // currentSide reads the package in the working tree. A package.json that is
 // gone declares no entry point; one that does not parse is an error, because
 // the fix is in the tree.
-func currentSide(projectDir string) (apisurface.Side, error) {
-	files, err := filesInTree(projectDir)
+func currentSide(projectDir string, candidates []string) (apisurface.Side, error) {
+	files, err := filesInTree(projectDir, candidates)
 	if err != nil {
 		return apisurface.Side{}, err
 	}

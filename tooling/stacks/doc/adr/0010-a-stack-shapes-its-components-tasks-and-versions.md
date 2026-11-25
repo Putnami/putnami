@@ -1,6 +1,7 @@
 # ADR 0010 — A stack shapes its components' tasks, inputs and toolchain versions
 
-- **Status**: accepted
+- **Status**: accepted; decision 4 amended by
+  [ADR 0021](0021-a-tool-that-runs-only-its-stated-version-is-not-probed.md)
 - **Date**: 2026-11-09
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), `dotnet/extension`
   (`@putnami/dotnet`) and every stack extension on the core

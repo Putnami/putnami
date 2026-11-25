@@ -233,6 +233,19 @@
               "a-phased-test-waits-for-the-build-rush-runs-before-it"
             ]
           }
+        },
+        {
+          "id": "tools-take-the-cpu-budget",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-tools-take-a-budget-of-2"
+            ]
+          }
         }
       ]
     }

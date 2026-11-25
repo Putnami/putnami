@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	job "go.putnami.dev/protocol/job"
+
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -64,6 +66,15 @@ type FeatureCoverageRatchetReport struct {
 // root, the workspace root. workspaceOptions are the workspace option blocks the
 // job context carries, and baseline is the run's impacted baseline, or empty.
 func BuildFeatureCoverageRatchetResult(root string, workspaceOptions map[string]map[string]any, baseline string) (FeatureCoverageRatchetReport, error) {
+	return BuildFeatureCoverageRatchetResultFrom(nil, root, workspaceOptions, baseline)
+}
+
+// BuildFeatureCoverageRatchetResultFrom is BuildFeatureCoverageRatchetResult
+// reading the merge base and the debt list there from history, the change
+// history the job context carries for the same baseline
+// (go.putnami.dev/protocol/job, doc/adr/0003), and from Git when history is nil
+// or names another baseline.
+func BuildFeatureCoverageRatchetResultFrom(history *job.ChangeHistory, root string, workspaceOptions map[string]map[string]any, baseline string) (FeatureCoverageRatchetReport, error) {
 	report := FeatureCoverageRatchetReport{Debt: []string{}, BaselineDebt: []string{}, Grown: []string{}}
 	debt, adopted, findings := featureCoverageDebt(workspaceOptions["sdd"])
 	if len(findings) > 0 {
@@ -85,22 +96,35 @@ func BuildFeatureCoverageRatchetResult(root string, workspaceOptions map[string]
 	}
 	report.Baseline = baseline
 
-	shallow, err := sdkgit.IsShallow(root)
-	if err != nil {
-		return report, protocolcli.WithResultData(fmt.Errorf("feature coverage ratchet: %w", err), report)
+	if history != nil && history.Baseline != baseline {
+		history = nil
+	}
+	shallow := history != nil && history.Shallow
+	if history == nil {
+		var err error
+		shallow, err = sdkgit.IsShallow(root)
+		if err != nil {
+			return report, protocolcli.WithResultData(fmt.Errorf("feature coverage ratchet: %w", err), report)
+		}
 	}
 	if shallow {
 		return report, protocolcli.WithResultData(protocolcli.Classify(fmt.Errorf(
 			"feature coverage ratchet: the repository is a shallow clone, so its history may stop before the merge base with %s; fetch the whole history",
 			baseline), protocolcli.ErrInvalidConfig), report)
 	}
-	mergeBase, err := gitread.MergeBase(root, baseline)
+	mergeBase, err := changeMergeBase(history, root, baseline)
 	if err != nil {
 		return report, protocolcli.WithResultData(fmt.Errorf("feature coverage ratchet: %w", err), report)
 	}
 	report.MergeBase = mergeBase
 
-	block, found, err := workspaceSDDOptionsAt(root, mergeBase)
+	var block map[string]any
+	var found bool
+	if history != nil {
+		block, found, err = workspaceSDDOptionsOf(history.WorkspaceConfig)
+	} else {
+		block, found, err = workspaceSDDOptionsAt(root, mergeBase)
+	}
 	if err != nil {
 		report.Diagnostics = []diag.Diagnostic{diag.Errorf(ErrorCodeCoverageDebtBaselineUnavailable,
 			wsproto.WorkspaceConfigFilename, "read the debt list at the merge base %s: %v", shortCommit(mergeBase), err)}
@@ -168,6 +192,29 @@ func workspaceSDDOptionsAt(root, commit string) (map[string]any, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
+	return workspaceSDDOptions(data)
+}
+
+// workspaceSDDOptionsOf reads options.sdd of config, the workspace config the
+// merge base holds as the change history carries it; nil is no config.
+func workspaceSDDOptionsOf(config *string) (map[string]any, bool, error) {
+	if config == nil {
+		return nil, false, nil
+	}
+	return workspaceSDDOptions([]byte(*config))
+}
+
+// changeMergeBase returns the merge base of baseline and HEAD: from history
+// when the job context carries it, from Git otherwise.
+func changeMergeBase(history *job.ChangeHistory, root, baseline string) (string, error) {
+	if history == nil {
+		return gitread.MergeBase(root, baseline)
+	}
+	return history.MergeBase, nil
+}
+
+// workspaceSDDOptions reads options.sdd of a workspace config's bytes.
+func workspaceSDDOptions(data []byte) (map[string]any, bool, error) {
 	var document struct {
 		Options map[string]json.RawMessage `json:"options"`
 	}

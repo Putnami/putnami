@@ -8,6 +8,7 @@
     "monorepo/bazel-delegated-stack#reports-become-the-summary",
     "monorepo/bazel-delegated-stack#sync-writes-the-package-graph",
     "monorepo/bazel-delegated-stack#tasks-delegate-to-bazel",
+    "monorepo/bazel-delegated-stack#tools-take-the-cpu-budget",
     "monorepo/bazel-delegated-stack#validate-fails-on-a-stale-graph"
   ]
 }

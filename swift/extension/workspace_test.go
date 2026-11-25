@@ -129,7 +129,7 @@ func TestTheTestFilterReachesSwiftTestAndXcodebuild(t *testing.T) {
 	}
 	stackstest.WriteFile(t, root, "App/.xcode-version", "16.1\n")
 	status, _, _, err = runJobWith(t, root, "App", stacks.TaskTest, test, job.Params{"test": json.RawMessage(`"ShopTests/CheckoutTests"`)})
-	if status != "OK" || err != nil || !strings.Contains(s.ran(t), "-only-testing:ShopTests/CheckoutTests CODE_SIGNING_ALLOWED=NO") {
+	if status != "OK" || err != nil || !strings.Contains(s.ran(t), "-only-testing:ShopTests/CheckoutTests -jobs 2 CODE_SIGNING_ALLOWED=NO") {
 		t.Errorf("the filter reaches xcodebuild: %s %v %s", status, err, s.ran(t))
 	}
 	// An override whose last step is another program gets no filter, and a

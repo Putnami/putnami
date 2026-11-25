@@ -1,5 +1,7 @@
 {
   "id": "ruby",
+  "cpuEnv": ["PARALLEL_PROCESSOR_COUNT", "BUNDLE_JOBS"],
+  "cpuConfig": [{"file": "{root}/.bundle/config", "pattern": "(?m)^BUNDLE_JOBS\\s*:"}],
   "markers": [
     "Gemfile",
     "package.yml",

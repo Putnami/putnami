@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"go.putnami.dev/sdk/extension/gitread"
 )
@@ -17,7 +19,13 @@ import (
 // transparent caching. It handles cache key computation, hit/miss
 // detection, result restoration, and output storage.
 type CacheManager struct {
-	store           *LocalStore
+	store *LocalStore
+	// candidates is the run's read of the workspace's candidate cut
+	// (SetCandidateSource), nil when the run holds none.
+	candidates atomic.Pointer[CandidateSource]
+	// exclusion decides whether written paths lie where Git lists no
+	// candidate (SetCandidateExclusion), nil when the run holds none.
+	exclusion       atomic.Pointer[CandidateExclusion]
 	fileHashes      inputHashMemo     // memoizes file hashes: "dir|patterns|scope" → hash
 	extraFileHashes inputHashMemo     // memoizes extra-file hashes: workspace root and sorted paths, NUL-joined → hash
 	sourceStates    map[string]string // memoizes SourceState: workspace root → state
@@ -57,6 +65,44 @@ type memoizedInputHash struct {
 type invalidatedRegion struct {
 	generation uint64
 	written    InputRegion
+	// excluded answers whether the written paths lie where Git lists no
+	// candidate, nil when nothing says so.
+	excluded *candidateExclusion
+}
+
+// moves reports whether a write this invalidation names can move a digest of
+// region: the write reaches the region, and either it reaches the part where
+// the digest reads files that are not Git candidates, or it lies where Git can
+// list a candidate. The second question is asked only when the first leaves
+// it open, so a run whose writes reach no candidate digest never asks it.
+func (i invalidatedRegion) moves(region InputRegion) bool {
+	if !i.written.Overlaps(region) {
+		return false
+	}
+	if region.nonCandidates == nil || i.excluded == nil || i.written.Overlaps(*region.nonCandidates) {
+		return true
+	}
+	return !i.excluded.holds()
+}
+
+// CandidateExclusion reports whether every one of paths, absolute paths a task
+// of the run wrote, lies in a directory Git's rules exclude as a whole and
+// under which the work tree's candidate cut lists nothing, so the write adds
+// no Git candidate, removes none and changes none.
+type CandidateExclusion func(paths []string) bool
+
+// candidateExclusion is one invalidation's answer of a CandidateExclusion,
+// asked at most once, and only when a digest's entry depends on it.
+type candidateExclusion struct {
+	once     sync.Once
+	paths    []string
+	exclude  CandidateExclusion
+	excluded bool
+}
+
+func (e *candidateExclusion) holds() bool {
+	e.once.Do(func() { e.excluded = e.exclude(e.paths) })
+	return e.excluded
 }
 
 // lookup returns the digest memoized at key, or false with the generation a
@@ -82,7 +128,7 @@ func (m *inputHashMemo) memoize(key string, generation uint64, hash string, regi
 			return
 		}
 		for _, invalidation := range m.log {
-			if invalidation.generation > generation && invalidation.written.Overlaps(region) {
+			if invalidation.generation > generation && invalidation.moves(region) {
 				return
 			}
 		}
@@ -93,18 +139,20 @@ func (m *inputHashMemo) memoize(key string, generation uint64, hash string, regi
 	m.entries[key] = memoizedInputHash{hash: hash, region: region}
 }
 
-// invalidate drops every memoized digest whose region overlaps written, and
-// logs written for the digests being computed meanwhile.
-func (m *inputHashMemo) invalidate(written InputRegion) {
+// invalidate drops every memoized digest the write of written can move, and
+// logs it for the digests being computed meanwhile. excluded, when set, says
+// whether written lies where Git lists no candidate (invalidatedRegion.moves).
+func (m *inputHashMemo) invalidate(written InputRegion, excluded *candidateExclusion) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.generation++
+	invalidation := invalidatedRegion{generation: m.generation, written: written, excluded: excluded}
 	for key, memo := range m.entries {
-		if memo.region.Overlaps(written) {
+		if invalidation.moves(memo.region) {
 			delete(m.entries, key)
 		}
 	}
-	m.generation++
-	m.log = append(m.log, invalidatedRegion{generation: m.generation, written: written})
+	m.log = append(m.log, invalidation)
 	if len(m.log) > invalidationLogSize {
 		m.log = append([]invalidatedRegion(nil), m.log[len(m.log)-invalidationLogSize:]...)
 	}
@@ -159,7 +207,13 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 		return cached, nil
 	}
 
-	hash, err := memoizedHashFiles(dir, patterns, expander, scope)
+	var hash string
+	var err error
+	if cut := cm.candidateSource(); cut != nil {
+		hash, err = hashFilesWith(cut, dir, patterns, expander, scope)
+	} else {
+		hash, err = memoizedHashFiles(dir, patterns, expander, scope)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -190,6 +244,27 @@ func (cm *CacheManager) HashFiles(dir string, patterns []string, expander InputE
 	return cm.lookupFileHash(dir, patterns, expander, scope)
 }
 
+// SetCandidateSource makes the keys of the run list a whole work tree's
+// candidate cut from source, the run's read of it, instead of asking Git
+// (CandidateSource). The source answers the current read, which a write of the
+// run makes stale as it drops the memoized digests the write can move.
+func (cm *CacheManager) SetCandidateSource(source CandidateSource) {
+	if cm == nil {
+		return
+	}
+	cm.candidates.Store(&source)
+}
+
+func (cm *CacheManager) candidateSource() CandidateSource {
+	if cm == nil {
+		return nil
+	}
+	if source := cm.candidates.Load(); source != nil {
+		return *source
+	}
+	return nil
+}
+
 // InvalidateFileHashes drops every memoized input digest, project files and
 // extra files alike. A task whose rewrites are not confined to declared
 // outputs — a source rewriter — calls it once it ran, so its post-run mutation
@@ -199,8 +274,8 @@ func (cm *CacheManager) InvalidateFileHashes() {
 		return
 	}
 	everything := InputRegion{unbounded: true}
-	cm.fileHashes.invalidate(everything)
-	cm.extraFileHashes.invalidate(everything)
+	cm.fileHashes.invalidate(everything, nil)
+	cm.extraFileHashes.invalidate(everything, nil)
 }
 
 // InvalidateFileHashesUnder drops every memoized input digest whose region
@@ -209,13 +284,34 @@ func (cm *CacheManager) InvalidateFileHashes() {
 // because nothing it reads changed. The caller names the paths before any task
 // that reads them can start, so no key computed after a write reads a digest
 // of the bytes before it.
+//
+// A digest that reads Git candidates where the paths lie, and nothing else
+// there, also keeps its entry when the run's CandidateExclusion answers that
+// the paths lie where Git lists no candidate, such as the workspace's .putnami
+// directory when Git ignores it (tooling/cli ADR 0106). The exclusion is asked
+// only for such a digest.
 func (cm *CacheManager) InvalidateFileHashesUnder(paths []string) {
 	if cm == nil || len(paths) == 0 {
 		return
 	}
 	written := PathsRegion(paths)
-	cm.fileHashes.invalidate(written)
-	cm.extraFileHashes.invalidate(written)
+	var excluded *candidateExclusion
+	if exclusion := cm.exclusion.Load(); exclusion != nil && *exclusion != nil {
+		excluded = &candidateExclusion{paths: slices.Clone(paths), exclude: *exclusion}
+	}
+	cm.fileHashes.invalidate(written, excluded)
+	cm.extraFileHashes.invalidate(written, excluded)
+}
+
+// SetCandidateExclusion gives the run the answer of whether written paths lie
+// where Git lists no candidate (CandidateExclusion), so a write there keeps the
+// memoized digests that read only Git candidates where it lies
+// (InvalidateFileHashesUnder).
+func (cm *CacheManager) SetCandidateExclusion(exclusion CandidateExclusion) {
+	if cm == nil {
+		return
+	}
+	cm.exclusion.Store(&exclusion)
 }
 
 // lookupExtraFilesHash computes the combined content hash of a set of extra

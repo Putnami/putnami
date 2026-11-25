@@ -92,6 +92,8 @@ exit "${STUB_EXIT:-0}"
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
+	// The check reads PANTS_VERSION: the machine's value must not decide.
+	t.Setenv("PANTS_VERSION", "")
 }
 
 func TestAVerbRunsOnePantsGoalOverItsPackages(t *testing.T) {
@@ -107,8 +109,8 @@ func TestAVerbRunsOnePantsGoalOverItsPackages(t *testing.T) {
 	} {
 		t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
 		results := runBatchJob(t, root, task, "src/python/pricing", "src/python/web")
-		if log := stubLog(t); len(log) != 2 || !strings.HasSuffix(log[0], " pants --version") || log[1] != rootReal+" "+want {
-			t.Errorf("%s ran %q, want the version check then %q", task, log, want)
+		if log := stubLog(t); len(log) != 1 || log[0] != rootReal+" "+want {
+			t.Errorf("%s ran %q, want %q alone", task, log, want)
 		}
 		for dir, r := range results {
 			if r.Status != "OK" || r.Data["delegatedTo"] != "pants" {

@@ -307,6 +307,20 @@ The task is cached. Its key holds what the verdict reads:
   at the project directory, and whether a commit since that tag that touches
   the project declares a breaking change.
 
+The task reads that baseline from its job context, with the files the tag
+holds at the project directory, which the CLI extracts once per tag commit
+(the `releaseBaselineFiles` runtime input, which adds nothing to the key). The
+working tree's files (step 6) are the project's candidate cut, which the
+context carries too (the `candidateFiles` runtime input): the key moves when a
+file under the project enters or leaves the cut, an untracked file included.
+The task starts git when the context does not hold the tag's files of the
+project: a package that moved since its release, whose former directory it
+finds and reads, a project directory that the tag does not hold or that holds
+no `package.json` there, and an extraction the CLI could not make. A project
+inside a repository nested in the workspace's, a submodule or a nested clone,
+lists its working tree with git too: the context's cut does not list it
+([ADR 0014](adr/0014-a-typescript-job-reads-the-tree-from-its-context.md)).
+
 The key names no commit. A pull request and the commit its squash merge puts
 on the main branch share the verdict when they hold one tree and their
 messages declare the same break: put the marker in the pull request title. A

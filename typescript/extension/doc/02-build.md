@@ -547,6 +547,18 @@ anyway:
 | `typescript-tsc-tracked-output` | An output that holds a file Git tracks, which emptying it would delete |
 | `typescript-tsc-config` | The config the command names does not exist |
 
+The build reads the files the Git index tracks under the project from its
+job context, through the `trackedFiles` runtime input, so adding a path under
+the project to the index, or removing one, moves its key. Whether Git ignores
+each output is asked of Git, in one `git check-ignore` for every output: an
+output may be a file, such as a `.tsbuildinfo`, or a directory the build has
+not created yet, which no fact of the context answers. The same call tells a
+work tree from a directory outside every repository, so the key holds no
+repository state, and a shallow and a complete clone share it. A repository
+Git refuses, such as one owned by another user, fails the build. A project
+inside a repository nested in the workspace's, such as a submodule, is
+checked against that repository's index, with Git ([ADR 0014](adr/0014-a-typescript-job-reads-the-tree-from-its-context.md)).
+
 ### Phase 3: Types
 
 Invokes `tsc` to generate TypeScript declaration files (`.d.ts` + `.d.ts.map`).

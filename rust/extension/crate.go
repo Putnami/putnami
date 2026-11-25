@@ -16,9 +16,11 @@ import (
 	"strings"
 
 	extensionproto "go.putnami.dev/protocol/extension"
+	job "go.putnami.dev/protocol/job"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/dockerpublish"
+	"go.putnami.dev/sdk/extension/gitcandidate"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/procstat"
@@ -79,7 +81,7 @@ func stageCrate(c context.Context, ctx *pctx.Context, root stacks.RootStep, emit
 	if err != nil {
 		return err
 	}
-	if err := stageWithDependencies(ctx.WorkspaceRoot, root.Dir, stagedWorkspace(ctx), version); err != nil {
+	if err := stageWithDependencies(ctx, ctx.WorkspaceRoot, root.Dir, stagedWorkspace(ctx), version); err != nil {
 		return fmt.Errorf("stage the crate: %w", err)
 	}
 	cmd := exec.CommandContext(c, root.Program("cargo"), "update", "--workspace") //nolint:gosec // the selected toolchain
@@ -95,7 +97,7 @@ func stageCrate(c context.Context, ctx *pctx.Context, root stacks.RootStep, emit
 // stageWithDependencies copies the stack root under dest, then every directory
 // a path dependency reaches outside what is copied: cargo reads them all, and
 // a sibling crate of a stack root is not inside it.
-func stageWithDependencies(workspace, stackRoot, dest, version string) error {
+func stageWithDependencies(ctx *pctx.Context, workspace, stackRoot, dest, version string) error {
 	var copied []string
 	var stage func(string) error
 	stage = func(dir string) error {
@@ -103,7 +105,7 @@ func stageWithDependencies(workspace, stackRoot, dest, version string) error {
 		if err != nil {
 			return err
 		}
-		if err := copyStackRoot(dir, filepath.Join(dest, rel), version); err != nil {
+		if err := copyStackRoot(ctx, dir, filepath.Join(dest, rel), version); err != nil {
 			return err
 		}
 		copied = append(copied, dir)
@@ -161,9 +163,11 @@ func pathDependencies(content string) []string {
 
 // copyStackRoot copies what cargo would package from: inside a Git repository,
 // the files Git tracks or does not ignore. The copy has no .git, so a file that
-// .gitignore hides would otherwise reach the registry.
-func copyStackRoot(from, to, version string) error {
-	files, tracked, err := gitFiles(from)
+// .gitignore hides would otherwise reach the registry. The files come from the
+// job context ctx when it carries the candidate cut of from, and from Git
+// otherwise.
+func copyStackRoot(ctx *pctx.Context, from, to, version string) error {
+	files, tracked, err := stagedFiles(ctx, from)
 	if err != nil {
 		return err
 	}
@@ -204,6 +208,23 @@ func copyStackRoot(from, to, version string) error {
 		}
 		return stageFile(path, filepath.Join(to, rel), info, version)
 	})
+}
+
+// stagedFiles lists, relative to dir, the files Git tracks or does not ignore:
+// the candidate cut the job context carries (gitcandidate.ContextCut), unless
+// it lists a submodule, whose files only Git lists, and gitFiles otherwise.
+func stagedFiles(ctx *pctx.Context, dir string) (files []string, tracked bool, err error) {
+	if cut, ok := gitcandidate.ContextCut(ctx, dir); ok {
+		files = make([]string, 0, len(cut))
+		for _, file := range cut {
+			if file.Mode == job.CandidateModeSubmodule {
+				return gitFiles(dir)
+			}
+			files = append(files, file.Path)
+		}
+		return files, true, nil
+	}
+	return gitFiles(dir)
 }
 
 // gitFiles lists, relative to dir, the files Git tracks or does not ignore,

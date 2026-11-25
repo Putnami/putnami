@@ -17,6 +17,7 @@
     "monorepo/rush-adoption#reports-come-from-the-project-options",
     "monorepo/rush-adoption#sync-writes-the-project-graph",
     "monorepo/rush-adoption#tasks-delegate-to-rush",
+    "monorepo/rush-adoption#tools-take-the-cpu-budget",
     "monorepo/rush-adoption#unmapped-commands-are-listed",
     "monorepo/rush-adoption#validate-fails-on-a-stale-graph"
   ]

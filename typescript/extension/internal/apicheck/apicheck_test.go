@@ -156,11 +156,22 @@ func (f *fixture) commit(message string) {
 	f.git("commit", "-q", "--allow-empty", "-m", message)
 }
 
+// check runs the check reading history and the working tree from git, then
+// from the release baseline and the candidate cut the CLI would put in the job
+// context, and fails unless both give the same report.
 func (f *fixture) check() *Report {
 	f.t.Helper()
-	report, err := Check(f.root, f.project, projectName, f.tags)
+	report, err := Check(f.root, f.project, projectName, f.tags, nil, nil)
 	if err != nil {
 		f.t.Fatalf("Check: %v", err)
+	}
+	fromBaseline, err := Check(f.root, f.project, projectName, f.tags, releaseBaselineOf(f.t, f.root, f.project),
+		candidatesOf(f.t, f.root, f.project))
+	if err != nil {
+		f.t.Fatalf("Check with the release baseline: %v", err)
+	}
+	if !reflect.DeepEqual(report, fromBaseline) {
+		f.t.Fatalf("the release baseline gives another report:\n git      %+v\n baseline %+v", report, fromBaseline)
 	}
 	return report
 }
@@ -448,7 +459,7 @@ func TestAnInvalidCatalogFailsTheCheck(t *testing.T) {
 	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "typescript-extension-fails-on-an-invalid-catalog")
 	t.Parallel()
 	f := newFixture(t, `{"protocolVersion":1,"entries":[{"id":"x"}]}`)
-	if _, err := Check(f.root, f.project, projectName, f.tags); err == nil || !strings.Contains(err.Error(), "putnami.support.json is invalid") {
+	if _, err := Check(f.root, f.project, projectName, f.tags, nil, nil); err == nil || !strings.Contains(err.Error(), "putnami.support.json is invalid") {
 		t.Fatalf("err = %v, want an invalid catalog", err)
 	}
 }
@@ -605,13 +616,13 @@ func TestAContextWithoutTagsTakesTheVerdictBothKindsShare(t *testing.T) {
 	f := newFixture(t, both)
 	f.write("ts/lib/src/index.ts", waveOnlySource)
 	f.commit("feat: drop the greeting")
-	report, err := Check(f.root, f.project, projectName, nil)
+	report, err := Check(f.root, f.project, projectName, nil, nil, nil)
 	if err != nil || report.Skip != "" || len(report.Changes) != 1 {
 		t.Fatalf("listed stable both ways: report = %+v, err = %v, want the project checked", report, err)
 	}
 
 	f = newFixture(t, `{"protocolVersion":1,"entries":[{"id":"other","kind":"package","status":"stable"}]}`)
-	report, err = Check(f.root, f.project, projectName, nil)
+	report, err = Check(f.root, f.project, projectName, nil, nil, nil)
 	if err != nil || !strings.Contains(report.Skip, "neither a stable package nor a stable protocol") {
 		t.Fatalf("not listed: report = %+v, err = %v, want the project skipped", report, err)
 	}
@@ -627,7 +638,7 @@ func TestAContextWithoutTagsFailsTheCheckWhenACatalogExists(t *testing.T) {
 		f.write("ts/lib/src/index.ts", waveOnlySource)
 		f.commit("feat: drop the greeting")
 
-		report, err := Check(f.root, f.project, projectName, nil)
+		report, err := Check(f.root, f.project, projectName, nil, nil, nil)
 		if err == nil {
 			t.Fatalf("listed as %s: report = %+v, want an error", listed, report)
 		}
@@ -718,7 +729,7 @@ func TestAPackageAbsentAtTheTagPasses(t *testing.T) {
 	f.write("ts/new/index.ts", "export const fresh = 1;\n")
 	f.commit("feat: a new package")
 
-	report, err := Check(f.root, filepath.Join(f.root, "ts", "new"), "@example/new", []string{"ts"})
+	report, err := Check(f.root, filepath.Join(f.root, "ts", "new"), "@example/new", []string{"ts"}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -731,7 +742,7 @@ func TestAPackageAbsentAtTheTagPasses(t *testing.T) {
 
 	// Without a catalog nothing calls the package stable: it is new.
 	f.remove("putnami.support.json")
-	report, err = Check(f.root, filepath.Join(f.root, "ts", "new"), "@example/new", []string{"ts"})
+	report, err = Check(f.root, filepath.Join(f.root, "ts", "new"), "@example/new", []string{"ts"}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -936,12 +947,12 @@ func TestAWorkingTreeTheCheckCannotReadFails(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, catalog("package", "stable"))
 	f.write("ts/lib/src/index.ts", "export function (((\n")
-	if _, err := Check(f.root, f.project, projectName, f.tags); err == nil || !strings.Contains(err.Error(), "src/index.ts:1 does not parse") {
+	if _, err := Check(f.root, f.project, projectName, f.tags, nil, nil); err == nil || !strings.Contains(err.Error(), "src/index.ts:1 does not parse") {
 		t.Fatalf("err = %v, want the syntax error", err)
 	}
 	f.write("ts/lib/src/index.ts", greetSource)
 	f.write("ts/lib/package.json", "{not json\n")
-	if _, err := Check(f.root, f.project, projectName, f.tags); err == nil || !strings.Contains(err.Error(), "package.json does not parse") {
+	if _, err := Check(f.root, f.project, projectName, f.tags, nil, nil); err == nil || !strings.Contains(err.Error(), "package.json does not parse") {
 		t.Fatalf("err = %v, want the manifest error", err)
 	}
 }
@@ -972,7 +983,7 @@ func TestOnlySourceFilesGitWouldCommitAreRead(t *testing.T) {
 	f.write("ts/lib/node_modules/dep/index.ts", "export const dep = 1;\n")
 	f.write("ts/lib/README.md", "# lib\n")
 	f.write("ts/lib/src/new.ts", "export const fresh = 1;\n")
-	files, err := filesInTree(f.project)
+	files, err := filesInTree(f.project, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -992,7 +1003,7 @@ func TestAWorkspaceOutsideGitHasNothingToCompare(t *testing.T) {
 	}
 	// The temporary directory may sit inside a repository; git must not find it.
 	t.Setenv("GIT_CEILING_DIRECTORIES", root)
-	report, err := Check(root, project, projectName, []string{"ts"})
+	report, err := Check(root, project, projectName, []string{"ts"}, nil, nil)
 	if err != nil || !strings.Contains(report.Warning, "not in a git repository") || report.Note != "" {
 		t.Fatalf("report = %+v, err = %v", report, err)
 	}
@@ -1002,7 +1013,7 @@ func TestARepositoryWithoutACommitHasNothingToCompare(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	runGit(t, root, "init", "-q")
-	report, err := Check(root, root, projectName, []string{"ts"})
+	report, err := Check(root, root, projectName, []string{"ts"}, nil, nil)
 	if err != nil || !strings.Contains(report.Note, "no commit") {
 		t.Fatalf("report = %+v, err = %v", report, err)
 	}
@@ -1014,7 +1025,7 @@ func TestAShallowCloneWarnsInsteadOfComparing(t *testing.T) {
 	f.commit("chore: a second commit")
 	clone := filepath.Join(t.TempDir(), "clone")
 	runGit(t, f.root, "clone", "-q", "--depth", "1", "file://"+f.root, clone)
-	report, err := Check(clone, filepath.Join(clone, "ts", "lib"), projectName, f.tags)
+	report, err := Check(clone, filepath.Join(clone, "ts", "lib"), projectName, f.tags, nil, nil)
 	if err != nil || !strings.Contains(report.Warning, "shallow") {
 		t.Fatalf("report = %+v, err = %v", report, err)
 	}
@@ -1026,7 +1037,7 @@ func TestWithoutTheTypeScriptPackageTheCheckFails(t *testing.T) {
 	if err := os.RemoveAll(filepath.Join(f.root, "node_modules")); err != nil {
 		t.Fatal(err)
 	}
-	_, err := Check(f.root, f.project, projectName, f.tags)
+	_, err := Check(f.root, f.project, projectName, f.tags, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "the typescript package is not installed") || !strings.Contains(err.Error(), "putnami install") {
 		t.Fatalf("err = %v, want the missing parser", err)
 	}

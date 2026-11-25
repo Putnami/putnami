@@ -1,5 +1,7 @@
 {
   "id": "nx",
+  "cpuEnv": ["NX_PARALLEL"],
+  "cpuConfig": [{"file": "{root}/nx.json", "pattern": "\"parallel\"\\s*:"}],
   "delegated": true,
   "markers": ["project.json", "package.json"],
   "toolchain": {

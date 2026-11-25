@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	job "go.putnami.dev/protocol/job"
 	"go.putnami.dev/sdk/extension/docslinks"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -59,7 +60,7 @@ type DocsLinkFinding struct {
 // line and column.
 func BuildDocsLinksResult(ws *workspace.Workspace, workspaceOptions map[string]map[string]any) (DocsLinksReport, []docslinks.Finding, error) {
 	report := DocsLinksReport{Findings: []DocsLinkFinding{}}
-	reader, err := docslinks.NewReader(ws.Root)
+	reader, err := docslinks.NewReaderFrom(&job.Context{WorkspaceRoot: ws.Root, Tree: ws.Tree}, ws.Root)
 	if err != nil {
 		return report, nil, fmt.Errorf("docs-links: %w", err)
 	}

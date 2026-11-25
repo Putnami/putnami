@@ -152,6 +152,7 @@ The Rust reference profile:
 | `markers` | The files that make a directory a candidate. |
 | `toolchain.command`, `toolchain.pattern` | How to read the version on the machine: the command's output, standard output first, matched by the pattern's `version` group. |
 | `toolchain.fallback` | A command that lists the installed versions, run when `toolchain.command` fails: when none of them satisfies the expected version, the check is a mismatch that names them, so a provided toolchain may take its place. |
+| `toolchain.stated` | Says the tool runs only the version its files state, or the one the variable `stated.env` names when set, and refuses any other, as the Pants launcher does. When that version is exact, the check of the toolchain on `PATH` takes it, looks the command up and starts nothing; otherwise it runs the command. A provisioned toolchain and `toolchain.also` still run theirs ([ADR 0021](adr/0021-a-tool-that-runs-only-its-stated-version-is-not-probed.md)). |
 | `toolchain.provisioned` | The environment variable that holds the toolchain the workspace lock pins, for a stack extension that pins one. |
 | `toolchain.path` | Directories, relative to the stack root, put first on `PATH`, in order, for the toolchain check and every step, offline too: the tools the repository installs for itself, such as `node_modules/.bin`. A directory that does not exist is left out; a pinned toolchain still comes before them ([ADR 0018](adr/0018-a-profile-puts-the-repository-tools-first-on-path.md)). |
 | `tasks.<task>.withoutCoverage` | How the task runs on a toolchain with no coverage support: a `probe` that exits non-zero there, and the `steps` that replace the task's. Its coverage reports are not read, and the task warns with `stacks.coverage_unavailable`. |
@@ -169,6 +170,9 @@ The Rust reference profile:
 | `variants.<name>` | A part of the profile one build runs, applied before the project's override. |
 | `tasks.<task>.dir` | Where the steps run: `project`, the default, or `root`, the stack root, for a tool that resolves its addresses from there. |
 | `delegated` | `true` for a stack whose build tool keeps its own cache; see [Delegated stacks](#delegated-stacks). An override cannot change it. |
+| `cpuEnv` | The variables through which the stack's tools take the job's CPU budget; see [The CPU budget](#the-cpu-budget). |
+| `cpuConfig` | The files, each a `file` under the project or `{root}/`, and a `pattern`, in which a component sets its tools' width itself, which then wins over the budget. |
+| `{cpus}` | In a step or a batch step, within the argument of its flag: the job's CPU budget, else `GOMAXPROCS`; see [The CPU budget](#the-cpu-budget). |
 
 The toolchain files are inputs of every task, whatever its input sets. Every
 task names at least one input set.
@@ -278,6 +282,61 @@ tools write to standard output:
 
 When the detector names two components at one path, the first is the project,
 and the probe reports the other with `stacks.component_conflict`.
+
+### The CPU budget
+
+The scheduler grants each job a CPU budget, `PUTNAMI_CPU_BUDGET`, and the tools
+a task's steps start take their thread count from it through their own
+control. A variable named in `cpuEnv` reaches every step of a task set to the
+budget, unless the environment already sets it: the operator's value wins. A
+tool whose control is a flag names `{cpus}` within the argument that holds the
+flag, such as `--jobs={cpus}`; it expands to the budget, or to `GOMAXPROCS` in
+a run without one. The variables also reach the steps of a root job and of a
+workspace job, such as an install, a package's compile or `dotnet publish`.
+Neither reaches the cache key, and neither reaches a selected toolchain, whose
+environment starts the application a serve or run job built, nor a locked
+step, which may hand its environment to the application it starts, as Java's
+run does
+([ADR 0020](adr/0020-a-stack-tool-takes-the-cpu-budget-unless-the-project-sets-its-width.md)).
+
+A component's own configuration wins over the budget: when a file named in
+`cpuConfig` holds its setting, such as `concurrency:` in `dart_test.yaml`, the
+budget binds nothing for that task, no `cpuEnv` variable is set, and each
+argument that names `{cpus}` is left out. A batch binds nothing when one of
+its members configures its width. Each stack's test shows what its tools
+receive from a budget of 2.
+
+| Stack | Tool | Control | The project's own setting |
+|---|---|---|---|
+| rust | cargo build, cargo clippy, cargo nextest, libtest | `CARGO_BUILD_JOBS`, `NEXTEST_TEST_THREADS`, `RUST_TEST_THREADS` | `test-threads` in `.config/nextest.toml`, `jobs` in `.cargo/config.toml` |
+| java | Gradle, Android Gradle | `--max-workers={cpus}` | `org.gradle.workers.max` in `gradle.properties` |
+| dotnet | dotnet build, dotnet test, dotnet format, MSBuild nodes | `DOTNET_PROCESSOR_COUNT` | none |
+| swift | swift build, swift test, xcodebuild | `--jobs={cpus}`, and the runtime commands' `--jobs`, `--num-workers`, `-jobs` | none |
+| dart | dart test, flutter test | `--concurrency={cpus}` | `concurrency` in `dart_test.yaml` |
+| ruby | RuboCop, Bundler | `PARALLEL_PROCESSOR_COUNT`, `BUNDLE_JOBS` | `BUNDLE_JOBS` in `.bundle/config` |
+| nx | the delegated tool | `NX_PARALLEL` | `parallel` in `nx.json` |
+| moon | the delegated tool | `MOON_CONCURRENCY` | none |
+| rush | the delegated tool | `RUSH_PARALLELISM` | none |
+| turbo | the delegated tool | `TURBO_CONCURRENCY`, read by turbo 2.5 and later | `concurrency` in `turbo.json` |
+| bazel | bazel build, bazel test | `--local_cpu_resources={cpus}` | `--local_cpu_resources` or `--local_resources` in `.bazelrc` |
+
+These tools take no budget, and run with their own width:
+
+- Maven builds one module at a time unless the build sets `-T`: its control
+  would turn parallel builds on, which a build must choose itself.
+- Rails' parallel tests: `PARALLEL_WORKERS` replaces the build's own
+  `parallelize(workers:)`, and would turn parallel tests on in a suite that
+  keeps them off.
+- Bazel's `--jobs`, which also bounds remote execution.
+- Pants: its options belong to pantsd, which recomputes its graph when one
+  changes between runs, and it refuses a `rule_threads_core` below 2.
+- `dart analyze`, `dart compile`, `flutter build`, swift-format, and the
+  parallel test runners of an Xcode scheme have no control a step can set.
+- RSpec, Minitest outside Rails, PHPUnit and Composer run in one process.
+- PHPStan reads its process count only from its configuration
+  (`parameters.parallel.maximumNumberOfProcesses`).
+- A delegated tool's own tasks, such as the compilers an Nx or Bazel target
+  starts, take only what the tool hands them.
 
 ### A project overrides any value
 
@@ -398,7 +457,10 @@ keeps its key when only `Cargo.lock` moves.
 
 The key carries the **expected** version: the value the toolchain file
 states, or `toolchain.version` when a project sets one. Before its first step,
-the task reads the version on the machine with `toolchain.command`:
+the task reads the version on the machine with `toolchain.command`, or, for a
+profile that declares `toolchain.stated`, takes the exact version its variable
+or its files state and only looks the command up
+([ADR 0021](adr/0021-a-tool-that-runs-only-its-stated-version-is-not-probed.md)):
 
 - the versions match, or nothing states an expected version: the task runs.
   An expected version with fewer components names the stable releases it

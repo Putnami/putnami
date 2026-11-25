@@ -151,7 +151,16 @@ Git:
 - `releaseBaseline`: the baseline above;
 - `releaseBaselineFiles`: beside `releaseBaseline`, the directory that holds
   the project as the line's last tag holds it. It adds nothing to the key, which
-  already holds the tag's object at the project.
+  already holds the tag's object at the project;
+- `candidateFiles`: the candidate cut a `git:` input enumerates, with each
+  path's index mode, at or below the task's directory and, when a closure input
+  holds a `git:` pattern, each member of its dependency closure;
+- `workspaceCandidateFiles`: the workspace's cut, for a project task with a
+  workspace `git:**` input, written once per run to a file the context names
+  with the SHA-256 the key holds;
+- `changeHistory`: for an uncached task only, the history since the run's
+  impacted baseline: whether the clone is shallow, the merge base, the commits
+  and the workspace config at the merge base. It adds nothing to a key.
 
 The task's directory is its project's directory, or the workspace for a
 workspace task. The CLI reads each fact once per run, adds the value to the
@@ -161,7 +170,8 @@ directory under the project moves the key, a change elsewhere does not. A task
 that declares no fact gets none. The files of a version line's last tag are
 extracted once per tag commit for the projects that declare
 `releaseBaselineFiles`, and removed when the run ends. See the job protocol's
-[ADR 0002](../../../protocols/job/doc/adr/0002-a-job-reads-the-tree-facts-its-key-holds.md).
+[ADR 0002](../../../protocols/job/doc/adr/0002-a-job-reads-the-tree-facts-its-key-holds.md)
+and [ADR 0003](../../../protocols/job/doc/adr/0003-a-job-reads-the-candidate-cut-and-the-change-history-from-its-context.md).
 
 ### Extension Implementation
 
@@ -418,6 +428,13 @@ Staging unchanged bytes does not. When every `git:` pattern of an input has a
 literal segment before its first wildcard, Git lists only the candidates below
 those segments; that listing selects the same files, so the key does not move.
 A pattern with no such segment, such as `git:**`, lists the whole repository.
+
+A run computes each candidate digest once and keeps it until a write of the run
+can move it. A write under the workspace's `.putnami`, where command outputs
+live, keeps it when Git excludes that directory as a whole and lists nothing
+below it: the write adds no candidate and changes none. Where Git does not
+exclude `.putnami`, a file written there is a candidate, and the digest is
+computed again. See [ADR 0106](adr/0106-a-write-under-an-excluded-putnami-keeps-the-candidate-digests.md).
 
 Candidate inputs hash raw file bytes and symlink target text, with separate
 file-type markers, and each regular file's executable bit as a source binding

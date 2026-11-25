@@ -156,8 +156,14 @@ The test name is not a skip reason, so only the condition is read for CI or
 flakiness. The guard reads tokens, not types: comments, strings, template
 literals and regular expressions never match. It does not parse JSX text, so
 an apostrophe in JSX text reads as a string to the end of its line. It skips
-`node_modules`, `dist`, nested projects and the directories git ignores, the
-same files the task's cache key leaves out.
+`node_modules`, `dist`, `out`, `vendor`, dot directories and nested projects,
+and reads every other test file under the project, whether or not git ignores
+it: those are the files the lint's key holds, since the key's file walk
+follows no ignore rule either. So the guard starts no git, and building the
+project into `dist` or `out` does not move the lint's key; an output directory
+of another name is in the key, and the guard reads the test files compiled
+into it
+([ADR 0014](adr/0014-a-typescript-job-reads-the-tree-from-its-context.md)).
 
 A skip or focus that stays on purpose carries a reviewed exception, on the same
 line or on a comment line of its own just above:

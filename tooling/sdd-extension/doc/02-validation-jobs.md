@@ -8,7 +8,7 @@ contract.
 | Command | Activation | Steps | Cached |
 |---|---|---|---|
 | `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
+| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents, verdict policies also on the listing of the candidate cut; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
 
 Two commands rather than one, because one command carries one activation and
 these two have different subjects. A project's features and specs are a
@@ -816,6 +816,7 @@ keeps its key on the candidate cut and reads no history.
 
 ```json
 "inputs": {
+  "candidateFiles": { "from": "runtime" },
   "policies": { "from": "workspace", "files": ["putnami.verdict-policy.json", "**/putnami.verdict-policy.json", "!**/.gen/**"] },
   "layout":   { "from": "workspace", "files": ["putnami.workspace.json", "**/putnami.json", "!**/.gen/**"] }
 }
@@ -828,11 +829,17 @@ The `layout` port holds the files that place the root, the scopes and the
 projects, so moving a project or turning a directory into a scope moves the
 key.
 
-Inside a Git work tree the step reads the candidate cut, so an ignored policy
-file is neither read nor judged. The listing never enters `.gen`, which the
-ports exclude, nor `.git`, `.putnami`, `dist`, `node_modules`, `out` or
-`vendor`, which the key's file walk skips, so the key holds every file the
-step reads. Both ports are workspace ports. The project side of the key is
+Inside a Git work tree the step lists the policy files from the candidate cut,
+so an ignored policy file is neither read nor judged. The cut comes from the
+job context: the step declares `candidateFiles`, the CLI reads the workspace's
+cut before the first task and again after a write of the run, and the key
+folds its listing, so a change to the index alone, such as a mode change or
+staging an untracked file, also moves the key. The step
+starts no Git; without the member, from an older CLI, it lists the cut with
+Git. The listing never enters `.gen`, which the ports exclude, nor `.git`,
+`.putnami`, `dist`, `node_modules`, `out` or `vendor`, which the key's file
+walk skips, so the key holds every file the step reads. Both file ports are
+workspace ports. The project side of the key is
 therefore empty, and the CLI keys an empty project side on every file under
 the root, so most edits re-run the step. It reads a few small files.
 

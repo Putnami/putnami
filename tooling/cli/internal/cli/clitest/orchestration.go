@@ -248,6 +248,22 @@ fi
 // processes depends on the host's workers and no count holds it.
 func CountsFixture(t *testing.T, projects int, batchable bool) string {
 	t.Helper()
+	return countsFixture(t, projects, batchable, false)
+}
+
+// WritingCountsFixture is CountsFixture whose tasks write: each keys on the
+// Git candidates of its project (`git:**`) and writes one declared output
+// under its command output directory, below the workspace's .putnami, which
+// the workspace's .gitignore excludes. A write there changes no candidate, so
+// it moves no digest of the candidates a later task keys on, and the git calls
+// of a run are those of a run whose tasks write nothing.
+func WritingCountsFixture(t *testing.T, projects int) string {
+	t.Helper()
+	return countsFixture(t, projects, false, true)
+}
+
+func countsFixture(t *testing.T, projects int, batchable, writes bool) string {
+	t.Helper()
 	root := t.TempDir()
 	includes := []string{"extension"}
 	for i := range projects {
@@ -276,6 +292,16 @@ func CountsFixture(t *testing.T, projects int, batchable bool) string {
 			Cache:    &extensionproto.TaskCachePolicy{Enabled: &enabled, Deterministic: true, NoOutput: true},
 			Declares: &extensionproto.TaskDeclaration{},
 		}
+		if writes {
+			task := tasks[command]
+			task.Args = []string{"-c", `printf '%s\n' "$0" > "$1"`, command, "{outputRoot}/report.txt"}
+			task.Inputs = map[string]extensionproto.TaskInputPort{"candidates": {From: "project", Files: []string{"git:**"}}}
+			task.Cache = &extensionproto.TaskCachePolicy{Enabled: &enabled, Deterministic: true}
+			task.Declares = &extensionproto.TaskDeclaration{Outputs: map[string]extensionproto.DeclaredOutput{
+				"report": {Kind: "file", Root: "command-output", Path: "report.txt"},
+			}}
+			tasks[command] = task
+		}
 		if batchable {
 			task := tasks[command]
 			task.Args = []string{"{extensionRoot}/batch.sh"}
@@ -293,6 +319,9 @@ func CountsFixture(t *testing.T, projects int, batchable bool) string {
 	}
 	WriteFile(t, filepath.Join(root, "extension", "putnami.extension.json"), string(data))
 	WriteFile(t, filepath.Join(root, "extension", "batch.sh"), countsBatchScript)
+	if writes {
+		WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n")
+	}
 	InitGitRepo(t, root)
 	return root
 }

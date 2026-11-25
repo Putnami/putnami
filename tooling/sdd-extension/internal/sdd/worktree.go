@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	job "go.putnami.dev/protocol/job"
 	"go.putnami.dev/sdk/extension/gitcandidate"
 )
 
@@ -30,8 +31,15 @@ type worktree struct {
 // openWorktree lists the candidate cut of root once. An enumeration that fails
 // inside a Git work tree is an error, never an empty workspace.
 func openWorktree(root string) (*worktree, error) {
+	return openWorktreeFrom(nil, root)
+}
+
+// openWorktreeFrom is openWorktree for a job whose context carries tree: the
+// cut comes from the context when the task declared it, and from Git
+// otherwise.
+func openWorktreeFrom(facts *job.Tree, root string) (*worktree, error) {
 	root = filepath.Clean(root)
-	tree, err := gitcandidate.Open(root)
+	tree, err := gitcandidate.OpenFrom(&job.Context{WorkspaceRoot: root, Tree: facts}, root)
 	if err != nil {
 		return nil, fmt.Errorf("list the candidate files of the workspace: %w", err)
 	}

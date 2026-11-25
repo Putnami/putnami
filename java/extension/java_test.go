@@ -294,14 +294,14 @@ func TestATaskRunsTheVariantStepsAfterTheJavaCheck(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		filepath.Join(g, "api") + ": gradlew --console=plain :api:check -x :api:test",
-		filepath.Join(g, "bom") + ": gradlew --console=plain :bom:check\n",
-		filepath.Join(g, "bom") + ": gradlew --console=plain :bom:assemble\n",
-		filepath.Join(g, "catalog") + ": gradlew --console=plain :catalog:generateCatalogAsToml\n",
-		filepath.Join(g, "api") + ": gradlew --console=plain :api:test :api:jacocoTestReport",
-		filepath.Join(g, "api") + ": gradlew --console=plain :api:assemble",
-		filepath.Join(g, "app") + ": gradlew --console=plain :app:testDebugUnitTest :app:createDebugUnitTestCoverageReport",
-		filepath.Join(g, "app") + ": gradlew --console=plain :app:assembleDebug",
+		filepath.Join(g, "api") + ": gradlew --console=plain --max-workers=2 :api:check -x :api:test",
+		filepath.Join(g, "bom") + ": gradlew --console=plain --max-workers=2 :bom:check\n",
+		filepath.Join(g, "bom") + ": gradlew --console=plain --max-workers=2 :bom:assemble\n",
+		filepath.Join(g, "catalog") + ": gradlew --console=plain --max-workers=2 :catalog:generateCatalogAsToml\n",
+		filepath.Join(g, "api") + ": gradlew --console=plain --max-workers=2 :api:test :api:jacocoTestReport",
+		filepath.Join(g, "api") + ": gradlew --console=plain --max-workers=2 :api:assemble",
+		filepath.Join(g, "app") + ": gradlew --console=plain --max-workers=2 :app:testDebugUnitTest :app:createDebugUnitTestCoverageReport",
+		filepath.Join(g, "app") + ": gradlew --console=plain --max-workers=2 :app:assembleDebug",
 	} {
 		if !strings.Contains(ran(t, log), want) {
 			t.Errorf("ran\n%s\nwant %q", ran(t, log), want)

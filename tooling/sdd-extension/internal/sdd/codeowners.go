@@ -132,7 +132,7 @@ type CodeownersReport struct {
 // committed workspace option blocks the job context carries.
 func BuildCodeownersResult(ws *workspace.Workspace, workspaceOptions map[string]map[string]any) (CodeownersReport, error) {
 	report := CodeownersReport{Path: CodeownersPath, Rules: []CodeownersRule{}}
-	tree, err := openWorktree(ws.Root)
+	tree, err := openWorktreeFrom(ws.Tree, ws.Root)
 	if err != nil {
 		return report, fmt.Errorf("codeowners: %w", err)
 	}

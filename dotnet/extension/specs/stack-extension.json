@@ -143,6 +143,12 @@
     {
       "id": "filters-the-tests",
       "text": "test with the test flag, short -t, passes its value to dotnet test as --filter <value>, whose bare form selects the tests whose fully qualified name contains it, so a test project in which it selects no test passes with no failed case."
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": [
+        "The steps of a project's tasks take the job's CPU budget as DOTNET_PROCESSOR_COUNT, which bounds dotnet build, test and format and the MSBuild nodes they start, unless the environment sets it."
+      ]
     }
   ],
   "decisions": [

@@ -48,6 +48,15 @@
           }
         },
         {
+          "id": "the-version-check-starts-no-pants",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-version-check-reads-the-stated-version-and-starts-no-pants"]
+          }
+        },
+        {
           "id": "a-delegated-verb-runs-one-pants-command",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
@@ -76,6 +85,15 @@
           "verification": {
             "kind": "acceptance",
             "checks": ["the-manifest-conforms-to-the-stack-core"]
+          }
+        },
+        {
+          "id": "pants-keeps-its-own-width",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-pants-command-takes-no-budget"]
           }
         }
       ]

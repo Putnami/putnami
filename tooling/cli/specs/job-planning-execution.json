@@ -234,6 +234,10 @@
       "text": "A release baseline names the object its tag held at the project directory when the line's last release was read, read from that release's commit, so a tag moved during the run cannot pair a key with other files. An extraction of the baseline's files that fails keeps the task's key, since the key holds the baseline and not the files: the failure is logged, the context carries no release baseline, and the job reads Git."
     },
     {
+      "id": "candidate-cut-and-history-follow-the-key",
+      "text": "A task that declares candidateFiles keys on the candidate cut its git: inputs cover, with each path's index mode, and one that declares workspaceCandidateFiles on the workspace's cut, which its job reads from one file of the run. A task that declares changeHistory gets the history since the run's impacted baseline only when its cache is disabled, and the history moves no key. A write of the run outside .putnami reads the cut again for the next key or uncached job. A task that declares none keeps its key."
+    },
+    {
       "id": "executed-directory-output-starts-empty",
       "text": "Before a task executes, the engine empties each literal-path directory output that is required, under the command-output root, or declares emptied, keeping ceded and preserved subpaths and the build stamp. A hit whose entry records such an output empty empties it too, or executes the task when it cannot. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. Other outputs are not emptied. A key marker keeps entries stored without emptying from being served."
     },

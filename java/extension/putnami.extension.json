@@ -570,6 +570,9 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "workspaceCandidateFiles": {
+          "from": "runtime"
+        },
         "readme": {
           "from": "project",
           "files": [

@@ -114,7 +114,7 @@ func DiscoverSpecs(ws *workspace.Workspace, scope *Scope) SpecDiscoveryResult {
 			diag.Errorf(featureproto.ErrorCodeParseError, "workspace", "workspace root is unavailable"),
 		}}
 	}
-	external := func() (Reader, error) { return NewTaskReader(ws.Root) }
+	external := func() (Reader, error) { return NewTaskReaderFrom(ws.Tree, ws.Root) }
 	return discoverSpecs(ws, scope, reader, external, featureproto.SpecReaderFor)
 }
 

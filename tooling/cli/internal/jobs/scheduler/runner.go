@@ -412,7 +412,7 @@ func prepareJobInvocation(
 	jobCtx.storeRoot, _ = ctx.Value(runStoreRootKey{}).(string)
 	// A job run outside a scheduler run carries no tree facts: it asks Git.
 	if tree, _ := ctx.Value(runTreeFactsKey{}).(*cachekey.TreeFacts); tree != nil {
-		jobCtx.Tree = jobTree(tree, ws, job)
+		jobCtx.Tree = jobTree(tree, ws, job, jobCtx.Selection)
 	}
 	scratchLease, err := store.AcquireScratch(ws.Root)
 	if err != nil {

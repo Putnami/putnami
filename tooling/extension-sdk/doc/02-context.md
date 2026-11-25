@@ -374,6 +374,27 @@ if baseline, ok := facts.ReleaseBaseline(); ok && baseline.Directory != "" {
 The release baseline has no Git fallback: history reaches only a task that
 declares it.
 
+A task that reads the candidate cut, the files a `git:` input keys, declares
+`candidateFiles`: its own directory, and its dependency closure's members when
+a closure input holds a `git:` pattern. A project task that reads the whole
+workspace declares `workspaceCandidateFiles` beside a workspace `git:**` input,
+and receives the cut through one file of the run. Open it through
+`go.putnami.dev/sdk/extension/gitcandidate`, which answers from the context
+when it covers the root asked and from Git otherwise. An uncached task that
+compares the change with the run's impacted baseline declares
+`changeHistory`; it has no Git fallback either:
+
+```go
+tree, err := gitcandidate.OpenFrom(ctx, ctx.Project.FullPath)
+if err != nil {
+	return err
+}
+_ = tree // nil outside a work tree
+if history, ok := treefacts.From(ctx).ChangeHistory(); ok && !history.Shallow {
+	_ = history.Commits // baseline..HEAD, newest first
+}
+```
+
 ### Project Bin Field
 
 `Main`, `Bin` and `Exports` are **superseded by `Metadata`**. The orchestrator

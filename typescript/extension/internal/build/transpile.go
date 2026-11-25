@@ -13,6 +13,7 @@ import (
 
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/typescript/extension/internal/project"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 // browserConditions are the package.json export conditions whose targets are
@@ -125,7 +126,7 @@ func RunTranspile(bunBin, projectPath, outputPath string, params TranspileParams
 		}
 		args := buildTranspileArgs(projectPath, outputPath, graphParams, graph.entrypoints, externals, tsconfig)
 
-		result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Timeout(5*time.Minute))
+		result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Env(toolchain.BunEnv(nil)), exec.Timeout(5*time.Minute))
 		if err != nil {
 			return nil, []string{fmt.Sprintf("Transpile failed [%s graph]: %v", graph.name, err)}, nil
 		}

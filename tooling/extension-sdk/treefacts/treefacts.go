@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -158,6 +159,19 @@ func (f *Facts) ReleaseBaseline() (*job.ReleaseBaseline, bool) {
 	return f.tree.ReleaseBaseline, true
 }
 
+// ChangeHistory returns the history of the change since the run's impacted
+// baseline the context carries, and false when it carries none: the task did
+// not declare `changeHistory`, its cache is enabled, the run has no impacted
+// baseline, or the orchestrator could not read it (doc/adr/0003 of the job
+// protocol). As for the release baseline there is no fallback here: a job
+// without the member reads history as it did before the member existed.
+func (f *Facts) ChangeHistory() (*job.ChangeHistory, bool) {
+	if f == nil || f.tree == nil || f.tree.ChangeHistory == nil {
+		return nil, false
+	}
+	return f.tree.ChangeHistory, true
+}
+
 // RepositoryState is the state of the repository holding dir and the
 // absolute root of its work tree: outside a work tree, then without a commit,
 // then shallow, else complete. The root is empty outside a work tree. A Git
@@ -192,4 +206,27 @@ func RepositoryState(dir string) (state, root string, err error) {
 		return job.RepositoryShallow, root, nil
 	}
 	return job.RepositoryComplete, root, nil
+}
+
+// NestedRepository reports whether dir lies in a repository nested in the
+// workspace's: a directory from dir up to, but not including, workspaceRoot
+// holds a .git entry, the directory of a clone or the file of a submodule. The
+// workspace's index lists such a repository as one entry and nothing below it,
+// so the context's tracked and candidate listings say nothing of dir: a job
+// asks Git in dir instead.
+func NestedRepository(workspaceRoot, dir string) bool {
+	root := filepath.Clean(workspaceRoot)
+	for current := filepath.Clean(dir); current != root; current = filepath.Dir(current) {
+		rel, err := filepath.Rel(root, current)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return false
+		}
+		if _, err := os.Lstat(filepath.Join(current, ".git")); err == nil {
+			return true
+		}
+		if filepath.Dir(current) == current {
+			return false
+		}
+	}
+	return false
 }

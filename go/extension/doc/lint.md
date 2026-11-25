@@ -29,6 +29,8 @@ pre-bake the same toolchain before the lint gate runs.
    - Resolve binary: matching system PATH → matching managed tools dir → pinned `go install`
    - Resolve config (see [Config Resolution](#config-resolution))
    - Run `golangci-lint run [--fix] [--new] [--config] [--timeout]`
+   - golangci-lint and staticcheck take the job's CPU budget through the
+     `GOMAXPROCS` the scheduler exports; an operator-set `GOMAXPROCS` wins
    - Parse output and emit diagnostics
    - Run the [skip guard](#skip-guard) over the project's `_test.go` files, unless `--skip-guard=false`
 2. **staticcheck** (if `--tool` is `staticcheck` or `all`):

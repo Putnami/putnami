@@ -141,6 +141,12 @@
         "An entry naming another task, a package task or an input is listed and not written.",
         "The sync removes an entry turbo.json no longer gives."
       ]
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": [
+        "A turbo command takes the job's CPU budget as TURBO_CONCURRENCY, unless the environment sets it or turbo.json sets concurrency."
+      ]
     }
   ],
   "decisions": [

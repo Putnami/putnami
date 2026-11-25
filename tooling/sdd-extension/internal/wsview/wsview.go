@@ -57,6 +57,7 @@ import (
 	"fmt"
 	"sort"
 
+	job "go.putnami.dev/protocol/job"
 	workspaceproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 )
@@ -106,6 +107,14 @@ type Workspace struct {
 	// dependency rules over a graph it knows is partial.
 	Warnings     []string
 	WarningCodes []WarningCode
+	// Tree is the tree facts the job context carries (go.putnami.dev/protocol/job,
+	// doc/adr/0003): the candidate cut and the change history the task
+	// declared. Nil outside a job, and for a task that declares none.
+	Tree *job.Tree
+	// NamesNoCommit marks the view of a cached task: its report names the
+	// worktree and no commit, since its key reads no commit (ADR 0059 of the
+	// CLI) and a replayed entry would report the commit of another run.
+	NamesNoCommit bool
 
 	projectByID   map[string]*Project
 	projectByName map[string]*Project
@@ -299,6 +308,7 @@ func FromContext(ctx *pctx.Context) (ws *Workspace, scoped bool) {
 	view := NewWorkspace(ctx.WorkspaceRoot, nil, projects)
 	view.Name = ctx.Workspace.Name
 	view.Version = ctx.Workspace.Version
+	view.Tree = ctx.Tree
 	if !complete && len(ctx.SelectedProjects) > 0 {
 		// The orchestrator ran this task ONCE FOR THE WORKSPACE and handed it
 		// the selection instead of the membership. Every workspace-wide claim is

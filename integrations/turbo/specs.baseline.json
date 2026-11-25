@@ -18,6 +18,7 @@
     "monorepo/turbo-adoption#sync-previews-a-diff",
     "monorepo/turbo-adoption#sync-writes-the-package-graph",
     "monorepo/turbo-adoption#tasks-delegate-to-turbo",
+    "monorepo/turbo-adoption#tools-take-the-cpu-budget",
     "monorepo/turbo-adoption#unmapped-tasks-are-listed",
     "monorepo/turbo-adoption#validate-fails-on-a-stale-graph"
   ]

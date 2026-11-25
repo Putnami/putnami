@@ -7,7 +7,8 @@
     "pattern": "(?m)^(?<version>[0-9]+\\.[0-9]+\\.[0-9]+\\S*)\\s*$",
     "files": [
       { "path": "pants.toml", "key": "GLOBAL.pants_version" }
-    ]
+    ],
+    "stated": { "env": "PANTS_VERSION" }
   },
   "inputs": {
     "sources": ["**"]

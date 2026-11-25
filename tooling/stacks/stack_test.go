@@ -18,6 +18,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
@@ -678,6 +679,23 @@ func TestWorkspaceRootJobRunsOnceAtEachRootTheWorkspaceIncludes(t *testing.T) {
 	if len(dirs) != 1 || dirs[0] != filepath.Join(root, ".") {
 		t.Errorf("dirs = %v", dirs)
 	}
+	// A workspace job runs the stack's tools: they take the job's CPU budget.
+	t.Setenv(cpubudget.Env, "2")
+	t.Setenv("DEMO_JOBS", "")
+	_ = os.Unsetenv("DEMO_JOBS")
+	s.Profile.CPUEnv = []string{"DEMO_JOBS"}
+	var jobs string
+	budgeted := s.WorkspaceRootJob(FailOnMissingToolchain, func(_ context.Context, step RootStep, _ *jsonl.Emitter) error {
+		for _, entry := range step.Env {
+			if v, ok := strings.CutPrefix(entry, "DEMO_JOBS="); ok {
+				jobs = v
+			}
+		}
+		return nil
+	})
+	if status, _, err := budgeted(ctx, jsonl.New(), nil); status != statusOK || err != nil || jobs != "2" {
+		t.Errorf("a workspace job's step reads DEMO_JOBS=%q: %s %v", jobs, status, err)
+	}
 	// The step lists the manifest of every component the job keeps at the
 	// root, not the disabled one's.
 	if want := []string{filepath.Join(root, "crates/api/Cargo.toml"), filepath.Join(root, "crates/pricing/Cargo.toml")}; !reflect.DeepEqual(manifests, want) {
@@ -1099,5 +1117,136 @@ func TestProbeAttributesTheEdgesOfAComponentThatNamesTheirSource(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("dependencySources = %v, want %v", got, want)
+	}
+}
+
+// A step takes the job's CPU budget: {cpus} expands to it, and each variable
+// the profile's cpuEnv names receives it unless the environment sets it.
+func TestAStepTakesTheCPUBudget(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	t.Setenv(cpubudget.Env, "2")
+	t.Setenv("DEMO_JOBS", "")
+	_ = os.Unsetenv("DEMO_JOBS")
+	t.Setenv("DEMO_THREADS", "7")
+	stubTools(t, "1.82.0", junitPass)
+	s := testProfileWithLcov(t)
+	s.Profile.CPUEnv = []string{"DEMO_JOBS", "DEMO_THREADS"}
+	task := s.Profile.Tasks[TaskLint]
+	task.Steps = [][]string{{"sh", "-c", "echo \"$1 $DEMO_JOBS $DEMO_THREADS\" > \"$STUB_ROOT/cpus\"", "sh", "-j{cpus}"}}
+	s.Profile.Tasks[TaskLint] = task
+	if status, _, rec := runTask(t, s, root, TaskLint); status != statusOK {
+		t.Fatalf("status %s: %v", status, rec.diags)
+	}
+	if got, _ := os.ReadFile(filepath.Join(root, "cpus")); strings.TrimSpace(string(got)) != "-j2 2 7" {
+		t.Errorf("the step read %q, want -j2 2 7", got)
+	}
+	// A component whose own configuration sets the width keeps it: the
+	// argument that names {cpus} is left out, and no variable is bound.
+	s.Profile.CPUConfig = []CPUConfig{{File: "{root}/demo.toml", Pattern: `(?m)^jobs\s*=`}}
+	writeFile(t, root, "demo.toml", "jobs = 1\n")
+	if status, _, rec := runTask(t, s, root, TaskLint); status != statusOK {
+		t.Fatalf("status %s: %v", status, rec.diags)
+	}
+	if got, _ := os.ReadFile(filepath.Join(root, "cpus")); strings.TrimSpace(string(got)) != "7" {
+		t.Errorf("the step read %q, want the configured width alone", got)
+	}
+}
+
+func TestAProfileStatesItsCPUControls(t *testing.T) {
+	for _, p := range []Profile{
+		{CPUEnv: []string{"A=B"}},
+		{CPUConfig: []CPUConfig{{File: "/abs", Pattern: "x"}}},
+		{CPUConfig: []CPUConfig{{File: "a", Pattern: "("}}},
+	} {
+		if err := p.validateCPUBudget(); err == nil {
+			t.Errorf("%+v is refused", p)
+		}
+	}
+	if err := checkCPUArg(CPUsPlaceholder); err == nil {
+		t.Error("{cpus} alone is refused")
+	}
+	if err := checkCPUArg("--jobs=" + CPUsPlaceholder); err != nil {
+		t.Errorf("--jobs={cpus}: %v", err)
+	}
+}
+
+// A root job's step runs the stack's tools and takes the job's CPU budget,
+// unless the operator sets the variable or the component configures its
+// width; a locked step and a selected toolchain, whose environment may start
+// the application a job builds, carry none.
+func TestARootJobTakesTheCPUBudgetAndALockedOrSelectedRootNone(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	t.Setenv(cpubudget.Env, "2")
+	t.Setenv("DEMO_JOBS", "")
+	_ = os.Unsetenv("DEMO_JOBS")
+	s := testStack(t)
+	s.Profile.CPUEnv = []string{"DEMO_JOBS"}
+	meta, _ := json.Marshal(Metadata{Component: "api", Root: "."})
+	ctx := &pctx.Context{WorkspaceRoot: root, Project: pctx.Project{FullPath: filepath.Join(root, "crates/api"), Metadata: map[string]json.RawMessage{s.Extension: meta}}}
+	demoJobs := func(env []string) (string, bool) {
+		value, set := "", false
+		for _, entry := range env {
+			if v, ok := strings.CutPrefix(entry, "DEMO_JOBS="); ok {
+				value, set = v, true
+			}
+		}
+		return value, set
+	}
+	rootJob := func() (string, bool) {
+		t.Helper()
+		var jobs string
+		var bound, ran bool
+		status, _, err := s.RootJob(func(_ context.Context, step RootStep, _ *jsonl.Emitter) error {
+			jobs, bound = demoJobs(step.Env)
+			ran = true
+			return nil
+		})(ctx, jsonl.New(), nil)
+		if status != statusOK || err != nil || !ran {
+			t.Fatalf("root job: %s %v, step ran %v", status, err, ran)
+		}
+		return jobs, bound
+	}
+
+	if jobs, _ := rootJob(); jobs != "2" {
+		t.Errorf("a root job's step reads DEMO_JOBS=%q, want 2", jobs)
+	}
+
+	var ran bool
+	if err := s.Locked(ctx, jsonl.New(), func(_ context.Context, step RootStep, _ *jsonl.Emitter) error {
+		ran = true
+		if jobs, set := demoJobs(step.Env); set {
+			t.Errorf("a locked step reads DEMO_JOBS=%q", jobs)
+		}
+		return nil
+	}); err != nil || !ran {
+		t.Fatalf("locked: %v, step ran %v", err, ran)
+	}
+	selected, err := s.Selected(ctx, jsonl.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if jobs, set := demoJobs(selected.Env); set {
+		t.Errorf("a selected toolchain carries DEMO_JOBS=%q", jobs)
+	}
+
+	t.Setenv("DEMO_JOBS", "7")
+	if jobs, _ := rootJob(); jobs != "7" {
+		t.Errorf("the operator's DEMO_JOBS became %q, want 7", jobs)
+	}
+
+	_ = os.Unsetenv("DEMO_JOBS")
+	s.Profile.CPUConfig = []CPUConfig{{File: "{root}/demo.toml", Pattern: `(?m)^jobs\s*=`}}
+	writeFile(t, root, "demo.toml", "jobs = 1\n")
+	if jobs, bound := rootJob(); bound {
+		t.Errorf("a configured width still binds DEMO_JOBS=%q", jobs)
 	}
 }

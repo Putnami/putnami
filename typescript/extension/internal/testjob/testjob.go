@@ -7,14 +7,17 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/hostenv"
 	"go.putnami.dev/typescript/extension/internal/parse"
 	"go.putnami.dev/typescript/extension/internal/project"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 // DefaultTestTimeout bounds the wall-clock duration of the `bun test` subprocess.
@@ -99,7 +102,13 @@ func buildTestArgs(outputPath string, params TestParams) []string {
 		// Off by default: the putnami DAG already runs projects in parallel, so
 		// in-suite workers multiply contention unless a project opts in.
 	case "true":
-		args = append(args, "--parallel")
+		// As many workers as the job's CPU budget grants, else bun's own
+		// width, the host's cores.
+		if budget := cpubudget.Get(); budget > 0 {
+			args = append(args, "--parallel="+strconv.Itoa(budget))
+		} else {
+			args = append(args, "--parallel")
+		}
 	default:
 		args = append(args, "--parallel="+params.Parallel)
 	}
@@ -167,12 +176,12 @@ func buildTestEnv(params TestParams) map[string]string {
 	}
 	if raw := os.Getenv(envDatabaseTestBindings); strings.TrimSpace(raw) != "" {
 		env[envDatabaseTestBindings] = raw
-		return env
+		return toolchain.BunEnv(env)
 	}
 	if binding := strings.TrimSpace(params.DatabaseBinding); binding != "" {
 		env[envDatabaseTestBindings] = binding
 	}
-	return env
+	return toolchain.BunEnv(env)
 }
 
 // RunTests executes bun test and returns raw output.

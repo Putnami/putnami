@@ -582,6 +582,33 @@ func (t Toolchain) MachineVersion(ctx context.Context, dir string, env []string)
 	return "", fmt.Errorf("%s printed no version that matches %q", strings.Join(t.Command, " "), t.Pattern)
 }
 
+// onPathVersion is the version of the toolchain on PATH. For a tool that runs
+// only its stated version, it is the version its variable names, else the one
+// its files state, when that version is exact: the command is looked up on
+// PATH and not started (ADR 0021). Otherwise it is what the command prints.
+func (t Toolchain) onPathVersion(ctx context.Context, dir string, expected Expected, env []string) (string, error) {
+	if t.Stated != nil {
+		// toolchain.version, set by the profile or a project, is not what
+		// the tool reads: only its files and its variable are.
+		stated := ""
+		if expected.Source != "profile" {
+			stated = expected.Version
+		}
+		if t.Stated.Env != "" {
+			if value := strings.TrimSpace(environmentValue(env, t.Stated.Env)); value != "" {
+				stated = value
+			}
+		}
+		if IsExact(stated) {
+			if _, err := t.command(ctx, env); err != nil {
+				return "", err
+			}
+			return stated, nil
+		}
+	}
+	return t.MachineVersion(ctx, dir, env)
+}
+
 // Selection is the toolchain a task runs and the outcome of its check.
 type Selection struct {
 	// Env is the environment of the task's steps.
@@ -636,7 +663,7 @@ func (t Toolchain) Select(ctx context.Context, dir string, expected Expected, en
 // toolchain may take its place.
 func (t Toolchain) SelectWith(ctx context.Context, dir string, expected Expected, env []string, matches func(expected, machine string) bool) (Selection, error) {
 	onPath := Selection{Env: env}
-	machine, machineErr := t.MachineVersion(ctx, dir, env)
+	machine, machineErr := t.onPathVersion(ctx, dir, expected, env)
 	if machineErr == nil {
 		onPath.Verdict = t.CompareWith(expected, machine, matches)
 		if !onPath.Verdict.Fail {

@@ -20,6 +20,7 @@
     "ruby/stack-extension#serves-an-application",
     "ruby/stack-extension#tasks-run-the-profile",
     "ruby/stack-extension#test-runner-per-component",
+    "ruby/stack-extension#tools-take-the-cpu-budget",
     "ruby/stack-extension#upgrades-the-dependencies",
     "ruby/stack-extension#workspace-install-runs-bundler"
   ]

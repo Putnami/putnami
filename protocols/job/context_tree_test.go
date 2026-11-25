@@ -2,6 +2,10 @@ package job
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -13,7 +17,8 @@ import (
 // stays `[]` and an absent listing stays absent.
 func TestTreeFixturesRoundTrip(t *testing.T) {
 	spectest.Proves(t, "job/execution-context", "tree-facts-are-answers", "an-empty-listing-stays-an-answer")
-	for _, path := range []string{"fixtures/v2/valid/tree-facts.json", "fixtures/v2/valid/tree-unmanaged.json", "fixtures/v2/valid/tree-untagged.json"} {
+	for _, path := range []string{"fixtures/v2/valid/tree-facts.json", "fixtures/v2/valid/tree-unmanaged.json", "fixtures/v2/valid/tree-untagged.json",
+		"fixtures/v2/valid/tree-candidates.json", "fixtures/v2/valid/tree-history-shallow.json"} {
 		ctx, diags := ParseAndValidate(readFixture(t, path))
 		if diag.HasErrors(diags) {
 			t.Fatalf("%s: %v", path, diags)
@@ -30,7 +35,8 @@ func TestTreeFixturesRoundTrip(t *testing.T) {
 			t.Fatalf("%s written again: %v", path, diags)
 		}
 		if (ctx.Tree.TrackedFiles == nil) != (again.Tree.TrackedFiles == nil) ||
-			(ctx.Tree.IgnoredDirectories == nil) != (again.Tree.IgnoredDirectories == nil) {
+			(ctx.Tree.IgnoredDirectories == nil) != (again.Tree.IgnoredDirectories == nil) ||
+			(ctx.Tree.CandidateFiles == nil) != (again.Tree.CandidateFiles == nil) {
 			t.Errorf("%s: a listing changed between absent and empty when written again", path)
 		}
 	}
@@ -62,6 +68,52 @@ func TestTreeVocabulariesAreSorted(t *testing.T) {
 			if vocabulary[i-1] >= vocabulary[i] {
 				t.Errorf("%s states are not sorted: %q precedes %q", name, vocabulary[i-1], vocabulary[i])
 			}
+		}
+	}
+}
+
+// TestCandidateListingRoundTrip pins that a listing file reads back what was
+// encoded, and that a file whose bytes do not match the digest, or whose cut is
+// not sorted, is refused.
+func TestCandidateListingRoundTrip(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "candidate-cut-and-history-are-answers", "a-candidate-listing-file-matches-its-digest")
+	files := []CandidateFile{{Path: "a/b.go", Mode: CandidateModeRegular}, {Path: "a/new.txt", Mode: CandidateModeUntracked}}
+	data, digest, err := EncodeCandidateFiles(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "candidates.json")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadCandidateListing(&CandidateListing{File: path, Digest: digest})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got, files) {
+		t.Errorf("read %v, want %v", got, files)
+	}
+	if _, err := ReadCandidateListing(&CandidateListing{File: path, Digest: strings.Repeat("0", 64)}); err == nil {
+		t.Error("a listing whose digest does not match was read")
+	}
+	unsorted, unsortedDigest, err := EncodeCandidateFiles([]CandidateFile{files[1], files[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, unsorted, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadCandidateListing(&CandidateListing{File: path, Digest: unsortedDigest}); err == nil {
+		t.Error("an unsorted listing was read")
+	}
+}
+
+// TestTreeCandidateModesAreSorted pins the canonical order of the candidate
+// modes.
+func TestTreeCandidateModesAreSorted(t *testing.T) {
+	for i := 1; i < len(CandidateModes); i++ {
+		if CandidateModes[i-1] >= CandidateModes[i] {
+			t.Errorf("candidate modes are not sorted: %q precedes %q", CandidateModes[i-1], CandidateModes[i])
 		}
 	}
 }

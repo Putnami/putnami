@@ -94,6 +94,94 @@ type Tree struct {
 	// ReleaseBaseline is the project's release baseline, present when the
 	// task declares the `releaseBaseline` runtime input.
 	ReleaseBaseline *ReleaseBaseline `json:"releaseBaseline,omitempty"`
+	// CandidateDirectories are the directories CandidateFiles covers,
+	// relative to the workspace root in slash form ("." for the root), sorted
+	// and unique: the task's directory, and each member of its dependency
+	// closure when a closure input holds a `git:` pattern (doc/adr/0003).
+	// Present exactly when CandidateFiles is.
+	CandidateDirectories []string `json:"candidateDirectories,omitzero"`
+	// CandidateFiles is the candidate cut at or below CandidateDirectories:
+	// the paths a `git:` input enumerates (`git ls-files --cached --others
+	// --exclude-standard`), before the disk is read, with their index modes.
+	// Sorted by path and unique. Present when the task declares the
+	// `candidateFiles` runtime input and the workspace is inside a work tree.
+	CandidateFiles []CandidateFile `json:"candidateFiles,omitzero"`
+	// WorkspaceCandidates names the file that holds the workspace's candidate
+	// cut, written once per run, present when the task declares the
+	// `workspaceCandidateFiles` runtime input and the workspace is inside a
+	// work tree.
+	WorkspaceCandidates *CandidateListing `json:"workspaceCandidates,omitempty"`
+	// ChangeHistory is the history of the change since the run's impacted
+	// baseline, present when the task declares the `changeHistory` runtime
+	// input, its cache is disabled and the run has an impacted baseline.
+	ChangeHistory *ChangeHistory `json:"changeHistory,omitempty"`
+}
+
+// Candidate modes: the closed vocabulary of CandidateFile.Mode. A tracked
+// path carries its index mode; an untracked one, and one the index holds
+// unmerged, carry no single mode.
+const (
+	CandidateModeRegular    = "100644"
+	CandidateModeExecutable = "100755"
+	CandidateModeSymlink    = "120000"
+	CandidateModeSubmodule  = "160000"
+	CandidateModeUnmerged   = "unmerged"
+	CandidateModeUntracked  = "untracked"
+)
+
+// CandidateModes is the closed candidate-mode vocabulary in canonical (sorted)
+// order.
+var CandidateModes = []string{
+	CandidateModeRegular,
+	CandidateModeExecutable,
+	CandidateModeSymlink,
+	CandidateModeSubmodule,
+	CandidateModeUnmerged,
+	CandidateModeUntracked,
+}
+
+// CandidateFile is one path of the candidate cut.
+type CandidateFile struct {
+	// Path is relative to the workspace root, in slash form.
+	Path string `json:"path"`
+	// Mode is one of CandidateModes.
+	Mode string `json:"mode"`
+}
+
+// CandidateListing names a file of the run that holds a candidate cut: the
+// JSON array of CandidateFile EncodeCandidateFiles writes.
+type CandidateListing struct {
+	// File is the absolute path of the file, which the job reads and never
+	// writes; the run removes it when it ends.
+	File string `json:"file"`
+	// Digest is the lowercase hex SHA-256 of the file's bytes, the value the
+	// task's key holds.
+	Digest string `json:"digest"`
+}
+
+// ChangeHistory is what the history says about the change since the run's
+// impacted baseline.
+type ChangeHistory struct {
+	// Baseline is the run's impacted baseline, as the selection names it.
+	Baseline string `json:"baseline"`
+	// Shallow reports a shallow clone, whose history may stop before the
+	// merge base: it then carries nothing else.
+	Shallow bool `json:"shallow,omitempty"`
+	// MergeBase is the merge base of Baseline and HEAD.
+	MergeBase string `json:"mergeBase,omitempty"`
+	// Commits are the commits of Baseline..HEAD, newest first, merges
+	// included. Present, possibly empty, when the clone is not shallow.
+	Commits []HistoryCommit `json:"commits,omitzero"`
+	// WorkspaceConfig is putnami.workspace.json as MergeBase holds it at the
+	// workspace's directory, absent when it holds none.
+	WorkspaceConfig *string `json:"workspaceConfig,omitempty"`
+}
+
+// HistoryCommit is one commit message of the history.
+type HistoryCommit struct {
+	SHA     string `json:"sha"`
+	Subject string `json:"subject"`
+	Body    string `json:"body,omitempty"`
 }
 
 // TreeRepository is the repository state of the workspace.
@@ -131,7 +219,12 @@ type ReleaseBaseline struct {
 // A PRESENT-but-null member, and a present-but-null listing, are neither an
 // answer nor its absence. A tree without a fact is no member at all: the
 // orchestrator writes one only for a task that declares a fact.
-func validateTree(tree *Tree, present, tracked, ignored bool) []diag.Diagnostic {
+// treeListings is which listings the document carries, null included.
+type treeListings struct {
+	tracked, ignored, candidates, candidateDirectories bool
+}
+
+func validateTree(tree *Tree, present bool, listings treeListings) []diag.Diagnostic {
 	present = present || tree != nil
 	if !present {
 		return nil
@@ -140,8 +233,10 @@ func validateTree(tree *Tree, present, tracked, ignored bool) []diag.Diagnostic 
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidValue, "tree",
 			"tree must be omitted or contain a non-null object")}
 	}
-	tracked = tracked || tree.TrackedFiles != nil
-	ignored = ignored || tree.IgnoredDirectories != nil
+	tracked := listings.tracked || tree.TrackedFiles != nil
+	ignored := listings.ignored || tree.IgnoredDirectories != nil
+	candidates := listings.candidates || tree.CandidateFiles != nil
+	candidateDirectories := listings.candidateDirectories || tree.CandidateDirectories != nil
 	var diags []diag.Diagnostic
 	switch {
 	case tree.Directory == "":
@@ -150,7 +245,8 @@ func validateTree(tree *Tree, present, tracked, ignored bool) []diag.Diagnostic 
 		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "tree.directory",
 			"tree.directory must be a clean slash path relative to the workspace root, or \".\", got %q", tree.Directory))
 	}
-	if tree.Repository == nil && !tracked && !ignored && tree.ReleaseBaseline == nil {
+	if tree.Repository == nil && !tracked && !ignored && tree.ReleaseBaseline == nil && !candidates &&
+		!candidateDirectories && tree.WorkspaceCandidates == nil && tree.ChangeHistory == nil {
 		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "tree",
 			"tree carries no fact; omit the member when the task declares none"))
 	}
@@ -165,7 +261,139 @@ func validateTree(tree *Tree, present, tracked, ignored bool) []diag.Diagnostic 
 		diags = append(diags, validateTreeListing("tree.ignoredDirectories", tree.Directory, tree.IgnoredDirectories)...)
 	}
 	diags = append(diags, validateReleaseBaseline(tree.ReleaseBaseline)...)
+	if candidates != candidateDirectories {
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "tree.candidateFiles",
+			"tree.candidateFiles and tree.candidateDirectories go together"))
+	} else if candidates {
+		diags = append(diags, validateCandidates(tree.CandidateDirectories, tree.CandidateFiles)...)
+	}
+	diags = append(diags, validateCandidateListing(tree.WorkspaceCandidates)...)
+	diags = append(diags, validateChangeHistory(tree.ChangeHistory)...)
 	return diags
+}
+
+// validateCandidates checks a candidate cut and the directories it covers.
+func validateCandidates(directories []string, files []CandidateFile) []diag.Diagnostic {
+	if directories == nil || files == nil {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidValue, "tree.candidateFiles",
+			"tree.candidateFiles and tree.candidateDirectories must be omitted or contain a non-null array")}
+	}
+	var diags []diag.Diagnostic
+	if len(directories) == 0 {
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "tree.candidateDirectories",
+			"tree.candidateDirectories names at least one directory"))
+	}
+	for i, directory := range directories {
+		if directory != "." && !cleanRelativePath(directory) {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, fmt.Sprintf("tree.candidateDirectories[%d]", i),
+				"tree.candidateDirectories[%d] must be a clean slash path relative to the workspace root, or \".\", got %q", i, directory))
+		}
+		if i > 0 && directories[i-1] >= directory {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "tree.candidateDirectories",
+				"tree.candidateDirectories must be sorted and free of duplicates; %q precedes %q", directories[i-1], directory))
+		}
+	}
+	diags = append(diags, ValidateCandidateFiles("tree.candidateFiles", directories, files)...)
+	return diags
+}
+
+// ValidateCandidateFiles checks a candidate cut: every path clean, relative
+// and at or below one of directories, every mode one of CandidateModes, the
+// paths sorted in byte order and free of duplicates.
+func ValidateCandidateFiles(field string, directories []string, files []CandidateFile) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	for i, file := range files {
+		covered := false
+		for _, directory := range directories {
+			if atOrBelow(directory, file.Path) {
+				covered = true
+				break
+			}
+		}
+		if !cleanRelativePath(file.Path) || !covered {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, fmt.Sprintf("%s[%d].path", field, i),
+				"%s[%d].path must be a clean slash path relative to the workspace root at or below %s, got %q",
+				field, i, strings.Join(directories, ", "), file.Path))
+		}
+		if !oneOf(file.Mode, CandidateModes) {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, fmt.Sprintf("%s[%d].mode", field, i),
+				"%s[%d].mode is %q; want one of %s", field, i, file.Mode, strings.Join(CandidateModes, ", ")))
+		}
+		if i > 0 && files[i-1].Path >= file.Path {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, field,
+				"%s must be sorted by path and free of duplicates; %q precedes %q", field, files[i-1].Path, file.Path))
+		}
+	}
+	return diags
+}
+
+// validateCandidateListing checks the name of a candidate listing file.
+func validateCandidateListing(listing *CandidateListing) []diag.Diagnostic {
+	if listing == nil {
+		return nil
+	}
+	var diags []diag.Diagnostic
+	if !isAbsolutePath(listing.File) {
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "tree.workspaceCandidates.file",
+			"tree.workspaceCandidates.file must be an absolute path, got %q", listing.File))
+	}
+	if !lowerHex(listing.Digest, 64) {
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "tree.workspaceCandidates.digest",
+			"tree.workspaceCandidates.digest must be a lowercase hex SHA-256, got %q", listing.Digest))
+	}
+	return diags
+}
+
+// validateChangeHistory checks a change history: the baseline, and either a
+// shallow clone that carries nothing else or the merge base and the commits.
+func validateChangeHistory(history *ChangeHistory) []diag.Diagnostic {
+	if history == nil {
+		return nil
+	}
+	const field = "tree.changeHistory"
+	var diags []diag.Diagnostic
+	if strings.TrimSpace(history.Baseline) == "" {
+		diags = append(diags, diag.Errorf(ErrorCodeMissingField, field+".baseline", "%s.baseline is required", field))
+	}
+	if history.Shallow {
+		if history.MergeBase != "" || history.Commits != nil || history.WorkspaceConfig != nil {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, field,
+				"%s of a shallow clone carries no merge base, commit or workspace config", field))
+		}
+		return diags
+	}
+	if !commitID(history.MergeBase) {
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, field+".mergeBase",
+			"%s.mergeBase must be a full commit ID, got %q", field, history.MergeBase))
+	}
+	if history.Commits == nil {
+		diags = append(diags, diag.Errorf(ErrorCodeMissingField, field+".commits",
+			"%s.commits is required when the clone is not shallow; no commit is an empty array", field))
+	}
+	for i, commit := range history.Commits {
+		if !commitID(commit.SHA) {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, fmt.Sprintf("%s.commits[%d].sha", field, i),
+				"%s.commits[%d].sha must be a full commit ID, got %q", field, i, commit.SHA))
+		}
+	}
+	return diags
+}
+
+// commitID reports a full SHA-1 or SHA-256 commit ID in lowercase hex.
+func commitID(value string) bool {
+	return lowerHex(value, 40) || lowerHex(value, 64)
+}
+
+func lowerHex(value string, length int) bool {
+	if len(value) != length {
+		return false
+	}
+	for _, c := range value {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // validateTreeListing checks one listing: non-null, every path clean, relative

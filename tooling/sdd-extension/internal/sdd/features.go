@@ -266,7 +266,7 @@ func BuildFeatureTaskValidationResult(ws *workspace.Workspace, selection Selecti
 			protocolcli.ErrInvalidConfig,
 		)
 	}
-	reader, err := featureengine.NewTaskReader(ws.Root)
+	reader, err := featureengine.NewTaskReaderFrom(ws.Tree, ws.Root)
 	if err != nil {
 		return FeatureValidationReport{}, fmt.Errorf("features validate: %w", err)
 	}

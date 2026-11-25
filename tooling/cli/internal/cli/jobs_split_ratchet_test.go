@@ -79,6 +79,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/distribution",
 			"go.putnami.dev/protocol/extension",
 			"go.putnami.dev/protocol/features",
+			"go.putnami.dev/protocol/job",
 			"go.putnami.dev/protocol/runtime",
 			"go.putnami.dev/protocol/workspace",
 			"go.putnami.dev/sdk/extension/dirlink",
@@ -96,7 +97,6 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/cli/model/extension",
 			"go.putnami.dev/cli/model/workspace",
 			"go.putnami.dev/protocol/cli",
-			"go.putnami.dev/protocol/job",
 			"go.putnami.dev/sdk/extension/gitread",
 			"go.putnami.dev/sdk/extension/gittest",
 			"go.putnami.dev/sdk/extension/profiles",
@@ -106,7 +106,8 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"toolchains, the host platform and the release baseline the git history names; it reads " +
 			"them through the workspace, extension and store models, and never imports the scheduler " +
 			"or the runner. It also converts a task's result to and from its cache entry, whose events " +
-			"name protocol features",
+			"name protocol features, and reads the tree facts a key holds in the shapes the job " +
+			"protocol hands them to the job",
 	},
 	{
 		dir: "internal/jobs/planner",

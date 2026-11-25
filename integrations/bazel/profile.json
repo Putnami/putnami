@@ -1,5 +1,6 @@
 {
   "id": "bazel",
+  "cpuConfig": [{"file": "{root}/.bazelrc", "pattern": "--local_(cpu_)?resources"}],
   "delegated": true,
   "markers": ["BUILD.bazel", "BUILD"],
   "toolchain": {
@@ -15,14 +16,14 @@
   "tasks": {
     "test": {
       "steps": [
-        ["bazel", "test", "--instrumentation_filter=^//", "--build_event_json_file={output}/build-events.json", "//{component}:all"]
+        ["bazel", "test", "--local_cpu_resources={cpus}", "--instrumentation_filter=^//", "--build_event_json_file={output}/build-events.json", "//{component}:all"]
       ],
       "reportSteps": [
         ["{runtime}", "collect-reports", "--events", "{output}/build-events.json", "--root", "{root}", "--package", "{component}", "--into", "{output}/reports"]
       ],
       "batch": {
         "steps": [
-          ["bazel", "test", "--instrumentation_filter=^//", "--build_event_json_file={batch}/build-events.json", "//{component}:all"]
+          ["bazel", "test", "--local_cpu_resources={cpus}", "--instrumentation_filter=^//", "--build_event_json_file={batch}/build-events.json", "//{component}:all"]
         ],
         "reportSteps": [
           ["{runtime}", "collect-reports", "--events", "{batch}/build-events.json", "--root", "{root}", "--package", "{component}", "--runs-of-package", "--into", "{output}/reports"]
@@ -37,11 +38,11 @@
     },
     "build": {
       "steps": [
-        ["bazel", "build", "--instrumentation_filter=^//", "//{component}:all"]
+        ["bazel", "build", "--local_cpu_resources={cpus}", "--instrumentation_filter=^//", "//{component}:all"]
       ],
       "batch": {
         "steps": [
-          ["bazel", "build", "--instrumentation_filter=^//", "--build_event_json_file={batch}/build-events.json", "//{component}:all"]
+          ["bazel", "build", "--local_cpu_resources={cpus}", "--instrumentation_filter=^//", "--build_event_json_file={batch}/build-events.json", "//{component}:all"]
         ]
       },
       "inputs": ["sources"],

@@ -106,6 +106,8 @@ func parseContextPresence(data []byte) (contextPresence, error) {
 		tree:                     tree,
 		treeTrackedFiles:         nestedHas("tree", "trackedFiles"),
 		treeIgnoredDirectories:   nestedHas("tree", "ignoredDirectories"),
+		treeCandidateFiles:       nestedHas("tree", "candidateFiles"),
+		treeCandidateDirectories: nestedHas("tree", "candidateDirectories"),
 	}, nil
 }
 

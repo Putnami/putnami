@@ -10,6 +10,7 @@ import (
 	"sort"
 	"testing"
 
+	job "go.putnami.dev/protocol/job"
 	putnamigit "go.putnami.dev/tooling/sdd/extension/internal/gitread"
 )
 
@@ -141,5 +142,58 @@ func TestNewTaskReaderReadsTheDiskOutsideAWorkTree(t *testing.T) {
 	}
 	if _, err := NewTaskReader(filepath.Join(t.TempDir(), "absent")); err == nil {
 		t.Fatal("NewTaskReader of an absent root succeeded")
+	}
+}
+
+// A job whose context carries the cut reads it, and binds a project's source,
+// without Git: the binding equals the one Git enumerates, the executable bit
+// and an untracked candidate included.
+func TestCutReaderFromTheContextBindsTheSourceWithoutGit(t *testing.T) {
+	repo := initFeatureGitRepo(t)
+	writeRevisionFile(t, repo, ".gitignore", "*.log\n")
+	writeRevisionFile(t, repo, "billing/putnami.features.json", "{\"manifest\":true}")
+	writeRevisionFile(t, repo, "billing/run.sh", "#!/bin/sh\n")
+	if err := os.Chmod(filepath.Join(repo, "billing", "run.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runFeatureGit(t, repo, "add", ".gitignore", "billing")
+	writeRevisionFile(t, repo, "billing/new.json", "{}")
+	writeRevisionFile(t, repo, "billing/debug.log", "ignored\n")
+	viaGit, err := putnamigit.ProjectSourceBinding(repo, filepath.Join(repo, "billing"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tree := &job.Tree{Directory: ".", CandidateDirectories: []string{"."}, CandidateFiles: []job.CandidateFile{
+		{Path: ".gitignore", Mode: job.CandidateModeRegular},
+		{Path: "billing/new.json", Mode: job.CandidateModeUntracked},
+		{Path: "billing/putnami.features.json", Mode: job.CandidateModeRegular},
+		{Path: "billing/run.sh", Mode: job.CandidateModeExecutable},
+	}}
+	t.Setenv("PATH", t.TempDir())
+	opened, err := NewTaskReaderFrom(tree, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, ok := opened.(*CutReader)
+	if !ok {
+		t.Fatalf("NewTaskReaderFrom = %T, want the candidate cut", opened)
+	}
+	if _, err := reader.ReadFile("billing", "debug.log"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("ReadFile(debug.log) error = %v, want fs.ErrNotExist", err)
+	}
+	binding, err := reader.SourceBinding("billing")
+	if err != nil || binding != viaGit {
+		t.Errorf("SourceBinding(billing) = %q, %v, want the Git binding %q", binding, err, viaGit)
+	}
+	unmerged := &job.Tree{Directory: ".", CandidateDirectories: []string{"."}, CandidateFiles: []job.CandidateFile{
+		{Path: "billing/putnami.features.json", Mode: job.CandidateModeUnmerged},
+	}}
+	opened, err = NewTaskReaderFrom(unmerged, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := opened.(*CutReader).SourceBinding("billing"); err == nil {
+		t.Error("an unmerged candidate was bound")
 	}
 }

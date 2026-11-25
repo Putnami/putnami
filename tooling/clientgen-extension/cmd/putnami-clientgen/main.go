@@ -162,7 +162,7 @@ func runCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 	if ctx.WorkspaceRoot == "" {
 		return "FAILED", nil, errors.New("workspace client command received no workspace root")
 	}
-	report := workspaceclient.InspectCommitted(ctx.WorkspaceRoot, memberPaths(ctx.WorkspaceProjects))
+	report := workspaceclient.InspectCommittedFrom(ctx, ctx.WorkspaceRoot, memberPaths(ctx.WorkspaceProjects))
 	// Each phase is timed and reported (Report.Timings, one metric event per
 	// phase). The session record exposes this task as one durationMs, and the
 	// split behind that number is what decides where a slow guard spends its

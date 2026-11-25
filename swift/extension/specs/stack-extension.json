@@ -118,6 +118,12 @@
         "publish with the docker channel pushes the packaged image to registries.oci.publish through the shared publisher, and an application that publishes the docker channel declares it as an oci release-set member.",
         "A library or an Xcode project publishes nothing."
       ]
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": [
+        "swift build, swift test and xcodebuild take the job's CPU budget: --jobs, --num-workers and -jobs, the budget, else GOMAXPROCS."
+      ]
     }
   ],
   "decisions": [

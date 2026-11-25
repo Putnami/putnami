@@ -708,6 +708,27 @@ const (
 	// key already holds, the tag's object at the project directory. Without
 	// RuntimeInputReleaseBaseline it names nothing.
 	RuntimeInputReleaseBaselineFiles = "releaseBaselineFiles"
+	// RuntimeInputCandidateFiles is the candidate cut a `git:` input
+	// enumerates, with each path's index mode, at or below the task's
+	// directory and, when a closure input holds a `git:` pattern, each member
+	// of its dependency closure. The CLI reads the workspace's cut once per
+	// run, keys the listing and writes it to the job context's
+	// `tree.candidateFiles` (go.putnami.dev/protocol/job, doc/adr/0003). An
+	// older CLI resolves nothing for it, and the SDK then asks Git.
+	RuntimeInputCandidateFiles = "candidateFiles"
+	// RuntimeInputWorkspaceCandidateFiles is the workspace's candidate cut,
+	// for a project task that reads the whole workspace: the CLI writes it
+	// once per run to a file, keys the file's digest and names the file in the
+	// job context's `tree.workspaceCandidates`. A task declares it only beside
+	// a workspace `git:**` input (ValidateTreeFactInputs).
+	RuntimeInputWorkspaceCandidateFiles = "workspaceCandidateFiles"
+	// RuntimeInputChangeHistory is the history of the change since the run's
+	// impacted baseline: whether the clone is shallow, the merge base, the
+	// commits since the baseline and the workspace config at the merge base,
+	// written to the job context's `tree.changeHistory`. It adds nothing to a
+	// key, and only an uncached task declares it (ValidateTreeFactInputs): a
+	// commit is state no cache key names.
+	RuntimeInputChangeHistory = "changeHistory"
 )
 
 // TaskInputPort declares a task input source.

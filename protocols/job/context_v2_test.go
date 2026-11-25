@@ -189,6 +189,18 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 		"tree.releaseBaseline.hasTags",
 		"tree.releaseBaseline.breaking",
 		"tree.releaseBaseline.directory",
+		"tree.candidateFiles",
+		"tree.candidateFiles[0].path",
+		"tree.candidateFiles[0].mode",
+		"tree.candidateDirectories",
+		"tree.candidateDirectories[0]",
+		"tree.workspaceCandidates.file",
+		"tree.workspaceCandidates.digest",
+		"tree.changeHistory",
+		"tree.changeHistory.baseline",
+		"tree.changeHistory.mergeBase",
+		"tree.changeHistory.commits",
+		"tree.changeHistory.commits[0].sha",
 	} {
 		if !fields[field] {
 			t.Errorf("no invalid v2 fixture reports on %q", field)

@@ -380,6 +380,7 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "workspaceCandidateFiles": { "from": "runtime" },
         "readme": { "from": "project", "files": ["README.md"] },
         "repository": { "from": "workspace", "files": ["git:**"] },
         "docs-links": { "from": "params" }
@@ -562,6 +563,7 @@
         },
         "workspaceConfig": { "from": "workspace", "files": ["pyproject.toml", "uv.lock", "uv.toml", ".python-version"] },
         "parameters": { "from": "params" },
+        "candidateFiles": { "from": "runtime" },
         "extensionVersion": { "from": "runtime" }
       },
       "timeoutMs": 1800000,

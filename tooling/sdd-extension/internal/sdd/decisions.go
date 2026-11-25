@@ -170,7 +170,7 @@ func unusableDecisions(report DecisionsReport) (DecisionsReport, error) {
 // checks proved against the worktree.
 func BuildDecisionsResult(ws *workspace.Workspace) (DecisionsReport, error) {
 	var report DecisionsReport
-	tree, err := openWorktree(ws.Root)
+	tree, err := openWorktreeFrom(ws.Tree, ws.Root)
 	if err != nil {
 		return report, fmt.Errorf("decisions: %w", err)
 	}

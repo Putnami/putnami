@@ -85,7 +85,7 @@ func TestADeclaredTreeFactIsKeyedAndCarried(t *testing.T) {
 	silent := treeFactsJob(app)
 
 	cache := newTreeFactsCache(t)
-	tree := jobTree(cachekey.RunTreeFacts(cache, root), ws, declaring)
+	tree := jobTree(cachekey.RunTreeFacts(cache, root), ws, declaring, nil)
 	want := &protocoljob.Tree{
 		Directory:          "app",
 		Repository:         &protocoljob.TreeRepository{State: putnamigit.RepositoryComplete},
@@ -93,7 +93,7 @@ func TestADeclaredTreeFactIsKeyedAndCarried(t *testing.T) {
 		IgnoredDirectories: []string{"app/dist"},
 	}
 	assertTree(t, tree, want)
-	if got := jobTree(cachekey.RunTreeFacts(cache, root), ws, silent); got != nil {
+	if got := jobTree(cachekey.RunTreeFacts(cache, root), ws, silent, nil); got != nil {
 		t.Fatalf("a task that declares no fact got %+v", got)
 	}
 
@@ -128,7 +128,7 @@ func TestADeclaredTreeFactIsKeyedAndCarried(t *testing.T) {
 	// A workspace task covers the workspace.
 	workspaceJob := treeFactsJob(ws.ProjectByID("/app"), extproto.RuntimeInputIgnoredDirectories)
 	workspaceJob.SelectedProjects = ws.Projects
-	got := jobTree(cachekey.RunTreeFacts(newTreeFactsCache(t), root), ws, workspaceJob)
+	got := jobTree(cachekey.RunTreeFacts(newTreeFactsCache(t), root), ws, workspaceJob, nil)
 	if got == nil || got.Directory != "." || !slices.Contains(got.IgnoredDirectories, "app/dist") ||
 		!slices.Contains(got.IgnoredDirectories, "other/dist") {
 		t.Fatalf("workspace task tree = %+v, want the ignored directories of the workspace", got)
@@ -145,7 +145,7 @@ func TestTreeFactsOutsideAWorkTreeAreEmptyAnswers(t *testing.T) {
 	job := treeFactsJob(ws.ProjectByID("/app"), extproto.RuntimeInputTrackedFiles, extproto.RuntimeInputIgnoredDirectories, extproto.RuntimeInputRepository)
 	cache := newTreeFactsCache(t)
 	treeFactKeyOf(t, ws, job, cache)
-	assertTree(t, jobTree(cachekey.RunTreeFacts(cache, root), ws, job), &protocoljob.Tree{
+	assertTree(t, jobTree(cachekey.RunTreeFacts(cache, root), ws, job, nil), &protocoljob.Tree{
 		Directory:          "app",
 		Repository:         &protocoljob.TreeRepository{State: putnamigit.RepositoryUnmanaged},
 		TrackedFiles:       []string{},
@@ -194,7 +194,7 @@ func TestAJobsKeyAndContextComeFromOneRead(t *testing.T) {
 	writeFileAt(t, filepath.Join(root, "app", "staged.go"), "package main\n")
 	treeKeyedGit(t, root, "add", "app/staged.go")
 
-	tree := jobTree(cachekey.RunTreeFacts(cache, root), ws, job)
+	tree := jobTree(cachekey.RunTreeFacts(cache, root), ws, job, nil)
 	if tree == nil || !slices.Equal(tree.TrackedFiles, []string{"app/main.go"}) {
 		t.Fatalf("context tracked files = %+v, want the listing the key read", tree)
 	}
@@ -220,18 +220,18 @@ func TestTheBaselineFilesAreExtractedOnlyWhenAskedFor(t *testing.T) {
 	facts.SetPlanned(ws, []*jobmodel.ScheduledJob{baselineOnly, withFiles})
 	t.Cleanup(facts.Close)
 
-	only := jobTree(facts, ws, baselineOnly)
+	only := jobTree(facts, ws, baselineOnly, nil)
 	if only == nil || only.ReleaseBaseline == nil || only.ReleaseBaseline.State != protocoljob.ReleaseBaselineTagged || only.ReleaseBaseline.Directory != "" {
 		t.Fatalf("baseline-only tree = %+v, want the tagged baseline with no directory", only)
 	}
-	if entries, _ := filepath.Glob(filepath.Join(store.ResolveScratchRoot(root), "release-baselines-*")); len(entries) != 0 {
+	if entries, _ := filepath.Glob(filepath.Join(store.ResolveScratchRoot(root), "tree-facts-*")); len(entries) != 0 {
 		t.Fatalf("a task that did not ask for the files extracted %v", entries)
 	}
-	with := jobTree(facts, ws, withFiles)
+	with := jobTree(facts, ws, withFiles, nil)
 	if with == nil || with.ReleaseBaseline == nil || with.ReleaseBaseline.Directory == "" {
 		t.Fatalf("tree with files = %+v, want the directory", with)
 	}
-	if entries, _ := filepath.Glob(filepath.Join(store.ResolveScratchRoot(root), "release-baselines-*")); len(entries) != 1 {
+	if entries, _ := filepath.Glob(filepath.Join(store.ResolveScratchRoot(root), "tree-facts-*")); len(entries) != 1 {
 		t.Fatalf("extractions = %v, want the one the task asked for", entries)
 	}
 }
@@ -262,7 +262,7 @@ func TestAFailedExtractionKeepsTheKeyAndIsLogged(t *testing.T) {
 	if got := treeFactKeyOf(t, ws, job, cache); got != want {
 		t.Errorf("the key moved with a failed extraction (%s != %s)", got, want)
 	}
-	if tree := jobTree(facts, ws, job); tree != nil && tree.ReleaseBaseline != nil {
+	if tree := jobTree(facts, ws, job, nil); tree != nil && tree.ReleaseBaseline != nil {
 		t.Fatalf("tree = %+v, want no release baseline after a failed extraction", tree)
 	}
 	if !strings.Contains(logged.String(), "release baseline files not extracted") || !strings.Contains(logged.String(), "v1.0.0") {

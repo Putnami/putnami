@@ -77,7 +77,7 @@ type VerdictPolicyReport struct {
 // finish.
 func BuildVerdictPolicyResult(ws *workspace.Workspace) (VerdictPolicyReport, error) {
 	report := VerdictPolicyReport{Policies: []string{}}
-	tree, err := openWorktree(ws.Root)
+	tree, err := openWorktreeFrom(ws.Tree, ws.Root)
 	if err != nil {
 		return report, fmt.Errorf("verdict policy: %w", err)
 	}

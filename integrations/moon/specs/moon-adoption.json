@@ -137,6 +137,12 @@
         "A dependency on another task, or on a project outside its dependencies, is listed and not written.",
         "The sync owns those entries: it removes one moon no longer gives and keeps every other command's."
       ]
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": [
+        "A moon command takes the job's CPU budget as MOON_CONCURRENCY, unless the environment sets it."
+      ]
     }
   ],
   "decisions": [

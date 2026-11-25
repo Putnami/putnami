@@ -79,7 +79,7 @@ type RecipesReport struct {
 // BuildRecipesResult validates every committed recipe index in the worktree.
 func BuildRecipesResult(ws *workspace.Workspace) (RecipesReport, error) {
 	report := RecipesReport{Indexes: []string{}}
-	tree, err := openWorktree(ws.Root)
+	tree, err := openWorktreeFrom(ws.Tree, ws.Root)
 	if err != nil {
 		return report, fmt.Errorf("recipes: %w", err)
 	}

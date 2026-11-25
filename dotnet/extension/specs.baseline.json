@@ -19,6 +19,7 @@
     "dotnet/stack-extension#sdk-roll-forward-is-honored",
     "dotnet/stack-extension#serves-an-application",
     "dotnet/stack-extension#tasks-run-the-profile",
+    "dotnet/stack-extension#tools-take-the-cpu-budget",
     "dotnet/stack-extension#upgrades-the-packages"
   ]
 }

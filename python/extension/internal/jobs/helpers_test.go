@@ -14,6 +14,7 @@ import (
 
 	"go.putnami.dev/python/extension/internal/toolchain"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/hostenv"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
@@ -102,6 +103,28 @@ func TestMakeEnv(t *testing.T) {
 			t.Error("expected non-empty env")
 		}
 	})
+}
+
+// A job with a budget of 2 hands ruff two threads; an application the job
+// serves or runs receives no budget variable, and a value the operator set
+// stays.
+func TestRuffTakesTheCPUBudget(t *testing.T) {
+	t.Setenv(cpubudget.Env, "2")
+	t.Setenv("RAYON_NUM_THREADS", "")
+	_ = os.Unsetenv("RAYON_NUM_THREADS")
+	if got := batchRuffEnv("/ws")["RAYON_NUM_THREADS"]; got != "2" {
+		t.Errorf("batch ruff RAYON_NUM_THREADS = %q, want 2", got)
+	}
+	if got, _ := envValue(cpubudget.Bind(MakeEnv("/ws", "/ws", nil), ruffThreadVars...), "RAYON_NUM_THREADS"); got != "2" {
+		t.Errorf("ruff RAYON_NUM_THREADS = %q, want 2", got)
+	}
+	if _, set := envValue(MakeEnv("/ws", "/ws/pkg", nil), "RAYON_NUM_THREADS"); set {
+		t.Error("a served application receives RAYON_NUM_THREADS")
+	}
+	t.Setenv("RAYON_NUM_THREADS", "5")
+	if got := batchRuffEnv("/ws")["RAYON_NUM_THREADS"]; got != "" {
+		t.Errorf("batch ruff overrides the operator's RAYON_NUM_THREADS with %q", got)
+	}
 }
 
 // ---- MakeTestEnv: host platform identity scrub ----

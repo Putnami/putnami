@@ -9,10 +9,12 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	featureproto "go.putnami.dev/protocol/features"
+	job "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/docslinks"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/treefacts"
 	"go.putnami.dev/tooling/sdd/extension/internal/sdd"
 	"go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -69,6 +71,7 @@ func runSpecsValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (strin
 	if err != nil {
 		return "", nil, err
 	}
+	ws.NamesNoCommit = true
 	report, projection, verdict := sdd.BuildSpecValidationWithCriteria(ws, selection)
 	publishDiagnostics(emit, report.Diagnostics)
 	if verdict == nil {
@@ -203,6 +206,7 @@ func runSpecsRatchetValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string)
 	if err != nil {
 		return "", nil, err
 	}
+	ws.NamesNoCommit = true
 	report, verdict := sdd.BuildSpecsRatchetResult(ws)
 	publishDiagnostics(emit, report.Diagnostics)
 	enforced := 0
@@ -352,7 +356,7 @@ func runBreakingMarkerValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []strin
 	if ctx.Selection != nil && ctx.Selection.Mode == pctx.SelectionModeImpacted {
 		baseline = ctx.Selection.Baseline
 	}
-	report, verdict := sdd.BuildBreakingMarkerResult(ctx.WorkspaceRoot, os.Getenv(sdd.ProposalMessageEnv), baseline)
+	report, verdict := sdd.BuildBreakingMarkerResultFrom(changeHistory(ctx), ctx.WorkspaceRoot, os.Getenv(sdd.ProposalMessageEnv), baseline)
 	publishDiagnostics(emit, report.Diagnostics)
 	switch {
 	case !report.Proposal:
@@ -449,7 +453,7 @@ func runFeatureCoverageRatchetValidate(ctx *pctx.Context, emit *jsonl.Emitter, _
 	if ctx.Selection != nil && ctx.Selection.Mode == pctx.SelectionModeImpacted {
 		baseline = ctx.Selection.Baseline
 	}
-	report, verdict := sdd.BuildFeatureCoverageRatchetResult(ctx.WorkspaceRoot, workspaceOptions, baseline)
+	report, verdict := sdd.BuildFeatureCoverageRatchetResultFrom(changeHistory(ctx), ctx.WorkspaceRoot, workspaceOptions, baseline)
 	publishDiagnostics(emit, report.Diagnostics)
 	switch {
 	case report.Note != "":
@@ -595,4 +599,11 @@ func reportData(report any) (map[string]any, error) {
 		return nil, protocolcli.Classify(fmt.Errorf("decode validation report: %w", err), protocolcli.ErrInvalidConfig)
 	}
 	return data, nil
+}
+
+// changeHistory is the history of the change since the run's impacted baseline
+// the job context carries, or nil (treefacts.ChangeHistory).
+func changeHistory(ctx *pctx.Context) *job.ChangeHistory {
+	history, _ := treefacts.From(ctx).ChangeHistory()
+	return history
 }

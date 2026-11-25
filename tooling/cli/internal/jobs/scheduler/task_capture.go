@@ -547,7 +547,7 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 	restored := cachekey.RestoredOutputPaths(s.outputRoots(), job, entry)
 	if err := s.materializeDeclaredOutputs(job, entry); err != nil {
 		s.invalidateCapabilitySourceBindingsForRestore(job, entry)
-		s.cache.InvalidateFileHashesUnder(restored)
+		s.invalidateWritten(restored)
 		slog.Warn("declared restore failed; executing task",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		return nil
@@ -558,7 +558,7 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 	// before the hit is published, so no same-run consumer and no later
 	// package/publish/deploy reader can observe the older revision.
 	s.restampRestoredVersionStamp(job, entry)
-	s.cache.InvalidateFileHashesUnder(restored)
+	s.invalidateWritten(restored)
 	// A provider may legitimately omit ActionResult.Events when it does not
 	// advertise the optional action-events capability, and entries written before
 	// that capability carry none. Recover the reserved artifacts whose exact

@@ -329,7 +329,13 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 		}
 		return
 	}
-	env := selected.Env
+	projects := make([]string, len(members))
+	for i, m := range members {
+		projects[i] = m.in.projectAbs
+	}
+	// The command's tools take the job's CPU budget, unless a member
+	// configures their width itself.
+	env, cpus := first.profile.CPUBudget(selected.Env, rootAbs, projects...)
 	lock, err := lockStackRoot(first.in.workspaceRoot, first.meta, first.profile)
 	if err != nil {
 		failAll("%v", err)
@@ -342,7 +348,7 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 		return
 	}
 	defer func() { _ = os.RemoveAll(batchDir) }()
-	vars := map[string]string{"{root}": rootAbs, BatchDirPlaceholder: batchDir}
+	vars := map[string]string{"{root}": rootAbs, BatchDirPlaceholder: batchDir, CPUsPlaceholder: cpus}
 	if slices.ContainsFunc(first.task.Batch.ReportSteps, func(step []string) bool {
 		return slices.ContainsFunc(step, func(a string) bool { return strings.Contains(a, "{runtime}") })
 	}) {
@@ -375,6 +381,9 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 		perMember := make([][]string, len(members))
 		for k, m := range members {
 			perMember[k] = m.task.Batch.Steps[i]
+		}
+		if cpus == "" {
+			perMember = withoutCPUArgs(perMember)
 		}
 		argv := expandBatchStep(perMember, vars, components)
 		if s.Step != nil {

@@ -62,6 +62,7 @@
     "typescript/typescript-project-toolchain#test-type-checker-choice",
     "typescript/typescript-project-toolchain#the-lockfile-in-use-keys-the-cache",
     "typescript/typescript-project-toolchain#the-packager-refuses-a-nameless-manifest",
+    "typescript/typescript-project-toolchain#tools-take-the-cpu-budget",
     "typescript/typescript-project-toolchain#tsc-build-runs-the-installed-tsc",
     "typescript/typescript-project-toolchain#tsc-compiler-choice",
     "typescript/typescript-project-toolchain#tsc-key-follows-what-tsc-reads",

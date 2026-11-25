@@ -74,6 +74,11 @@ func decorateEnv(base []string, workspaceRoot, workingDir string, extra map[stri
 	return env
 }
 
+// ruffThreadVars bound ruff's Rayon pool: ruff takes the job's CPU budget
+// through it, unless the environment sets it. Only the lint steps that run
+// ruff receive it, never an application a job serves or runs.
+var ruffThreadVars = []string{"RAYON_NUM_THREADS"}
+
 // FileExists returns true if the path exists.
 func FileExists(path string) bool {
 	_, err := os.Stat(path)

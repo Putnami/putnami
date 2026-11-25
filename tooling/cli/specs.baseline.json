@@ -204,6 +204,7 @@
     "cli/job-planning-execution#an-interactive-launch-names-the-directory-it-was-typed-in",
     "cli/job-planning-execution#an-interactive-subcommand-refuses-a-preview-it-cannot-honor",
     "cli/job-planning-execution#batch-parity-and-live-cells-follow-declared-kinds",
+    "cli/job-planning-execution#candidate-cut-and-history-follow-the-key",
     "cli/job-planning-execution#canonical-result",
     "cli/job-planning-execution#clientgen-key-reads-no-run-written-tree",
     "cli/job-planning-execution#command-catalog",

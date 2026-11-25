@@ -487,9 +487,13 @@ func TestValidateContributesTheWorkspaceGuard(t *testing.T) {
 	}
 	// The port is project-scoped because a workspace-once task's project is
 	// rooted at the workspace root, so `git:**` holds the whole repository's
-	// candidate cut. A workspace port, a narrower glob or a second port would
-	// key on a set other than the one the check reads.
-	wantInputs := map[string]proto.TaskInputPort{"repository": {From: "project", Files: []string{"git:**"}}}
+	// candidate cut. A workspace port, a narrower glob or a second file port
+	// would key on a set other than the one the check reads. The runtime port
+	// hands the job that cut from its context.
+	wantInputs := map[string]proto.TaskInputPort{
+		"repository":     {From: "project", Files: []string{"git:**"}},
+		"candidateFiles": {From: "runtime"},
+	}
 	if !reflect.DeepEqual(task.Inputs, wantInputs) {
 		t.Fatalf("the guard inputs are %+v, want %+v: the check reads the candidate cut, and `git:**` is the key that holds it",
 			task.Inputs, wantInputs)

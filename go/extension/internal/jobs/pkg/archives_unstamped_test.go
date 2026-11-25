@@ -120,6 +120,9 @@ func newUnstampedWorkspace(t *testing.T, manifest, putnamiJSON, readme string) u
 }
 
 func TestNewUnstampedWorkspaceIsTheSameOnAForeignMachine(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is required to build the checkout")
+	}
 	gittest.AssertMachineIndependent(t, func() string {
 		return newUnstampedWorkspace(t, unstampedManifest, "{}", "first\n").root
 	})

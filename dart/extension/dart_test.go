@@ -307,7 +307,7 @@ func TestTojunitAndLCOVBecomeTheTestAndCoverageSummary(t *testing.T) {
 		t.Errorf("coverageSummary = %v", got)
 	}
 	tests := filepath.Join(out, "test", "tests.json")
-	if got, want := ran(t, log), pricing+": flutter test --no-pub --coverage --file-reporter=json:"+tests+"\n"+
+	if got, want := ran(t, log), pricing+": flutter test --concurrency=2 --no-pub --coverage --file-reporter=json:"+tests+"\n"+
 		pricing+": tojunit --input "+tests+" --output "+filepath.Join(out, "test", "junit.xml")+" --base "+pricing+"/\n"; got != want {
 		t.Errorf("test ran\n%s\nwant\n%s", got, want)
 	}
@@ -322,7 +322,7 @@ func TestTojunitAndLCOVBecomeTheTestAndCoverageSummary(t *testing.T) {
 	if got := data["coverageSummary"].(map[string]any); got["covered"] != 1 || got["total"] != 2 {
 		t.Errorf("a Dart package's format_coverage report is read: %v", got)
 	}
-	if got := ran(t, log); !strings.Contains(got, ": dart test --coverage="+filepath.Join(out, "test", "coverage")) ||
+	if got := ran(t, log); !strings.Contains(got, ": dart test --concurrency=2 --coverage="+filepath.Join(out, "test", "coverage")) ||
 		!strings.Contains(got, ": format_coverage --lcov --in="+filepath.Join(out, "test", "coverage")+" --out="+filepath.Join(out, "test", "lcov.info")) {
 		t.Errorf("a Dart package runs dart test and format_coverage:\n%s", got)
 	}

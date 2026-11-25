@@ -8,6 +8,7 @@ import (
 	"go.putnami.dev/python/extension/internal/toolchain"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
@@ -44,7 +45,7 @@ func LintFormat(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, 
 	cmdArgs := toolchain.UVRunWithToolArgs(uv, "ruff", packageName, projectRoot, ruffArgs...)
 
 	emit.PhaseStart("format")
-	output, err := ruffSingleRun(cmdArgs[0], cmdArgs[1:], projectRoot, MakeEnv(wsRoot, projectRoot, nil))
+	output, err := ruffSingleRun(cmdArgs[0], cmdArgs[1:], projectRoot, cpubudget.Bind(MakeEnv(wsRoot, projectRoot, nil), ruffThreadVars...))
 
 	if err == nil {
 		emit.PhaseEnd("format", "success")
