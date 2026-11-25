@@ -248,8 +248,8 @@ func assertPoolEmpty(t *testing.T, pool *resourcePool) {
 	t.Helper()
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
-	if pool.cpuUsedMilli != 0*milliCPU || len(pool.live) != 0 || len(pool.waiters) != 0 {
-		t.Fatalf("pool not empty: used=%d live=%d waiters=%d", pool.cpuUsedMilli, len(pool.live), len(pool.waiters))
+	if pool.cpuUsedMilli != 0 || pool.grantedCPU != 0 || len(pool.live) != 0 || len(pool.waiters) != 0 {
+		t.Fatalf("pool not empty: used=%d granted=%d live=%d waiters=%d", pool.cpuUsedMilli, pool.grantedCPU, len(pool.live), len(pool.waiters))
 	}
 }
 

@@ -623,7 +623,8 @@ long pole under `--all` and an ordinary job in a single-project run; freezing on
 plan's shape into task history would make a grant depend on which projects the
 previous run selected. Only the occupancy-derived, plan-independent ceiling
 travels into `.putnami/stats/tasks.json`. Both policies are equally
-deterministic: the same machine, history and plan give the same grants.
+deterministic: the same machine, history and plan give the same planned
+ceilings, which the CPUs left free may only raise when a task starts.
 
 The bootstrap distinguishes two kinds of cache miss:
 
@@ -744,8 +745,8 @@ of worker count and any waiting is visible without external trace analysis.
   starvation rather than dependency stalls.
 - **Critical path** — the longest dependency chain weighted by measured job
   durations, with its total duration and the jobs along it.
-- **CPU budgets** — every deterministic singleton or shared-batch subprocess
-  grant (job/group, effective weight, expected CPU work, cores), so "why did
+- **CPU budgets** — every singleton or shared-batch subprocess grant
+  (job/group, effective weight, expected CPU work, cores), so "why did
   this task only get one core" is
   answerable from the run itself.
 - **Capacity** — `run.orchestration.capacity`: the CPU capacity, the worker
@@ -753,8 +754,9 @@ of worker count and any waiting is visible without external trace analysis.
   aside) with the
   machine's one-minute load, sampled from the run's start to its end, with
   both peaks. `--trace-profile` prints the peaks.
-- **Resource reservations** — the CPU/RAM admission claim for each executed
-  job/group (retries reuse the same claim; a cache hit has none), sorted by
+- **Resource reservations** — the CPU/RAM admission charge for each executed
+  job/group, its CPU rounded up to whole CPUs (retries reuse the same charge;
+  a cache hit has none), sorted by
   public group key and
   bounded to keep session metadata finite. Internal reservation identifiers are
   never serialized.

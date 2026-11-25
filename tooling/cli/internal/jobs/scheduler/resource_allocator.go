@@ -253,10 +253,12 @@ func (p *resourcePool) tryAcquire(request resourceRequest) (resourceReservation,
 
 // tryAcquireLocked takes request when it fits. With workConserving, a CPU
 // charge also fits while any CPU is free, even when it is larger than what is
-// free: a waiting execution then never leaves CPU idle behind it.
+// free: a waiting execution then never leaves CPU idle behind it. A request
+// that charges no CPU, such as a dispatch's claims or a serve step, never
+// waits for CPU, even while the charges exceed the capacity.
 func (p *resourcePool) tryAcquireLocked(request resourceRequest, workConserving bool) (resourceReservation, bool) {
 	freeCPU := p.cpuCapacityMilli - p.cpuUsedMilli
-	if request.cpuMilli > freeCPU && (!workConserving || freeCPU <= 0) {
+	if request.cpuMilli > 0 && request.cpuMilli > freeCPU && (!workConserving || freeCPU <= 0) {
 		return resourceReservation{}, false
 	}
 	if p.memoryCapacity > 0 && request.memoryBytes > p.memoryCapacity-p.memoryUsed {
@@ -355,7 +357,7 @@ func (p *resourcePool) resize(reservation *resourceReservation, request resource
 	p.memoryUsed -= min(held.memoryBytes-next.memoryBytes, p.memoryUsed)
 	growCPU := request.cpuMilli - next.cpuMilli
 	growMemory := request.memoryBytes - next.memoryBytes
-	fits := growCPU <= p.cpuCapacityMilli-p.cpuUsedMilli &&
+	fits := (growCPU <= 0 || growCPU <= p.cpuCapacityMilli-p.cpuUsedMilli) &&
 		(p.memoryCapacity == 0 || growMemory <= p.memoryCapacity-p.memoryUsed)
 	covered := growCPU == 0 && growMemory == 0
 	if !covered && fits && len(p.waiters) == 0 {

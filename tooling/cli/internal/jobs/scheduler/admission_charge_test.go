@@ -191,3 +191,30 @@ func TestAWaitingExecutionStartsWhileAnyCPUIsFree(t *testing.T) {
 	pool.release(narrow)
 	assertPoolEmpty(t, pool)
 }
+
+func TestARequestChargingNoCPUIsAdmittedWhileTheChargesExceedTheCapacity(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
+	t.Parallel()
+	pool := newResourcePool(2, 0, nil)
+	first, _ := pool.tryAcquire(resourceRequest{cpuMilli: 1_500})
+	over, ok := pool.acquireExecution(t.Context(), resourceRequest{cpuMilli: 1_000}, executionRank{key: "/over"})
+	if !ok || pool.cpuUsedMilli != 2_500 {
+		t.Fatalf("over-capacity start = %v with %d used, want 2500", ok, pool.cpuUsedMilli)
+	}
+	// A dispatch's claims and a serve step charge no CPU.
+	claims, ok := pool.tryAcquire(resourceRequest{})
+	if !ok {
+		t.Fatal("a request charging no CPU was refused over the capacity")
+	}
+	serve, ok := pool.acquireExecution(t.Context(), resourceRequest{}, executionRank{key: "/serve"})
+	if !ok {
+		t.Fatal("a serve step was refused over the capacity")
+	}
+	if !pool.resize(&serve, resourceRequest{}) {
+		t.Fatal("resizing a no-CPU reservation over the capacity did not cover it")
+	}
+	for _, held := range []resourceReservation{first, over, claims, serve} {
+		pool.release(held)
+	}
+	assertPoolEmpty(t, pool)
+}
