@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -73,6 +75,12 @@ func extensionsPrepare(ctx context.Context, wsRoot string, cfg *wsproto.Config, 
 	if err := scheduler.PrepareSourceBuiltRuntimes(ctx, ws, built); err != nil {
 		return fmt.Errorf("prepare extension runtimes: %w", err)
 	}
+	// The runtimes an --impacted hosted run compares with the diff's base
+	// (ADR 0104): best effort, since a runtime left out only keeps its
+	// extension's consumers in that run.
+	for _, note := range prepareComparisonRuntimes(ctx, ws, discovered.Extensions) {
+		iox.Fprintln(os.Stderr, "  putnami extensions prepare: "+note)
+	}
 
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		entries := make([]preparedRuntimeEntry, 0, len(built))
@@ -91,4 +99,31 @@ func extensionsPrepare(ctx context.Context, wsRoot string, cfg *wsproto.Config, 
 		iox.Fprintf(out, "  ✓ %s runtime %s\n", ext.Name, ext.RuntimeExecutable)
 	}
 	return nil
+}
+
+// prepareComparisonRuntimes resolves the baseline an --impacted run of this
+// tree resolves, and prepares the runtimes its runtime comparison looks up
+// (scheduler.PrepareComparisonRuntimes). It returns what it could not do.
+func prepareComparisonRuntimes(ctx context.Context, ws *workspace.Workspace, extensions []*extension.ExtensionDescription) []string {
+	// Only a source workspace's hosted run compares runtimes (ADR 0104).
+	if !extension.SourceWorkspace(ws.Root) {
+		return nil
+	}
+	resolved, err := workspace.ResolveImpactedBaselineDetailed(ws, "")
+	if err != nil {
+		return []string{"no baseline to compare runtimes against: " + err.Error()}
+	}
+	diff, err := git.DiffWorkingTree(ws.Root, resolved.Ref)
+	if err != nil || diff.Base == "" {
+		return []string{fmt.Sprintf("no merge base with %s to compare runtimes against: %v", resolved.Ref, err)}
+	}
+	// No change since the merge base moves no runtime: nothing to compare.
+	if len(diff.Files) == 0 {
+		return nil
+	}
+	notes, err := scheduler.PrepareComparisonRuntimes(ctx, ws, extensions, diff.Base)
+	if err != nil {
+		notes = append(notes, err.Error())
+	}
+	return notes
 }

@@ -26,7 +26,8 @@
 # refused where tooling/cli is absent, and where no content key can be computed
 # (no git work tree, or no sha256sum or shasum). With the CLI it built or
 # reused, it runs `putnami extensions prepare`, which prepares the runtimes of
-# the workspace's path extensions that a hosted run starts as providers. That
+# the workspace's path extensions that a hosted run starts as providers, and
+# the tree and merge-base runtimes an --impacted hosted run compares. That
 # command needs the exact Go release the workspace lock pins, so the mode first
 # installs that release under the Putnami home, unless the home holds it
 # already, or $GOROOT/bin/go or the go on PATH runs as it. Progress, the output
@@ -386,7 +387,8 @@ json_string() {
 # of key $1, the way exec_source_blob starts it: in the workspace root, with the
 # key that names the blob. The command prepares, into the artifact store, the
 # runtime of each path extension whose providers a hosted run of this tree
-# starts from this build. Its output goes to stderr, so stdout keeps only the
+# starts from this build, and the runtimes its --impacted selection compares
+# with the merge base. Its output goes to stderr, so stdout keeps only the
 # engine line.
 prepare_source_runtimes() {
   local key="$1"

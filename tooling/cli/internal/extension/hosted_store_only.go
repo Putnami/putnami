@@ -145,6 +145,11 @@ func StartsRepositoryCode(workspaceRoot string, ext *ExtensionDescription) bool 
 	return !InArtifactStore(workspaceRoot, ext) && !FromSourceBuild(workspaceRoot, ext)
 }
 
+// SourceWorkspace reports whether the workspace lock of workspaceRoot records
+// the workspace as the source of its CLI: the workspaces whose runtimes
+// `./putnamiw --print-engine` prepares before a hosted run.
+func SourceWorkspace(workspaceRoot string) bool { return sourceWorkspace(workspaceRoot) }
+
 // sourceWorkspace reports whether the workspace lock of workspaceRoot records
 // the workspace as the source of its CLI. A lock that cannot be read records
 // nothing.

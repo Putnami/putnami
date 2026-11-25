@@ -862,7 +862,7 @@ putnami extensions install          # Install/update all extensions and run inst
 putnami extensions list             # List extensions with their constraint, installed version and source
 putnami extensions update           # Update extension versions (lock and exact pins)
 putnami extensions remove <name>    # Remove an extension
-putnami extensions prepare          # Prepare the provider runtimes of a source workspace
+putnami extensions prepare          # Prepare the runtimes a hosted run of a source workspace starts or compares
 putnami extensions validate [path]  # Validate an extension manifest (for authors; needs no workspace)
 ```
 
@@ -996,6 +996,16 @@ command only when the store holds no runtime for the current inputs. It prints
 one line per runtime, or, with `--output=jsonl`, one record each in the
 result's `data`. In any other
 workspace it prepares nothing.
+
+In that workspace it also prepares the runtimes an `--impacted` hosted run
+compares with the diff's base (ADR 0103): it resolves the baseline that run
+resolves and, unless nothing changed since the merge base, for every path
+extension whose `runtime.prepare` builds its runtime, exists at the
+merge base and has other runtime inputs there, it admits the runtime of this
+tree and the runtime of the merge base, each under the digest its own lock
+gives. That part is best effort: an extension it cannot prepare is named on
+stderr, keeps its consumers in that run, and never fails the command
+([ADR 0104](adr/0104-a-hosted-run-compares-runtimes-prepared-before-it.md)).
 
 The command resolves each prepare toolchain to exactly the release the lock
 pins, and installs none. It fails when that release is missing, when a provider

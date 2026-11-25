@@ -863,6 +863,9 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	if code := applyStandaloneBaseline(req, ws); code != ExitSuccess {
 		return SessionResult{ExitCode: code}, nil
 	}
+	// Both selections below may compare extension runtimes (ADR 0103): they
+	// stop with the run.
+	req.selectionCtx = ctx
 	releaseSetOptions, verification, verificationEvidence, code := resolveReleaseSetSelections(req, ws, extensions...)
 	if code != ExitSuccess {
 		return SessionResult{ExitCode: code}, nil
@@ -870,7 +873,6 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	if deployNarrowsToChannelMembers(req, releaseSetOptions) {
 		req.Global.ImpactedStrict = true
 	}
-	req.selectionCtx = ctx
 	selectedProjects, code := selectProjects(req, ws, extensions...)
 	clock.Phase(protocolcli.OrchestrationPhaseSelection, phaseStarted)
 	if code != ExitSuccess {
