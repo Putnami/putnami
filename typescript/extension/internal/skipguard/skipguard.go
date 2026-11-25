@@ -27,16 +27,12 @@
 package skipguard
 
 import (
-	"bytes"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
-
-	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Category is the diagnostic category every finding carries.
@@ -94,12 +90,13 @@ var skippedDirectories = map[string]bool{
 }
 
 // ScanProject scans every test file under root, without entering a nested
-// Putnami project or a directory git ignores. The task's cache key leaves
-// ignored directories out, so the lint must not read them either. Findings
-// are sorted by file and position.
+// Putnami project, a dot directory or one of skippedDirectories. It reads the
+// files the task's cache key holds, whether or not git ignores them: the key's
+// file walk follows no ignore rule either, so the verdict depends on nothing
+// the key leaves out and the scan starts no git. Findings are sorted by file
+// and position.
 func ScanProject(root string) ([]Finding, error) {
 	var findings []Finding
-	ignored := ignoredDirectories(root)
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			if path == root {
@@ -113,9 +110,6 @@ func ScanProject(root string) ([]Finding, error) {
 			}
 			name := entry.Name()
 			if skippedDirectories[name] || strings.HasPrefix(name, ".") || fileExists(filepath.Join(path, "putnami.json")) {
-				return filepath.SkipDir
-			}
-			if rel, relErr := filepath.Rel(root, path); relErr == nil && ignored[filepath.ToSlash(rel)] {
 				return filepath.SkipDir
 			}
 			return nil
@@ -145,25 +139,6 @@ func ScanProject(root string) ([]Finding, error) {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
-}
-
-// ignoredDirectories returns the directories under root that git ignores
-// entirely, as slash-separated paths relative to root. Outside a git
-// repository, or without git, it returns nil and nothing is ignored.
-func ignoredDirectories(root string) map[string]bool {
-	cmd := exec.Command("git", "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z")
-	cmd.Dir = root
-	output, err := procstat.Output(cmd)
-	if err != nil {
-		return nil
-	}
-	dirs := make(map[string]bool)
-	for _, entry := range bytes.Split(output, []byte{0}) {
-		if name := string(entry); strings.HasSuffix(name, "/") {
-			dirs[strings.TrimSuffix(name, "/")] = true
-		}
-	}
-	return dirs
 }
 
 // ScanFile scans one test file.

@@ -135,7 +135,7 @@ func TestTheFilesOfTheTreeAreTheSourceFilesACommitWouldHold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	files, err := filesInTree(f.project)
+	files, err := filesInTree(f.project, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/exec"
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/procstat"
+	"go.putnami.dev/sdk/extension/treefacts"
 	"go.putnami.dev/sdk/extension/tscscript"
 	"go.putnami.dev/typescript/extension/internal/parse"
 	"go.putnami.dev/typescript/extension/internal/project"
@@ -287,22 +289,39 @@ func installedTsc(projectPath, workspaceRoot string) (string, bool) {
 
 // CheckTscOutputs refuses outputs Putnami cannot own in a Git work tree: one
 // Git does not ignore, which would enter the build's own key, and one that
-// holds a file Git tracks, which emptying it would delete. Outside a work
-// tree it checks nothing.
-func CheckTscOutputs(projectPath string, plan *TscPlan) error {
-	if err := procstat.Run(osexec.Command("git", "-C", projectPath, "rev-parse", "--is-inside-work-tree")); err != nil {
-		return nil
+// holds a file Git tracks, which emptying it would delete. Outputs are checked
+// in order, each for a tracked file first. Outside a work tree, or without a
+// git program, it checks nothing.
+//
+// The tracked files come from facts, which answer from the job context when
+// the task declares `trackedFiles`. Whether Git ignores an output is asked of
+// Git, in one `check-ignore --no-index` for every output: an output may be a
+// file, or a directory the build has not created yet, and no tree fact answers
+// either (doc/adr/0014). That call also tells a work tree from a directory
+// outside every repository, so the task keys no repository state. A project
+// inside a repository nested in the workspace's, such as a submodule, has its
+// files tracked by that repository's index, which the context's listing does
+// not read: the check asks Git there.
+func CheckTscOutputs(workspaceRoot, projectPath string, plan *TscPlan, facts *treefacts.Facts) error {
+	if treefacts.NestedRepository(workspaceRoot, projectPath) {
+		facts = nil
+	}
+	tracked, err := facts.TrackedFiles(projectPath)
+	if err != nil {
+		if gitread.Unmanaged(projectPath) != nil {
+			return nil
+		}
+		return fmt.Errorf("list the files Git tracks under %s: %w", projectPath, err)
 	}
 	rel := slashRel(projectPath, plan.Config)
-	for i, output := range plan.Outputs() {
+	outputs := plan.Outputs()
+	var probes []string
+	var trackedErr error
+	for i, output := range outputs {
 		path := slashRel(projectPath, output)
-		tracked, err := procstat.Output(osexec.Command("git", "-C", projectPath, "ls-files", "-z", "--", path))
-		if err != nil {
-			return fmt.Errorf("list the files Git tracks under %s: %w", path, err)
-		}
-		if len(tracked) > 0 {
-			first := strings.SplitN(string(tracked), "\x00", 2)[0]
-			return tscErrorf(CodeTscOutputTracked, rel, "%s is an output of tsc, and Git tracks %s in it: building empties it, so move the committed files out of it or stop tracking them", path, first)
+		if first, ok := firstTracked(tracked, path); ok {
+			trackedErr = tscErrorf(CodeTscOutputTracked, rel, "%s is an output of tsc, and Git tracks %s in it: building empties it, so move the committed files out of it or stop tracking them", path, first)
+			break
 		}
 		probe := path
 		if i == 0 || output == plan.DeclarationDir {
@@ -310,17 +329,60 @@ func CheckTscOutputs(projectPath string, plan *TscPlan) error {
 			// directory even before the directory exists.
 			probe = path + "/.putnami-ignore-probe"
 		}
-		err = procstat.Run(osexec.Command("git", "-C", projectPath, "check-ignore", "-q", "--no-index", "--", probe))
-		var exit *osexec.ExitError
-		switch {
-		case err == nil:
-		case errors.As(err, &exit) && exit.ExitCode() == 1:
-			return tscErrorf(CodeTscOutputIgnored, rel, "%s is an output of tsc that Git does not ignore: add it to .gitignore, so the files tsc emits do not key the build that emits them", path)
-		default:
-			return fmt.Errorf("ask Git whether it ignores %s: %w", path, err)
+		probes = append(probes, probe)
+	}
+	if len(probes) > 0 {
+		ignored, err := ignoredProbes(projectPath, probes)
+		if err != nil {
+			if gitread.Unmanaged(projectPath) != nil {
+				// Without git, only what the context lists is checked.
+				return trackedErr
+			}
+			return err
+		}
+		for i, probe := range probes {
+			if !ignored[probe] {
+				path := slashRel(projectPath, outputs[i])
+				return tscErrorf(CodeTscOutputIgnored, rel, "%s is an output of tsc that Git does not ignore: add it to .gitignore, so the files tsc emits do not key the build that emits them", path)
+			}
 		}
 	}
-	return nil
+	return trackedErr
+}
+
+// firstTracked returns the first tracked path, in the listing's order, that
+// is path or lies below it.
+func firstTracked(tracked []string, path string) (string, bool) {
+	for _, file := range tracked {
+		if file == path || strings.HasPrefix(file, path+"/") {
+			return file, true
+		}
+	}
+	return "", false
+}
+
+// ignoredProbes asks Git, in one call, which probes its ignore rules match,
+// whether or not they exist. Each probe is a slash path relative to dir.
+func ignoredProbes(dir string, probes []string) (map[string]bool, error) {
+	cmd := osexec.Command("git", "-C", dir, "check-ignore", "--no-index", "-z", "--stdin")
+	cmd.Stdin = strings.NewReader(strings.Join(probes, "\x00") + "\x00")
+	output, err := procstat.Output(cmd, procstat.Git)
+	var exit *osexec.ExitError
+	switch {
+	case err == nil:
+	case errors.As(err, &exit) && exit.ExitCode() == 1:
+		// Git ignores none of them.
+		return map[string]bool{}, nil
+	default:
+		return nil, fmt.Errorf("ask Git whether it ignores %s: %w", strings.Join(probes, ", "), err)
+	}
+	ignored := map[string]bool{}
+	for name := range strings.SplitSeq(string(output), "\x00") {
+		if name != "" {
+			ignored[name] = true
+		}
+	}
+	return ignored, nil
 }
 
 // CleanTscOutputs removes the plan's outputs, so a file tsc stops emitting is

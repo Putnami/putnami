@@ -320,3 +320,51 @@ func TestABuildOutputDirectoryDoesNotMoveTheGoLintKey(t *testing.T) {
 		t.Fatalf("building into dist, .gen and bin moved the lint key (%s != %s)", built, fresh)
 	}
 }
+
+// A task that reads a release baseline, as validate-api does (ADR 0062), keeps
+// its key when it starts declaring releaseBaselineFiles, and moves it only when
+// it declares candidateFiles, which adds the candidate cut of its directory.
+func TestAReleaseBaselineTaskMovesItsKeyOnlyByDeclaringTheCandidateCut(t *testing.T) {
+	root := treeFactsRepo(t)
+	ws := treeFactsWorkspace(root)
+	project := ws.ProjectByID("/app")
+	baseline := keyOf(t, ws, treeFactsJob(project, extproto.RuntimeInputReleaseBaseline), newRunCache(t))
+	files := keyOf(t, ws, treeFactsJob(project, extproto.RuntimeInputReleaseBaseline, extproto.RuntimeInputReleaseBaselineFiles), newRunCache(t))
+	candidates := keyOf(t, ws, treeFactsJob(project, extproto.RuntimeInputReleaseBaseline, extproto.RuntimeInputReleaseBaselineFiles,
+		extproto.RuntimeInputCandidateFiles), newRunCache(t))
+	if baseline != files {
+		t.Errorf("releaseBaselineFiles moved the key (%s != %s)", baseline, files)
+	}
+	if candidates == files {
+		t.Error("candidateFiles left the key where the baseline alone puts it")
+	}
+	again := keyOf(t, ws, treeFactsJob(project, extproto.RuntimeInputReleaseBaseline, extproto.RuntimeInputReleaseBaselineFiles,
+		extproto.RuntimeInputCandidateFiles), newRunCache(t))
+	if candidates != again {
+		t.Errorf("one tree gave two keys with candidateFiles (%s != %s)", candidates, again)
+	}
+}
+
+// A lint keyed on ordinary source patterns, as the TypeScript lint tasks are,
+// keeps its key when the project builds into an ignored output directory:
+// the key's file walk never enters dist, and the task declares no tree fact
+// that lists the directories Git ignores.
+func TestABuildOutputDirectoryDoesNotMoveALintKey(t *testing.T) {
+	root := treeFactsRepo(t)
+	writeFileAt(t, filepath.Join(root, ".gitignore"), "dist/\n")
+	ws := treeFactsWorkspace(root)
+	ext := &extension.ExtensionDescription{Name: "@test/ext", Tasks: map[string]extension.TaskDefinition{"check": {}}}
+	def := extension.JobDefinition{
+		Name: "lint~check", ExtensionName: ext.Name, Cache: true,
+		TaskCachePolicy: &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{
+			Files: []string{"**/*.ts", "**/*.js", "**/*.json"}}},
+	}
+	job := &jobmodel.ScheduledJob{Project: ws.ProjectByID("/app"), Extension: ext,
+		Step: &extension.PipelineStep{ID: "check", Task: "check"}, JobDef: &def}
+	before := keyOf(t, ws, job, newRunCache(t))
+	writeFileAt(t, filepath.Join(root, "app", "dist", "index.js"), "export {};\n")
+	writeFileAt(t, filepath.Join(root, "app", "dist", "index.test.js"), "test.only('a', () => {});\n")
+	if after := keyOf(t, ws, job, newRunCache(t)); after != before {
+		t.Fatalf("building into dist moved the lint key (%s != %s)", before, after)
+	}
+}

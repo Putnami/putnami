@@ -350,7 +350,10 @@ func TestIgnoringProjectIsTheSameOnAForeignMachine(t *testing.T) {
 	gittest.AssertMachineIndependent(t, func() string { return ignoringProject(t) })
 }
 
-func TestScanProjectSkipsDirectoriesGitIgnores(t *testing.T) {
+// The scan reads what the lint's key holds, which no ignore rule narrows: a
+// test file under a directory git ignores is scanned, and the verdict does not
+// depend on which directories git ignores.
+func TestScanProjectReadsDirectoriesGitIgnores(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
@@ -360,8 +363,13 @@ func TestScanProjectSkipsDirectoriesGitIgnores(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(findings) != 1 || filepath.Base(findings[0].File) != "a.test.ts" {
-		t.Fatalf("findings = %+v, want a.test.ts only", findings)
+	files := make([]string, 0, len(findings))
+	for _, finding := range findings {
+		rel, _ := filepath.Rel(root, finding.File)
+		files = append(files, filepath.ToSlash(rel))
+	}
+	if got := strings.Join(files, ","); got != "a.test.ts,build/a.test.js" {
+		t.Fatalf("scanned files = %s, want a.test.ts,build/a.test.js", got)
 	}
 }
 

@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	job "go.putnami.dev/protocol/job"
 	"go.putnami.dev/sdk/extension/exec"
+	"go.putnami.dev/sdk/extension/treefacts"
 )
 
 const tscFeature = "typescript/typescript-project-toolchain"
@@ -291,20 +293,130 @@ func TestCheckTscOutputsRefusesAnUnignoredOrTrackedOutput(t *testing.T) {
 	}
 
 	project, plan := setup("node_modules\ndist/\n*.tsbuildinfo\n", false)
-	if err := CheckTscOutputs(project, plan); err != nil {
+	if err := CheckTscOutputs(filepath.Dir(filepath.Dir(project)), project, plan, nil); err != nil {
 		t.Errorf("ignored outputs = %v, want accepted", err)
 	}
 	project, plan = setup("node_modules\n*.tsbuildinfo\n", false)
-	if err := CheckTscOutputs(project, plan); !isTscError(err, CodeTscOutputIgnored) || !strings.Contains(err.Error(), "dist") {
+	if err := CheckTscOutputs(filepath.Dir(filepath.Dir(project)), project, plan, nil); !isTscError(err, CodeTscOutputIgnored) || !strings.Contains(err.Error(), "dist") {
 		t.Errorf("an outDir Git does not ignore = %v, want %s naming dist", err, CodeTscOutputIgnored)
 	}
 	project, plan = setup("node_modules\ndist/\n", false)
-	if err := CheckTscOutputs(project, plan); !isTscError(err, CodeTscOutputIgnored) || !strings.Contains(err.Error(), "tsconfig.tsbuildinfo") {
+	if err := CheckTscOutputs(filepath.Dir(filepath.Dir(project)), project, plan, nil); !isTscError(err, CodeTscOutputIgnored) || !strings.Contains(err.Error(), "tsconfig.tsbuildinfo") {
 		t.Errorf("a .tsbuildinfo Git does not ignore = %v, want %s naming it", err, CodeTscOutputIgnored)
 	}
 	project, plan = setup("node_modules\ndist/\n*.tsbuildinfo\n", true)
-	if err := CheckTscOutputs(project, plan); !isTscError(err, CodeTscOutputTracked) || !strings.Contains(err.Error(), "dist/index.js") {
+	if err := CheckTscOutputs(filepath.Dir(filepath.Dir(project)), project, plan, nil); !isTscError(err, CodeTscOutputTracked) || !strings.Contains(err.Error(), "dist/index.js") {
 		t.Errorf("a tracked file in the outDir = %v, want %s naming it", err, CodeTscOutputTracked)
+	}
+}
+
+func TestCheckTscOutputsReadsTheTrackedFilesOfItsContext(t *testing.T) {
+	spectest.Proves(t, tscFeature, "tsc-output-restores-at-outdir", "an-unusable-outdir-fails-before-tsc-runs")
+	plan := func(t *testing.T, gitignore string) (string, string, *TscPlan) {
+		t.Helper()
+		root, project := tscWorkspace(t, map[string]string{
+			".gitignore":             gitignore,
+			"libs/lib/package.json":  libPackage("tsc -b"),
+			"libs/lib/tsconfig.json": libConfig,
+		})
+		plan, err := PlanTsc(project, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return root, project, plan
+	}
+	context := func(root string, tracked ...string) *treefacts.Facts {
+		return treefacts.From(&job.Context{WorkspaceRoot: root, Tree: &job.Tree{
+			Directory:    "libs/lib",
+			TrackedFiles: append([]string{"libs/lib/package.json"}, tracked...),
+		}})
+	}
+
+	t.Run("without git", func(t *testing.T) {
+		root, project, plan := plan(t, "")
+		t.Setenv("PATH", "")
+		if err := CheckTscOutputs(root, project, plan, context(root)); err != nil {
+			t.Errorf("without a git program = %v, want nothing checked", err)
+		}
+		// The context alone refuses a tracked file in the outDir, with no git.
+		err := CheckTscOutputs(root, project, plan, context(root, "libs/lib/dist/index.js"))
+		if !isTscError(err, CodeTscOutputTracked) || !strings.Contains(err.Error(), "dist/index.js") {
+			t.Errorf("a tracked file in the outDir = %v, want %s naming it", err, CodeTscOutputTracked)
+		}
+		// And whatever output holds it.
+		err = CheckTscOutputs(root, project, plan, context(root, "libs/lib/tsconfig.tsbuildinfo"))
+		if !isTscError(err, CodeTscOutputTracked) || !strings.Contains(err.Error(), "tsconfig.tsbuildinfo") {
+			t.Errorf("a tracked .tsbuildinfo = %v, want %s naming it", err, CodeTscOutputTracked)
+		}
+	})
+
+	t.Run("in a work tree", func(t *testing.T) {
+		if _, err := osexec.LookPath("git"); err != nil {
+			t.Skip("git is not on PATH")
+		}
+		root, project, ignoring := plan(t, "node_modules\ndist/\n*.tsbuildinfo\n")
+		if out, err := osexec.Command("git", "-C", root, "init", "-q").CombinedOutput(); err != nil {
+			t.Fatalf("git init: %v: %s", err, out)
+		}
+		if err := CheckTscOutputs(root, project, ignoring, context(root, "libs/lib/distribution.md")); err != nil {
+			t.Errorf("a tracked file beside the outDir = %v, want the outputs accepted", err)
+		}
+		// Outputs are checked in order: the outDir Git does not ignore refuses
+		// before the tracked .tsbuildinfo that follows it.
+		if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte("node_modules\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		err := CheckTscOutputs(root, project, ignoring, context(root, "libs/lib/tsconfig.tsbuildinfo"))
+		if !isTscError(err, CodeTscOutputIgnored) || !strings.Contains(err.Error(), "dist") {
+			t.Errorf("an unignored outDir before a tracked .tsbuildinfo = %v, want %s naming dist", err, CodeTscOutputIgnored)
+		}
+	})
+}
+
+// A project inside a repository nested in the workspace's, a clone or a
+// submodule, has its tracked files in that repository's index, which the
+// context's listing does not read: the check asks Git there and refuses the
+// tracked output.
+func TestCheckTscOutputsAsksGitInANestedRepository(t *testing.T) {
+	spectest.Proves(t, tscFeature, "tsc-output-restores-at-outdir", "an-unusable-outdir-fails-before-tsc-runs")
+	if _, err := osexec.LookPath("git"); err != nil {
+		t.Skip("git is not on PATH")
+	}
+	for _, tc := range []struct {
+		name string
+		// init initializes the nested repository at inner, from root.
+		init []string
+	}{
+		{"a nested clone", []string{"init", "-q"}},
+		{"a submodule's .git file", []string{"init", "-q", "--separate-git-dir", "../../.inner.git"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, _ := tscWorkspace(t, map[string]string{
+				".gitignore":                   "node_modules\ndist/\n*.tsbuildinfo\n",
+				"libs/inner/lib/package.json":  libPackage("tsc -b"),
+				"libs/inner/lib/tsconfig.json": libConfig,
+				"libs/inner/lib/dist/index.js": "",
+			})
+			project := filepath.Join(root, "libs", "inner", "lib")
+			inner := filepath.Join(root, "libs", "inner")
+			for _, args := range [][]string{{"-C", root, "init", "-q"}, append([]string{"-C", inner}, tc.init...), {"-C", inner, "add", "-f", "lib/dist/index.js"}} {
+				if out, err := osexec.Command("git", args...).CombinedOutput(); err != nil {
+					t.Fatalf("git %v: %v: %s", args, err, out)
+				}
+			}
+			plan, err := PlanTsc(project, root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The workspace's index lists nothing under the project.
+			facts := treefacts.From(&job.Context{WorkspaceRoot: root, Tree: &job.Tree{
+				Directory: "libs/inner/lib", TrackedFiles: []string{},
+			}})
+			err = CheckTscOutputs(root, project, plan, facts)
+			if !isTscError(err, CodeTscOutputTracked) || !strings.Contains(err.Error(), "dist/index.js") {
+				t.Errorf("a tracked file in the outDir of a nested repository = %v, want %s naming it", err, CodeTscOutputTracked)
+			}
+		})
 	}
 }
 

@@ -131,15 +131,19 @@ func filesAtTag(dir string, entries []treeEntry) ([]apisurface.File, error) {
 // git tracks and the untracked files git does not ignore: the files a commit
 // of the tree would hold, so both sides of a comparison follow one rule. A
 // tracked file that is deleted, and anything that is not a regular file, is
-// left out.
-func filesInTree(dir string) ([]apisurface.File, error) {
-	output, err := gitOutput(dir, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ".")
-	if err != nil {
-		return nil, err
+// left out. candidates, when not nil, are those files as the job context
+// lists them, and no git starts.
+func filesInTree(dir string, candidates []string) ([]apisurface.File, error) {
+	if candidates == nil {
+		output, err := gitOutput(dir, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ".")
+		if err != nil {
+			return nil, err
+		}
+		candidates = strings.Split(output, "\x00")
 	}
 	seen := map[string]bool{}
 	var files []apisurface.File
-	for name := range strings.SplitSeq(output, "\x00") {
+	for _, name := range candidates {
 		if name == "" || seen[name] || !apisurface.IsSource(name) {
 			continue
 		}

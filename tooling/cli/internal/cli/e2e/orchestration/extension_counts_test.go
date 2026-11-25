@@ -146,8 +146,8 @@ var extensionCases = []extensionCase{
 		files:      typescriptFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:       "engine job 8 · control 1 · git 24 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 10 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 6 | jobs git check-ignore 2 · ls-files 3 · rev-parse 1",
-		was:        "engine job 8 · control 1 · git 25 | engine git diff 1 · for-each-ref 1 · ls-files 11 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 7 | jobs git check-ignore 2 · ls-files 4 · rev-parse 1",
+		cold:       "engine job 8 · control 1 · git 25 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
+		was:        "engine job 8 · control 1 · git 24 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 10 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 6 | jobs git check-ignore 2 · ls-files 3 · rev-parse 1",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
