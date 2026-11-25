@@ -204,6 +204,13 @@
     {
       "id": "a-tree-fact-input-binds-its-task",
       "text": "A task that declares the workspaceCandidateFiles runtime input keys the workspace's whole candidate cut through a workspace git:** input, and a task that declares the changeHistory runtime input is never cached: a manifest that breaks either rule is refused."
+    },
+    {
+      "id": "a-toolchain-probe-may-name-its-own-executable",
+      "text": [
+        "A runtime toolchain's probe may declare `self`: one to sixteen `args` of a second probe whose answer is an absolute path, and an optional relative `path` below it. Validation refuses an empty or longer `args`, and a `path` that is absolute, has an empty or `..` segment, or holds a token.",
+        "The member is contract 26 and raises no floor: RequiredCLIContract keeps the stamp the manifest's other vocabulary requires, since a reader below 26 drops the member and probes the binary once per run."
+      ]
     }
   ],
   "decisions": [
@@ -223,6 +230,7 @@
     "protocols/extension/doc/adr/0013-a-default-that-takes-positionals-requires-contract-15.md",
     "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md",
     "protocols/extension/doc/adr/0020-a-host-hook-may-run-at-the-prompt-in-the-background.md",
+    "tooling/cli/doc/adr/0105-a-toolchain-that-names-its-own-executable-is-recorded.md",
     "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md",
     "protocols/collaboration/doc/adr/0007-a-declared-result-member-may-join-version-1.md"
   ]

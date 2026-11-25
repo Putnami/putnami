@@ -776,6 +776,8 @@
             "a-changed-runtime-is-handshaken-again",
             "a-probe-runs-once-per-binary-identity",
             "a-changed-binary-is-probed-again",
+            "a-toolchain-that-names-itself-is-recorded",
+            "a-dispatcher-whose-target-changes-is-probed-again",
             "a-recorded-input-answer-is-read-again",
             "a-changed-extension-or-request-asks-again",
             "planning-an-unchanged-workspace-starts-only-git"

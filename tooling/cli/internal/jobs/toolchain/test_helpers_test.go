@@ -1,9 +1,11 @@
 package toolchain
 
 import (
+	"context"
 	"math"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -74,5 +76,34 @@ func alwaysWaitingForCPU(*os.Process) func() procdeadline.ProcessSample {
 	return func() procdeadline.ProcessSample {
 		waited += time.Hour
 		return procdeadline.ProcessSample{WaitedForCPU: waited, Measured: true}
+	}
+}
+
+// probeNoArgs runs the production probe of path with no argument, in the
+// working directory, with the answer limit of a version.
+func probeNoArgs(ctx context.Context, path string, env []string, deadline procdeadline.ProcessDeadline) (string, error) {
+	return probeRuntimeToolchainAnswer(ctx, path, "", nil, env, deadline, toolVersionMaxLen)
+}
+
+// builtSelfTool is testdata/selftool, built once per test process.
+var builtSelfTool struct {
+	once sync.Once
+	path string
+	err  error
+	out  []byte
+}
+
+// selfToolConfig is the configuration testdata/selftool reads beside itself.
+type selfToolConfig struct {
+	Exec      string `json:"exec,omitempty"`
+	Version   string `json:"version,omitempty"`
+	Root      string `json:"root,omitempty"`
+	Argv0Root bool   `json:"argv0Root,omitempty"`
+}
+
+// removeSelfTool deletes the selftool build, if any.
+func removeSelfTool() {
+	if builtSelfTool.path != "" {
+		_ = os.RemoveAll(filepath.Dir(builtSelfTool.path))
 	}
 }

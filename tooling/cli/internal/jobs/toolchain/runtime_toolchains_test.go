@@ -185,7 +185,7 @@ func TestRuntimeToolchainProbeTimeoutIsFiveSecondsUnlessTheCallerSetsOne(t *test
 func TestRuntimeToolchainMismatchUnwrapsToAProbeThatTimedOut(t *testing.T) {
 	dir := t.TempDir()
 	path := fixtureproc.Write(t, filepath.Join(dir, "compiler"), fixtureproc.Program{WaitFor: []string{filepath.Join(dir, "never")}})
-	_, probeErr := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, procdeadline.HostProcessDeadline(100*time.Millisecond))
+	_, probeErr := probeNoArgs(context.Background(), path, []string{"PATH=/usr/bin:/bin"}, procdeadline.HostProcessDeadline(100*time.Millisecond))
 	// The deadline ends the probe, or on a loaded host the bound on time the
 	// deadline does not count does. Both are a probe timeout.
 	if probeErr == nil || !errors.Is(probeErr, ErrToolchainProbeTimeout) {
@@ -275,7 +275,7 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 				program.WaitFor = []string{filepath.Join(dir, "never")}
 			}
 			path := fixtureproc.Write(t, filepath.Join(dir, "compiler"), program)
-			got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, tc.deadline)
+			got, err := probeNoArgs(context.Background(), path, []string{"PATH=/usr/bin:/bin"}, tc.deadline)
 			timedOut := strings.HasPrefix(tc.want, "probe timed out")
 			// A timeout goes on with the times the host decides, so only its
 			// start is fixed. On a loaded host the bound on time the deadline
@@ -295,7 +295,7 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 		// not exist, and Windows reads no program image in it.
 		path := WithExecutableSuffix(runtime.GOOS, filepath.Join(t.TempDir(), "compiler"))
 		writeExecutable(t, path, "#!/nonexistent/interpreter\n")
-		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"},
+		got, err := probeNoArgs(context.Background(), path, []string{"PATH=/usr/bin:/bin"},
 			procdeadline.HostProcessDeadline(toolVersionProbeTimeout))
 		if want := "probe failed to start: "; err == nil || !strings.HasPrefix(err.Error(), want) {
 			t.Fatalf("probe = %q, %v; want an error starting with %q", got, err, want)
@@ -323,7 +323,7 @@ func TestRuntimeToolchainProbeAnswersOnStandardOutput(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "uv"), tc.program)
-			got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"},
+			got, err := probeNoArgs(context.Background(), path, []string{"PATH=/usr/bin:/bin"},
 				procdeadline.HostProcessDeadline(toolVersionProbeTimeout))
 			if tc.wantErr != "" {
 				if err == nil || err.Error() != tc.wantErr {
@@ -348,7 +348,7 @@ func TestRuntimeToolchainProbeDeadlineCountsFromTheFirstInstruction(t *testing.T
 	t.Run("held past its deadline, it answers", func(t *testing.T) {
 		path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "compiler"), fixtureproc.Program{Stdout: "1.2.3\n"})
 		deadline := procdeadline.ProcessDeadline{Run: 0, Uncounted: elapsesNever, Progress: neverRunning}
-		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, deadline)
+		got, err := probeNoArgs(context.Background(), path, []string{"PATH=/usr/bin:/bin"}, deadline)
 		if err != nil || got != "1.2.3" {
 			t.Fatalf("probe = %q, %v; want 1.2.3", got, err)
 		}
@@ -356,7 +356,7 @@ func TestRuntimeToolchainProbeDeadlineCountsFromTheFirstInstruction(t *testing.T
 	t.Run("waiting for a CPU past its deadline, it answers", func(t *testing.T) {
 		path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "compiler"), fixtureproc.Program{Stdout: "1.2.3\n"})
 		deadline := procdeadline.ProcessDeadline{Run: time.Nanosecond, Uncounted: elapsesNever, Progress: alwaysWaitingForCPU}
-		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, deadline)
+		got, err := probeNoArgs(context.Background(), path, []string{"PATH=/usr/bin:/bin"}, deadline)
 		if err != nil || got != "1.2.3" {
 			t.Fatalf("probe = %q, %v; want 1.2.3", got, err)
 		}
@@ -366,7 +366,7 @@ func TestRuntimeToolchainProbeDeadlineCountsFromTheFirstInstruction(t *testing.T
 		program := fixtureproc.Program{WaitFor: []string{filepath.Join(dir, "never")}}
 		path := fixtureproc.Write(t, filepath.Join(dir, "compiler"), program)
 		deadline := procdeadline.ProcessDeadline{Run: elapsesNever, Uncounted: 0, Progress: neverRunning}
-		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, deadline)
+		got, err := probeNoArgs(context.Background(), path, []string{"PATH=/usr/bin:/bin"}, deadline)
 		if want := "probe timed out at its 0s bound on time not counted: the host held it "; err == nil ||
 			!strings.HasPrefix(err.Error(), want) {
 			t.Fatalf("probe = %q, %v; want an error starting with %q", got, err, want)

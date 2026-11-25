@@ -422,6 +422,20 @@
               "a-workspace-cut-needs-a-workspace-git-input-and-history-an-uncached-task"
             ]
           }
+        },
+        {
+          "id": "a-toolchain-probe-may-name-its-own-executable",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-probe-self-is-validated",
+              "a-probe-self-raises-no-contract-floor"
+            ]
+          }
         }
       ]
     }

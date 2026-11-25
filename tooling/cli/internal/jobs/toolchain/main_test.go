@@ -20,5 +20,6 @@ func TestMain(m *testing.M) {
 	}
 	code := m.Run()
 	_ = os.RemoveAll(dir)
+	removeSelfTool()
 	os.Exit(code)
 }

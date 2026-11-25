@@ -12,6 +12,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/store"
 )
 
 // extensionCase is the fixture of one extension built here: a workspace that
@@ -214,10 +215,18 @@ func TestTheExtensionCounts(t *testing.T) {
 			// The engine probes each candidate of a pinned toolchain until one
 			// answers with the pinned release: the pinned Go through GOROOT and
 			// the case's pinned tools first on PATH make the first candidate
-			// answer, whatever else the host's PATH holds. Both sit in the
-			// cases' own Putnami home, whose toolchains answer from a record
-			// once probed, whichever directory the host keeps them in.
-			goroot, tools := putnamiHome(t, home, goRoot(t), tools)
+			// answer, whatever else the host's PATH holds. They stay where the
+			// machine keeps them, outside the cases' Putnami home: each names its
+			// own executable through its probe's self, so it answers from a
+			// record once probed.
+			goroot := goRoot(t)
+			requireRecordable(t, filepath.Join(goroot, "bin", "go"))
+			for _, tool := range tools {
+				if filepath.Base(tool) == "bun" {
+					requireRecordable(t, tool)
+				}
+			}
+			putnamiHome(t, home)
 			t.Setenv("GOROOT", goroot)
 			dirs := []string{filepath.Join(goroot, "bin")}
 			for _, tool := range tools {
@@ -295,59 +304,44 @@ func requireOffline(t *testing.T, tc extensionCase) (tools []string) {
 	return tools
 }
 
-// putnamiHome sets PUTNAMI_HOME to home, a Putnami home whose tools are the
-// machine's and whose toolchains hold the pinned Go at goroot and the pinned
-// Bun among tools at the paths a provisioned release takes, and points the
-// artifact store, and the records a run keeps there, at home too. The Go and
-// Bun executables are copies, so each is a release of the home's own; the
-// rest of the Go root is linked. A home a case already filled is reused. It
-// returns the Go root and the tools by their paths in that home.
-func putnamiHome(t *testing.T, home, goroot string, tools []string) (string, []string) {
+// requireRecordable skips the case unless the toolchain executable at path is
+// one the engine records once it named itself: a native file with one link.
+// A host whose Go or Bun is a script or a hard link probes it on each run, so
+// the counts held here do not describe it.
+func requireRecordable(t *testing.T, path string) {
 	t.Helper()
-	var lock struct {
-		Toolchains map[string]struct{ Version string } `json:"toolchains"`
+	real, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		t.Skipf("the case's toolchain %s does not resolve: %v", path, err)
 	}
-	readJSON(t, "putnami.lock.json", &lock)
+	identity, ok := store.StatFileIdentity(real)
+	if !ok || identity.Links != 1 {
+		t.Skipf("the case's toolchain %s has no file identity or several links, so it is probed on each run", real)
+	}
+	file, err := os.Open(real)
+	if err != nil {
+		t.Skip(err)
+	}
+	defer func() { _ = file.Close() }()
+	head := make([]byte, 2)
+	if _, err := file.Read(head); err == nil && string(head) == "#!" {
+		t.Skipf("the case's toolchain %s is a script, so it is probed on each run", real)
+	}
+}
+
+// putnamiHome sets PUTNAMI_HOME to home, a Putnami home whose tools are the
+// machine's and whose toolchains are empty, and points the artifact store, and
+// the records a run keeps there, at home too. A home a case already filled is
+// reused.
+func putnamiHome(t *testing.T, home string) {
+	t.Helper()
 	if machineTools := toolsRoot(t); machineTools != "" {
 		if _, err := os.Stat(machineTools); err == nil {
 			linkOnce(t, machineTools, filepath.Join(home, "tools"))
 		}
 	}
-	homeGoroot := filepath.Join(home, "toolchains", "go", "go-"+lock.Toolchains["go"].Version, "go")
-	entries, err := os.ReadDir(goroot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if entry.Name() != "bin" {
-			linkOnce(t, filepath.Join(goroot, entry.Name()), filepath.Join(homeGoroot, entry.Name()))
-			continue
-		}
-		bins, err := os.ReadDir(filepath.Join(goroot, "bin"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, bin := range bins {
-			source, target := filepath.Join(goroot, "bin", bin.Name()), filepath.Join(homeGoroot, "bin", bin.Name())
-			if bin.Name() == "go" {
-				copyOnce(t, source, target)
-			} else {
-				linkOnce(t, source, target)
-			}
-		}
-	}
-	homeTools := make([]string, 0, len(tools))
-	for _, tool := range tools {
-		if filepath.Base(tool) == "bun" {
-			homeBun := filepath.Join(home, "toolchains", "bun", "bun-"+lock.Toolchains["bun"].Version, "bin", "bun")
-			copyOnce(t, tool, homeBun)
-			tool = homeBun
-		}
-		homeTools = append(homeTools, tool)
-	}
 	t.Setenv("PUTNAMI_HOME", home)
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(home, "artifacts"))
-	return homeGoroot, homeTools
 }
 
 // linkOnce links path to target unless path exists.
@@ -360,24 +354,6 @@ func linkOnce(t *testing.T, target, path string) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(target, path); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// copyOnce copies the executable at source to path unless path exists.
-func copyOnce(t *testing.T, source, path string) {
-	t.Helper()
-	if _, err := os.Lstat(path); err == nil {
-		return
-	}
-	data, err := os.ReadFile(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, data, 0o755); err != nil {
 		t.Fatal(err)
 	}
 }

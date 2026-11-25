@@ -1,6 +1,8 @@
 # ADR 0102 — Planning reads recorded facts
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0105](0105-a-toolchain-that-names-its-own-executable-is-recorded.md)
+  (decision 2)
 - **Date**: 2026-11-25
 - **Amends**: [ADR 0078](0078-the-core-asks-extensions-to-expand-their-input-selectors.md),
   decision 1 (one resolver per run asks and keeps)

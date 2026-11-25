@@ -385,10 +385,14 @@ a host hook at `UserPromptSubmit` or one that declares `async` requires
 contract 25 wherever it loads from: a reader at 25 accepts the event and
 writes an async hook to run in the background, and an older reader would
 refuse the event or the member, or run the hook in the foreground.
-`RequiredLoadContract` includes that rung too. A manifest that
+`RequiredLoadContract` includes that rung too. A runtime toolchain probe
+that declares `self` is read from contract 26 and raises no rung: a reader
+below 26 drops the member and probes the binary once per run, with the same
+answer, so neither `RequiredCLIContract` nor `RequiredLoadContract` includes
+it. A manifest that
 still carries the deleted `tools` section loads leniently with no provider,
 and strict validation refuses the member. The reader loads every stamp from
-the one the manifest's vocabulary requires up to `protocols/cli.LatestContract` (25):
+the one the manifest's vocabulary requires up to `protocols/cli.LatestContract` (26):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|

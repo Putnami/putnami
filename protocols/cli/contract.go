@@ -45,6 +45,15 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	26: ADDITIVE, NO FLOOR — how a runtime toolchain's binary names its own
+//	   executable (`probe.self`). From 26 on, the CLI runs the declared probe
+//	   once, when it records a toolchain outside the Putnami home's
+//	   toolchains, and records the version answer only when the executable
+//	   the answer names is the candidate's own file. A reader below 26 drops
+//	   the member and probes the binary once per run, with the same answer,
+//	   so the member raises no manifest's stamp: RequiredCLIContract ignores
+//	   it, and the manifest loads in every reader of its other vocabulary's
+//	   rung. Rungs 20 to 25 are listed in doc/01-contract.md.
 //	19: ADDITIVE — the collaboration providers an extension declares
 //	   (`providers`, keyed by contract). From 19 on, the CLI reaches each
 //	   declared operation as a subprocess that reads one provider request and
@@ -352,7 +361,15 @@ const ProviderMembersContract = 24
 // member, or write the hook in the foreground, refuses the stamp instead.
 const PromptHostHooksContract = 25
 
+// ToolchainProbeSelfContract is the contract from which the CLI reads a
+// runtime toolchain probe's self: how the binary names its own executable. It
+// raises no floor: a reader below it drops the member and probes the binary
+// once per run, which keys on the same answer, so RequiredCLIContract never
+// returns it and a manifest that declares the member keeps the stamp its other
+// vocabulary requires.
+const ToolchainProbeSelfContract = 26
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = PromptHostHooksContract
+const LatestContract = ToolchainProbeSelfContract

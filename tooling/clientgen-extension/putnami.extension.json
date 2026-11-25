@@ -16,7 +16,8 @@
           "args": ["env", "GOVERSION"],
           "expect": "go{version}",
           "unset": ["GOROOT"],
-          "environment": { "GOTOOLCHAIN": "local" }
+          "environment": { "GOTOOLCHAIN": "local" },
+          "self": { "args": ["env", "GOROOT"], "path": "bin/go" }
         },
         "environment": {
           "GOROOT": { "from": "ancestor", "levels": 2 },
@@ -39,7 +40,7 @@
           { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-windows-x64/bun.exe" },
           { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bin/bun" }
         ],
-        "probe": { "args": ["--version"], "expect": "{version}" },
+        "probe": { "args": ["--version"], "expect": "{version}", "self": { "args": ["--print", "process.execPath"] } },
         "environment": {
           "BUN_INSTALL": { "from": "ancestor", "levels": 2 },
           "PUTNAMI_CLIENTGEN_TYPESCRIPT_RUNTIME": { "from": "executable" }

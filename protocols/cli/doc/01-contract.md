@@ -341,6 +341,15 @@ so Claude Code runs it in the background and the turn does not wait for it. A
 reader below 25 would refuse the event or the member, or write the hook in
 the foreground, so it refuses the stamp instead. The floor binds a manifest
 wherever it loads from. Only a manifest with such a hook is stamped 25.
+Contract `26` (`ToolchainProbeSelfContract`) is additive for a runtime
+toolchain probe that declares `self`, how the binary names its own executable.
+From 26 on, the CLI runs that probe once, when it records a toolchain outside
+the Putnami home's toolchains, and records the version answer only when the
+executable the answer names is the candidate's own file. A reader below 26
+drops the member and probes the binary once per run, with the same answer, so
+the member raises no floor: a manifest that declares it keeps the stamp its
+other vocabulary requires. An older reader's strict validation (`putnami extensions
+validate`, an extension's packaging) refuses the member it does not know.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

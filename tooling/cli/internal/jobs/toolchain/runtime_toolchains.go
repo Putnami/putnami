@@ -653,17 +653,15 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 			reject("not executable")
 			continue
 		}
-		// Only a release the Putnami home's toolchains hold answers from a
-		// record: the candidate and the file it resolves to both lie there.
-		// Any other candidate, such as a shim or a dispatcher whose answer
-		// follows its configuration, or a link from the toolchains to one, is
-		// probed once per run.
-		recordRoot := ""
-		if resolvedToolchainsRoot != "" && underDirectory(toolchainsRoot, executable) &&
-			underDirectory(resolvedToolchainsRoot, realExecutable) {
-			recordRoot = storeRoot
-		}
-		got, want, err := probeRuntimeToolchainVersion(ctx, recordRoot, realExecutable, requirement.Probe, version, base)
+		// A release the Putnami home's toolchains hold answers from a record:
+		// the candidate and the file it resolves to both lie there. Any other
+		// candidate answers from a record only when its probe's self named that
+		// same file (probeRuntimeToolchainVersion): a shim or a dispatcher whose
+		// answer follows its configuration names another file, and is probed
+		// once per run.
+		home := resolvedToolchainsRoot != "" && underDirectory(toolchainsRoot, executable) &&
+			underDirectory(resolvedToolchainsRoot, realExecutable)
+		got, want, err := probeRuntimeToolchainVersion(ctx, storeRoot, home, realExecutable, requirement.Probe, version, base)
 		if err != nil {
 			rejections = append(rejections, runtimeToolchainRejection{candidate: label, reason: err.Error(), err: err})
 			continue
@@ -694,10 +692,20 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 //
 // The answer is read once per binary identity (identifyProbe): from the
 // process's memo, or from the record under storeRoot, the artifact store
-// root, which may be empty to read and write no record. A probe that
-// succeeded is kept; one that failed is not.
-func probeRuntimeToolchainVersion(ctx context.Context, storeRoot, executable string, probe extensionproto.RuntimeToolchainProbe, version string, base []string) (got, want string, err error) {
+// root, which may be empty to read and write no record. A record is read and
+// written for home, a release the Putnami home's toolchains hold, and for a
+// probe that declares self: when no record answers, the self probe runs once
+// after the version probe succeeds, and the answer is recorded only when self
+// names executable itself (checkSelf). A probe that succeeded is kept in
+// memory; one that failed is not.
+func probeRuntimeToolchainVersion(ctx context.Context, storeRoot string, home bool, executable string, probe extensionproto.RuntimeToolchainProbe, version string, base []string) (got, want string, err error) {
 	want = strings.ReplaceAll(probe.Expect, extensionproto.RuntimeToolchainVersionToken, version)
+	if probe.Self != nil {
+		// The self check runs the executable from an empty directory.
+		if executable, err = filepath.Abs(executable); err != nil {
+			return "", want, fmt.Errorf("probe failed: %w", err)
+		}
+	}
 	probeEnv := append([]string(nil), base...)
 	unset := slices.Sorted(slices.Values(probe.Unset))
 	for _, name := range unset {
@@ -711,18 +719,40 @@ func probeRuntimeToolchainVersion(ctx context.Context, storeRoot, executable str
 	}
 	slices.Sort(set)
 	probeEnv = PrependPathWith(envkeys.Host, probeEnv, filepath.Dir(executable))
-	identity, keep := identifyProbe(executable, probe.Args, set, unset, probeEnv)
+	identity, keep := identifyProbe(executable, probe.Args, set, unset, probeEnv, probe.Self)
+	recordRoot := ""
+	if home || probe.Self != nil {
+		recordRoot = storeRoot
+	}
+	state := probeUnknown
 	if keep {
-		if answer, ok := recordedProbeAnswer(storeRoot, identity); ok {
+		var answer string
+		if answer, state = recordedProbeAnswer(recordRoot, identity); state == probeAnswered {
 			return answer, want, nil
 		}
 	}
-	got, err = probeRuntimeToolchain(ctx, executable, probe.Args, probeEnv,
-		procdeadline.HostProcessDeadline(runtimeToolchainProbeTimeout(ctx)))
-	if err == nil && keep {
-		recordProbeAnswer(storeRoot, identity, got)
+	// The version probe that decides whether the candidate qualifies runs in
+	// the working directory, which its identity names: a version manager's
+	// shim answers the version the workspace pins from there.
+	got, err = probeRuntimeToolchainAnswer(ctx, executable, "", probe.Args, probeEnv,
+		procdeadline.HostProcessDeadline(runtimeToolchainProbeTimeout(ctx)), toolVersionMaxLen)
+	if err != nil || !keep {
+		return got, want, err
 	}
-	return got, want, err
+	keepProbeAnswer(identity, got)
+	switch {
+	case recordRoot == "" || !identity.native:
+	case home:
+		recordProbeAnswer(recordRoot, identity, got)
+	case state != probeNamesOther:
+		switch checkSelf(ctx, executable, *probe.Self, probe.Args, probeEnv, identity, got) {
+		case selfNamesExecutable:
+			recordProbeAnswer(recordRoot, identity, got)
+		case selfNamesOther:
+			recordNamesOther(recordRoot, identity)
+		}
+	}
+	return got, want, nil
 }
 
 // describeRuntimeToolchainCandidate names a candidate by its 1-based position,
@@ -949,7 +979,8 @@ func runtimeToolchainProbeTimeout(ctx context.Context) time.Duration {
 	return toolVersionProbeTimeout
 }
 
-// probeRuntimeToolchain runs the declared probe under deadline and returns its
+// probeRuntimeToolchainAnswer runs path with args under deadline, in dir, or in
+// the CLI's working directory when dir is empty, and returns its
 // trimmed one-line answer: the standard output, or the standard error when the
 // probe writes nothing to its standard output. A warning a program writes to
 // its standard error beside a version on its standard output is not part of
@@ -957,13 +988,15 @@ func runtimeToolchainProbeTimeout(ctx context.Context) time.Duration {
 // timeout (ErrToolchainProbeTimeout), a failed start, a failed exit, output
 // that stays open after the probe exits, or an answer that is empty, too long,
 // or spans several lines.
-func probeRuntimeToolchain(ctx context.Context, path string, args, env []string, deadline procdeadline.ProcessDeadline) (string, error) {
+// maxLen is the longest answer it accepts.
+func probeRuntimeToolchainAnswer(ctx context.Context, path, dir string, args, env []string, deadline procdeadline.ProcessDeadline, maxLen int) (string, error) {
 	probeCtx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 	stdout := &boundedBuffer{limit: toolVersionProbeOutputLimit}
 	stderr := &boundedBuffer{limit: toolVersionProbeOutputLimit}
 	cmd := exec.CommandContext(probeCtx, path, args...)
 	cmd.Env = env
+	cmd.Dir = dir
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.WaitDelay = toolVersionProbeWaitDelay
@@ -996,8 +1029,8 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 	switch {
 	case value == "":
 		return "", errors.New("probe output empty")
-	case len(value) > toolVersionMaxLen:
-		return "", fmt.Errorf("probe output too long (%d bytes, limit %d)", len(value), toolVersionMaxLen)
+	case len(value) > maxLen:
+		return "", fmt.Errorf("probe output too long (%d bytes, limit %d)", len(value), maxLen)
 	case strings.ContainsAny(value, "\r\n"):
 		return "", errors.New("probe output malformed (more than one line)")
 	}

@@ -67,10 +67,31 @@ type RuntimeToolchainCandidate struct {
 // standard error when the probe writes nothing to its standard output. Exact matching prevents adjacent
 // versions such as 1.2.30 and 1.2.3 from sharing an identity.
 type RuntimeToolchainProbe struct {
-	Args        []string          `json:"args,omitempty"`
-	Expect      string            `json:"expect"`
-	Unset       []string          `json:"unset,omitempty"`
-	Environment map[string]string `json:"environment,omitempty"`
+	Args        []string                   `json:"args,omitempty"`
+	Expect      string                     `json:"expect"`
+	Unset       []string                   `json:"unset,omitempty"`
+	Environment map[string]string          `json:"environment,omitempty"`
+	Self        *RuntimeToolchainProbeSelf `json:"self,omitempty"`
+}
+
+// RuntimeToolchainProbeSelf declares how a toolchain's binary names its own
+// executable: a second probe, run with Args under the probe's environment in
+// an empty directory of its own, answers one line that is an absolute path,
+// and Path,
+// when set, is a slash-separated path relative to that answer. The executable
+// named is the answer joined with Path, or the answer itself.
+//
+// The CLI reads it from protocol/cli.ToolchainProbeSelfContract and records a
+// toolchain outside the Putnami home's toolchains only when the executable
+// named is the candidate's own file. A dispatcher names the toolchain it runs,
+// another file, so it is probed once per run. Declare it only for a binary
+// whose own file holds the version it answers, and whose answer names the
+// file the kernel runs: an answer read from argv[0], as PHP's PHP_BINARY on
+// Unix, names a dispatcher that execs the toolchain with its own argv. The member raises no stamp: a
+// reader below that contract drops it and probes the binary once per run.
+type RuntimeToolchainProbeSelf struct {
+	Args []string `json:"args"`
+	Path string   `json:"path,omitempty"`
 }
 
 // RuntimeToolchainEnvironment derives one child environment value from the
@@ -146,6 +167,9 @@ func validateRuntimeToolchain(base string, requirement RuntimeToolchain) []diag.
 	if len(requirement.Probe.Args) > 16 || len(requirement.Probe.Unset) > 16 || len(requirement.Probe.Environment) > 16 {
 		diags = append(diags, diag.Errorf("limit-exceeded", base+".probe", "probe arguments and environment are bounded to 16 entries each"))
 	}
+	if requirement.Probe.Self != nil {
+		diags = append(diags, validateRuntimeToolchainProbeSelf(base+".probe.self", *requirement.Probe.Self)...)
+	}
 	for i, name := range requirement.Probe.Unset {
 		if !validEnvironmentName(name) {
 			diags = append(diags, diag.Errorf("invalid-value", fmt.Sprintf("%s.probe.unset[%d]", base, i), "invalid environment name %q", name))
@@ -187,6 +211,34 @@ func validateRuntimeToolchain(base string, requirement RuntimeToolchain) []diag.
 		default:
 			diags = append(diags, diag.Errorf("invalid-value", field+".from", "unknown environment binding source %q", binding.From))
 		}
+	}
+	return diags
+}
+
+// validateRuntimeToolchainProbeSelf checks a probe's self: one to sixteen
+// arguments, and a path, when set, that stays below the answer it is joined
+// to: relative, slash-separated, with no empty, "." or ".." segment and no
+// token.
+func validateRuntimeToolchainProbeSelf(field string, self RuntimeToolchainProbeSelf) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	if len(self.Args) == 0 {
+		diags = append(diags, diag.Errorf("required-field", field+".args", "a self probe needs at least one argument"))
+	}
+	if len(self.Args) > 16 {
+		diags = append(diags, diag.Errorf("limit-exceeded", field+".args", "self probe arguments are bounded to 16 entries"))
+	}
+	if self.Path == "" {
+		return diags
+	}
+	valid := len(self.Path) <= 256 && !strings.ContainsAny(self.Path, "{}\\:") && !strings.HasPrefix(self.Path, "/")
+	for _, segment := range strings.Split(self.Path, "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			valid = false
+		}
+	}
+	if !valid {
+		diags = append(diags, diag.Errorf("invalid-value", field+".path",
+			"self path %q must be a relative slash-separated path of at most 256 bytes, with no empty, . or .. segment, no backslash, colon or token", self.Path))
 	}
 	return diags
 }

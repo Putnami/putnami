@@ -210,7 +210,7 @@ func provisionedInstallComplete(ctx context.Context, executable, version string,
 	if probe == nil {
 		return true
 	}
-	got, want, err := probeRuntimeToolchainVersion(ctx, "", executable, *probe, version, base)
+	got, want, err := probeRuntimeToolchainVersion(ctx, "", false, executable, *probe, version, base)
 	return err == nil && got == want
 }
 

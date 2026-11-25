@@ -36,6 +36,13 @@
           ],
           "environment": {
             "GOTOOLCHAIN": "local"
+          },
+          "self": {
+            "args": [
+              "env",
+              "GOROOT"
+            ],
+            "path": "bin/go"
           }
         },
         "environment": {

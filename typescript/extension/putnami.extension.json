@@ -17,7 +17,8 @@
           "args": ["env", "GOVERSION"],
           "expect": "go{version}",
           "unset": ["GOROOT"],
-          "environment": { "GOTOOLCHAIN": "local" }
+          "environment": { "GOTOOLCHAIN": "local" },
+          "self": { "args": ["env", "GOROOT"], "path": "bin/go" }
         },
         "environment": {
           "GOROOT": { "from": "ancestor", "levels": 2 },
@@ -33,7 +34,7 @@
           { "from": "home", "path": ".bun/bin/bun" },
           { "from": "provisioned" }
         ],
-        "probe": { "args": ["--version"], "expect": "{version}" },
+        "probe": { "args": ["--version"], "expect": "{version}", "self": { "args": ["--print", "process.execPath"] } },
         "environment": { "BUN_INSTALL": { "from": "ancestor", "levels": 2 } },
         "prependPath": true
       }

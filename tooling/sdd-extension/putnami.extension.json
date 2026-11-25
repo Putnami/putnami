@@ -18,7 +18,8 @@
           "args": ["env", "GOVERSION"],
           "expect": "go{version}",
           "unset": ["GOROOT"],
-          "environment": { "GOTOOLCHAIN": "local" }
+          "environment": { "GOTOOLCHAIN": "local" },
+          "self": { "args": ["env", "GOROOT"], "path": "bin/go" }
         },
         "environment": {
           "GOROOT": { "from": "ancestor", "levels": 2 },

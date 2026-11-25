@@ -582,6 +582,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 					Expect:      "go{version}",
 					Unset:       []string{"GOROOT"},
 					Environment: map[string]string{"GOTOOLCHAIN": "local"},
+					Self:        &proto.RuntimeToolchainProbeSelf{Args: []string{"env", "GOROOT"}, Path: "bin/go"},
 				},
 				Environment: map[string]proto.RuntimeToolchainEnvironment{
 					"GOROOT":      {From: proto.RuntimeToolchainEnvironmentAncestor, Levels: 2},

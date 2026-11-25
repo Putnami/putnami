@@ -140,6 +140,39 @@ directory is the only declared addition to `PATH`. The lock version, platform
 integrity, declaration and availability form the portable toolchain identity in
 runtime and task cache keys.
 
+A probe may also declare how the binary names its own executable, `self`:
+
+```json
+"probe": {
+  "args": ["env", "VERSION"],
+  "expect": "{version}",
+  "self": { "args": ["env", "ROOT"], "path": "bin/compiler" }
+}
+```
+
+`self.args` run a second probe, with the version probe's variables, whose
+one-line answer is an absolute path; the version probe that decides runs in
+the working directory, as a version manager's shim needs, and the `self` probe
+runs, with the version probe again, in one empty directory of its own; `self.path`, when set, is
+a slash-separated path below that answer, with no empty, `.` or `..` segment.
+The executable named is the answer joined with `path`, or the answer itself.
+The CLI records a probe's answer between runs only for a release the Putnami
+home's toolchains hold, or for a binary whose `self` names that same file, with
+its symbolic links resolved, and whose version answer is the same in that
+empty directory: it runs this check once, when it records. A
+dispatcher, such as a version manager's shim, names the toolchain it runs,
+another file, so it is probed once per run and answers the version its
+configuration selects. The empty-directory comparison sees a version the
+working directory selects only while the two answers differ, so a binary
+recorded while they agree keeps its answer when the working directory changes
+later. Declare `self` only for a binary whose own file holds the version it
+answers and whose version the working directory does not select, as Go's
+under `GOTOOLCHAIN=local`: a launcher that loads its version from a shared
+library, such as a Ruby built shared, does not qualify, and neither does one
+whose answer comes from `argv[0]`, such as PHP's `PHP_BINARY`, since a
+dispatcher that execs it with its own argv would be named. The member is read from CLI contract 26 and raises no stamp: an older
+reader drops it and probes the binary once per run.
+
 A candidate comes `from` one of five sources:
 
 - `path`: the bare executable name `path`, looked up on `PATH`.
