@@ -1,7 +1,6 @@
 package documents
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,107 +54,4 @@ func cliModuleRoot(t *testing.T) string {
 func projectRoot(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(repositoryRoot(t), filepath.FromSlash(cliDocumentsProjectDir))
-}
-
-func requireShell(t *testing.T) {
-	t.Helper()
-	if _, err := os.Stat("/bin/sh"); err != nil {
-		t.Skip("/bin/sh unavailable on this platform")
-	}
-}
-
-type streamCaptureResult struct {
-	data []byte
-	err  error
-}
-
-// drainCapturedStream reads a captured pipe concurrently with the code under
-// test. Waiting until afterwards lets a large rendering fill the finite pipe
-// buffer and block forever in Write.
-func drainCapturedStream(r io.Reader) <-chan streamCaptureResult {
-	done := make(chan streamCaptureResult, 1)
-	go func() {
-		data, err := io.ReadAll(r)
-		done <- streamCaptureResult{data: data, err: err}
-	}()
-	return done
-}
-
-// captureStdout captures the process standard output produced by fn.
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
-
-	orig := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("os.Pipe: %v", err)
-	}
-	os.Stdout = w
-	defer func() {
-		os.Stdout = orig
-		_ = w.Close()
-		_ = r.Close()
-	}()
-
-	readDone := drainCapturedStream(r)
-	fn()
-
-	os.Stdout = orig
-	if err := w.Close(); err != nil {
-		t.Fatalf("close writer: %v", err)
-	}
-	result := <-readDone
-	if result.err != nil {
-		t.Fatalf("read stdout: %v", result.err)
-	}
-	return string(result.data)
-}
-
-// captureStdoutStderr captures both standard streams produced by fn.
-func captureStdoutStderr(t *testing.T, fn func()) string {
-	t.Helper()
-
-	origOut, origErr := os.Stdout, os.Stderr
-	rOut, wOut, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("os.Pipe stdout: %v", err)
-	}
-	rErr, wErr, err := os.Pipe()
-	if err != nil {
-		_ = wOut.Close()
-		_ = rOut.Close()
-		t.Fatalf("os.Pipe stderr: %v", err)
-	}
-	os.Stdout = wOut
-	os.Stderr = wErr
-	defer func() {
-		os.Stdout = origOut
-		os.Stderr = origErr
-		_ = wOut.Close()
-		_ = wErr.Close()
-		_ = rOut.Close()
-		_ = rErr.Close()
-	}()
-
-	outDone := drainCapturedStream(rOut)
-	errDone := drainCapturedStream(rErr)
-	fn()
-
-	os.Stdout = origOut
-	os.Stderr = origErr
-	if err := wOut.Close(); err != nil {
-		t.Fatalf("close stdout writer: %v", err)
-	}
-	if err := wErr.Close(); err != nil {
-		t.Fatalf("close stderr writer: %v", err)
-	}
-	out := <-outDone
-	if out.err != nil {
-		t.Fatalf("read stdout: %v", out.err)
-	}
-	errBuf := <-errDone
-	if errBuf.err != nil {
-		t.Fatalf("read stderr: %v", errBuf.err)
-	}
-	return string(out.data) + string(errBuf.data)
 }

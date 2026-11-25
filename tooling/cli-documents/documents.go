@@ -1,6 +1,7 @@
-// Package documents holds the gates that read this repository's own documents:
-// the governance surface, the contributor recipe, the release plan and its
-// recorded verdict, the public-cut candidate, and the shipped manifests.
+// Package documents holds the gates that read this repository's whole
+// candidate tree: the public-cut scan, and the release rehearsal with its
+// release plan and recorded verdict. The gates that read a known document set
+// live in tooling/cli-document-set, which keys on those documents alone.
 //
 // They live in their own project because a cache key is per project and per
 // command, never per task. Declaring CONTRIBUTING.md as a test input of

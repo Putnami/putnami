@@ -9,8 +9,6 @@ module go.putnami.dev/tooling/cli/documents
 go 1.25.7
 
 require (
-	go.putnami.dev/protocol/ci v0.0.0
-	go.putnami.dev/protocol/cli v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
 	go.putnami.dev/sdk/extension v0.0.0
@@ -18,34 +16,12 @@ require (
 )
 
 require (
-	go.putnami.dev/cli/model v0.0.0 // indirect
-	go.putnami.dev/protocol/agentcontext v0.0.0 // indirect
-	go.putnami.dev/protocol/architecture v0.0.0 // indirect
 	go.putnami.dev/protocol/cache v0.0.0 // indirect
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
-	go.putnami.dev/protocol/clientcontract v0.0.0 // indirect
-	go.putnami.dev/protocol/collaboration v0.0.0 // indirect
-	go.putnami.dev/protocol/config v0.0.0 // indirect
-	go.putnami.dev/protocol/contracts v0.0.0 // indirect
-	go.putnami.dev/protocol/database v0.0.0 // indirect
+	go.putnami.dev/protocol/cli v0.0.0 // indirect
 	go.putnami.dev/protocol/diagnostic v0.0.0 // indirect
-	go.putnami.dev/protocol/distribution v0.0.0 // indirect
-	go.putnami.dev/protocol/doctor v0.0.0 // indirect
-	go.putnami.dev/protocol/events v0.0.0 // indirect
 	go.putnami.dev/protocol/extension v0.0.0 // indirect
-	go.putnami.dev/protocol/gomod v0.0.0 // indirect
-	go.putnami.dev/protocol/infra v0.0.0 // indirect
-	go.putnami.dev/protocol/job v0.0.0 // indirect
-	go.putnami.dev/protocol/oci v0.0.0 // indirect
-	go.putnami.dev/protocol/put v0.0.0 // indirect
-	go.putnami.dev/protocol/registry v0.0.0 // indirect
-	go.putnami.dev/protocol/runner v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
-	go.putnami.dev/protocol/storage v0.0.0 // indirect
-	go.putnami.dev/protocol/support v0.0.0 // indirect
-	go.putnami.dev/protocol/telemetry v0.0.0 // indirect
-	go.putnami.dev/protocol/template v0.0.0 // indirect
-	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 )
 
