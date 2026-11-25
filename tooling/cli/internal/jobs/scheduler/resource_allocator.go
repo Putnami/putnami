@@ -18,14 +18,11 @@ const (
 	// milliCPU is one CPU in the unit admission counts: a task with history is
 	// charged the occupancy it measured, a fraction of a CPU (planChargeMilli).
 	milliCPU = 1000
-	// minChargeMilli is the least CPU an execution that reserves any is
-	// charged, so a task whose history reads as idle still counts.
-	minChargeMilli = 100
 )
 
 // resourceRequest is the scheduler reservation for one physical subprocess:
-// the CPU ceiling it is granted, which is exported to the child, and the memory
-// the coordinator admits concurrently.
+// the CPU admission charges for it (planChargeMilli), not the ceiling exported
+// to the child, and the memory the coordinator admits concurrently.
 type resourceRequest struct {
 	// cpuMilli is the CPU admission charges, in thousandths of a CPU.
 	cpuMilli    int
@@ -254,8 +251,9 @@ func (p *resourcePool) tryAcquire(request resourceRequest) (resourceReservation,
 // tryAcquireLocked takes request when it fits. With workConserving, a CPU
 // charge also fits while any CPU is free, even when it is larger than what is
 // free: a waiting execution then never leaves CPU idle behind it. A request
-// that charges no CPU, such as a dispatch's claims or a serve step, never
-// waits for CPU, even while the charges exceed the capacity.
+// that charges no CPU, such as a dispatch's claims or a serve step, fits
+// whatever the CPU charges, even above the capacity; a waiting one still
+// starts in rank order, behind a waiter that cannot start yet.
 func (p *resourcePool) tryAcquireLocked(request resourceRequest, workConserving bool) (resourceReservation, bool) {
 	freeCPU := p.cpuCapacityMilli - p.cpuUsedMilli
 	if request.cpuMilli > 0 && request.cpuMilli > freeCPU && (!workConserving || freeCPU <= 0) {
@@ -450,14 +448,16 @@ func usableMemoryBytes(capacity uint64) uint64 {
 
 // planChargeMilli is the CPU admission reserves for a task granted ceiling,
 // in thousandths of a CPU. A task with history is charged the occupancy it
-// measured, scaled by its weight, at least minChargeMilli and at most its
-// ceiling: rounding a task that fills 1.1 CPUs up to the 2 it is granted
-// would hold back work for CPU it leaves idle. A ceiling the critical-path
-// lift raised, or one with no measured wall time, is charged whole: the
-// lift's cores come from the work admission holds back. A task with none is
-// charged one CPU, scaled by its configured weight: until every tool a job
-// starts honors its grant, charging a cold task more than it fills leaves
-// CPUs idle on a fresh checkout.
+// measured, scaled by its weight, at least one CPU and at most its ceiling:
+// rounding a task that fills 1.1 CPUs up to the 2 it is granted would hold
+// back work for CPU it leaves idle, while a task measured below one CPU still
+// holds a worker, and the one-CPU floor is what the measurements behind ADR
+// 0100's amendment ran with. A ceiling the critical-path lift raised, or one
+// with no measured wall time, is charged whole: the lift's cores come from the
+// work admission holds back. A task with none is charged one CPU, scaled by
+// its configured weight: charging a cold task more than it fills left CPUs
+// idle on a fresh checkout, as measured before every tool a job starts honored
+// its grant (#1504); measuring it again belongs to #1450.
 func planChargeMilli(job *ScheduledJob, recommendation cpuRecommendation, ceiling, totalCPU int) int {
 	if !recommendation.fromHistory {
 		return bootstrapCPUCharge(job, totalCPU) * milliCPU
@@ -481,7 +481,7 @@ func planChargeMilli(job *ScheduledJob, recommendation cpuRecommendation, ceilin
 	if demand <= 0 {
 		return whole
 	}
-	return min(max(demand, minChargeMilli), whole)
+	return min(max(demand, milliCPU), whole)
 }
 
 // bootstrapCPUCharge is the first-cold CPU charge: one CPU, raised by a

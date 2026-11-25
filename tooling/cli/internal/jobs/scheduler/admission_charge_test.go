@@ -30,10 +30,19 @@ func TestAdmissionChargesTheMeasuredOccupancyNotItsRoundedCeiling(t *testing.T) 
 		t.Fatal("a fourth 1.1-CPU task fitted on four CPUs, want it refused")
 	}
 
-	// A near-idle task is charged the floor, never zero.
-	idle := alloc.recommend(1, 10, 1_000, 0, 0)
-	if charge := planChargeMilli(job, idle, idle.budget, 4); charge != minChargeMilli {
-		t.Fatalf("idle charge = %d, want the floor %d", charge, minChargeMilli)
+	// A task measured below one CPU is charged one: the request admission
+	// takes, not only the planned charge.
+	idle := alloc.recommend(1, 300, 1_000, 0, 0)
+	if charge := planChargeMilli(job, idle, idle.budget, 4); charge != milliCPU {
+		t.Fatalf("charge of a 0.3-CPU task = %d, want the one-CPU floor", charge)
+	}
+	scheduler := &Scheduler{
+		cpuAlloc:          alloc,
+		resources:         newResourcePool(4, 0, nil),
+		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {recommendation: idle, ceiling: idle.budget, chargeMilli: planChargeMilli(job, idle, idle.budget, 4)}},
+	}
+	if request := scheduler.groupResourceRequest([]*ScheduledJob{job}); request.cpuMilli != milliCPU {
+		t.Fatalf("request of a 0.3-CPU task = %d, want the one-CPU floor", request.cpuMilli)
 	}
 	// A weight scales the occupancy charged, within the ceiling.
 	weighted := alloc.recommend(2, 1_100, 1_000, 0, 0)
@@ -56,8 +65,8 @@ func TestAdmissionChargesALiftedCeilingWhole(t *testing.T) {
 	}
 	// Under the measured policy the same history is not lifted.
 	measured := newCPUAllocator(4, cpuBudgetPolicyMeasured).recommend(1, 900, 1_000, 0, 4)
-	if measured.lifted || planChargeMilli(job, measured, measured.budget, 4) != 900 {
-		t.Fatalf("measured recommendation = %+v, want no lift and a 900 charge", measured)
+	if measured.lifted || planChargeMilli(job, measured, measured.budget, 4) != milliCPU {
+		t.Fatalf("measured recommendation = %+v, want no lift and the one-CPU floor", measured)
 	}
 }
 

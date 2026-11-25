@@ -543,7 +543,7 @@ fractional charge never leaves a CPU idle behind it:
   and limits tool-native parallelism. Admission counts thousandths of a CPU.
   A task with history is charged the occupancy it measured (CPU over wall
   time, at the granted ceiling when its history holds an observation there),
-  scaled by its weight, at least a tenth of a CPU and at most its ceiling; a
+  scaled by its weight, at least one CPU and at most its ceiling; a
   ceiling the critical-path lift raised is charged whole. A task with history
   is granted its planned ceiling raised to the CPUs the running ceilings leave
   free, so the last task of a run has the whole machine. A task with no
@@ -633,14 +633,16 @@ The bootstrap distinguishes two kinds of cache miss:
   while admission charges one CPU, raised by an explicit CPU weight, and uses
   the declared resource class for memory: 512 MiB for a light task or 1280 MiB
   for a declared-heavy task, clamped to the machine. Charging a cold task its
-  whole ceiling, or a seed of it, leaves CPUs idle on a fresh checkout until
-  every tool honors its grant (ADR 0100 has the measurement). The grant is
+  whole ceiling, or a seed of it, left CPUs idle on a fresh checkout, as
+  measured before every tool a job starts honored its grant (#1504; ADR 0100
+  has the measurement, and measuring it again belongs to #1450). The grant is
   never persisted as proven CPU demand; the execution still records its
   measured RSS and actual observation ceiling so the next regular-cold run has
   contextual evidence.
 - **Regular cold** means the build/task cache missed but a learned profile is
   present. The ceiling comes from CPU/wall demand and configured/learned weight,
-  and admission charges it. RAM admission uses peak RSS from the nearest observed ceiling,
+  and admission charges the occupancy it measured, at least one CPU and at
+  most that ceiling. RAM admission uses peak RSS from the nearest observed ceiling,
   retains the measured high-water mark when the new ceiling is lower, scales it
   when the ceiling is higher, and adds confidence/saturation headroom.
 
@@ -660,8 +662,8 @@ interrupted, so many serves can leave less memory to the finite tasks. The waite
 start in the coordinator's longest-first order, so goroutine timing never
 picks who runs first.
 
-For a batch, members share the maximum CPU ceiling, and admission charges it
-once, because there is one tool-native pool. First-cold memory similarly uses one shared physical-process
+For a batch, members share the maximum CPU ceiling, and admission charges
+their largest charge once, because there is one tool-native pool. First-cold memory similarly uses one shared physical-process
 class envelope rather than multiplying it by the number of logical rows.
 Learned singleton memory estimates add because shared-config tools may retain
 several projects' inputs concurrently. A learned batch RSS is already one
