@@ -532,7 +532,7 @@ var catalog = []Command{
 		Kind:        KindStructured,
 		Category:    "Extensions & Templates",
 		Summary:     "Prepare the provider runtimes of a source workspace",
-		Description: "Prepare into the artifact store the runtime of each path extension that serves a provider in a workspace that builds its own CLI. A hosted run of the same tree starts these runtimes and prepares none itself. ./putnamiw --print-engine runs this command after it builds the CLI",
+		Description: "Prepare into the artifact store the runtime of each path extension that serves a provider in a workspace that builds its own CLI, and, for each path extension whose runtime inputs differ at the merge base an --impacted run compares against, the runtimes of this tree and of that base. A hosted run of the same tree starts these runtimes and compares them, and prepares none itself. ./putnamiw --print-engine runs this command after it builds the CLI",
 		Usage:       "putnami extensions prepare [--output <format>]",
 		Examples: []string{
 			"putnami extensions prepare",

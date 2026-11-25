@@ -85,6 +85,20 @@
         }
       },
       {
+        "id": "a-hosted-run-compares-runtimes-prepared-before-it",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "extensions-prepare-admits-the-runtimes-a-hosted-comparison-looks-up",
+            "a-hosted-comparison-prepares-nothing"
+          ]
+        }
+      },
+      {
         "id": "impacted-ignores-own-writes",
         "stage": "coded",
         "evidenceKinds": [

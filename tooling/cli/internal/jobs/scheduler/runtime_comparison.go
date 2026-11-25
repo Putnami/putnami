@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -30,7 +31,6 @@ const (
 	runtimeReasonNoBase          = "the diff has no base commit"
 	runtimeReasonNoBaseExtension = "the extension does not exist at the base"
 	runtimeReasonToolchains      = "its locked prepare toolchains differ from the base's"
-	runtimeReasonNotSourceBuilt  = "a hosted run compares only the runtimes the source build prepared"
 	runtimeReasonHeadNotPrepared = "this tree's runtime is not in the artifact store"
 )
 
@@ -90,13 +90,16 @@ func CompareExtensionRuntimes(
 	// A hosted run can only compare what the source build prepared and the
 	// store holds: it answers the others before writing the base tree, and
 	// writes nothing when none is left.
+	headDigests := make([]string, len(compared))
 	if hosted {
 		pending := 0
 		for i, ext := range compared {
-			if reason := hostedHeadRefusal(root, artifacts, ext); reason != "" {
+			digest, reason := hostedHead(root, artifacts, ext)
+			if reason != "" {
 				answers[i].Reason = reason
 				continue
 			}
+			headDigests[i] = digest
 			pending++
 		}
 		if pending == 0 {
@@ -106,7 +109,9 @@ func CompareExtensionRuntimes(
 	baseRoot, cleanup, err := checkoutBase(root, diffBase)
 	if err != nil {
 		for i := range answers {
-			answers[i].Reason = "check out the base: " + err.Error()
+			if answers[i].Reason == "" {
+				answers[i].Reason = "check out the base: " + err.Error()
+			}
 		}
 		return answers
 	}
@@ -117,15 +122,16 @@ func CompareExtensionRuntimes(
 		if answers[i].Reason != "" {
 			continue
 		}
-		answers[i].Unchanged, answers[i].Reason = compareOneRuntime(ctx, ws, baseWS, root, artifacts, ext, hosted)
+		answers[i].Unchanged, answers[i].Reason = compareOneRuntime(ctx, ws, baseWS, root, artifacts, ext, hosted, headDigests[i])
 	}
 	return answers
 }
 
 // compareOneRuntime compares the runtime of ext prepared from this tree with
 // the one prepared from the base tree. A run that holds the run credential
-// looks both up in the artifact store and prepares neither: it only compares
-// the runtimes the source build prepared before the run.
+// looks both up in the artifact store, the head's under hostedHeadDigest, and
+// prepares neither: it compares only the runtimes `putnami extensions
+// prepare` admitted before the run (PrepareComparisonRuntimes).
 func compareOneRuntime(
 	ctx context.Context,
 	ws, baseWS *workspace.Workspace,
@@ -133,6 +139,7 @@ func compareOneRuntime(
 	artifacts *artifactstore.Store,
 	ext *extension.ExtensionDescription,
 	hosted bool,
+	hostedHeadDigest string,
 ) (bool, string) {
 	resolved, err := dirlink.Resolve(ext.Path)
 	if err != nil {
@@ -169,12 +176,7 @@ func compareOneRuntime(
 
 	var headDigest, baseDigest string
 	if hosted {
-		if reason := hostedHeadRefusal(root, artifacts, ext); reason != "" {
-			return false, reason
-		}
-		if headDigest, err = sourceBuiltRuntimeDigest(root, ext); err != nil {
-			return false, "digest this tree's runtime inputs: " + err.Error()
-		}
+		headDigest = hostedHeadDigest
 		if baseDigest, err = sourceBuiltRuntimeDigest(baseWS.Root, &base); err != nil {
 			return false, "digest the base runtime inputs: " + err.Error()
 		}
@@ -207,20 +209,19 @@ func compareOneRuntime(
 	return true, ""
 }
 
-// hostedHeadRefusal says why a hosted run cannot compare ext, or "" when the
-// source build prepared its head runtime and the store holds it.
-func hostedHeadRefusal(root string, artifacts *artifactstore.Store, ext *extension.ExtensionDescription) string {
-	if !extension.FromSourceBuild(root, ext) {
-		return runtimeReasonNotSourceBuilt
-	}
+// hostedHead returns the digest under which a hosted run finds the head
+// runtime of ext, the locked one `putnami extensions prepare` admits it under
+// (sourceBuiltRuntimeDigest), or why it cannot compare ext: a hosted run
+// prepares nothing, so a runtime the store does not hold is not compared.
+func hostedHead(root string, artifacts *artifactstore.Store, ext *extension.ExtensionDescription) (string, string) {
 	digest, err := sourceBuiltRuntimeDigest(root, ext)
 	if err != nil {
-		return "digest this tree's runtime inputs: " + err.Error()
+		return "", "digest this tree's runtime inputs: " + err.Error()
 	}
 	if !artifacts.Has(digest) {
-		return runtimeReasonHeadNotPrepared
+		return "", runtimeReasonHeadNotPrepared
 	}
-	return ""
+	return digest, ""
 }
 
 // sourcePreparedExtensionsByProject maps each project of ws to the extension
@@ -338,4 +339,105 @@ func runtimeContentsDigest(dir string) (string, error) {
 		h.Write([]byte{0})
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// PrepareComparisonRuntimes admits into the artifact store, before a hosted
+// run, the runtimes CompareExtensionRuntimes looks up in it: for each
+// in-workspace extension that prepares its runtime from source and exists at
+// diffBase, whose runtime inputs differ between this tree and the base, the
+// runtime of this tree and the runtime of the base, each under the digest a
+// hosted run computes from its own lock (sourceBuiltRuntimeDigest). An
+// extension whose inputs are the same at the base needs no comparison: its
+// runtime edge does not fire.
+//
+// It is best effort and returns one note per extension it could not prepare:
+// a runtime it leaves out only keeps that extension's edge in the hosted run.
+// It runs repository code, the prepare commands of both trees, so it refuses
+// to run under the run credential, as `putnami extensions prepare` does.
+func PrepareComparisonRuntimes(
+	ctx context.Context,
+	ws *workspace.Workspace,
+	extensions []*extension.ExtensionDescription,
+	diffBase string,
+) ([]string, error) {
+	if runcredential.Hosted() {
+		return nil, fmt.Errorf("prepare comparison runtimes: a run that holds the run credential prepares no runtime")
+	}
+	if ws == nil || strings.TrimSpace(diffBase) == "" {
+		return nil, nil
+	}
+	root, err := dirlink.Resolve(ws.Root)
+	if err != nil {
+		root = ws.Root
+	}
+	var candidates []*extension.ExtensionDescription
+	for _, ext := range sourcePreparedExtensionsByProject(ws, extensions) {
+		candidates = append(candidates, ext)
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Name < candidates[j].Name })
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+	baseRoot, cleanup, err := checkoutBase(root, diffBase)
+	if err != nil {
+		return nil, fmt.Errorf("check out the base %s: %w", diffBase, err)
+	}
+	defer cleanup()
+	artifacts := artifactstore.New(store.ResolveArtifactStoreRoot(ws.Root))
+
+	var notes []string
+	var heads, bases []*extension.ExtensionDescription
+	for _, ext := range candidates {
+		resolved, err := dirlink.Resolve(ext.Path)
+		if err != nil {
+			resolved = ext.Path
+		}
+		rel, err := filepath.Rel(root, resolved)
+		if err != nil {
+			continue
+		}
+		head := *ext
+		head.RuntimeExecutable, head.RuntimeDigest, head.RuntimeToolchains = "", "", nil
+		base := head
+		base.Path = filepath.Join(baseRoot, rel)
+		if _, err := os.Stat(filepath.Join(base.Path, extension.ManifestFilename)); err != nil {
+			continue
+		}
+		headDigest, headErr := sourceBuiltRuntimeDigest(root, &head)
+		baseDigest, baseErr := sourceBuiltRuntimeDigest(baseRoot, &base)
+		if headErr != nil || baseErr != nil {
+			notes = append(notes, fmt.Sprintf("%s: digest the runtime inputs: %v", ext.Name, errors.Join(headErr, baseErr)))
+			continue
+		}
+		if headDigest == baseDigest {
+			continue
+		}
+		if !artifacts.Has(headDigest) {
+			heads = append(heads, &head)
+		}
+		if !artifacts.Has(baseDigest) {
+			bases = append(bases, &base)
+		}
+	}
+	notes = append(notes, prepareLocked(ctx, &workspace.Workspace{Root: root}, heads)...)
+	notes = append(notes, prepareLocked(ctx, &workspace.Workspace{Root: baseRoot}, bases)...)
+	return notes, nil
+}
+
+// prepareLocked prepares each extension of exts in ws, one at a time so one
+// failure leaves the others prepared, and returns a note for each one it could
+// not prepare under its locked digest.
+func prepareLocked(ctx context.Context, ws *workspace.Workspace, exts []*extension.ExtensionDescription) []string {
+	var notes []string
+	for _, ext := range exts {
+		if err := SynchronizeExtensionRuntimes(ctx, ws, []*extension.ExtensionDescription{ext}, nil); err != nil {
+			notes = append(notes, fmt.Sprintf("%s: prepare the runtime of %s: %v", ext.Name, ws.Root, err))
+			continue
+		}
+		locked, err := sourceBuiltRuntimeDigest(ws.Root, ext)
+		if err != nil || locked != ext.RuntimeDigest {
+			notes = append(notes, fmt.Sprintf("%s: the runtime prepared from %s is not under the digest its lock records", ext.Name, ws.Root))
+		}
+	}
+	return notes
 }

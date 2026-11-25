@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -206,15 +207,16 @@ func TestCompareExtensionRuntimes_AnExtensionAbsentAtTheBaseKeepsTheEdge(t *test
 }
 
 // A run that holds the run credential prepares no runtime, its own or the
-// base's: it compares only the runtimes the source build prepared.
+// base's: with nothing in the store it compares nothing.
 func TestCompareExtensionRuntimes_AHostedRunPreparesNothing(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "a-hosted-run-compares-runtimes-prepared-before-it", "a-hosted-comparison-prepares-nothing")
 	ws, ext, base := runtimeComparisonRepo(t)
 	restore := runcredential.SetForTest("bearer")
 	defer restore()
 	writeRuntimeFile(t, ext.Path, "cmd/source", "source, edited")
 	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, []string{"/ext"}, base)
-	if len(got) != 1 || got[0].Unchanged || got[0].Reason != runtimeReasonNotSourceBuilt {
-		t.Fatalf("a hosted run compared %+v, want /ext kept as not source-built", got)
+	if len(got) != 1 || got[0].Unchanged || got[0].Reason != runtimeReasonHeadNotPrepared {
+		t.Fatalf("a hosted run compared %+v, want /ext kept because nothing prepared its runtime", got)
 	}
 	if ext.RuntimeDigest != "" || ext.RuntimeExecutable != "" {
 		t.Errorf("a hosted run prepared the head runtime: digest %q executable %q", ext.RuntimeDigest, ext.RuntimeExecutable)
@@ -258,5 +260,57 @@ func TestCompareExtensionRuntimes_DifferentLockedToolchainsKeepTheEdge(t *testin
 	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, []string{"/ext"}, base)
 	if len(got) != 1 || got[0].Unchanged || got[0].Reason != runtimeReasonToolchains {
 		t.Fatalf("a toolchain bump compared %+v, want /ext kept because its toolchains differ", got)
+	}
+}
+
+// The runtimes `putnami extensions prepare` admits before a hosted run are the
+// ones the hosted comparison finds: it proves the runtime unchanged without
+// preparing anything or recording repository code.
+func TestPrepareComparisonRuntimes_LetsAHostedRunCompare(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "a-hosted-run-compares-runtimes-prepared-before-it", "extensions-prepare-admits-the-runtimes-a-hosted-comparison-looks-up")
+	ws, ext, base := runtimeComparisonRepo(t)
+	writeRuntimeFile(t, ext.Path, "cmd/source", "source, edited")
+	notes, err := PrepareComparisonRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, base)
+	if err != nil || len(notes) != 0 {
+		t.Fatalf("PrepareComparisonRuntimes: notes %v, err %v", notes, err)
+	}
+
+	restore := runcredential.SetForTest("bearer")
+	defer restore()
+	hosted := runtimeTestExtension(ext.Path)
+	hosted.RelPath = "ext"
+	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{hosted}, []string{"/ext"}, base)
+	if len(got) != 1 || !got[0].Unchanged {
+		t.Fatalf("a hosted run after the preparation compared %+v, want /ext unchanged", got)
+	}
+	if hosted.RuntimeDigest != "" || hosted.RuntimeExecutable != "" {
+		t.Errorf("the hosted comparison prepared the head runtime: digest %q", hosted.RuntimeDigest)
+	}
+	if err := runcredential.RequireCustody("test"); err != nil {
+		t.Errorf("the hosted comparison recorded repository code: %v", err)
+	}
+	if _, err := PrepareComparisonRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, base); err == nil {
+		t.Error("PrepareComparisonRuntimes ran under the run credential")
+	}
+}
+
+// An extension whose runtime inputs are the same at the base is not prepared:
+// its runtime edge does not fire.
+func TestPrepareComparisonRuntimes_SkipsAnUnchangedExtension(t *testing.T) {
+	ws, ext, base := runtimeComparisonRepo(t)
+	notes, err := PrepareComparisonRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, base)
+	if err != nil || len(notes) != 0 {
+		t.Fatalf("PrepareComparisonRuntimes: notes %v, err %v", notes, err)
+	}
+	entries, err := os.ReadDir(os.Getenv("PUTNAMI_ARTIFACT_DIR"))
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.Name() == "sha256" {
+			if inner, _ := os.ReadDir(filepath.Join(os.Getenv("PUTNAMI_ARTIFACT_DIR"), "sha256")); len(inner) > 0 {
+				t.Errorf("an extension with the same inputs at the base was prepared: %d store entries", len(inner))
+			}
+		}
 	}
 }

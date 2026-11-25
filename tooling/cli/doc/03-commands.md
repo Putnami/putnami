@@ -997,6 +997,15 @@ one line per runtime, or, with `--output=jsonl`, one record each in the
 result's `data`. In any other
 workspace it prepares nothing.
 
+It also prepares the runtimes an `--impacted` hosted run compares with the
+diff's base (ADR 0103): it resolves the baseline that run resolves, and for
+every path extension whose `runtime.prepare` builds its runtime, exists at the
+merge base and has other runtime inputs there, it admits the runtime of this
+tree and the runtime of the merge base, each under the digest its own lock
+gives. That part is best effort: an extension it cannot prepare is named on
+stderr, keeps its consumers in that run, and never fails the command
+([ADR 0104](adr/0104-a-hosted-run-compares-runtimes-prepared-before-it.md)).
+
 The command resolves each prepare toolchain to exactly the release the lock
 pins, and installs none. It fails when that release is missing, when a provider
 command of the extension resolves a runtime toolchain, when the runtime it

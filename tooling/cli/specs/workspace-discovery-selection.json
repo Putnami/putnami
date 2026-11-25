@@ -42,6 +42,13 @@
       ]
     },
     {
+      "id": "a-hosted-run-compares-runtimes-prepared-before-it",
+      "text": [
+        "`putnami extensions prepare` admits, for each path extension whose runtime inputs differ at the merge base an --impacted run compares against, the runtimes of the tree and of that base, best effort.",
+        "A hosted run compares only runtimes the store holds under the digests their locks give, and prepares none."
+      ]
+    },
+    {
       "id": "impacted-ignores-own-writes",
       "text": "The impacted diff leaves out every path under a .gen/ or .putnami/ directory, whether or not .gitignore lists it, and every uncommitted file the run wrote before it selected: one that was not uncommitted when the run started and that no commit since the base changes."
     },
@@ -119,6 +126,7 @@
     "tooling/cli/doc/adr/0070-a-task-scope-keeps-a-job-by-its-declared-side-effects.md",
     "tooling/cli/doc/adr/0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md",
     "tooling/cli/doc/adr/0087-a-fresh-worktree-restores-its-generated-clients.md",
-    "tooling/cli/doc/adr/0103-an-unchanged-extension-runtime-reaches-no-consumer.md"
+    "tooling/cli/doc/adr/0103-an-unchanged-extension-runtime-reaches-no-consumer.md",
+    "tooling/cli/doc/adr/0104-a-hosted-run-compares-runtimes-prepared-before-it.md"
   ]
 }
