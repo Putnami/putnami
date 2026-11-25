@@ -126,6 +126,8 @@ esac
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
+	// The check reads PANTS_VERSION: the machine's value must not decide.
+	t.Setenv("PANTS_VERSION", "")
 }
 
 // peekTargets writes under dir what the stub pants serves from an export:
@@ -513,8 +515,8 @@ func TestATaskRunsPantsOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 			t.Errorf("%s: status %s, data %v, events %s", task, status, data, events)
 		}
 		log := stubLog(t)
-		if len(log) != 2 || !strings.HasSuffix(log[0], " pants --version") || log[1] != rootReal+" "+want {
-			t.Errorf("%s ran %q, want the version check then %q in %s", task, log, want, rootReal)
+		if len(log) != 1 || log[0] != rootReal+" "+want {
+			t.Errorf("%s ran %q, want %q alone in %s", task, log, want, rootReal)
 		}
 	}
 
@@ -541,14 +543,76 @@ func TestATaskRunsPantsOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 	}
 	stackstest.WriteFile(t, root, "pants.toml", string(config))
 
-	t.Setenv("STUB_VERSION", "2.24.1")
+	t.Setenv("PANTS_VERSION", "2.24.1")
 	if status, _, events := runJob(t, root, "src/python/pricing", stacks.TaskLint); status != "FAILED" || !strings.Contains(events, stacks.CodeToolchainMismatch) {
 		t.Errorf("a Pants version other than pants.toml's fails the task: %s %s", status, events)
 	}
-	t.Setenv("STUB_VERSION", "")
+	t.Setenv("PANTS_VERSION", "")
 	t.Setenv("STUB_TEST_EXIT", "1")
 	if status, _, events := runJob(t, root, "src/python/pricing", stacks.TaskTest); status != "FAILED" || !strings.Contains(events, stacks.CodeStepFailed) {
 		t.Errorf("a failing pants test fails the task: %s %s", status, events)
+	}
+}
+
+func TestTheVersionCheckReadsTheStatedVersionAndStartsNoPants(t *testing.T) {
+	spectest.Proves(t, feature, "the-version-check-starts-no-pants", "the-version-check-reads-the-stated-version-and-starts-no-pants")
+	d := readDemo(t)
+	stubPants(t, d)
+	root := repository(t, d, true)
+	rootReal, _ := filepath.EvalSymlinks(root)
+	want := rootReal + " pants lint src/python/pricing:"
+	lint := func() (string, string, []string) {
+		t.Helper()
+		t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
+		status, _, events := runJob(t, root, "src/python/pricing", stacks.TaskLint)
+		return status, events, stubLog(t)
+	}
+
+	// The launcher runs the version pants.toml states, and Pants enforces
+	// it: the check starts no pants, whatever pants --version would print.
+	t.Setenv("STUB_VERSION", "2.24.1")
+	if status, events, log := lint(); status != "OK" || !slices.Equal(log, []string{want}) {
+		t.Errorf("the stated version is the version: %s %q %s", status, log, events)
+	}
+
+	// PANTS_VERSION selects the release the launcher runs.
+	t.Setenv("PANTS_VERSION", "2.24.1")
+	if status, events, log := lint(); status != "FAILED" || !strings.Contains(events, stacks.CodeToolchainMismatch) || !strings.Contains(events, "2.24.1") || len(log) != 0 {
+		t.Errorf("a PANTS_VERSION other than pants.toml's fails with no pants started: %s %q %s", status, log, events)
+	}
+	t.Setenv("PANTS_VERSION", "2.25.0")
+	if status, events, log := lint(); status != "OK" || !slices.Equal(log, []string{want}) {
+		t.Errorf("a PANTS_VERSION equal to pants.toml's passes: %s %q %s", status, log, events)
+	}
+	t.Setenv("PANTS_VERSION", "")
+
+	// A change to the pinned version is seen by the next run.
+	config, err := os.ReadFile(filepath.Join(root, "pants.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bumped := strings.Replace(string(config), `pants_version = "2.25.0"`, `pants_version = "2.24.1"`, 1)
+	if bumped == string(config) {
+		t.Fatal("the demo's pants.toml states no pants_version 2.25.0")
+	}
+	stackstest.WriteFile(t, root, "pants.toml", bumped)
+	if status, events, log := lint(); status != "OK" || !slices.Equal(log, []string{want}) {
+		t.Errorf("a new pinned version is the version of the next run: %s %q %s", status, log, events)
+	}
+
+	// Without a stated version, the check asks pants.
+	unpinned := strings.Replace(string(config), `pants_version = "2.25.0"`, "", 1)
+	stackstest.WriteFile(t, root, "pants.toml", unpinned)
+	t.Setenv("STUB_VERSION", "")
+	if status, events, log := lint(); status != "OK" || len(log) != 2 || !strings.HasSuffix(log[0], " pants --version") || !strings.Contains(events, "no toolchain file states the expected version") {
+		t.Errorf("without a stated version, pants --version runs: %s %q %s", status, log, events)
+	}
+	stackstest.WriteFile(t, root, "pants.toml", string(config))
+
+	// Without pants on PATH, the task fails before any step.
+	t.Setenv("PATH", t.TempDir())
+	if status, events, _ := lint(); status != "FAILED" || !strings.Contains(events, stacks.CodeToolchainMissing) {
+		t.Errorf("a missing pants is still missing: %s %s", status, events)
 	}
 }
 

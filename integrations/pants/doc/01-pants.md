@@ -87,8 +87,9 @@ scopes, says which package may depend on which.
 
 ## What each task runs
 
-Each task first compares `pants --version` with `GLOBAL.pants_version` in
-`pants.toml`, then runs one command at the workspace root, with no shell.
+Each task first checks the Pants version against `GLOBAL.pants_version` in
+`pants.toml` (see [The version check](#the-version-check)), then runs one
+command at the workspace root, with no shell.
 `<dir>:` names the targets of the package's directory and those they generate,
 not those of the packages under it.
 
@@ -165,11 +166,19 @@ depends on.
 
 ## The version check
 
+The Pants launcher runs the release `PANTS_VERSION` names when it is set, else
+the one `GLOBAL.pants_version` states, and Pants refuses to start under any
+other. So the check takes that version, looks `pants` up on `PATH` and starts
+no Pants: a warm task starts one Pants command, its own. Both are read on every
+run, so a new pinned version, a new `PANTS_VERSION` or a removed `pants` is
+seen by the next one.
+
 | Case | Result |
 |---|---|
-| `pants --version` prints the version `pants.toml` states | The task runs |
-| It prints another one | The task fails with `stacks.toolchain_mismatch`; set `toolchain.check` to `warn` in the package's options to run anyway |
+| `PANTS_VERSION` is unset or names the version `pants.toml` states | The task runs |
+| `PANTS_VERSION` names another one | The task fails with `stacks.toolchain_mismatch`; set `toolchain.check` to `warn` in the package's options to run anyway |
 | `pants` is not on `PATH` | The task fails with `stacks.toolchain_missing` |
-| `pants.toml` states no `pants_version` | The warning `stacks.toolchain_unpinned` |
+| `pants.toml` states no exact `pants_version` and `PANTS_VERSION` is unset | The check runs `pants --version`, and warns with `stacks.toolchain_unpinned` when nothing states one |
+| `pants.toml` states none and `PANTS_VERSION` names an exact version | The task runs with no Pants started, and warns with `stacks.toolchain_unpinned` |
 
 The extension never installs Pants.

@@ -9,6 +9,7 @@
     "monorepo/pants-delegated-stack#reports-become-the-summary",
     "monorepo/pants-delegated-stack#sync-writes-the-package-graph",
     "monorepo/pants-delegated-stack#tasks-delegate-to-pants",
+    "monorepo/pants-delegated-stack#the-version-check-starts-no-pants",
     "monorepo/pants-delegated-stack#validate-fails-on-a-stale-graph"
   ]
 }

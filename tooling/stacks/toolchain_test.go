@@ -481,3 +481,92 @@ func TestMachineVersionRunsTheToolchainTheTaskPathFinds(t *testing.T) {
 		t.Errorf("MachineVersions reads the task's PATH too: %v, %v", versions, err)
 	}
 }
+
+// countingTool writes a tool that prints version and appends a line to a log
+// each time it starts; it returns the log's path.
+func countingTool(t *testing.T, dir, name, version string) string {
+	t.Helper()
+	log := filepath.Join(t.TempDir(), "starts")
+	script := "#!/bin/sh\necho started >> '" + log + "'\necho 'tool " + version + "'\n"
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0o755); err != nil { //nolint:gosec // an executable stub
+		t.Fatal(err)
+	}
+	return log
+}
+
+func starts(t *testing.T, log string) int {
+	t.Helper()
+	data, err := os.ReadFile(log)
+	if errors.Is(err, os.ErrNotExist) {
+		return 0
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Count(string(data), "started")
+}
+
+func TestAToolThatRunsItsStatedVersionIsNotStarted(t *testing.T) {
+	bin := t.TempDir()
+	log := countingTool(t, bin, "stubtool", "2.30.0")
+	tc := Toolchain{Command: []string{"stubtool", "--version"}, Pattern: `^tool (?<version>[0-9.]+)`, Stated: &StatedVersion{Env: "STUB_VERSION"}}
+	expected := Expected{Version: "2.31.0", Source: "pants.toml"}
+	ctx := context.Background()
+	env := []string{"PATH=" + bin}
+
+	got, err := tc.Select(ctx, bin, expected, env)
+	if err != nil || got.Verdict.Code != "" || starts(t, log) != 0 {
+		t.Fatalf("the stated version passes with no start: %+v %v, %d starts", got, err, starts(t, log))
+	}
+	got, err = tc.Select(ctx, bin, expected, append(env, "STUB_VERSION=2.30.0"))
+	if err != nil || got.Verdict.Code != CodeToolchainMismatch || !got.Verdict.Fail || !strings.Contains(got.Verdict.Message, "2.30.0") || starts(t, log) != 0 {
+		t.Errorf("a variable that names another version is a mismatch, with no start: %+v %v", got, err)
+	}
+	got, err = tc.Select(ctx, bin, expected, append(env, "STUB_VERSION=2.31.0"))
+	if err != nil || got.Verdict.Code != "" || starts(t, log) != 0 {
+		t.Errorf("a variable that names the stated version passes: %+v %v", got, err)
+	}
+
+	got, err = tc.Select(ctx, bin, Expected{}, env)
+	if err != nil || got.Verdict.Code != CodeToolchainUnpinned || starts(t, log) != 1 {
+		t.Errorf("without a stated version, the command runs: %+v %v, %d starts", got, err, starts(t, log))
+	}
+	got, err = tc.Select(ctx, bin, Expected{Version: "2.31.0", Source: "profile"}, env)
+	if err != nil || got.Verdict.Code != CodeToolchainMismatch || starts(t, log) != 2 {
+		t.Errorf("toolchain.version is not what the tool reads, so the command runs: %+v %v, %d starts", got, err, starts(t, log))
+	}
+
+	empty := t.TempDir()
+	if _, err := tc.Select(ctx, empty, expected, []string{"PATH=" + empty}); !errors.Is(err, ErrToolchainMissing) {
+		t.Errorf("a tool missing from PATH is still missing: %v", err)
+	}
+
+	probed := tc
+	probed.Stated = nil
+	if got, err := probed.Select(ctx, bin, expected, env); err != nil || got.Verdict.Code != CodeToolchainMismatch || starts(t, log) != 3 {
+		t.Errorf("a profile that does not opt in still runs the command: %+v %v", got, err)
+	}
+}
+
+func TestStatedNamesAnEnvironmentVariable(t *testing.T) {
+	tc := Toolchain{Command: []string{"stubtool"}, Pattern: `(?<version>.+)`, Stated: &StatedVersion{Env: "lower-case"}}
+	if err := tc.validate(); err == nil || !strings.Contains(err.Error(), "stated.env") {
+		t.Errorf("a stated variable that is not a name is refused: %v", err)
+	}
+	tc.Stated.Env = "PANTS_VERSION"
+	if err := tc.validate(); err != nil {
+		t.Errorf("a stated variable name is accepted: %v", err)
+	}
+}
+
+func TestAFurtherCheckDeclaresNoStatedVersion(t *testing.T) {
+	p := mustProfile(t)
+	p.Toolchain.Also = []Toolchain{{Command: []string{"cargo", "--version"}, Pattern: `(?<version>.+)`, Stated: &StatedVersion{}}}
+	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "toolchain.also[0].stated") {
+		t.Errorf("a further check that declares stated is refused: %v", err)
+	}
+	p.Toolchain.Also[0].Stated = nil
+	if err := p.Validate(); err != nil {
+		t.Errorf("the same further check without stated is accepted: %v", err)
+	}
+}

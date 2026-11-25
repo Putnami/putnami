@@ -48,6 +48,15 @@
           }
         },
         {
+          "id": "the-version-check-starts-no-pants",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-version-check-reads-the-stated-version-and-starts-no-pants"]
+          }
+        },
+        {
           "id": "a-delegated-verb-runs-one-pants-command",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

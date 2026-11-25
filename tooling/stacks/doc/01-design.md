@@ -152,6 +152,7 @@ The Rust reference profile:
 | `markers` | The files that make a directory a candidate. |
 | `toolchain.command`, `toolchain.pattern` | How to read the version on the machine: the command's output, standard output first, matched by the pattern's `version` group. |
 | `toolchain.fallback` | A command that lists the installed versions, run when `toolchain.command` fails: when none of them satisfies the expected version, the check is a mismatch that names them, so a provided toolchain may take its place. |
+| `toolchain.stated` | Says the tool runs only the version its files state, or the one the variable `stated.env` names when set, and refuses any other, as the Pants launcher does. When that version is exact, the check of the toolchain on `PATH` takes it, looks the command up and starts nothing; otherwise it runs the command. A provisioned toolchain and `toolchain.also` still run theirs ([ADR 0021](adr/0021-a-tool-that-runs-only-its-stated-version-is-not-probed.md)). |
 | `toolchain.provisioned` | The environment variable that holds the toolchain the workspace lock pins, for a stack extension that pins one. |
 | `toolchain.path` | Directories, relative to the stack root, put first on `PATH`, in order, for the toolchain check and every step, offline too: the tools the repository installs for itself, such as `node_modules/.bin`. A directory that does not exist is left out; a pinned toolchain still comes before them ([ADR 0018](adr/0018-a-profile-puts-the-repository-tools-first-on-path.md)). |
 | `tasks.<task>.withoutCoverage` | How the task runs on a toolchain with no coverage support: a `probe` that exits non-zero there, and the `steps` that replace the task's. Its coverage reports are not read, and the task warns with `stacks.coverage_unavailable`. |
@@ -456,7 +457,10 @@ keeps its key when only `Cargo.lock` moves.
 
 The key carries the **expected** version: the value the toolchain file
 states, or `toolchain.version` when a project sets one. Before its first step,
-the task reads the version on the machine with `toolchain.command`:
+the task reads the version on the machine with `toolchain.command`, or, for a
+profile that declares `toolchain.stated`, takes the exact version its variable
+or its files state and only looks the command up
+([ADR 0021](adr/0021-a-tool-that-runs-only-its-stated-version-is-not-probed.md)):
 
 - the versions match, or nothing states an expected version: the task runs.
   An expected version with fewer components names the stable releases it

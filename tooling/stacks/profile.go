@@ -133,6 +133,19 @@ type Toolchain struct {
 	// Also are further toolchain checks every task runs, such as the Dart SDK
 	// a Flutter SDK bundles. An entry with no check takes this one's.
 	Also []Toolchain `json:"also,omitempty"`
+	// Stated, when set, says the tool runs only the version its files state,
+	// or the one its variable names when set, as the Pants launcher does: the
+	// check of the toolchain on PATH takes that version when it is exact and
+	// starts no command (ADR 0021).
+	Stated *StatedVersion `json:"stated,omitempty"`
+}
+
+// StatedVersion is how a tool that runs only its stated version selects it.
+type StatedVersion struct {
+	// Env names the environment variable that, when set, names the version
+	// the tool runs in place of the one its files state, such as
+	// PANTS_VERSION.
+	Env string `json:"env,omitempty"`
 }
 
 // Range dialects.
@@ -369,6 +382,9 @@ func (p Profile) Validate() error {
 		if len(a.Path) > 0 {
 			return fmt.Errorf("toolchain.also[%d].path: a further check reads the task's PATH, which toolchain.path sets", i)
 		}
+		if a.Stated != nil {
+			return fmt.Errorf("toolchain.also[%d].stated: a further check runs its command", i)
+		}
 		if err := a.validate(); err != nil {
 			return fmt.Errorf("toolchain.also[%d].%w", i, err)
 		}
@@ -491,6 +507,9 @@ func (t Toolchain) validate() error {
 	case "", RangesPubSDK, RangesPubFlutter:
 	default:
 		return fmt.Errorf("ranges: %q is not %s or %s", t.Ranges, RangesPubSDK, RangesPubFlutter)
+	}
+	if t.Stated != nil && t.Stated.Env != "" && !environmentName.MatchString(t.Stated.Env) {
+		return fmt.Errorf("stated.env: %q is not an environment variable name", t.Stated.Env)
 	}
 	return nil
 }
