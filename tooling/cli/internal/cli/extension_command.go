@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
@@ -311,14 +312,14 @@ func (a *App) runExtensionStructuredCommand(
 			iox.Fprintf(stderr, "putnami: %v\n", err)
 			return ExitUsage
 		}
-		versions, err := interactiveCommandVersions(ws, group, sub, engine.BuildVersionInfo)
+		versions, tree, err := interactiveCommandVersions(ws, group, sub, engine.BuildVersionInfo)
 		if err != nil {
 			iox.Fprintf(stderr, "putnami: %v\n", err)
 			return ExitError
 		}
 		return runInteractiveExtensionCommand(
 			ctx, ws, job, group+" "+sub, commandParams, versions,
-			hostRPCBinding{root: wsRoot, config: cfg, extensions: extensions},
+			hostRPCBinding{root: wsRoot, config: cfg, extensions: extensions, tree: tree},
 			stdin, stdout, stderr,
 		)
 	}
@@ -327,13 +328,13 @@ func (a *App) runExtensionStructuredCommand(
 
 // interactiveCommandVersions resolves the version of each line for an
 // interactive extension command with resolve, engine.BuildVersionInfo in
-// production. The credential seam gets no version line: its bearer depends on
-// the host alone.
+// production, and returns the tree state it captured. The credential seam gets no version line: its bearer
+// depends on the host alone.
 func interactiveCommandVersions(ws *workspace.Workspace, group, sub string,
-	resolve func(*workspace.Workspace) (cachekey.RunVersions, error),
-) (cachekey.RunVersions, error) {
+	resolve func(*workspace.Workspace) (cachekey.RunVersions, *git.VersionInfo, error),
+) (cachekey.RunVersions, *git.VersionInfo, error) {
 	if lifecycle.IsCredentialSeam(group, sub) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	return resolve(ws)
 }

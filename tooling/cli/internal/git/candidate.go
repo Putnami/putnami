@@ -51,15 +51,14 @@ func CandidatePaths(root string, prefixes ...string) ([]string, error) {
 	return unique, nil
 }
 
-// TrackedUnder lists the paths the index of the repository holding dir tracks
-// at or below rel, a slash path relative to dir. The paths are relative to
-// dir, in slash form, sorted and unique. It reads the index alone, so a
-// tracked file deleted from the worktree is listed, and rel need not exist.
-// It folds case, as the emptying does: on a case-insensitive filesystem the
-// index can spell a path another way than rel, and that path is listed too.
+// TrackedPaths lists every path the index of the repository holding dir
+// tracks at or below dir, relative to dir, in slash form, sorted and unique. It
+// reads the index alone, so a tracked file deleted from the worktree is
+// listed, and an untracked file is not. TrackedPathsUnder reads the paths
+// below one path from the list.
 // When Git does not manage dir, the error is an *UnmanagedError.
-func TrackedUnder(dir, rel string) ([]string, error) {
-	stdout, stderr, err := gitread.RunCapture(dir, "ls-files", "-z", "--cached", "--", ":(literal,icase)"+rel)
+func TrackedPaths(dir string) ([]string, error) {
+	stdout, stderr, err := gitread.RunCapture(dir, "ls-files", "-z", "--cached")
 	if err != nil {
 		if unmanaged := gitread.Unmanaged(dir); unmanaged != nil {
 			return nil, unmanaged
@@ -69,6 +68,21 @@ func TrackedUnder(dir, rel string) ([]string, error) {
 	paths := gitread.SplitNUL(stdout)
 	sort.Strings(paths)
 	return slices.Compact(paths), nil
+}
+
+// TrackedPathsUnder returns the paths of tracked, a TrackedPaths list, at or
+// below rel, a slash path relative to the same directory; rel need not exist.
+// It folds case, as the emptying does: on a case-insensitive filesystem the
+// index can spell a path another way than rel, and that path is listed too.
+func TrackedPathsUnder(tracked []string, rel string) []string {
+	var under []string
+	for _, path := range tracked {
+		if len(path) == len(rel) && strings.EqualFold(path, rel) ||
+			len(path) > len(rel) && path[len(rel)] == '/' && strings.EqualFold(path[:len(rel)], rel) {
+			under = append(under, path)
+		}
+	}
+	return under
 }
 
 // literalPathspecs turns slash paths into the pathspec arguments that match

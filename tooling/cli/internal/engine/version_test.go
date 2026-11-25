@@ -52,7 +52,7 @@ func mustCaptureVersionSnapshot(t *testing.T, dir string) *git.VersionInfo {
 // PUTNAMI_SOURCE_REVISION, where it cannot fail.
 func mustBuildVersionInfo(t *testing.T, ws *workspace.Workspace) cachekey.RunVersions {
 	t.Helper()
-	versions, err := BuildVersionInfo(ws)
+	versions, _, err := BuildVersionInfo(ws)
 	if err != nil {
 		t.Fatalf("BuildVersionInfo: %v", err)
 	}

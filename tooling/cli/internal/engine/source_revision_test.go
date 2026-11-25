@@ -37,7 +37,7 @@ func TestRunFailsWhenTheBoundCommitCannotBeVersioned(t *testing.T) {
 			if err == nil || result.ExitCode != ExitError || !strings.Contains(err.Error(), tc.names) {
 				t.Fatalf("Run = exit %d, %v; want exit %d and an error naming %s", result.ExitCode, err, ExitError, tc.names)
 			}
-			versions, err := BuildVersionInfo(snapshotWorkspace(t, tc.dir))
+			versions, _, err := BuildVersionInfo(snapshotWorkspace(t, tc.dir))
 			if err == nil || versions != nil || !strings.Contains(err.Error(), tc.names) {
 				t.Fatalf("BuildVersionInfo = %+v, %v; want no versions and an error naming %s", versions, err, tc.names)
 			}
@@ -52,7 +52,7 @@ func TestBoundVersionKeepsTheBaseAndTimeOfHEAD(t *testing.T) {
 	outside := workspace.NewWorkspace(t.TempDir(), nil, []*workspace.Project{{ID: "/app", Name: "app", Path: "."}})
 	t.Setenv(git.SourceRevisionEnv, "")
 	t.Setenv(git.SourceCommitTimeEnv, "")
-	if _, err := BuildVersionInfo(outside); err != nil {
+	if _, _, err := BuildVersionInfo(outside); err != nil {
 		t.Fatalf("unset override outside git = %v, want the run tolerated", err)
 	}
 

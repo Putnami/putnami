@@ -1324,3 +1324,22 @@ func TestBuildJobContextGivesTheLineVersionOnlyToATaskWhoseKeyCarriesIt(t *testi
 		}
 	}
 }
+
+// A job a scheduler run spawns names its shared OCI layer cache under the
+// store root the run resolved once, so the spawn asks Git nothing: the root
+// here is no store any resolution would name.
+func TestBuildEnvVarsNamesTheRunsStoreRoot(t *testing.T) {
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "resolved"))
+	ws := &workspace.Workspace{Name: "test-workspace", Root: t.TempDir(), Config: &wsproto.Config{}}
+	job := &ScheduledJob{
+		Project:   &workspace.Project{Name: "test-workspace", Path: "."},
+		Extension: &extension.ExtensionDescription{Name: "@putnami/cloud", Path: "/workspace/cloud"},
+		JobDef:    &extension.JobDefinition{Name: "deploy", ExtensionName: "@putnami/cloud"},
+	}
+	ctx := BuildJobContext(ws, job, nil, nil, nil)
+	ctx.storeRoot = filepath.Join(t.TempDir(), "run")
+	want := extensionproto.SharedOCILayerCacheRootEnv + "=" + filepath.Join(ctx.storeRoot, "oci")
+	if env := BuildEnvVars(ctx); !slices.Contains(env, want) {
+		t.Fatalf("env missing %q in %v", want, env)
+	}
+}

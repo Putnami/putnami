@@ -91,6 +91,10 @@ type JobCommandContext struct {
 	WorkspaceWarnings []protocolcli.WorkspaceWarning `json:"workspaceWarnings,omitempty"`
 	OutputPath        string                         `json:"outputPath"`
 	CacheRoot         string                         `json:"cacheRoot"`
+	// storeRoot is the store root of the run that spawns the job, which
+	// BuildEnvVars names as the parent of the shared OCI layer cache. It is no
+	// member of the context file. Empty, BuildEnvVars resolves it.
+	storeRoot string
 }
 
 // JobContextWorkspace describes the workspace in the context file. Options
@@ -543,6 +547,10 @@ const ProvidersEnv = "PUTNAMI_PROVIDERS"
 // PUTNAMI_OCI_CACHE_ROOT is core-owned content shared by image extensions and
 // worktrees of this repository.
 func BuildEnvVars(ctx *JobCommandContext) []string {
+	storeRoot := ctx.storeRoot
+	if storeRoot == "" {
+		storeRoot = store.ResolveStoreRoot(ctx.WorkspaceRoot)
+	}
 	vars := []string{
 		"PUTNAMI_WORKSPACE_ROOT=" + ctx.WorkspaceRoot,
 		"PUTNAMI_WORKSPACE_NAME=" + ctx.Workspace.Name,
@@ -551,7 +559,7 @@ func BuildEnvVars(ctx *JobCommandContext) []string {
 		"PUTNAMI_OUTPUT_PATH=" + ctx.OutputPath,
 		"PUTNAMI_CACHE_ROOT=" + ctx.CacheRoot,
 		extensionproto.MachineCacheRootEnv + "=" + ctx.Extension.CacheRoot,
-		extensionproto.SharedOCILayerCacheRootEnv + "=" + filepath.Join(store.ResolveStoreRoot(ctx.WorkspaceRoot), store.OCILayerCacheDirName),
+		extensionproto.SharedOCILayerCacheRootEnv + "=" + filepath.Join(storeRoot, store.OCILayerCacheDirName),
 		"PUTNAMI_CLI_USER_AGENT=" + useragent.String(),
 	}
 	if ctx.Project != nil {

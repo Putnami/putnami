@@ -141,15 +141,16 @@ const (
 	maxBusyRetries = 3
 )
 
-// NewRunBudget arms the in-run budget for one run writing through local. Create
+// NewRunBudget arms the in-run budget for one run writing through local, whose
+// store root the run resolved once (ResolveStoreRoot) as storeRoot. Create
 // it before the run's first cache lookup: that instant is the run's protection
 // boundary. A nil local (caching off) yields a nil budget, whose methods are
 // no-ops, and so does a handle on a RELOCATED store (a cache verification's
 // temporary store): its bytes are not the machine's to count, and collecting it
 // mid-verification would take the entries the verification's hit run is about
 // to read.
-func NewRunBudget(workspaceRoot string, cfg Config, local *LocalStore) *RunBudget {
-	if local == nil || local.Root() != ResolveStoreRoot(workspaceRoot) {
+func NewRunBudget(workspaceRoot, storeRoot string, cfg Config, local *LocalStore) *RunBudget {
+	if local == nil || local.Root() != storeRoot {
 		return nil
 	}
 	b := &RunBudget{

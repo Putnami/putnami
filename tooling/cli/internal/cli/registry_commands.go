@@ -167,7 +167,7 @@ func newImpactPlanPlanner(wsRoot string, cfg *wsproto.Config, commands []string,
 		if err != nil {
 			return ci.PlannerResult{}, fmt.Errorf("plan %s: load workspace for impact-plan versions: %w", gate, err)
 		}
-		versions, err := engine.BuildVersionInfo(ws)
+		versions, _, err := engine.BuildVersionInfo(ws)
 		if err != nil {
 			return ci.PlannerResult{}, fmt.Errorf("plan %s: impact-plan versions: %w", gate, err)
 		}

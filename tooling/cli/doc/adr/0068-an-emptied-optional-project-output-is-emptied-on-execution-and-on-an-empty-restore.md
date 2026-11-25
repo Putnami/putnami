@@ -77,12 +77,23 @@ no task writes. Each `cloud/clients` provider slice committed
    workspace that does not ignore it.
 6. **The engine never empties an emptied output that holds a Git-tracked
    file.** Before the scheduler empties an output that declares `emptied`, and
-   before a restore writes anything for its task, it asks the Git index once
-   per such output whether it tracks a file under the output's path outside
-   the kept subpaths. A tracked file deleted from the worktree counts. When
-   one does, the execution fails before its subprocess starts, as a failure to
-   empty does (ADR 0064 point 6), with an error that names the output, its
-   path and the first tracked file, and says that an emptied output owns its
+   before a restore writes anything for its task, it asks whether the Git
+   index tracks a file under the output's path outside the kept subpaths. A
+   run reads the index the first time it asks, and again only when the
+   index file changed since: its size, its modification time or the checksum
+   git writes at its end, read without starting git, differs. A task that
+   stages a file changes the checksum, even when the size and the time stay.
+   When the index carries no checksum (`index.skipHash`), when `$GIT_DIR` is
+   set, when `GIT_CEILING_DIRECTORIES` hides the repository the run's git
+   finds, or when no index can be read, the run reads it at every emptied
+   output that asks. Every other emptied output of the run is answered from
+   the read the run holds. The reads replace one `git ls-files` per emptied
+   output on each execution and restore, which counted among the engine's
+   931 `git ls-files` of this repository's no-cache gate on 2026-11-24. A
+   tracked file deleted from the worktree counts. When one does, the
+   execution fails before its subprocess starts, as a failure to empty does
+   (ADR 0064 point 6), with an error that names the output, its path and the
+   first tracked file, and says that an emptied output owns its
    path whole, so the committed files move out of it with `git mv`. When that
    file is gone from the worktree, the error says that Git still tracks it and
    names the `git rm --cached` that stages its removal. A restore, which would
@@ -149,8 +160,12 @@ declares `emptied`, and is not otherwise.
   already deleted is not in that set, and that tree's `git:**` key equals the
   key of a tree that never tracked it, so the check does not report it;
   describe still fails on it, because the index tracks it.
-- Each execution and restore of a task with an emptied output runs
-  `git ls-files` once per such output: twice for `build-describe`.
+- A run with an emptied output runs `git ls-files` once, whatever the number
+  of its emptied outputs, executions and restores, and once more each time
+  the index changed before an emptied output asks. With `index.skipHash`,
+  `$GIT_DIR` set, a `GIT_CEILING_DIRECTORIES` that hides the repository or an
+  index it cannot read, it runs `git ls-files` at every emptied output that
+  asks.
 - Each computation of a clientgen key lists the Git candidates below
   `.gen/clientgen/config.json` only, because a `git:` input lists its
   candidates under the bound of its patterns. The bound selects exactly the

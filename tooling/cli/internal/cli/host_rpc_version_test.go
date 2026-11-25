@@ -297,3 +297,32 @@ func TestHostRPC_VersionLinesReportsAGitFailureAsTheHosts(t *testing.T) {
 		t.Fatalf("version.lines in a shallow clone = %v, want %d naming the fetch to run", err, hostrpcproto.CodeInternalError)
 	}
 }
+
+// version.lines reads the tree state the launch captured when it resolved its
+// versions instead of asking git again: a version off HEAD carries the
+// captured suffix, here one no reading of the tree produces.
+func TestHostRPC_VersionLinesReadsTheLaunchsTreeState(t *testing.T) {
+	t.Parallel()
+	root, _ := hostRPCVersionRepo(t)
+	tree, err := git.TreeState(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree.Suffix = "captured.by.the.launch"
+	answer, err := dialHostRPC(t, hostRPCBinding{root: root, config: wsproto.Load(root), tree: tree}).VersionLines(t.Context(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	read := 0
+	for _, line := range answer.Lines {
+		if !line.Tagged {
+			read++
+			if !strings.HasSuffix(line.Version, tree.Suffix) {
+				t.Errorf("line %s version %q, want the captured suffix %q", line.Line, line.Version, tree.Suffix)
+			}
+		}
+	}
+	if read == 0 {
+		t.Fatalf("lines %+v, want a line off its tag", answer.Lines)
+	}
+}

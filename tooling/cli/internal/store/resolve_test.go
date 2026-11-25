@@ -264,3 +264,23 @@ func initStoreGitRepo(t *testing.T) string {
 	}
 	return dir
 }
+
+// A run resolves its store root once: a later change to what ResolveStoreRoot
+// would answer does not reach the run, and a nil RunStoreRoot resolves on each
+// call.
+func TestRunStoreRootResolvesOnce(t *testing.T) {
+	first, second := t.TempDir(), t.TempDir()
+	t.Setenv(storeDirEnv, first)
+	run := &RunStoreRoot{}
+	if got := run.Resolve(t.TempDir()); got != first {
+		t.Fatalf("Resolve = %q, want %q", got, first)
+	}
+	t.Setenv(storeDirEnv, second)
+	if got := run.Resolve(t.TempDir()); got != first {
+		t.Fatalf("Resolve after the first = %q, want the run's %q", got, first)
+	}
+	var none *RunStoreRoot
+	if got := none.Resolve(t.TempDir()); got != second {
+		t.Fatalf("nil Resolve = %q, want %q", got, second)
+	}
+}

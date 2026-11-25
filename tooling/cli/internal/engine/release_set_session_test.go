@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs/publication"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
+	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -606,7 +607,7 @@ func useUnchangedReleaseSetHead(t *testing.T, root string, req Request) {
 		t.Fatalf("build keying plan = exit %d", code)
 	}
 	preparation, err := publication.PrepareReleaseSetRun(ctx, options, ws, selected, verification, extensions, discovered,
-		keying, probe.CommandParams, scheduler.NewRunCacheManager(root, ""), probe.selection, false)
+		keying, probe.CommandParams, scheduler.NewRunCacheManager(store.ResolveStoreRoot(root), ""), probe.selection, false)
 	if err != nil || preparation.Run == nil || preparation.Run.Plan() == nil {
 		t.Fatalf("prepare fixture release set = %+v, %v", preparation, err)
 	}

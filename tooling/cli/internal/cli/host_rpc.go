@@ -41,6 +41,10 @@ type hostRPCBinding struct {
 	extensions []*extension.ExtensionDescription
 	callerDir  string
 	userScope  *workspace.Workspace
+	// tree is the tree state the launch captured when it resolved its
+	// versions, which version.lines reads instead of asking git again. Nil, as
+	// outside git or for a launch that resolved none, version.lines reads it.
+	tree *git.VersionInfo
 }
 
 // startHostRPC opens the channel of one launch. It returns the variables the
@@ -272,7 +276,8 @@ func sortedMergedProjects(merged map[string]wsproto.MergedProject) []wsproto.Mer
 // fails it answers from the recorded view and names it in RecordedGraph, so a
 // caller that releases can refuse; without a usable view it fails. A scope
 // that names no line is invalid params, and any other failure, such as a
-// shallow clone, is the host's.
+// shallow clone, is the host's. Each line's version reads the tree state the
+// launch captured (tree) instead of asking git for it again.
 func (b hostRPCBinding) versionLines(ctx context.Context, params hostrpcproto.VersionLinesParams) (hostrpcproto.VersionLinesResult, error) {
 	if b.root == "" {
 		return hostrpcproto.VersionLinesResult{}, &hostrpcproto.Error{Code: hostrpcproto.CodeUnavailable,
@@ -296,7 +301,7 @@ func (b hostRPCBinding) versionLines(ctx context.Context, params hostrpcproto.Ve
 	if result.SourceRevision, err = versioncmd.BoundRevision(b.root); err != nil {
 		return hostrpcproto.VersionLinesResult{}, err
 	}
-	head, err := git.ReadHead(b.root, nil)
+	head, err := git.ReadHead(b.root, b.tree)
 	if err != nil {
 		return hostrpcproto.VersionLinesResult{}, err
 	}

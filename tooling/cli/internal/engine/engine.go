@@ -64,6 +64,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/sessionreporter"
 	"go.putnami.dev/tooling/cli/internal/specgate"
+	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -431,6 +432,10 @@ type Request struct {
 	// run proceeds either way (scheduler.BuildRunVersions); --debug prints it, so a
 	// 0.0.0 stamp can be told apart from a line that is really untagged.
 	versionsErr error
+	// storeRoot is the run's store root, resolved once: the cache manager, the
+	// store budget and every job's shared OCI layer cache read it. Engine.Run
+	// resets it on each run.
+	storeRoot *store.RunStoreRoot
 	// ancestry is the bound commit's ancestry, read before the first hook by a
 	// run that may publish (runAncestry), nil for every other run.
 	//
@@ -607,6 +612,7 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	// version snapshot, the hooks and the providers start are the run's too.
 	req.orchestration = scheduler.NewOrchestrationClock()
 	req.versions, req.versionsErr = nil, nil
+	req.storeRoot = &store.RunStoreRoot{}
 	if req.ErrorOut == nil {
 		req.ErrorOut = os.Stderr
 	}

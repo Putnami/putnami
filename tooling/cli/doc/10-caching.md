@@ -752,11 +752,17 @@ is stored.
 
 **An emptied output never loses a committed file.** Before the scheduler
 empties an `optionalEmpty` directory that declares `emptied`, and before a
-restore writes anything for its task, it asks the Git index once per such
-output whether it tracks a file under the output's path, outside the kept
-subpaths. A tracked file deleted from the worktree counts. When the index
-tracks one, the execution fails before its subprocess starts, with an error
-that names the output, its path and the first tracked file: an emptied output
+restore writes anything for its task, it asks whether the Git index tracks a
+file under the output's path, outside the kept subpaths. A run reads the index
+once and answers every emptied output from that read, and reads it again when
+the index file changed since: its size, its modification time or the checksum
+at its end differs, as it does when a task stages a file. With
+`index.skipHash`, `$GIT_DIR` set, a `GIT_CEILING_DIRECTORIES` that hides the
+repository or an index it cannot read, the run reads the index at every
+emptied output. A tracked
+file deleted from the worktree counts. When the index tracks one, the
+execution fails before its subprocess starts, with an error that names the
+output, its path and the first tracked file: an emptied output
 owns its path whole, so move the committed files out of it with `git mv`. For
 a clientgen provider whose config lists only an in-module Go client, run
 `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`; the

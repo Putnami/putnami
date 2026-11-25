@@ -38,6 +38,11 @@ type SchedulerConfig struct {
 	ContinueOnError bool
 	Retry           int
 	NoCache         bool
+	// StoreRoot is the store root the run resolved once
+	// (store.ResolveStoreRoot), which every job receives as the parent of its
+	// shared OCI layer cache. Empty, the scheduler resolves it once when it
+	// runs.
+	StoreRoot string
 	// NoCacheProjects is the RESOLVED id set of --no-cache-projects: the
 	// projects whose own tasks refuse cache reuse while the rest of the run
 	// keeps it. Empty means the run-wide policy alone applies, and
@@ -156,6 +161,9 @@ type Scheduler struct {
 	keylessMemo map[string]string
 	renderer    Renderer
 	cache       *store.CacheManager
+	// tracked is the run's one read of the Git index, which every emptied
+	// output of the run is checked against (refuseTrackedEmptiedOutputs).
+	tracked trackedIndex
 	// cacheStats is present for every cache-enabled run, including local-only
 	// runs. A configured remote cache shares this exact accumulator so the final
 	// snapshot cannot split one session across two independently-timed views.
@@ -697,6 +705,12 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	// The workspace membership every job context carries is resolved once for
 	// the run: it encodes the configuration of every project.
 	ctx = context.WithValue(ctx, workspaceMembershipKey{}, cachekey.NewWorkspaceMembership(s.ws))
+	// So is the store root: resolving it asks Git, and a job spawn asks none.
+	storeRoot := s.cfg.StoreRoot
+	if storeRoot == "" {
+		storeRoot = store.ResolveStoreRoot(s.ws.Root)
+	}
+	ctx = context.WithValue(ctx, runStoreRootKey{}, storeRoot)
 
 	// Build dependency state
 	schedulable := planner.SchedulableJobs(s.planned)

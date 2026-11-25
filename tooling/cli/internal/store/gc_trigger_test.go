@@ -77,7 +77,7 @@ func TestRunBudget_ProjectsFromRecordedUsageAndSparesWhatTheRunTouched(t *testin
 	writeUsageRecord(t, root, 1000)
 
 	run := NewLocalStore(root)
-	b := NewRunBudget(ws, budgetConfig(10000), run)
+	b := NewRunBudget(ws, ResolveStoreRoot(ws), budgetConfig(10000), run)
 	// The lookup an in-flight job makes.
 	if e, err := run.LookupTaskEntry(held); err != nil || e == nil {
 		t.Fatalf("LookupTaskEntry(held) = %v, %v", e, err)
@@ -136,7 +136,7 @@ func TestRunBudget_ProjectsFromRecordedUsageAndSparesWhatTheRunTouched(t *testin
 func TestRunBudget_FirstWriteMeasuresWhenNoPassHasRecordedUsage(t *testing.T) {
 	root := isolateStoreBudget(t)
 	run := NewLocalStore(root)
-	b := NewRunBudget(t.TempDir(), budgetConfig(1<<30), run)
+	b := NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), budgetConfig(1<<30), run)
 
 	b.AfterBatch()
 	b.wg.Wait()
@@ -161,7 +161,7 @@ func TestRunBudget_FirstWriteMeasuresWhenNoPassHasRecordedUsage(t *testing.T) {
 	if report := off.Close(); report != (RunBudgetReport{}) {
 		t.Errorf("a nil budget reported %+v", report)
 	}
-	if NewRunBudget(t.TempDir(), Config{}, nil) != nil {
+	if NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), Config{}, nil) != nil {
 		t.Error("NewRunBudget without a store handle returned a budget")
 	}
 }
@@ -177,7 +177,7 @@ func TestRunBudget_OverBudgetMeasurementWaitsForGrowth(t *testing.T) {
 	writeUsageRecord(t, root, 20000) // stale: far more than is on disk
 
 	run := NewLocalStore(root)
-	b := NewRunBudget(t.TempDir(), budgetConfig(10000), run)
+	b := NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), budgetConfig(10000), run)
 
 	putFilled(t, run, hashN(2), 500, 'a') // grown 500, not over a tenth (1000)
 	b.AfterBatch()
@@ -209,7 +209,7 @@ func TestRunBudget_ConsecutiveRunsAccumulateTheirGrowth(t *testing.T) {
 	writeUsageRecord(t, root, 8000)
 
 	first := NewLocalStore(root)
-	b1 := NewRunBudget(t.TempDir(), budgetConfig(10000), first)
+	b1 := NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), budgetConfig(10000), first)
 	putFilled(t, first, hashN(1), 1500, 'a')
 	b1.AfterBatch() // 8000+1500 is within budget: no pass
 	if report := b1.Close(); report.Passes != 0 {
@@ -224,7 +224,7 @@ func TestRunBudget_ConsecutiveRunsAccumulateTheirGrowth(t *testing.T) {
 	}
 
 	second := NewLocalStore(root)
-	b2 := NewRunBudget(t.TempDir(), budgetConfig(10000), second)
+	b2 := NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), budgetConfig(10000), second)
 	putFilled(t, second, hashN(2), 1500, 'b')
 	b2.AfterBatch() // 9500+1500 crosses the budget only because the first run's growth was kept
 	report := b2.Close()
@@ -241,7 +241,7 @@ func TestRunBudget_ConsecutiveRunsAccumulateTheirGrowth(t *testing.T) {
 func TestRunBudget_CloseAddsNothingWithoutARecord(t *testing.T) {
 	root := isolateStoreBudget(t)
 	run := NewLocalStore(root)
-	b := NewRunBudget(t.TempDir(), budgetConfig(1<<30), run)
+	b := NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), budgetConfig(1<<30), run)
 	putFilled(t, run, hashN(1), 1500, 'a')
 	b.Close()
 	if got, ok := readUsageRecord(t, root); ok {
@@ -258,8 +258,8 @@ func TestUpdateGCUsage_ConcurrentWritersLoseNoUpdate(t *testing.T) {
 	stamp := gcStampPath()
 
 	a, b := NewLocalStore(root), NewLocalStore(root)
-	budgetA := NewRunBudget(t.TempDir(), budgetConfig(1<<30), a)
-	budgetB := NewRunBudget(t.TempDir(), budgetConfig(1<<30), b)
+	budgetA := NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), budgetConfig(1<<30), a)
+	budgetB := NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), budgetConfig(1<<30), b)
 	putFilled(t, a, hashN(1), 700, 'a')
 	putFilled(t, b, hashN(2), 300, 'b')
 
@@ -293,7 +293,7 @@ func TestRunBudget_BusyScanIsNotAMeasurementAndIsRetriedBoundedly(t *testing.T) 
 	writeUsageRecord(t, root, 9000)
 
 	run := NewLocalStore(root)
-	b := NewRunBudget(t.TempDir(), budgetConfig(10000), run)
+	b := NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), budgetConfig(10000), run)
 	putFilled(t, run, hashN(2), 4000, 'g') // projected 13000; on disk over 10 KB with the 6 KB seed
 
 	release := NewLocalStore(root).lockExclusive()
@@ -343,7 +343,7 @@ func TestRunBudget_EvictBusyPassIsRetriedOnceTheStoreIsFree(t *testing.T) {
 	writeUsageRecord(t, root, 9000)
 
 	run := NewLocalStore(root)
-	b := NewRunBudget(t.TempDir(), budgetConfig(10000), run)
+	b := NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), budgetConfig(10000), run)
 	b.opts.LockWait = 0 // one try, so the test does not wait out LockWait
 	// On disk: 11 KB and more, over the 10 KB budget.
 	putFilled(t, run, hashN(2), 5000, 'g')
@@ -423,7 +423,7 @@ func TestNewRunBudget_RelocatedStoreArmsNoBudget(t *testing.T) {
 	root := isolateStoreBudget(t)
 	writeUsageRecord(t, root, 1000)
 	relocated := NewLocalStore(filepath.Join(t.TempDir(), "verify-store"))
-	b := NewRunBudget(t.TempDir(), budgetConfig(1), relocated)
+	b := NewRunBudget(t.TempDir(), ResolveStoreRoot(t.TempDir()), budgetConfig(1), relocated)
 	if b != nil {
 		t.Fatal("a budget was armed on a relocated store")
 	}

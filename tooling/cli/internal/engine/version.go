@@ -18,15 +18,18 @@ import (
 // exported for the extension-command path, which stamps a single interactive
 // job without going through the run lifecycle and therefore has no captured
 // snapshot to layer. It fails where Engine.Run fails (captureVersionSnapshot).
-func BuildVersionInfo(ws *workspace.Workspace) (cachekey.RunVersions, error) {
+// It also returns the tree state it captured, nil outside git, so the launch's
+// other readers of the tree, such as its host RPC channel, read the same
+// snapshot instead of asking git again.
+func BuildVersionInfo(ws *workspace.Workspace) (cachekey.RunVersions, *git.VersionInfo, error) {
 	snapshot, err := captureVersionSnapshot(ws.Root)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// A line git cannot read degrades rather than failing the command: an
 	// extension command is not a release (scheduler.BuildRunVersions).
 	versions, _ := scheduler.BuildRunVersions(ws, snapshot)
-	return versions, nil
+	return versions, snapshot, nil
 }
 
 // captureVersionSnapshot reads the git-derived TREE state (SHA, branch, dirty
@@ -152,7 +155,7 @@ func newRunCacheManager(req *Request, ws *workspace.Workspace) *store.CacheManag
 	if req.CacheVerification != nil {
 		storeRootOverride = req.CacheVerification.StoreRoot
 	}
-	cache := scheduler.NewRunCacheManager(req.WorkspaceRoot, storeRootOverride)
+	cache := scheduler.NewRunCacheManager(req.storeRoot.Resolve(req.WorkspaceRoot), storeRootOverride)
 	if req.VersionSnapshot != nil && !req.Portable.frozen() {
 		cache.RecordManagedRoot(ws.Root)
 	}

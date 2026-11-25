@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"sync"
 	"time"
 
 	workspace "go.putnami.dev/protocol/workspace"
@@ -279,4 +280,24 @@ func ResolveMaxIdleBuilds(cfg Config) int64 {
 		return *cfg.MaxIdleBuilds
 	}
 	return defaultMaxIdleBuilds
+}
+
+// RunStoreRoot is a run's store root, resolved the first time the run asks
+// (ResolveStoreRoot asks Git for the repository's common directory), so every
+// reader of the run shares one resolution.
+type RunStoreRoot struct {
+	once sync.Once
+	root string
+}
+
+// Resolve returns the store root of the run in workspaceRoot, resolving it
+// once: a run has one workspace root, so every later call returns the first
+// resolution, whatever root it names. A nil RunStoreRoot resolves it on each
+// call.
+func (r *RunStoreRoot) Resolve(workspaceRoot string) string {
+	if r == nil {
+		return ResolveStoreRoot(workspaceRoot)
+	}
+	r.once.Do(func() { r.root = ResolveStoreRoot(workspaceRoot) })
+	return r.root
 }

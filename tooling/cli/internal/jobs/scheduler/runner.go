@@ -405,6 +405,7 @@ func prepareJobInvocation(
 
 	membership, _ := ctx.Value(workspaceMembershipKey{}).(*cachekey.WorkspaceMembership)
 	jobCtx := buildJobContext(ws, job, commandParams, configDefaults, versions, membership)
+	jobCtx.storeRoot, _ = ctx.Value(runStoreRootKey{}).(string)
 	scratchLease, err := store.AcquireScratch(ws.Root)
 	if err != nil {
 		return nil, nil, nil, err
@@ -505,6 +506,11 @@ func RunJob(
 // run stamps it rather than encoding the configuration of every project again.
 // A job run outside a scheduler run carries none and resolves its own.
 type workspaceMembershipKey struct{}
+
+// runStoreRootKey carries the store root a scheduler run resolved once
+// (string), so a job spawn names its shared OCI layer cache without asking
+// Git. A job run outside a scheduler run carries none and resolves its own.
+type runStoreRootKey struct{}
 
 // serveStepKey marks a context under which runJob runs a serve-workload step.
 type serveStepKey struct{}

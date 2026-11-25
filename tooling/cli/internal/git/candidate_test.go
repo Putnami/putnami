@@ -45,12 +45,13 @@ func TestReadIndexModes(t *testing.T) {
 	}
 }
 
-// TrackedUnder answers from the index: a tracked file deleted from the
-// worktree is listed, an untracked file is not, a sibling whose name shares
-// the prefix is not, a path spelled in another case lists what the index
-// tracks under it, and a path that does not exist lists nothing. Outside a
-// repository the answer is an *UnmanagedError.
-func TestTrackedUnderListsWhatTheIndexTracksBelowAPath(t *testing.T) {
+// TrackedPaths answers from the index: a tracked file deleted from the
+// worktree is listed, and an untracked file is not. TrackedPathsUnder reads
+// below a path from that list: a sibling whose name shares the prefix is not
+// listed, a path spelled in another case lists what the index tracks under
+// it, and a path that does not exist lists nothing. Outside a repository the
+// answer is an *UnmanagedError.
+func TestTrackedPathsListWhatTheIndexTracksBelowAPath(t *testing.T) {
 	repo := initGitRepo(t)
 	ws := filepath.Join(repo, "sub", "ws")
 	for _, rel := range []string{"out/a.txt", "out/nested/b.txt", "outer.txt", "out[x]/c.txt"} {
@@ -63,24 +64,28 @@ func TestTrackedUnderListsWhatTheIndexTracksBelowAPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	tracked, err := TrackedPaths(ws)
+	if err != nil {
+		t.Fatalf("TrackedPaths: %v", err)
+	}
+	if got, want := strings.Join(tracked, ","), "out/a.txt,out/nested/b.txt,out[x]/c.txt,outer.txt"; got != want {
+		t.Errorf("TrackedPaths = %s, want %s", got, want)
+	}
 	for rel, want := range map[string][]string{
-		"out":     {"out/a.txt", "out/nested/b.txt"},
-		"OUT":     {"out/a.txt", "out/nested/b.txt"},
-		"out[x]":  {"out[x]/c.txt"},
-		"missing": nil,
+		"out":       {"out/a.txt", "out/nested/b.txt"},
+		"OUT":       {"out/a.txt", "out/nested/b.txt"},
+		"out[x]":    {"out[x]/c.txt"},
+		"outer.txt": {"outer.txt"},
+		"missing":   nil,
 	} {
-		got, err := TrackedUnder(ws, rel)
-		if err != nil {
-			t.Fatalf("TrackedUnder(%q): %v", rel, err)
-		}
-		if strings.Join(got, ",") != strings.Join(want, ",") {
-			t.Errorf("TrackedUnder(%q) = %v, want %v", rel, got, want)
+		if got := TrackedPathsUnder(tracked, rel); strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("TrackedPathsUnder(%q) = %v, want %v", rel, got, want)
 		}
 	}
 
-	_, err := TrackedUnder(t.TempDir(), "out")
+	_, err = TrackedPaths(t.TempDir())
 	var unmanaged *gitread.UnmanagedError
 	if !errors.As(err, &unmanaged) {
-		t.Fatalf("TrackedUnder outside a repository = %v, want an *gitread.UnmanagedError", err)
+		t.Fatalf("TrackedPaths outside a repository = %v, want an *gitread.UnmanagedError", err)
 	}
 }

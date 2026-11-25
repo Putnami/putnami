@@ -164,8 +164,8 @@ func TestAHitOverATrackedFileInAnEmptiedOutputIsNotServed(t *testing.T) {
 }
 
 // Outside a Git work tree there is no index to ask, and the output is emptied
-// as before: the scheduler asks once per emptied output and the answer is
-// that Git does not manage the workspace.
+// as before: the run reads the index once and the answer is that Git does
+// not manage the workspace.
 func TestOutsideAGitWorkTreeAnEmptiedOutputIsEmptied(t *testing.T) {
 	spectest.Proves(t, emptyingFeature, "emptied-output-keeps-tracked-files", "outside-a-git-work-tree-an-emptied-output-is-emptied")
 	f, clientgen := newTrackedEmptiedFixture(t, false)
@@ -173,22 +173,22 @@ func TestOutsideAGitWorkTreeAnEmptiedOutputIsEmptied(t *testing.T) {
 		t.Fatalf("the fixture workspace %s is inside a Git work tree", f.ws.Root)
 	}
 	var unmanaged []error
-	saved := trackedUnder
-	trackedUnder = func(dir, rel string) ([]string, error) {
-		paths, err := saved(dir, rel)
+	saved := trackedPaths
+	trackedPaths = func(dir string) ([]string, error) {
+		paths, err := saved(dir)
 		var outside *gitread.UnmanagedError
 		if errors.As(err, &outside) {
 			unmanaged = append(unmanaged, err)
 		}
 		return paths, err
 	}
-	t.Cleanup(func() { trackedUnder = saved })
+	t.Cleanup(func() { trackedPaths = saved })
 
 	writeFileAt(t, filepath.Join(clientgen, "config.json"), "{\"targets\":[\"go\"]}\n")
 	f.executed(t, "execution outside Git", f.run(t, SchedulerConfig{}))
 	assertFilesIn(t, "execution outside Git", clientgen)
 	if len(unmanaged) != 1 {
-		t.Fatalf("the scheduler asked Git %d times and was told it does not manage the workspace, want once", len(unmanaged))
+		t.Fatalf("the run read the index %d times and was told Git does not manage the workspace, want once", len(unmanaged))
 	}
 }
 
@@ -231,4 +231,92 @@ func TestAGitWorkTreeWithoutAGitProgramFailsClosed(t *testing.T) {
 	}
 	f.executed(t, "execution without git outside a work tree", f.run(t, SchedulerConfig{}))
 	assertFilesIn(t, "execution without git outside a work tree", clientgen)
+}
+
+// A run reads the Git index once and answers every emptied output from that
+// read: a task with two emptied outputs, whose execution empties both, reads
+// it once, and so does a run that refuses the second output for the file the
+// index tracks there.
+func TestARunReadsTheIndexOnceForItsEmptiedOutputs(t *testing.T) {
+	spectest.Proves(t, emptyingFeature, "emptied-output-keeps-tracked-files", "an-emptied-output-that-holds-a-tracked-file-is-never-emptied")
+	f, clientgen := newTrackedEmptiedFixture(t, true)
+	task := f.planned[0].Extension.Tasks[emptyingTask]
+	task.Declares.Outputs["schema"] = extension.DeclaredOutput{
+		Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".gen/schema",
+		OptionalEmpty: true, Emptied: true,
+	}
+	f.planned[0].Extension.Tasks[emptyingTask] = task
+	writeFileAt(t, filepath.Join(clientgen, "built.json"), "{}\n")
+	writeFileAt(t, filepath.Join(f.gen, "schema", "openapi.json"), "{}\n")
+	reads := 0
+	saved := trackedPaths
+	trackedPaths = func(dir string) ([]string, error) {
+		reads++
+		return saved(dir)
+	}
+	t.Cleanup(func() { trackedPaths = saved })
+
+	f.executed(t, "execution of two emptied outputs", f.run(t, SchedulerConfig{}))
+	assertFilesIn(t, "execution of two emptied outputs", clientgen)
+	assertFilesIn(t, "execution of two emptied outputs", filepath.Join(f.gen, "schema"))
+	if reads != 1 {
+		t.Fatalf("the run read the index %d times, want once", reads)
+	}
+
+	// The one read answers each output: a file tracked under the second
+	// output refuses the execution, which leaves the file in place.
+	schema := filepath.Join(f.gen, "schema", "openapi.json")
+	writeFileAt(t, schema, "{}\n")
+	treeKeyedGit(t, f.ws.Root, "add", "-f", emptyingProject+"/.gen/schema/openapi.json")
+	reads = 0
+	result := f.run(t, SchedulerConfig{})
+	row := f.rows(t, "execution over a tracked file in the second output", result)[0]
+	if result.Success || row.Status != "failed" || row.Error == nil ||
+		!strings.Contains(row.Error.Message, `declared output "schema" (`+emptyingProject+`/.gen/schema) holds the Git-tracked file`) {
+		t.Fatalf("row = %+v (success=%v), want the second output refused for its tracked file", row, result.Success)
+	}
+	assertFilesIn(t, "execution over a tracked file in the second output", filepath.Join(f.gen, "schema"), "openapi.json")
+	if reads != 1 {
+		t.Fatalf("the refused run read the index %d times, want once", reads)
+	}
+}
+
+// A file staged after the run read the index, as a task of the run may stage
+// one, is never emptied: the index file changed, so the next emptied output
+// that asks reads it again and is refused for the file.
+func TestAFileStagedAfterTheRunReadTheIndexIsNeverEmptied(t *testing.T) {
+	spectest.Proves(t, emptyingFeature, "emptied-output-keeps-tracked-files", "an-emptied-output-that-holds-a-tracked-file-is-never-emptied")
+	f, _ := newTrackedEmptiedFixture(t, true)
+	task := f.planned[0].Extension.Tasks[emptyingTask]
+	task.Declares.Outputs["schema"] = extension.DeclaredOutput{
+		Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".gen/schema",
+		OptionalEmpty: true, Emptied: true,
+	}
+	f.planned[0].Extension.Tasks[emptyingTask] = task
+	staged := emptyingProject + "/.gen/schema/openapi.json"
+	writeFileAt(t, filepath.Join(f.ws.Root, filepath.FromSlash(staged)), "{}\n")
+	reads := 0
+	saved := trackedPaths
+	trackedPaths = func(dir string) ([]string, error) {
+		paths, err := saved(dir)
+		reads++
+		if reads == 1 {
+			// The first read answers clientgen; the file is staged before
+			// schema asks.
+			treeKeyedGit(t, f.ws.Root, "add", "-f", staged)
+		}
+		return paths, err
+	}
+	t.Cleanup(func() { trackedPaths = saved })
+
+	result := f.run(t, SchedulerConfig{})
+	row := f.rows(t, "execution over a file staged after the read", result)[0]
+	if result.Success || row.Status != "failed" || row.Error == nil ||
+		!strings.Contains(row.Error.Message, `declared output "schema" (`+emptyingProject+`/.gen/schema) holds the Git-tracked file `+staged) {
+		t.Fatalf("row = %+v (success=%v), want the second output refused for the staged file", row, result.Success)
+	}
+	assertFilesIn(t, "execution over a file staged after the read", filepath.Join(f.gen, "schema"), "openapi.json")
+	if reads != 2 {
+		t.Fatalf("the run read the index %d times, want twice: once, and again after it changed", reads)
+	}
 }

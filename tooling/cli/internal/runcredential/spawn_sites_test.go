@@ -175,7 +175,7 @@ var spawnSites = map[string]spawnSite{
 		why: "git ls-files; gitread.Executable asks /usr/bin/xcrun, a fixed program, for the git to run"},
 	"git/candidate.go:ReadIndexModes": {spawns: 1, verdict: noRepositoryCode,
 		why: "git ls-files"},
-	"git/candidate.go:TrackedUnder": {spawns: 2, verdict: noRepositoryCode,
+	"git/candidate.go:TrackedPaths": {spawns: 2, verdict: noRepositoryCode,
 		why: "read verbs only: ls-files, and rev-parse through gitread.Unmanaged"},
 	"git/eol.go:CRLFCheckouts": {spawns: 1, verdict: noRepositoryCode,
 		why: "git ls-files"},

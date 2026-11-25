@@ -237,7 +237,7 @@ fixtures load. The other extensions built here hold no count yet:
 
 | Count | What it is | How it is lowered |
 |---|---|---|
-| Git calls per job | The engine's git calls on runs of 6 and 15 tasks, whose difference is the engine's git calls per job times 9; the git calls of the SDK jobs, by subcommand. | The engine reads the tree once per run and hands its facts to jobs in the job context; a job reads them there instead of running git. |
+| Git calls per job | The engine's git calls on runs of 6 and 15 tasks, each on the default store under a home of its own, whose difference is the engine's git calls per job times 9, recorded at 0; the git calls of the SDK jobs, by subcommand. | The engine reads the tree once per run and hands its facts to jobs in the job context; a job reads them there instead of running git. |
 | Processes started by planning an unchanged workspace | Every process `--dry-run` starts on the workspace: git, toolchain probes, control processes. A plan reports no `run.orchestration`, so the test reads the process-wide ledger around it (`clitest.PlanCounts`). The engine's fixture also holds a whole run of the unchanged workspace, every task found in the cache. | A probe or a read that does not depend on the change is answered from what the run already knows, or from state kept between runs. |
 | CLI starts per job | The `putnami` processes the SDK jobs start, such as the registry credential a Go job materializes. | The engine materializes what jobs ask the CLI for once per run and hands it to them. |
 | Extension processes per run | The job, batch and control processes the engine starts. | Ready tasks share a batch process, or one extension process runs many jobs. |

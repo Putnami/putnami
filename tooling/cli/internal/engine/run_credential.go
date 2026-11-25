@@ -161,7 +161,7 @@ func startHostedRemoteCache(ctx context.Context, req *Request) (*remotecache.Rem
 	if req.CacheVerification != nil {
 		storeRootOverride = req.CacheVerification.StoreRoot
 	}
-	if err := remote.StartProvider(ctx, ws, scheduler.NewRunCacheManager(req.WorkspaceRoot, storeRootOverride)); err != nil {
+	if err := remote.StartProvider(ctx, ws, scheduler.NewRunCacheManager(req.storeRoot.Resolve(req.WorkspaceRoot), storeRootOverride)); err != nil {
 		remote.Close()
 		return nil, err
 	}

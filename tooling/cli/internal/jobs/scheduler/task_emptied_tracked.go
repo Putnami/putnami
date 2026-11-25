@@ -7,23 +7,57 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"go.putnami.dev/sdk/extension/gitread"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
-// trackedUnder is putnamigit.TrackedUnder. It is a variable only so a test can
-// count the questions the scheduler asks.
-var trackedUnder = putnamigit.TrackedUnder
+// trackedPaths is putnamigit.TrackedPaths. It is a variable only so a test can
+// count the reads of the index the scheduler makes.
+var trackedPaths = putnamigit.TrackedPaths
+
+// trackedIndex is the run's read of the Git index (ADR 0068 point 6): the
+// paths it tracks under the workspace root, read the first time an emptied
+// output asks and again only when the index file changed since, as a task
+// that stages a file changes it. Every other emptied output of the run is
+// answered from the read it holds.
+type trackedIndex struct {
+	mu    sync.Mutex
+	read  bool
+	stamp putnamigit.IndexStamp
+	paths []string
+	err   error
+}
+
+// trackedUnder lists the paths the index tracks at or below rel
+// (putnamigit.TrackedPathsUnder), from the run's read of the index. It reads
+// the index again when the index file changed since that read, or when its
+// location cannot be found: a stat answers whether it changed, and only a
+// change starts git.
+func (s *Scheduler) trackedUnder(root, rel string) ([]string, error) {
+	s.tracked.mu.Lock()
+	defer s.tracked.mu.Unlock()
+	stamp, stamped := putnamigit.ReadIndexStamp(root)
+	if !s.tracked.read || !stamped || stamp != s.tracked.stamp {
+		s.tracked.paths, s.tracked.err = trackedPaths(root)
+		s.tracked.read, s.tracked.stamp = stamped, stamp
+	}
+	if s.tracked.err != nil {
+		return nil, s.tracked.err
+	}
+	return putnamigit.TrackedPathsUnder(s.tracked.paths, rel), nil
+}
 
 // refuseTrackedEmptiedOutputs fails when an output of job that declares
 // emptied holds a file the Git index tracks (ADR 0068). Such an output owns
 // its path whole: an execution empties it, and a restore empties or replaces
 // it, so either would delete a committed file. The scheduler asks before it
-// empties or writes anything for job, once per such output. The answer comes
-// from the index alone, so a tracked file already deleted from the worktree
-// counts too. A file under a kept subpath (ceded, preserved, or the build
+// empties or writes anything for job, once per such output, and answers from
+// the run's read of the index (trackedUnder), which it repeats only when the
+// index changed, so a tracked file already deleted from the worktree counts
+// too. A file under a kept subpath (ceded, preserved, or the build
 // stamp) is never removed, so it does not count.
 //
 // The error names the first such file and the Git command that takes it out
@@ -55,7 +89,7 @@ func (s *Scheduler) refuseTrackedEmptiedOutputs(job *ScheduledJob) error {
 			return fmt.Errorf("declared output %q: %w", declared.ID, err)
 		}
 		rel = filepath.ToSlash(rel)
-		tracked, err := trackedUnder(roots.Root, rel)
+		tracked, err := s.trackedUnder(roots.Root, rel)
 		var unmanaged *gitread.UnmanagedError
 		if errors.As(err, &unmanaged) {
 			if entry, inside := putnamigit.WorkTreeEntry(roots.Root); inside && errors.Is(err, gitread.ErrNoProgram) {
@@ -83,7 +117,8 @@ func (s *Scheduler) refuseTrackedEmptiedOutputs(job *ScheduledJob) error {
 	return nil
 }
 
-// cutPrefixFold is strings.CutPrefix that folds case, as TrackedUnder does.
+// cutPrefixFold is strings.CutPrefix that folds case, as
+// putnamigit.TrackedPathsUnder does.
 func cutPrefixFold(path, prefix string) (string, bool) {
 	if len(path) < len(prefix) || !strings.EqualFold(path[:len(prefix)], prefix) {
 		return path, false

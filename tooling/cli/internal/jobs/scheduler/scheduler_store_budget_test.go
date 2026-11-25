@@ -81,7 +81,7 @@ func TestRunPlan_StoreBudgetCollectsAtABatchBoundaryAndSparesInFlightEntries(t *
 
 	cache := store.NewCacheManager(store.NewLocalStore(storeRoot))
 	maxBytes, grace := int64(10000), time.Duration(0)
-	budget := store.NewRunBudget(t.TempDir(), store.Config{MaxBytes: &maxBytes, GCGrace: &grace}, cache.Store())
+	budget := store.NewRunBudget(t.TempDir(), store.ResolveStoreRoot(t.TempDir()), store.Config{MaxBytes: &maxBytes, GCGrace: &grace}, cache.Store())
 
 	holdJob := makeScheduledJob("app", "hold", nil)
 	growJob := makeScheduledJob("lib", "grow", nil)

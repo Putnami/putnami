@@ -385,7 +385,7 @@ func TestHostedRunRemoteCacheNeverStartsAProviderAfterRepositoryCode(t *testing.
 		}},
 	}}}
 	ws := workspace.NewWorkspace(wsRoot, nil, nil)
-	cm := scheduler.NewRunCacheManager(wsRoot, "")
+	cm := scheduler.NewRunCacheManager(store.ResolveStoreRoot(wsRoot), "")
 	req := &Request{WorkspaceRoot: wsRoot, Global: GlobalFlags{CacheTrust: string(store.CacheTrustAny)}}
 
 	t.Cleanup(runcredential.SetForTest("prc_engine_custody"))
