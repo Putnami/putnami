@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	model "go.putnami.dev/cli/model/workspace"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -67,6 +68,11 @@ type ImpactedSelection struct {
 	// example. They are not in ChangedFiles and select nothing. Nil when the
 	// run recorded no tree state at its start (ImpactedSelectionOptions).
 	RunWrittenFiles []string
+	// RuntimeComparisons are the extensions the selection compared with the
+	// runtime the diff's base prepares (ImpactedSelectionOptions.CompareRuntimes),
+	// in the order the comparer answered them. Those whose runtime is
+	// unchanged fired no extension-consumer edge. Nil when nothing was compared.
+	RuntimeComparisons []RuntimeComparison
 	// Trace explains every entry of Projects: which changed file claimed each
 	// directly affected project and how, which edge reached each propagated
 	// one, and which of them run a subset of their tasks (Trace.Scopes). It is
@@ -532,6 +538,28 @@ type ImpactedSelectionOptions struct {
 	// and is left out of the diff (ImpactedSelection.RunWrittenFiles). Nil when
 	// nothing was recorded: every uncommitted path then counts.
 	RunStart []string
+	// CompareRuntimes, when set, compares the runtime each candidate
+	// extension project prepares from this tree with the one the diff's base
+	// prepares. The candidates are the in-workspace extension projects the
+	// selection reached without a changed file of their own. An extension it
+	// answers Unchanged for fires no extension-consumer edge for a runtime
+	// input (ChangeImpactOptions.UnchangedRuntimes); any other answer, and an
+	// extension it does not answer for, leaves the edge as it was.
+	CompareRuntimes func(candidates []string, diffBase string) []RuntimeComparison
+}
+
+// RuntimeComparison is the answer CompareRuntimes gives for one extension
+// project: whether its prepared runtime is byte for byte the one the diff's
+// base prepares, or why it could not say.
+type RuntimeComparison struct {
+	// Project is the extension project's ID.
+	Project string
+	// Unchanged is true only when both runtimes were prepared and their
+	// contents are identical.
+	Unchanged bool
+	// Reason says why Unchanged is false: the base runtime is not in the
+	// artifact store, a preparation failed, or the contents differ.
+	Reason string
 }
 
 // ImpactedSelectionWithOptions is ImpactedSelectionForBaseline refined by
@@ -577,7 +605,25 @@ func ImpactedSelectionWithOptions(
 	// shared calculation in the model package, which the watch loop replans
 	// against too.
 	impact := traceChangeImpact(ws, diff.Files, ChangeImpactOptions{Tasks: tasks})
+	var comparisons []RuntimeComparison
+	if opts.CompareRuntimes != nil {
+		if candidates := runtimeCandidates(impact); len(candidates) > 0 {
+			comparisons = opts.CompareRuntimes(candidates, diff.Base)
+			unchanged := make(map[string]bool, len(comparisons))
+			for _, comparison := range comparisons {
+				if comparison.Unchanged {
+					unchanged[comparison.Project] = true
+				}
+			}
+			// A second walk with the proof: the cut-off edges select nothing,
+			// and everything they alone reached leaves the selection.
+			if len(unchanged) > 0 {
+				impact = traceChangeImpact(ws, diff.Files, ChangeImpactOptions{Tasks: tasks, UnchangedRuntimes: unchanged})
+			}
+		}
+	}
 	return ImpactedSelection{
+		RuntimeComparisons: comparisons,
 		Projects:         impact.Projects,
 		Baseline:         resolved.Ref,
 		BaselineSource:   resolved.Source,
@@ -663,4 +709,45 @@ func ResolveImpactedBaselineDetailed(ws *Workspace, explicit string) (git.Resolv
 		resolved.Source = git.BaselineSourceConfig
 	}
 	return resolved, err
+}
+
+// runtimeCandidates lists the projects whose prepared runtime a selection may
+// compare with the diff base's: every selected project that is not a seed, in
+// ws.Projects order. The trace records one edge per project, so it cannot say
+// which extensions fired; the comparer keeps the extensions it prepares from
+// source and ignores the rest.
+func runtimeCandidates(impact model.ImpactResult) []string {
+	candidates := make([]string, 0, len(impact.Projects))
+	for _, project := range impact.Projects {
+		if _, seeded := impact.Trace.Seeds[project.ID]; !seeded {
+			candidates = append(candidates, project.ID)
+		}
+	}
+	return candidates
+}
+
+// RuntimeComparisonsExplanation names, in one line, the extensions whose
+// unchanged runtime fired no extension-consumer edge, and the ones the
+// selection could not compare, with the first reason. Empty when nothing was
+// compared.
+func (s ImpactedSelection) RuntimeComparisonsExplanation() string {
+	if len(s.RuntimeComparisons) == 0 {
+		return ""
+	}
+	var unchanged, other []string
+	for _, comparison := range s.RuntimeComparisons {
+		if comparison.Unchanged {
+			unchanged = append(unchanged, comparison.Project)
+			continue
+		}
+		other = append(other, comparison.Project+" ("+comparison.Reason+")")
+	}
+	var parts []string
+	if len(unchanged) > 0 {
+		parts = append(parts, "the runtime of "+strings.Join(unchanged, ", ")+" is the one the diff's base prepares, so their consumers do not re-run their tasks")
+	}
+	if len(other) > 0 {
+		parts = append(parts, "compared and kept: "+strings.Join(other, ", "))
+	}
+	return "  --impacted: " + strings.Join(parts, "; ") + "."
 }

@@ -30,6 +30,17 @@ type ChangeImpactOptions struct {
 	// project-level mapping: a changed file claims its project whole and a
 	// dependency edge reaches a dependent whole.
 	Tasks TaskImpactIndex
+
+	// UnchangedRuntimes names the in-workspace extension projects whose
+	// runtime, prepared from this tree, is byte for byte the one the diff's
+	// base prepares. Such an extension's runtime moved nothing its consumers
+	// execute, so its extension-consumer edge does not fire for a runtime
+	// input; the edge a confined manifest change fires still does. A seed is
+	// never cut off: a changed file of the extension project itself may be
+	// read at run time from the extension root, outside what it prepares.
+	// The caller proves each entry; an extension it could not compare is
+	// absent, and its edge fires as before.
+	UnchangedRuntimes map[string]bool
 }
 
 // TaskImpactIndex answers the task-level questions the change→project pass asks
@@ -366,7 +377,7 @@ func TraceChangeImpact(ws *Workspace, changedFiles []string, opts ChangeImpactOp
 		}
 	}
 	affectedSet, edges, scopes := propagateImpact(ws, opts.Tasks, consumers, directIDs, seedScopes,
-		movedContracts(ws, changedFiles))
+		movedContracts(ws, changedFiles), opts.UnchangedRuntimes)
 
 	result := make([]*Project, 0)
 	for _, p := range ws.Projects {
@@ -404,7 +415,7 @@ func ImpactReachWithTasks(ws *Workspace, from string, index TaskImpactIndex) Imp
 		return ImpactResult{}
 	}
 	affected, edges, scopes := propagateImpact(ws, index, extensionConsumerIndex(ws), []string{from}, nil,
-		contractMoves{every: true})
+		contractMoves{every: true}, nil)
 	result := make([]*Project, 0, len(affected))
 	for _, p := range ws.Projects {
 		if affected[p.ID] {
@@ -877,12 +888,14 @@ func propagateImpact(
 	seedIDs []string,
 	seedScopes map[string]*impactScope,
 	moved contractMoves,
+	unchangedRuntimes map[string]bool,
 ) (map[string]bool, map[string]ImpactEdge, map[string][]string) {
 	w := impactWalk{
-		ws:         ws,
-		index:      index,
-		consumers:  consumers,
-		moved:      moved,
+		ws:                ws,
+		index:             index,
+		consumers:         consumers,
+		moved:             moved,
+		unchangedRuntimes: unchangedRuntimes,
 		seed:       make(map[string]bool, len(seedIDs)),
 		state:      make(map[string]*impactScope, len(seedIDs)),
 		edges:      make(map[string]ImpactEdge),
@@ -920,7 +933,10 @@ type impactWalk struct {
 	index     TaskImpactIndex
 	consumers map[string][]string
 	// moved gates the contract edge; propagateImpact states the rule.
-	moved      contractMoves
+	moved contractMoves
+	// unchangedRuntimes cuts off the runtime extension-consumer edge of the
+	// extensions ChangeImpactOptions.UnchangedRuntimes names.
+	unchangedRuntimes map[string]bool
 	seed       map[string]bool
 	state      map[string]*impactScope
 	edges      map[string]ImpactEdge
@@ -993,7 +1009,7 @@ func (w *impactWalk) run() {
 // extension with neither moved nothing its consumers run.
 func (w *impactWalk) consumerEdgeFrom(extensionID string, scope *impactScope, carries bool) (ImpactEdge, []string, bool) {
 	edge := ImpactEdge{From: extensionID, Kind: ImpactEdgeExtensionConsumer}
-	if scope.full || w.runtimeCarries(scope, carries) {
+	if (scope.full || w.runtimeCarries(scope, carries)) && !w.runtimeUnchanged(extensionID) {
 		if scope.cause != "" {
 			edge.Via, edge.Cause = scope.cause, ImpactCauseRuntimeInput
 		}
@@ -1008,6 +1024,14 @@ func (w *impactWalk) consumerEdgeFrom(extensionID string, scope *impactScope, ca
 	}
 	edge.Via, edge.Cause = scope.declaredBy, ImpactCauseTaskDeclaration
 	return edge, sortedKeys(scope.declared), true
+}
+
+// runtimeUnchanged reports whether the caller proved extensionID's prepared
+// runtime identical to the diff base's (ChangeImpactOptions.UnchangedRuntimes).
+// A seed is never unchanged: the extension project itself changed, and its root
+// holds files its tasks may read at run time beside what it prepares.
+func (w *impactWalk) runtimeUnchanged(extensionID string) bool {
+	return w.unchangedRuntimes[extensionID] && !w.seed[extensionID]
 }
 
 // runtimeCarries reports whether the tasks a claim or an edge gave a project,

@@ -36,7 +36,7 @@
     {
       "id": "impacted-closure",
       "text": [
-        "Impacted selection maps changed files to the tasks reading them where their command may run, plus the transitive dependent closure, reaching an in-workspace extension's consumers for the tasks its change moves.",
+        "Impacted selection maps changed files to the tasks reading them where their command may run, plus the transitive dependent closure, reaching an in-workspace extension's consumers for the tasks its change moves, unless the runtime it prepares is byte for byte the one the diff's base prepares.",
         "A task-scoped project keeps those jobs, each job with side effects, each criteria job when its scope names a task of a command with a kind, and their dependencies, in order.",
         "A run executing the selection records its complete trace, the diff base and the uncommitted changed files as a session event."
       ]
@@ -118,6 +118,7 @@
     "tooling/cli/doc/adr/0053-a-registry-pin-wins-over-a-same-name-project-manifest.md",
     "tooling/cli/doc/adr/0070-a-task-scope-keeps-a-job-by-its-declared-side-effects.md",
     "tooling/cli/doc/adr/0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md",
-    "tooling/cli/doc/adr/0087-a-fresh-worktree-restores-its-generated-clients.md"
+    "tooling/cli/doc/adr/0087-a-fresh-worktree-restores-its-generated-clients.md",
+    "tooling/cli/doc/adr/0103-an-unchanged-extension-runtime-reaches-no-consumer.md"
   ]
 }

@@ -83,9 +83,16 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 		// (ADR 0044). A run that loaded none keeps the project-level mapping.
 		// The run's resolver answers the input selectors of the changed
 		// projects; a nil resolver's matcher selects every path.
+		// An extension whose runtime is byte for byte the one the diff's base
+		// prepares moved nothing its consumers run (ADR 0103): the selection
+		// compares the runtimes the first walk reached and walks again with the
+		// proof.
 		selection, err := workspace.ImpactedSelectionWithOptions(ws, req.Global.Baseline, workspace.ImpactedSelectionOptions{
 			Tasks:    workspace.NewTaskIndex(ws, extensions, req.inputResolver.Matcher()),
 			RunStart: req.runStart,
+			CompareRuntimes: func(candidates []string, diffBase string) []workspace.RuntimeComparison {
+				return scheduler.CompareExtensionRuntimes(context.Background(), ws, extensions, candidates, diffBase)
+			},
 		})
 		switch {
 		case err != nil && impactedFailureEndsRun(req, ws.Root, err):
@@ -123,7 +130,7 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 			req.selectionEvidence.taskScopes = selection.TaskScopes()
 			// The base line itself is a statement, not a diagnostic: only a
 			// fallback tier's warning joins the diagnostics.
-			notes := []string{selection.UnownedRootFilesExplanation(), selection.RunWrittenFilesExplanation()}
+			notes := []string{selection.UnownedRootFilesExplanation(), selection.RunWrittenFilesExplanation(), selection.RuntimeComparisonsExplanation()}
 			if selection.BaselineIsFallback() {
 				notes = append([]string{selection.BaselineExplanation()}, notes...)
 			}

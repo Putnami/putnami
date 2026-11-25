@@ -79,7 +79,8 @@
             "a-narrowed-plan-orders-its-jobs-as-the-full-plan-does",
             "a-manifest-change-reaches-the-tasks-it-moves",
             "the-trace-names-the-runtime-input",
-            "a-file-claims-only-the-tasks-its-project-may-plan"
+            "a-file-claims-only-the-tasks-its-project-may-plan",
+            "an-unchanged-extension-runtime-leaves-its-consumers"
           ]
         }
       },
