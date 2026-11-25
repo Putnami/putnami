@@ -617,7 +617,10 @@ The block is capped at 5 seeds and 10 edges. The full record is the
 `selection:impacted` event below, one entry per selected project, each with
 its `taskScope` when it has one; `putnami projects why` answers with the same
 edges for one pair and the same `taskScope` for the target. Both read one
-propagation, so they cannot disagree on a project or on its scope.
+propagation, so they agree on a project and on its scope, with one exception:
+`projects why` has no diff to compare runtimes against, so it still names an
+extension-consumer edge the selection cut off because the extension's runtime
+is unchanged (`runtimeComparisons`).
 
 Every run that executes an `--impacted` selection also records the whole
 trace, uncapped, as one `selection:impacted` session event: on the live
@@ -635,9 +638,13 @@ output format. Its `event` carries:
 | `seeds` | one `{project, file, kind, via}` per claim, in the block's order |
 | `edges` | one `{project, from, kind}` per propagated project, in selection order; a `contract` edge adds `via`, the committed contract that changed, and `contractSha256`, its sha256; an `extension-consumer` edge adds `via`, the changed file it rests on, and `cause`, `runtime-input` or `task-declaration` |
 | `scopes` | one `{project, tasks}` per task-scoped project, in selection order; `tasks` are the task scopes it runs, sorted |
+| `runtimeComparisons` | one `{project, unchanged, reason}` per extension whose runtime the selection compared with the one the diff's base prepares; an `unchanged` one fired no extension-consumer edge, and `reason` says why another kept it; absent when none was compared ([ADR 0103](adr/0103-an-unchanged-extension-runtime-reaches-no-consumer.md)) |
 
 Two runs with the same `HEAD`, the same `diffBase` and no `uncommittedFiles`
-read the same diff and select the same projects. A path in `uncommittedFiles`
+read the same diff and select the same projects, unless their artifact stores
+answer the runtime comparison differently: a hosted run whose store lacks a
+base runtime keeps an edge a local run cut off, and `runtimeComparisons` says
+which. A path in `uncommittedFiles`
 on a CI runner is one the run itself wrote before it planned — the first place
 to look when a hosted run selects more than a local one.
 

@@ -71,6 +71,8 @@ func CompareExtensionRuntimes(
 	if len(compared) == 0 {
 		return nil
 	}
+	artifacts := artifactstore.New(store.ResolveArtifactStoreRoot(ws.Root))
+	hosted := runcredential.Hosted()
 	answers := make([]workspace.RuntimeComparison, len(compared))
 	for i, id := range projects {
 		answers[i] = workspace.RuntimeComparison{Project: id}
@@ -85,6 +87,22 @@ func CompareExtensionRuntimes(
 	if err != nil {
 		root = ws.Root
 	}
+	// A hosted run can only compare what the source build prepared and the
+	// store holds: it answers the others before writing the base tree, and
+	// writes nothing when none is left.
+	if hosted {
+		pending := 0
+		for i, ext := range compared {
+			if reason := hostedHeadRefusal(root, artifacts, ext); reason != "" {
+				answers[i].Reason = reason
+				continue
+			}
+			pending++
+		}
+		if pending == 0 {
+			return answers
+		}
+	}
 	baseRoot, cleanup, err := checkoutBase(root, diffBase)
 	if err != nil {
 		for i := range answers {
@@ -94,10 +112,11 @@ func CompareExtensionRuntimes(
 	}
 	defer cleanup()
 
-	artifacts := artifactstore.New(store.ResolveArtifactStoreRoot(ws.Root))
-	hosted := runcredential.Hosted()
 	baseWS := &workspace.Workspace{Root: baseRoot}
 	for i, ext := range compared {
+		if answers[i].Reason != "" {
+			continue
+		}
 		answers[i].Unchanged, answers[i].Reason = compareOneRuntime(ctx, ws, baseWS, root, artifacts, ext, hosted)
 	}
 	return answers
@@ -150,14 +169,11 @@ func compareOneRuntime(
 
 	var headDigest, baseDigest string
 	if hosted {
-		if !extension.FromSourceBuild(root, ext) {
-			return false, runtimeReasonNotSourceBuilt
+		if reason := hostedHeadRefusal(root, artifacts, ext); reason != "" {
+			return false, reason
 		}
 		if headDigest, err = sourceBuiltRuntimeDigest(root, ext); err != nil {
 			return false, "digest this tree's runtime inputs: " + err.Error()
-		}
-		if !artifacts.Has(headDigest) {
-			return false, runtimeReasonHeadNotPrepared
 		}
 		if baseDigest, err = sourceBuiltRuntimeDigest(baseWS.Root, &base); err != nil {
 			return false, "digest the base runtime inputs: " + err.Error()
@@ -189,6 +205,22 @@ func compareOneRuntime(
 		return false, runtimeReasonDiffers
 	}
 	return true, ""
+}
+
+// hostedHeadRefusal says why a hosted run cannot compare ext, or "" when the
+// source build prepared its head runtime and the store holds it.
+func hostedHeadRefusal(root string, artifacts *artifactstore.Store, ext *extension.ExtensionDescription) string {
+	if !extension.FromSourceBuild(root, ext) {
+		return runtimeReasonNotSourceBuilt
+	}
+	digest, err := sourceBuiltRuntimeDigest(root, ext)
+	if err != nil {
+		return "digest this tree's runtime inputs: " + err.Error()
+	}
+	if !artifacts.Has(digest) {
+		return runtimeReasonHeadNotPrepared
+	}
+	return ""
 }
 
 // sourcePreparedExtensionsByProject maps each project of ws to the extension

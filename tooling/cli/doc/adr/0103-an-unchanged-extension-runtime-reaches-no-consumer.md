@@ -53,6 +53,10 @@ its dependency edges carry: its own tests still read the change.
   and its manifest decides what runs.
 - **A confined manifest change** (ADR 0044 §3) fires as before: it names the
   steps whose declaration moved, which no runtime comparison speaks to.
+- **A request a runner provider executes.** A frozen request runs on the
+  runner's platform, where a runtime this machine proves unchanged may differ,
+  for example through a file only that platform compiles; its selection
+  compares nothing.
 - **Anything not proven.** The selection compares only what it can: an
   extension whose runtime it could not prepare, whose base runtime is missing,
   or whose base checkout failed keeps its edge. Selection shrinks on a proof

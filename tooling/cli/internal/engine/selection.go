@@ -91,6 +91,12 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 			Tasks:    workspace.NewTaskIndex(ws, extensions, req.inputResolver.Matcher()),
 			RunStart: req.runStart,
 			CompareRuntimes: func(candidates []string, diffBase string) []workspace.RuntimeComparison {
+				// A request a runner provider executes is frozen with this
+				// selection and runs on the runner's platform, where a runtime
+				// this machine proves unchanged may differ: no proof travels.
+				if req.runnerProvider != nil {
+					return nil
+				}
 				ctx := req.selectionCtx
 				if ctx == nil {
 					ctx = context.Background()

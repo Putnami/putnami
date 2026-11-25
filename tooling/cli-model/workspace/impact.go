@@ -404,7 +404,10 @@ func TraceChangeImpact(ws *Workspace, changedFiles []string, opts ChangeImpactOp
 //
 // It is what `why_impacted` answers from. Sharing the one propagation with
 // `impacted`, rather than a second walk over the same edges, is what makes the
-// two tools agree on the reach AND on the scope by construction.
+// two tools agree on the reach AND on the scope by construction, except for
+// the extension-consumer edges a selection cuts off because a runtime is
+// unchanged (ChangeImpactOptions.UnchangedRuntimes): a reach has no diff to
+// compare runtimes against, so it keeps them.
 func ImpactReach(ws *Workspace, from string) ImpactResult {
 	return ImpactReachWithTasks(ws, from, nil)
 }
