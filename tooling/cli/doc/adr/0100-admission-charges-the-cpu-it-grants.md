@@ -108,7 +108,7 @@ workers, took 988 s (session `20261125-042912-330c4e`).
 - Tools that do not honor `PUTNAMI_CPU_BUDGET` still exceed their grant; the
   load the report samples shows them.
 
-## Amendment — 2026-11-25: admission charges measured occupancy, a grant takes the free CPUs
+## Amendment — 2026-11-25: admission charges measured occupancy
 
 ### Context
 
@@ -118,10 +118,8 @@ The `--no-cache` gate restricted to 14 projects
 (`/go/framework/{client,api,database,app,openapi,grpc,telemetry}`,
 `/typescript/framework/{client,application,web,analytics,cli-protocol,ui}`,
 `/tooling/cli-documents`) took 93.2 s from the history of a first run against
-84.5 s from none, with a one-minute load of 3.3 against 4.4; from no history
-the granted ceilings summed to 16 on 4 CPUs, and the full gate held a load of
-15.7 on average and 27.0 at its peak. Three causes, read from the run's task
-events, its capacity samples and an admission trace:
+84.5 s from none. Three causes, read from the runs' task events, capacity
+samples and an admission trace:
 
 - **Rounding.** A ceiling is whole CPUs, so a task that measured 1.1 CPUs was
   charged 2: the history of that selection charged 345 CPU-seconds for 222
@@ -146,55 +144,80 @@ events, its capacity samples and an admission trace:
    waiter is still never overtaken, but it starts once CPU is free even when
    its charge exceeds what is free; the charges then exceed the capacity by
    less than its own, and no other waiter starts until they are below it.
-3. **A grant takes the CPUs the running ceilings leave free.** Every
-   subprocess that reserves CPU is granted at least the CPUs the ceilings of
-   the running subprocesses leave free. A task with history gets its planned
-   ceiling or more, so the last task of a run has the whole machine. A task
-   with no history gets at least one CPU and at most the whole capacity, so
-   cold ceilings no longer stack to four times the CPUs. Only the planned,
-   unweighted ceiling teaches the history its floor. This replaces decision 2:
-   a task with no history is no longer granted the whole capacity beside
-   others.
+3. **A task with history is granted at least the free CPUs.** Its planned
+   ceiling is raised to the CPUs the ceilings of the running subprocesses
+   leave free, so the last task of a run has the whole machine. Only the
+   planned, unweighted ceiling teaches the history its floor.
+4. **A task with no history keeps decision 2.** No cold rule measured below
+   keeps the load under 1.5 times the CPUs without lengthening the full gate.
 
 ### Measurements
 
-The 14-project selection, `./putnamiw lint,test,build,validate --projects
-<selection> --no-cache --enforce-coverage`, A = `main` at `00810ec6`, B = the
+The selection gate, `./putnamiw lint,test,build,validate --projects
+<selection> --no-cache --enforce-coverage`; A = `main` at `00810ec6`, B = the
 option, one git worktree each, each run alone once the one-minute load fell
-below 2.0, A and B alternating: from an empty history three runs each, then
-one seeding run each, then two runs each from that seeded history. Medians,
-the one-minute load read every 15 s from `/proc/loadavg`.
+below 2.0, A and B alternating: from an empty history three runs each, one
+seeding run each, then two runs each from the seeded history. The full gate
+replaces `--projects <selection>` with `--all`, from an empty history, once
+the load fell below 1.0. Medians; the one-minute load is read every 15 s from
+`/proc/loadavg`, mean.
 
-- **B1, rejected**: decisions 1 and a cold share without the free CPUs for a
-  task with history or the start rule. Cold 61.0 s (load 3.2) against A 68.7 s
-  (4.1); warm 68.4 s (2.9) against A 75.9 s (2.8). Warm stayed 12 % slower
-  than cold: the tail ran at one CPU (sessions `20261125-161933-86d184`,
+Chosen, decisions 1 to 4 at `d9ab7157`:
+
+- Selection from an empty history: 69.2 s [69.2–75.0], load 4.0, against A
+  68.2 s [68.0–72.0], load 3.9.
+- Selection from the seeded history: 63.8 s [62.8–64.8], load 3.4, against
+  A 83.6 s [81.6–85.6], load 2.8. Warm is 8 % faster than cold, where A is
+  23 % slower (sessions `20261125-194858-7b0aae`, `20261125-195253-0df0d3`).
+- Full gate: 541.0 s, load 13.6 (session `20261125-201955-cbb0cc`), against
+  A 527.4 s, load 14.6 (`20261125-203126-d969bc`); A ranged 514.2 to 558.3 s
+  over six runs. The first full run of B's tree took 623.2 s: its Go build
+  cache was cold for the changed CLI packages, which a Putnami `--no-cache`
+  run does not reset.
+
+Rejected for a task with history, each a cumulative step towards the chosen
+one, with a task with no history granted only the CPUs the running ceilings
+leave free (see below):
+
+- Decision 1 alone, the planned ceiling kept: warm 68.4 s against cold
+  61.0 s, the tail at one CPU (sessions `20261125-161933-86d184`,
   `20261125-162313-444ea7`).
-- **B2, rejected**: B1 with decision 3 whole. Cold 61.0 s (3.0) against A
-  61.5 s (3.9); warm 70.0 s (2.8) against A 81.0 s (2.7): warm 15 % slower
-  than cold, the head-of-line wait (sessions `20261125-164320-e61b20`,
-  `20261125-164725-6a6e0e`).
-- **B3, rejected**: B2 with a waiter starting once a whole CPU is free. Cold
-  63.4 s (3.0) against A 65.2 s (3.5); warm 65.8 s (3.5) against A 76.7 s
-  (3.1): warm still 4 % slower than cold, the fourth worker waiting on less
-  than one free CPU (sessions `20261125-170836-57fbfc`,
-  `20261125-171230-9ea945`).
-- **B4, chosen**: decisions 1 to 3. Cold 67.0 s [63.6–68.2] (load 3.1, peak
-  granted 7) against A 67.2 s [65.9–70.1] (4.1, peak granted 16); warm 57.9 s
-  [56.7–59.0] (3.4) against A 77.2 s [73.7–80.7] (2.7). Warm is 14 % faster
-  than cold, and 25 % faster than A warm (sessions `20261125-173508-684049`,
-  `20261125-173901-df3db9`; cold `20261125-171952-6c6e24`,
-  `20261125-172346-e6d8ee`, `20261125-172742-955ff3`).
+- Adding decision 3: warm 70.0 s against cold 61.0 s, the head-of-line wait
+  (`20261125-164320-e61b20`, `20261125-164725-6a6e0e`).
+- A waiter starting once a whole CPU is free instead of decision 2: warm
+  65.8 s against cold 63.4 s, the fourth worker waiting on less than one free
+  CPU (`20261125-170836-57fbfc`, `20261125-171230-9ea945`).
+- Decision 2 itself in that series: warm 57.9 s against cold 67.0 s and A
+  warm 77.2 s (`20261125-173508-684049`, `20261125-173901-df3db9`).
 
-Task CPU is unchanged between options (183 to 215 s per selection run). The
-runs, their reports, task histories and load samples are on branch
-`epic-925/1450-cold` under `evidence/1450-cold/`.
+Rejected for a task with no history, on the full gate:
+
+- **The CPUs the running ceilings leave free, at least one**: load 5.2 on
+  average, 7.3 at its peak, but 826.4 s (session `20261125-182206-8d4959`)
+  and a failure: the machine is busy whenever a cold task starts, so nearly
+  every task got one CPU, `/tooling/cli` tests ran 422 s against 211 s and
+  one of them, which needs parallelism, failed. On the selection the same
+  rule took 61.0 to 67.0 s, as fast as A, with a load of 3.0 to 3.2.
+- **Those free CPUs, at least half the machine**: 605.6 s, load 9.3
+  (session `20261125-190532-aedad0`), `/tooling/cli` tests 318 s.
+
+Both runs were the first of their trees, so their Go build cache was cold for
+the changed CLI packages, which cost the chosen tree 82 s on its first run;
+the long pole alone, a task whose ceiling is fixed when it starts and whose
+length no history tells, lengthened them more. The kind seed, quarter seed
+and 1.5-times admission rejected above lengthened it too.
+
+The runs, their reports, sessions, task histories and load samples are on
+branch `epic-925/1450-cold` under `evidence/1450-cold/`.
 
 ### Consequences
 
-- A cold task's ceiling depends on the subprocesses running when it starts;
-  a task with history keeps a deterministic planned ceiling that live peers
-  only raise.
+- A warm run is no longer slower than a cold one; from a seeded history the
+  selection is 24 % faster than before.
+- A task with history keeps a deterministic planned ceiling that live peers
+  only raise; it records an observation at the ceiling it was granted, and
+  its history's ceiling floor stays the planned one.
 - The charges may exceed the CPU capacity by less than one waiter's charge.
-- A task granted more than its planned ceiling records an observation at that
-  grant; its history's ceiling floor stays the planned one.
+- From an empty history the full gate still holds a load of about 3.5 times
+  the CPUs: a cold task is granted the whole machine until its first run is
+  measured.
