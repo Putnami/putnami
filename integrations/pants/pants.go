@@ -32,7 +32,7 @@ func Stack() (stacks.Stack, error) {
 	if err != nil {
 		return stacks.Stack{}, fmt.Errorf("profile.json: %w", err)
 	}
-	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect}, nil
+	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, ReadBatch: ReadBatch, BatchReportOwner: ReportOwner}, nil
 }
 
 // Detect names the components among the candidate paths with the Pants

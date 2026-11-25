@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "monorepo/bazel-delegated-stack#a-delegated-verb-runs-one-bazel-command",
     "monorepo/bazel-delegated-stack#manifest-follows-the-profile",
     "monorepo/bazel-delegated-stack#packages-become-projects",
     "monorepo/bazel-delegated-stack#reports-become-the-summary",

@@ -48,6 +48,14 @@
       ]
     },
     {
+      "id": "a-delegated-verb-runs-one-bazel-command",
+      "text": [
+        "Packages that run one delegated task together run one bazel test or bazel build over //<a>:all //<b>:all, which writes one build-event file.",
+        "When it fails, a failed test or target fails its package with Bazel's status; a package passes only when its targets completed and, for bazel test, each of its tests passed; any other fails as not run.",
+        "Each package collects the reports of its own test runs."
+      ]
+    },
+    {
       "id": "reports-become-the-summary",
       "text": [
         "After its steps, whatever their outcome, the test task copies the test.xml and LCOV coverage.dat of each test run the build-event file lists, the coverage of the package's sources alone, and reads them into the test and coverage summary, merging a source across runs; a non-LCOV coverage.dat is skipped with a warning.",
@@ -66,6 +74,7 @@
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
-    "protocols/workspace/doc/adr/0007-a-delegated-build-graph-backs-its-edges.md"
+    "protocols/workspace/doc/adr/0007-a-delegated-build-graph-backs-its-edges.md",
+    "tooling/stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md"
   ]
 }

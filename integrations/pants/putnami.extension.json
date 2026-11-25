@@ -198,7 +198,7 @@
       }
     },
     "lint-run": {
-      "description": "Run pants lint <dir>: in the workspace root for one package, after the Pants version check. Putnami's cache is off: Pants's cache decides what reruns.",
+      "description": "Run pants lint <dir>: in the workspace root for one package, after the Pants version check. The packages of one verb run as one pants lint <a>: <b>:; a failure fails each of them. Putnami's cache is off: Pants's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -233,6 +233,9 @@
       "cache": {
         "enabled": false
       },
+      "batchable": {
+        "tool": "pants"
+      },
       "declares": {
         "outputs": {
           "reports": {
@@ -250,7 +253,7 @@
       }
     },
     "test-run": {
-      "description": "Run pants --test-report --test-use-coverage --coverage-py-report=[\"xml\"] test <dir>: in the workspace root for one package, after the Pants version check; then copy the JUnit reports under dist/test/reports and the Cobertura report dist/coverage/python/coverage.xml into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task. Putnami's cache is off: Pants's cache decides what reruns.",
+      "description": "Run pants --test-report --test-use-coverage --coverage-py-report=[\"xml\"] test <dir>: in the workspace root for one package, after the Pants version check; then copy the JUnit reports under dist/test/reports and the Cobertura report dist/coverage/python/coverage.xml into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task. The packages of one verb run as one pants test <a>: <b>:, each result read from Pants's test results and each package reading the JUnit reports of its own addresses. Putnami's cache is off: Pants's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -285,6 +288,9 @@
       "cache": {
         "enabled": false
       },
+      "batchable": {
+        "tool": "pants"
+      },
       "declares": {
         "outputs": {
           "reports": {
@@ -302,7 +308,7 @@
       }
     },
     "build-run": {
-      "description": "Run pants package <dir>: in the workspace root for one package, after the Pants version check. Putnami's cache is off: Pants's cache decides what reruns.",
+      "description": "Run pants package <dir>: in the workspace root for one package, after the Pants version check. The packages of one verb run as one pants package <a>: <b>:; a failure fails each of them. Putnami's cache is off: Pants's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -336,6 +342,9 @@
       },
       "cache": {
         "enabled": false
+      },
+      "batchable": {
+        "tool": "pants"
       },
       "declares": {
         "outputs": {

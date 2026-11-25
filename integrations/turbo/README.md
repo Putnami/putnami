@@ -8,8 +8,9 @@ modes.
   `bun build`, `bun test` or `biome` runs `@putnami/typescript`, with Putnami's
   cache; every other task keeps running through Turborepo.
 - **Delegate**: `putnami lint`, `putnami test` and `putnami build` run
-  `turbo run <task> --filter=<package>` on each affected package, and
-  Turborepo keeps its cache, local and remote.
+  one `turbo run <task> --filter=<a> --filter=<b>` over the affected
+  packages, each result read from its run summary, and Turborepo keeps its
+  cache, local and remote.
 
 It is a delegated stack extension: a manifest, the Turborepo stack profile
 (`profile.json`), the entrypoint of the stack core,

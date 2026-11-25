@@ -2,7 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
   "id": "delegate-runs-one-process-per-task",
-  "statement": "a delegated moon or nx verb runs one tool command over its projects, reads each result from the tool's report and stops as a whole; turbo, rush, pants and bazel keep one process per task: rush lint and test take --only, only build --to; bazel one filter",
+  "statement": "a delegated verb runs one tool command over its projects and stops as a whole: moon, nx, turbo, rush (lint and test --only, build --to), pants, bazel; when it fails, a project passes only on the success the tool reports for it",
   "settled": "2026-11-24",
   "settledBy": "fdumay",
   "adr": "tooling/stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md",

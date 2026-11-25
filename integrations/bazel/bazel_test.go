@@ -181,14 +181,23 @@ case "$1" in build|test|coverage) echo "$1 collect=$collect filter=$filter" >> "
 case "$1" in
   test|coverage)
     kind=".uncovered"; [ "$collect" = 1 ] && kind=""
-    if [ "$collect" = 1 ] && [ -d '` + ci + `'/coverage/package/"$pkg" ]; then
-      variant=all; [ "$filter" = "^//$pkg[/:]" ] && variant=package
-      for f in $(cd '` + ci + `'/coverage/"$variant" && find "$pkg" -name coverage.dat); do
-        if [ -n "$STUB_COVERAGE" ]; then cp "$STUB_COVERAGE" '` + testlogs + `'/"$f"; else cp '` + ci + `'/coverage/"$variant"/"$f" '` + testlogs + `'/"$f"; fi
-      done
-    fi
-    if [ -e '` + ci + `'/events/"$flat".json ]; then cp '` + ci + `'/events/"$flat$kind".json "$bep"; else echo '{"id":{"started":{}}}' > "$bep"; fi
+    echo '{"id":{"started":{}}}' > "$bep"
+    for a in "$@"; do
+      case "$a" in //*:all) ;; *) continue;; esac
+      pkg="${a#//}"; pkg="${pkg%:all}"; flat="$(echo "$pkg" | tr / _)"
+      if [ "$collect" = 1 ] && [ -d '` + ci + `'/coverage/package/"$pkg" ]; then
+        variant=all; [ "$filter" = "^//$pkg[/:]" ] && variant=package
+        for f in $(cd '` + ci + `'/coverage/"$variant" && find "$pkg" -name coverage.dat); do
+          if [ -n "$STUB_COVERAGE" ]; then cp "$STUB_COVERAGE" '` + testlogs + `'/"$f"; else cp '` + ci + `'/coverage/"$variant"/"$f" '` + testlogs + `'/"$f"; fi
+        done
+      fi
+      if [ -e '` + ci + `'/events/"$flat".json ]; then tail -n +2 '` + ci + `'/events/"$flat$kind".json >> "$bep"; fi
+    done
+    if [ -n "$STUB_EVENTS" ]; then printf '%s\n' "$STUB_EVENTS" >> "$bep"; fi
     exit "${STUB_TEST_EXIT:-0}";;
+  build)
+    if [ -n "$bep" ]; then echo '{"id":{"started":{}}}' > "$bep"; [ -z "$STUB_EVENTS" ] || printf '%s\n' "$STUB_EVENTS" >> "$bep"; fi
+    exit "${STUB_BUILD_EXIT:-0}";;
 esac
 exit 0
 `

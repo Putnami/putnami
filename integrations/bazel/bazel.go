@@ -37,6 +37,7 @@ func Stack() (stacks.Stack, error) {
 		Profile:   profile,
 		Detect:    Detect,
 		Commands:  map[string]stacks.Command{CollectReportsCommand: CollectReports},
+		ReadBatch: ReadBatch,
 	}, nil
 }
 

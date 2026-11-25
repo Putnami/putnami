@@ -104,6 +104,20 @@ run on the named project alone, against the upstream outputs already on disk:
 a lint or a test of one project never lints or tests the projects it depends
 on.
 
+The projects of one verb run as one command
+(ADR 0019 of `tooling/stacks`): `putnami build` over `@demo/api` and
+`@demo/pricing` runs `rush build --to=@demo/api --to=@demo/pricing` once,
+and `putnami test` runs `rush test --only=@demo/api --only=@demo/pricing`.
+When the command fails, each project's result is read from the summary Rush
+prints at its end. A project whose operations, `<project>` or
+`<project> (<phase>)`, Rush lists as succeeded, restored from cache, already
+up to date or with no work passes. One it lists as failed fails with the
+details Rush printed for it; so does one with warnings, which fail the
+command, even under a policy that allows them. A project Rush lists as blocked
+or aborted, or does not list, fails as not run, and a summary that names no
+failure fails every project. A task that runs alone, such as a retry, runs the
+step of the table.
+
 A `test` or `lint` that `command-line.json` declares as a phased command, one
 of whose phases depends on an upstream phase, as rushstack's `_phase:build`
 does, waits for the project's `build` task: `rush test --only` and

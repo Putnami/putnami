@@ -71,6 +71,14 @@
       ]
     },
     {
+      "id": "a-delegated-verb-runs-one-turbo-command",
+      "text": [
+        "Packages that run one delegated task together run one turbo run <task> --filter=<a> --filter=<b> --summarize at the workspace root.",
+        "When it fails, each result is read from the run summary it wrote: a package task that exited 0 passes, one that did not fails with turbo's error, and one the summary does not list fails as not run.",
+        "The reader removes the summary."
+      ]
+    },
+    {
       "id": "reports-from-the-package-options",
       "text": [
         "The test task reads the JUnit and coverage reports that options[\"@putnami/turbo\"].tasks.test.reports of the package's putnami.json names into the test and coverage summary;",
@@ -139,6 +147,7 @@
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
     "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md",
     "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md",
-    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md"
+    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md",
+    "tooling/stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md"
   ]
 }

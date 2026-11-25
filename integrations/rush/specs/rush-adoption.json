@@ -49,6 +49,13 @@
       ]
     },
     {
+      "id": "a-delegated-verb-runs-one-rush-command",
+      "text": [
+        "Projects that run one delegated task together run one rush lint or rush test --only <a> --only <b>, or rush build --to <a> --to <b>.",
+        "When it fails, each result is read from Rush's summary: succeeded, from cache, up to date or no op passes; failed or with warnings fails with Rush's details; blocked, aborted or not listed fails as not run."
+      ]
+    },
+    {
       "id": "reports-come-from-the-project-options",
       "text": [
         "The test task reads the JUnit and coverage files a project names in its putnami.json, under options.@putnami/rush.tasks.test.reports, into the test and coverage summary.",
@@ -125,6 +132,7 @@
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
-    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md"
+    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md",
+    "tooling/stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md"
   ]
 }

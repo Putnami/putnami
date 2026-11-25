@@ -143,6 +143,12 @@ type Stack struct {
 	// the report ReadBatch reads: a batch removes them under the root's lock
 	// before its command, so a report of an earlier run is never read.
 	BatchReports []string
+	// BatchReportOwner answers, once per batch command from its report (its
+	// components and the tool's output), the function that names the
+	// component of a report file the command's components share, from its
+	// path under the stack root; ok is false for a file of the whole command,
+	// which every component reads. Nil reads every file as each component's.
+	BatchReportOwner func(report BatchReport) func(file string) (component string, ok bool)
 	// Commands are the extension's own runtime commands, by name: a step
 	// runs one as {runtime} <name> <args>. A name is neither a task nor a
 	// control call.

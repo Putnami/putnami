@@ -65,6 +65,21 @@
           }
         },
         {
+          "id": "a-delegated-verb-runs-one-bazel-command",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-verb-runs-one-bazel-test-over-its-packages",
+              "a-failing-test-fails-its-package-alone",
+              "a-package-bazel-did-not-run-fails-as-not-run"
+            ]
+          }
+        },
+        {
           "id": "reports-become-the-summary",
           "stage": "coded",
           "evidenceKinds": [

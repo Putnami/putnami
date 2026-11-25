@@ -2,9 +2,9 @@
 
 `@putnami/pants` runs the packages of a Pants repository as Putnami projects
 and delegates each task to Pants: `putnami lint`, `putnami test` and
-`putnami build` run `pants lint`, `pants test` and `pants package` on each
-affected package, read its reports, and leave caching and remote execution to
-Pants.
+`putnami build` run one `pants lint`, `pants test` or `pants package` over
+the affected packages, read each package's reports, and leave caching and
+remote execution to Pants.
 
 It is the first delegated stack extension: a manifest, the Pants stack profile
 (`profile.json`), the entrypoint of the stack core,

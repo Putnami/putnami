@@ -185,14 +185,17 @@ func stubBazel(t *testing.T, demo map[string]map[string]string) string {
 set -e
 echo "$(pwd) bazel $*" >> '`+log+`'
 case "$1" in --version) echo "bazel 7.4.1"; exit 0;; esac
-for a in "$@"; do last="$a"; done
 case "$1" in
   query) cat '`+ci+`/bazel-graph.json';;
   test)
-    pkg="${last#//}"; pkg="${pkg%:all}"; flat="$(echo "$pkg" | tr / _)"
     for a in "$@"; do case "$a" in --build_event_json_file=*) bep="${a#--build_event_json_file=}";; esac; done
     mkdir -p "$(dirname "$bep")"
-    if [ -e '`+ci+`'/events/"$flat".json ]; then cp '`+ci+`'/events/"$flat".json "$bep"; else : > "$bep"; fi;;
+    : > "$bep"
+    for a in "$@"; do
+      case "$a" in //*:all) ;; *) continue;; esac
+      pkg="${a#//}"; pkg="${pkg%:all}"; flat="$(echo "$pkg" | tr / _)"
+      if [ -e '`+ci+`'/events/"$flat".json ]; then cat '`+ci+`'/events/"$flat".json >> "$bep"; fi
+    done;;
 esac
 `)
 	if err := os.Chmod(filepath.Join(bin, "bazel"), 0o755); err != nil {
@@ -226,7 +229,12 @@ func bazelTests(t *testing.T, root, base, log string) ([]string, string) {
 		if real, _ := filepath.EvalSymlinks(dir); real != rootReal {
 			t.Errorf("bazel test ran in %s, want the workspace root", dir)
 		}
-		tested = append(tested, call[strings.LastIndex(call, " ")+1:])
+		// One command over the verb's packages (stacks ADR 0019).
+		for _, arg := range strings.Fields(call) {
+			if strings.HasPrefix(arg, "//") {
+				tested = append(tested, arg)
+			}
+		}
 	}
 	slices.Sort(tested)
 	// Every task of the run is uncached: no lookup, so no hit and no miss,
@@ -288,6 +296,9 @@ func TestAChangeToOneBazelPackageRunsItAndItsDependentsThroughBazel(t *testing.T
 	tested, out := bazelTests(t, root, base, log)
 	if want := []string{"//api:all", "//pricing:all"}; !slices.Equal(tested, want) {
 		t.Errorf("bazel test ran on %v, want %v: the changed package and its dependent\n%s", tested, want, out)
+	}
+	if logged, _ := os.ReadFile(log); strings.Count(string(logged), " bazel test ") != 1 {
+		t.Errorf("the test verb ran %q, want one bazel test over both packages", logged)
 	}
 	var collected []string
 	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {

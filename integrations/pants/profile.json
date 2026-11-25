@@ -17,6 +17,11 @@
       "steps": [
         ["pants", "lint", "{component}:"]
       ],
+      "batch": {
+        "steps": [
+          ["pants", "lint", "{component}:"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     },
@@ -24,6 +29,11 @@
       "steps": [
         ["pants", "--test-report", "--test-use-coverage", "--coverage-py-report=[\"xml\"]", "test", "{component}:"]
       ],
+      "batch": {
+        "steps": [
+          ["pants", "--test-report", "--test-use-coverage", "--coverage-py-report=[\"xml\"]", "--test-show-rerun-command", "test", "{component}:"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root",
       "reports": {
@@ -35,6 +45,11 @@
       "steps": [
         ["pants", "package", "{component}:"]
       ],
+      "batch": {
+        "steps": [
+          ["pants", "package", "{component}:"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     }

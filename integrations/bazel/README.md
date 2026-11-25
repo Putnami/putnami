@@ -2,8 +2,9 @@
 
 `@putnami/bazel` runs the packages of a Bazel workspace as Putnami projects
 and delegates each task to Bazel: `putnami test` and `putnami build` run
-`bazel test` and `bazel build` on each affected package, read its reports,
-and leave caching and remote execution to Bazel.
+one `bazel test` or `bazel build` over the affected packages, read each
+package's result and reports from its build-event file, and leave caching and
+remote execution to Bazel.
 
 It is a delegated stack extension: a manifest, the Bazel stack profile
 (`profile.json`), the entrypoint of the stack core,

@@ -1,0 +1,18 @@
+{"id": {"started": {}}, "started": {"command": "test"}}
+{"id": {"targetConfigured": {"label": "//a:g"}}, "configured": {"targetKind": "genrule rule"}}
+{"id": {"targetConfigured": {"label": "//b:g"}}, "configured": {"targetKind": "genrule rule"}}
+{"id": {"targetConfigured": {"label": "//c:g"}}, "configured": {"targetKind": "genrule rule"}}
+{"id": {"targetCompleted": {"label": "//a:g", "configuration": {"id": "5c864536bb2c4dd7b84e076a6dab8f700df816ad8f8998bb302a45cc805cb966"}}}, "completed": {"success": true}}
+{"id": {"targetCompleted": {"label": "//c:g", "configuration": {"id": "5c864536bb2c4dd7b84e076a6dab8f700df816ad8f8998bb302a45cc805cb966"}}}, "completed": {"success": true}}
+{"id": {"targetCompleted": {"label": "//b:g", "configuration": {"id": "5c864536bb2c4dd7b84e076a6dab8f700df816ad8f8998bb302a45cc805cb966"}}}, "completed": {"success": true}}
+{"id": {"targetConfigured": {"label": "//b:t"}}, "configured": {"targetKind": "sh_test rule", "testSize": "MEDIUM"}}
+{"id": {"targetConfigured": {"label": "//c:t"}}, "configured": {"targetKind": "sh_test rule", "testSize": "MEDIUM"}}
+{"id": {"targetConfigured": {"label": "//a:t"}}, "configured": {"targetKind": "sh_test rule", "testSize": "MEDIUM"}}
+{"id": {"targetCompleted": {"label": "//c:t", "configuration": {"id": "b357dd09923b37f48f631ab81341a90e6b4443fce0a2dddfde9d204ca537a54e"}}}, "completed": {"success": true}}
+{"id": {"targetCompleted": {"label": "//b:t", "configuration": {"id": "b357dd09923b37f48f631ab81341a90e6b4443fce0a2dddfde9d204ca537a54e"}}}, "completed": {"success": true}}
+{"id": {"targetCompleted": {"label": "//a:t", "configuration": {"id": "b357dd09923b37f48f631ab81341a90e6b4443fce0a2dddfde9d204ca537a54e"}}}, "completed": {"success": true}}
+{"id": {"testSummary": {"label": "//a:t", "configuration": {"id": "b357dd09923b37f48f631ab81341a90e6b4443fce0a2dddfde9d204ca537a54e"}}}, "testSummary": {"overallStatus": "PASSED", "totalRunCount": 1, "passed": [{"uri": "file:///cache/execroot/__main__/bazel-out/k8-fastbuild/testlogs/a/t/test.log"}]}}
+{"id": {"testSummary": {"label": "//c:t", "configuration": {"id": "b357dd09923b37f48f631ab81341a90e6b4443fce0a2dddfde9d204ca537a54e"}}}, "testSummary": {"overallStatus": "PASSED", "totalRunCount": 1, "passed": [{"uri": "file:///cache/execroot/__main__/bazel-out/k8-fastbuild/testlogs/c/t/test.log"}]}}
+{"id": {"testSummary": {"label": "//b:t", "configuration": {"id": "b357dd09923b37f48f631ab81341a90e6b4443fce0a2dddfde9d204ca537a54e"}}}, "testSummary": {"overallStatus": "FAILED", "totalRunCount": 1, "failed": [{"uri": "file:///cache/execroot/__main__/bazel-out/k8-fastbuild/testlogs/b/t/test.log"}]}}
+{"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "TESTS_FAILED", "code": 3}}}
+{"id": {"progress": {}}, "lastMessage": true}

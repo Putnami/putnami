@@ -42,6 +42,17 @@
           "--filter={component}"
         ]
       ],
+      "batch": {
+        "steps": [
+          [
+            "turbo",
+            "run",
+            "lint",
+            "--filter={component}",
+            "--summarize"
+          ]
+        ]
+      },
       "inputs": [
         "sources"
       ],
@@ -56,6 +67,17 @@
           "--filter={component}"
         ]
       ],
+      "batch": {
+        "steps": [
+          [
+            "turbo",
+            "run",
+            "test",
+            "--filter={component}",
+            "--summarize"
+          ]
+        ]
+      },
       "inputs": [
         "sources"
       ],
@@ -70,6 +92,17 @@
           "--filter={component}"
         ]
       ],
+      "batch": {
+        "steps": [
+          [
+            "turbo",
+            "run",
+            "build",
+            "--filter={component}",
+            "--summarize"
+          ]
+        ]
+      },
       "inputs": [
         "sources"
       ],

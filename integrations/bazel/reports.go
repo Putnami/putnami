@@ -18,7 +18,7 @@ import (
 
 // CollectReportsCommand is the runtime command the test task's report step
 // runs: {runtime} collect-reports --events <file> --root <dir>
-// [--package <dir>] --into <dir>.
+// [--package <dir> [--runs-of-package]] --into <dir>.
 const CollectReportsCommand = "collect-reports"
 
 // Report file names: the JUnit log and the LCOV coverage of a test run, as
@@ -45,7 +45,9 @@ var testOutputs = map[string]string{
 // a coverage copy keeps the records of the sources under that package
 // directory alone: the test steps instrument every source of the main
 // repository, so a test's coverage also holds the packages it depends on,
-// which are projects of their own. Bazel's own outputs are only read, never
+// which are projects of their own. With --runs-of-package too, it copies only
+// the runs of the targets of that package: a batch's build-event file lists
+// the runs of every package of the command. Bazel's own outputs are only read, never
 // removed: a removed output would make Bazel rerun a cached test. A missing
 // build-event file, as when bazel stopped before it wrote one, collects
 // nothing and is no error: the task's reports are missing then, and the step
@@ -59,12 +61,13 @@ func CollectReports(args []string, _, stderr io.Writer) error {
 	events := fs.String("events", "", "the build-event file of the test run")
 	root := fs.String("root", "", "the Bazel workspace root")
 	pkg := fs.String("package", "", "the package whose sources the coverage keeps")
+	ownRuns := fs.Bool("runs-of-package", false, "copy only the runs of the package's own targets")
 	into := fs.String("into", "", "the directory the reports are copied to")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *events == "" || *root == "" || *into == "" || fs.NArg() != 0 {
-		return errors.New("usage: collect-reports --events <file> --root <dir> [--package <dir>] --into <dir>")
+	if *events == "" || *root == "" || *into == "" || fs.NArg() != 0 || (*ownRuns && *pkg == "") {
+		return errors.New("usage: collect-reports --events <file> --root <dir> [--package <dir> [--runs-of-package]] --into <dir>")
 	}
 	runs, err := testRuns(*events)
 	if errors.Is(err, os.ErrNotExist) {
@@ -74,6 +77,9 @@ func CollectReports(args []string, _, stderr io.Writer) error {
 		return err
 	}
 	for _, run := range runs {
+		if *ownRuns && run.pkg != strings.Trim(*pkg, "/") {
+			continue
+		}
 		for name, src := range run.files(*root) {
 			rel := path.Join(run.logDir, name)
 			if name == coverageFile && !isLCOV(src) {
@@ -95,6 +101,8 @@ func CollectReports(args []string, _, stderr io.Writer) error {
 
 // testRun is one test run a build-event file lists.
 type testRun struct {
+	// pkg is the package of the run's target.
+	pkg string
 	// logDir is the run's directory relative to bazel-testlogs:
 	// <package>/<target>, and below it the shard, run and attempt
 	// directories a local output names.
@@ -161,7 +169,8 @@ func testRuns(file string) ([]testRun, error) {
 		if !ok {
 			continue
 		}
-		run := testRun{logDir: dir}
+		pkg, _ := labelPackage(e.ID.TestResult.Label)
+		run := testRun{pkg: pkg, logDir: dir}
 		if e.TestResult != nil {
 			for _, o := range e.TestResult.TestActionOutput {
 				name, ok := testOutputs[o.Name]
@@ -201,6 +210,18 @@ func labelLogDir(label string) (string, bool) {
 		return "", false
 	}
 	return path.Join(pkg, name), true
+}
+
+// labelPackage is the package of a target of the main repository: the
+// directory before the colon of //<package>:<name>, or the whole of
+// //<package>.
+func labelPackage(label string) (string, bool) {
+	rest, ok := strings.CutPrefix(strings.TrimLeft(label, "@"), "//")
+	if !ok {
+		return "", false
+	}
+	pkg, _, _ := strings.Cut(rest, ":")
+	return pkg, true
 }
 
 // localOutput reads a file URI of a test output: the local file, and its

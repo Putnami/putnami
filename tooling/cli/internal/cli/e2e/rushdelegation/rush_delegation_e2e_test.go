@@ -169,14 +169,28 @@ func rushBuilds(t *testing.T, root, base, log string) ([]string, string) {
 	var built []string
 	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
 		dir, call, _ := strings.Cut(line, " rush ")
-		pkg, ok := strings.CutPrefix(call, "build --to ")
+		args, ok := strings.CutPrefix(call, "build ")
 		if !ok {
 			continue
 		}
 		if real, _ := filepath.EvalSymlinks(dir); real != rootReal {
 			t.Errorf("rush build ran in %s, want the workspace root", dir)
 		}
-		built = append(built, pkg)
+		// A project that runs alone takes --to <project>; the projects of
+		// one verb run as one command, each with --to=<project> (stacks ADR
+		// 0019).
+		if pkg, ok := strings.CutPrefix(args, "--to "); ok {
+			built = append(built, pkg)
+			continue
+		}
+		for _, arg := range strings.Fields(args) {
+			pkg, ok := strings.CutPrefix(arg, "--to=")
+			if !ok {
+				t.Errorf("rush build ran with %q, want --to=<project>", arg)
+				continue
+			}
+			built = append(built, pkg)
+		}
 	}
 	slices.Sort(built)
 	if !strings.Contains(out, "Cache: 0 local hit · 0 miss") {
@@ -251,6 +265,9 @@ func TestAChangeToOneRushProjectRunsRushBuildOnItAndItsDependents(t *testing.T) 
 	built, out := rushBuilds(t, root, base, log)
 	if want := []string{"@demo/api", "@demo/pricing"}; !slices.Equal(built, want) {
 		t.Errorf("rush build ran on %v, want %v: the changed project and its dependent\n%s", built, want, out)
+	}
+	if logged, _ := os.ReadFile(log); strings.Count(string(logged), " rush build ") != 1 {
+		t.Errorf("the build verb ran %q, want one rush build over both projects", logged)
 	}
 
 	// A change to api runs api alone: pricing, its dependency, runs no rush.

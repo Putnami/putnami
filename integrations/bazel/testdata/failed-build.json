@@ -1,0 +1,15 @@
+{"id": {"started": {}}, "started": {"command": "build"}}
+{"id": {"targetConfigured": {"label": "//a:g"}}, "configured": {"targetKind": "genrule rule"}}
+{"id": {"targetConfigured": {"label": "//a:t"}}, "configured": {"targetKind": "sh_test rule", "testSize": "MEDIUM"}}
+{"id": {"targetConfigured": {"label": "//b:g"}}, "configured": {"targetKind": "genrule rule"}}
+{"id": {"targetConfigured": {"label": "//b:t"}}, "configured": {"targetKind": "sh_test rule", "testSize": "MEDIUM"}}
+{"id": {"targetCompleted": {"label": "//a:g", "configuration": {"id": "5c864536bb2c4dd7b84e076a6dab8f700df816ad8f8998bb302a45cc805cb966"}}}, "completed": {"success": true}}
+{"id": {"targetConfigured": {"label": "//c:g"}}, "configured": {"targetKind": "genrule rule"}}
+{"id": {"targetCompleted": {"label": "//b:g", "configuration": {"id": "5c864536bb2c4dd7b84e076a6dab8f700df816ad8f8998bb302a45cc805cb966"}}}, "completed": {"success": true}}
+{"id": {"targetConfigured": {"label": "//c:t"}}, "configured": {"targetKind": "sh_test rule", "testSize": "MEDIUM"}}
+{"id": {"targetCompleted": {"label": "//b:t", "configuration": {"id": "b357dd09923b37f48f631ab81341a90e6b4443fce0a2dddfde9d204ca537a54e"}}}, "completed": {"success": true}}
+{"id": {"targetCompleted": {"label": "//a:t", "configuration": {"id": "b357dd09923b37f48f631ab81341a90e6b4443fce0a2dddfde9d204ca537a54e"}}}, "completed": {"success": true}}
+{"id": {"targetCompleted": {"label": "//c:t", "configuration": {"id": "b357dd09923b37f48f631ab81341a90e6b4443fce0a2dddfde9d204ca537a54e"}}}, "completed": {"success": true}}
+{"id": {"targetCompleted": {"label": "//c:g", "configuration": {"id": "5c864536bb2c4dd7b84e076a6dab8f700df816ad8f8998bb302a45cc805cb966"}}}, "completed": {"failureDetail": {"message": "bash failed: error executing Genrule command (from target //c:g) /bin/bash -c 'source external/bazel_tools/tools/genrule/genrule-setup.sh; exit 1'\n\nUse --sandbox_debug to see verbose messages from the sandbox and retain the sandbox build root for debugging", "spawn": {"code": "NON_ZERO_EXIT", "spawnExitCode": 1}}}}
+{"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "BUILD_FAILURE", "code": 1}}}
+{"id": {"buildToolLogs": {}}, "lastMessage": true}

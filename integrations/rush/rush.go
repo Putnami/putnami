@@ -50,6 +50,7 @@ func Stack() (stacks.Stack, error) {
 		Extension: ExtensionName,
 		Profile:   profile,
 		Detect:    Detect,
+		ReadBatch: ReadBatch,
 	}, nil
 }
 

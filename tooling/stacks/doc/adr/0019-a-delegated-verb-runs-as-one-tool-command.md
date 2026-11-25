@@ -4,8 +4,9 @@
 - **Date**: 2026-11-24
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), `@putnami/cli` (the
   scheduler's batching), `integrations/moon` (`@putnami/moon`),
-  `integrations/nx` (`@putnami/nx`); `@putnami/turbo`, `@putnami/rush`,
-  `@putnami/pants` and `@putnami/bazel` follow in their own change
+  `integrations/nx` (`@putnami/nx`), `integrations/turbo` (`@putnami/turbo`),
+  `integrations/rush` (`@putnami/rush`), `integrations/pants`
+  (`@putnami/pants`) and `integrations/bazel` (`@putnami/bazel`)
 - **Amends**: [ADR 0008](0008-a-delegated-stack-keeps-its-tool-cache.md),
   which ran the tool once per component, and
   [ADR 0097 of tooling/cli](../../../cli/doc/adr/0097-a-project-names-what-a-command-waits-for.md),
@@ -38,7 +39,18 @@ delegated task has its cache off.
   holds `{component}` is repeated once per component, in the order of the
   selection, and `{components}` is the components joined with commas. moon
   states `moon run {component}:<task>`, which runs `moon run a:lint b:lint`;
-  Nx states `nx run-many -t <task> -p {components}`.
+  Nx states `nx run-many -t <task> -p {components}`; turbo `turbo run <task>
+  --filter={component} --summarize`; Rush `rush lint --only {component}`,
+  `rush test --only {component}` and `rush build --to {component}`; Pants
+  `pants <goal> {component}:`; Bazel `bazel test` or `bazel build` over
+  `//{component}:all`.
+- A batch step may name `{batch}`, a directory the core creates empty for
+  each command and removes once every project read its reports: Bazel writes
+  its build-event file there. A batch may state its own `reportSteps`, which
+  run once per project after the command, whatever its outcome, with that
+  project's `{component}` and `{output}`, `{root}`, `{runtime}` and
+  `{batch}`: Bazel collects each package's JUnit and coverage there. A task
+  with report steps batches only when its batch states its own.
 - The manifest declares such a task `batchable`, with the stack id as its
   tool, and keeps its cache off. The conformance kit holds the manifest to the
   profile: a task is batchable exactly when its profile task states
@@ -57,8 +69,10 @@ delegated task has its cache off.
   resolved toolchain: for each, it runs the toolchain check once, takes the
   stack root's lock once, removes each component's reports and the tool's own
   report files the stack names, and runs the batch
-  steps at the root. It then answers one result per selected project id. The stack extension
-  reads the tool's report:
+  steps at the root. It then answers one result per selected project id. The
+  core hands the stack the command's report after every command, and counts
+  the outcomes only when the command failed: a stack may remove there a file
+  its command wrote. The stack extension reads the tool's report:
   - moon: the run report moon writes in `.moon/cache/runReport.json` during
     the command. A target moon reports `passed` or `cached` passes; a target
     it reports failed fails with moon's error and the end of the output moon
@@ -67,6 +81,35 @@ delegated task has its cache off.
     `> nx run <project>:<target>`, and the closing summary lists the failed
     targets. A failed target fails with its section; a target with a section
     and not listed passes.
+  - turbo: the run summary `--summarize` writes under `.turbo/runs`: the
+    newest one written since the command started whose command runs the same
+    tasks with the same filters, whatever their form. A task `<package>#<task>` whose execution exited 0
+    passes; one that exited otherwise, or carries an error, fails with
+    turbo's error. A task turbo stopped or never started is not listed. The
+    reader removes the summary it read.
+  - Rush: the summary Rush prints at the end of the command, one list per
+    status. An operation of the project, named `<project>` or `<project>
+    (<phase>)`, that Rush lists as succeeded, restored from cache, already up
+    to date or with no work passes; one listed as failed, or with warnings,
+    which fail the command, fails with the details Rush printed for it. A
+    project listed as blocked or aborted is not named.
+  - Pants: what `pants test --test-show-rerun-command` prints, one line per
+    test target, `<sigil> <address> succeeded|failed …`, then the command
+    that reruns every target whose test failed, those Pants prints no line
+    for included. A package the rerun command or a failed line names fails
+    with them; one whose own lines all succeeded passes. A line that stands
+    for a batch of files passes no package. An output with no rerun command,
+    or one that names a target of no package of the command, names no
+    package. `pants lint` and `pants package` report per tool, not per
+    package: their failure names no package.
+  - Bazel: the build-event file the command wrote in `{batch}`. A package's
+    targets are the labels `//<package>:<name>`. A package fails when one of
+    its tests ends other than passed or flaky, or one of its targets failed or
+    was aborted, with Bazel's status and the end of the test's log; it passes
+    when one of its targets completed, none failed and, for `bazel test`, each
+    of its test targets has a summary that passed. A failure of a label of no
+    selected package, as a test a suite of another package runs, and a file
+    Bazel did not finish, with no last message, name no package.
   - A target the report does not name, when the command fails, fails as not
     run, naming the targets that failed. A command that fails and whose
     report names no failed target fails every project with the step's
@@ -74,7 +117,20 @@ delegated task has its cache off.
     passes every project.
 - Each project then reads its own JUnit and coverage reports into its own
   output directory, as one process per task reads them, and its result
-  records `delegatedTo`.
+  records `delegatedTo`. A report file that several projects' patterns
+  match, as Pants's `dist/test/reports`, is read by the project the stack
+  names as its owner: Pants names each JUnit file after the address of its
+  test target, as `Address.path_safe_spec` writes it, such as
+  `src.a.x_test.py.tests.xml` for `src/a/x_test.py:tests` and
+  `src.a.sub.x_test.py@tests.xml` for `src/a/sub/x_test.py:../tests`, a file
+  of a nested directory that the target of `src/a` holds; a generated name
+  follows after `@` and parameters after `@@`. The Pants stack
+  owns a file by the address of the command's output whose name it carries,
+  from a table it builds once per command,
+  so a nested package never reads its parent's report; a name no address
+  matches goes to the one package that prefixes it. A file the stack names
+  no owner of, as one coverage file of the whole command, is read by every
+  project, which counts the sources it owns.
 - A verb stops as a whole. Within one command, the tool decides whether it
   runs the targets left after a failure. Putnami's fail-fast acts between
   commands: a failed project fails the verb's command, and the run stops the
@@ -130,5 +186,17 @@ delegated task has its cache off.
 - A workspace synced before this change fails `putnami validate` with the
   stack's stale-sync diagnostic until `putnami projects sync` writes the batch
   beside the steps it wrote.
-- turbo, rush, pants and bazel keep one process per task until their profiles
-  state `batch.steps`.
+- A failed `pants lint` or `pants package` fails every package of its
+  command: Pants's output does not say which package failed.
+- Pants names the JUnit report of a pytest batch, the targets one
+  `batch_compatibility_tag` groups, `batch-of-<address>+<n>-files.xml`: no
+  package owns it, so every package of the command reads its cases. When a
+  batch spans packages, their test counts include each other's cases, and a
+  failed case fails each of them.
+- Bazel's report step reads the whole build-event file once per package.
+- A Rush project with warnings fails when the command failed, even under a policy that
+  allows warnings: the summary does not say whether they failed it.
+- turbo writes a run summary under `.turbo/runs` for each command, and the
+  reader removes it; `--summarize` needs turbo 1.9 or later.
+- Bazel's build-event file of a batch lives in a directory the core removes:
+  the file of a task that runs alone stays in its output directory.

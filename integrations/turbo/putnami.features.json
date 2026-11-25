@@ -121,6 +121,21 @@
           }
         },
         {
+          "id": "a-delegated-verb-runs-one-turbo-command",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-verb-runs-one-turbo-run-over-its-packages",
+              "a-failing-package-fails-alone-with-turbos-error",
+              "a-package-turbo-did-not-run-fails-as-not-run"
+            ]
+          }
+        },
+        {
           "id": "reports-from-the-package-options",
           "stage": "coded",
           "evidenceKinds": [

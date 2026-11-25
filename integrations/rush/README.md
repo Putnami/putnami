@@ -4,7 +4,8 @@
 
 - **Delegate**: each Rush project is a Putnami project whose tasks run
   `rush build --to <package>` or `rush test|lint --only <package>` at the
-  workspace root, and Rush keeps its build cache. It is a delegated stack extension on
+  workspace root, the projects of one verb as one command, each result read
+  from Rush's summary, and Rush keeps its build cache. It is a delegated stack extension on
   [`tooling/stacks`](../../tooling/stacks/doc/01-design.md#delegated-stacks).
 - **Import**: each Rush project becomes a `@putnami/typescript` project with
   its edges, which Putnami installs and caches. A `build`, `test` or `lint`

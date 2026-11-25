@@ -110,6 +110,23 @@ in the task's output. The copy of a `coverage.dat` keeps the records of the
 package's own sources: a package it depends on is a project of its own, with
 its own coverage.
 
+The packages of one verb run as one command
+(ADR 0019 of `tooling/stacks`): `putnami test` over `api` and `pricing` runs
+one `bazel test --instrumentation_filter=^// --build_event_json_file=<dir>/build-events.json //api:all //pricing:all`,
+and `putnami build` one `bazel build` with the same filter and its own
+build-event file, in a directory Putnami removes afterwards. After the
+command, whatever its outcome, each package collects the reports of its own
+test runs from that file. When the command fails, each package's result is
+read from the file: a package fails when one of its tests ends other than
+passed or flaky, with Bazel's status and the end of the test's log, or one of
+its targets failed to build or was aborted; it passes when one of its targets
+completed, none failed and, for `bazel test`, each of its test targets has a
+summary that passed. Any other package, as one Bazel stopped before, fails as
+not run, and so does every package of a file Bazel did not finish. A failure of a target
+of no package of the command, such as a test a `test_suite` of another
+package runs, fails every package. A task that runs alone, such as a retry,
+runs the command of the table.
+
 ### Coverage is opt-in
 
 `bazel test` collects no coverage, and `bazel coverage` can fail where

@@ -135,6 +135,10 @@ type runInput struct {
 	outputRoot string
 	// stdout receives the steps' output.
 	stdout io.Writer
+	// ownsReport, when set, reports whether a report file a pattern outside
+	// {output}/ matches is this component's: a batch's components share the
+	// files their patterns match.
+	ownsReport func(abs string) bool
 }
 
 // reporter receives a run's diagnostics; jsonl.Emitter is one.
@@ -835,6 +839,9 @@ func (s Stack) readTaskReports(in runInput, meta Metadata, profile Profile, t Ta
 		}
 		var out []string
 		for _, m := range matches {
+			if in.ownsReport != nil && !in.ownsReport(m) {
+				continue
+			}
 			copied++
 			dst := filepath.Join(outDir, "reports", fmt.Sprintf("%02d-%s", copied, filepath.Base(m)))
 			if err := copyFile(m, dst); err != nil {

@@ -77,6 +77,21 @@
           }
         },
         {
+          "id": "a-delegated-verb-runs-one-rush-command",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-verb-runs-one-rush-command-over-its-projects",
+              "a-failing-project-fails-alone-with-rushs-details",
+              "a-project-rush-blocked-fails-as-not-run"
+            ]
+          }
+        },
+        {
           "id": "reports-come-from-the-project-options",
           "stage": "coded",
           "evidenceKinds": [

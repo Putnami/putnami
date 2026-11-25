@@ -1,0 +1,52 @@
+{
+  "version": "1",
+  "turboVersion": "2.11.13",
+  "execution": {
+    "command": "turbo run test --filter=a --filter=b --filter=c",
+    "success": 0,
+    "failed": 1,
+    "attempted": 3,
+    "exitCode": 1
+  },
+  "tasks": [
+    {
+      "taskId": "b#build",
+      "task": "build",
+      "package": "b",
+      "logFile": "packages/b/.turbo/turbo-build.log",
+      "directory": "packages/b",
+      "execution": {
+        "startTime": 1795565073617,
+        "endTime": 1795565073618,
+        "exitCode": 0
+      },
+      "cache": {
+        "local": true,
+        "remote": false,
+        "status": "HIT",
+        "source": "LOCAL",
+        "timeSaved": 84,
+        "dirtyHash": "079651d8df3e696f806d82fb2c8ccd9d63b68a7d67c58719477e6d7e033dc9d7"
+      }
+    },
+    {
+      "taskId": "b#test",
+      "task": "test",
+      "package": "b",
+      "logFile": "packages/b/.turbo/turbo-test.log",
+      "directory": "packages/b",
+      "execution": {
+        "startTime": 1795565073618,
+        "endTime": 1795565074709,
+        "error": "command (/repo/packages/b) /opt/node22/bin/npm run test exited (1)",
+        "exitCode": 1
+      },
+      "cache": {
+        "local": false,
+        "remote": false,
+        "status": "MISS",
+        "timeSaved": 0
+      }
+    }
+  ]
+}

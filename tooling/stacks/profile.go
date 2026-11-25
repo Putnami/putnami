@@ -206,12 +206,23 @@ type Batch struct {
 	// Steps are the argument vectors run at the stack root. An argument that
 	// holds {component} is repeated once per component, in the order of the
 	// selection; {components} is the components joined with commas; {root}
-	// is the stack root.
+	// is the stack root; {batch} is a directory the core creates empty for
+	// the command.
 	Steps [][]string `json:"steps"`
+	// ReportSteps run once per component after the steps, whatever their
+	// outcome, with that component's {component} and {output}, and {root},
+	// {runtime} and {batch}: they write the component's reports from what the
+	// command left in {batch}. A task with report steps batches only when its
+	// batch states its own.
+	ReportSteps [][]string `json:"reportSteps,omitempty"`
 }
 
 // BatchPlaceholder is the components of a batch, joined with commas.
 const BatchPlaceholder = "{components}"
+
+// BatchDirPlaceholder is a directory the core creates empty for one batch
+// command and removes once every component read its reports.
+const BatchDirPlaceholder = "{batch}"
 
 // Target is one target of a task, or one per file a pattern matches.
 type Target struct {
@@ -546,8 +557,9 @@ func (t Task) validate(sets map[string][]string) error {
 }
 
 // validateBatch checks a task's batch: a delegated task's, run at the stack
-// root, and a plain command with no artifact, target, coverage fallback or
-// report step, which read one component at a time.
+// root, and a plain command with no artifact, target or coverage fallback,
+// which read one component at a time, and with report steps of its own when
+// the task has some.
 func (t Task) validateBatch(delegated bool) error {
 	b := t.Batch
 	if b == nil {
@@ -558,8 +570,10 @@ func (t Task) validateBatch(delegated bool) error {
 		return errors.New("steps: only a delegated profile runs a task over several components")
 	case t.Dir != DirRoot:
 		return errors.New("steps: a batch runs at the stack root: set the task's dir to root")
-	case len(t.Artifacts) > 0, len(t.Targets) > 0, t.WithoutCoverage != nil, len(t.ReportSteps) > 0:
-		return errors.New("steps: a task with artifacts, targets, withoutCoverage or reportSteps runs one component at a time")
+	case len(t.Artifacts) > 0, len(t.Targets) > 0, t.WithoutCoverage != nil:
+		return errors.New("steps: a task with artifacts, targets or withoutCoverage runs one component at a time")
+	case len(t.ReportSteps) > 0 && len(b.ReportSteps) == 0:
+		return errors.New("reportSteps: a task with report steps batches only when its batch states its own")
 	}
 	if len(b.Steps) == 0 {
 		return errors.New("steps: a batch runs at least one step")
@@ -574,15 +588,29 @@ func (t Task) validateBatch(delegated bool) error {
 				switch ph {
 				case "{component}", BatchPlaceholder:
 					names = true
-				case "{root}":
+				case "{root}", BatchDirPlaceholder:
 				default:
-					return fmt.Errorf("steps[%d]: %s is no batch placeholder; use {root}, {component} or %s", i, ph, BatchPlaceholder)
+					return fmt.Errorf("steps[%d]: %s is no batch placeholder; use {root}, {component}, %s or %s", i, ph, BatchPlaceholder, BatchDirPlaceholder)
 				}
 			}
 		}
 	}
 	if !names {
 		return fmt.Errorf("steps: no step names {component} or %s", BatchPlaceholder)
+	}
+	for i, step := range b.ReportSteps {
+		if len(step) == 0 || step[0] == "" {
+			return fmt.Errorf("reportSteps[%d]: a step names a program", i)
+		}
+		for _, arg := range step {
+			for _, ph := range placeholderExpr.FindAllString(arg, -1) {
+				switch ph {
+				case "{root}", "{component}", "{output}", "{runtime}", BatchDirPlaceholder:
+				default:
+					return fmt.Errorf("reportSteps[%d]: %s is no batch report placeholder; use {root}, {component}, {output}, {runtime} or %s", i, ph, BatchDirPlaceholder)
+				}
+			}
+		}
 	}
 	return nil
 }

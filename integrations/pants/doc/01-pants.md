@@ -105,9 +105,30 @@ The list form `["xml"]` replaces the `[coverage-py] report` list of
 The test task then reads the JUnit reports under `dist/test/reports/` and the
 Cobertura report `dist/coverage/python/coverage.xml` into the test and
 coverage summary. Those reports are removed before the command runs, and the
-packages of one repository run one task at a time, so a package never reads
-another's report. A failed case, a command that exits non-zero, or a missing
-report fails the task.
+packages of one repository run one command at a time, so a package never
+reads a report of an earlier run. A failed case, a command that exits
+non-zero, or a missing report fails the task.
+
+The packages of one verb run as one command
+(ADR 0019 of `tooling/stacks`): `putnami test` over `src/python/pricing` and
+`src/python/web` runs one `pants … test src/python/pricing: src/python/web:`.
+Each package reads the JUnit reports Pants names after the addresses of its
+own test targets, such as `src.python.pricing.pricing_test.py.tests.xml` for
+`src/python/pricing/pricing_test.py:tests`, or
+`src.python.pricing.sub.x_test.py@tests.xml` for a file of a subdirectory
+that the target of `src/python/pricing` holds, even when that subdirectory is
+a package of its own; and the coverage of its own sources. When `pants test` fails, each package's result is read
+from what Pants prints: the batch command adds `--test-show-rerun-command`, so
+Pants ends with the command that reruns every target whose test failed. A
+package that command or a failed line names fails, one whose own result lines
+all succeeded passes, and one with neither fails as not run; an output with no
+rerun command fails every package. A pytest batch, which a
+`batch_compatibility_tag` groups, writes one JUnit report that no package
+owns: every package of the command reads it, so a batch across packages
+counts its cases in each, and a failed case fails each. `pants lint` and `pants package` report per tool,
+not per package: when one fails, every package of the command fails with its
+error. A task that runs alone, such as a retry, runs the command of the
+table.
 
 The shipped test command reads Python coverage. A repository without the
 Python backend overrides the test steps and states `"coverage": []` in each

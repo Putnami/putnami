@@ -147,14 +147,16 @@ func stubPants(t *testing.T, demo map[string]map[string]string) string {
 set -e
 echo "$(pwd) pants $*" >> '`+log+`'
 case "$1" in --version) echo 2.25.0; exit 0;; esac
-for a in "$@"; do last="$a"; done
 case " $* " in
   *" list :: "*) cat '`+ci+`/addresses.txt';;
   *" peek "*) cat '`+ci+`/pants-graph.json';;
   *" test "*)
-    prefix="$(echo "${last%:}" | tr / .)."
     mkdir -p dist/test/reports dist/coverage/python
-    for f in '`+ci+`'/dist/test/reports/"$prefix"*; do [ -e "$f" ] && cp "$f" dist/test/reports/; done
+    for a in "$@"; do
+      case "$a" in *:) ;; *) continue;; esac
+      prefix="$(echo "${a%:}" | tr / .)."
+      for f in '`+ci+`'/dist/test/reports/"$prefix"*; do [ -e "$f" ] && cp "$f" dist/test/reports/; done
+    done
     cp '`+ci+`/dist/coverage/python/coverage.xml' dist/coverage/python/coverage.xml;;
 esac
 `)
@@ -189,7 +191,9 @@ func pantsTests(t *testing.T, root, base, log string) ([]string, string) {
 		if real, _ := filepath.EvalSymlinks(dir); real != rootReal {
 			t.Errorf("pants test ran in %s, want the workspace root", dir)
 		}
-		tested = append(tested, call[strings.LastIndex(call, " ")+1:])
+		// One command over the verb's packages (stacks ADR 0019).
+		_, packages, _ := strings.Cut(call, " test ")
+		tested = append(tested, strings.Fields(packages)...)
 	}
 	slices.Sort(tested)
 	// Every task of the run is uncached: no lookup, so no hit and no miss,
@@ -250,6 +254,9 @@ func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T
 	tested, out := pantsTests(t, root, base, log)
 	if want := []string{"src/python/api:", "src/python/pricing:"}; !slices.Equal(tested, want) {
 		t.Errorf("pants test ran on %v, want %v: the changed package and its dependent\n%s", tested, want, out)
+	}
+	if logged, _ := os.ReadFile(log); strings.Count(string(logged), " test ") != 1 {
+		t.Errorf("the test verb ran %q, want one pants test over both packages", logged)
 	}
 	if strings.Contains(out, "src/python/web test~test") {
 		t.Errorf("web, which nothing in the change reaches, ran:\n%s", out)

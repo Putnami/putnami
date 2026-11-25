@@ -48,6 +48,19 @@
           }
         },
         {
+          "id": "a-delegated-verb-runs-one-pants-command",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-verb-runs-one-pants-goal-over-its-packages",
+              "a-failing-test-target-fails-its-package-alone",
+              "a-package-pants-did-not-report-fails-as-not-run"
+            ]
+          }
+        },
+        {
           "id": "reports-become-the-summary",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

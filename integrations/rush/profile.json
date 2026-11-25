@@ -18,6 +18,11 @@
       "steps": [
         ["rush", "lint", "--only", "{component}"]
       ],
+      "batch": {
+        "steps": [
+          ["rush", "lint", "--only={component}"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     },
@@ -25,6 +30,11 @@
       "steps": [
         ["rush", "test", "--only", "{component}"]
       ],
+      "batch": {
+        "steps": [
+          ["rush", "test", "--only={component}"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     },
@@ -32,6 +42,11 @@
       "steps": [
         ["rush", "build", "--to", "{component}"]
       ],
+      "batch": {
+        "steps": [
+          ["rush", "build", "--to={component}"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     }

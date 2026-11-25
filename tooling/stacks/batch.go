@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,13 +33,20 @@ type BatchReport struct {
 	Root string
 	// Components are the components the command ran, in its order.
 	Components []string
-	// Command is the step that failed, as it ran: the targets it names.
+	// Failed is true when a step failed: only then does the core count the
+	// outcomes ReadBatch answers.
+	Failed bool
+	// Command is the step that failed, else the last step, as it ran: the
+	// targets it names.
 	Command []string
-	// Started is when the failed step started. The files the stack names in
+	// Started is when that step started. The files the stack names in
 	// BatchReports were removed just before it.
 	Started time.Time
-	// Output is the failed step's output, its tail when it is long.
+	// Output is that step's output, its tail when it is long.
 	Output []byte
+	// Dir is the {batch} directory of the command, removed once every
+	// component read its reports.
+	Dir string
 }
 
 // BatchOutcome is one component's result as the tool's report states it.
@@ -328,6 +336,23 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 		return
 	}
 	defer func() { _ = lock.Release() }()
+	batchDir, err := os.MkdirTemp("", "putnami-"+first.profile.ID+"-batch-")
+	if err != nil {
+		failAll("%v", err)
+		return
+	}
+	defer func() { _ = os.RemoveAll(batchDir) }()
+	vars := map[string]string{"{root}": rootAbs, BatchDirPlaceholder: batchDir}
+	if slices.ContainsFunc(first.task.Batch.ReportSteps, func(step []string) bool {
+		return slices.ContainsFunc(step, func(a string) bool { return strings.Contains(a, "{runtime}") })
+	}) {
+		runtime, err := s.runtimePath()
+		if err != nil {
+			failAll("%v", err)
+			return
+		}
+		vars["{runtime}"] = runtime
+	}
 
 	components := make([]string, len(members))
 	for i, m := range members {
@@ -341,7 +366,8 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 	var output *tailBuffer
 	var started time.Time
 	var stepErr error
-	var failedArgv []string
+	// lastArgv is the step that failed, else the last one that ran.
+	var lastArgv []string
 	// later is true when a step failed before the last one: the steps after
 	// it ran on no component.
 	later := false
@@ -350,7 +376,7 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 		for k, m := range members {
 			perMember[k] = m.task.Batch.Steps[i]
 		}
-		argv := expandBatchStep(perMember, rootAbs, components)
+		argv := expandBatchStep(perMember, vars, components)
 		if s.Step != nil {
 			adapted, err := s.Step(ctx, task, first.meta, stepRoot, argv, emit.Info)
 			if err != nil {
@@ -367,7 +393,7 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 				return
 			}
 		}
-		output, started = &tailBuffer{limit: batchOutputLimit}, time.Now()
+		output, started, lastArgv = &tailBuffer{limit: batchOutputLimit}, time.Now(), argv
 		emit.Info("$ " + strings.Join(argv, " "))
 		cmd := exec.CommandContext(ctx, selected.ProgramIn(first.profile.Toolchain, argv[0], env), argv[1:]...) //nolint:gosec // the profile's own step
 		cmd.Dir = rootAbs
@@ -376,14 +402,17 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 		cmd.Stdout = writer
 		cmd.Stderr = writer
 		if err := procstat.Run(cmd); err != nil {
-			stepErr, failedArgv = err, argv
+			stepErr = err
 			later = i < len(first.task.Batch.Steps)-1
 			break
 		}
 	}
+	// The stack reads the report after every command, so it may remove a
+	// file the command wrote; its outcomes count only when a step failed.
+	report := BatchReport{Task: task, Root: rootAbs, Components: components, Failed: stepErr != nil, Command: lastArgv, Started: started, Output: output.Bytes(), Dir: batchDir}
 	outcomes := map[string]BatchOutcome{}
-	if stepErr != nil && s.ReadBatch != nil {
-		outcomes = s.ReadBatch(BatchReport{Task: task, Root: rootAbs, Components: components, Command: failedArgv, Started: started, Output: output.Bytes()})
+	if s.ReadBatch != nil {
+		outcomes = s.ReadBatch(report)
 	}
 	named := false
 	var failed []string
@@ -401,7 +430,11 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 	if len(failed) == 0 {
 		named = false
 	}
-	command := strings.Join(failedArgv, " ")
+	command := strings.Join(lastArgv, " ")
+	var ownerOf func(file string) (string, bool)
+	if s.BatchReportOwner != nil {
+		ownerOf = s.BatchReportOwner(report)
+	}
 	for _, m := range members {
 		var memberErr error
 		o, ok := outcomes[m.meta.Component]
@@ -421,9 +454,47 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 			// It passed the step that failed, and never ran the next ones.
 			memberErr = failWith(m.report, CodeStepFailed, "the steps after %s did not run %s: it failed on %s", command, m.meta.Component, strings.Join(failed, ", "))
 		}
+		memberErr = s.runBatchReportSteps(ctx, m, vars, selected, env, memberErr)
+		if ownerOf != nil {
+			component := m.meta.Component
+			m.in.ownsReport = func(abs string) bool {
+				rel, ok := relSlash(rootAbs, abs)
+				if !ok {
+					return true
+				}
+				owner, named := ownerOf(rel)
+				return !named || owner == component
+			}
+		}
 		status, data, _ := s.readTaskReports(m.in, m.meta, m.profile, m.task, rootAbs, m.outDir, memberErr, false, m.report)
 		m.finish(status, data)
 	}
+}
+
+// runBatchReportSteps runs the batch's report steps for one member, whatever
+// the command's outcome, and answers the member's error: its own, else the
+// first report step that failed.
+func (s Stack) runBatchReportSteps(ctx context.Context, m *batchMember, vars map[string]string, selected Selection, env []string, memberErr error) error {
+	own := maps.Clone(vars)
+	own["{component}"] = m.meta.Component
+	own["{output}"] = m.outDir
+	for _, step := range m.task.Batch.ReportSteps {
+		argv := expandStep(step, own)
+		m.report.Info("$ " + strings.Join(argv, " "))
+		cmd := exec.CommandContext(ctx, selected.ProgramIn(m.profile.Toolchain, argv[0], env), argv[1:]...) //nolint:gosec // the profile's own report step
+		cmd.Dir = m.in.projectAbs
+		cmd.Env = env
+		cmd.Stdout = os.Stderr
+		cmd.Stderr = os.Stderr
+		if err := procstat.Run(cmd); err != nil {
+			if memberErr == nil {
+				memberErr = failWith(m.report, CodeStepFailed, "%s: %v", strings.Join(argv, " "), err)
+			} else {
+				m.report.Info(fmt.Sprintf("%s: %v", strings.Join(argv, " "), err))
+			}
+		}
+	}
+	return memberErr
 }
 
 // delegated is the data of a delegated profile's failed result.
@@ -454,17 +525,18 @@ func batchShape(steps [][]string) string {
 // expandBatchStep answers one batch step over the components, from each
 // member's own version of the step (one shape): an argument that names
 // {component} once per component, from that component's own argument;
-// {components} the components joined with commas; {root} the stack root.
-func expandBatchStep(perMember [][]string, rootAbs string, components []string) []string {
+// {components} the components joined with commas; {root} and {batch} from
+// vars.
+func expandBatchStep(perMember [][]string, vars map[string]string, components []string) []string {
 	var argv []string
 	for j, arg := range perMember[0] {
 		if !strings.Contains(arg, "{component}") {
-			arg = strings.ReplaceAll(arg, "{root}", rootAbs)
+			arg = expand(arg, vars)
 			argv = append(argv, strings.ReplaceAll(arg, BatchPlaceholder, strings.Join(components, ",")))
 			continue
 		}
 		for k, c := range components {
-			own := strings.ReplaceAll(perMember[k][j], "{root}", rootAbs)
+			own := expand(perMember[k][j], vars)
 			argv = append(argv, strings.ReplaceAll(own, "{component}", c))
 		}
 	}

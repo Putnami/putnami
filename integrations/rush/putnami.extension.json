@@ -201,7 +201,7 @@
       }
     },
     "lint-run": {
-      "description": "Run rush lint --only <package> at the workspace root for one project, and for no project upstream of it, after the Rush version check, when command-line.json declares a lint command; the sync disables lint otherwise. Putnami's cache is off.",
+      "description": "Run rush lint --only <package> at the workspace root for one project, and for no project upstream of it, after the Rush version check, when command-line.json declares a lint command; the sync disables lint otherwise. The projects of one verb run as one rush lint --only <a> --only <b>, each result read from Rush's summary. Putnami's cache is off.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -236,6 +236,9 @@
       "cache": {
         "enabled": false
       },
+      "batchable": {
+        "tool": "rush"
+      },
       "declares": {
         "outputs": {
           "reports": {
@@ -253,7 +256,7 @@
       }
     },
     "test-run": {
-      "description": "Run rush test --only <package> at the workspace root for one project, and for no project upstream of it, after the Rush version check; then read the JUnit and coverage reports the project's options.@putnami/rush.tasks.test.reports name. A step that exits non-zero, or a failed case, fails the task; without reports the result is the exit code. Putnami's cache is off: Rush's build cache decides what reruns.",
+      "description": "Run rush test --only <package> at the workspace root for one project, and for no project upstream of it, after the Rush version check; then read the JUnit and coverage reports the project's options.@putnami/rush.tasks.test.reports name. A step that exits non-zero, or a failed case, fails the task; without reports the result is the exit code. The projects of one verb run as one rush test --only <a> --only <b>, each result read from Rush's summary. Putnami's cache is off: Rush's build cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -288,6 +291,9 @@
       "cache": {
         "enabled": false
       },
+      "batchable": {
+        "tool": "rush"
+      },
       "declares": {
         "outputs": {
           "reports": {
@@ -305,7 +311,7 @@
       }
     },
     "build-run": {
-      "description": "Run rush build --to <package> at the workspace root for one project, after the Rush version check. Putnami's cache is off: Rush's build cache decides what reruns.",
+      "description": "Run rush build --to <package> at the workspace root for one project, after the Rush version check. The projects of one verb run as one rush build --to <a> --to <b>, each result read from Rush's summary. Putnami's cache is off: Rush's build cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -339,6 +345,9 @@
       },
       "cache": {
         "enabled": false
+      },
+      "batchable": {
+        "tool": "rush"
       },
       "declares": {
         "outputs": {

@@ -78,7 +78,9 @@ where fifteen took 25.8 s.
 - A batched delegated task publishes no key, as before: the key of a task
   that waits for it folds the key that task would have, unchanged by the
   batch.
-- Rush keeps one process per task until its profile states the batch command.
+- turbo, Rush, Pants and Bazel run a delegated verb as one command too. A Rush
+  `test` that waits for the project's `build` still does: the projects'
+  `rush build --to=…` runs first, then one `rush test --only=…` over them.
 
 ## Rejected alternatives
 

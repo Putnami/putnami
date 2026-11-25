@@ -20,6 +20,14 @@
       "reportSteps": [
         ["{runtime}", "collect-reports", "--events", "{output}/build-events.json", "--root", "{root}", "--package", "{component}", "--into", "{output}/reports"]
       ],
+      "batch": {
+        "steps": [
+          ["bazel", "test", "--instrumentation_filter=^//", "--build_event_json_file={batch}/build-events.json", "//{component}:all"]
+        ],
+        "reportSteps": [
+          ["{runtime}", "collect-reports", "--events", "{batch}/build-events.json", "--root", "{root}", "--package", "{component}", "--runs-of-package", "--into", "{output}/reports"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root",
       "reports": {
@@ -31,6 +39,11 @@
       "steps": [
         ["bazel", "build", "--instrumentation_filter=^//", "//{component}:all"]
       ],
+      "batch": {
+        "steps": [
+          ["bazel", "build", "--instrumentation_filter=^//", "--build_event_json_file={batch}/build-events.json", "//{component}:all"]
+        ]
+      },
       "inputs": ["sources"],
       "dir": "root"
     }

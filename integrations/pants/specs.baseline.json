@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "monorepo/pants-delegated-stack#a-delegated-verb-runs-one-pants-command",
     "monorepo/pants-delegated-stack#manifest-follows-the-profile",
     "monorepo/pants-delegated-stack#packages-become-projects",
     "monorepo/pants-delegated-stack#reports-become-the-summary",

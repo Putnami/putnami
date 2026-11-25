@@ -45,6 +45,14 @@
       ]
     },
     {
+      "id": "a-delegated-verb-runs-one-pants-command",
+      "text": [
+        "Packages that run one delegated task together run one pants <goal> <a>: <b>: at the workspace root.",
+        "When pants test fails, a package whose targets the rerun command names fails, one whose own result lines all succeeded passes, and any other fails as not run.",
+        "Each package reads the JUnit reports named after its own addresses, and every package of the command the report of a pytest batch."
+      ]
+    },
+    {
       "id": "reports-become-the-summary",
       "text": [
         "After its steps, the test task reads the JUnit reports under dist/test/reports and the Cobertura report dist/coverage/python/coverage.xml, removed before the steps so another package's run is never read as this one's, into the test and coverage summary.",
@@ -60,6 +68,7 @@
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
-    "protocols/workspace/doc/adr/0007-a-delegated-build-graph-backs-its-edges.md"
+    "protocols/workspace/doc/adr/0007-a-delegated-build-graph-backs-its-edges.md",
+    "tooling/stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md"
   ]
 }

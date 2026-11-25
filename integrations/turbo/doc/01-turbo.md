@@ -201,6 +201,19 @@ and neither holds a `turbo`, the sync, and so `putnami init --from turbo`,
 warns with `stacks.toolchain_missing`. Turborepo's `dependsOn` runs the
 upstream tasks, such as `^build`, and its cache answers them.
 
+The packages of one verb run as one command
+(ADR 0019 of `tooling/stacks`):
+`putnami lint` over `@demo/api` and `@demo/pricing` runs
+`turbo run lint --filter=@demo/api --filter=@demo/pricing --summarize` once
+at the workspace root. When the command fails, each package's result is read
+from the run summary it wrote under `.turbo/runs`: a task of the package that
+exited 0 passes, and one that exited otherwise fails with turbo's error and
+the end of its log. A task turbo stopped or never started, such as one that
+waits for a failed task, is not in the summary and fails as not run; a summary
+that names no failure fails every package. The summary the command wrote is
+removed once read. `--summarize` needs turbo 1.9 or later. A task that runs
+alone, such as a retry, runs the command of the table.
+
 Every task sets `cache.enabled` to `false`: Putnami stores no entry and replays
 none, and each task result records `delegatedTo: turbo`. Impact selection is
 Putnami's, on the edges the sync wrote: `putnami test --impacted` runs

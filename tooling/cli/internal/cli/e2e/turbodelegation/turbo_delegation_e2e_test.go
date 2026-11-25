@@ -216,14 +216,21 @@ func turboTests(t *testing.T, root, base, log string) ([]string, string) {
 	var tested []string
 	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
 		dir, call, _ := strings.Cut(line, " turbo ")
-		pkg, ok := strings.CutPrefix(call, "run test --filter=")
+		args, ok := strings.CutPrefix(call, "run test ")
 		if !ok {
 			continue
 		}
 		if real, _ := filepath.EvalSymlinks(dir); real != rootReal {
 			t.Errorf("turbo run test ran in %s, want the workspace root", dir)
 		}
-		tested = append(tested, pkg)
+		// One command over the verb's packages (stacks ADR 0019).
+		for _, arg := range strings.Fields(args) {
+			if pkg, ok := strings.CutPrefix(arg, "--filter="); ok {
+				tested = append(tested, pkg)
+			} else if arg != "--summarize" {
+				t.Errorf("turbo run test ran with %q, want --filter=<package> and --summarize", arg)
+			}
+		}
 	}
 	slices.Sort(tested)
 	if !strings.Contains(out, "Cache: 0 local hit · 0 miss") {
@@ -283,6 +290,9 @@ func TestAChangeToOneTurboPackageRunsItAndItsDependentsThroughTurbo(t *testing.T
 	tested, out := turboTests(t, root, base, log)
 	if want := []string{"@demo/api", "@demo/pricing"}; !slices.Equal(tested, want) {
 		t.Errorf("turbo run test ran on %v, want %v: the changed package and its dependent\n%s", tested, want, out)
+	}
+	if logged, _ := os.ReadFile(log); strings.Count(string(logged), " run test ") != 1 {
+		t.Errorf("the test verb ran %q, want one turbo run over both packages", logged)
 	}
 
 	// A change to api runs api alone: pricing, its dependency, runs no turbo.
