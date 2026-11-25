@@ -30,6 +30,17 @@ type ChangeImpactOptions struct {
 	// project-level mapping: a changed file claims its project whole and a
 	// dependency edge reaches a dependent whole.
 	Tasks TaskImpactIndex
+
+	// UnchangedRuntimes names the in-workspace extension projects whose
+	// runtime, prepared from this tree, is byte for byte the one the diff's
+	// base prepares. Such an extension's runtime moved nothing its consumers
+	// execute, so its extension-consumer edge does not fire for a runtime
+	// input; the edge a confined manifest change fires still does. A seed is
+	// never cut off: a changed file of the extension project itself may be
+	// read at run time from the extension root, outside what it prepares.
+	// The caller proves each entry; an extension it could not compare is
+	// absent, and its edge fires as before.
+	UnchangedRuntimes map[string]bool
 }
 
 // TaskImpactIndex answers the task-level questions the change→project pass asks
@@ -271,6 +282,11 @@ type ImpactTrace struct {
 	// project resolution. The two spellings never collide: a project ID starts
 	// with "/" and a task scope never does.
 	Scopes map[string][]string
+	// RuntimeEdges are, sorted, the extension projects whose runtime fired an
+	// extension-consumer edge: the extensions whose consumers run their tasks
+	// because a runtime input moved. A caller that compares runtimes
+	// (ChangeImpactOptions.UnchangedRuntimes) needs to ask about these alone.
+	RuntimeEdges []string
 }
 
 // ScopeOf returns the tasks a task-scoped project is limited to, or nil for a
@@ -365,8 +381,8 @@ func TraceChangeImpact(ws *Workspace, changedFiles []string, opts ChangeImpactOp
 			directIDs = append(directIDs, p.ID)
 		}
 	}
-	affectedSet, edges, scopes := propagateImpact(ws, opts.Tasks, consumers, directIDs, seedScopes,
-		movedContracts(ws, changedFiles))
+	affectedSet, edges, scopes, runtimeEdges := propagateImpact(ws, opts.Tasks, consumers, directIDs, seedScopes,
+		movedContracts(ws, changedFiles), opts.UnchangedRuntimes)
 
 	result := make([]*Project, 0)
 	for _, p := range ws.Projects {
@@ -378,7 +394,7 @@ func TraceChangeImpact(ws *Workspace, changedFiles []string, opts ChangeImpactOp
 	return ImpactResult{
 		Projects:         result,
 		UnownedRootFiles: unownedRootFiles,
-		Trace:            ImpactTrace{Seeds: seeds, Edges: edges, Scopes: scopes},
+		Trace:            ImpactTrace{Seeds: seeds, Edges: edges, Scopes: scopes, RuntimeEdges: runtimeEdges},
 	}
 }
 
@@ -388,7 +404,10 @@ func TraceChangeImpact(ws *Workspace, changedFiles []string, opts ChangeImpactOp
 //
 // It is what `why_impacted` answers from. Sharing the one propagation with
 // `impacted`, rather than a second walk over the same edges, is what makes the
-// two tools agree on the reach AND on the scope by construction.
+// two tools agree on the reach AND on the scope by construction, except for
+// the extension-consumer edges a selection cuts off because a runtime is
+// unchanged (ChangeImpactOptions.UnchangedRuntimes): a reach has no diff to
+// compare runtimes against, so it keeps them.
 func ImpactReach(ws *Workspace, from string) ImpactResult {
 	return ImpactReachWithTasks(ws, from, nil)
 }
@@ -403,8 +422,8 @@ func ImpactReachWithTasks(ws *Workspace, from string, index TaskImpactIndex) Imp
 	if ws == nil || ws.ProjectByID(from) == nil {
 		return ImpactResult{}
 	}
-	affected, edges, scopes := propagateImpact(ws, index, extensionConsumerIndex(ws), []string{from}, nil,
-		contractMoves{every: true})
+	affected, edges, scopes, runtimeEdges := propagateImpact(ws, index, extensionConsumerIndex(ws), []string{from}, nil,
+		contractMoves{every: true}, nil)
 	result := make([]*Project, 0, len(affected))
 	for _, p := range ws.Projects {
 		if affected[p.ID] {
@@ -413,7 +432,7 @@ func ImpactReachWithTasks(ws *Workspace, from string, index TaskImpactIndex) Imp
 	}
 	return ImpactResult{
 		Projects: result,
-		Trace:    ImpactTrace{Seeds: map[string][]ImpactSeed{from: nil}, Edges: edges, Scopes: scopes},
+		Trace:    ImpactTrace{Seeds: map[string][]ImpactSeed{from: nil}, Edges: edges, Scopes: scopes, RuntimeEdges: runtimeEdges},
 	}
 }
 
@@ -868,7 +887,8 @@ func isExtensionManifestOf(p *Project, file string) bool {
 //
 // The second result names, for every non-seed project in the closure, the edge
 // that reached it; the third lists, for every task-scoped project, its sorted
-// tasks. The walk is a fixpoint over a queue seeded in ws.Projects order and
+// tasks; the fourth names the extensions whose runtime fired an
+// extension-consumer edge. The walk is a fixpoint over a queue seeded in ws.Projects order and
 // grown in graph order, and a scope only grows, so both are deterministic.
 func propagateImpact(
 	ws *Workspace,
@@ -877,17 +897,20 @@ func propagateImpact(
 	seedIDs []string,
 	seedScopes map[string]*impactScope,
 	moved contractMoves,
-) (map[string]bool, map[string]ImpactEdge, map[string][]string) {
+	unchangedRuntimes map[string]bool,
+) (map[string]bool, map[string]ImpactEdge, map[string][]string, []string) {
 	w := impactWalk{
-		ws:         ws,
-		index:      index,
-		consumers:  consumers,
-		moved:      moved,
-		seed:       make(map[string]bool, len(seedIDs)),
-		state:      make(map[string]*impactScope, len(seedIDs)),
-		edges:      make(map[string]ImpactEdge),
-		propagated: make(map[string]int),
-		queue:      append([]string(nil), seedIDs...),
+		ws:                ws,
+		index:             index,
+		consumers:         consumers,
+		moved:             moved,
+		unchangedRuntimes: unchangedRuntimes,
+		runtimeFired:      make(map[string]bool),
+		seed:              make(map[string]bool, len(seedIDs)),
+		state:             make(map[string]*impactScope, len(seedIDs)),
+		edges:             make(map[string]ImpactEdge),
+		propagated:        make(map[string]int),
+		queue:             append([]string(nil), seedIDs...),
 	}
 	for _, id := range seedIDs {
 		w.seed[id] = true
@@ -910,7 +933,7 @@ func propagateImpact(
 			scopes[id] = scope.scope()
 		}
 	}
-	return affected, w.edges, scopes
+	return affected, w.edges, scopes, sortedKeys(w.runtimeFired)
 }
 
 // impactWalk is propagateImpact's working state: the queue, the scopes and the
@@ -920,12 +943,18 @@ type impactWalk struct {
 	index     TaskImpactIndex
 	consumers map[string][]string
 	// moved gates the contract edge; propagateImpact states the rule.
-	moved      contractMoves
-	seed       map[string]bool
-	state      map[string]*impactScope
-	edges      map[string]ImpactEdge
-	propagated map[string]int
-	queue      []string
+	moved contractMoves
+	// unchangedRuntimes cuts off the runtime extension-consumer edge of the
+	// extensions ChangeImpactOptions.UnchangedRuntimes names.
+	unchangedRuntimes map[string]bool
+	// runtimeFired collects the extensions whose runtime fired an
+	// extension-consumer edge (ImpactTrace.RuntimeEdges).
+	runtimeFired map[string]bool
+	seed         map[string]bool
+	state        map[string]*impactScope
+	edges        map[string]ImpactEdge
+	propagated   map[string]int
+	queue        []string
 }
 
 func (w *impactWalk) run() {
@@ -993,7 +1022,8 @@ func (w *impactWalk) run() {
 // extension with neither moved nothing its consumers run.
 func (w *impactWalk) consumerEdgeFrom(extensionID string, scope *impactScope, carries bool) (ImpactEdge, []string, bool) {
 	edge := ImpactEdge{From: extensionID, Kind: ImpactEdgeExtensionConsumer}
-	if scope.full || w.runtimeCarries(scope, carries) {
+	if (scope.full || w.runtimeCarries(scope, carries)) && !w.runtimeUnchanged(extensionID) {
+		w.runtimeFired[extensionID] = true
 		if scope.cause != "" {
 			edge.Via, edge.Cause = scope.cause, ImpactCauseRuntimeInput
 		}
@@ -1008,6 +1038,14 @@ func (w *impactWalk) consumerEdgeFrom(extensionID string, scope *impactScope, ca
 	}
 	edge.Via, edge.Cause = scope.declaredBy, ImpactCauseTaskDeclaration
 	return edge, sortedKeys(scope.declared), true
+}
+
+// runtimeUnchanged reports whether the caller proved extensionID's prepared
+// runtime identical to the diff base's (ChangeImpactOptions.UnchangedRuntimes).
+// A seed is never unchanged: the extension project itself changed, and its root
+// holds files its tasks may read at run time beside what it prepares.
+func (w *impactWalk) runtimeUnchanged(extensionID string) bool {
+	return w.unchangedRuntimes[extensionID] && !w.seed[extensionID]
 }
 
 // runtimeCarries reports whether the tasks a claim or an edge gave a project,

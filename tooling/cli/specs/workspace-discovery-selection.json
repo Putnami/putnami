@@ -118,6 +118,7 @@
     "tooling/cli/doc/adr/0053-a-registry-pin-wins-over-a-same-name-project-manifest.md",
     "tooling/cli/doc/adr/0070-a-task-scope-keeps-a-job-by-its-declared-side-effects.md",
     "tooling/cli/doc/adr/0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md",
-    "tooling/cli/doc/adr/0087-a-fresh-worktree-restores-its-generated-clients.md"
+    "tooling/cli/doc/adr/0087-a-fresh-worktree-restores-its-generated-clients.md",
+    "tooling/cli/doc/adr/0103-an-unchanged-extension-runtime-reaches-no-consumer.md"
   ]
 }

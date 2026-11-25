@@ -156,6 +156,20 @@
           }
         },
         {
+          "id": "an-unchanged-runtime-fires-no-consumer-edge",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unchanged-runtime-reaches-no-consumer",
+              "a-changed-extension-is-never-cut-off"
+            ]
+          }
+        },
+        {
           "id": "a-checking-task-moves-no-extension-runtime",
           "stage": "coded",
           "evidenceKinds": [

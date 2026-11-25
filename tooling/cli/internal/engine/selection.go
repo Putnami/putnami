@@ -83,9 +83,26 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 		// (ADR 0044). A run that loaded none keeps the project-level mapping.
 		// The run's resolver answers the input selectors of the changed
 		// projects; a nil resolver's matcher selects every path.
+		// An extension whose runtime is byte for byte the one the diff's base
+		// prepares moved nothing its consumers run (ADR 0103): the selection
+		// compares the runtimes the first walk reached and walks again with the
+		// proof.
 		selection, err := workspace.ImpactedSelectionWithOptions(ws, req.Global.Baseline, workspace.ImpactedSelectionOptions{
 			Tasks:    workspace.NewTaskIndex(ws, extensions, req.inputResolver.Matcher()),
 			RunStart: req.runStart,
+			CompareRuntimes: func(candidates []string, diffBase string) []workspace.RuntimeComparison {
+				// A request a runner provider executes is frozen with this
+				// selection and runs on the runner's platform, where a runtime
+				// this machine proves unchanged may differ: no proof travels.
+				if req.runnerProvider != nil {
+					return nil
+				}
+				ctx := req.selectionCtx
+				if ctx == nil {
+					ctx = context.Background()
+				}
+				return scheduler.CompareExtensionRuntimes(ctx, ws, extensions, candidates, diffBase)
+			},
 		})
 		switch {
 		case err != nil && impactedFailureEndsRun(req, ws.Root, err):
@@ -123,7 +140,7 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 			req.selectionEvidence.taskScopes = selection.TaskScopes()
 			// The base line itself is a statement, not a diagnostic: only a
 			// fallback tier's warning joins the diagnostics.
-			notes := []string{selection.UnownedRootFilesExplanation(), selection.RunWrittenFilesExplanation()}
+			notes := []string{selection.UnownedRootFilesExplanation(), selection.RunWrittenFilesExplanation(), selection.RuntimeComparisonsExplanation()}
 			if selection.BaselineIsFallback() {
 				notes = append([]string{selection.BaselineExplanation()}, notes...)
 			}
@@ -145,6 +162,11 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 					iox.Fprintln(req.stdout(), note)
 				}
 				if note := selection.RunWrittenFilesExplanation(); note != "" {
+					iox.Fprintln(req.stdout(), note)
+				}
+				// A selection the runtime comparison shrank says so: each
+				// extension whose consumers it left out, and each it kept.
+				if note := selection.RuntimeComparisonsExplanation(); note != "" {
 					iox.Fprintln(req.stdout(), note)
 				}
 				// The other direction — a selection that is too LARGE — is
