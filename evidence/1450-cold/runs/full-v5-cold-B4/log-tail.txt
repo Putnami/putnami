@@ -1,0 +1,40 @@
+    error: specs validate failed with 1 spec diagnostic(s)
+  @putnami/contributor lint~docs cancel  52ms
+  @putnami/clientgen validate~features cancel  185ms
+  @putnami/clientgen validate~specs cancel  <1ms
+  go.putnami.dev/cloud/clients/agency-api test~test-env-teardown done  13ms
+  go.putnami.dev/cloud/clients/auth-server test~test-env-teardown done  13ms
+  go.putnami.dev/cloud/clients/cache-server test~test-env-teardown done  13ms
+  go.putnami.dev/cloud/clients/config-api test~test-env-teardown done  13ms
+  go.putnami.dev/cloud/clients/control-api test~test-env-teardown done  12ms
+  go.putnami.dev/cloud/clients/data-api test~test-env-teardown done  13ms
+  go.putnami.dev/cloud/clients/db-gateway test~test-env-teardown done  13ms
+  go.putnami.dev/cloud/clients/delivery-api test~test-env-teardown done  14ms
+  go.putnami.dev/cloud/clients/distribution-api test~test-env-teardown done  16ms
+  go.putnami.dev/cloud/clients/identity-api test~test-env-teardown done  13ms
+  go.putnami.dev/cloud/clients/observability-api test~test-env-teardown done  16ms
+  go.putnami.dev/cloud/clients/oci-server test~test-env-teardown done  17ms
+  go.putnami.dev/cloud/clients/put-server test~test-env-teardown done  16ms
+  go.putnami.dev/cloud/clients/runtime-api test~test-env-teardown done  15ms
+  go.putnami.dev/cloud/clients/source-api test~test-env-teardown done  13ms
+  go.putnami.dev/cloud/runtime test~test-env-teardown done  14ms
+  go.putnami.dev/client test~test-env-teardown done  15ms
+  go.putnami.dev/grpc test~test-env-teardown done  14ms
+  go.putnami.dev/openapi test~test-env-teardown done  14ms
+  go.putnami.dev/telemetry test~test-env-teardown done  13ms
+  telemetry.putnami.dev test~test-env-teardown done  15ms
+  @putnami/cloud-extension test~test-env-teardown skip  <1ms
+  putnami.dev test~test-env-teardown skip  <1ms
+  @putnami/windows-vet test~test-env-teardown skip  <1ms
+  go.putnami.dev/examples/ts-items-client test~test-env-teardown skip  <1ms
+
+  Failed:
+    /tooling/cli:validate~@putnami/sdd~specs
+
+  specs: 32 spec(s) for 32 authored feature(s), 1 publishable project(s) assessed
+  Hint: re-run with --output=jsonl for structured diagnostics and a complete session artifact.
+
+  1/2212 failed  1111 canceled  126 coalesced  289 skipped  42.4s
+
+putnami: session reporting incomplete: reporter refused events.jsonl chunk 0: reporter_not_configured; replay with putnami sessions replay --session 20261125-185133-47f91f
+putnami: expired unacknowledged reporting session 20261125-163549-8f2d30 (sessions.keep=20); replay is no longer available

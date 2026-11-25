@@ -1,0 +1,40 @@
+  go.putnami.dev/database lint~staticcheck done  98ms
+  go.putnami.dev/telemetry lint~staticcheck done  98ms
+  go.putnami.dev/app lint~staticcheck done  98ms
+  go.putnami.dev/api lint~staticcheck done  98ms
+  go.putnami.dev/client lint~staticcheck done  98ms
+  go.putnami.dev/grpc lint~staticcheck done  98ms
+  go.putnami.dev/openapi lint~staticcheck done  98ms
+  putnami validate-workspace~decisions done  188ms
+  putnami validate-workspace~recipes done  139ms
+  @putnami/cli-documents validate~specs done  323ms
+  @putnami/cli-documents lint~docs done  97ms
+  putnami validate-workspace~specs-ratchet done  369ms
+  @putnami/cli-documents validate~features done  253ms
+  go.putnami.dev/api build~infra done  23ms
+  putnami validate-workspace~breaking-marker done  19ms
+  putnami validate~rush-graph-check done  9ms
+  putnami validate-workspace~agent-attribution done  20ms
+  putnami validate-workspace~codeowners done  118ms
+  putnami validate~nx-graph-check done  9ms
+  putnami validate-workspace~feature-coverage-ratchet done  14ms
+  putnami validate~turbo-graph-check done  14ms
+  putnami validate~pants-graph-check done  9ms
+  putnami validate~bazel-graph-check done  8ms
+  putnami validate~moon-graph-check done  8ms
+  go.putnami.dev/app build~infra skip  35ms
+  go.putnami.dev/client build~infra skip  34ms
+  go.putnami.dev/grpc build~infra skip  14ms
+  go.putnami.dev/database build~infra skip  28ms
+  go.putnami.dev/openapi build~infra skip  19ms
+  go.putnami.dev/telemetry build~infra skip  20ms
+  @putnami/cli-documents build~infra skip  19ms
+  @putnami/cli-documents validate~api skip  17ms
+  putnami validate-workspace~verdict-policy done  85ms
+  putnami validate-workspace~architecture done  50ms
+putnami: spec verification: /go/framework/api: 6 requirement(s) of feature "go/api-contracts" have checks that NO observation source reported. A test can attest them from /go/framework/api itself, from a project it depends on, or from a direct dependent that implements its contract; none of the 28 project(s) that could have answered was consulted — --no-cache: no cached observation may be served: /cloud/extension, /go/framework/config, /go/framework/errors, /go/framework/http, /go/framework/inject, /go/framework/logger, /go/framework/migration, /go/framework/proto and 20 more. Unresolvable evidence is warned, never sanctioned, so this did not fail the run. To decide these requirements, run `putnami specs verify` to see which checks are unproven, then select /go/framework/api together with the project whose tests declare them — or re-run without --no-cache.
+
+  300 succeeded  74 coalesced  150 skipped  1.1m
+
+putnami: session reporting incomplete: reporter refused events.jsonl chunk 0: reporter_not_configured; replay with putnami sessions replay --session 20261125-194858-7b0aae
+putnami: expired unacknowledged reporting session 20261125-170114-f20267 (sessions.keep=20); replay is no longer available

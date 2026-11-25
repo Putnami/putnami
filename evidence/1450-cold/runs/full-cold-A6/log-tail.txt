@@ -1,0 +1,40 @@
+  @putnami/ui test~types done  3.2s
+  @putnami/analytics lint~format done  104ms
+  @putnami/ui lint~format done  104ms
+  @putnami/web lint~format done  104ms
+  @putnami/typescript-doc-examples test~types done  2.2s
+  @example/10-service-to-service test~generate done  332ms
+  go.putnami.dev/examples/ts-items-client test~generate done  1.0s
+  @putnami/windows-vet test~generate done  52ms
+  go.putnami.dev/examples/ts-items-client test~describe skip  39ms
+  @putnami/analytics lint~check done  1.2s
+  @putnami/ui lint~check done  1.2s
+  @putnami/web lint~check done  1.2s
+  go.putnami.dev/examples/ts-items-client test~test-env done  27ms
+  @putnami/windows-vet test~test-env done  31ms
+  @putnami/windows-vet test~test done  292ms
+  @putnami/windows-vet test~test-env-teardown done  55ms
+  @putnami/typescript-templates-proof test~generate done  288ms
+  putnami.dev test~generate done  13.4s
+  putnami.dev test~test-env done  139ms
+  go.putnami.dev/examples/ts-items-client test~test done  11.2s
+  go.putnami.dev/examples/ts-items-client test~test-env-teardown done  29ms
+  putnami.dev test~test done  6.8s
+  putnami.dev test~test-env-teardown done  31ms
+  putnami.dev test~types done  4.0s
+  putnami.dev lint~format done  228ms
+  @putnami/typescript-templates-proof test~types done  1.8s
+  @putnami/typescript-doc-examples test~test done  21.7s
+  @putnami/typescript-doc-examples lint~format done  162ms
+  putnami.dev lint~check done  3.2s
+  go.putnami.dev/examples/ts-items-client lint~golangci-lint done  3.3s
+  go.putnami.dev/examples/ts-items-client lint~staticcheck done  603ms
+  @putnami/typescript-doc-examples lint~check done  2.3s
+  @putnami/typescript-templates-proof test~test done  19.6s
+  @putnami/typescript-templates-proof lint~format done  41ms
+  @putnami/typescript-templates-proof lint~check done  1.3s
+
+  1551 succeeded  160 coalesced  501 skipped  8.7m
+
+putnami: session reporting incomplete: reporter refused events.jsonl chunk 0: reporter_not_configured; replay with putnami sessions replay --session 20261125-203126-d969bc
+putnami: expired unacknowledged reporting session 20261125-170635-7fa2da (sessions.keep=20); replay is no longer available

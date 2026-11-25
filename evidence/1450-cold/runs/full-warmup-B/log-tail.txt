@@ -1,0 +1,40 @@
+  putnami.dev test~generate done  14.0s
+  putnami.dev test~test-env done  118ms
+  putnami.dev test~test done  5.9s
+  putnami.dev test~test-env-teardown done  32ms
+  @putnami/cli lint~staticcheck-check-only done  45.5s
+  @putnami/typescript-doc-examples test~generate cached
+  @putnami/typescript-doc-examples test~test cached
+  @putnami/typescript-doc-examples test~types cached
+  @putnami/typescript-doc-examples lint~format cached
+  @putnami/typescript-doc-examples lint~check cached
+  @example/10-service-to-service test~generate cached
+  go.putnami.dev/examples/ts-items-client test~generate cached
+  @putnami/windows-vet test~generate cached
+  go.putnami.dev/examples/ts-items-client test~describe cached
+  @putnami/windows-vet test~test-env done  23ms
+  go.putnami.dev/examples/ts-items-client test~test-env done  21ms
+  @putnami/windows-vet test~test cached
+  @putnami/windows-vet test~test-env-teardown done  43ms
+  go.putnami.dev/examples/ts-items-client test~test cached
+  go.putnami.dev/examples/ts-items-client test~test-env-teardown done  47ms
+  go.putnami.dev/examples/ts-items-client lint~golangci-lint cached
+  go.putnami.dev/examples/ts-items-client lint~staticcheck cached
+  @putnami/typescript-templates-proof test~generate cached
+  @putnami/typescript-templates-proof test~test cached
+  @putnami/typescript-templates-proof test~types cached
+  @putnami/typescript-templates-proof lint~format cached
+  @putnami/typescript-templates-proof lint~check cached
+  putnami.dev test~types done  12.6s
+  putnami.dev lint~format cached
+  putnami.dev lint~check cached
+  @putnami/cli lint~golangci-lint-check-only done  1.5m
+  @putnami/cli test~test done  8.4m
+  @putnami/cli build~infra done  16ms
+
+  482 succeeded  1614 cached  2 coalesced  114 skipped  9.6m
+
+  Cache: 1614 local hit · 564 miss · served in 58s (keys 50s · bindings 6s · restore-verify 1s · spawned 190 processes)
+  Remote cache: 0 hit · 575 miss · saved 0ms · spent 609ms (setup 100ms · negotiate 509ms · restore 0ms · upload 0ms)
+putnami: session reporting incomplete: reporter refused events.jsonl chunk 0: reporter_not_configured; replay with putnami sessions replay --session 20261125-180006-ebd632
+putnami: expired unacknowledged reporting session 20261125-162313-444ea7 (sessions.keep=20); replay is no longer available

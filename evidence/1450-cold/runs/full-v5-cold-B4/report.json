@@ -1,0 +1,2480 @@
+{
+  "protocolVersion": 2,
+  "sessionId": "20261125-185133-47f91f",
+  "startTime": "2026-11-25T18:51:33.559023218Z",
+  "endTime": "2026-11-25T18:52:19.044047156Z",
+  "origin": "cli",
+  "enforceCoverage": true,
+  "git": {
+    "sha": "83d5a749c7ced0e13cfc3825ef67c73b35c63218",
+    "dirty": false
+  },
+  "run": {
+    "outcome": "failure",
+    "exitCode": 1,
+    "counts": {
+      "total": 2212,
+      "succeeded": 781,
+      "failed": 1,
+      "canceled": 1111,
+      "skipped": 319
+    },
+    "reuse": {
+      "localCache": 0,
+      "remoteCache": 0,
+      "coalesced": 126
+    },
+    "durationMs": 45485,
+    "cpu": {
+      "allocatedMillicores": 4000,
+      "allocatedSource": "logical-cpus",
+      "allocatedMs": 181940,
+      "actualMs": 84930,
+      "executions": 998
+    }
+  },
+  "commands": [
+    {
+      "command": "build",
+      "counts": {
+        "total": 669,
+        "succeeded": 191,
+        "failed": 0,
+        "canceled": 355,
+        "skipped": 123
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 0
+      },
+      "freshWallMs": 16248,
+      "cpuMs": 13498,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "command": "client-generate",
+      "counts": {
+        "total": 19,
+        "succeeded": 17,
+        "failed": 0,
+        "canceled": 2,
+        "skipped": 0
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 0
+      },
+      "freshWallMs": 2251,
+      "cpuMs": 1765,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "command": "lint",
+      "counts": {
+        "total": 447,
+        "succeeded": 114,
+        "failed": 0,
+        "canceled": 333,
+        "skipped": 0
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 0
+      },
+      "freshWallMs": 12693,
+      "cpuMs": 10292,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "command": "test",
+      "counts": {
+        "total": 508,
+        "succeeded": 119,
+        "failed": 0,
+        "canceled": 268,
+        "skipped": 121
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 126
+      },
+      "freshWallMs": 2447,
+      "cpuMs": 1561,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "command": "validate",
+      "counts": {
+        "total": 558,
+        "succeeded": 340,
+        "failed": 1,
+        "canceled": 142,
+        "skipped": 75
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 0
+      },
+      "freshWallMs": 63725,
+      "cpuMs": 56919,
+      "errors": 1,
+      "warnings": 1779
+    },
+    {
+      "command": "validate-workspace",
+      "counts": {
+        "total": 11,
+        "succeeded": 0,
+        "failed": 0,
+        "canceled": 11,
+        "skipped": 0
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 0
+      },
+      "freshWallMs": 0,
+      "errors": 0,
+      "warnings": 0
+    }
+  ],
+  "jobs": [
+    {
+      "key": "/tooling/cli:validate~@putnami/sdd~specs",
+      "project": "/tooling/cli",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "failed",
+      "reuse": "none",
+      "durationMs": 288,
+      "cpuMs": 280,
+      "diagnostics": [
+        {
+          "severity": "error",
+          "message": "requirement \"the-scheduler-admits-the-cpu-it-grants\" text must be non-blank, at most 512 bytes, without control characters",
+          "code": "features.invalid_requirement",
+          "file": "tooling/cli/specs/job-planning-execution.json#requirements[93].text"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/runner:validate~@putnami/sdd~specs",
+      "project": "/protocols/runner",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 357,
+      "cpuMs": 323,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/runner\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/runner"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/platform:validate~@putnami/sdd~specs",
+      "project": "/protocols/platform",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 333,
+      "cpuMs": 290,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/platform\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/platform"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/agentcontext:validate~@putnami/sdd~specs",
+      "project": "/protocols/agentcontext",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 332,
+      "cpuMs": 287,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/agentcontext\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/agentcontext"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/i18n:validate~@putnami/sdd~specs",
+      "project": "/protocols/i18n",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 329,
+      "cpuMs": 297,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/i18n\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/i18n"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/features:validate~@putnami/sdd~specs",
+      "project": "/protocols/features",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 317,
+      "cpuMs": 284,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/features\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/features"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/oci:validate~@putnami/sdd~specs",
+      "project": "/protocols/oci",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 315,
+      "cpuMs": 282,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/oci\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/oci"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/migration:validate~@putnami/sdd~specs",
+      "project": "/protocols/migration",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 313,
+      "cpuMs": 287,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/migration\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/migration"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/grpc-services:validate~@putnami/sdd~specs",
+      "project": "/protocols/grpc-services",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 312,
+      "cpuMs": 285,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/grpc-services\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/grpc-services"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/doctor:validate~@putnami/sdd~specs",
+      "project": "/protocols/doctor",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 311,
+      "cpuMs": 254,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/doctor\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/doctor"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/infra:validate~@putnami/sdd~specs",
+      "project": "/protocols/infra",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 309,
+      "cpuMs": 264,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/infra\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/infra"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/cache:validate~@putnami/sdd~specs",
+      "project": "/protocols/cache",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 308,
+      "cpuMs": 264,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/cache\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/cache"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/workspace:validate~@putnami/sdd~specs",
+      "project": "/protocols/workspace",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 307,
+      "cpuMs": 287,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/workspace\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/workspace"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/gomod:validate~@putnami/sdd~specs",
+      "project": "/protocols/gomod",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 304,
+      "cpuMs": 267,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/gomod\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/gomod"
+        }
+      ]
+    },
+    {
+      "key": "/tooling/cli:validate~@putnami/sdd~features",
+      "project": "/tooling/cli",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 302,
+      "cpuMs": 195,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"optin\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"extension-agent-content-integrity\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"superseded-owners-refused\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"legacy-pins-dropped\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"starter-agent-content-opt-in\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-written-on-explicit-lifecycle\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-ownership-by-command\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-exit-guard\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[16]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-async\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[17]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"user-scope-skills\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[18]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hook-relay\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[19]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"legacy-declarations-refused\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hook-relay-passthrough\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[20]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-user-files\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[21]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-user-files-kept\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[22]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"record-last\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[2]"
+        }
+      ],
+      "truncatedCount": 346
+    },
+    {
+      "key": "/protocols/keyring:validate~@putnami/sdd~specs",
+      "project": "/protocols/keyring",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 297,
+      "cpuMs": 253,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/keyring\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/keyring"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/evidence:validate~@putnami/sdd~specs",
+      "project": "/protocols/evidence",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 297,
+      "cpuMs": 256,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/evidence\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/evidence"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/extension:validate~@putnami/sdd~specs",
+      "project": "/protocols/extension",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 296,
+      "cpuMs": 255,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/extension\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/extension"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/http-routes:validate~@putnami/sdd~specs",
+      "project": "/protocols/http-routes",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 294,
+      "cpuMs": 271,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/http-routes\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/http-routes"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/ci:validate~@putnami/sdd~specs",
+      "project": "/protocols/ci",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 293,
+      "cpuMs": 260,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/ci\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/ci"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/architecture:validate~@putnami/sdd~specs",
+      "project": "/protocols/architecture",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 291,
+      "cpuMs": 280,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/architecture\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/architecture"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/telemetry:validate~@putnami/sdd~specs",
+      "project": "/protocols/telemetry",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 290,
+      "cpuMs": 235,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/telemetry\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/telemetry"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/runtime:validate~@putnami/sdd~specs",
+      "project": "/protocols/runtime",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 289,
+      "cpuMs": 278,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/runtime\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/runtime"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/transaction:validate~@putnami/sdd~specs",
+      "project": "/protocols/transaction",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 289,
+      "cpuMs": 271,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/transaction\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/transaction"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/database:validate~@putnami/sdd~specs",
+      "project": "/protocols/database",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 288,
+      "cpuMs": 250,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/database\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/database"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/sitecontent:validate~@putnami/sdd~specs",
+      "project": "/protocols/sitecontent",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 287,
+      "cpuMs": 265,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/sitecontent\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/sitecontent"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/config:validate~@putnami/sdd~specs",
+      "project": "/protocols/config",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 283,
+      "cpuMs": 248,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/config\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/config"
+        }
+      ]
+    },
+    {
+      "key": "/sites/telemetry.putnami.dev:validate~@putnami/sdd~features",
+      "project": "/sites/telemetry.putnami.dev",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 278,
+      "cpuMs": 222,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"ingest-is-anonymous\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/telemetry.putnami.dev/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"undeclared-requests-are-rejected\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/telemetry.putnami.dev/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"aggregate-read-fails-closed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/telemetry.putnami.dev/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"caller-address-is-not-retained\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/telemetry.putnami.dev/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"fields-are-allowlisted\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/telemetry.putnami.dev/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"acceptance-is-not-an-oracle\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/telemetry.putnami.dev/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"small-groups-are-withheld\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/telemetry.putnami.dev/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"exhausted-dimension-is-reported-unavailable\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/telemetry.putnami.dev/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-receiver-imports-only-what-it-declares\" has only stale supporting evidence",
+          "code": "features.stale_evidence",
+          "file": "sites/telemetry.putnami.dev/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"declared-surface-is-complete\" has only stale supporting evidence",
+          "code": "features.stale_evidence",
+          "file": "sites/telemetry.putnami.dev/putnami.features.json#features[0].requirements[9]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/storage:validate~@putnami/sdd~specs",
+      "project": "/protocols/storage",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 275,
+      "cpuMs": 253,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/storage\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/storage"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/capabilities:validate~@putnami/sdd~specs",
+      "project": "/protocols/capabilities",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 274,
+      "cpuMs": 237,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/capabilities\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/capabilities"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/qualify:validate~@putnami/sdd~specs",
+      "project": "/protocols/qualify",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 274,
+      "cpuMs": 269,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/qualify\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/qualify"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/codehost:validate~@putnami/sdd~specs",
+      "project": "/protocols/codehost",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 273,
+      "cpuMs": 270,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/codehost\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/codehost"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/registry:validate~@putnami/sdd~specs",
+      "project": "/protocols/registry",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 273,
+      "cpuMs": 257,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/registry\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/registry"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/analytics:validate~@putnami/sdd~specs",
+      "project": "/protocols/analytics",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 269,
+      "cpuMs": 260,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/analytics\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/analytics"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/distribution:validate~@putnami/sdd~specs",
+      "project": "/protocols/distribution",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 269,
+      "cpuMs": 252,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/distribution\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/distribution"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/job:validate~@putnami/sdd~specs",
+      "project": "/protocols/job",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 269,
+      "cpuMs": 246,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/job\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/job"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/support:validate~@putnami/sdd~specs",
+      "project": "/protocols/support",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 269,
+      "cpuMs": 252,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/support\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/support"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/identity:validate~@putnami/sdd~specs",
+      "project": "/protocols/identity",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 267,
+      "cpuMs": 254,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/identity\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/identity"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/screenshots:validate~@putnami/sdd~specs",
+      "project": "/protocols/screenshots",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 267,
+      "cpuMs": 264,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/screenshots\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/screenshots"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/contracts:validate~@putnami/sdd~specs",
+      "project": "/protocols/contracts",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 266,
+      "cpuMs": 257,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/contracts\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/contracts"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/template:validate~@putnami/sdd~specs",
+      "project": "/protocols/template",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 266,
+      "cpuMs": 260,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/template\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/template"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/cli:validate~@putnami/sdd~specs",
+      "project": "/protocols/cli",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 260,
+      "cpuMs": 245,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/cli\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/cli"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/clientcontract:validate~@putnami/sdd~specs",
+      "project": "/protocols/clientcontract",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 260,
+      "cpuMs": 234,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/clientcontract\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/clientcontract"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/diagnostic:validate~@putnami/sdd~specs",
+      "project": "/protocols/diagnostic",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 259,
+      "cpuMs": 241,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/diagnostic\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/diagnostic"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/collaboration:validate~@putnami/sdd~specs",
+      "project": "/protocols/collaboration",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 257,
+      "cpuMs": 251,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/collaboration\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/collaboration"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/runner:validate~@putnami/sdd~features",
+      "project": "/protocols/runner",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 256,
+      "cpuMs": 207,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"the-source-manifest-is-canonical\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-provider-envelope-is-strict\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-client-submits-only-to-a-compatible-provider\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"follow-replays-without-duplicates\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-session-bundle-is-closed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"importers-verify-and-are-idempotent\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"source-identity-is-the-content\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"source-paths-are-portable-and-bounded\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"symlinks-resolve-inside-the-snapshot\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"decoders-are-strict\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-v1-request-is-strict-and-canonical\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"input-digests-name-the-applicable-inputs\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"providers-and-publication-are-additive\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-v2-request-names-a-commit\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"versions-never-mix\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runner/putnami.features.json#features[0].requirements[9]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/events:validate~@putnami/sdd~specs",
+      "project": "/protocols/events",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 254,
+      "cpuMs": 254,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/events\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/events"
+        }
+      ]
+    },
+    {
+      "key": "/go/extension:validate~@putnami/sdd~features",
+      "project": "/go/extension",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 251,
+      "cpuMs": 185,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"archive-matrix-honesty\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"api-compatibility-marker\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"api-verdict-names-no-commit\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"cli-compatibility-marker\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"go-jobs-read-the-tree-from-their-context\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"managed-toolchain\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"member-event-per-publication\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"dry-run-registry-probe\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[16]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"managed-publication-packs-only\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[17]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"merged-config-survives-a-cache-hit\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[18]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"modfile-restoration\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[19]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"archive-agent-content\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"tidy-drift-visibility\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[20]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"offline-tidy-is-a-cacheable-no-op\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[21]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"proxy-dependent-tidy-is-reported-and-uncached\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[22]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-check-run-writes-no-source\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/extension/putnami.features.json#features[0].requirements[23]"
+        }
+      ],
+      "truncatedCount": 65
+    },
+    {
+      "key": "/protocols/put:validate~@putnami/sdd~specs",
+      "project": "/protocols/put",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 246,
+      "cpuMs": 231,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/put\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/put"
+        }
+      ]
+    },
+    {
+      "key": "/dotnet/extension:validate~@putnami/sdd~features",
+      "project": "/dotnet/extension",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 242,
+      "cpuMs": 188,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"projects-become-projects\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"runs-an-application-once\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"packages-an-application-image\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"publishes-an-application-image\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"restores-the-workspace\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"fetch-reads-the-credential-first\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"upgrades-the-packages\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"checks-documentation-links\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[16]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"filters-the-tests\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[17]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"tasks-run-the-profile\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"only-test-projects-test\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"reports-become-the-summary\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"sdk-roll-forward-is-honored\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"inputs-stay-narrow\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"manifest-follows-the-profile\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"applications-are-told-apart\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "dotnet/extension/putnami.features.json#features[0].requirements[7]"
+        }
+      ],
+      "truncatedCount": 2
+    },
+    {
+      "key": "/go/framework/telemetry:validate~@putnami/sdd~features",
+      "project": "/go/framework/telemetry",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 239,
+      "cpuMs": 193,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"bounded-shutdown\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"process-instance-identity\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"push-transport\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"service-identity\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"span-always-ends\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"trace-propagation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"generated-client-telemetry\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"export-directives\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[16]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"default-from-environment\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"duration-precision\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"endpoint-required\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"export-cadence\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"trace-budget\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"parent-policy\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"live-sampling-settings\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"lifecycle-purity\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/telemetry/putnami.features.json#features[0].requirements[8]"
+        }
+      ],
+      "truncatedCount": 1
+    },
+    {
+      "key": "/protocols/put:validate~@putnami/sdd~features",
+      "project": "/protocols/put",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 237,
+      "cpuMs": 196,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"the-version-bounds-and-paths-are-pinned\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-publish-stores-the-payload-at-its-digest\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-publisher-sends-its-bearer\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"each-kind-has-one-profile\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-wire-is-closed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-error-codes-are-closed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-fixture-corpus-is-the-contract\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-payload-is-canonical\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"blob-references-are-three-members\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"an-archive-lists-its-platforms\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"coordinates-and-versions-are-validated\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"an-answer-matches-its-request\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/put/putnami.features.json#features[0].requirements[9]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/oci:validate~@putnami/sdd~features",
+      "project": "/protocols/oci",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 237,
+      "cpuMs": 171,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"the-version-and-endpoints-are-pinned\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/oci/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-fast-path-is-taken-only-when-advertised\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/oci/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"one-call-tags-every-ref\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/oci/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-error-codes-are-closed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/oci/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-fixture-corpus-is-the-contract\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/oci/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-registry-host-rules-are-one-table\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/oci/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"consumers-read-the-host-by-the-rules\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/oci/putnami.features.json#features[0].requirements[6]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/template:validate~@putnami/sdd~features",
+      "project": "/protocols/template",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 236,
+      "cpuMs": 192,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"the-strict-parser-refuses-undeclared-members\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/template/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"name-and-description-are-required\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/template/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"every-fixture-gets-its-verdict\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/template/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-lenient-read-answers-identity\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/template/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"root-declarations-stay-out\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/template/putnami.features.json#features[0].requirements[4]"
+        }
+      ]
+    },
+    {
+      "key": "/go/framework/storage:validate~@putnami/sdd~features",
+      "project": "/go/framework/storage",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 235,
+      "cpuMs": 232,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"backend-contract\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/storage/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"constraints\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/storage/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"deadlines-and-streams\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/storage/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"isolation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/storage/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"signed-access\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/storage/putnami.features.json#features[0].requirements[4]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/gomod:validate~@putnami/sdd~features",
+      "project": "/protocols/gomod",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 231,
+      "cpuMs": 185,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"the-version-and-endpoints-are-pinned\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/gomod/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-field-names-are-the-servers\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/gomod/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-error-codes-are-closed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/gomod/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-fixture-corpus-is-the-contract\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/gomod/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-release-answers-the-requested-version\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/gomod/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-version-is-bound-to-the-stored-zip\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/gomod/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"publishing-releases-nothing\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/gomod/putnami.features.json#features[0].requirements[6]"
+        }
+      ]
+    },
+    {
+      "key": "/go/framework/grpc:validate~@putnami/sdd~features",
+      "project": "/go/framework/grpc",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 230,
+      "cpuMs": 212,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"api-bridge\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/grpc/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"bounded-drain\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/grpc/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"bridge-validation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/grpc/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"connect-protocol\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/grpc/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"gateway-mounting\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/grpc/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"interceptor-chain\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/grpc/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"reflection-opt-in\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/grpc/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"secure-defaults\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/grpc/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"service-inventory\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "go/framework/grpc/putnami.features.json#features[0].requirements[8]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/runtime:validate~@putnami/sdd~features",
+      "project": "/protocols/runtime",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 229,
+      "cpuMs": 192,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"the-versions-are-pinned\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-schemas-and-the-go-types-agree\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-fixture-corpus-holds-both-versions\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"this-module-owns-only-the-inner-event\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-extension-sdk-emits-a-conforming-stream\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-typescript-runtime-emits-and-validates-a-conforming-stream\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-cli-arms-on-typed-readiness\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"one-stream-one-negotiated-version\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"version-2-adds-only-ready\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"events-parse-and-validate-by-type\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-stream-ends-with-one-result\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-emitter-writes-lines-the-parser-reads\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"readiness-is-typed-and-canonical\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-workload-announces-readiness-in-a-log-line\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"result-payloads-are-typed-and-bounded\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-release-set-outcome-is-one-opaque-payload\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/runtime/putnami.features.json#features[0].requirements[9]"
+        }
+      ]
+    },
+    {
+      "key": "/python/extension:validate~@putnami/sdd~features",
+      "project": "/python/extension",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 229,
+      "cpuMs": 185,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"explicit-opt-in\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"publishes-an-application-image\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"experimental-boundary\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"workspace-scope\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"native-tools\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"pinned-uv\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-repository-uv-pin-is-kept\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"uv-answers-its-toolchain-pin\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"exact-uv-declaration\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"packages-an-application-image\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"image-installs-the-locked-wheels\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"image-ships-the-application-files\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[0].requirements[9]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"explicit-template\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[1].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"minimal-server-shape\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[1].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"experimental-disclosure\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[1].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"explicit-template\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "python/extension/putnami.features.json#features[2].requirements[0]"
+        }
+      ],
+      "truncatedCount": 2
+    },
+    {
+      "key": "/protocols/architecture:validate~@putnami/sdd~features",
+      "project": "/protocols/architecture",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 228,
+      "cpuMs": 192,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"single-interpretation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/architecture/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"distributed-authority\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/architecture/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"planned-is-not-observed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/architecture/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"exact-drift\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/architecture/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"ratchet\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/architecture/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"coverage\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/architecture/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"framework-evidence\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/architecture/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"contained-read-only-tooling\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/architecture/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"runtime-enforcement\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/architecture/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"authored-version-one-stays-valid\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/architecture/putnami.features.json#features[0].requirements[9]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/agentcontext:validate~@putnami/sdd~features",
+      "project": "/protocols/agentcontext",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 227,
+      "cpuMs": 190,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"pinned-versions\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/agentcontext/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"conformance-corpus\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/agentcontext/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"canonical-deterministic-bytes\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/agentcontext/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"strict-parse\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/agentcontext/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"publish-safety-fails-closed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/agentcontext/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"paths-are-workspace-relative-and-canonical\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/agentcontext/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"tests-section-and-diagnostic-taxonomy\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/agentcontext/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-producer-emits-a-valid-document-and-writes-nothing\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/agentcontext/putnami.features.json#features[0].requirements[7]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/support:validate~@putnami/sdd~features",
+      "project": "/protocols/support",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 226,
+      "cpuMs": 176,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"closed-vocabularies-and-exact-version\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/support/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"strict-canonical-catalog\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/support/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"validation-reports-independent-findings\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/support/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-documented-status-is-read-from-the-support-section\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/support/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"stable-only-consumers\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/support/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"promotion-ladder-is-documented\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/support/putnami.features.json#features[0].requirements[5]"
+        }
+      ]
+    },
+    {
+      "key": "/sites/putnami.dev:validate~@putnami/sdd~features",
+      "project": "/sites/putnami.dev",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 226,
+      "cpuMs": 179,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"what-the-site-records-is-what-the-notice-says\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"one-source-per-section\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"model-pages-are-not-surfaces\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"python-is-browseable-not-anchored\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"every-language-and-tool-is-published\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"documentation-sources-are-version-addressed-snapshots\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"no-generated-mirror-in-source\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"python-is-marked-experimental\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"route-inventory-is-complete\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"unmatched-paths-are-not-routed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"agent-surfaces-track-the-docs-tree\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"sparse-release-delivery-is-explicit\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"docs-enumeration-is-build-order-independent\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"system-model-is-published\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[9]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"catalog-is-the-only-source\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[2].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"closed-status-vocabulary\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[2].requirements[1]"
+        }
+      ],
+      "truncatedCount": 30
+    },
+    {
+      "key": "/protocols/analytics:validate~@putnami/sdd~features",
+      "project": "/protocols/analytics",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 224,
+      "cpuMs": 183,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"the-version-codes-and-bounds-are-pinned\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/analytics/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-vocabulary-is-closed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/analytics/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-batch-is-decoded-strictly-and-validated\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/analytics/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"lengths-are-utf-8-bytes\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/analytics/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"the-fixture-corpus-is-the-contract\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/analytics/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"bots-are-one-shared-list\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/analytics/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"classification-follows-the-shared-corpus\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "protocols/analytics/putnami.features.json#features[0].requirements[6]"
+        }
+      ]
+    }
+  ],
+  "elidedJobs": 2148,
+  "scheduler": {
+    "parallelism": 4,
+    "criticalPathMs": 3063
+  }
+}

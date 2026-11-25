@@ -1,0 +1,40 @@
+  @putnami/windows-vet test~test-env-teardown done  42ms
+  @putnami/web test~types done  2.9s
+  @putnami/ui test~generate done  163ms
+  @putnami/analytics test~test done  1.9s
+  @putnami/ui test~test done  395ms
+  @putnami/analytics test~types done  2.4s
+  @putnami/typescript-doc-examples test~generate done  281ms
+  @putnami/ui test~types done  2.5s
+  @putnami/web test~test done  7.0s
+  @putnami/analytics lint~format done  130ms
+  @putnami/ui lint~format done  130ms
+  @putnami/web lint~format done  130ms
+  @putnami/typescript-doc-examples test~types done  2.1s
+  @putnami/analytics lint~check done  1.1s
+  @putnami/ui lint~check done  1.1s
+  @putnami/web lint~check done  1.1s
+  @putnami/typescript-templates-proof test~generate done  268ms
+  putnami.dev test~generate done  12.5s
+  putnami.dev test~test-env done  108ms
+  go.putnami.dev/examples/ts-items-client test~test done  11.0s
+  go.putnami.dev/examples/ts-items-client test~test-env-teardown done  40ms
+  putnami.dev test~types done  3.4s
+  putnami.dev test~test done  5.8s
+  putnami.dev test~test-env-teardown done  36ms
+  @putnami/typescript-doc-examples test~test done  18.5s
+  @putnami/typescript-doc-examples lint~format done  106ms
+  putnami.dev lint~format done  206ms
+  @putnami/typescript-templates-proof test~types done  2.0s
+  @putnami/typescript-doc-examples lint~check done  3.1s
+  putnami.dev lint~check done  3.2s
+  go.putnami.dev/examples/ts-items-client lint~golangci-lint done  2.7s
+  go.putnami.dev/examples/ts-items-client lint~staticcheck done  606ms
+  @putnami/typescript-templates-proof test~test done  17.6s
+  @putnami/typescript-templates-proof lint~format done  36ms
+  @putnami/typescript-templates-proof lint~check done  1.2s
+
+  1551 succeeded  160 coalesced  501 skipped  8.5m
+
+putnami: session reporting incomplete: reporter refused events.jsonl chunk 0: reporter_not_configured; replay with putnami sessions replay --session 20261125-200844-82cd22
+putnami: expired unacknowledged reporting session 20261125-170259-f152a7 (sessions.keep=20); replay is no longer available
