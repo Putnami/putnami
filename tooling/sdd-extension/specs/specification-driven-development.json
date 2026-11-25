@@ -81,7 +81,7 @@
       "text": [
         "validate-workspace reads every putnami.verdict-policy.json with the ci protocol's strict parser: an unknown kind, value, key or maturity, a map by maturity without modeled, and a map on a key that concerns no feature fail with the protocol's code.",
         "A file that is not at the root, in a project or in a scope above a project fails with sdd.verdict_policy_location, an unreadable file fails closed, and no file is adoption.",
-        "The key names the file itself, putnami.workspace.json and every putnami.json."
+        "The key names the file, putnami.workspace.json, every putnami.json and the context's cut."
       ]
     },
     {

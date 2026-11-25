@@ -103,3 +103,27 @@ func TestTheWorktreeReadsTheCutFromTheContextWithoutGit(t *testing.T) {
 		t.Errorf("read a file outside the cut: %v, want it absent", err)
 	}
 }
+
+// The verdict policy step lists the policy files from the cut its context
+// carries, and starts no Git: a policy file the cut does not list is not read.
+func TestVerdictPolicyReadsTheCutFromTheContextWithoutGit(t *testing.T) {
+	root := decisionsWorkspace(t)
+	ws := verdictPolicyWorkspace(t, root)
+	writeVerdictPolicy(t, root, "go/lib", nestedVerdictPolicy)
+	writeVerdictPolicy(t, root, "ignored", `{"gaps":{"no-requirement":"ignore"}}`)
+	ws.Tree = &job.Tree{Directory: ".", CandidateDirectories: []string{"."}, CandidateFiles: []job.CandidateFile{
+		{Path: "go/lib/putnami.json", Mode: job.CandidateModeRegular},
+		{Path: "go/lib/putnami.verdict-policy.json", Mode: job.CandidateModeRegular},
+		{Path: "go/putnami.json", Mode: job.CandidateModeRegular},
+		{Path: "putnami.workspace.json", Mode: job.CandidateModeRegular},
+	}}
+	withoutGit(t)
+
+	report, err := BuildVerdictPolicyResult(ws)
+	if err != nil {
+		t.Fatalf("the cut holds one valid file, yet the task failed: %v (%+v)", err, report.Diagnostics)
+	}
+	if want := []string{"go/lib/putnami.verdict-policy.json"}; !reflect.DeepEqual(report.Policies, want) {
+		t.Fatalf("policies = %v, want %v", report.Policies, want)
+	}
+}

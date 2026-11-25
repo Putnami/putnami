@@ -403,8 +403,8 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				"a map by maturity that does not hold modeled, and a map on a key that concerns no feature fail with the protocol's code, naming the file and the member. " +
 				"A file sits at the root, in a project directory, or in a directory above a project whose putnami.json is a scope manifest; a file in any other directory fails with sdd.verdict_policy_location, " +
 				"and a file the task cannot read, such as a symbolic link, fails with sdd.verdict_policy_unreadable. A workspace without a policy file passes. " +
-				"Inside a Git work tree the task reads the candidate cut, so an ignored file is never read, and it never enters .gen, .git, .putnami, dist, node_modules, out or vendor. " +
-				"The key names the policy file itself, and the files that place the root, the scopes and the projects: putnami.workspace.json and every putnami.json.",
+				"Inside a Git work tree the task reads the candidate cut from its job context, so an ignored file is never read, and it never enters .gen, .git, .putnami, dist, node_modules, out or vendor. " +
+				"The key names the policy file itself, the files that place the root, the scopes and the projects: putnami.workspace.json and every putnami.json, and the cut's listing.",
 			Kind:      "command",
 			Command:   "{extensionRuntime}",
 			Args:      []string{"verdict-policy-validate"},
@@ -414,6 +414,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			// never a glob such as `**/*.json`. The layout port holds the files
 			// that place the root, the scopes and the projects.
 			Inputs: map[string]proto.TaskInputPort{
+				"candidateFiles": {From: "runtime"},
 				"policies": {From: "workspace", Files: []string{
 					"putnami.verdict-policy.json",
 					"**/putnami.verdict-policy.json",
@@ -944,7 +945,9 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 		"architecture-validate": {"declarations": "workspace", "evidence": "workspace", "policy": "workspace"},
 		// A policy file may sit in any scope or project directory, and the
 		// files that place the scopes and the projects belong to no project.
-		"verdict-policy-validate": {"policies": "workspace", "layout": "workspace"},
+		// The step lists the policy files from the candidate cut its context
+		// carries, so its key folds the cut's listing.
+		"verdict-policy-validate": {"policies": "workspace", "layout": "workspace", "candidateFiles": "runtime"},
 	}
 	for _, name := range sortedKeys(wantScopes) {
 		task := m.Tasks[name]
@@ -968,7 +971,7 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 			if declared.From != want {
 				t.Errorf("task %q port %q reads from %q, want %q", name, port, declared.From, want)
 			}
-			if len(declared.Files) == 0 {
+			if len(declared.Files) == 0 && want != "runtime" {
 				t.Errorf("task %q port %q declares no files; an empty port keys on nothing", name, port)
 			}
 		}
@@ -1042,8 +1045,9 @@ func TestTheCoverageRatchetIsNeverServedFromCache(t *testing.T) {
 
 // TestTheVerdictPolicyStepKeysOnTheFileItNames pins the key of
 // verdict-policy-validate: each pattern of its policies port names the policy
-// file itself, and its layout port names the files that place the root, the
-// scopes and the projects.
+// file itself, its layout port names the files that place the root, the
+// scopes and the projects, and it declares the candidate cut it lists the
+// policy files from, which its key folds and its context carries.
 func TestTheVerdictPolicyStepKeysOnTheFileItNames(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "verdict-policies-are-checked", "the-key-names-the-policy-file")
 	task, found := committedManifest(t).Tasks["verdict-policy-validate"]
@@ -1051,8 +1055,9 @@ func TestTheVerdictPolicyStepKeysOnTheFileItNames(t *testing.T) {
 		t.Fatal("the manifest declares no verdict-policy-validate task")
 	}
 	want := map[string]proto.TaskInputPort{
-		"policies": {From: "workspace", Files: []string{"putnami.verdict-policy.json", "**/putnami.verdict-policy.json", "!**/.gen/**"}},
-		"layout":   {From: "workspace", Files: []string{"putnami.workspace.json", "**/putnami.json", "!**/.gen/**"}},
+		"candidateFiles": {From: "runtime"},
+		"policies":       {From: "workspace", Files: []string{"putnami.verdict-policy.json", "**/putnami.verdict-policy.json", "!**/.gen/**"}},
+		"layout":         {From: "workspace", Files: []string{"putnami.workspace.json", "**/putnami.json", "!**/.gen/**"}},
 	}
 	if !reflect.DeepEqual(task.Inputs, want) {
 		t.Errorf("inputs = %+v, want %+v", task.Inputs, want)

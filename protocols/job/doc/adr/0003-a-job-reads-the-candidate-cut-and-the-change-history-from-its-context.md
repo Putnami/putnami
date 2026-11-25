@@ -137,8 +137,14 @@ baseline is the run's impacted baseline (`selection.baseline`).
   candidate added or removed, and also a change no byte shows, staging an
   untracked file, `git rm --cached` or a mode change in the index. No other
   task's key moves.
-- Still read through Git: sdd `verdict-policy-validate`, whose key holds only
-  the policy files it names; the clientgen guard's `check-ignore --no-index`,
+- sdd `verdict-policy-validate` lists its policy files from the cut. It
+  declares `candidateFiles` for the workspace root, so its key also folds the
+  cut's listing beside the files its ports name. Its key already hashed the
+  workspace's files, so the listing adds a change to the index alone and a
+  file that enters or leaves the cut by its ignore rules. The check proves
+  what it proved, it starts no Git, and a policy file that becomes ignored no
+  longer keeps a verdict that read it.
+- Still read through Git: the clientgen guard's `check-ignore --no-index`,
   on its error path only; a crate root outside its project or with
   submodules; the interactive commands of point 5. The orchestration counts
   of `tooling/cli` exercise none of the Python image, the clientgen guard and

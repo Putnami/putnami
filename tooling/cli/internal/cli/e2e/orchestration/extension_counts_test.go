@@ -157,8 +157,8 @@ var extensionCases = []extensionCase{
 		files:      sddFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 13 · git 23 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 8 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git ls-files 1",
-		was:        "engine job 13 · git 30 | engine git diff 1 · for-each-ref 1 · ls-files 13 · rev-parse 10 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 9 | jobs git ls-files 7 · rev-parse 2",
+		cold:       "engine job 13 · git 24 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 9 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 13 · git 23 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 8 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git ls-files 1",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{

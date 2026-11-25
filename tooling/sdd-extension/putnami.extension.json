@@ -1537,7 +1537,7 @@
       }
     },
     "verdict-policy-validate": {
-      "description": "Validate every putnami.verdict-policy.json of the workspace. The ci protocol's strict parser checks the content: an unknown kind, value, key or maturity, a map by maturity that does not hold modeled, and a map on a key that concerns no feature fail with the protocol's code, naming the file and the member. A file sits at the root, in a project directory, or in a directory above a project whose putnami.json is a scope manifest; a file in any other directory fails with sdd.verdict_policy_location, and a file the task cannot read, such as a symbolic link, fails with sdd.verdict_policy_unreadable. A workspace without a policy file passes. Inside a Git work tree the task reads the candidate cut, so an ignored file is never read, and it never enters .gen, .git, .putnami, dist, node_modules, out or vendor. The key names the policy file itself, and the files that place the root, the scopes and the projects: putnami.workspace.json and every putnami.json.",
+      "description": "Validate every putnami.verdict-policy.json of the workspace. The ci protocol's strict parser checks the content: an unknown kind, value, key or maturity, a map by maturity that does not hold modeled, and a map on a key that concerns no feature fail with the protocol's code, naming the file and the member. A file sits at the root, in a project directory, or in a directory above a project whose putnami.json is a scope manifest; a file in any other directory fails with sdd.verdict_policy_location, and a file the task cannot read, such as a symbolic link, fails with sdd.verdict_policy_unreadable. A workspace without a policy file passes. Inside a Git work tree the task reads the candidate cut from its job context, so an ignored file is never read, and it never enters .gen, .git, .putnami, dist, node_modules, out or vendor. The key names the policy file itself, the files that place the root, the scopes and the projects: putnami.workspace.json and every putnami.json, and the cut's listing.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1546,6 +1546,9 @@
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
       "inputs": {
+        "candidateFiles": {
+          "from": "runtime"
+        },
         "layout": {
           "from": "workspace",
           "files": [

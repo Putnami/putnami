@@ -252,7 +252,7 @@ activation:
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
 | `validate` | one project, activated by `putnami.features.json`, `features/*.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
+| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents, verdict policies also on the listing of the candidate cut; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
 
 Both are in the canonical gate:
 
@@ -295,7 +295,8 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   are committed files its patterns name.
 - `verdict-policy-validate` keys on every `putnami.verdict-policy.json`, with
   patterns that spell out the file name, and on `putnami.workspace.json` and
-  every `putnami.json`, which place the root, the scopes and the projects. See
+  every `putnami.json`, which place the root, the scopes and the projects, and
+  on the listing of the candidate cut it reads from its job context. See
   [the validation jobs](doc/02-validation-jobs.md#verdict-policy-validate--cached-on-the-policy-and-layout-files).
 - `decisions-validate`, `recipes-validate`, `codeowners-sync`,
   `docs-links-validate` and `feature-coverage-validate` read files no narrow
