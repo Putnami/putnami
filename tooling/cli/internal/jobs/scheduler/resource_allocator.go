@@ -77,8 +77,8 @@ type resourcePool struct {
 	memoryCapacity   uint64
 	cpuUsedMilli     int
 	// cpuCapacity is the whole CPUs of the machine, and grantedCPU the sum of
-	// the ceilings of the running subprocesses that reserve CPU: a task is
-	// granted at least what that sum leaves free (grantCeiling).
+	// the ceilings of the running subprocesses that reserve CPU: a task with
+	// history is granted at least what that sum leaves free (grantCeiling).
 	cpuCapacity int
 	grantedCPU  int
 	memoryUsed  uint64
@@ -372,13 +372,13 @@ func (p *resourcePool) resize(reservation *resourceReservation, request resource
 }
 
 // grantCeiling records that a subprocess which reserves CPU starts with
-// ceiling, and answers the ceiling it is granted: never less than the CPUs the
-// running ceilings leave free, so a task that runs alone, such as the last one
-// of a run, has the whole machine whatever its history measured while it shared
-// it. A task with history (cold false) is granted at least its planned
-// ceiling. A task with no history (cold) is granted at least one CPU and at
-// most ceiling, the whole machine, so the ceilings of cold tasks never stack to
-// several times the CPUs. Admission still charges what planChargeMilli says.
+// ceiling, and answers the ceiling it is granted. A task with history (cold
+// false) is granted its planned ceiling raised to the CPUs the running
+// ceilings leave free, so a task that runs alone, such as the last one of a
+// run, has the whole machine whatever its history measured while it shared
+// it. A task with no history (cold) keeps its planned ceiling, the whole
+// machine: it may be the run's long pole, and a ceiling never grows once its
+// subprocess started. Admission still charges what planChargeMilli says.
 // releaseCeiling returns what grantCeiling answered.
 func (p *resourcePool) grantCeiling(ceiling int, cold bool) int {
 	if p == nil {
@@ -386,11 +386,8 @@ func (p *resourcePool) grantCeiling(ceiling int, cold bool) int {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	free := max(p.cpuCapacity-p.grantedCPU, 1)
-	if cold {
-		ceiling = min(ceiling, free)
-	} else {
-		ceiling = max(ceiling, free)
+	if !cold {
+		ceiling = max(ceiling, p.cpuCapacity-p.grantedCPU)
 	}
 	p.grantedCPU += ceiling
 	return ceiling

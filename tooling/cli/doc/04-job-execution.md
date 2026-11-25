@@ -544,12 +544,11 @@ fractional charge never leaves a CPU idle behind it:
   A task with history is charged the occupancy it measured (CPU over wall
   time, at the granted ceiling when its history holds an observation there),
   scaled by its weight, at least a tenth of a CPU and at most its ceiling; a
-  ceiling the critical-path lift raised is charged whole. A task with no
-  history is charged one CPU. Every subprocess that reserves CPU is granted at
-  least the CPUs the running ceilings leave free: a task with history its
-  planned ceiling or more, so the last task of a run has the whole machine; a
-  task with no history at least one CPU and at most the whole capacity, which
-  it gets while it runs alone (first cold, below). A serve step, which runs
+  ceiling the critical-path lift raised is charged whole. A task with history
+  is granted its planned ceiling raised to the CPUs the running ceilings leave
+  free, so the last task of a run has the whole machine. A task with no
+  history is granted the whole capacity and charged one CPU (first cold,
+  below). A serve step, which runs
   until the run is interrupted, reserves none, so it never holds CPU a finite
   task waits for and keeps its planned ceiling. The planned ceiling of a task
   with history is deterministic for the same machine, task history, and plan;
@@ -558,8 +557,8 @@ fractional charge never leaves a CPU idle behind it:
 - **Memory**: the learned or first-cold envelope described below.
 
 [ADR 0100](adr/0100-admission-charges-the-cpu-it-grants.md) records why a
-history-backed task is charged its measured occupancy, and why a cold task is
-granted the CPUs the running ceilings leave free.
+history-backed task is charged its measured occupancy and granted the CPUs
+left free, and why a cold task keeps the first-cold rule.
 
 CPU capacity is the machine's logical CPUs clamped to its captured cgroup
 bandwidth quota. At the opening environment sample, memory capacity captures
@@ -712,8 +711,7 @@ cache keys:
   **before** configured or learned weight is applied, so a throttled observation
   cannot lower the next grant and starve a known long pole, while changing or
   removing a weight affects the next comparable run. A task with no history
-  receives the CPUs the running ceilings leave free for its first execution,
-  the whole machine when it runs alone; that grant (and a
+  receives the whole machine for its first execution; that grant (and a
   batch's fixed class grant) is not persisted as proven singleton demand, so
   the next run uses the measurement it just learned. The store also retains a bounded set of at most
   eight concurrency-conditioned observations per task: CPU, wall, peak RSS,

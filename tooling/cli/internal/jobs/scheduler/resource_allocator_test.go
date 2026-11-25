@@ -33,7 +33,7 @@ func heavyResourceJob(id string) *ScheduledJob {
 
 func TestFirstColdTaskIsGrantedTheMachineAndChargedOneCPU(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-is-granted-at-least-the-cpus-left-free")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-cold-task-is-granted-the-machine-and-charged-one-cpu")
 	tests := []struct {
 		name           string
 		cpu            int
@@ -75,7 +75,7 @@ func TestFirstColdTaskIsGrantedTheMachineAndChargedOneCPU(t *testing.T) {
 
 func TestFirstColdChargeFollowsTheConfiguredWeight(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-is-granted-at-least-the-cpus-left-free")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-cold-task-is-granted-the-machine-and-charged-one-cpu")
 	job := heavyResourceJob("/weighted")
 	job.CPUWeight = 2
 	if charge := bootstrapCPUCharge(job, 4); charge != 2 {

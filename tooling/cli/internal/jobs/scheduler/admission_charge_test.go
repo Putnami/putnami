@@ -82,32 +82,27 @@ func TestAdmissionChargesTheOccupancyMeasuredAtTheGrantedCeiling(t *testing.T) {
 	}
 }
 
-func TestColdTaskIsGrantedTheCPUsTheRunningCeilingsLeaveFree(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-is-granted-at-least-the-cpus-left-free")
+func TestColdTaskKeepsTheWholeMachine(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-cold-task-is-granted-the-machine-and-charged-one-cpu")
 	t.Parallel()
 	pool := newResourcePool(4, 0, nil)
-	first := pool.grantCeiling(4, true)
-	if first != 4 {
-		t.Fatalf("first cold grant = %d, want the whole machine while it runs alone", first)
+	if first := pool.grantCeiling(4, true); first != 4 {
+		t.Fatalf("first cold grant = %d, want the whole machine", first)
 	}
-	if second := pool.grantCeiling(4, true); second != 1 {
-		t.Fatalf("second cold grant = %d, want at least one CPU once the machine is granted", second)
+	if second := pool.grantCeiling(4, true); second != 4 {
+		t.Fatalf("second cold grant = %d, want the whole machine beside others too", second)
 	}
-	pool.releaseCeiling(first)
-	if third := pool.grantCeiling(4, true); third != 3 {
-		t.Fatalf("cold grant beside a one-CPU ceiling = %d, want the 3 left free", third)
-	}
-	// A task with history keeps its planned ceiling on a granted machine.
+	// A task with history beside them keeps its planned ceiling.
 	if planned := pool.grantCeiling(2, false); planned != 2 {
 		t.Fatalf("history-backed grant = %d, want its planned 2", planned)
 	}
-	if pool.grantedCPU != 6 {
-		t.Fatalf("granted = %d, want 1 + 3 + 2", pool.grantedCPU)
+	if pool.grantedCPU != 10 {
+		t.Fatalf("granted = %d, want 4 + 4 + 2", pool.grantedCPU)
 	}
 }
 
 func TestATaskWithHistoryIsGrantedTheCPUsLeftFreeAboveItsCeiling(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-is-granted-at-least-the-cpus-left-free")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-with-history-is-granted-at-least-the-cpus-left-free")
 	t.Parallel()
 	pool := newResourcePool(4, 0, nil)
 	// The last task of a run, measured at one CPU while it shared the machine,
@@ -128,7 +123,7 @@ func TestATaskWithHistoryIsGrantedTheCPUsLeftFreeAboveItsCeiling(t *testing.T) {
 }
 
 func TestAcquireGroupCPUBudgetGrantsTheCPUsLeftFree(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-is-granted-at-least-the-cpus-left-free")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-with-history-is-granted-at-least-the-cpus-left-free")
 	t.Parallel()
 	scheduler := &Scheduler{cpuAlloc: newCPUAllocator(4, ""), resources: newResourcePool(4, 0, nil)}
 	known := statJob("/known", "test")
@@ -141,14 +136,15 @@ func TestAcquireGroupCPUBudgetGrantsTheCPUsLeftFree(t *testing.T) {
 		t.Fatalf("recorded ceiling = %d, want its own planned 1, not the free CPUs", known.CPUBudgetUnweightedCeiling)
 	}
 	cold := statJob("/cold", "test")
-	if granted := scheduler.acquireGroupCPUBudget([]taskWork{{job: cold}}, true); granted != 1 || cold.CPUBudget != 1 {
-		t.Fatalf("cold grant on a granted machine = %d (budget %d), want one CPU", granted, cold.CPUBudget)
+	if granted := scheduler.acquireGroupCPUBudget([]taskWork{{job: cold}}, true); granted != 4 || cold.CPUBudget != 4 {
+		t.Fatalf("cold grant on a granted machine = %d (budget %d), want the whole machine", granted, cold.CPUBudget)
 	}
-	// A batch with a cold member shares too.
-	member := statJob("/member", "test")
-	other := statJob("/other", "test")
-	if granted := scheduler.acquireGroupCPUBudget([]taskWork{{job: member}, {job: other}}, true); granted != 1 || member.CPUBudget != 1 {
-		t.Fatalf("cold batch grant on a granted machine = %d (budget %d), want one CPU", granted, member.CPUBudget)
+	// A task with history on a granted machine keeps its planned ceiling.
+	second := statJob("/second", "test")
+	second.ExpectedCPUWorkMs = 2_000
+	second.ExpectedWallMs = 1_000
+	if granted := scheduler.acquireGroupCPUBudget([]taskWork{{job: second}}, true); granted != 2 || second.CPUBudget != 2 {
+		t.Fatalf("history-backed grant on a granted machine = %d (budget %d), want its planned 2", granted, second.CPUBudget)
 	}
 	// An execution that reserves no CPU, such as a serve step, keeps its
 	// planned ceiling and counts nothing.
@@ -156,8 +152,8 @@ func TestAcquireGroupCPUBudgetGrantsTheCPUsLeftFree(t *testing.T) {
 	if granted := scheduler.acquireGroupCPUBudget([]taskWork{{job: serve}}, false); granted != 0 || serve.CPUBudget != 4 {
 		t.Fatalf("serve grant = %d (budget %d), want 0 counted and the planned 4", granted, serve.CPUBudget)
 	}
-	if scheduler.resources.grantedCPU != 6 {
-		t.Fatalf("granted = %d, want 4 + 1 + 1", scheduler.resources.grantedCPU)
+	if scheduler.resources.grantedCPU != 10 {
+		t.Fatalf("granted = %d, want 4 + 4 + 2", scheduler.resources.grantedCPU)
 	}
 }
 

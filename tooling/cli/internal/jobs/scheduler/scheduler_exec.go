@@ -455,10 +455,9 @@ func (s *Scheduler) plannedCeiling(job *ScheduledJob) (cpuRecommendation, int) {
 // stamps it on every member. When the execution reserves CPU (reservesCPU), it
 // answers that ceiling, which the caller hands back to releaseCeiling once the
 // subprocess ends, and zero otherwise. A task with history is granted its
-// planned ceiling, raised to the CPUs the running ceilings leave free. A task
-// with no history, or a batch with such a member, is granted those free CPUs,
-// at least one (resourcePool.grantCeiling): its planned ceiling is the whole
-// machine, which only a task that runs alone can fill. An execution that
+// planned ceiling, raised to the CPUs the running ceilings leave free
+// (resourcePool.grantCeiling). A task with no history, or a batch with such a
+// member, keeps its planned ceiling, the whole machine. An execution that
 // reserves no CPU keeps its planned ceiling.
 //
 // The ceiling stays group-scoped for a batch, deliberately:

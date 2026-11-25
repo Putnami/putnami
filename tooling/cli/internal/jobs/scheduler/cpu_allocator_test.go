@@ -25,7 +25,7 @@ func grant(
 
 func TestCPUAllocator_ColdTaskGetsWholeMachine(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-is-granted-at-least-the-cpus-left-free")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-cold-task-is-granted-the-machine-and-charged-one-cpu")
 	a := newCPUAllocator(10, "")
 	if got := grant(a, "p:lint", 1, 0, 0, 0, 0); got.budget != 10 || got.fromHistory {
 		t.Fatalf("recommendation = %+v, want the whole machine, not from history", got)

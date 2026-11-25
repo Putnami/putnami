@@ -60,11 +60,11 @@ func normalizeCPUBudgetPolicy(value string) cpuBudgetPolicy {
 //     to do and cannot on its own lift a long pole out of a starved fixed point;
 //   - the configured/learned weight scales the result as a relative multiplier.
 //
-// A task with no history is recommended the whole machine, and admission
-// charges it one CPU (bootstrapCPUCharge) and grants it the CPUs the running
-// ceilings leave free (resourcePool.grantCeiling), so that grant alone depends
-// on its peers. It is not persisted as proven concurrency; the next run uses
-// the first execution's measured evidence.
+// A task with no history receives the whole machine, and admission charges
+// it one CPU (bootstrapCPUCharge). That grant is not persisted as proven
+// concurrency; the next run uses the first execution's measured evidence. A
+// task with history is granted at least the CPUs the running ceilings leave
+// free (resourcePool.grantCeiling).
 type cpuAllocator struct {
 	mu       sync.Mutex
 	totalCPU int
