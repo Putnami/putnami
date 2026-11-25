@@ -1,0 +1,40 @@
+  @putnami/typescript-doc-examples test~generate done  399ms
+  @putnami/analytics lint~format done  216ms
+  @putnami/web lint~format done  216ms
+  @putnami/ui test~types done  3.5s
+  @putnami/typescript-doc-examples test~types done  2.4s
+  @putnami/ui lint~format done  292ms
+  @putnami/analytics lint~check done  2.7s
+  @putnami/web lint~check done  2.7s
+  @putnami/ui lint~check done  4.2s
+  @example/10-service-to-service test~generate done  280ms
+  @putnami/typescript-templates-proof test~generate done  289ms
+  go.putnami.dev/examples/ts-items-client test~generate done  80ms
+  @putnami/windows-vet test~generate done  35ms
+  go.putnami.dev/examples/ts-items-client test~describe skip  20ms
+  @putnami/windows-vet test~test-env done  31ms
+  go.putnami.dev/examples/ts-items-client test~test-env done  24ms
+  @putnami/typescript-templates-proof test~types done  2.3s
+  @putnami/windows-vet test~test done  505ms
+  @putnami/windows-vet test~test-env-teardown done  55ms
+  putnami.dev test~generate done  18.7s
+  putnami.dev test~test-env done  230ms
+  go.putnami.dev/examples/ts-items-client test~test done  13.2s
+  go.putnami.dev/examples/ts-items-client test~test-env-teardown done  115ms
+  putnami.dev test~test done  6.5s
+  putnami.dev test~test-env-teardown done  47ms
+  go.putnami.dev/examples/ts-items-client lint~golangci-lint done  4.0s
+  @putnami/typescript-doc-examples test~test done  29.6s
+  @putnami/typescript-doc-examples lint~format done  129ms
+  putnami.dev test~types done  5.9s
+  go.putnami.dev/examples/ts-items-client lint~staticcheck done  1.9s
+  putnami.dev lint~format done  316ms
+  @putnami/typescript-doc-examples lint~check done  3.5s
+  putnami.dev lint~check done  2.7s
+  @putnami/typescript-templates-proof test~test done  26.9s
+  @putnami/typescript-templates-proof lint~format done  46ms
+  @putnami/typescript-templates-proof lint~check done  1.6s
+
+  1551 succeeded  160 coalesced  501 skipped  12.2m
+
+putnami: session reporting incomplete: reporter refused events.jsonl chunk 0: reporter_not_configured; replay with putnami sessions replay --session 20261125-134418-688aa6
