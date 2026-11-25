@@ -347,6 +347,33 @@ wrote it; resolve it by name first, then by id. Read it, not `Config`, to
 compose a workload with its providers. Inside `WorkspaceProjects` an entry
 without `RunsWith` runs with nothing.
 
+### Tree facts
+
+A task that declares the `trackedFiles`, `ignoredDirectories`, `repository`
+or `releaseBaseline` runtime input receives the fact in `ctx.Tree`, the value
+its cache key holds. A task that also declares `releaseBaselineFiles` gets the
+directory that holds the project as the line's last tag holds it. Read it through `go.putnami.dev/sdk/extension/treefacts`,
+which answers from the context and asks Git only for what the context does not
+cover, such as a fact the task did not declare or a context an older CLI
+wrote:
+
+```go
+facts := treefacts.From(ctx)
+ignored := facts.IgnoredDirectories(ctx.Project.FullPath) // relative to the directory asked
+tracked, err := facts.TrackedFiles(ctx.Project.FullPath)
+if err != nil {
+	return err
+}
+_ = tracked
+_ = ignored
+if baseline, ok := facts.ReleaseBaseline(); ok && baseline.Directory != "" {
+	_ = baseline.Directory // the project as the line's last tag holds it
+}
+```
+
+The release baseline has no Git fallback: history reaches only a task that
+declares it.
+
 ### Project Bin Field
 
 `Main`, `Bin` and `Exports` are **superseded by `Metadata`**. The orchestrator

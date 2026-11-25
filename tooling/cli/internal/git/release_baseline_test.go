@@ -1,10 +1,13 @@
 package git
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gittest"
 )
 
 const apiPattern = "api/v{version}"
@@ -102,6 +105,16 @@ func TestReadReleaseBaselineOutsideARepositoryAndWithoutGit(t *testing.T) {
 	}
 	if _, err := ReadReleaseBaseline(filepath.Join(t.TempDir(), "missing"), apiPattern); err == nil {
 		t.Fatal("a directory git cannot run in read as a baseline, want an error")
+	}
+	// A repository git refuses to read is a failure, not a directory
+	// outside every repository.
+	refused := t.TempDir()
+	gittest.Run(t, refused, "init", "-q")
+	if err := os.WriteFile(filepath.Join(refused, ".git", "config"), []byte("[core\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := ReadReleaseBaseline(refused, apiPattern); err == nil {
+		t.Fatalf("a refused repository read as the baseline %+v, want an error", got)
 	}
 	t.Setenv("PATH", t.TempDir())
 	if _, err := ReadReleaseBaseline(t.TempDir(), apiPattern); err == nil {

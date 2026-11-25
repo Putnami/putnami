@@ -684,6 +684,30 @@ const (
 	// its verdict compares the working tree with the line's last release.
 	// Declaring it requires protocol/cli ReleaseBaselineInputContract.
 	RuntimeInputReleaseBaseline = "releaseBaseline"
+	// RuntimeInputTrackedFiles is the list of paths the Git index tracks at or
+	// below the task's directory: its project's directory, or the workspace
+	// root for a workspace task. The CLI reads the index once per run, keys the
+	// list and writes it to the job context's `tree.trackedFiles`
+	// (go.putnami.dev/protocol/job, doc/adr/0002). An older CLI resolves
+	// nothing for it, and the SDK accessor then asks Git, so declaring it
+	// needs no contract rung.
+	RuntimeInputTrackedFiles = "trackedFiles"
+	// RuntimeInputIgnoredDirectories is the list of directories Git ignores
+	// entirely at or below the task's directory, keyed and written to
+	// `tree.ignoredDirectories` as RuntimeInputTrackedFiles is.
+	RuntimeInputIgnoredDirectories = "ignoredDirectories"
+	// RuntimeInputRepository is the repository state of the workspace: outside
+	// a work tree, without a commit, shallow, or complete. It is keyed and
+	// written to `tree.repository` as RuntimeInputTrackedFiles is.
+	RuntimeInputRepository = "repository"
+	// RuntimeInputReleaseBaselineFiles asks for the files of the release
+	// baseline: beside RuntimeInputReleaseBaseline, the CLI extracts the files
+	// the line's last tag holds at the project directory and names that
+	// directory in the job context's `tree.releaseBaseline.directory`. It adds
+	// nothing to the cache key: the directory is derived from the baseline the
+	// key already holds, the tag's object at the project directory. Without
+	// RuntimeInputReleaseBaseline it names nothing.
+	RuntimeInputReleaseBaselineFiles = "releaseBaselineFiles"
 )
 
 // TaskInputPort declares a task input source.

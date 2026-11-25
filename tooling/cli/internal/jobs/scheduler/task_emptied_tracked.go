@@ -19,10 +19,11 @@ import (
 var trackedPaths = putnamigit.TrackedPaths
 
 // trackedIndex is the run's read of the Git index (ADR 0068 point 6): the
-// paths it tracks under the workspace root, read the first time an emptied
-// output asks and again only when the index file changed since, as a task
-// that stages a file changes it. Every other emptied output of the run is
-// answered from the read it holds.
+// paths it tracks under the workspace root, and the stamp of the index file
+// taken before that read. The first read is the run's tree facts'
+// (cachekey.TreeFacts), so the emptied outputs and the trackedFiles fact of
+// every job context share it; the index is read again only when the index
+// file changed since, as a task that stages a file changes it.
 type trackedIndex struct {
 	mu    sync.Mutex
 	read  bool
@@ -39,8 +40,12 @@ type trackedIndex struct {
 func (s *Scheduler) trackedUnder(root, rel string) ([]string, error) {
 	s.tracked.mu.Lock()
 	defer s.tracked.mu.Unlock()
-	stamp, stamped := putnamigit.ReadIndexStamp(root)
-	if !s.tracked.read || !stamped || stamp != s.tracked.stamp {
+	if !s.tracked.read {
+		var stamped bool
+		s.tracked.paths, s.tracked.stamp, stamped, s.tracked.err = s.tree.TrackedRead(trackedPaths)
+		s.tracked.read = stamped
+	}
+	if stamp, stamped := putnamigit.ReadIndexStamp(root); !s.tracked.read || !stamped || stamp != s.tracked.stamp {
 		s.tracked.paths, s.tracked.err = trackedPaths(root)
 		s.tracked.read, s.tracked.stamp = stamped, stamp
 	}

@@ -87,6 +87,7 @@ func parseContextPresence(data []byte) (contextPresence, error) {
 	_, userScope := root["userScope"]
 	_, invocationDir := root["invocationDir"]
 	_, workspaceWarnings := root["workspaceWarnings"]
+	_, tree := root["tree"]
 	return contextPresence{
 		workspaceOptions:         nestedHas("workspace", "options"),
 		workspaceProjects:        workspaceProjects,
@@ -102,6 +103,9 @@ func parseContextPresence(data []byte) (contextPresence, error) {
 		userScope:                userScope,
 		invocationDir:            invocationDir,
 		workspaceWarnings:        workspaceWarnings,
+		tree:                     tree,
+		treeTrackedFiles:         nestedHas("tree", "trackedFiles"),
+		treeIgnoredDirectories:   nestedHas("tree", "ignoredDirectories"),
 	}, nil
 }
 

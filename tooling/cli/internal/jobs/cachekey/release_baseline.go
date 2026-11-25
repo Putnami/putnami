@@ -3,12 +3,10 @@ package cachekey
 import (
 	"fmt"
 	"path/filepath"
-	"slices"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
-	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -31,8 +29,7 @@ import (
 // keying a verdict to a baseline nobody read. One run reads each project's
 // baseline once.
 func releaseBaselineIdentity(ws *workspace.Workspace, job *jobmodel.ScheduledJob, cache *store.CacheManager) (string, error) {
-	if job == nil || job.JobDef == nil || job.JobDef.TaskCachePolicy == nil || job.JobDef.TaskCachePolicy.Key == nil ||
-		!slices.Contains(job.JobDef.TaskCachePolicy.Key.Runtime, extproto.RuntimeInputReleaseBaseline) {
+	if !DeclaresRuntimeInput(job, extproto.RuntimeInputReleaseBaseline) {
 		return "", nil
 	}
 	if job.Project == nil {
@@ -40,17 +37,13 @@ func releaseBaselineIdentity(ws *workspace.Workspace, job *jobmodel.ScheduledJob
 	}
 	dir := filepath.Join(ws.Root, job.Project.Path)
 	pattern := LineTagPattern(ws, job.Project.Line)
-	value, err := cache.Digest("release-baseline\x00"+dir+"\x00"+pattern, func() (string, error) {
-		baseline, err := putnamigit.ReadReleaseBaseline(dir, pattern)
-		if err != nil {
-			return "", err
-		}
-		return baseline.Value(), nil
-	})
+	// The run's tree facts read it, so the job context carries the baseline
+	// this key holds (protocols/job ADR 0002).
+	baseline, err := RunTreeFacts(cache, ws.Root).ReleaseBaseline(dir, pattern)
 	if err != nil {
 		return "", fmt.Errorf("read the release baseline of %s: %w", job.Project.Name, err)
 	}
-	return extproto.RuntimeInputReleaseBaseline + "=" + value, nil
+	return extproto.RuntimeInputReleaseBaseline + "=" + baseline.Value(), nil
 }
 
 // LineTagPattern is the tag pattern of a version line: the one the line's scope

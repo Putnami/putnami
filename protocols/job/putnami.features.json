@@ -86,6 +86,19 @@
           }
         },
         {
+          "id": "tree-facts-are-answers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-empty-listing-stays-an-answer"
+            ]
+          }
+        },
+        {
           "id": "the-cli-produces-a-conforming-context",
           "stage": "coded",
           "evidenceKinds": [

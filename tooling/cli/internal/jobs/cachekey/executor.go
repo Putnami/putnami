@@ -849,6 +849,13 @@ func ComputeJobCacheHashWith(
 	if baseline != "" {
 		policy.RuntimeIdentity = append(policy.RuntimeIdentity, baseline)
 	}
+	// The tree facts the task declared, from the run's one read; the job
+	// context carries the same values (protocols/job ADR 0002).
+	facts, err := treeFactIdentity(ws, job, cache)
+	if err != nil {
+		return "", fmt.Errorf("cache key for %s: %w", job.Key(), err)
+	}
+	policy.RuntimeIdentity = append(policy.RuntimeIdentity, facts...)
 
 	// Collect upstream hashes for dependencies
 	var upstreamHashes []string

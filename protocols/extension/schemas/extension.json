@@ -2010,7 +2010,7 @@
             "env",
             "runtime"
           ],
-          "description": "Input source type. A 'runtime' port's name selects the value the CLI resolves into the cache key: hostPlatform, extensionVersion, or releaseBaseline (the project's release baseline read from git; requires cliContract 7)."
+          "description": "Input source type. A 'runtime' port's name selects the value the CLI resolves into the cache key: hostPlatform, extensionVersion, releaseBaseline (the project's release baseline read from git; requires cliContract 7), trackedFiles, ignoredDirectories or repository (tree facts the job context also carries in its tree member), or releaseBaselineFiles (the release baseline's files, named in the job context; no key material)."
         },
         "files": {
           "$ref": "#/$defs/globArray",
@@ -2128,7 +2128,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Runtime input names included in the cache key: hostPlatform, extensionVersion, or releaseBaseline (requires cliContract 7)."
+          "description": "Runtime input names included in the cache key: hostPlatform, extensionVersion, releaseBaseline (requires cliContract 7), trackedFiles, ignoredDirectories, repository or releaseBaselineFiles (no key material)."
         }
       }
     },

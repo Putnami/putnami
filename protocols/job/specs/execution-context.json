@@ -34,11 +34,16 @@
       "text": "A parameter lookup falls back to the alternative names the caller lists. 1 and on read as true, 0 and off as false, and a JSON true as true. A numeric string reads as its number. An unrecognized or missing value returns the caller's default, and a string lookup returns the raw value."
     },
     {
+      "id": "tree-facts-are-answers",
+      "text": "Only a version 2 document carries tree facts: the directory they cover, the repository state, the tracked files, the ignored directories and the release baseline. A listing is sorted, unique and at or below the directory, and an empty listing is an answer that stays an empty listing when the document is written again, while an absent fact stays absent. A tree without a fact, a null listing, an unknown state, and a release baseline member its state does not allow are refused."
+    },
+    {
       "id": "the-cli-produces-a-conforming-context",
       "text": "The context the CLI builds for a job passes the strict reader as version 2. It carries the plan node's typed identity and key, the run's resolved selection byte for byte and no staging tree, and a numeric string parameter still reads as its number on the consumer side."
     }
   ],
   "decisions": [
-    "protocols/job/doc/adr/0001-v2-optional-members.md"
+    "protocols/job/doc/adr/0001-v2-optional-members.md",
+    "protocols/job/doc/adr/0002-a-job-reads-the-tree-facts-its-key-holds.md"
   ]
 }

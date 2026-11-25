@@ -47,7 +47,7 @@ both, and the v1 corpus is unchanged.
 | Version | Members | Corpus |
 | --- | --- | --- |
 | 1 | everything above | `fixtures/{valid,invalid}` |
-| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `project.generatedFrom`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `workspaceWarnings`, `ProjectRef.config`, `ProjectRef.extensions`, `ProjectRef.type` and `ProjectRef.runsWith` | `fixtures/v2/{valid,invalid}` |
+| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `project.generatedFrom`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `workspaceWarnings`, `tree`, `ProjectRef.config`, `ProjectRef.extensions`, `ProjectRef.type` and `ProjectRef.runsWith` | `fixtures/v2/{valid,invalid}` |
 
 **Putnami's orchestrator produces v2 only.** The CLI requires an extension
 contract whose SDK reads v2, so a subprocess that reaches this context is
@@ -294,6 +294,19 @@ defaults are) is the language extension's, the graph is core's.
   `--quiet` too. Absence means the load warned of nothing. A present member is
   a non-empty array (`job.invalid_value`) whose entries each carry a non-empty
   `code` and `message` (`job.missing_field`).
+
+- **`tree`** (v2 only) — the tree facts the task declares as runtime inputs,
+  each the value its cache key holds
+  ([ADR 0002](doc/adr/0002-a-job-reads-the-tree-facts-its-key-holds.md)):
+  `directory`, the workspace-relative directory the listings cover;
+  `repository.state` (`unmanaged`, `no-commit`, `shallow`, `complete`);
+  `trackedFiles` and `ignoredDirectories`, sorted workspace-relative paths at
+  or below `directory`, where `[]` is an answer; and `releaseBaseline`, the
+  release baseline, with the absolute `directory` that holds the project as
+  the line's last tag holds it when the task also declares
+  `releaseBaselineFiles`. Absent for a task that declares no fact. A tree
+  with no fact, a null listing, an unknown state, and a baseline member its
+  state does not allow are refused (`job.invalid_value`, `job.missing_field`).
 
 A v1 document may not carry v2 members (`job.unexpected_field`): a v1
 consumer would ignore exactly the members a v2 consumer would trust.

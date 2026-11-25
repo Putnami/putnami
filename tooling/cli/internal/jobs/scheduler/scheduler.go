@@ -161,8 +161,13 @@ type Scheduler struct {
 	keylessMemo map[string]string
 	renderer    Renderer
 	cache       *store.CacheManager
-	// tracked is the run's one read of the Git index, which every emptied
-	// output of the run is checked against (refuseTrackedEmptiedOutputs).
+	// tree is the run's one read of the tree facts (protocols/job ADR 0002):
+	// every key and every job context of the run answer from it, and the
+	// emptied outputs (refuseTrackedEmptiedOutputs) start from its read. It
+	// is the cache manager's, so the key computation reads the same object.
+	tree *cachekey.TreeFacts
+	// tracked is the emptied outputs' view of the index: the tree facts' read,
+	// read again when the index file changed (trackedUnder).
 	tracked trackedIndex
 	// cacheStats is present for every cache-enabled run, including local-only
 	// runs. A configured remote cache shares this exact accumulator so the final
@@ -387,6 +392,12 @@ func newScheduler(
 	}
 	if cache != nil && !cfg.NoCache {
 		s.cacheStats = &cachekey.CacheStats{}
+	}
+	if ws != nil {
+		s.tree = cachekey.RunTreeFacts(cache, ws.Root)
+		s.tree.SetPlanned(ws, planned)
+	} else {
+		s.tree = cachekey.NewTreeFacts("")
 	}
 	if cache != nil {
 		// The stamp's marker reads the answer every execution key of the run
@@ -711,6 +722,11 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 		storeRoot = store.ResolveStoreRoot(s.ws.Root)
 	}
 	ctx = context.WithValue(ctx, runStoreRootKey{}, storeRoot)
+	// So are the tree facts a job declares: the context carries the values
+	// the job's key holds, from the run's one read.
+	ctx = context.WithValue(ctx, runTreeFactsKey{}, s.tree)
+	s.tree.Prime(s.planned)
+	defer s.tree.Close()
 	// A native registry credential a job declares is materialized once for
 	// the run, per host and validity window (CLI ADR 0101).
 	ctx = withNativeCredentials(ctx, newNativeCredentials(s.ws.Root))

@@ -176,6 +176,19 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 		"selection.reuse.members",
 		"selection.reuse.members[0].version",
 		"selection.emptyImpact",
+		"tree",
+		"tree.directory",
+		"tree.repository.state",
+		"tree.trackedFiles",
+		"tree.trackedFiles[0]",
+		"tree.ignoredDirectories",
+		"tree.ignoredDirectories[0]",
+		"tree.releaseBaseline.state",
+		"tree.releaseBaseline.pattern",
+		"tree.releaseBaseline.tag",
+		"tree.releaseBaseline.hasTags",
+		"tree.releaseBaseline.breaking",
+		"tree.releaseBaseline.directory",
 	} {
 		if !fields[field] {
 			t.Errorf("no invalid v2 fixture reports on %q", field)
@@ -235,6 +248,9 @@ func TestV1FixturesStayV1(t *testing.T) {
 		}
 		if ctx.Workspace.Options != nil {
 			t.Errorf("v1 fixture %s carries the v2 workspace.options member", path)
+		}
+		if ctx.Tree != nil {
+			t.Errorf("v1 fixture %s carries the v2 tree member", path)
 		}
 		// fixtures/valid is the corpus other runtimes' SDK conformance suites
 		// read. A member added here is a member an older strict parser rejects

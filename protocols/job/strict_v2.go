@@ -29,6 +29,9 @@ type contextPresence struct {
 	userScope                bool
 	invocationDir            bool
 	workspaceWarnings        bool
+	tree                     bool
+	treeTrackedFiles         bool
+	treeIgnoredDirectories   bool
 }
 
 // v2 validation rules. Validate (strict.go) checks every document against the
@@ -132,6 +135,10 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "workspaceWarnings",
 				"workspaceWarnings requires protocolVersion %d", ProtocolVersion2))
 		}
+		if ctx.presence.tree || ctx.Tree != nil {
+			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "tree",
+				"tree requires protocolVersion %d", ProtocolVersion2))
+		}
 		// The v2-only members of ProjectRef are v2-only for the same reason as
 		// every member above, and the cost of getting it wrong is concrete: a
 		// v1 consumer ignores `sourceName` and renames the manifest anyway,
@@ -211,6 +218,8 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 		diags = append(diags, validateInvocationDir(ctx.InvocationDir, ctx.presence.invocationDir)...)
 		diags = append(diags, validateWorkspaceWarnings(ctx.WorkspaceWarnings, ctx.presence.workspaceWarnings)...)
 		diags = append(diags, validateSelection(ctx.Selection, ctx.presence.selection)...)
+		diags = append(diags, validateTree(ctx.Tree, ctx.presence.tree,
+			ctx.presence.treeTrackedFiles, ctx.presence.treeIgnoredDirectories)...)
 		for i, project := range ctx.SelectedProjects {
 			diags = append(diags, validateProjectRefConfig(
 				fmt.Sprintf("selectedProjects[%d]", i), project.Config)...)

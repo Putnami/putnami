@@ -75,6 +75,10 @@ type JobCommandContext struct {
 	// task omits the member entirely, which is what keeps the private tree
 	// undiscoverable from a context document that has no business knowing it.
 	Invocation *protocoljob.Invocation `json:"invocation,omitempty"`
+	// Tree carries the tree facts the task declares as runtime inputs, each
+	// the value its cache key holds (protocols/job ADR 0002), from the run's
+	// one read. Absent for a task that declares none.
+	Tree *protocoljob.Tree `json:"tree,omitempty"`
 	// UserScope is present exactly when the job runs outside any workspace, from
 	// an extension pinned in the user scope. The workspace members then name the
 	// user-scope directory, and CallerDir is where the command was invoked and

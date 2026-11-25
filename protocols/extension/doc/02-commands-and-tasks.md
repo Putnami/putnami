@@ -989,7 +989,11 @@ key. The CLI resolves these names; any other name contributes nothing:
 |------|-------|
 | `hostPlatform` | The host's operating system and architecture |
 | `extensionVersion` | The version of the extension that runs the task |
-| `releaseBaseline` | The project's release baseline, read from git: the repository state (no work tree, no commit, a shallow clone, or no tag of the project's version line), the line's tag pattern, the last line tag HEAD reaches, the object that tag holds at the project directory, and whether a commit since that tag that touches the project declares a breaking change. It names no commit HEAD reaches, so a branch and its squash merge share the key when the squash message declares the same break; a squash title that adds or drops the breaking marker moves it. Declaring it requires `cliContract` 7. |
+| `releaseBaseline` | The project's release baseline, read from git, which the job context carries in `tree.releaseBaseline`: the repository state (no work tree, no commit, a shallow clone, or no tag of the project's version line), the line's tag pattern, the last line tag HEAD reaches, the object that tag holds at the project directory, and whether a commit since that tag that touches the project declares a breaking change. It names no commit HEAD reaches, so a branch and its squash merge share the key when the squash message declares the same break; a squash title that adds or drops the breaking marker moves it. Declaring it requires `cliContract` 7. |
+| `trackedFiles` | The paths the Git index tracks at or below the task's directory (its project's, or the workspace for a workspace task), read once per run. The job context carries the same list in `tree.trackedFiles`. |
+| `ignoredDirectories` | The directories Git ignores entirely at or below the task's directory, read once per run. The job context carries the same list in `tree.ignoredDirectories`. |
+| `repository` | The repository state: `unmanaged`, `no-commit`, `shallow` or `complete`. The job context carries it in `tree.repository`. |
+| `releaseBaselineFiles` | Beside `releaseBaseline`, the files the line's last tag holds at the project directory, extracted once per tag commit; the job context names their directory in `tree.releaseBaseline.directory`. It adds nothing to the key, which already holds the tag's object at the project. |
 
 A `task` input is the typed producer/consumer edge, and `optional` is what
 makes it a requirement or a courtesy:

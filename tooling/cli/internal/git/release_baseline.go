@@ -51,6 +51,12 @@ type ReleaseBaseline struct {
 	// Breaking reports whether a commit after Tag up to HEAD that touches the
 	// project directory declares a breaking change (protocolcli.ParseConventionalCommit).
 	Breaking bool `json:"breaking,omitempty"`
+	// Commit is the commit Tag points at, and Prefix the project directory
+	// relative to the work tree's root, in slash form ("" at the root). Neither
+	// is part of Value: they locate the files Tag holds for the job that reads
+	// them, and the key holds Object, which names those files.
+	Commit string `json:"-"`
+	Prefix string `json:"-"`
 }
 
 // Value is the baseline's canonical encoding: the same baseline always gives
@@ -77,8 +83,9 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 	baseline := ReleaseBaseline{Pattern: tagPattern}
 	output, stderr, err := gitread.RunCapture(dir, "rev-parse", "--is-inside-work-tree", "--is-shallow-repository", "--show-prefix")
 	if err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
+		// Only a directory outside every repository is unmanaged: a refused
+		// repository, or a git that cannot run, is a failure, never a state.
+		if OutsideRepository(gitread.Unmanaged(dir)) {
 			baseline.State = ReleaseBaselineUnmanaged
 			return baseline, nil
 		}
@@ -123,6 +130,7 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 	}
 
 	baseline.State, baseline.Tag = ReleaseBaselineTagged, last.Tag
+	baseline.Commit, baseline.Prefix = last.Commit, prefix
 	if baseline.Object, err = objectAtTag(dir, last.Tag, prefix); err != nil {
 		return ReleaseBaseline{}, err
 	}

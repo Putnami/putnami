@@ -236,8 +236,14 @@ var spawnSites = map[string]spawnSite{
 		why: "git rev-parse"},
 	"git/numstat.go:DiffLineCounts": {spawns: 2, verdict: noRepositoryCode,
 		why: "read verbs only: diff, ls-files"},
-	"git/release_baseline.go:ReadReleaseBaseline": {spawns: 5, verdict: noRepositoryCode,
-		why: "read verbs only, through linetag.LastRelease, gitread.CommitsSince and the gitread runners: rev-parse, for-each-ref, cat-file, log"},
+	"git/repository_state.go:IgnoredDirectories": {spawns: 2, verdict: noRepositoryCode,
+		why: "read verbs only, through the gitread runners: ls-files, rev-parse"},
+	"git/repository_state.go:WriteFilesAtCommit": {spawns: 3, verdict: noRepositoryCode,
+		why: "read verbs only: ls-tree, and cat-file --batch, which reads raw blobs and applies no filter; gitread.Executable asks /usr/bin/xcrun, a fixed program, for the git to run"},
+	"git/repository_state.go:RepositoryState": {spawns: 1, verdict: noRepositoryCode,
+		why: "read verbs only, through treefacts.RepositoryState: rev-parse"},
+	"git/release_baseline.go:ReadReleaseBaseline": {spawns: 6, verdict: noRepositoryCode,
+		why: "read verbs only, through linetag.LastRelease, gitread.CommitsSince, gitread.Unmanaged and the gitread runners: rev-parse, for-each-ref, cat-file, log"},
 	"git/release_baseline.go:objectAtTag": {spawns: 2, verdict: noRepositoryCode,
 		why: "read verbs only: rev-parse, ls-tree"},
 	"git/source_binding.go:(*SourceBindingSnapshot).ProjectSourceBindingMeasured": {spawns: 1, verdict: noRepositoryCode,
@@ -726,6 +732,8 @@ func scanSpawnSites(t *testing.T, root string) (map[string][]token.Pos, map[stri
 //   - a releaseset client starts `putnami cloud release-set`;
 //   - linetag.LastRelease starts git with read verbs only;
 //   - treefingerprint.Compute starts git with read verbs only;
+//   - treefacts.RepositoryState, and a treefacts.Facts that From returns,
+//     start git with read verbs only when the job context does not answer;
 //   - a gitread reader or runner starts git with the verbs its caller passes,
 //     and gitread.Executable asks /usr/bin/xcrun for the git to run on macOS;
 //   - proctree.StartTime starts ps with fixed arguments on a system without
@@ -756,6 +764,7 @@ var spawnCalls = map[string]map[string]bool{
 	"go.putnami.dev/sdk/extension/linetag":         {"LastRelease": true},
 	"go.putnami.dev/sdk/extension/proctree":        {"StartTime": true},
 	"go.putnami.dev/sdk/extension/treefingerprint": {"Compute": true},
+	"go.putnami.dev/sdk/extension/treefacts":       {"From": true, "RepositoryState": true},
 }
 
 // startMethods are the functions that start a built process: the methods of
@@ -771,6 +780,7 @@ var startMethods = map[string]bool{"Start": true, "Run": true, "Output": true, "
 var spawnTypes = map[string]map[string]bool{
 	"os/exec": {"Cmd": true},
 	"go.putnami.dev/sdk/extension/releaseset": {"Client": true},
+	"go.putnami.dev/sdk/extension/treefacts":  {"Facts": true},
 }
 
 // spawnTypeValue returns the node that builds a value of a spawn type, and the

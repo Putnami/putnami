@@ -137,6 +137,32 @@ baseline once, so a tag created during the run is seen by the next run.
 Declaring the input requires CLI contract 7. See
 [ADR 0062](adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md).
 
+### Tree Facts
+
+A task that reads what Git says about the tree declares the fact as a runtime
+input, and receives it in its job context's `tree` member instead of asking
+Git:
+
+- `trackedFiles`: the paths the Git index tracks at or below the task's
+  directory;
+- `ignoredDirectories`: the directories Git ignores entirely at or below it;
+- `repository`: the repository state, `unmanaged`, `no-commit`, `shallow` or
+  `complete`;
+- `releaseBaseline`: the baseline above;
+- `releaseBaselineFiles`: beside `releaseBaseline`, the directory that holds
+  the project as the line's last tag holds it. It adds nothing to the key, which
+  already holds the tag's object at the project.
+
+The task's directory is its project's directory, or the workspace for a
+workspace task. The CLI reads each fact once per run, adds the value to the
+task's key, and writes the same value to the context, so a cached verdict
+never reads a fact its key does not hold: adding a tracked file or an ignored
+directory under the project moves the key, a change elsewhere does not. A task
+that declares no fact gets none. The files of a version line's last tag are
+extracted once per tag commit for the projects that declare
+`releaseBaselineFiles`, and removed when the run ends. See the job protocol's
+[ADR 0002](../../../protocols/job/doc/adr/0002-a-job-reads-the-tree-facts-its-key-holds.md).
+
 ### Extension Implementation
 
 Every key names the implementation of the extension that runs the task, in

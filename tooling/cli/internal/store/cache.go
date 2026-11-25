@@ -24,6 +24,8 @@ type CacheManager struct {
 	sourceStateMu   sync.Mutex
 	digests         map[string]*memoizedDigest // memoizes Digest: key → one computation
 	digestsMu       sync.Mutex
+	values          map[string]*memoizedValue // memoizes Value: key → one value
+	valuesMu        sync.Mutex
 	inputResolver   InputResolver // expands the input selectors a key reads
 	inputResolverMu sync.Mutex
 }
@@ -106,6 +108,12 @@ func (m *inputHashMemo) invalidate(written InputRegion) {
 	if len(m.log) > invalidationLogSize {
 		m.log = append([]invalidatedRegion(nil), m.log[len(m.log)-invalidationLogSize:]...)
 	}
+}
+
+// memoizedValue is one key's value in CacheManager.Value.
+type memoizedValue struct {
+	once  sync.Once
+	value any
 }
 
 // memoizedDigest is one key's computation in CacheManager.Digest.
@@ -273,6 +281,29 @@ func (cm *CacheManager) Digest(key string, compute func() (string, error)) (stri
 	cm.digestsMu.Unlock()
 	entry.once.Do(func() { entry.value, entry.err = compute() })
 	return entry.value, entry.err
+}
+
+// Value returns the value build builds for key, building it at most once for
+// the life of the manager, one per run: the first caller builds, and
+// concurrent callers for the same key wait for that value. It is how the run's
+// readers that the key computation and the scheduler share, such as the run's
+// tree facts, are one object. A nil manager builds on every call.
+func (cm *CacheManager) Value(key string, build func() any) any {
+	if cm == nil {
+		return build()
+	}
+	cm.valuesMu.Lock()
+	if cm.values == nil {
+		cm.values = make(map[string]*memoizedValue)
+	}
+	entry, ok := cm.values[key]
+	if !ok {
+		entry = &memoizedValue{}
+		cm.values[key] = entry
+	}
+	cm.valuesMu.Unlock()
+	entry.once.Do(func() { entry.value = build() })
+	return entry.value
 }
 
 // CacheKey holds the inputs that contribute to a cache key.

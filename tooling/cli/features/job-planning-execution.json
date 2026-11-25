@@ -877,6 +877,22 @@
         }
       },
       {
+        "id": "tree-facts-follow-the-key",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-declared-tree-fact-is-keyed-and-carried",
+            "a-run-reads-each-tree-fact-once",
+            "a-release-baseline-is-extracted-once-per-tag-commit",
+            "a-job-reads-the-tree-facts-without-git"
+          ]
+        }
+      },
+      {
         "id": "executed-directory-output-starts-empty",
         "stage": "coded",
         "evidenceKinds": [

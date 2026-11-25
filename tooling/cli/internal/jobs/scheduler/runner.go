@@ -410,6 +410,10 @@ func prepareJobInvocation(
 	membership, _ := ctx.Value(workspaceMembershipKey{}).(*cachekey.WorkspaceMembership)
 	jobCtx := buildJobContext(ws, job, commandParams, configDefaults, versions, membership)
 	jobCtx.storeRoot, _ = ctx.Value(runStoreRootKey{}).(string)
+	// A job run outside a scheduler run carries no tree facts: it asks Git.
+	if tree, _ := ctx.Value(runTreeFactsKey{}).(*cachekey.TreeFacts); tree != nil {
+		jobCtx.Tree = jobTree(tree, ws, job)
+	}
 	scratchLease, err := store.AcquireScratch(ws.Root)
 	if err != nil {
 		return nil, nil, nil, err
@@ -523,6 +527,10 @@ type workspaceMembershipKey struct{}
 // (string), so a job spawn names its shared OCI layer cache without asking
 // Git. A job run outside a scheduler run carries none and resolves its own.
 type runStoreRootKey struct{}
+
+// runTreeFactsKey carries the run's tree facts (*cachekey.TreeFacts), from
+// which a job context takes the facts its task declares.
+type runTreeFactsKey struct{}
 
 // serveStepKey marks a context under which runJob runs a serve-workload step.
 type serveStepKey struct{}

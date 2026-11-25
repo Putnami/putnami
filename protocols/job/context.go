@@ -126,6 +126,10 @@ type Context struct {
 	// command that writes a result envelope carries them in its
 	// workspaceWarnings. Absent means the load warned of nothing.
 	WorkspaceWarnings []cliproto.WorkspaceWarning `json:"workspaceWarnings,omitempty"`
+	// Tree is the set of tree facts the task declared, each the value its
+	// cache key holds (context_tree.go). v2 only and optional: absent for a
+	// task that declares none.
+	Tree *Tree `json:"tree,omitempty"`
 	// Params are the merged, coerced job parameters (CLI flags over config
 	// defaults); accessors define the shared coercion contract.
 	Params Params `json:"params"`

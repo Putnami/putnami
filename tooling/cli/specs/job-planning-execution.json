@@ -226,6 +226,10 @@
       "text": "A task that declares the releaseBaseline runtime input keys on its project's release baseline: the repository state, the line's tag pattern, the tag of its last release, the tree that tag holds at the project, and whether a commit since that tag that touches the project declares a breaking change. The key names no commit: a branch and its squash merge share it if they declare one break. A new tag, other content at the tag, a shallow clone and a changed breaking marker, even in a squash title, move it."
     },
     {
+      "id": "tree-facts-follow-the-key",
+      "text": "A task that declares the trackedFiles, ignoredDirectories or repository runtime input keys on that fact, bounded to its project's directory or the workspace for a workspace task, and its job context carries the same value. A task that declares none gets no fact and keeps its key. A run reads each fact once, and extracts a line's last tag once per tag commit for the projects that declare releaseBaselineFiles, which moves no key."
+    },
+    {
       "id": "executed-directory-output-starts-empty",
       "text": "Before a task executes, the engine empties each literal-path directory output that is required, under the command-output root, or declares emptied, keeping ceded and preserved subpaths and the build stamp. A hit whose entry records such an output empty empties it too, or executes the task when it cannot. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. Other outputs are not emptied. A key marker keeps entries stored without emptying from being served."
     },
