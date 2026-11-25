@@ -78,6 +78,9 @@ func taskDigestView(task TaskDefinition) ([]byte, error) {
 
 	copied.Description = ""
 	copied.Visibility = ""
+	// The native registry credential says how the job is run, not what it
+	// produces, like the registry endpoints it reads.
+	copied.NativeRegistryCredential = nil
 	for id, port := range copied.Outputs {
 		if port.Description != "" {
 			port.Description = ""

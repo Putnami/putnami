@@ -97,6 +97,10 @@ type TaskDefinition = proto.TaskDefinition
 // same-key batching.
 type TaskBatchPolicy = proto.TaskBatchPolicy
 
+// TaskRegistryCredential is the protocol's registry endpoint whose native
+// credential a task's job reads.
+type TaskRegistryCredential = proto.TaskRegistryCredential
+
 // TaskInputPort is the protocol's task input source.
 type TaskInputPort = proto.TaskInputPort
 
@@ -362,21 +366,25 @@ type JobDefinition struct {
 	// of a scarce shared resource one execution holds while it runs. They gate
 	// ADMISSION against the run's `--resource <name>=<units>` budgets and never
 	// serialize anything, which is what separates them from Writes/Reads above.
-	Resources       map[string]int
-	Cache           bool
-	Priority        int
-	Quiet           bool
-	ActivationFiles []string
-	Activation      string
-	Channel         string
-	Flags           map[string]FlagDefinition
-	PipelineSteps   []PipelineStep
-	PipelineOutputs map[string]OutputBinding
-	TaskCachePolicy *TaskCachePolicy
-	Batchable       *TaskBatchPolicy
-	Traits          CommandTraits // resolved orchestration traits (verb defaults or manifest override)
-	Heavy           *bool         // per-step heavy override from the pipeline step
-	CPUWeight       *float64      // per-step relative CPU-demand multiplier
+	Resources map[string]int
+	// NativeRegistryCredential is the task's manifest member: the registry
+	// endpoint whose native credential the engine materializes before the job
+	// starts (CLI ADR 0101). Nil declares none.
+	NativeRegistryCredential *TaskRegistryCredential
+	Cache                    bool
+	Priority                 int
+	Quiet                    bool
+	ActivationFiles          []string
+	Activation               string
+	Channel                  string
+	Flags                    map[string]FlagDefinition
+	PipelineSteps            []PipelineStep
+	PipelineOutputs          map[string]OutputBinding
+	TaskCachePolicy          *TaskCachePolicy
+	Batchable                *TaskBatchPolicy
+	Traits                   CommandTraits // resolved orchestration traits (verb defaults or manifest override)
+	Heavy                    *bool         // per-step heavy override from the pipeline step
+	CPUWeight                *float64      // per-step relative CPU-demand multiplier
 	// NoCommandLayerInputs is set for a pipeline step that declares
 	// commandLayerInputs false: the project's command option layers give it no
 	// filePatterns and no envInputs.

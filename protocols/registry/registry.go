@@ -39,6 +39,7 @@ package registry
 
 import (
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -69,7 +70,21 @@ const (
 	// native form a host's registry kind uses, so it writes the file and the
 	// framework stays free of both the credential format and the host list.
 	SeamMaterializeFlag = "materialize"
+	// SeamForRunFlag, beside SeamMaterializeFlag, asks for a credential that
+	// stays valid for NativeCredentialValidity: the engine hands that window to
+	// the jobs of a run. A cloud that predates it refuses the flag with exit 2,
+	// and the engine then names no host to its jobs, which call the seam
+	// themselves.
+	SeamForRunFlag = "for-run"
 )
+
+// NativeCredentialValidity is how long a credential a successful
+// `--materialize --for-run` writes stays valid, at least. The cloud reuses a
+// stored token for that shape only when it stays valid that long and 30
+// seconds more, and mints a fresh one otherwise. The engine materializes a host once for this
+// window, from the start of the call, and tells its jobs so (CLI ADR 0101): the
+// seam itself states no expiry.
+const NativeCredentialValidity = 4 * time.Minute
 
 // PublishProviderCommandName is the retired capability marker (see the package
 // doc). It is kept so both repositories name the same reserved spelling when

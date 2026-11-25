@@ -22,6 +22,7 @@ package clitest
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -30,6 +31,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
+	registryproto "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
@@ -52,10 +54,24 @@ const PortableTaskDeadlineMs = scheduler.DefaultTimeoutMs
 // exercises it sets it with t.Setenv. internal/cli's own TestMain does the
 // same for the package the e2e tests were carved out of.
 func Main(m *testing.M) int {
+	AnswerRegistryTokenSeam()
 	_ = os.Unsetenv(extension.PrivatePutRegistryURLEnv)
 	// No test starts the host's CLI to resolve a registry credential.
 	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
 	return m.Run()
+}
+
+// AnswerRegistryTokenSeam answers `cloud registry-token` when the test binary
+// was started as the CLI of a run: an engine the test runs in process, or a
+// job it starts, calls its own executable for a native registry credential
+// (CLI ADR 0101). It answers as a CLI signed in to no cloud, exit 3 and no
+// token, and exits, so the start is counted and nothing leaves the host. A
+// TestMain that dispatches on other roles calls it first.
+func AnswerRegistryTokenSeam() {
+	if len(os.Args) > 2 && os.Args[1] == registryproto.SeamParentCommand && os.Args[2] == registryproto.SeamSubcommand {
+		fmt.Fprintln(os.Stderr, "putnami: not signed in; run putnami cloud login")
+		os.Exit(protocolcli.ExitAuth)
+	}
 }
 
 // RequireShell skips the test where /bin/sh, which every fixture task is

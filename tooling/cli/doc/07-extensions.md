@@ -531,6 +531,7 @@ Tasks are atomic executable units. Commands reference tasks in their pipeline st
 | `writes` | `ResourceRef[]` | Resources this task writes (see [Write Resources](#write-resources)) |
 | `reads` | `ResourceRef[]` | Resources this task reads |
 | `resources` | `map[string]int` | Units of a named scarce resource one execution holds (see [Resource Budgets](#resource-budgets)) |
+| `nativeRegistryCredential` | `{registry, endpoint}` | The registry endpoint whose native credential the job reads; the engine materializes it once per host and per 4-minute window before the job starts ([ADR 0101](adr/0101-the-engine-materializes-a-native-registry-credential-once-per-origin.md)) |
 | `cache` | `CachePolicy` | Cache behavior and key specification |
 | `declares` | `TaskDeclaration` | Task contract v3: the task's exact outputs, its effects, and whether it mutates sources. A publish task lists the publish channels it serves in `publishChannels`, in the grammar of a project's `publish` list and with the `registry` effect; a manifest with such a task requires CLI contract 12 — see [Publish Channels](../../../protocols/extension/doc/02-commands-and-tasks.md#publish-channels) |
 

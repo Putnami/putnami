@@ -1265,7 +1265,12 @@
         "materialize": {
           "type": "boolean",
           "default": false,
-          "description": "Write the bearer to the registry's native credential store for one immediate invocation; no bearer is printed."
+          "description": "Write the bearer to the registry's native credential store; no bearer is printed."
+        },
+        "for-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "With --materialize: write a credential that stays valid for the window the engine hands a run's jobs (4 minutes)."
         }
       },
       "run": [

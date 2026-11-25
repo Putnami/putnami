@@ -711,6 +711,9 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 		storeRoot = store.ResolveStoreRoot(s.ws.Root)
 	}
 	ctx = context.WithValue(ctx, runStoreRootKey{}, storeRoot)
+	// A native registry credential a job declares is materialized once for
+	// the run, per host and validity window (CLI ADR 0101).
+	ctx = withNativeCredentials(ctx, newNativeCredentials(s.ws.Root))
 
 	// Build dependency state
 	schedulable := planner.SchedulableJobs(s.planned)

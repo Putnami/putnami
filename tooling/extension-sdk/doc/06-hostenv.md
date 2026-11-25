@@ -49,11 +49,11 @@ Azure, Vercel, Fly and Heroku are deliberately absent: no Putnami surface detect
 
 The list only ever grows, and growth is additive-safe — removing a variable from a test process cannot make a correct test fail, because a correct test does not assert on the identity of the machine that launched it. The list is sorted and duplicate-free (pinned by a test) so a diff to it is reviewable. Matching is exact and case-sensitive, matching POSIX environment semantics on the container platforms this describes.
 
-## Job variables of a hosted run
+## Job variables
 
-A hosted run describes each job to the extension that runs it in two variables: `PUTNAMI_OFFLINE_DEPENDENCIES` and `PUTNAMI_JOB_CREDENTIAL_FD`. They are addressed to the extension, not to the repository's tests. A test process that inherits them takes the paths of a job of a hosted run: it refuses to refresh a credential and treats every dependency as already downloaded. Tests written for a developer machine then fail on a hosted run and nowhere else.
+The engine describes each job to the extension that runs it in three variables: on a hosted run, `PUTNAMI_OFFLINE_DEPENDENCIES` and `PUTNAMI_JOB_CREDENTIAL_FD`; on any run, `PUTNAMI_NATIVE_REGISTRY_CREDENTIALS`, the native registry credentials it materialized for the job. They are addressed to the extension, not to the repository's tests. A test process that inherits them takes the paths of a job of the engine: it refuses to refresh a credential, treats every dependency as already downloaded, or starts no credential CLI while the engine's answer holds. Tests written for a developer machine then fail under the engine and nowhere else.
 
-`JobVars` lists the two names and `ScrubJobVars` removes them. A test launcher applies its own offline policy first and scrubs afterwards, so the settings that forbid a dependency download (`GOPROXY=off` for Go) stay in the test process. Only the two names go.
+`JobVars` lists the names and `ScrubJobVars` removes them. A test launcher applies its own offline policy first and scrubs afterwards, so the settings that forbid a dependency download (`GOPROXY=off` for Go) stay in the test process. Only the names go.
 
 ## API
 
@@ -69,7 +69,7 @@ ok := hostenv.IsPlatformIdentity("K_SERVICE") // true
 // A copy of a KEY=VALUE environment with the block removed.
 env := hostenv.ScrubPlatformIdentity(os.Environ())
 
-// The two job variables of a hosted run, and a copy of env without them.
+// The job variables, and a copy of env without them.
 jobNames := hostenv.JobVars()
 env = hostenv.ScrubJobVars(env)
 ```

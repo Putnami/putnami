@@ -352,6 +352,10 @@ func buildJobInvocation(
 	// received it, and only the spawn that hands one sets it
 	// (attachJobCredential). An inherited or declared value names nothing.
 	env = removeEnvKey(env, extensionproto.JobCredentialFDEnv)
+	// The native registry credentials this run materialized are a fact of
+	// this spawn too (nativeCredentialEnv): an inherited or declared value
+	// names another run's answers.
+	env = removeEnvKey(env, extensionproto.NativeRegistryCredentialsEnv)
 	// A hosted run states, last, that the job must not download
 	// dependencies, and holds no framework credential in its environment. A
 	// workspace-fetch outside a hosted install's dependency fetch is offline
@@ -417,12 +421,20 @@ func prepareJobInvocation(
 		return nil, nil, nil, fmt.Errorf("write context file: %w", err)
 	}
 
+	// The registry credential the task declares is materialized once per run
+	// and validity window, before the job starts and before its deadline runs
+	// (CLI ADR 0101).
+	nativeCredential := nativeCredentialEnv(ctx, job)
+
 	cancel := context.CancelFunc(func() {})
 	if deadline, bounded := TaskDeadline(job); bounded {
 		ctx, cancel = context.WithTimeout(ctx, deadline)
 	}
 
 	inv := buildJobInvocation(ws, job, jobCtx, extraEnv, runtimePath)
+	if nativeCredential != "" {
+		inv.env = append(inv.env, nativeCredential)
+	}
 	inv.contextFile = contextFile
 	inv.scratchLease = scratchLease
 	inv.args = append(inv.args, "--putnamiContext", contextFile)

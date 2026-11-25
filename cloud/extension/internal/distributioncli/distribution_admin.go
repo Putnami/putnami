@@ -306,7 +306,7 @@ func distributionGrantContext(params map[string]any, workspaceRoot string, env m
 	if !ok {
 		return "", "", "", clicore.NewError("Put registry endpoint is unavailable; run `putnami cloud login`", clicore.ExitAuth)
 	}
-	token, err = mintUserRegistryToken(params, workspaceRoot, env, ioctx, endpoint)
+	token, err = mintUserRegistryToken(params, workspaceRoot, env, ioctx, endpoint, 0)
 	return workspaceID, token, strings.TrimRight(endpoint.URL, "/"), err
 }
 

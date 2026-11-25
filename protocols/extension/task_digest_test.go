@@ -337,3 +337,14 @@ func TestTaskContractDigest_FixtureCorpus(t *testing.T) {
 		}
 	}
 }
+
+// The native registry credential says how a job runs, like the registry
+// endpoints it reads, so declaring it keeps every cache entry.
+func TestTaskContractDigest_IgnoresTheNativeRegistryCredential(t *testing.T) {
+	task := TaskDefinition{Kind: "command", Command: "go"}
+	declared := task
+	declared.NativeRegistryCredential = &TaskRegistryCredential{Registry: "go", Endpoint: "origin"}
+	if TaskContractDigest(task) != TaskContractDigest(declared) {
+		t.Fatal("declaring a native registry credential moves the task contract digest")
+	}
+}

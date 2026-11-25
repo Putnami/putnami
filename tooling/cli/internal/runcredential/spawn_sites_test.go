@@ -97,6 +97,8 @@ var spawnSites = map[string]spawnSite{
 		why: "the runtime of an extension not installed from the artifact store"},
 	"jobs/publication/release_set.go:newReleaseSetProvider": {spawns: 1, verdict: marked, by: "jobs/publication/release_set.go:newReleaseSetProvider",
 		why: "putnami cloud release-set, a CLI without the run credential that loads the workspace's extensions"},
+	"jobs/scheduler/native_registry_credential.go:(*nativeCredentials).ensure": {spawns: 1, verdict: marked, by: "jobs/scheduler/native_registry_credential.go:(*nativeCredentials).ensure",
+		why: "putnami cloud registry-token --materialize, a CLI without the run credential that loads the workspace's extensions"},
 	"jobs/scheduler/runner.go:(*jobInvocation).execCommand": {spawns: 1, verdict: marked, by: "jobs/scheduler/runner.go:(*jobInvocation).startJob",
 		why: "a job; a job that receives the credential starts as a holder in the same function"},
 	"runnerprovider/session.go:Spawn": {spawns: 1, verdict: marked, by: "runnerprovider/launch.go:LaunchSpecFor",
@@ -123,8 +125,9 @@ var spawnSites = map[string]spawnSite{
 		via: "resolve", why: "putnami cloud registry-token, the host-keyed registry credential"},
 
 	// Variables that hold a spawn helper; their uses are classified above.
-	"extension/http_client.go:ResolveRegistryToken":        {spawns: 1, verdict: alias},
-	"extension/http_client.go:ResolveRegistryTokenWithCLI": {spawns: 1, verdict: alias},
+	"extension/http_client.go:ResolveRegistryToken":                            {spawns: 1, verdict: alias},
+	"jobs/scheduler/native_registry_credential.go:materializeNativeCredential": {spawns: 1, verdict: alias},
+	"extension/http_client.go:ResolveRegistryTokenWithCLI":                     {spawns: 1, verdict: alias},
 
 	// Programs the repository does not control. A fresh checkout's git
 	// configuration and hooks directory are the runner's, so a git verb that
@@ -737,7 +740,7 @@ var spawnCalls = map[string]map[string]bool{
 	"syscall":               {"Exec": true, "ForkExec": true, "StartProcess": true},
 	"golang.org/x/sys/unix": {"Exec": true},
 	"go.putnami.dev/sdk/extension/registrycred": {
-		"ResolveToken": true, "ResolveTokenWithCLI": true, "EnsureNativeCredential": true,
+		"ResolveToken": true, "ResolveTokenWithCLI": true, "EnsureNativeCredential": true, "MaterializeNativeCredential": true,
 	},
 	"go.putnami.dev/sdk/extension/gitread": {
 		"CommitsSince": true, "CurrentBranch": true, "CurrentBranchName": true, "Executable": true,

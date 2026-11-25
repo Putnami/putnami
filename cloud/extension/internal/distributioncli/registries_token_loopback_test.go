@@ -29,7 +29,7 @@ func TestMintUserRegistryTokenNeverHandsTheMachineTokenToALoopbackRegistry(t *te
 				return nil, http.ErrUseLastResponse
 			})}}
 
-			token, err := mintUserRegistryToken(nil, t.TempDir(), env, ioctx, endpoint)
+			token, err := mintUserRegistryToken(nil, t.TempDir(), env, ioctx, endpoint, 0)
 			if err == nil || token != "" {
 				t.Fatalf("loopback registry token = %q, err = %v; want an error and no token", token, err)
 			}

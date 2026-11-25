@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -122,26 +123,54 @@ func EnsureNativeCredential(ctx context.Context, workspaceRoot, host string) Out
 		return Outcome{Kind: prior.Kind}
 	}
 
-	outcome := materializeNativeCredential(ctx, workspaceRoot, host)
+	// The engine materialized this host before it started the job, and its
+	// answer still holds (CLI ADR 0101): start no CLI.
+	outcome, answered := engineAnswer(host, time.Now())
+	if !answered {
+		executable, advertised := resolveCloudCLIExecutable()
+		outcome = materializeNativeCredential(ctx, executable, advertised, workspaceRoot, host, nil)
+	}
 	materialized[host] = outcome
 	return outcome
 }
 
+// MaterializeNativeCredential runs the seam for host once, with executable,
+// the absolute path of the CLI that calls it, and with registry.SeamForRunFlag,
+// so the credential stays valid for registry.NativeCredentialValidity. It
+// classifies the answer: a cloud that predates the flag answers
+// KindUnsupported. It
+// remembers nothing: the engine calls it once per host and per validity window
+// (registry.NativeCredentialValidity) and hands its jobs the answer
+// (extensionproto.NativeRegistryCredentialsEnv). Like EnsureNativeCredential,
+// it starts no process in a hosted run's job or for an empty host, and returns
+// KindSkipped.
+//
+// env is the child's environment, the caller's own when nil.
+func MaterializeNativeCredential(ctx context.Context, executable, workspaceRoot, host string, env []string) Outcome {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "" || hostedJob() {
+		return Outcome{Kind: KindSkipped}
+	}
+	return materializeNativeCredential(ctx, executable, true, workspaceRoot, host, env, "--"+registry.SeamForRunFlag)
+}
+
 // materializeNativeCredential runs the seam once and classifies the result.
-func materializeNativeCredential(ctx context.Context, workspaceRoot, host string) Outcome {
+// advertised says executable is the exact CLI the runner selected.
+// extra are the arguments after the fixed invocation.
+func materializeNativeCredential(ctx context.Context, executable string, advertised bool, workspaceRoot, host string, env []string, extra ...string) Outcome {
 	ctx, cancel := context.WithTimeout(ctx, materializeTimeout)
 	defer cancel()
 
-	executable, advertised := resolveCloudCLIExecutable()
 	// The host is a discrete argv element of a fixed command; no shell is
 	// involved, and the executable is the CLI-owned absolute path or the
 	// package-owned fallback, never caller input.
-	cmd := exec.CommandContext(ctx, executable,
+	args := append([]string{
 		registry.SeamParentCommand,
 		registry.SeamSubcommand,
-		"--"+registry.SeamHostFlag, host,
-		"--"+registry.SeamMaterializeFlag,
-	)
+		"--" + registry.SeamHostFlag, host,
+		"--" + registry.SeamMaterializeFlag,
+	}, extra...)
+	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.WaitDelay = credentialWaitDelay
 	if dir := strings.TrimSpace(workspaceRoot); dir != "" {
 		if info, err := os.Stat(dir); err == nil && info.IsDir() {
@@ -152,7 +181,10 @@ func materializeNativeCredential(ctx context.Context, workspaceRoot, host string
 	// first-use install. `putnami install` on a fresh checkout has not written
 	// the marker yet when it asks for this credential, so without the opt-out
 	// the child would start a nested install racing the parent's and time out.
-	cmd.Env = append(os.Environ(), "PUTNAMI_NO_AUTO_INSTALL=1")
+	if env == nil {
+		env = os.Environ()
+	}
+	cmd.Env = append(slices.Clone(env), "PUTNAMI_NO_AUTO_INSTALL=1")
 	if advertised {
 		// Same reason as resolveTokenCLIArgs: this child is already the exact
 		// CLI its runner selected, so a workspace-pin relaunch would replace its

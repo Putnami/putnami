@@ -117,6 +117,10 @@ func TestMain(m *testing.M) {
 	if wsproto.IsProbeInvocation(os.Args[1:]) {
 		os.Exit(runPathProbeRole())
 	}
+	// The engine of a local run starts its own executable, this test binary,
+	// with the engine's environment, for a native registry credential: it
+	// must not run the role that environment names.
+	clitest.AnswerRegistryTokenSeam()
 	switch role := os.Getenv(custodyRoleEnv); role {
 	case "":
 		fixtureproc.QuietRaceExit()

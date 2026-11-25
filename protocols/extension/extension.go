@@ -488,6 +488,22 @@ type TaskDefinition struct {
 	// sources it reads. Nil means the task uses the v2 contract, where the
 	// footprint is inferred — see task_contract.go for what changes and why.
 	Declares *TaskDeclaration `json:"declares,omitempty"`
+	// NativeRegistryCredential declares that the task's job reaches a registry
+	// whose package manager reads a native credential file (`.netrc`,
+	// `.npmrc`). The engine materializes that credential once per host for
+	// registry.NativeCredentialValidity before the first job that needs it,
+	// and tells the job so in NativeRegistryCredentialsEnv. It is an execution
+	// fact: it enters no cache key and no task contract digest.
+	NativeRegistryCredential *TaskRegistryCredential `json:"nativeRegistryCredential,omitempty"`
+}
+
+// TaskRegistryCredential names the endpoint of a native registry credential:
+// the member Endpoint of the project's effective `registries.<Registry>`
+// entry, a URL or a bare host. An absent entry, member or value declares
+// nothing.
+type TaskRegistryCredential struct {
+	Registry string `json:"registry"`
+	Endpoint string `json:"endpoint"`
 }
 
 // TaskBatchPolicy opts a cacheable per-project task into opportunistic

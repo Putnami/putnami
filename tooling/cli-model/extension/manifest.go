@@ -89,6 +89,7 @@ func Resolve(manifest *Manifest, extPath string) *ExtensionDescription {
 				job.Resources = task.Resources
 				job.Cache = task.Cache.IsEnabled()
 				job.Batchable = task.Batchable
+				job.NativeRegistryCredential = task.NativeRegistryCredential
 				// v2: derive cache key from task.Inputs
 				if len(task.Inputs) > 0 {
 					derivedKey := DeriveTaskCacheKey(task.Inputs)

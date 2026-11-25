@@ -100,7 +100,7 @@ func init() {
 		"from-stdin", "fromStdin", "reveal",
 		"stdin", "confirm", "execute", "sign-in", "signIn",
 		"auto-iam-authn", "autoIamAuthn", "health-check", "healthCheck", "supervise",
-		"for-registry", "forRegistry", "global", "opaque", "materialize", "include-revoked", "remove", "if-present", "ifPresent",
+		"for-registry", "forRegistry", "global", "opaque", "materialize", "for-run", "forRun", "include-revoked", "remove", "if-present", "ifPresent",
 		"skip-publish-config", "skipPublishConfig",
 		"skip-publish-migration", "skipPublishMigration", "stable", "archives",
 		"skip-publish-deployment", "skipPublishDeployment",

@@ -656,6 +656,12 @@ workspace's own configuration and runs
 writes the native credential itself — the `//<host>/:_authToken=` line in
 `~/.npmrc` for npm, the `machine <host>` entry in `~/.netrc` for Go.
 
+In a run, a task that declares `nativeRegistryCredential` does not start that
+command itself: the engine runs it once per host with `--for-run` before the
+first such job, again every 4 minutes while jobs need it, and tells each job
+so; the Go tasks that fetch modules declare the module origin
+([ADR 0101](adr/0101-the-engine-materializes-a-native-registry-credential-once-per-origin.md)).
+
 No token passes through the framework, and the host is the whole request. The
 refresh never blocks an install: with no cloud extension, no session
 (`run putnami cloud login`), or a registry the cloud does not manage, the

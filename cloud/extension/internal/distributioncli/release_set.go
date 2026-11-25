@@ -341,7 +341,7 @@ func resolveReleaseSetProviderCredential(
 		}
 		return resolvedRegistryToken{Token: token, Endpoint: endpoint}, nil
 	}
-	token, err := mintUserRegistryToken(params, workspaceRoot, env, ioctx, endpoint)
+	token, err := mintUserRegistryToken(params, workspaceRoot, env, ioctx, endpoint, 0)
 	if err != nil {
 		return resolvedRegistryToken{}, err
 	}

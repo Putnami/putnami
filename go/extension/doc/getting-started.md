@@ -379,8 +379,10 @@ putnami cloud registry-token --host <declared origin host> --materialize
 The cloud writes the `machine <host>` entry in the file `go` reads: the one
 `NETRC` names, or your own `~/.netrc` when `NETRC` is unset. The extension never
 sees the token, and the host is the whole request. The extension never sets
-`NETRC`, and it refreshes the entry before each job that fetches modules, so an
-expired credential is replaced before `go` sends it. `putnami projects create`
+`NETRC`. Each task that fetches modules declares the origin, so a run writes
+the entry once and again every 4 minutes, before the next job that needs it,
+and a job outside a run refreshes it before it starts: an expired credential is
+replaced before `go` sends it. `putnami projects create`
 refreshes it the same way before it resolves the framework version.
 
 `putnami upgrade` asks the origin for each module's channel itself

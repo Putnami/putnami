@@ -27,12 +27,12 @@ when the process enables it
 A credential is resolved by running one fixed command with the host as data:
 
 ```
-putnami cloud registry-token --host <host> [--materialize]
+putnami cloud registry-token --host <host> [--materialize [--for-run]]
 ```
 
 - The framework stores no host list, recipe model or credential file. It knows
   only the invocation tokens (`cloud`, `registry-token`, `host`,
-  `materialize`), which this module pins.
+  `materialize`, `for-run`), which this module pins.
 - **Stdout carries a bare bearer and nothing else.** `ValidBearer` accepts a
   non-empty token with no whitespace. A value with whitespace is a status line
   on the wrong stream and counts as "no token", never as a malformed
@@ -40,7 +40,11 @@ putnami cloud registry-token --host <host> [--materialize]
 - **`--materialize`** asks the cloud to write the host's native credential
   (`.npmrc`, `.netrc`, docker config) for an installer whose package manager
   takes no bearer on a pipe. It prints nothing; exit 2 means the cloud lacks
-  the shape, exit 3 means the user is not signed in.
+  the shape, exit 3 means the user is not signed in. With `--for-run`, the
+  credential it writes stays valid for at least `NativeCredentialValidity`
+  (4 minutes): the engine materializes it once per host for that window and
+  tells its jobs so
+  ([CLI ADR 0101](../../../../tooling/cli/doc/adr/0101-the-engine-materializes-a-native-registry-credential-once-per-origin.md)).
 - **Absence is a supported answer.** No cloud, an unmanaged host and a
   signed-out user all yield "no token"; the caller uses the standard floor
   (explicit token, `.npmrc`, platform keychain). The cloud's stderr is relayed

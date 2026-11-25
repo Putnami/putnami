@@ -277,3 +277,26 @@ func TestRefreshModuleOriginCredential_PrefersTheEnvironmentDeclaration(t *testi
 		t.Fatalf("hosts = %v, want [go.putnami.dev] — GO_REGISTRY_URL wins", *hosts)
 	}
 }
+
+// TestTheEngineMaterializesTheOriginOfEveryModuleFetchingTask pins the
+// manifest to the dispatch table: a task whose job refreshes the module
+// origin's credential declares it, so the engine materializes it once per run
+// and the job starts no CLI (CLI ADR 0101); a task whose job does not declares
+// nothing, so the engine starts no CLI for it.
+func TestTheEngineMaterializesTheOriginOfEveryModuleFetchingTask(t *testing.T) {
+	manifest := loadExtensionManifest(t)
+	for name, task := range manifest.Tasks {
+		if task.Command != "{extensionRuntime}" || len(task.Args) == 0 {
+			continue
+		}
+		declared := task.NativeRegistryCredential
+		switch {
+		case moduleFetchingJobs[task.Args[0]] && declared == nil:
+			t.Errorf("task %s runs job %s, which fetches modules, and declares no nativeRegistryCredential", name, task.Args[0])
+		case !moduleFetchingJobs[task.Args[0]] && declared != nil:
+			t.Errorf("task %s runs job %s, which fetches no module, and declares a nativeRegistryCredential", name, task.Args[0])
+		case declared != nil && (declared.Registry != "go" || declared.Endpoint != "origin"):
+			t.Errorf("task %s declares %+v, want the go origin", name, *declared)
+		}
+	}
+}

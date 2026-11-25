@@ -32,6 +32,9 @@ func TestConformance_Seam(t *testing.T) {
 	if SeamHostFlag != "host" {
 		t.Errorf("SeamHostFlag = %q, want host", SeamHostFlag)
 	}
+	if SeamForRunFlag != "for-run" {
+		t.Errorf("SeamForRunFlag = %q, want for-run", SeamForRunFlag)
+	}
 	if SeamMaterializeFlag != "materialize" {
 		t.Errorf("SeamMaterializeFlag = %q, want materialize", SeamMaterializeFlag)
 	}

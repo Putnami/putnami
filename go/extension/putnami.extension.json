@@ -613,6 +613,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["test"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "env": {
         "APP_ENV": "test"
@@ -702,6 +703,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["test-race"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "env": {
         "APP_ENV": "test"
@@ -820,6 +822,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["workspace-sync"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{workspaceRoot}",
       "cache": false,
       "timeoutMs": 300000,
@@ -911,6 +914,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build", "--phase", "tidy"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
@@ -939,6 +943,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build", "--phase", "tidy-check"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
@@ -967,6 +972,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build-generate"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
@@ -1017,6 +1023,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build-describe"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 900000,
       "inputs": {
@@ -1100,6 +1107,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build", "--phase", "compile"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 900000,
       "inputs": {
@@ -1156,6 +1164,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build", "--phase", "cross-compile", "--trimpath", "--cgo", "false"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 900000,
       "inputs": {
@@ -1286,6 +1295,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["lint", "--tool", "golangci-lint"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 600000,
       "inputs": {
@@ -1331,6 +1341,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["lint", "--tool", "golangci-lint"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 600000,
       "inputs": {
@@ -1422,6 +1433,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["lint", "--tool", "staticcheck"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
@@ -1456,6 +1468,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["serve"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "cache": false,
       "timeoutMs": -1,
@@ -1472,6 +1485,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["run"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "cache": false,
       "timeoutMs": -1,
@@ -1488,6 +1502,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["package", "--go"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
@@ -1511,6 +1526,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["package", "--archives"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 1800000,
       "cache": { "versionAware": true },
@@ -1539,6 +1555,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["package", "--docker"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "cache": { "versionAware": true },
@@ -1563,6 +1580,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["publish", "--go"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
@@ -1584,6 +1602,7 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["publish", "--docker"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "cache": false,

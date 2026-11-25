@@ -1348,6 +1348,25 @@
         },
         "declares": {
           "$ref": "#/$defs/taskDeclaration"
+        },
+        "nativeRegistryCredential": {
+          "$ref": "#/$defs/taskRegistryCredential"
+        }
+      }
+    },
+    "taskRegistryCredential": {
+      "type": "object",
+      "description": "The registry whose native credential (.netrc, .npmrc) the task's job reads: the member `endpoint` of the project's effective `registries.<registry>` entry, a URL or a bare host. The engine materializes it once per host for a validity window before the first job that needs it, and tells the job so in PUTNAMI_NATIVE_REGISTRY_CREDENTIALS. It enters no cache key.",
+      "additionalProperties": false,
+      "required": ["registry", "endpoint"],
+      "properties": {
+        "registry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },

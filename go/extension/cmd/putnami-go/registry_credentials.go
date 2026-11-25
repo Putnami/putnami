@@ -102,6 +102,11 @@ func withRegistryCredential(name string, job cli.JobFunc) cli.JobFunc {
 // leaves NETRC alone, `go` reads the standard ~/.netrc, and the cloud writes
 // the `machine <host>` entry there.
 //
+// Each task that runs one of moduleFetchingJobs declares the origin in its
+// manifest (nativeRegistryCredential), so in a run the engine has written the
+// entry once for the run before it started the job, and the refresh starts no
+// CLI while that answer holds (CLI ADR 0101).
+//
 // A caller that pinned NETRC is refreshed too: the cloud writes the entry into
 // the file NETRC names, the one `go` reads, so skipping the refresh would leave
 // that file's entry to expire.

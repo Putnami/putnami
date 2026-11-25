@@ -58,7 +58,16 @@ func RegistryToken(params map[string]any, workspaceRoot string, env map[string]s
 	if err != nil {
 		return err
 	}
-	token, err := mintUserRegistryToken(params, workspaceRoot, env, ioctx, endpoint)
+	// A credential materialized for a run stays valid for the window the
+	// engine tells its jobs (registry.NativeCredentialValidity), so a stored
+	// token is reused for it only when it outlives that window. Any other
+	// shape keeps the stored token until it is about to expire.
+	freshFor := time.Duration(0)
+	if clicore.Truthy(clicore.Param(params, "materialize")) &&
+		clicore.Truthy(clicore.Param(params, regproto.SeamForRunFlag, "forRun")) {
+		freshFor = regproto.NativeCredentialValidity
+	}
+	token, err := mintUserRegistryToken(params, workspaceRoot, env, ioctx, endpoint, freshFor)
 	if err != nil {
 		// A session on PUTNAMI_CLOUD_TOKEN alone cannot sign in, so it is not
 		// told to.
@@ -75,7 +84,7 @@ func RegistryToken(params map[string]any, workspaceRoot string, env map[string]s
 			map[string]any{"registry": endpoint.Registry, "host": endpoint.Host},
 			params,
 			ioctx,
-			fmt.Sprintf("Materialized a short-lived %s credential for one immediate native invocation.", endpoint.Registry),
+			fmt.Sprintf("Materialized a short-lived %s credential.", endpoint.Registry),
 		)
 		return nil
 	}
@@ -163,6 +172,7 @@ func mintUserRegistryToken(
 	env map[string]string,
 	ioctx clicore.IO,
 	endpoint RegistryEndpoint,
+	freshFor time.Duration,
 ) (string, error) {
 	if err := delegatedRegistryMintError(env); err != nil {
 		return "", err
@@ -176,7 +186,7 @@ func mintUserRegistryToken(
 		)
 	}
 	now := nowOrDefault(ioctx.Now)()
-	if token, ok, err := cachedRegistryAccessToken(env, endpoint.Host, clientID, requestedScope, now); err != nil {
+	if token, ok, err := cachedRegistryAccessToken(env, endpoint.Host, clientID, requestedScope, now.Add(freshFor)); err != nil {
 		return "", err
 	} else if ok {
 		return token, nil
@@ -201,6 +211,12 @@ func mintUserRegistryToken(
 	}
 	if auth == nil || auth.AccessToken == "" {
 		return "", clicore.NewError("auth server returned an empty registry access token", clicore.ExitAPI)
+	}
+	// A fresh token that expires inside the window a run asked for would
+	// break the promise the window makes: the caller then refreshes the
+	// credential itself, job by job.
+	if freshFor > 0 && !clicore.AccessTokenFresh(auth.AccessToken, mintedExpiry(auth.AccessToken, auth.ExpiresAt), now.Add(freshFor)) {
+		return "", clicore.NewError(fmt.Sprintf("the registry token expires before the %s a run asked for", freshFor), clicore.ExitAPI)
 	}
 	if err := storeRegistryAccessToken(env, endpoint.Host, registryAccessToken{
 		AccessToken: auth.AccessToken,
@@ -611,4 +627,16 @@ func readDockerToken(env map[string]string, host string) (string, error) {
 		return token, nil
 	}
 	return "", nil
+}
+
+// mintedExpiry is the expiry of a minted token: the one the token response
+// stated, else the token's own exp claim, else "" (unknown).
+func mintedExpiry(token, stated string) string {
+	if stated != "" {
+		return stated
+	}
+	if exp := clicore.ValueFloat(clicore.DecodeJWT(token), "exp"); exp > 0 {
+		return time.Unix(int64(exp), 0).UTC().Format(time.RFC3339Nano)
+	}
+	return ""
 }

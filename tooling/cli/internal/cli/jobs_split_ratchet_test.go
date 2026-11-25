@@ -207,6 +207,9 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/sdk/extension/filelock",
 			"go.putnami.dev/sdk/extension/gitread",
 			"go.putnami.dev/sdk/extension/pkgmeta",
+			// The registry-token seam the engine calls once per run for a
+			// native registry credential a task declares.
+			"go.putnami.dev/sdk/extension/registrycred",
 			"go.putnami.dev/sdk/extension/procstat",
 			"go.putnami.dev/sdk/extension/proctree",
 			"go.putnami.dev/sdk/extension/releaseset",
@@ -234,7 +237,6 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/workspace",
 			"go.putnami.dev/sdk/extension/gittest",
 			"go.putnami.dev/sdk/extension/ownerperm",
-			"go.putnami.dev/sdk/extension/registrycred",
 			"go.putnami.dev/tooling/cli/internal/cacheprovider",
 			"go.putnami.dev/tooling/cli/internal/fixtureproc",
 			"go.putnami.dev/tooling/cli/internal/jobs/remotecache",

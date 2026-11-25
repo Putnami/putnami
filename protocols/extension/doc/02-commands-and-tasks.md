@@ -434,6 +434,7 @@ A task is an atomic executable unit — a subprocess with defined inputs, output
 | `cache` | no | Cache policy |
 | `batchable` | no | Same-key batching policy for per-project tasks: opportunistic for a cached task, one command per verb for a task whose cache is off |
 | `declares` | no | Task contract v3: exact outputs, effects, the publish channels a publish task serves, and source mutation |
+| `nativeRegistryCredential` | no | `{"registry": "go", "endpoint": "origin"}`: the job reads the native credential (`.netrc`, `.npmrc`) of that endpoint of the project's effective `registries`. The engine materializes it once per host for 4 minutes before the first job that needs it and tells the job in `PUTNAMI_NATIVE_REGISTRY_CREDENTIALS`, which `registrycred.EnsureNativeCredential` reads. Never part of cache keys |
 | `inputSchemaRef` | no | Reference to a contract schema for input validation |
 | `outputSchemaRef` | no | Reference to a contract schema for output validation |
 

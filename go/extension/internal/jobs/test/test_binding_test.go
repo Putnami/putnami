@@ -143,6 +143,7 @@ func TestBuildTestEnv_HostedRunKeepsDownloadsOffAndScrubsTheJobVariables(t *test
 	}
 	t.Setenv("PUTNAMI_OFFLINE_DEPENDENCIES", "1")
 	t.Setenv("PUTNAMI_JOB_CREDENTIAL_FD", "7")
+	t.Setenv("PUTNAMI_NATIVE_REGISTRY_CREDENTIALS", `{"go.putnami.dev":{"validUntil":"2030-01-01T00:00:00Z","outcome":"materialized"}}`)
 	t.Setenv("GOPROXY", "https://proxy.golang.org,direct")
 	t.Setenv("GONOPROXY", "corp.example/*")
 	t.Setenv("GOFLAGS", "-trimpath")
