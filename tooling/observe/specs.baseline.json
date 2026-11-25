@@ -88,6 +88,7 @@
     "tooling/observe-go#go-report-paths",
     "tooling/observe-host-report#publish-fails-open",
     "tooling/observe-host-report#publish-host-endpoints",
+    "tooling/observe-host-report#publish-level-3-partly-compared",
     "tooling/observe-host-report#publish-level-3-preview",
     "tooling/observe-host-report#publish-level-3-status",
     "tooling/observe-host-report#publish-needs-upload",

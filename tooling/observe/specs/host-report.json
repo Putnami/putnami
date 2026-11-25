@@ -41,6 +41,13 @@
       ]
     },
     {
+      "id": "publish-level-3-partly-compared",
+      "text": [
+        "A partly compared signal is named with the number of components it did not compare; when the reporter lists 50, the most Delivery lists, the note says at least 50.",
+        "The status description counts the unknown signals and the partly compared ones apart."
+      ]
+    },
+    {
       "id": "publish-level-3-status",
       "text": [
         "The status description ends with what level 3 would have held when that fits in its 140 characters.",

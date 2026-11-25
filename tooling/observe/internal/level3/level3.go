@@ -19,6 +19,9 @@ const (
 	maxReason = 200
 	// noReason is the reason of an unknown signal that gave none.
 	noReason = "the reporter gave no reason"
+	// MaxNotCompared is the most components Delivery lists as not compared
+	// for one signal: a list that long may have been cut.
+	MaxNotCompared = 50
 )
 
 // Signal is one signal of the preview.
@@ -35,6 +38,12 @@ type Signal struct {
 	// NotCompared counts the components a known signal could not compare,
 	// so its count holds for the others only.
 	NotCompared int
+}
+
+// NotComparedCut says whether the reporter may have cut the list of
+// components the signal did not compare: it lists MaxNotCompared or more.
+func (s Signal) NotComparedCut() bool {
+	return s.NotCompared >= MaxNotCompared
 }
 
 // Preview is the level 3 preview of one change.

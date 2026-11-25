@@ -492,6 +492,12 @@ A report it cannot find or read is a warning in the same summary, such as `obser
 
 With `--upload --publish`, on a pull or merge request, `putnami observe` sets the commit status `putnami/observe` on the pull request's head commit, or on the commit of the merge request pipeline, with a one-line summary such as `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`. It also writes one summary note with the components, their tests and coverage, the least covered changed lines and the dependency changes. The status and the note's first link open the full report the upload stored, once the reporter answers its URL; until then they link the CI run. The next run updates the same note instead of adding one.
 
+When Putnami Cloud answers the upload with a level 3 preview, one line of the note says what level 3 would have held on the change, signal by signal: broken rules, lost coverage, deleted decisions, untested specs and vanished tests. A signal the evidence did not measure is named as unknown with its reason, never as zero. A signal that could not compare every component is named as partly compared, with the number of components it did not compare, or "at least 50" when the list reaches the 50 Putnami Cloud lists at most. With either, the line says "as far as the evidence tells", or that the evidence does not tell when every signal is unknown. It then names the next step to reach level 3 and links the report:
+
+> **Level 3 preview** against `main`: as far as the evidence tells, level 3 would have held this change on 1 broken rule; unknown: vanished tests (`no-base-test-cases`). Next step to level 3: make vanished tests known; the report shows how.
+
+The status ends with the same answer when it fits in its 140 characters, such as `; level 3 would have held it on 2 signals, 1 unknown`, else in fewer words, such as `; level 3 preview: 2 held, 1 unknown, 1 partial`, when those fit. The preview informs and never blocks: the status stays success whatever it holds. [Uploading the evidence](/docs/tooling-&-workspace/observe/observe#uploading-the-evidence) describes the preview the reporter answers.
+
 Without `--upload`, after a failed upload, without the code host token, or on a branch push, the summary says why nothing was posted, and the job still passes. On a pull request from a fork, GitHub gives a read-only `GITHUB_TOKEN` and refuses the post; the job still passes. [Pull requests from forks](#pull-requests-from-forks) relays it from your repository instead.
 
 ### 6) Upload the evidence to Putnami Cloud

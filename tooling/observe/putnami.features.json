@@ -1271,6 +1271,20 @@
           }
         },
         {
+          "id": "publish-level-3-partly-compared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-capped-list-reads-at-least-50",
+              "the-status-counts-partly-compared-signals-apart"
+            ]
+          }
+        },
+        {
           "id": "publish-level-3-status",
           "stage": "coded",
           "evidenceKinds": [

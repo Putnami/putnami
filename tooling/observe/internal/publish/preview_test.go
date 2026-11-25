@@ -95,7 +95,7 @@ func TestAnUnknownSignalIsNeverAZero(t *testing.T) {
 		},
 		"a signal partly compared": {
 			allKnown(0, 0, 0, 0, 0)[:len(allKnown(0, 0, 0, 0, 0))-2] + `,"notCompared":["apps/web","apps/api"]}}`,
-			"**Level 3 preview** against `main`: as far as the evidence tells, no known level 3 signal would have held this change; " +
+			"**Level 3 preview** against `main`: as far as the evidence tells, no level 3 signal would have held this change on the components the evidence compared; " +
 				"partly compared: vanished tests (2 components not compared).",
 		},
 	} {
@@ -157,7 +157,7 @@ func TestTheStatusSaysWhatLevel3WouldHaveHeld(t *testing.T) {
 		`{"brokenRules":{"state":"known","count":0},"coverageLost":{"state":"known","count":0},"deletedDecisions":{"state":"known","count":0},"untestedSpecs":{"state":"known","count":0}}`: "no known level 3 signal would have held it, 1 unknown",
 		`{}`: "level 3 preview unknown",
 		allKnown(0, 0, 0, 0, 2)[:len(allKnown(0, 0, 0, 0, 2))-2] + `,"notCompared":["a"]}}`: "level 3 would have held it on 1 signal",
-		allKnown(0, 0, 0, 0, 0)[:len(allKnown(0, 0, 0, 0, 0))-2] + `,"notCompared":["a"]}}`: "no known level 3 signal would have held it, 1 unknown",
+		allKnown(0, 0, 0, 0, 0)[:len(allKnown(0, 0, 0, 0, 0))-2] + `,"notCompared":["a"]}}`: "level 3 preview: 0 held, 1 partial",
 	} {
 		if got := StatusDescription(o, preview(t, raw)); got != base+"; "+want {
 			t.Errorf("status %q, want %q", got, base+"; "+want)
@@ -175,13 +175,75 @@ func TestTheStatusSaysWhatLevel3WouldHaveHeld(t *testing.T) {
 	}
 	long.Analysis.ChangedLineCoverage = &evidence.ChangedLineCoverage{CoveredLines: 1, TotalLines: 1}
 	long.Analysis.DependencyChanges = make([]evidence.DependencyChange, 1000)
-	none := preview(t, allKnown(0, 0, 0, 0, 0)[:len(allKnown(0, 0, 0, 0, 0))-len(`,"vanishedTests":{"state":"known","count":0}}`)]+"}")
+	none := preview(t, `{"vanishedTests":{"state":"known","count":0,"notCompared":["a"]}}`)
 	want := Description(long)
-	if len([]rune(want+"; "+level3Short(*none))) <= maxDescription {
+	if len([]rune(want+"; "+level3Compact(*none))) <= maxDescription {
 		t.Fatalf("the long description %q leaves room for the preview", want)
 	}
 	if got := StatusDescription(long, none); got != want {
 		t.Fatalf("status %q, want the description alone %q", got, want)
+	}
+}
+
+// notCompared lists n components as not compared on vanished tests, whose
+// count is vanished, the other signals known and zero.
+func notCompared(vanished, n int) string {
+	names := make([]string, n)
+	for i := range names {
+		names[i] = fmt.Sprintf("%q", fmt.Sprintf("apps/c%d", i))
+	}
+	full := allKnown(0, 0, 0, 0, vanished)
+	return full[:len(full)-2] + `,"notCompared":[` + strings.Join(names, ",") + `]}}`
+}
+
+func TestACappedListReadsAtLeast50(t *testing.T) {
+	spectest.Proves(t, feature, "publish-level-3-partly-compared", "a-capped-list-reads-at-least-50")
+	for n, want := range map[int]string{
+		1:                         "partly compared: vanished tests (1 component not compared).",
+		level3.MaxNotCompared - 1: "partly compared: vanished tests (49 components not compared).",
+		level3.MaxNotCompared:     "partly compared: vanished tests (at least 50 components not compared).",
+	} {
+		line := previewLine(t, Note(pullRequest(), "", preview(t, notCompared(0, n))))
+		if !strings.Contains(line, want) {
+			t.Errorf("%d not compared: line\n%s\nwant it to hold\n%s", n, line, want)
+		}
+		if !strings.Contains(line, "as far as the evidence tells") || strings.Contains(line, "nothing") {
+			t.Errorf("%d not compared: a partly compared signal reads as known whole: %s", n, line)
+		}
+	}
+}
+
+func TestTheStatusCountsPartlyComparedSignalsApart(t *testing.T) {
+	spectest.Proves(t, feature, "publish-level-3-partly-compared", "the-status-counts-partly-compared-signals-apart")
+	o := pullRequest()
+	base := Description(o)
+	// Broken rules hold the change, lost coverage is unknown and vanished
+	// tests are partly compared: three signals, counted apart.
+	apart := strings.Replace(notCompared(0, 3), `"brokenRules":{"state":"known","count":0}`, `"brokenRules":{"state":"known","count":1}`, 1)
+	apart = strings.Replace(apart, `"coverageLost":{"state":"known","count":0}`, `"coverageLost":{"state":"unknown","reason":"no-coverage"}`, 1)
+	for raw, want := range map[string]string{
+		notCompared(0, 2): "level 3 preview: 0 held, 1 partial",
+		// A partly compared signal that holds the change counts as held:
+		// what it holds is known.
+		notCompared(2, level3.MaxNotCompared): "level 3 would have held it on 1 signal",
+		apart:                                 "level 3 preview: 1 held, 1 unknown, 1 partial",
+	} {
+		got := StatusDescription(o, preview(t, raw))
+		if got != base+"; "+want {
+			t.Errorf("status %q, want %q", got, base+"; "+want)
+		}
+	}
+	// With room for it, the status says it in full.
+	for raw, want := range map[string]string{
+		apart:             "level 3 would have held it on 1 signal, 1 unknown, 1 partly compared",
+		notCompared(0, 2): "no known level 3 signal would have held it, 1 partly compared",
+	} {
+		if got := level3Short(*preview(t, raw)); got != want {
+			t.Errorf("short form %q, want %q", got, want)
+		}
+	}
+	if got, want := level3Compact(*preview(t, allKnown(1, 0, 2, 0, 0))), "level 3 preview: 2 held"; got != want {
+		t.Errorf("compact form %q, want %q", got, want)
 	}
 }
 

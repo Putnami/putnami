@@ -55,42 +55,73 @@ func Description(o observe.Observation) string {
 
 // StatusDescription is Description followed by what level 3 would have held
 // on the change, when the reporter answered a preview and the whole fits in
-// maxDescription characters.
+// maxDescription characters, in fewer words when only those fit.
 func StatusDescription(o observe.Observation, preview *level3.Preview) string {
 	description := Description(o)
 	if preview == nil {
 		return description
 	}
-	if with := description + "; " + level3Short(*preview); len([]rune(with)) <= maxDescription {
-		return with
+	for _, short := range []string{level3Short(*preview), level3Compact(*preview)} {
+		if with := description + "; " + short; len([]rune(with)) <= maxDescription {
+			return with
+		}
 	}
 	return description
 }
 
 // level3Short says in a few words what level 3 would have held: the number
-// of signals that would have held the change, and the ones the evidence does
-// not fully tell, unknown or partly compared.
+// of signals that would have held the change, then the unknown signals and
+// the partly compared ones that hold nothing, each counted apart. A partly
+// compared signal that holds the change counts as held: what it holds is
+// known.
 func level3Short(p level3.Preview) string {
-	// A partly compared signal that holds the change counts as held: what it
-	// holds is known.
-	held, uncertain := len(p.Held()), len(p.Unknown())
+	held, unknown, partial := len(p.Held()), len(p.Unknown()), partlyComparedZeros(p)
+	level := fmt.Sprintf("level %d", p.Level)
+	var short string
+	switch {
+	case unknown == len(p.Signals):
+		return level + " preview unknown"
+	case held > 0:
+		short = level + " would have held it on " + count(held, "signal")
+	case unknown+partial == 0:
+		return level + " would have held nothing"
+	default:
+		short = "no known " + level + " signal would have held it"
+	}
+	return short + uncertain(unknown, partial, "partly compared")
+}
+
+// level3Compact is level3Short in fewer words, for a description that has no
+// room for it, with the same counts.
+func level3Compact(p level3.Preview) string {
+	held, unknown, partial := len(p.Held()), len(p.Unknown()), partlyComparedZeros(p)
+	if unknown == len(p.Signals) || held+unknown+partial == 0 {
+		return level3Short(p)
+	}
+	return fmt.Sprintf("level %d preview: %d held", p.Level, held) + uncertain(unknown, partial, "partial")
+}
+
+// partlyComparedZeros counts the partly compared signals that hold nothing.
+func partlyComparedZeros(p level3.Preview) int {
+	n := 0
 	for _, s := range p.Partial() {
 		if s.Count == 0 {
-			uncertain++
+			n++
 		}
 	}
-	level := fmt.Sprintf("level %d", p.Level)
-	switch {
-	case len(p.Unknown()) == len(p.Signals):
-		return level + " preview unknown"
-	case uncertain == 0 && held == 0:
-		return level + " would have held nothing"
-	case uncertain == 0:
-		return level + " would have held it on " + count(held, "signal")
-	case held == 0:
-		return fmt.Sprintf("no known %s signal would have held it, %d unknown", level, uncertain)
+	return n
+}
+
+// uncertain names the unknown signals and the partly compared ones apart.
+func uncertain(unknown, partial int, partialWord string) string {
+	text := ""
+	if unknown > 0 {
+		text += fmt.Sprintf(", %d unknown", unknown)
 	}
-	return fmt.Sprintf("%s would have held it on %s, %d unknown", level, count(held, "signal"), uncertain)
+	if partial > 0 {
+		text += fmt.Sprintf(", %d %s", partial, partialWord)
+	}
+	return text
 }
 
 // Note is the Markdown summary note. Its first line is Marker, and its first
@@ -151,8 +182,10 @@ func level3Line(p level3.Preview, reportURL string) string {
 			phrases[i] = s.Phrase()
 		}
 		fmt.Fprintf(&b, "level %d would have held this change on %s", p.Level, series(phrases))
-	case hedge:
+	case len(unknown) > 0:
 		fmt.Fprintf(&b, "as far as the evidence tells, no known level %d signal would have held this change", p.Level)
+	case hedge:
+		fmt.Fprintf(&b, "as far as the evidence tells, no level %d signal would have held this change on the components the evidence compared", p.Level)
 	default:
 		fmt.Fprintf(&b, "level %d would have held nothing on this change", p.Level)
 	}
@@ -168,7 +201,13 @@ func level3Line(p level3.Preview, reportURL string) string {
 	if len(partial) > 0 {
 		parts := make([]string, len(partial))
 		for i, s := range partial {
-			parts[i] = fmt.Sprintf("%s (%s not compared)", s.Label(), count(s.NotCompared, "component"))
+			notCompared := count(s.NotCompared, "component")
+			if s.NotComparedCut() {
+				// The reporter lists at most MaxNotCompared: the list may
+				// have been cut, so its length is a floor.
+				notCompared = "at least " + notCompared
+			}
+			parts[i] = fmt.Sprintf("%s (%s not compared)", s.Label(), notCompared)
 		}
 		b.WriteString("; partly compared: " + strings.Join(parts, ", "))
 	}

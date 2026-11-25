@@ -283,7 +283,7 @@ upload opened.
 ```json
 "level3Preview": {"level": 3, "baseBranch": "main",
   "brokenRules": {"state": "known", "count": 1},
-  "vanishedTests": {"state": "unknown", "reason": "no run of main to compare"}}
+  "vanishedTests": {"state": "unknown", "reason": "no-base-test-cases"}}
 ```
 
 The signals are `brokenRules`, `coverageLost`, `deletedDecisions`,
@@ -292,7 +292,9 @@ when its `state` is `known` and its count is a non-negative integer. Any other
 signal, a missing one included, is unknown, with the `reason` the reporter
 gave or one observe writes: observe never reads it as zero. A known signal
 whose `notCompared` lists components is partly compared: its count holds for
-the other components only. A `level3Preview` that is not an object is dropped
+the other components only. Putnami Cloud lists at most 50 components a signal
+did not compare, so a list of 50 may have been cut, and the note then says at
+least 50. A `level3Preview` that is not an object is dropped
 without a diagnostic, and the upload still succeeded. Observe keeps the
 preview for `--publish`.
 
@@ -401,20 +403,26 @@ On a GitHub pull request or a GitLab merge request it:
    `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`,
    or says that the base was not resolved. With a level 3 preview it ends
    with what level 3 would have held, for example `; level 3 would have held
-   it on 2 signals, 1 unknown`, when that fits in the status's 140
-   characters. It
+   it on 2 signals, 1 unknown, 1 partly compared`, when that fits in the
+   status's 140 characters, else in fewer words, `; level 3 preview: 2 held,
+   1 unknown, 1 partial`, when those fit. It counts apart the signals that
+   would have held the change, the unknown ones and the partly compared ones
+   that hold nothing; a partly compared signal that holds the change counts
+   as held. It
    links the report (its `target_url`), or the CI run when the reporter
    answered no URL.
 2. Writes one Markdown note on the request. Its first link opens the report;
    without a report URL it links the CI run alone. With a level 3 preview,
    one line under the summary says what level 3 would have held on the
    change, names each unknown signal with its reason and each partly
-   compared one, says "as far as the evidence tells" when one is either,
-   never "nothing", and names the next step to reach level 3:
+   compared one with the number of components it did not compare, says "as
+   far as the evidence tells" when one is either, or that the evidence does
+   not tell when every signal is unknown, never "nothing", and names the
+   next step to reach level 3:
 
    > **Level 3 preview** against `main`: as far as the evidence tells, level 3
    > would have held this change on 1 broken rule; unknown: vanished tests
-   > (`no run of main to compare`). Next step to level 3: make vanished tests
+   > (`no-base-test-cases`). Next step to level 3: make vanished tests
    > known; the report shows how.
 
    The preview informs and never blocks: the status stays success whatever
