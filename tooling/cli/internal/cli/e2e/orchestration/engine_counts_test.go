@@ -66,3 +66,32 @@ func total(counts map[string]int64) int64 {
 	}
 	return sum
 }
+
+// writingWas is the ledger of the writing run before a write under an ignored
+// .putnami kept the digests of Git candidates: every task listed its project's
+// candidates again, with one rev-parse and two ls-files, after the task before
+// it wrote its report.
+const writingWas = "engine job 9 · git 42 | engine git for-each-ref 1 · ls-files 21 · rev-parse 15 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none"
+
+// TestAWriteUnderAnIgnoredPutnamiListsNoCandidateAgain holds the git calls of
+// a run whose tasks key on their project's Git candidates and each write a
+// report under the workspace's .putnami, which Git ignores: each project's
+// candidates are listed once, by its first task, whatever the tasks after it
+// wrote. The run asks Git once whether .putnami is excluded, and reads the
+// workspace's cut once to see that it lists nothing below it (tooling/cli ADR
+// 0106).
+func TestAWriteUnderAnIgnoredPutnamiListsNoCandidateAgain(t *testing.T) {
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	hometest.Temp(t)
+	root := clitest.WritingCountsFixture(t, 3)
+	clitest.ForgetTaskHistory(t, root)
+	cold := clitest.RunCounts(t, root, "lint,test,build", "--all", "--max-parallel", "1", "--no-cache")
+	const want = "engine job 9 · git 26 | engine git check-ignore 1 · for-each-ref 1 · ls-files 10 · rev-parse 9 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none"
+	if got := cold.Ledger(); got != want {
+		t.Errorf("a run of 9 tasks that write under the ignored .putnami:\n got  %s\n want %s\n%s", got, want, countsHint)
+	}
+	if err := checkCountsRule(writingWas, want); err != nil {
+		t.Errorf("the writing run: %v\n was %s\n now %s\n%s", err, writingWas, want, countsHint)
+	}
+}

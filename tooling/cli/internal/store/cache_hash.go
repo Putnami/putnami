@@ -844,6 +844,14 @@ type InputRegion struct {
 	roots     []string
 	spelled   int
 	unbounded bool
+	// nonCandidates, when set, is the part of the region where the digest
+	// reads files that are not Git candidates: the region of its includes
+	// other than "git:" patterns, empty when every include is one. The rest
+	// of the region holds Git candidates only, which a write under a
+	// directory Git excludes as a whole neither adds, removes nor changes
+	// (CacheManager.SetCandidateExclusion). Nil, the whole region may hold
+	// files that are not candidates.
+	nonCandidates *InputRegion
 }
 
 // globMetacharacters make a path segment a glob for path.Match and
@@ -865,20 +873,40 @@ const globMetacharacters = `*?[\`
 //   - a "git:" pattern matches candidate paths relative to dir, where "*" and
 //     "**" also match ".." segments, so it is bounded only when its static
 //     prefix names a segment other than ".." or ".".
+//
+// When an include is a "git:" pattern, the region also records the part its
+// other includes bound (InputRegion.nonCandidates): every file outside that
+// part is a Git candidate.
 func FileInputRegion(dir string, patterns []string) InputRegion {
 	if len(patterns) == 0 {
 		return PathsRegion([]string{dir})
 	}
 	includes, _ := wsproto.SplitFilePatterns(patterns)
-	roots := make([]string, 0, len(includes))
+	var all, others []string
+	allBounded, othersBounded, git := true, true, false
 	for _, pattern := range includes {
+		_, candidates := wsproto.GitFilePattern(pattern)
+		git = git || candidates
 		root, bounded := patternRoot(dir, pattern)
-		if !bounded {
-			return InputRegion{unbounded: true}
+		allBounded = allBounded && bounded
+		if !candidates {
+			othersBounded = othersBounded && bounded
+			others = append(others, root)
 		}
-		roots = append(roots, root)
+		all = append(all, root)
 	}
-	return PathsRegion(roots)
+	region := InputRegion{unbounded: true}
+	if allBounded {
+		region = PathsRegion(all)
+	}
+	if git {
+		nonCandidates := InputRegion{unbounded: true}
+		if othersBounded {
+			nonCandidates = PathsRegion(others)
+		}
+		region.nonCandidates = &nonCandidates
+	}
+	return region
 }
 
 // PathsRegion is the region of the named paths and everything beneath them: the

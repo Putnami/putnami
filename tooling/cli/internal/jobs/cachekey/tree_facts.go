@@ -84,6 +84,10 @@ type cutRead struct {
 	listingOnce   sync.Once
 	listing       *protocoljob.CandidateListing
 	listingErr    error
+	// putnamiOnce decides once whether a path the read lists lies at or
+	// below the workspace's .putnami directory (candidateReachesPutnami).
+	putnamiOnce   sync.Once
+	putnamiListed bool
 }
 
 type onceHistory struct {
@@ -130,6 +134,9 @@ func RunTreeFacts(cache *store.CacheManager, root string) *TreeFacts {
 		// A key's `git:**` digest of the workspace lists the cut from the same
 		// read (protocols/job ADR 0003).
 		cache.SetCandidateSource(facts.CandidateSource())
+		// A write under an excluded .putnami keeps the digests of Git
+		// candidates (tooling/cli ADR 0106).
+		cache.SetCandidateExclusion(facts.ExcludesFromCandidates)
 		return facts
 	}).(*TreeFacts)
 	return facts
@@ -206,12 +213,18 @@ func (t *TreeFacts) currentCut() *cutRead {
 	t.cutMu.Lock()
 	defer t.cutMu.Unlock()
 	if t.cut == nil || t.cutStale {
-		t.cutSeq++
-		read := &cutRead{seq: t.cutSeq}
-		read.files, read.err = candidateFiles(t.root)
-		t.cut, t.cutStale = read, false
+		t.readCut()
 	}
 	return t.cut
+}
+
+// readCut reads the cut again and makes it the current read. The caller holds
+// cutMu.
+func (t *TreeFacts) readCut() {
+	t.cutSeq++
+	read := &cutRead{seq: t.cutSeq}
+	read.files, read.err = candidateFiles(t.root)
+	t.cut, t.cutStale = read, false
 }
 
 // keyCut is the read a key of the job takes: the current one, recorded so the
@@ -249,7 +262,6 @@ func (t *TreeFacts) InvalidateCut(paths []string) {
 	if t == nil {
 		return
 	}
-	putnami := filepath.Join(t.root, ".putnami")
 	t.cutMu.Lock()
 	defer t.cutMu.Unlock()
 	if t.cut == nil {
@@ -260,7 +272,7 @@ func (t *TreeFacts) InvalidateCut(paths []string) {
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			continue
 		}
-		if (path == putnami || strings.HasPrefix(path, putnami+string(filepath.Separator))) && t.putnamiExcluded() {
+		if t.inPutnami(path) && t.putnamiExcluded() {
 			continue
 		}
 		t.cutStale = true
@@ -284,9 +296,110 @@ func (t *TreeFacts) atTopLevel() bool {
 // whole, and the current read lists nothing below it. The caller holds cutMu.
 func (t *TreeFacts) putnamiExcluded() bool {
 	t.putnamiOnce.Do(func() { t.putnamiIgnored = ignoresDirectory(t.root, ".putnami") })
-	return t.putnamiIgnored && !slices.ContainsFunc(t.cut.files, func(file protocoljob.CandidateFile) bool {
-		return file.Path == ".putnami" || strings.HasPrefix(file.Path, ".putnami/")
-	})
+	read := t.cut
+	if read.err != nil {
+		// A cut that could not be read says nothing of what lies below.
+		return false
+	}
+	read.putnamiOnce.Do(func() { read.putnamiListed = t.candidateReachesPutnami(read.files) })
+	return t.putnamiIgnored && !read.putnamiListed
+}
+
+// candidateReachesPutnami reports whether a candidate of files lies at or
+// below the workspace's .putnami directory: its path names it, with case
+// folded as a case-insensitive file system resolves it, or a directory on its
+// path is a symbolic link that leads there, so the digest of the candidate
+// reads bytes a write under .putnami changes. Each directory of the cut is
+// stated once.
+func (t *TreeFacts) candidateReachesPutnami(files []protocoljob.CandidateFile) bool {
+	resolvedPutnami := filepath.Join(resolvedPath(t.root), ".putnami")
+	checked := map[string]bool{}
+	for _, file := range files {
+		lower := strings.ToLower(file.Path)
+		if lower == ".putnami" || strings.HasPrefix(lower, ".putnami/") {
+			return true
+		}
+		for dir := path.Dir(file.Path); dir != "." && !checked[dir]; dir = path.Dir(dir) {
+			checked[dir] = true
+			full := filepath.Join(t.root, filepath.FromSlash(dir))
+			info, err := os.Lstat(full)
+			if err != nil || info.Mode()&os.ModeSymlink == 0 {
+				continue
+			}
+			if atOrUnder(resolvedPath(full), resolvedPutnami) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ExcludesFromCandidates reports whether every one of paths, absolute paths a
+// task of the run wrote, lies at or under the workspace's .putnami directory
+// while a write there leaves the cut as it is (InvalidateCut): Git's rules
+// exclude the directory as a whole and the cut lists nothing below it. Such a
+// write adds no Git candidate, removes none and changes the bytes of none, so
+// it moves no digest of Git candidates (store.CandidateExclusion, tooling/cli
+// ADR 0106). The cache asks it only for a write that reaches such a digest; a
+// run that has not read the cut yet reads it then, and Git is asked about
+// .putnami once per run, as for InvalidateCut. A read a write of the run made
+// stale is read again first, so the answer holds the candidates after that
+// write. A path a symbolic link leads out of .putnami, .putnami itself being
+// one, is not excluded: the write lands where the link leads (inPutnami).
+//
+// An answer that reads the cut, the first of the run or the first after a
+// write made the read stale, does so while the cache holds its memo's lock: a
+// key computed meanwhile waits for it.
+func (t *TreeFacts) ExcludesFromCandidates(paths []string) bool {
+	if t == nil || t.root == "" || len(paths) == 0 {
+		return false
+	}
+	for _, path := range paths {
+		if !t.inPutnami(path) {
+			return false
+		}
+	}
+	t.cutMu.Lock()
+	defer t.cutMu.Unlock()
+	if t.cut == nil || t.cutStale {
+		t.readCut()
+	}
+	return t.putnamiExcluded()
+}
+
+// inPutnami reports whether a write to path lands at or under the workspace's
+// .putnami directory: path names it, and with every symbolic link on it
+// followed, path still lies under the .putnami of the resolved workspace root.
+// A link on .putnami itself, or below it, that leads elsewhere makes the write
+// land elsewhere, maybe among the candidates.
+func (t *TreeFacts) inPutnami(path string) bool {
+	if !atOrUnder(path, filepath.Join(t.root, ".putnami")) {
+		return false
+	}
+	return atOrUnder(resolvedPath(path), filepath.Join(resolvedPath(t.root), ".putnami"))
+}
+
+// atOrUnder reports whether path is directory or lies below it.
+func atOrUnder(path, directory string) bool {
+	return path == directory || strings.HasPrefix(path, directory+string(filepath.Separator))
+}
+
+// resolvedPath is path with every symbolic link on its longest existing
+// prefix followed: where a write to path lands, also when path itself does not
+// exist yet or any longer.
+func resolvedPath(path string) string {
+	for prefix := path; ; prefix = filepath.Dir(prefix) {
+		if real, err := filepath.EvalSymlinks(prefix); err == nil {
+			rest, err := filepath.Rel(prefix, path)
+			if err != nil {
+				return path
+			}
+			return filepath.Join(real, rest)
+		}
+		if filepath.Dir(prefix) == prefix {
+			return path
+		}
+	}
 }
 
 // CandidateSource answers the keys of the run the workspace's candidate cut

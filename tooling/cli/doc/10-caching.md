@@ -429,6 +429,13 @@ literal segment before its first wildcard, Git lists only the candidates below
 those segments; that listing selects the same files, so the key does not move.
 A pattern with no such segment, such as `git:**`, lists the whole repository.
 
+A run computes each candidate digest once and keeps it until a write of the run
+can move it. A write under the workspace's `.putnami`, where command outputs
+live, keeps it when Git excludes that directory as a whole and lists nothing
+below it: the write adds no candidate and changes none. Where Git does not
+exclude `.putnami`, a file written there is a candidate, and the digest is
+computed again. See [ADR 0106](adr/0106-a-write-under-an-excluded-putnami-keeps-the-candidate-digests.md).
+
 Candidate inputs hash raw file bytes and symlink target text, with separate
 file-type markers, and each regular file's executable bit as a source binding
 reads it: from the file's permission bits, or on Windows, which stores no bit,

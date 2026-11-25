@@ -185,7 +185,11 @@ bench.
 Each test runs the real CLI in a fixture workspace and reads the counts from its
 `run.orchestration` report (`clitest.RunCounts`). The engine's fixture
 (`clitest.CountsFixture`) runs trivial `/bin/sh` tasks, so what it starts is the
-engine's alone. Each extension's fixture loads the extension from this tree with
+engine's alone. Its writing variant (`clitest.WritingCountsFixture`) keys each
+task on its project's Git candidates and writes a report under the ignored
+`.putnami`, so its git calls show that such a write lists no candidate again
+([ADR 0106](adr/0106-a-write-under-an-excluded-putnami-keeps-the-candidate-digests.md)).
+Each extension's fixture loads the extension from this tree with
 one small project it serves, and runs on one worker from no task history
 (`clitest.ForgetTaskHistory`), so its tasks run in the same order every time:
 with a history, ready tasks dispatch longest first by the durations earlier
