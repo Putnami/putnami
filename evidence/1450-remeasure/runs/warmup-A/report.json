@@ -1,0 +1,4004 @@
+{
+  "protocolVersion": 2,
+  "sessionId": "20261125-125307-b48325",
+  "startTime": "2026-11-25T12:53:07.781270376Z",
+  "endTime": "2026-11-25T13:16:43.743610028Z",
+  "origin": "cli",
+  "enforceCoverage": true,
+  "git": {
+    "sha": "a36f193d000079de7c5585b77fb5aee3ba34ae53",
+    "dirty": false
+  },
+  "run": {
+    "outcome": "success",
+    "exitCode": 0,
+    "counts": {
+      "total": 2212,
+      "succeeded": 1681,
+      "failed": 0,
+      "canceled": 0,
+      "skipped": 531
+    },
+    "reuse": {
+      "localCache": 0,
+      "remoteCache": 0,
+      "coalesced": 160
+    },
+    "durationMs": 1415962,
+    "cpu": {
+      "allocatedMillicores": 4000,
+      "allocatedSource": "logical-cpus",
+      "allocatedMs": 5663848,
+      "actualMs": 5222848,
+      "executions": 1843
+    }
+  },
+  "commands": [
+    {
+      "command": "build",
+      "counts": {
+        "total": 669,
+        "succeeded": 393,
+        "failed": 0,
+        "canceled": 0,
+        "skipped": 276
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 0
+      },
+      "freshWallMs": 435124,
+      "cpuMs": 425143,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "command": "client-generate",
+      "counts": {
+        "total": 19,
+        "succeeded": 19,
+        "failed": 0,
+        "canceled": 0,
+        "skipped": 0
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 0
+      },
+      "freshWallMs": 3423,
+      "cpuMs": 3539,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "command": "lint",
+      "counts": {
+        "total": 447,
+        "succeeded": 447,
+        "failed": 0,
+        "canceled": 0,
+        "skipped": 0
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 0
+      },
+      "freshWallMs": 2014149,
+      "cpuMs": 1738848,
+      "errors": 0,
+      "warnings": 291
+    },
+    {
+      "command": "test",
+      "counts": {
+        "total": 508,
+        "succeeded": 348,
+        "failed": 0,
+        "canceled": 0,
+        "skipped": 160
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 160
+      },
+      "freshWallMs": 2670228,
+      "cpuMs": 2942185,
+      "tests": {
+        "total": 46412,
+        "passed": 46057,
+        "failed": 0,
+        "skipped": 355
+      },
+      "coverage": {
+        "percentage": 88.08428755101865,
+        "granularity": "statements",
+        "covered": 204160,
+        "total": 231778,
+        "enforced": true
+      },
+      "errors": 0,
+      "warnings": 5
+    },
+    {
+      "command": "validate",
+      "counts": {
+        "total": 558,
+        "succeeded": 463,
+        "failed": 0,
+        "canceled": 0,
+        "skipped": 95
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 0
+      },
+      "freshWallMs": 148222,
+      "cpuMs": 109777,
+      "errors": 0,
+      "warnings": 2549
+    },
+    {
+      "command": "validate-workspace",
+      "counts": {
+        "total": 11,
+        "succeeded": 11,
+        "failed": 0,
+        "canceled": 0,
+        "skipped": 0
+      },
+      "reuse": {
+        "localCache": 0,
+        "remoteCache": 0,
+        "coalesced": 0
+      },
+      "freshWallMs": 2149,
+      "cpuMs": 1825,
+      "errors": 0,
+      "warnings": 0
+    }
+  ],
+  "jobs": [
+    {
+      "key": "/tooling/cli-model:test~test",
+      "project": "/tooling/cli-model",
+      "task": "test~test",
+      "command": "test",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 5905,
+      "cpuMs": 8579,
+      "coverage": {
+        "percentage": 86.47,
+        "granularity": "statements",
+        "covered": 2512,
+        "total": 2905,
+        "enforced": true
+      },
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "0% coverage (11 statements)",
+          "code": "UNCOVERED_FILE",
+          "file": "go.putnami.dev/cli/model/jobs/executor.go"
+        },
+        {
+          "severity": "warning",
+          "message": "0% coverage (24 statements)",
+          "code": "UNCOVERED_FILE",
+          "file": "go.putnami.dev/cli/model/workspace/includes.go"
+        }
+      ]
+    },
+    {
+      "key": "/tooling/stacks:test~test",
+      "project": "/tooling/stacks",
+      "task": "test~test",
+      "command": "test",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 5905,
+      "cpuMs": 8579,
+      "coverage": {
+        "percentage": 89.32,
+        "granularity": "statements",
+        "covered": 3369,
+        "total": 3772,
+        "enforced": true
+      },
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "0% coverage (18 statements)",
+          "code": "UNCOVERED_FILE",
+          "file": "go.putnami.dev/tooling/stacks/command_order.go"
+        }
+      ]
+    },
+    {
+      "key": "/sites/putnami.dev:lint~check",
+      "project": "/sites/putnami.dev",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 5715,
+      "cpuMs": 5525,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Potential leaked value that might cause unintended rendering.",
+          "code": "lint/suspicious/noLeakedRender",
+          "file": "sites/putnami.dev/src/components/page-meta.tsx",
+          "line": 31,
+          "column": 8
+        },
+        {
+          "severity": "warning",
+          "message": "This function has too many lines (144). Maximum allowed is 100.",
+          "code": "lint/complexity/noExcessiveLinesPerFunction",
+          "file": "sites/putnami.dev/src/components/search-modal.tsx",
+          "line": 106,
+          "column": 8
+        },
+        {
+          "severity": "warning",
+          "message": "id attribute should not be a static string literal. Generate unique IDs using useId().",
+          "code": "lint/correctness/useUniqueElementIds",
+          "file": "sites/putnami.dev/src/components/search-modal.tsx",
+          "line": 286,
+          "column": 11
+        },
+        {
+          "severity": "warning",
+          "message": "Potential leaked value that might cause unintended rendering.",
+          "code": "lint/suspicious/noLeakedRender",
+          "file": "sites/putnami.dev/src/components/search-modal.tsx",
+          "line": 352,
+          "column": 8
+        },
+        {
+          "severity": "warning",
+          "message": "Potential leaked value that might cause unintended rendering.",
+          "code": "lint/suspicious/noLeakedRender",
+          "file": "sites/putnami.dev/src/components/search-modal.tsx",
+          "line": 367,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "sites/putnami.dev/src/lib/content/bump.ts",
+          "line": 57,
+          "column": 22
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 21 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "sites/putnami.dev/src/lib/content/ingest.ts",
+          "line": 183,
+          "column": 23
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 17 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "sites/putnami.dev/src/lib/content/materialize.ts",
+          "line": 86,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 29 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "sites/putnami.dev/src/lib/content/materialize.ts",
+          "line": 242,
+          "column": 23
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "sites/putnami.dev/src/lib/content/materialize.ts",
+          "line": 296,
+          "column": 20
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "sites/putnami.dev/src/lib/content/registry.ts",
+          "line": 142,
+          "column": 29
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "sites/putnami.dev/src/lib/content/registry.ts",
+          "line": 302,
+          "column": 29
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 17 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "sites/putnami.dev/src/lib/content/sitecontent.ts",
+          "line": 201,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 21 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "sites/putnami.dev/src/lib/content/tar.ts",
+          "line": 85,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 16 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "sites/putnami.dev/src/lib/content/tar.ts",
+          "line": 153,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 22 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "sites/putnami.dev/src/lib/content/verify.ts",
+          "line": 143,
+          "column": 17
+        }
+      ],
+      "truncatedCount": 25
+    },
+    {
+      "key": "/typescript/doc-examples:lint~check",
+      "project": "/typescript/doc-examples",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 5507,
+      "cpuMs": 4900,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 40 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/doc-examples/src/check.ts",
+          "line": 86,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 20 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/doc-examples/src/check.ts",
+          "line": 233,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 33 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/doc-examples/src/check.ts",
+          "line": 274,
+          "column": 33
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 27 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/doc-examples/src/check.ts",
+          "line": 355,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 42 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/doc-examples/src/check.ts",
+          "line": 404,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 17 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/doc-examples/src/markdown.ts",
+          "line": 32,
+          "column": 17
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/client:lint~check",
+      "project": "/typescript/framework/client",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 4323,
+      "cpuMs": 6510,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 20 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/client/src/generator/openapi-reader.ts",
+          "line": 664,
+          "column": 43
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 16 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/client/src/generator/openapi-reader.ts",
+          "line": 1221,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 22 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/client/src/generator/openapi-reader.ts",
+          "line": 1441,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 19 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/client/src/generator/openapi-reader.ts",
+          "line": 1782,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 24 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/client/src/generator/openapi-reader.ts",
+          "line": 1912,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "This function has too many lines (110). Maximum allowed is 100.",
+          "code": "lint/complexity/noExcessiveLinesPerFunction",
+          "file": "typescript/framework/client/src/generator/openapi-reader.ts",
+          "line": 816,
+          "column": 1
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/client/src/generator/openapi-reader.ts",
+          "line": 2683,
+          "column": 8
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 34 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/client/src/generator/page.ts",
+          "line": 41,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 21 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/client/src/generator/ts/strict-ts-generator.ts",
+          "line": 244,
+          "column": 73
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 29 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/client/src/generator/ts/strict-ts-generator.ts",
+          "line": 579,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 26 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/client/src/generator/ts/strict-ts-generator.ts",
+          "line": 950,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "This function has too many lines (111). Maximum allowed is 100.",
+          "code": "lint/complexity/noExcessiveLinesPerFunction",
+          "file": "typescript/framework/client/src/generator/ts/strict-ts-generator.ts",
+          "line": 39,
+          "column": 1
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 23 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/client/src/runtime/base-client.ts",
+          "line": 212,
+          "column": 3
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/client/src/runtime/base-client.ts",
+          "line": 598,
+          "column": 9
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/client/src/runtime/base-client.ts",
+          "line": 923,
+          "column": 5
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/client/src/runtime/base-client.ts",
+          "line": 1030,
+          "column": 5
+        }
+      ],
+      "truncatedCount": 66
+    },
+    {
+      "key": "/tooling/scaffold:test~test",
+      "project": "/tooling/scaffold",
+      "task": "test~test",
+      "command": "test",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 4321,
+      "cpuMs": 3040,
+      "coverage": {
+        "percentage": 89.67,
+        "granularity": "statements",
+        "covered": 165,
+        "total": 184,
+        "enforced": true
+      },
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "0% coverage (1 statements)",
+          "code": "UNCOVERED_FILE",
+          "file": "tooling/scaffold/extension/cmd/main.go"
+        }
+      ]
+    },
+    {
+      "key": "/tooling/extension-sdk:lint~golangci-lint",
+      "project": "/tooling/extension-sdk",
+      "task": "lint~golangci-lint",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 4115,
+      "cpuMs": 5221,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "reviewed exception: t.Skip stays because this package never starts infrastructure of its own on CI, so the test needs a contributor's docker daemon (skip-guard)",
+          "code": "skip-guard",
+          "file": "tooling/extension-sdk/dbtestenv/isolation_test.go",
+          "line": 130,
+          "column": 3
+        },
+        {
+          "severity": "warning",
+          "message": "reviewed exception: t.Skip stays because this package never starts infrastructure of its own on CI, so the test needs a contributor's PostgreSQL install (skip-guard)",
+          "code": "skip-guard",
+          "file": "tooling/extension-sdk/dbtestenv/native_test.go",
+          "line": 456,
+          "column": 3
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/spectest:lint~check",
+      "project": "/typescript/framework/spectest",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 4038,
+      "cpuMs": 4501,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/spectest/test/spectest.test.ts",
+          "line": 149,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/spectest/test/spectest.test.ts",
+          "line": 292,
+          "column": 12
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/spectest/test/spectest.test.ts",
+          "line": 342,
+          "column": 14
+        },
+        {
+          "severity": "warning",
+          "message": "reviewed exception: `specTest.skip` stays because this case proves that specTest.skip registers a skipped case (skip-guard)",
+          "code": "skip-guard",
+          "file": "typescript/framework/spectest/test/spectest.test.ts",
+          "line": 48,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "reviewed exception: `observeMeasurement.skip` stays because this case proves that observeMeasurement.skip registers a skipped measurement (skip-guard)",
+          "code": "skip-guard",
+          "file": "typescript/framework/spectest/test/spectest.test.ts",
+          "line": 56,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/cli-protocol:lint~check",
+      "project": "/typescript/framework/cli-protocol",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 3648,
+      "cpuMs": 4783,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 18 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/cli-protocol/src/qualify.ts",
+          "line": 289,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 20 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/cli-protocol/src/qualify.ts",
+          "line": 408,
+          "column": 23
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 66 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/cli-protocol/src/qualify.ts",
+          "line": 463,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/cli-protocol/src/qualify.ts",
+          "line": 292,
+          "column": 23
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/cli-protocol/src/result-v2.ts",
+          "line": 3630,
+          "column": 24
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 18 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/cli-protocol/src/result-v2.ts",
+          "line": 2369,
+          "column": 48
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 19 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/cli-protocol/src/result-v2.ts",
+          "line": 3527,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 16 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/cli-protocol/src/result-v2.ts",
+          "line": 3622,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 17 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/cli-protocol/src/result-v2.ts",
+          "line": 3799,
+          "column": 33
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 26 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/cli-protocol/src/result-v2.ts",
+          "line": 3838,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 17 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/cli-protocol/src/result-v2.ts",
+          "line": 3984,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/cli-protocol/src/result-v2.ts",
+          "line": 1419,
+          "column": 22
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/cli-protocol/src/result-v2.ts",
+          "line": 1561,
+          "column": 22
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 17 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/cli-protocol/src/session-subscribers.ts",
+          "line": 71,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/cli-protocol/test/protocol-conformance.test.ts",
+          "line": 51,
+          "column": 12
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/cli-protocol/test/protocol-conformance.test.ts",
+          "line": 51,
+          "column": 48
+        }
+      ],
+      "truncatedCount": 29
+    },
+    {
+      "key": "/typescript/framework/analytics:lint~check",
+      "project": "/typescript/framework/analytics",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 3204,
+      "cpuMs": 2717,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 16 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/analytics/src/server/sanitize/sanitizer.ts",
+          "line": 189,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/analytics/src/server/sanitize/sanitizer.ts",
+          "line": 381,
+          "column": 21
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/analytics/src/server/sanitize/sanitizer.ts",
+          "line": 405,
+          "column": 16
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/analytics/src/server/sink/queue.ts",
+          "line": 156,
+          "column": 13
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/analytics/src/server/sink/queue.ts",
+          "line": 107,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/analytics/src/server/sink/sink.ts",
+          "line": 303,
+          "column": 5
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/analytics/src/server/sink/sink.ts",
+          "line": 314,
+          "column": 9
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/analytics/test/declare.test.ts",
+          "line": 9,
+          "column": 12
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/analytics/test/entrypoints.test.ts",
+          "line": 55,
+          "column": 20
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 18 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/analytics/test/entrypoints.test.ts",
+          "line": 83,
+          "column": 14
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/ui:lint~check",
+      "project": "/typescript/framework/ui",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 3204,
+      "cpuMs": 2717,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/ui/src/components/markdown-renderer.tsx",
+          "line": 238,
+          "column": 3
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 22 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/ui/src/components/sanitize-html.ts",
+          "line": 228,
+          "column": 63
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 29 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/ui/src/components/sanitize-html.ts",
+          "line": 270,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 19 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/ui/src/components/tabs.tsx",
+          "line": 68,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "id attribute should not be a static string literal. Generate unique IDs using useId().",
+          "code": "lint/correctness/useUniqueElementIds",
+          "file": "typescript/framework/ui/test/components/alert.test.tsx",
+          "line": 18,
+          "column": 25
+        },
+        {
+          "severity": "warning",
+          "message": "id attribute should not be a static string literal. Generate unique IDs using useId().",
+          "code": "lint/correctness/useUniqueElementIds",
+          "file": "typescript/framework/ui/test/components/avatar.test.tsx",
+          "line": 19,
+          "column": 25
+        },
+        {
+          "severity": "warning",
+          "message": "id attribute should not be a static string literal. Generate unique IDs using useId().",
+          "code": "lint/correctness/useUniqueElementIds",
+          "file": "typescript/framework/ui/test/components/avatar.test.tsx",
+          "line": 73,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "id attribute should not be a static string literal. Generate unique IDs using useId().",
+          "code": "lint/correctness/useUniqueElementIds",
+          "file": "typescript/framework/ui/test/components/badge.test.tsx",
+          "line": 30,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "id attribute should not be a static string literal. Generate unique IDs using useId().",
+          "code": "lint/correctness/useUniqueElementIds",
+          "file": "typescript/framework/ui/test/components/drawer.test.tsx",
+          "line": 42,
+          "column": 9
+        },
+        {
+          "severity": "warning",
+          "message": "id attribute should not be a static string literal. Generate unique IDs using useId().",
+          "code": "lint/correctness/useUniqueElementIds",
+          "file": "typescript/framework/ui/test/components/drawer.test.tsx",
+          "line": 45,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/web:lint~check",
+      "project": "/typescript/framework/web",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 3204,
+      "cpuMs": 2717,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/web/bench/bench.ts",
+          "line": 34,
+          "column": 36
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/web/bench/bench.ts",
+          "line": 44,
+          "column": 37
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/web/bench/bench.ts",
+          "line": 44,
+          "column": 37
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/web/bench/build-ab.ts",
+          "line": 90,
+          "column": 20
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/web/bench/build-ab.ts",
+          "line": 167,
+          "column": 20
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/web/bin/generate-config.ts",
+          "line": 14,
+          "column": 23
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 86 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/web/bin/generate.ts",
+          "line": 93,
+          "column": 16
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/web/bin/generate.ts",
+          "line": 185,
+          "column": 28
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/web/bin/generate.ts",
+          "line": 185,
+          "column": 28
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/web/bin/generate.ts",
+          "line": 241,
+          "column": 44
+        }
+      ]
+    },
+    {
+      "key": "/cloud/runtime/typescript:lint~check",
+      "project": "/cloud/runtime/typescript",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 3029,
+      "cpuMs": 5272,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 26 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "cloud/runtime/typescript/src/runtime/remote-config-source.ts",
+          "line": 212,
+          "column": 11
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 26 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "cloud/runtime/typescript/src/runtime/remote-secrets-source.ts",
+          "line": 118,
+          "column": 11
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "cloud/runtime/typescript/test/remote-refresh.test.ts",
+          "line": 166,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "key": "/go/framework/keyringstore:test~test",
+      "project": "/go/framework/keyringstore",
+      "task": "test~test",
+      "command": "test",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 2271,
+      "cpuMs": 2606,
+      "coverage": {
+        "percentage": 36.07,
+        "granularity": "statements",
+        "covered": 44,
+        "total": 122,
+        "enforced": true
+      },
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "8 suite(s) skipped because their test database did not answer, so their SQL did not run: go.putnami.dev/keyringstore.TestLoadEmptyReturnsErrNoSigningKey, go.putnami.dev/keyringstore.TestRotateCommitsAtomically, go.putnami.dev/keyringstore.TestRotateNonAppliedWhenPredecessorNotActive, go.putnami.dev/keyringstore.TestRotateRetiredAtRoundTripsThroughLoad, go.putnami.dev/keyringstore.TestRotateRollsBackOnSuccessorConflict, go.putnami.dev/keyringstore.TestSaveDoesNotPruneOtherKeyrings, go.putnami.dev/keyringstore.TestSaveLoadRoundTrip, go.putnami.dev/keyringstore.TestSavePrunesDroppedKeys. Start the database, or pass --require-test-db to fail them.",
+          "code": "TEST_DATABASE_DID_NOT_ANSWER"
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/events:lint~check",
+      "project": "/typescript/framework/events",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 2170,
+      "cpuMs": 2874,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 42 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/events/src/events.plugin.ts",
+          "line": 316,
+          "column": 3
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 18 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/events/src/events.plugin.ts",
+          "line": 547,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/events/src/events.plugin.ts",
+          "line": 333,
+          "column": 19
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/events/src/google/pubsub.ts",
+          "line": 142,
+          "column": 9
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/events/src/google/pubsub.ts",
+          "line": 125,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/events/src/postgres/realtime.ts",
+          "line": 118,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/events/src/postgres/realtime.ts",
+          "line": 130,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/events/src/redis/pubsub.ts",
+          "line": 109,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/events/src/redis/pubsub.ts",
+          "line": 118,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/events/src/redis/stream-transport.ts",
+          "line": 170,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/storage:lint~check",
+      "project": "/typescript/framework/storage",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 2170,
+      "cpuMs": 2874,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/storage/src/backend/file.backend.ts",
+          "line": 386,
+          "column": 25
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/storage/src/backend/memory.backend.ts",
+          "line": 132,
+          "column": 21
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/storage/src/backend/memory.backend.ts",
+          "line": 63,
+          "column": 33
+        },
+        {
+          "severity": "warning",
+          "message": "Forbidden non-null assertion.",
+          "code": "lint/style/noNonNullAssertion",
+          "file": "typescript/framework/storage/src/backend/memory.backend.ts",
+          "line": 136,
+          "column": 21
+        },
+        {
+          "severity": "warning",
+          "message": "Forbidden non-null assertion.",
+          "code": "lint/style/noNonNullAssertion",
+          "file": "typescript/framework/storage/src/backend/memory.backend.ts",
+          "line": 167,
+          "column": 19
+        },
+        {
+          "severity": "warning",
+          "message": "Forbidden non-null assertion.",
+          "code": "lint/style/noNonNullAssertion",
+          "file": "typescript/framework/storage/src/backend/remote.backend.ts",
+          "line": 94,
+          "column": 20
+        },
+        {
+          "severity": "warning",
+          "message": "Forbidden non-null assertion.",
+          "code": "lint/style/noNonNullAssertion",
+          "file": "typescript/framework/storage/src/backend/remote.backend.ts",
+          "line": 89,
+          "column": 13
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 25 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/storage/src/server/storage.server.ts",
+          "line": 62,
+          "column": 58
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 21 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/storage/src/server/storage.server.ts",
+          "line": 116,
+          "column": 58
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 26 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/storage/src/storage.plugin.ts",
+          "line": 67,
+          "column": 11
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/application:lint~check",
+      "project": "/typescript/framework/application",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 1865,
+      "cpuMs": 3102,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/application/bench/bench.ts",
+          "line": 48,
+          "column": 37
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/application/bench/bench.ts",
+          "line": 48,
+          "column": 37
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/application/bench/bench.ts",
+          "line": 289,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/application/bench/bench.ts",
+          "line": 386,
+          "column": 69
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/application/bench/bench.ts",
+          "line": 387,
+          "column": 77
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/application/bench/bench.ts",
+          "line": 403,
+          "column": 72
+        },
+        {
+          "severity": "warning",
+          "message": "The use of void is not allowed.",
+          "code": "lint/complexity/noVoid",
+          "file": "typescript/framework/application/bench/bench.ts",
+          "line": 404,
+          "column": 80
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/application/bench/bench.ts",
+          "line": 38,
+          "column": 36
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/application/bin/_find-application.ts",
+          "line": 155,
+          "column": 13
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 16 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/application/bin/_find-application.ts",
+          "line": 118,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/database:lint~check",
+      "project": "/typescript/framework/database",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 1865,
+      "cpuMs": 3102,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Unexpected any. Specify a different type.",
+          "code": "lint/suspicious/noExplicitAny",
+          "file": "typescript/framework/database/src/abort.ts",
+          "line": 79,
+          "column": 57
+        },
+        {
+          "severity": "warning",
+          "message": "Unexpected any. Specify a different type.",
+          "code": "lint/suspicious/noExplicitAny",
+          "file": "typescript/framework/database/src/abort.ts",
+          "line": 117,
+          "column": 47
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/database/src/conformance/runner.ts",
+          "line": 236,
+          "column": 15
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 21 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/database/src/conformance/runner.ts",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/database/src/conformance/runner.ts",
+          "line": 246,
+          "column": 5
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/database/src/conformance/runner.ts",
+          "line": 250,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/database/src/conformance/runner.ts",
+          "line": 267,
+          "column": 21
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/database/src/conformance/runner.ts",
+          "line": 272,
+          "column": 22
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/database/src/conformance/runner.ts",
+          "line": 287,
+          "column": 18
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/database/src/conformance/runner.ts",
+          "line": 320,
+          "column": 11
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/document:lint~check",
+      "project": "/typescript/framework/document",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 1865,
+      "cpuMs": 3102,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Unexpected any. Specify a different type.",
+          "code": "lint/suspicious/noExplicitAny",
+          "file": "typescript/framework/document/src/adapter/firestore.adapter.ts",
+          "line": 171,
+          "column": 8
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 17 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/document/src/adapter/firestore.adapter.ts",
+          "line": 349,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/document/src/adapter/firestore.adapter.ts",
+          "line": 360,
+          "column": 21
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/document/src/adapter/firestore.adapter.ts",
+          "line": 433,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/document/src/adapter/firestore.adapter.ts",
+          "line": 465,
+          "column": 20
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 24 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/document/src/document.plugin.ts",
+          "line": 72,
+          "column": 56
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/document/src/document.plugin.ts",
+          "line": 118,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/document/src/document.plugin.ts",
+          "line": 78,
+          "column": 19
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/document/src/infra.ts",
+          "line": 57,
+          "column": 16
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 35 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/document/src/repository/query.ts",
+          "line": 53,
+          "column": 17
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/migration:lint~check",
+      "project": "/typescript/framework/migration",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 1204,
+      "cpuMs": 1893,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/migration/src/bundle.ts",
+          "line": 250,
+          "column": 5
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 22 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/migration/src/cli/index.ts",
+          "line": 219,
+          "column": 16
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 16 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/migration/src/cli/index.ts",
+          "line": 156,
+          "column": 16
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/migration/src/registry.ts",
+          "line": 113,
+          "column": 23
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/migration/src/registry.ts",
+          "line": 126,
+          "column": 23
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/migration/src/registry.ts",
+          "line": 139,
+          "column": 16
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/migration/src/registry.ts",
+          "line": 159,
+          "column": 5
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/migration/test/registry.test.ts",
+          "line": 340,
+          "column": 24
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/migration/test/types.test.ts",
+          "line": 61,
+          "column": 41
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/runtime:lint~check",
+      "project": "/typescript/framework/runtime",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 1204,
+      "cpuMs": 1893,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 35 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/runtime/src/config/config-service.ts",
+          "line": 175,
+          "column": 3
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/runtime/src/config/config-token.ts",
+          "line": 89,
+          "column": 19
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 16 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/runtime/src/config/config.ts",
+          "line": 506,
+          "column": 10
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/runtime/src/inject/container-context.ts",
+          "line": 330,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 20 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/runtime/src/inject/container.ts",
+          "line": 304,
+          "column": 11
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/runtime/src/inject/container.ts",
+          "line": 504,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/runtime/src/inject/container.ts",
+          "line": 509,
+          "column": 7
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/runtime/src/inject/container.ts",
+          "line": 534,
+          "column": 9
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/runtime/src/inject/container.ts",
+          "line": 564,
+          "column": 9
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/runtime/src/inject/container.ts",
+          "line": 580,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/utils:lint~check",
+      "project": "/typescript/framework/utils",
+      "task": "lint~check",
+      "command": "lint",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 1204,
+      "cpuMs": 1893,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/utils/src/server/package-json.ts",
+          "line": 127,
+          "column": 22
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 18 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/utils/src/server/stack.utils.ts",
+          "line": 68,
+          "column": 17
+        },
+        {
+          "severity": "warning",
+          "message": "Excessive complexity of 17 detected (max: 15).",
+          "code": "lint/complexity/noExcessiveCognitiveComplexity",
+          "file": "typescript/framework/utils/src/shared/object.utils.ts",
+          "line": 127,
+          "column": 96
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/utils/src/shared/object.utils.ts",
+          "line": 186,
+          "column": 22
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/utils/test/browser.test.ts",
+          "line": 15,
+          "column": 22
+        },
+        {
+          "severity": "warning",
+          "message": "Avoid using await inside loops.",
+          "code": "lint/performance/noAwaitInLoops",
+          "file": "typescript/framework/utils/test/browser.test.ts",
+          "line": 125,
+          "column": 24
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/utils/test/schema.test.ts",
+          "line": 426,
+          "column": 14
+        },
+        {
+          "severity": "warning",
+          "message": "Compare function missing.",
+          "code": "lint/suspicious/useArraySortCompare",
+          "file": "typescript/framework/utils/test/windows-path-guard.test.ts",
+          "line": 82,
+          "column": 10
+        }
+      ]
+    },
+    {
+      "key": "/sites/putnami.dev:validate~@putnami/sdd~features",
+      "project": "/sites/putnami.dev",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 841,
+      "cpuMs": 296,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"what-the-site-records-is-what-the-notice-says\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"one-source-per-section\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"model-pages-are-not-surfaces\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"python-is-browseable-not-anchored\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"every-language-and-tool-is-published\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"documentation-sources-are-version-addressed-snapshots\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"no-generated-mirror-in-source\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"python-is-marked-experimental\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"route-inventory-is-complete\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"unmatched-paths-are-not-routed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"agent-surfaces-track-the-docs-tree\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"sparse-release-delivery-is-explicit\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"docs-enumeration-is-build-order-independent\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"system-model-is-published\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[1].requirements[9]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"catalog-is-the-only-source\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[2].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"closed-status-vocabulary\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "sites/putnami.dev/putnami.features.json#features[2].requirements[1]"
+        }
+      ],
+      "truncatedCount": 30
+    },
+    {
+      "key": "/tooling/cli:validate~@putnami/sdd~features",
+      "project": "/tooling/cli",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 738,
+      "cpuMs": 313,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"optin\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"extension-agent-content-integrity\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"superseded-owners-refused\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"legacy-pins-dropped\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"starter-agent-content-opt-in\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-written-on-explicit-lifecycle\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-ownership-by-command\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-exit-guard\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[16]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-async\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[17]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"user-scope-skills\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[18]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hook-relay\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[19]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"legacy-declarations-refused\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hook-relay-passthrough\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[20]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-user-files\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[21]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"host-hooks-user-files-kept\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[22]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"record-last\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli/features/agent-workflow-lifecycle.json#feature.requirements[2]"
+        }
+      ],
+      "truncatedCount": 343
+    },
+    {
+      "key": "/tooling/linear-collaboration:validate~@putnami/sdd~features",
+      "project": "/tooling/linear-collaboration",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 689,
+      "cpuMs": 217,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"workflow-state-mapping\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/linear-collaboration/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"idempotent-create\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/linear-collaboration/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"checked-revision\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/linear-collaboration/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"named-labels\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/linear-collaboration/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"honest-failures\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/linear-collaboration/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"credential-safety\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/linear-collaboration/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"truthful-manifest\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/linear-collaboration/putnami.features.json#features[0].requirements[6]"
+        }
+      ]
+    },
+    {
+      "key": "/tooling/observe:validate~@putnami/sdd~features",
+      "project": "/tooling/observe",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 616,
+      "cpuMs": 249,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"runs-without-a-workspace\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"laptop-repository-key\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"ci-repository-key\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"laptop-base\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"declared-repository-evidence\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"recent-history\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"history-evidence\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"ci-detection\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"diff-base\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"report-discovery\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"evidence-document\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"caller-directory-writes\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"external-specs\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"short-log-summary\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"next-command\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"next-command-gitlab\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/observe/putnami.features.json#features[0].requirements[9]"
+        }
+      ],
+      "truncatedCount": 149
+    },
+    {
+      "key": "/typescript/framework/database:validate~@putnami/sdd~features",
+      "project": "/typescript/framework/database",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 577,
+      "cpuMs": 245,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"lazy-transaction\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"single-committer\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"partial-commit-is-an-error\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"timeout-rollback\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"cancellation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"secret-free-telemetry\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"declared-infrastructure\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"connection-url\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"acquire-time-search-path\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[1].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"connection-lifetime\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[1].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"connections-on-demand\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[1].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"datasource-bound-acquire\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[1].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"one-pool-per-physical-database\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[1].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"shared-pool-lifetime\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[1].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"tuning-agreement\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[1].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"byte-order-apply\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/database/putnami.features.json#features[2].requirements[0]"
+        }
+      ],
+      "truncatedCount": 10
+    },
+    {
+      "key": "/typescript/framework/cli-protocol:validate~@putnami/sdd~features",
+      "project": "/typescript/framework/cli-protocol",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 570,
+      "cpuMs": 235,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"recorded-output-stays-readable\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/cli-protocol/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"violations-order-by-code-unit\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/cli-protocol/putnami.features.json#features[0].requirements[1]"
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/events:validate~@putnami/sdd~features",
+      "project": "/typescript/framework/events",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 560,
+      "cpuMs": 213,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"at-least-once\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"payload-validation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"residual-failures-are-routed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"event-trace-context\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"bounded-concurrency\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"bounded-retry\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"browser-surface\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"cross-language-records\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"dead-letter-or-drop\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"graceful-drain\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"isolated-invocation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"no-silent-loss\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"one-record-per-message\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/events/putnami.features.json#features[0].requirements[9]"
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/migration:validate~@putnami/sdd~features",
+      "project": "/typescript/framework/migration",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 542,
+      "cpuMs": 226,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"backend-free\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/migration/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"defensive-reads\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/migration/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"deterministic-kind-order\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/migration/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"infra-aggregation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/migration/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"one-runner-per-kind\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/migration/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"orphan-sources-fail\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/migration/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"registry-is-per-boot\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/migration/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"source-validation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/migration/putnami.features.json#features[0].requirements[7]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/diagnostic:validate~@putnami/sdd~specs",
+      "project": "/protocols/diagnostic",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 541,
+      "cpuMs": 485,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/diagnostic\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/diagnostic"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/doctor:validate~@putnami/sdd~specs",
+      "project": "/protocols/doctor",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 518,
+      "cpuMs": 502,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/doctor\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/doctor"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/registry:validate~@putnami/sdd~specs",
+      "project": "/protocols/registry",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 515,
+      "cpuMs": 473,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/registry\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/registry"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/distribution:validate~@putnami/sdd~specs",
+      "project": "/protocols/distribution",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 504,
+      "cpuMs": 472,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/distribution\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/distribution"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/qualify:validate~@putnami/sdd~specs",
+      "project": "/protocols/qualify",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 500,
+      "cpuMs": 427,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/qualify\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/qualify"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/support:validate~@putnami/sdd~specs",
+      "project": "/protocols/support",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 499,
+      "cpuMs": 395,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/support\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/support"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/sitecontent:validate~@putnami/sdd~specs",
+      "project": "/protocols/sitecontent",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 495,
+      "cpuMs": 450,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/sitecontent\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/sitecontent"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/evidence:validate~@putnami/sdd~specs",
+      "project": "/protocols/evidence",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 491,
+      "cpuMs": 447,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/evidence\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/evidence"
+        }
+      ]
+    },
+    {
+      "key": "/ruby/extension:validate~@putnami/sdd~features",
+      "project": "/ruby/extension",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 484,
+      "cpuMs": 217,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"components-become-projects\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"checks-documentation-links\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"filters-the-tests\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"pins-a-ruby-release\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"machine-ruby-comes-first\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"fetches-the-locked-gems\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"serves-an-application\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"runs-an-application-once\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[16]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"packages-an-application-image\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[17]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"refuses-a-foreign-packaging-host\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[18]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"publishes-an-application-image\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[19]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"tasks-run-the-profile\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"test-runner-per-component\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"reports-become-the-summary\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"lint-reads-the-ruby-files\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"overrides-are-honored\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "ruby/extension/putnami.features.json#features[0].requirements[5]"
+        }
+      ],
+      "truncatedCount": 4
+    },
+    {
+      "key": "/protocols/job:validate~@putnami/sdd~specs",
+      "project": "/protocols/job",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 481,
+      "cpuMs": 441,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/job\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/job"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/cli:validate~@putnami/sdd~specs",
+      "project": "/protocols/cli",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 479,
+      "cpuMs": 425,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/cli\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/cli"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/extension:validate~@putnami/sdd~specs",
+      "project": "/protocols/extension",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 477,
+      "cpuMs": 413,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/extension\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/extension"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/events:validate~@putnami/sdd~specs",
+      "project": "/protocols/events",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 477,
+      "cpuMs": 436,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/events\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/events"
+        }
+      ]
+    },
+    {
+      "key": "/tooling/memory-store:validate~@putnami/sdd~features",
+      "project": "/tooling/memory-store",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 475,
+      "cpuMs": 219,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"explicit-backend\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/memory-store/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"one-contract-every-backend\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/memory-store/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"compare-and-set-checkpoints\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/memory-store/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"readable-records\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/memory-store/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"retries-never-duplicate\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/memory-store/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"layout-independent-context\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/memory-store/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"explicit-outage\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/memory-store/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"contextual-memory\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/memory-store/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"truthful-manifest\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/memory-store/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"portable-git-writes\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/memory-store/putnami.features.json#features[0].requirements[9]"
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/application:validate~@putnami/sdd~features",
+      "project": "/typescript/framework/application",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 475,
+      "cpuMs": 232,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"bootstrap-guard\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"requirement-validation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"route-loader-activation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"shutdown-order\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"signal-shutdown\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"build-only-generation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"capability-publication\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"composition-invalidation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"darc-runtime-enforcement\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"darc-runtime-evidence\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"failed-start-unwind\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"completed-startup-readiness\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"no-source-claim\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"phase-order\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[0].requirements[9]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"sse-admission-and-bounds\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[1].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"negotiated-sse-wire\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/application/putnami.features.json#features[1].requirements[1]"
+        }
+      ],
+      "truncatedCount": 88
+    },
+    {
+      "key": "/typescript/extension:validate~@putnami/sdd~features",
+      "project": "/typescript/extension",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 475,
+      "cpuMs": 263,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"phase-isolation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"node-target-refuses-bun-apis\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"library-output-has-no-lazy-chunk-loads\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"npm-agent-content\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"extension-archives\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"extension-archive-entry-points\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"package-channel-index\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"declared-assets-must-exist\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[16]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"lint-covers-the-project\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[17]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-check-only-lint-skips-what-putnami-writes\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[18]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"lint-chooses-the-linter\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[19]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"batch-equals-solo\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"lint-runs-eslint\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[20]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"no-node-on-the-host\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[21]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"workspace-biome-default\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[22]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"workspace-bun-pin\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/extension/putnami.features.json#features[0].requirements[23]"
+        }
+      ],
+      "truncatedCount": 62
+    },
+    {
+      "key": "/tooling/jira-collaboration:validate~@putnami/sdd~features",
+      "project": "/tooling/jira-collaboration",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 467,
+      "cpuMs": 215,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"state-by-category\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/jira-collaboration/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"content-revision\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/jira-collaboration/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"jql-find\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/jira-collaboration/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"reconciled-writes\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/jira-collaboration/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"honest-failures\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/jira-collaboration/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"credential-safety\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/jira-collaboration/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"truthful-manifest\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/jira-collaboration/putnami.features.json#features[0].requirements[6]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/features:validate~@putnami/sdd~specs",
+      "project": "/protocols/features",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 464,
+      "cpuMs": 412,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/features\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/features"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/ci:validate~@putnami/sdd~specs",
+      "project": "/protocols/ci",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 463,
+      "cpuMs": 443,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/ci\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/ci"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/http-routes:validate~@putnami/sdd~specs",
+      "project": "/protocols/http-routes",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 462,
+      "cpuMs": 437,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/http-routes\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/http-routes"
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/runtime:validate~@putnami/sdd~features",
+      "project": "/typescript/framework/runtime",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 461,
+      "cpuMs": 239,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"graph-validation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"singleton-identity\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"scope-isolation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"private-visibility\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"disposal-order\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"one-shot-lifecycle\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"root-surface\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"source-precedence\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[1].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"config-environment\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[1].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"env-fills-gaps\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[1].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"fail-loud\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[1].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"secret-redaction\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[1].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"secret-names-only\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[1].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"untrusted-input\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[1].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"contributed-paths\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[1].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"browser-surface\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/runtime/putnami.features.json#features[1].requirements[8]"
+        }
+      ],
+      "truncatedCount": 5
+    },
+    {
+      "key": "/rust/extension:validate~@putnami/sdd~features",
+      "project": "/rust/extension",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 460,
+      "cpuMs": 240,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"crates-become-projects\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"provides-its-test-tools\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"coverage-is-optional\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"crate-kind-is-detected\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"run-forwards-the-exit-code\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"serve-sets-the-port\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"package-builds-each-platform\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"package-provides-its-cross-tools\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[16]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"package-writes-archives\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[17]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"package-assembles-an-image\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[18]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"package-dry-run-builds-nothing\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[19]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"nested-roots-reach-the-key\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"publish-sends-the-staged-crate\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[20]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"publish-pushes-the-image\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[21]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"fetches-the-locked-crates\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[22]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"offline-tasks-stay-offline\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "rust/extension/putnami.features.json#features[0].requirements[23]"
+        }
+      ],
+      "truncatedCount": 12
+    },
+    {
+      "key": "/protocols/capabilities:validate~@putnami/sdd~specs",
+      "project": "/protocols/capabilities",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 460,
+      "cpuMs": 438,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/capabilities\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/capabilities"
+        }
+      ]
+    },
+    {
+      "key": "/tooling/cli-documents:validate~@putnami/sdd~features",
+      "project": "/tooling/cli-documents",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 456,
+      "cpuMs": 228,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"read-only-rehearsal\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"keyed-verdict-inputs\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"provenance-contract\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"canonical-migration-evidence\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"ten-evidence-items\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"no-vacuous-check\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"recorded-verdict\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"named-blockers\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"reused-scrub\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"publish-order-coverage\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"rollback-completeness\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"stable-recorded-fields\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"declarative-plan\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-documents/putnami.features.json#features[0].requirements[9]"
+        }
+      ]
+    },
+    {
+      "key": "/swift/extension:validate~@putnami/sdd~features",
+      "project": "/swift/extension",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 456,
+      "cpuMs": 194,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"components-become-projects\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"provides-its-toolchain\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"provides-llvm-cov\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"packages-an-application-image\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"publishes-an-application-image\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"packages-run-swiftpm\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"xcode-projects-run-xcodebuild\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"reports-are-attributed\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"overrides-are-honored\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"manifest-follows-the-profile\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"workspace-commands\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"applications-serve-and-run\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"test-filter\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"checks-documentation-links\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "swift/extension/putnami.features.json#features[0].requirements[9]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/oci:validate~@putnami/sdd~specs",
+      "project": "/protocols/oci",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 455,
+      "cpuMs": 441,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/oci\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/oci"
+        }
+      ]
+    },
+    {
+      "key": "/tooling/cli-model:validate~@putnami/sdd~features",
+      "project": "/tooling/cli-model",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 455,
+      "cpuMs": 218,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"target-expression-grammar\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"selection-filters\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"dependency-graph\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[0].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"change-impact\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[0].requirements[3]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-verdict-policy-selects-only-the-tasks-that-name-it\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[0].requirements[4]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"canonical-identity\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[0].requirements[5]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"model-purity\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[0].requirements[6]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"import-visibility\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[0].requirements[7]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-dependent-takes-only-the-step-references-it-may-run\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[0].requirements[8]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"a-checking-task-moves-no-extension-runtime\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[0].requirements[9]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"extension-verb-vocabulary\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[1].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"vocabulary-default-traits\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[1].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"command-kinds-and-traits\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[1].requirements[2]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"declared-verification-producers\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/cli-model/putnami.features.json#features[1].requirements[3]"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/clientcontract:validate~@putnami/sdd~specs",
+      "project": "/protocols/clientcontract",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 451,
+      "cpuMs": 396,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/clientcontract\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/clientcontract"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/agentcontext:validate~@putnami/sdd~specs",
+      "project": "/protocols/agentcontext",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 449,
+      "cpuMs": 440,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/agentcontext\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/agentcontext"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/collaboration:validate~@putnami/sdd~specs",
+      "project": "/protocols/collaboration",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 445,
+      "cpuMs": 396,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/collaboration\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/collaboration"
+        }
+      ]
+    },
+    {
+      "key": "/protocols/codehost:validate~@putnami/sdd~specs",
+      "project": "/protocols/codehost",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 443,
+      "cpuMs": 418,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/codehost\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/codehost"
+        }
+      ]
+    },
+    {
+      "key": "/tooling/clientgen-extension:validate~@putnami/sdd~features",
+      "project": "/tooling/clientgen-extension",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 439,
+      "cpuMs": 270,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"spec-mediated-generation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[0]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"strict-provider-discovery\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[10]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"external-authority\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[11]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"runtime-capability-gate\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[12]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"named-omissions\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[13]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"empty-first-party-contract\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[14]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"handwritten-client-guard\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[15]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"native-validation-gate\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[16]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"committed-generated-contract-finding\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[17]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"censused-pending-transports\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[18]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"classified-transport-inventory\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[19]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"protocol-conformant-manifest\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[1]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"transport-detection-precision\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[20]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"client-owned-generation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[21]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"language-commands-wait-for-generation\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[22]"
+        },
+        {
+          "severity": "warning",
+          "message": "requirement \"no-committed-client\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "tooling/clientgen-extension/putnami.features.json#features[0].requirements[23]"
+        }
+      ],
+      "truncatedCount": 9
+    },
+    {
+      "key": "/protocols/i18n:validate~@putnami/sdd~specs",
+      "project": "/protocols/i18n",
+      "task": "validate~@putnami/sdd~specs",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 438,
+      "cpuMs": 384,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "publishable project \"go.putnami.dev/protocol/i18n\" has no \"package\" entry in putnami.support.json",
+          "code": "specs.missing_support_entry",
+          "file": "protocols/i18n"
+        }
+      ]
+    },
+    {
+      "key": "/typescript/framework/spectest:validate~@putnami/sdd~features",
+      "project": "/typescript/framework/spectest",
+      "task": "validate~@putnami/sdd~features",
+      "command": "validate",
+      "outcome": "success",
+      "reuse": "none",
+      "durationMs": 437,
+      "cpuMs": 242,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "message": "requirement \"honest-verdict\" has no supporting evidence",
+          "code": "features.missing_evidence",
+          "file": "typescript/framework/spectest/putnami.features.json#features[0].requirements[0]"
+        }
+      ]
+    }
+  ],
+  "elidedJobs": 2148,
+  "scheduler": {
+    "parallelism": 8,
+    "criticalPathMs": 456639
+  }
+}

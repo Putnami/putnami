@@ -22,7 +22,7 @@ case "$MODE" in
   unchanged) ARGS="" ;;
   *) echo "bad mode"; exit 2 ;;
 esac
-ls .putnami/sessions 2>/dev/null | sort > "$LOGDIR/$LABEL.before"
+ls .putnami/sessions 2>/dev/null | grep -E "^[0-9]{8}-[0-9]{6}-" | sort > "$LOGDIR/$LABEL.before"
 
 ( while :; do echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $(cat /proc/loadavg)"; sleep 15; done ) > "$OUT/load.txt" &
 SAMPLER=$!
@@ -33,7 +33,7 @@ END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 kill $SAMPLER; wait $SAMPLER 2>/dev/null
 echo "$END $(cat /proc/loadavg)" >> "$OUT/load.txt"
 
-SID=$(ls .putnami/sessions | sort | comm -13 "$LOGDIR/$LABEL.before" - | tail -1)
+SID=$(ls .putnami/sessions | grep -E "^[0-9]{8}-[0-9]{6}-" | sort | comm -13 "$LOGDIR/$LABEL.before" - | tail -1)
 cp ".putnami/reports/$SID.json" "$OUT/report.json" 2>/dev/null
 cp ".putnami/sessions/$SID/session.json" "$OUT/session.json" 2>/dev/null
 [ -f .putnami/stats/tasks.json ] && cp .putnami/stats/tasks.json "$OUT/tasks-after.json"

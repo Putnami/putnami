@@ -1,0 +1,40 @@
+  @putnami/windows-vet test~generate done  49ms
+  go.putnami.dev/examples/ts-items-client test~describe skip  44ms
+  @putnami/windows-vet test~test-env done  45ms
+  go.putnami.dev/examples/ts-items-client test~test-env done  55ms
+  @putnami/web test~types done  15.3s
+  @putnami/analytics test~types done  14.3s
+  @putnami/typescript-doc-examples test~generate done  428ms
+  @putnami/ui test~types done  16.5s
+  @putnami/typescript-doc-examples test~types done  4.0s
+  putnami.dev test~generate done  20.3s
+  @putnami/analytics lint~format done  311ms
+  @putnami/ui lint~format done  311ms
+  @putnami/web lint~format done  311ms
+  putnami.dev test~test-env done  219ms
+  putnami.dev test~test done  10.3s
+  putnami.dev test~test-env-teardown done  48ms
+  @putnami/analytics lint~check done  3.2s
+  @putnami/ui lint~check done  3.2s
+  @putnami/web lint~check done  3.2s
+  @putnami/typescript-doc-examples test~test done  52.7s
+  @putnami/typescript-doc-examples lint~format done  213ms
+  putnami.dev test~types done  42.2s
+  putnami.dev lint~format done  483ms
+  @putnami/typescript-doc-examples lint~check done  5.5s
+  @putnami/typescript-templates-proof test~generate done  601ms
+  go.putnami.dev/examples/ts-items-client test~test done  25.5s
+  go.putnami.dev/examples/ts-items-client test~test-env-teardown done  41ms
+  putnami.dev lint~check done  5.7s
+  @putnami/typescript-templates-proof test~types done  5.0s
+  go.putnami.dev/examples/ts-items-client lint~golangci-lint done  18.3s
+  go.putnami.dev/examples/ts-items-client lint~staticcheck done  2.2s
+  @putnami/typescript-templates-proof test~test done  47.6s
+  @putnami/typescript-templates-proof lint~format done  118ms
+  @putnami/typescript-templates-proof lint~check done  4.5s
+  @putnami/windows-vet test~test done  2.3m
+  @putnami/windows-vet test~test-env-teardown done  21ms
+
+  1551 succeeded  160 coalesced  501 skipped  23.4m
+
+putnami: session reporting incomplete: reporter refused events.jsonl chunk 0: reporter_not_configured; replay with putnami sessions replay --session 20261125-125307-b48325
