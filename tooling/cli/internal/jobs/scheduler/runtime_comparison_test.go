@@ -72,6 +72,7 @@ func TestCheckoutBase(t *testing.T) {
 	git("init")
 	git("config", "commit.gpgsign", "false")
 	writeRuntimeFile(t, root, "ext/main.go", "package main // base\n")
+	writeExecutable(t, filepath.Join(root, "ext", "bin", "prepare"), "#!/bin/sh\n")
 	git("add", "-A")
 	git("commit", "-m", "base")
 	writeRuntimeFile(t, root, "ext/main.go", "package main // head\n")
@@ -83,6 +84,9 @@ func TestCheckoutBase(t *testing.T) {
 	got, err := os.ReadFile(filepath.Join(dir, "ext", "main.go"))
 	if err != nil || string(got) != "package main // base\n" {
 		t.Fatalf("base checkout holds %q (%v), want the committed file", got, err)
+	}
+	if info, err := os.Stat(filepath.Join(dir, "ext", "bin", "prepare")); err != nil || info.Mode()&0o111 == 0 {
+		t.Errorf("the committed executable is not executable in the base checkout: %v %v", info, err)
 	}
 	cleanup()
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {

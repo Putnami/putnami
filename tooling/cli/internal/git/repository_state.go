@@ -39,7 +39,8 @@ func RepositoryState(dir string) (state, root string, err error) {
 // or below paths (slash paths relative to the work tree's root; "." is the
 // whole tree), at the same relative paths. It reads raw blobs, as the commit's
 // tree names them: no export attribute, filter or conversion applies, so the
-// files are the content the tree object identifies. A path commit does not
+// files are the content the tree object identifies, and a file the tree marks
+// executable (100755) is executable. A path commit does not
 // hold writes nothing. Symbolic links and submodules are not files and are
 // left out. It starts two processes, `ls-tree` and `cat-file --batch`, in
 // root, the work tree's root.
@@ -49,7 +50,10 @@ func WriteFilesAtCommit(root, commit string, paths []string, target string) erro
 	if err != nil {
 		return fmt.Errorf("git ls-tree (in %s): %w: %s", root, err, strings.TrimSpace(stderr))
 	}
-	type file struct{ object, name string }
+	type file struct {
+		object, name string
+		executable   bool
+	}
 	var files []file
 	for record := range strings.SplitSeq(listing, "\x00") {
 		meta, name, found := strings.Cut(record, "\t")
@@ -64,7 +68,7 @@ func WriteFilesAtCommit(root, commit string, paths []string, target string) erro
 		if strings.ContainsAny(name, "\\:") || !filepath.IsLocal(local) {
 			return fmt.Errorf("git ls-tree (in %s): %q leaves the target directory", root, name)
 		}
-		files = append(files, file{object: fields[2], name: local})
+		files = append(files, file{object: fields[2], name: local, executable: fields[0] == "100755"})
 	}
 	if len(files) == 0 {
 		return nil
@@ -95,6 +99,14 @@ func WriteFilesAtCommit(root, commit string, paths []string, target string) erro
 	}
 	if waitErr != nil {
 		return fmt.Errorf("git cat-file (in %s): %w: %s", root, waitErr, strings.TrimSpace(catErr.String()))
+	}
+	for _, f := range files {
+		if !f.executable {
+			continue
+		}
+		if err := os.Chmod(filepath.Join(target, f.name), 0o755); err != nil { //nolint:gosec // the tree marks the file executable
+			return fmt.Errorf("mark %s executable: %w", f.name, err)
+		}
 	}
 	return nil
 }
