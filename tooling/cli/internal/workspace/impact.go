@@ -376,9 +376,7 @@ func (s ImpactedSelection) TraceRecord() ImpactTraceRecord {
 		}
 	}
 	for _, comparison := range s.RuntimeComparisons {
-		record.RuntimeComparisons = append(record.RuntimeComparisons, ImpactTraceRuntime{
-			Project: comparison.Project, Unchanged: comparison.Unchanged, Reason: comparison.Reason,
-		})
+		record.RuntimeComparisons = append(record.RuntimeComparisons, ImpactTraceRuntime(comparison))
 	}
 	return record
 }
@@ -555,8 +553,9 @@ type ImpactedSelectionOptions struct {
 	RunStart []string
 	// CompareRuntimes, when set, compares the runtime each candidate
 	// extension project prepares from this tree with the one the diff's base
-	// prepares. The candidates are the in-workspace extension projects the
-	// selection reached without a changed file of their own. An extension it
+	// prepares. The candidates are the extensions whose runtime fired an
+	// extension-consumer edge in the first walk without a changed file of
+	// their own (runtimeCandidates). An extension it
 	// answers Unchanged for fires no extension-consumer edge for a runtime
 	// input (ChangeImpactOptions.UnchangedRuntimes); any other answer, and an
 	// extension it does not answer for, leaves the edge as it was.
