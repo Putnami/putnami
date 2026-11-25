@@ -403,8 +403,8 @@
     {
       "id": "the-scheduler-admits-the-cpu-it-grants",
       "text": [
-        "A task with history reserves, after a cache miss and before its lease and locks, the occupancy it measured, at most its ceiling, the whole ceiling when the critical-path lift raised it; a task with none reserves one CPU, scaled by its configured weight. A cache hit and a serve step reserve none. A waiting subprocess starts, in longest-first order, while any CPU is unreserved.",
-        "Every subprocess that reserves CPU is granted at least the CPUs the running ceilings leave free: a task with history its ceiling or more, a task with no history at least one and at most the whole capacity. A weight scales occupancy before the critical-path lift; a learned weight lifts no ceiling above measured use.",
+        "After a cache miss, a task with history reserves its measured occupancy, at most its ceiling; a task with none one CPU. A hit or serve step reserves none. A waiter starts while any CPU is free.",
+        "A task with history is granted its ceiling raised to the CPUs running ceilings leave free; a task with none the whole capacity.",
         "auto and max run one worker per CPU of capacity, eco half, and a serve step adds one."
       ]
     }
