@@ -227,7 +227,7 @@ func TestTaskStats_DoesNotRetainColdFallbackAsProvenConcurrency(t *testing.T) {
 	store := loadTaskStats(t.TempDir())
 	job := statJob("/cli", "test")
 	scheduler := &Scheduler{cpuAlloc: newCPUAllocator(10, "")}
-	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}})
+	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}}, false)
 	if job.CPUBudget != 10 || job.CPUBudgetHistoryEligible {
 		t.Fatalf("cold grant = %d eligible=%v, want whole-machine fallback excluded from history", job.CPUBudget, job.CPUBudgetHistoryEligible)
 	}
@@ -241,7 +241,7 @@ func TestTaskStats_DoesNotRetainColdFallbackAsProvenConcurrency(t *testing.T) {
 
 	applyTaskTuning([]*ScheduledJob{job}, store)
 	job.LearnedCPUWeight = 8
-	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}})
+	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}}, false)
 	if job.CPUBudget != 8 || !job.CPUBudgetHistoryEligible {
 		t.Fatalf("history-backed long-pole grant = %d eligible=%v, want stable 8 and persistable", job.CPUBudget, job.CPUBudgetHistoryEligible)
 	}
@@ -263,7 +263,7 @@ func TestTaskStats_ConfigWeightChangeDoesNotRatchetHistoricalDemand(t *testing.T
 	scheduler := &Scheduler{cpuAlloc: newCPUAllocator(8, "")}
 
 	applyTaskTuning([]*ScheduledJob{job}, store)
-	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}})
+	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}}, false)
 	if job.CPUBudget != 4 {
 		t.Fatalf("weighted budget = %d, want 4", job.CPUBudget)
 	}
@@ -274,7 +274,7 @@ func TestTaskStats_ConfigWeightChangeDoesNotRatchetHistoricalDemand(t *testing.T
 
 	weight = 1
 	applyTaskTuning([]*ScheduledJob{job}, store)
-	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}})
+	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}}, false)
 	if job.CPUBudget != 1 {
 		t.Fatalf("budget after weight 4 -> 1 = %d, want unweighted demand 1", job.CPUBudget)
 	}
@@ -298,7 +298,7 @@ func TestTaskStats_LearnedWeightChangeDoesNotRatchetHistoricalDemand(t *testing.
 	if job.LearnedCPUWeight != 4 {
 		t.Fatalf("initial learned weight = %v, want 4", job.LearnedCPUWeight)
 	}
-	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}})
+	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}}, false)
 	if job.CPUBudget != 4 {
 		t.Fatalf("learned-weight budget = %d, want 4", job.CPUBudget)
 	}
@@ -310,7 +310,7 @@ func TestTaskStats_LearnedWeightChangeDoesNotRatchetHistoricalDemand(t *testing.
 	if job.LearnedCPUWeight != 0 {
 		t.Fatalf("adapted learned weight = %v, want neutral", job.LearnedCPUWeight)
 	}
-	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}})
+	scheduler.acquireGroupCPUBudget([]taskWork{{job: job}}, false)
 	if job.CPUBudget != 1 {
 		t.Fatalf("budget after learned weight 4 -> 1 = %d, want unweighted demand 1", job.CPUBudget)
 	}
@@ -446,7 +446,7 @@ func TestApplyTaskTuning_LearnedBoostAgainstPeers(t *testing.T) {
 
 func TestApplyTaskTuning_LearnedWeightLiftsOnlyToMeasuredUse(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	store := loadTaskStats(t.TempDir())
 	for _, id := range []string{"/a", "/b", "/c"} {
 		store.record(statJob(id, "test"), successResult(time.Second, time.Second))
@@ -832,7 +832,7 @@ func TestTaskStats_AnEarlierStoreIsIgnored(t *testing.T) {
 // although 7 × 29/7 is a hair above 29 in floating point.
 func TestApplyTaskTuning_LearnedWeightAddsNoCPUByRounding(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	store := loadTaskStats(t.TempDir())
 	for _, id := range []string{"/a", "/b", "/c"} {
 		store.record(statJob(id, "test"), successResult(time.Second, time.Second))

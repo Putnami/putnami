@@ -644,7 +644,7 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 		s.resourcePlanByJob[job.Key()] = scheduledResourcePlan{
 			recommendation: recommendation,
 			ceiling:        recommendation.budget,
-			charge:         planCharge(job, recommendation, recommendation.budget, machineCPU),
+			chargeMilli:    planChargeMilli(job, recommendation, recommendation.budget, machineCPU),
 			memoryFallback: bootstrapMemoryBytes(job, usableMemory),
 		}
 
@@ -661,7 +661,7 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 			s.batchCPUBudgetByJob[jobKey] = classBudget[key]
 			plan := s.resourcePlanByJob[jobKey]
 			plan.ceiling = classBudget[key]
-			plan.charge = planCharge(job, plan.recommendation, plan.ceiling, machineCPU)
+			plan.chargeMilli = planChargeMilli(job, plan.recommendation, plan.ceiling, machineCPU)
 			s.resourcePlanByJob[jobKey] = plan
 		}
 	}

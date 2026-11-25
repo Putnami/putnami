@@ -16,8 +16,8 @@ func batchAdmission(cpu0, cpu1 int) (*Scheduler, *groupAdmission, *ScheduledJob,
 	s := &Scheduler{
 		resources: newResourcePool(4, 0, nil),
 		resourcePlanByJob: map[string]scheduledResourcePlan{
-			m0.Key(): {ceiling: cpu0, charge: cpu0},
-			m1.Key(): {ceiling: cpu1, charge: cpu1},
+			m0.Key(): {ceiling: cpu0, chargeMilli: cpu0 * milliCPU},
+			m1.Key(): {ceiling: cpu1, chargeMilli: cpu1 * milliCPU},
 		},
 	}
 	return s, newGroupAdmission(s, []*ScheduledJob{m0, m1}), m0, m1
@@ -28,7 +28,7 @@ func batchAdmission(cpu0, cpu1 int) (*Scheduler, *groupAdmission, *ScheduledJob,
 // takes before its lease claim.
 func TestABatchReservesAMemberThatRunsWithoutALease(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	s, admission, m0, m1 := batchAdmission(4, 1)
 	admission.settle(m0, true)
 	if !admission.acquire(t.Context()) {
@@ -36,8 +36,8 @@ func TestABatchReservesAMemberThatRunsWithoutALease(t *testing.T) {
 	}
 	admission.pin()
 	admission.settle(m1, true)
-	if !admission.execute(t.Context()) || admission.hold.request.cpu != 4 {
-		t.Fatalf("batch reservation = %d CPUs, want the 4 its first member is granted", admission.hold.request.cpu)
+	if !admission.execute(t.Context()) || admission.hold.request.cpuMilli != 4*milliCPU {
+		t.Fatalf("batch reservation = %d CPUs, want the 4 its first member is granted", admission.hold.request.cpuMilli)
 	}
 	if grants := s.resources.grantsSnapshot(); len(grants) != 1 || grants[0].CPU != 4 {
 		t.Fatalf("reservation telemetry = %+v, want one 4-CPU batch", grants)
@@ -51,19 +51,19 @@ func TestABatchReservesAMemberThatRunsWithoutALease(t *testing.T) {
 // the cache leaves the reservation at once, without a wait.
 func TestABatchGivesBackWhatAMemberThatHitReserved(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	s, admission, m0, m1 := batchAdmission(1, 4)
-	if !admission.acquire(t.Context()) || admission.hold.request.cpu != 4 {
-		t.Fatalf("first reservation = %d CPUs, want 4 for the members not yet looked up", admission.hold.request.cpu)
+	if !admission.acquire(t.Context()) || admission.hold.request.cpuMilli != 4*milliCPU {
+		t.Fatalf("first reservation = %d CPUs, want 4 for the members not yet looked up", admission.hold.request.cpuMilli)
 	}
 	admission.pin()
 	admission.settle(m0, true)
 	admission.settle(m1, false)
-	if s.resources.cpuUsed != 1 {
-		t.Fatalf("pool holds %d CPUs once the second member hit, want 1", s.resources.cpuUsed)
+	if s.resources.cpuUsedMilli != 1*milliCPU {
+		t.Fatalf("pool holds %d CPUs once the second member hit, want 1", s.resources.cpuUsedMilli)
 	}
-	if !admission.execute(t.Context()) || admission.hold.request.cpu != 1 {
-		t.Fatalf("batch reservation = %d CPUs, want the 1 its executing member is granted", admission.hold.request.cpu)
+	if !admission.execute(t.Context()) || admission.hold.request.cpuMilli != 1*milliCPU {
+		t.Fatalf("batch reservation = %d CPUs, want the 1 its executing member is granted", admission.hold.request.cpuMilli)
 	}
 	if grants := s.resources.grantsSnapshot(); len(grants) != 1 || grants[0].Job != m0.Key() || grants[0].CPU != 1 {
 		t.Fatalf("reservation telemetry = %+v, want the executing member alone", grants)
@@ -96,7 +96,7 @@ func TestAGroupThatHitsReservesNothing(t *testing.T) {
 // to another session waits for its owner holding no CPU, and takes the CPU
 // again before it claims the lease the owner abandoned.
 func TestALeaseLoserGivesItsCPUBackWhileItWaits(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	root := t.TempDir()
 	owner := store.NewCacheManager(store.NewLocalStore(root))
 	waiter := store.NewCacheManager(store.NewLocalStore(root))
@@ -113,7 +113,7 @@ func TestALeaseLoserGivesItsCPUBackWhileItWaits(t *testing.T) {
 	scheduler := &Scheduler{
 		cache:             waiter,
 		resources:         newResourcePool(1, 0, nil),
-		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 1, charge: 1}},
+		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 1, chargeMilli: 1 * milliCPU}},
 	}
 	waiting := make(chan struct{}, 1)
 	scheduler.onCacheLeaseWait = func(*ScheduledJob) { waiting <- struct{}{} }
@@ -132,7 +132,7 @@ func TestALeaseLoserGivesItsCPUBackWhileItWaits(t *testing.T) {
 	case <-time.After(answerWaitBudget):
 		t.Fatal("the loser never waited for the lease owner")
 	}
-	free, ok := scheduler.resources.tryAcquire(resourceRequest{cpu: 1})
+	free, ok := scheduler.resources.tryAcquire(resourceRequest{cpuMilli: 1 * milliCPU})
 	if !ok {
 		t.Fatal("the lease loser held its CPU while it waited")
 	}
@@ -144,8 +144,8 @@ func TestALeaseLoserGivesItsCPUBackWhileItWaits(t *testing.T) {
 	if got.result != nil {
 		t.Fatalf("abandoned lease restored %+v, want the loser to own the lease", got.result)
 	}
-	if !admission.held || !admission.pinned || admission.hold.request.cpu != 1 {
-		t.Fatalf("admission = held %v pinned %v cpu %d, want the lease owner holding one CPU", admission.held, admission.pinned, admission.hold.request.cpu)
+	if !admission.held || !admission.pinned || admission.hold.request.cpuMilli != 1*milliCPU {
+		t.Fatalf("admission = held %v pinned %v cpu %d, want the lease owner holding one CPU", admission.held, admission.pinned, admission.hold.request.cpuMilli)
 	}
 	admission.release()
 	assertPoolEmpty(t, scheduler.resources)
@@ -156,23 +156,23 @@ func TestALeaseLoserGivesItsCPUBackWhileItWaits(t *testing.T) {
 // exactly the waiters the freed CPU fits, in order.
 func TestResizeFreesWithoutWaitingAndGrantsWhatFits(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	pool := newResourcePool(4, 0, nil)
-	held, _ := pool.tryAcquire(resourceRequest{cpu: 4})
+	held, _ := pool.tryAcquire(resourceRequest{cpuMilli: 4 * milliCPU})
 	granted := make(chan resourceReservation, 2)
 	for _, rank := range []executionRank{{criticalPathMs: 2, key: "/first"}, {criticalPathMs: 1, key: "/second"}} {
 		go func() {
-			if hold, ok := pool.acquireExecution(t.Context(), resourceRequest{cpu: 2}, rank); ok {
+			if hold, ok := pool.acquireExecution(t.Context(), resourceRequest{cpuMilli: 2 * milliCPU}, rank); ok {
 				granted <- hold
 			}
 		}()
 	}
 	waitForWaiters(t, pool, 2)
-	if !pool.resize(&held, resourceRequest{cpu: 3}) || held.request.cpu != 3 {
-		t.Fatalf("resize to 3 = %+v, want 3 CPUs held", held.request)
+	if !pool.resize(&held, resourceRequest{cpuMilli: 4 * milliCPU}) || held.request.cpuMilli != 4*milliCPU {
+		t.Fatalf("resize to 4 = %+v, want 4 CPUs held", held.request)
 	}
 	waitForWaiters(t, pool, 2)
-	if !pool.resize(&held, resourceRequest{cpu: 2}) {
+	if !pool.resize(&held, resourceRequest{cpuMilli: 2 * milliCPU}) {
 		t.Fatal("resize to 2 did not cover the request")
 	}
 	first := <-granted
@@ -193,32 +193,32 @@ func TestResizeFreesWithoutWaitingAndGrantsWhatFits(t *testing.T) {
 // reservation is left alone.
 func TestResizeRaisesOnlyWhatFitsAtOnce(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	pool := newResourcePool(4, 0, nil)
-	held, _ := pool.tryAcquire(resourceRequest{cpu: 2})
-	other, _ := pool.tryAcquire(resourceRequest{cpu: 2})
-	if pool.resize(&held, resourceRequest{cpu: 3}) || held.request.cpu != 2 {
-		t.Fatalf("a raise that does not fit = %+v, want the 2 CPUs held", held.request)
+	held, _ := pool.tryAcquire(resourceRequest{cpuMilli: 3_200})
+	other, _ := pool.tryAcquire(resourceRequest{cpuMilli: 800})
+	if pool.resize(&held, resourceRequest{cpuMilli: 3_500}) || held.request.cpuMilli != 3_200 {
+		t.Fatalf("a raise that does not fit = %+v, want the 3.2 CPUs held", held.request)
 	}
-	pool.release(other)
 	waiting := make(chan bool, 1)
 	go func() {
-		hold, ok := pool.acquireExecution(t.Context(), resourceRequest{cpu: 3}, executionRank{key: "/waiting"})
+		hold, ok := pool.acquireExecution(t.Context(), resourceRequest{cpuMilli: 3 * milliCPU}, executionRank{key: "/waiting"})
 		pool.release(hold)
 		waiting <- ok
 	}()
 	waitForWaiters(t, pool, 1)
-	if pool.resize(&held, resourceRequest{cpu: 3}) || held.request.cpu != 2 {
-		t.Fatalf("a raise past a waiter = %+v, want the 2 CPUs held", held.request)
+	if pool.resize(&held, resourceRequest{cpuMilli: 3_500}) || held.request.cpuMilli != 3_200 {
+		t.Fatalf("a raise past a waiter = %+v, want the 3.2 CPUs held", held.request)
 	}
+	pool.release(other)
 	pool.release(held)
 	<-waiting
-	held, _ = pool.tryAcquire(resourceRequest{cpu: 2})
-	if !pool.resize(&held, resourceRequest{cpu: 3}) || held.request.cpu != 3 || pool.cpuUsed != 3 {
-		t.Fatalf("a raise that fits = %+v used %d, want 3", held.request, pool.cpuUsed)
+	held, _ = pool.tryAcquire(resourceRequest{cpuMilli: 2 * milliCPU})
+	if !pool.resize(&held, resourceRequest{cpuMilli: 3 * milliCPU}) || held.request.cpuMilli != 3*milliCPU || pool.cpuUsedMilli != 3*milliCPU {
+		t.Fatalf("a raise that fits = %+v used %d, want 3", held.request, pool.cpuUsedMilli)
 	}
 	pool.release(held)
-	if pool.resize(&held, resourceRequest{cpu: 1}) {
+	if pool.resize(&held, resourceRequest{cpuMilli: 1 * milliCPU}) {
 		t.Fatal("a released reservation was resized")
 	}
 	assertPoolEmpty(t, pool)
@@ -229,7 +229,7 @@ func TestResizeRaisesOnlyWhatFitsAtOnce(t *testing.T) {
 // learned; the batch takes the difference, which fits at once.
 func TestABatchTakesTheMemoryItsExecutingMemberNeeds(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	profile := taskResourceProfile{Observations: []taskResourceObservation{
 		{CPUMs: 1000, WallMs: 1000, MaxRSSBytes: int64(2000 * testMiB), GrantedConcurrency: 1, BatchSize: 1, Samples: 4, Confidence: 1},
 		{CPUMs: 1000, WallMs: 1000, MaxRSSBytes: int64(1000 * testMiB), GrantedConcurrency: 1, BatchSize: 2, Samples: 4, Confidence: 1},
@@ -240,8 +240,8 @@ func TestABatchTakesTheMemoryItsExecutingMemberNeeds(t *testing.T) {
 	s := &Scheduler{
 		resources: newResourcePool(4, 8*1024*testMiB, nil),
 		resourcePlanByJob: map[string]scheduledResourcePlan{
-			m0.Key(): {ceiling: 1, charge: 1, memoryFallback: 512 * testMiB},
-			m1.Key(): {ceiling: 1, charge: 1, memoryFallback: 512 * testMiB},
+			m0.Key(): {ceiling: 1, chargeMilli: 1 * milliCPU, memoryFallback: 512 * testMiB},
+			m1.Key(): {ceiling: 1, chargeMilli: 1 * milliCPU, memoryFallback: 512 * testMiB},
 		},
 	}
 	alone := s.groupResourceRequest([]*ScheduledJob{m0}).memoryBytes

@@ -289,13 +289,13 @@ func TestBatchClassCPUBudgetStableAcrossSingletonAndRuntimeCohorts(t *testing.T)
 			t.Fatalf("fixed class budget for %s = %d, want 6", job.Key(), got)
 		}
 	}
-	if got := scheduler.groupResourceRequest(planned[:1]).cpu; got != 6 {
-		t.Fatalf("class-shaped CPU reservation = %d, want the granted class ceiling 6", got)
+	if got := scheduler.groupResourceRequest(planned[:1]).cpuMilli; got != 6*milliCPU {
+		t.Fatalf("class-shaped CPU reservation = %d, want the occupancy measured at the class ceiling, 4 CPUs at weight 2, capped by the ceiling 6", got)
 	}
 
 	// A dispatch that happens to contain only the lightest member still uses the
 	// class ceiling, but persists that member's own pre-weight ceiling (1), not 6.
-	scheduler.acquireGroupCPUBudget([]taskWork{{job: planned[0]}})
+	scheduler.acquireGroupCPUBudget([]taskWork{{job: planned[0]}}, false)
 	singletonBudget := planned[0].CPUBudget
 	if singletonBudget != 6 || !planned[0].CPUBudgetHistoryEligible ||
 		planned[0].CPUBudgetUnweightedCeiling != 1 {
@@ -313,7 +313,7 @@ func TestBatchClassCPUBudgetStableAcrossSingletonAndRuntimeCohorts(t *testing.T)
 		for _, index := range indexes {
 			work = append(work, taskWork{job: planned[index]})
 		}
-		scheduler.acquireGroupCPUBudget(work)
+		scheduler.acquireGroupCPUBudget(work, false)
 		leader := batchLeader(work)
 		if leader.CPUBudget != singletonBudget {
 			t.Fatalf("cohort %v physical budget = %d, want singleton budget %d", indexes, leader.CPUBudget, singletonBudget)

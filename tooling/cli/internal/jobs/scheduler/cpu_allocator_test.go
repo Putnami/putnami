@@ -25,7 +25,7 @@ func grant(
 
 func TestCPUAllocator_ColdTaskGetsWholeMachine(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-cold-task-is-granted-the-machine-and-charged-one-cpu")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-is-granted-at-least-the-cpus-left-free")
 	a := newCPUAllocator(10, "")
 	if got := grant(a, "p:lint", 1, 0, 0, 0, 0); got.budget != 10 || got.fromHistory {
 		t.Fatalf("recommendation = %+v, want the whole machine, not from history", got)
@@ -144,7 +144,7 @@ func TestAcquireGroupCPUBudget_UsesMaximumMemberCeilingWithoutPreparedClass(t *t
 	heavy.HistoricalCPUCeiling = 1
 
 	scheduler := &Scheduler{cpuAlloc: newCPUAllocator(8, "")}
-	scheduler.acquireGroupCPUBudget([]taskWork{{job: light}, {job: heavy}})
+	scheduler.acquireGroupCPUBudget([]taskWork{{job: light}, {job: heavy}}, false)
 
 	if light.CPUBudget != 3 || heavy.CPUBudget != 3 {
 		t.Fatalf("batch budgets = %d/%d, want maximum member ceiling 3", light.CPUBudget, heavy.CPUBudget)
@@ -167,7 +167,7 @@ func TestAcquireGroupCPUBudget_ColdMemberPreservesWholeMachineFallback(t *testin
 	cold := statJob("/b", "test")
 
 	scheduler := &Scheduler{cpuAlloc: newCPUAllocator(8, "")}
-	scheduler.acquireGroupCPUBudget([]taskWork{{job: known}, {job: cold}})
+	scheduler.acquireGroupCPUBudget([]taskWork{{job: known}, {job: cold}}, false)
 
 	if known.CPUBudget != 8 || cold.CPUBudget != 8 {
 		t.Fatalf("batch budgets = %d/%d, want machine cap 8 with a cold member", known.CPUBudget, cold.CPUBudget)
@@ -256,7 +256,7 @@ func TestCPUAllocator_CriticalityNeverLowersMeasuredDemand(t *testing.T) {
 
 func TestCPUAllocator_WeightScalesOccupancyNotTheLift(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	a := newCPUAllocator(10, cpuBudgetPolicyCriticalPath)
 	if got := a.recommend(4, 1_000, 1_000, 0, 2).budget; got != 4 {
 		t.Fatalf("weighted ceiling = %d, want occupancy 1 x weight 4 over the lift 2", got)

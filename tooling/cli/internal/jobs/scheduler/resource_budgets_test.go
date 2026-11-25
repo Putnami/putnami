@@ -20,7 +20,7 @@ func claimingJob(id, jobName, resource string, units int) *ScheduledJob {
 func TestResourceBudgetBlocksThirdClaimAndResumesOnRelease(t *testing.T) {
 	t.Parallel()
 	pool := newResourcePool(32, 0, map[string]int{"db-connections": 400})
-	claim := resourceRequest{cpu: 1, claims: map[string]int{"db-connections": 230}}
+	claim := resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"db-connections": 230}}
 
 	first, ok := pool.tryAcquire(claim)
 	if !ok {
@@ -45,16 +45,16 @@ func TestResourceBudgetBlocksThirdClaimAndResumesOnRelease(t *testing.T) {
 func TestResourceBudgetNeverGatesUnclaimingTasks(t *testing.T) {
 	t.Parallel()
 	pool := newResourcePool(32, 0, map[string]int{"db-connections": 400})
-	if _, ok := pool.tryAcquire(resourceRequest{cpu: 1, claims: map[string]int{"db-connections": 400}}); !ok {
+	if _, ok := pool.tryAcquire(resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"db-connections": 400}}); !ok {
 		t.Fatal("the sole claimant was not admitted")
 	}
 	for i := range 8 {
-		if _, ok := pool.tryAcquire(resourceRequest{cpu: 1}); !ok {
+		if _, ok := pool.tryAcquire(resourceRequest{cpuMilli: 1 * milliCPU}); !ok {
 			t.Fatalf("task %d, which claims nothing, was gated by an exhausted budget", i)
 		}
 	}
 	// A claim on a DIFFERENT resource is equally ungated: budgets never pool.
-	if _, ok := pool.tryAcquire(resourceRequest{cpu: 1, claims: map[string]int{"ports": 4}}); !ok {
+	if _, ok := pool.tryAcquire(resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"ports": 4}}); !ok {
 		t.Fatal("a claim on an unrelated resource was gated by db-connections")
 	}
 }
@@ -65,7 +65,7 @@ func TestResourceBudgetNeverGatesUnclaimingTasks(t *testing.T) {
 func TestUndeclaredResourceBudgetIsUnlimited(t *testing.T) {
 	t.Parallel()
 	pool := newResourcePool(32, 0, nil)
-	claim := resourceRequest{cpu: 1, claims: map[string]int{"db-connections": 230}}
+	claim := resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"db-connections": 230}}
 	for i := range 8 {
 		reservation, ok := pool.tryAcquire(claim)
 		if !ok {
@@ -86,10 +86,10 @@ func TestUndeclaredResourceBudgetIsUnlimited(t *testing.T) {
 func TestResourceBudgetChecksEveryClaimBeforeTakingAny(t *testing.T) {
 	t.Parallel()
 	pool := newResourcePool(32, 0, map[string]int{"db-connections": 400, "ports": 2})
-	if _, ok := pool.tryAcquire(resourceRequest{cpu: 1, claims: map[string]int{"ports": 2}}); !ok {
+	if _, ok := pool.tryAcquire(resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"ports": 2}}); !ok {
 		t.Fatal("the port holder was not admitted")
 	}
-	blocked := resourceRequest{cpu: 1, claims: map[string]int{"db-connections": 100, "ports": 1}}
+	blocked := resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"db-connections": 100, "ports": 1}}
 	for range 3 {
 		if _, ok := pool.tryAcquire(blocked); ok {
 			t.Fatal("a dispatch was admitted with no port budget left")
@@ -105,7 +105,7 @@ func TestResourceBudgetChecksEveryClaimBeforeTakingAny(t *testing.T) {
 func TestResourceClaimReleasesExactlyOnce(t *testing.T) {
 	t.Parallel()
 	scheduler := &Scheduler{resources: newResourcePool(4, 0, map[string]int{"db-connections": 400})}
-	reservation, ok := scheduler.resources.tryAcquire(resourceRequest{cpu: 1, claims: map[string]int{"db-connections": 230}})
+	reservation, ok := scheduler.resources.tryAcquire(resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"db-connections": 230}})
 	if !ok {
 		t.Fatal("reservation was not acquired")
 	}
@@ -116,7 +116,7 @@ func TestResourceClaimReleasesExactlyOnce(t *testing.T) {
 	if got := scheduler.resources.claimed["db-connections"]; got != 0 {
 		t.Fatalf("claimed units after a duplicated release = %d, want 0", got)
 	}
-	if _, ok := scheduler.resources.tryAcquire(resourceRequest{cpu: 1, claims: map[string]int{"db-connections": 400}}); !ok {
+	if _, ok := scheduler.resources.tryAcquire(resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"db-connections": 400}}); !ok {
 		t.Fatal("the whole budget was not reusable after release")
 	}
 }
@@ -129,7 +129,7 @@ func TestResourceClaimReleasesExactlyOnce(t *testing.T) {
 func TestImpossibleClaimRunsAloneInsteadOfHanging(t *testing.T) {
 	t.Parallel()
 	pool := newResourcePool(32, 0, map[string]int{"db-connections": 400})
-	impossible := resourceRequest{cpu: 1, claims: map[string]int{"db-connections": 460}}
+	impossible := resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"db-connections": 460}}
 	reservation, ok := pool.tryAcquire(impossible)
 	if !ok {
 		t.Fatal("an over-budget claim was refused on an idle pool — it can never be admitted at all")
@@ -137,7 +137,7 @@ func TestImpossibleClaimRunsAloneInsteadOfHanging(t *testing.T) {
 	if got := reservation.request.claims["db-connections"]; got != 400 {
 		t.Fatalf("clamped claim = %d, want the whole 400-unit budget", got)
 	}
-	if _, ok := pool.tryAcquire(resourceRequest{cpu: 1, claims: map[string]int{"db-connections": 1}}); ok {
+	if _, ok := pool.tryAcquire(resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"db-connections": 1}}); ok {
 		t.Fatal("a clamped dispatch did not hold the whole budget while it ran")
 	}
 }
@@ -167,7 +167,7 @@ func TestGroupResourceRequestCarriesClaims(t *testing.T) {
 	job := claimingJob("/app", "test", "db-connections", 230)
 	scheduler := &Scheduler{
 		resources:         newResourcePool(8, 0, map[string]int{"db-connections": 400}),
-		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 2, charge: 2}},
+		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 2, chargeMilli: 2 * milliCPU}},
 	}
 	if got := scheduler.groupResourceRequest([]*ScheduledJob{job}).claims["db-connections"]; got != 230 {
 		t.Fatalf("group request claim = %d, want 230", got)
@@ -182,9 +182,9 @@ func TestCoordinatorAdmissionWaitsForResourceBudget(t *testing.T) {
 	job := claimingJob("/app", "test", "db-connections", 230)
 	scheduler := &Scheduler{
 		resources:         newResourcePool(8, 0, map[string]int{"db-connections": 400}),
-		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 1, charge: 1}},
+		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 1, chargeMilli: 1 * milliCPU}},
 	}
-	held, ok := scheduler.resources.tryAcquire(resourceRequest{cpu: 1, claims: map[string]int{"db-connections": 230}})
+	held, ok := scheduler.resources.tryAcquire(resourceRequest{cpuMilli: 1 * milliCPU, claims: map[string]int{"db-connections": 230}})
 	if !ok {
 		t.Fatal("failed to arrange a held budget")
 	}

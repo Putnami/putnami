@@ -324,7 +324,7 @@ func testSummaryFromResultEvent(t *testing.T, event RawJobEvent) map[string]any 
 }
 
 func TestPlanSchedule_DynamicCPUBudgets(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	ws, ext := makeIntegrationWorkspace(t)
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
 

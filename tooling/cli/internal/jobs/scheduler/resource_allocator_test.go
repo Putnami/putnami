@@ -19,7 +19,7 @@ func assertResourcePoolIdle(t *testing.T, scheduler *Scheduler) {
 	if scheduler.resources == nil {
 		t.Fatal("scheduler resource pool was not initialized")
 	}
-	if scheduler.resources.cpuUsed != 0 || scheduler.resources.memoryUsed != 0 || len(scheduler.resources.live) != 0 {
+	if scheduler.resources.cpuUsedMilli != 0*milliCPU || scheduler.resources.memoryUsed != 0 || len(scheduler.resources.live) != 0 {
 		t.Fatalf("scheduler resources not fully released: %+v", scheduler.resources)
 	}
 }
@@ -33,7 +33,7 @@ func heavyResourceJob(id string) *ScheduledJob {
 
 func TestFirstColdTaskIsGrantedTheMachineAndChargedOneCPU(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-cold-task-is-granted-the-machine-and-charged-one-cpu")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-is-granted-at-least-the-cpus-left-free")
 	tests := []struct {
 		name           string
 		cpu            int
@@ -53,11 +53,11 @@ func TestFirstColdTaskIsGrantedTheMachineAndChargedOneCPU(t *testing.T) {
 			if recommendation.budget != tc.cpu || recommendation.fromHistory {
 				t.Fatalf("first-cold grant = %+v, want the machine %d", recommendation, tc.cpu)
 			}
-			charge := planCharge(job, recommendation, recommendation.budget, tc.cpu)
-			if charge != 1 {
+			charge := planChargeMilli(job, recommendation, recommendation.budget, tc.cpu)
+			if charge != milliCPU {
 				t.Fatalf("first-cold charge = %d, want one CPU", charge)
 			}
-			request := resourceRequest{cpu: charge, memoryBytes: bootstrapMemoryBytes(job, usableMemory)}
+			request := resourceRequest{cpuMilli: charge, memoryBytes: bootstrapMemoryBytes(job, usableMemory)}
 			pool := newResourcePool(tc.cpu, usableMemory, nil)
 			admitted := 0
 			for range 32 {
@@ -75,7 +75,7 @@ func TestFirstColdTaskIsGrantedTheMachineAndChargedOneCPU(t *testing.T) {
 
 func TestFirstColdChargeFollowsTheConfiguredWeight(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-cold-task-is-granted-the-machine-and-charged-one-cpu")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "a-task-is-granted-at-least-the-cpus-left-free")
 	job := heavyResourceJob("/weighted")
 	job.CPUWeight = 2
 	if charge := bootstrapCPUCharge(job, 4); charge != 2 {
@@ -87,8 +87,8 @@ func TestFirstColdChargeFollowsTheConfiguredWeight(t *testing.T) {
 	}
 }
 
-func TestAdmissionChargesTheHistoryBackedCeiling(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+func TestAdmissionChargesTheHistoryBackedOccupancy(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	t.Parallel()
 	job := statJob("/measured", "test")
 	job.ExpectedCPUWorkMs = 1500
@@ -100,10 +100,10 @@ func TestAdmissionChargesTheHistoryBackedCeiling(t *testing.T) {
 	}
 	recommendation := scheduler.cpuAlloc.recommend(1, 1500, 1000, 3, 0)
 	scheduler.resourcePlanByJob = map[string]scheduledResourcePlan{
-		job.Key(): {recommendation: recommendation, ceiling: recommendation.budget, charge: planCharge(job, recommendation, recommendation.budget, 10)},
+		job.Key(): {recommendation: recommendation, ceiling: recommendation.budget, chargeMilli: planChargeMilli(job, recommendation, recommendation.budget, 10)},
 	}
-	if request := scheduler.groupResourceRequest([]*ScheduledJob{job}); request.cpu != 3 {
-		t.Fatalf("admission charge = %d, want the granted ceiling 3", request.cpu)
+	if request := scheduler.groupResourceRequest([]*ScheduledJob{job}); request.cpuMilli != 1500 {
+		t.Fatalf("admission charge = %d, want the measured occupancy 1500 under the ceiling 3", request.cpuMilli)
 	}
 }
 
@@ -123,12 +123,12 @@ func TestRegularColdProfileControlsMemoryAdmission(t *testing.T) {
 	if recommendation.budget != 3 {
 		t.Fatalf("profile CPU ceiling = %d, want observed demand 3", recommendation.budget)
 	}
-	fallback := resourceRequest{cpu: 2, memoryBytes: 1280 * testMiB}
+	fallback := resourceRequest{cpuMilli: 2 * milliCPU, memoryBytes: 1280 * testMiB}
 	memory, _ := profiledMemoryRequest(profile, recommendation.budget, 1, fallback, 4*1024*testMiB)
 	if memory <= 600*testMiB || memory >= 700*testMiB {
 		t.Fatalf("profile memory reservation = %d MiB, want confidence/saturation headroom over 600 MiB", memory/testMiB)
 	}
-	request := resourceRequest{cpu: recommendation.budget, memoryBytes: memory}
+	request := resourceRequest{cpuMilli: recommendation.budget * milliCPU, memoryBytes: memory}
 
 	pool := newResourcePool(8, 2*1024*testMiB, nil)
 	if _, ok := pool.tryAcquire(request); !ok {
@@ -151,9 +151,9 @@ func TestRegularColdProfileControlsMemoryAdmission(t *testing.T) {
 }
 
 func TestExecutionWaitsInLongestFirstOrder(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	pool := newResourcePool(4, 0, nil)
-	occupied, ok := pool.acquireExecution(context.Background(), resourceRequest{cpu: 2}, executionRank{key: "/held"})
+	occupied, ok := pool.acquireExecution(context.Background(), resourceRequest{cpuMilli: 4 * milliCPU}, executionRank{key: "/held"})
 	if !ok {
 		t.Fatal("failed to arrange occupied capacity")
 	}
@@ -163,7 +163,7 @@ func TestExecutionWaitsInLongestFirstOrder(t *testing.T) {
 	var wg sync.WaitGroup
 	wait := func(rank executionRank, cpu int) {
 		defer wg.Done()
-		hold, ok := pool.acquireExecution(context.Background(), resourceRequest{cpu: cpu}, rank)
+		hold, ok := pool.acquireExecution(context.Background(), resourceRequest{cpuMilli: cpu}, rank)
 		if !ok {
 			t.Errorf("%s was not admitted", rank.key)
 			return
@@ -172,13 +172,13 @@ func TestExecutionWaitsInLongestFirstOrder(t *testing.T) {
 		pool.release(hold)
 	}
 	wg.Add(1)
-	go wait(long, 4)
+	go wait(long, 4*milliCPU)
 	waitForWaiters(t, pool, 1)
 	wg.Add(1)
-	go wait(short, 1)
+	go wait(short, 500)
 	waitForWaiters(t, pool, 2)
-	// The short execution fits the two free CPUs, yet never overtakes the long
-	// pole waiting for all four.
+	// Nothing is free: neither starts, and once CPU frees the short execution
+	// never overtakes the long pole.
 	select {
 	case key := <-order:
 		t.Fatalf("%s started while the long pole waited", key)
@@ -195,11 +195,11 @@ func TestExecutionWaitsInLongestFirstOrder(t *testing.T) {
 func TestExecutionWaitEndsWithItsContext(t *testing.T) {
 	t.Parallel()
 	pool := newResourcePool(2, 0, nil)
-	held, _ := pool.acquireExecution(context.Background(), resourceRequest{cpu: 2}, executionRank{key: "/a"})
+	held, _ := pool.acquireExecution(context.Background(), resourceRequest{cpuMilli: 2 * milliCPU}, executionRank{key: "/a"})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan bool)
 	go func() {
-		_, ok := pool.acquireExecution(ctx, resourceRequest{cpu: 1}, executionRank{key: "/b"})
+		_, ok := pool.acquireExecution(ctx, resourceRequest{cpuMilli: 1 * milliCPU}, executionRank{key: "/b"})
 		done <- ok
 	}()
 	waitForWaiters(t, pool, 1)
@@ -213,15 +213,15 @@ func TestExecutionWaitEndsWithItsContext(t *testing.T) {
 
 func TestACacheHitReservesNoCPU(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	job := statJob("/app", "test")
 	scheduler := &Scheduler{
 		resources:         newResourcePool(4, 0, nil),
-		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 4, charge: 4}},
+		resourcePlanByJob: map[string]scheduledResourcePlan{job.Key(): {ceiling: 4, chargeMilli: 4 * milliCPU}},
 	}
 	for range 8 {
 		group, _, ok := scheduler.takeAdmissiblePendingGroup([]*ScheduledJob{job}, false)
-		if !ok || group.reservation.request.cpu != 0 || group.reservation.request.memoryBytes != 0 {
+		if !ok || group.reservation.request.cpuMilli != 0*milliCPU || group.reservation.request.memoryBytes != 0 {
 			t.Fatalf("dispatch reservation = %+v admitted=%v, want no CPU or memory before the cache lookup", group.reservation.request, ok)
 		}
 	}
@@ -248,8 +248,8 @@ func assertPoolEmpty(t *testing.T, pool *resourcePool) {
 	t.Helper()
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
-	if pool.cpuUsed != 0 || len(pool.live) != 0 || len(pool.waiters) != 0 {
-		t.Fatalf("pool not empty: used=%d live=%d waiters=%d", pool.cpuUsed, len(pool.live), len(pool.waiters))
+	if pool.cpuUsedMilli != 0*milliCPU || len(pool.live) != 0 || len(pool.waiters) != 0 {
+		t.Fatalf("pool not empty: used=%d live=%d waiters=%d", pool.cpuUsedMilli, len(pool.live), len(pool.waiters))
 	}
 }
 
@@ -257,12 +257,12 @@ func TestFirstColdBatchSharesPhysicalClassEnvelopeAndCPU(t *testing.T) {
 	a := statJob("/a", "test")
 	b := statJob("/b", "test")
 	scheduler := &Scheduler{resourcePlanByJob: map[string]scheduledResourcePlan{
-		a.Key(): {ceiling: 3, charge: 3, memoryFallback: 600 * testMiB},
-		b.Key(): {ceiling: 2, charge: 2, memoryFallback: 700 * testMiB},
+		a.Key(): {ceiling: 3, chargeMilli: 3 * milliCPU, memoryFallback: 600 * testMiB},
+		b.Key(): {ceiling: 2, chargeMilli: 2 * milliCPU, memoryFallback: 700 * testMiB},
 	}}
 	request := scheduler.groupResourceRequest([]*ScheduledJob{a, b})
-	if request.cpu != 3 {
-		t.Fatalf("batch CPU reservation = %d, want shared maximum 3", request.cpu)
+	if request.cpuMilli != 3*milliCPU {
+		t.Fatalf("batch CPU reservation = %d, want shared maximum 3", request.cpuMilli)
 	}
 	if request.memoryBytes != 700*testMiB {
 		t.Fatalf("batch memory reservation = %d MiB, want one shared 700 MiB class envelope", request.memoryBytes/testMiB)
@@ -281,8 +281,8 @@ func TestBatchAdmissionSumsLearnedSingletonMemory(t *testing.T) {
 	scheduler := &Scheduler{
 		resources: newResourcePool(8, 8*1024*testMiB, nil),
 		resourcePlanByJob: map[string]scheduledResourcePlan{
-			a.Key(): {ceiling: 2, charge: 2, memoryFallback: 512 * testMiB},
-			b.Key(): {ceiling: 2, charge: 2, memoryFallback: 512 * testMiB},
+			a.Key(): {ceiling: 2, chargeMilli: 2 * milliCPU, memoryFallback: 512 * testMiB},
+			b.Key(): {ceiling: 2, chargeMilli: 2 * milliCPU, memoryFallback: 512 * testMiB},
 		},
 	}
 	request := scheduler.groupResourceRequest([]*ScheduledJob{a, b})
@@ -308,8 +308,8 @@ func TestBatchRSSContextAvoidsDoubleCountButKeepsSingletonEnvelope(t *testing.T)
 	scheduler := &Scheduler{
 		resources: newResourcePool(8, 8*1024*testMiB, nil),
 		resourcePlanByJob: map[string]scheduledResourcePlan{
-			a.Key(): {ceiling: 4, charge: 4, memoryFallback: 1280 * testMiB},
-			b.Key(): {ceiling: 4, charge: 4, memoryFallback: 1280 * testMiB},
+			a.Key(): {ceiling: 4, chargeMilli: 4 * milliCPU, memoryFallback: 1280 * testMiB},
+			b.Key(): {ceiling: 4, chargeMilli: 4 * milliCPU, memoryFallback: 1280 * testMiB},
 		},
 	}
 
@@ -327,7 +327,7 @@ func TestResourceReservationReleasesOnEveryTerminalOutcome(t *testing.T) {
 	for _, status := range []string{"success", "failed", "canceled"} {
 		t.Run(status, func(t *testing.T) {
 			scheduler := &Scheduler{resources: newResourcePool(2, 1024*testMiB, nil)}
-			reservation, ok := scheduler.resources.tryAcquire(resourceRequest{cpu: 2, memoryBytes: 900 * testMiB})
+			reservation, ok := scheduler.resources.tryAcquire(resourceRequest{cpuMilli: 2 * milliCPU, memoryBytes: 900 * testMiB})
 			if !ok {
 				t.Fatal("reservation was not acquired")
 			}
@@ -339,7 +339,7 @@ func TestResourceReservationReleasesOnEveryTerminalOutcome(t *testing.T) {
 			// A duplicate completion/release must not free someone else's claim.
 			scheduler.releaseGroupResources(completed)
 			assertResourcePoolIdle(t, scheduler)
-			if _, ok := scheduler.resources.tryAcquire(resourceRequest{cpu: 2, memoryBytes: 1024 * testMiB}); !ok {
+			if _, ok := scheduler.resources.tryAcquire(resourceRequest{cpuMilli: 2 * milliCPU, memoryBytes: 1024 * testMiB}); !ok {
 				t.Fatalf("capacity was not reusable after %s", status)
 			}
 		})
@@ -351,7 +351,7 @@ func TestResourceReservationTelemetryIsBoundedSortedAndPublic(t *testing.T) {
 	pool := newResourcePool(8, 8*1024*testMiB, nil)
 	for i := maxResourceReservationRecords + 5; i >= 0; i-- {
 		key := fmt.Sprintf("/job-%04d:test", i)
-		pool.grants[key] = resourceRequest{cpu: 2, memoryBytes: 513 * testMiB}
+		pool.grants[key] = resourceRequest{cpuMilli: 2 * milliCPU, memoryBytes: 513 * testMiB}
 	}
 
 	snapshot := pool.grantsSnapshot()
@@ -375,23 +375,23 @@ func TestResourceReservationTelemetryIsBoundedSortedAndPublic(t *testing.T) {
 
 func TestAServeStepReservesNoCPU(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	serve := statJob("/app", "serve~serve")
 	finite := statJob("/app", "test")
 	scheduler := &Scheduler{
 		cfg:       SchedulerConfig{ServeSteps: map[string]bool{serve.Key(): true}},
 		resources: newResourcePool(4, 0, nil),
 		resourcePlanByJob: map[string]scheduledResourcePlan{
-			serve.Key():  {ceiling: 2, charge: 2},
-			finite.Key(): {ceiling: 4, charge: 4},
+			serve.Key():  {ceiling: 2, chargeMilli: 2 * milliCPU},
+			finite.Key(): {ceiling: 4, chargeMilli: 4 * milliCPU},
 		},
 	}
 	held, ok := scheduler.resources.tryAcquire(scheduler.groupResourceRequest([]*ScheduledJob{serve}))
-	if !ok || held.request.cpu != 0 {
+	if !ok || held.request.cpuMilli != 0*milliCPU {
 		t.Fatalf("serve reservation = %+v admitted=%v, want no CPU", held.request, ok)
 	}
-	if request := scheduler.groupResourceRequest([]*ScheduledJob{finite}); request.cpu != 4 {
-		t.Fatalf("finite reservation = %d, want its ceiling 4", request.cpu)
+	if request := scheduler.groupResourceRequest([]*ScheduledJob{finite}); request.cpuMilli != 4*milliCPU {
+		t.Fatalf("finite reservation = %d, want its ceiling 4", request.cpuMilli)
 	}
 	if _, ok := scheduler.resources.tryAcquire(scheduler.groupResourceRequest([]*ScheduledJob{finite})); !ok {
 		t.Fatal("a running serve held CPU a finite task waits for")
