@@ -146,10 +146,16 @@ samples and an admission trace:
    less than its own, and no other waiter starts until they are below it.
 3. **A task with history is granted at least the free CPUs.** Its planned
    ceiling is raised to the CPUs the ceilings of the running subprocesses
-   leave free, so the last task of a run has the whole machine. Only the
-   planned, unweighted ceiling teaches the history its floor.
-4. **A task with no history keeps decision 2.** No cold rule measured below
-   keeps the load under 1.5 times the CPUs without lengthening the full gate.
+   leave free, so the last task of a run has the whole machine. The raise is
+   not charged: it replaces the rule of decision 1 above that ceilings never
+   sum above the CPU capacity, as a ceiling a task fills only while it runs
+   alone. Only the planned, unweighted ceiling teaches the history its floor.
+4. **A task with no history keeps decision 2 of the original decision.** It
+   is granted the whole capacity and charged one CPU: no cold rule measured
+   below keeps the load under 1.5 times the CPUs without lengthening the full
+   gate.
+5. A request that charges no CPU, a dispatch's claims or a serve step, is
+   admitted whatever the CPU charges, as before.
 
 ### Measurements
 
@@ -205,19 +211,23 @@ Both runs were the first of their trees, so their Go build cache was cold for
 the changed CLI packages, which cost the chosen tree 82 s on its first run;
 the long pole alone, a task whose ceiling is fixed when it starts and whose
 length no history tells, lengthened them more. The kind seed, quarter seed
-and 1.5-times admission rejected above lengthened it too.
+and 1.5-times admission this ADR's context rejected lengthened it too.
 
-The runs, their reports, sessions, task histories and load samples are on
-branch `epic-925/1450-cold` under `evidence/1450-cold/`.
+The runs, their reports, sessions, task histories and load samples are in
+`evidence/1450-cold/` of commit `bfe46a81` (branch `epic-925/1450-cold`).
 
 ### Consequences
 
-- A warm run is no longer slower than a cold one; from a seeded history the
-  selection is 24 % faster than before.
+- On the 14-project selection, a run from the history of one first run is no
+  longer slower than a cold one, and 24 % faster than before. Neither the
+  full gate from a history nor later generations of a history were measured:
+  a task granted more than its planned ceiling teaches its history the
+  occupancy it reached there, which may raise its next ceiling and charge.
 - A task with history keeps a deterministic planned ceiling that live peers
   only raise; it records an observation at the ceiling it was granted, and
   its history's ceiling floor stays the planned one.
-- The charges may exceed the CPU capacity by less than one waiter's charge.
+- The charges may exceed the CPU capacity by less than one waiter's charge,
+  and the ceilings granted by the CPUs left free.
 - From an empty history the full gate still holds a load of about 3.5 times
   the CPUs: a cold task is granted the whole machine until its first run is
   measured.
