@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/sdk/extension/tscscript"
 	"go.putnami.dev/typescript/extension/internal/parse"
 	"go.putnami.dev/typescript/extension/internal/project"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 // The compiler parameter's values.
@@ -345,7 +346,7 @@ type TscResult struct {
 // compiler's script itself, so no node program is needed.
 func RunTsc(bunBin, projectPath string, plan *TscPlan) (*TscResult, error) {
 	args := append([]string{plan.Tsc}, plan.Args...)
-	result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Timeout(10*time.Minute))
+	result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Env(toolchain.BunEnv(nil)), exec.Timeout(10*time.Minute))
 	if err != nil {
 		return nil, err
 	}

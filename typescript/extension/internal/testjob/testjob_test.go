@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/exec"
 )
 
@@ -492,6 +493,24 @@ func TestBuildTestArgs_Parallel(t *testing.T) {
 	}
 }
 
+// A suite that opts into bun's workers runs as many as a budget of 2 grants,
+// and each bun process marks with two garbage-collector threads.
+func TestBunTestTakesTheCPUBudget(t *testing.T) {
+	spectest.Proves(t, toolchainFeature, "tools-take-the-cpu-budget", "bun-and-the-node-runners-take-a-budget-of-2")
+	t.Setenv(cpubudget.Env, "2")
+	t.Setenv("BUN_JSC_numberOfGCMarkers", "")
+	_ = os.Unsetenv("BUN_JSC_numberOfGCMarkers")
+	if args := buildTestArgs("/out", TestParams{Parallel: "true"}); !slices.Contains(args, "--parallel=2") {
+		t.Fatalf("args = %v, want --parallel=2", args)
+	}
+	if args := buildTestArgs("/out", TestParams{Parallel: "3"}); !slices.Contains(args, "--parallel=3") {
+		t.Fatalf("args = %v, want the explicit --parallel=3", args)
+	}
+	if env := buildTestEnv(TestParams{}); env["BUN_JSC_numberOfGCMarkers"] != "2" {
+		t.Fatalf("env = %v, want BUN_JSC_numberOfGCMarkers=2", env)
+	}
+}
+
 func TestBuildTestArgs_WithTimeout(t *testing.T) {
 	args := buildTestArgs("/out", TestParams{Timeout: 5000})
 	found := false
@@ -783,6 +802,9 @@ func TestMain(m *testing.M) {
 		printEnvProbe()
 		os.Exit(0)
 	}
+	// The argument goldens state bun's own widths: the tests run without the
+	// CPU budget of the job that runs them, and pass one where they need it.
+	_ = os.Unsetenv(cpubudget.Env)
 	os.Exit(m.Run())
 }
 
@@ -975,5 +997,25 @@ func TestManifestDeclaresDatabaseTestBindingsInput(t *testing.T) {
 	// The env-var name is a cross-language constant; guard against drift.
 	if !strings.EqualFold(envDatabaseTestBindings, "DATABASE_TEST_BINDINGS") {
 		t.Errorf("env constant drifted to %q", envDatabaseTestBindings)
+	}
+}
+
+// A Vitest or Jest suite runs as many workers as a budget of 2 grants, unless
+// its own configuration sets its worker count.
+func TestNodeRunnersTakeTheCPUBudget(t *testing.T) {
+	spectest.Proves(t, toolchainFeature, "tools-take-the-cpu-budget", "bun-and-the-node-runners-take-a-budget-of-2")
+	dir := t.TempDir()
+	if got := nodeWorkers(dir); got != "" {
+		t.Fatalf("without a budget: %q", got)
+	}
+	t.Setenv(cpubudget.Env, "2")
+	if got := nodeWorkers(dir); got != "2" {
+		t.Fatalf("nodeWorkers = %q, want 2", got)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "vitest.config.ts"), []byte("export default { test: { maxWorkers: 1 } }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := nodeWorkers(dir); got != "" {
+		t.Fatalf("a configured worker count is replaced by %q", got)
 	}
 }

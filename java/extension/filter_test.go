@@ -62,7 +62,7 @@ func TestTheTestFilterReachesEachGradleVariantAndMaven(t *testing.T) {
 			t.Fatalf("%s test: %s %v\n%s", rel, status, err, ran(t, log))
 		}
 		script := filepath.Join(g, ".putnami/out", rel, stacks.TaskTest, gradleInitScriptName)
-		want := filepath.Join(g, rel) + ": gradlew --console=plain " + tasks + " --init-script " + script + " -Dputnami.testFilter=com.acme.QuotesTest.labels total\n"
+		want := filepath.Join(g, rel) + ": gradlew --console=plain --max-workers=2 " + tasks + " --init-script " + script + " -Dputnami.testFilter=com.acme.QuotesTest.labels total\n"
 		if got := ran(t, log); got != want {
 			t.Errorf("%s ran\n%s\nwant\n%s", rel, got, want)
 		}
@@ -72,7 +72,7 @@ func TestTheTestFilterReachesEachGradleVariantAndMaven(t *testing.T) {
 	}
 	// Without a filter, the steps run as the profile states them.
 	_ = os.Remove(log)
-	if status, _, err := runFiltered(t, g, "api", ""); status != "OK" || err != nil || ran(t, log) != filepath.Join(g, "api")+": gradlew --console=plain :api:test :api:jacocoTestReport\n" {
+	if status, _, err := runFiltered(t, g, "api", ""); status != "OK" || err != nil || ran(t, log) != filepath.Join(g, "api")+": gradlew --console=plain --max-workers=2 :api:test :api:jacocoTestReport\n" {
 		t.Errorf("no filter: %s %v\n%s", status, err, ran(t, log))
 	}
 

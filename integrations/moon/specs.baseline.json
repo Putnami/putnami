@@ -18,6 +18,7 @@
     "monorepo/moon-adoption#sync-writes-each-project",
     "monorepo/moon-adoption#tasks-delegate-to-moon",
     "monorepo/moon-adoption#the-root-project-is-named",
+    "monorepo/moon-adoption#tools-take-the-cpu-budget",
     "monorepo/moon-adoption#validate-fails-on-a-stale-graph"
   ]
 }

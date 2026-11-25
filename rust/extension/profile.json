@@ -1,5 +1,7 @@
 {
   "id": "rust",
+  "cpuEnv": ["CARGO_BUILD_JOBS", "NEXTEST_TEST_THREADS", "RUST_TEST_THREADS"],
+  "cpuConfig": [{"file": "{root}/.config/nextest.toml", "pattern": "(?m)^\\s*test-threads\\s*="}, {"file": "{root}/.cargo/config.toml", "pattern": "(?m)^\\s*jobs\\s*="}, {"file": "{root}/.cargo/config", "pattern": "(?m)^\\s*jobs\\s*="}],
   "markers": ["Cargo.toml"],
   "toolchain": {
     "command": ["rustc", "--version"],

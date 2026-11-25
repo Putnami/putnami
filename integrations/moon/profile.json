@@ -1,5 +1,6 @@
 {
   "id": "moon",
+  "cpuEnv": ["MOON_CONCURRENCY"],
   "delegated": true,
   "markers": ["moon.yml", "package.json", "tsconfig.json", "deno.json", "go.mod", "Cargo.toml", "pyproject.toml", "requirements.txt", "composer.json", "Gemfile"],
   "toolchain": {

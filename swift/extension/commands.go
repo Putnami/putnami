@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/tooling/stacks"
 )
 
@@ -104,8 +105,10 @@ func swiftPMTest(args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 	}
+	// The build and the test workers take the job's CPU budget.
+	cpus := strconv.Itoa(cpubudget.Threads())
 	argv := slices.Concat([]string{"test", "--force-resolved-versions", "--enable-code-coverage", "--parallel",
-		"--xunit-output", filepath.Join(*output, "xunit.xml")}, extra)
+		"--num-workers", cpus, "--jobs", cpus, "--xunit-output", filepath.Join(*output, "xunit.xml")}, extra)
 	cmd := exec.Command("swift", argv...) //nolint:gosec // the stack's own tool
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
@@ -454,7 +457,8 @@ func xcodebuild(args []string, stdout, stderr io.Writer) error {
 			argv = append(argv, "-only-testing:"+*filter)
 		}
 	}
-	argv = append(argv, "CODE_SIGNING_ALLOWED=NO")
+	// The build's concurrent tasks take the job's CPU budget.
+	argv = append(argv, "-jobs", strconv.Itoa(cpubudget.Threads()), "CODE_SIGNING_ALLOWED=NO")
 	cmd := exec.Command("xcodebuild", argv...) //nolint:gosec // the stack's own tool
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

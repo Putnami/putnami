@@ -170,6 +170,12 @@
     {
       "id": "manifest-follows-the-profile",
       "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the java:lint, java:test and java:build selectors, and each command runs one task that depends on the same task upstream, reads its selector and every variant's stack-root files for that task, and declares its command-output reports directory."
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": [
+        "The Gradle steps of a project's tasks take the job's CPU budget as --max-workers, unless gradle.properties at the stack root or in the project sets org.gradle.workers.max; a Maven build keeps its own width."
+      ]
     }
   ],
   "decisions": [

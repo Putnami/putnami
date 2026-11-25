@@ -19,6 +19,7 @@ import (
 	pexec "go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/typescript/extension/internal/project"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 // The node-target check. Bun runs the code it builds for itself; a build for
@@ -159,7 +160,7 @@ func readNodeGraph(bunBin, projectPath string, entrypoints []string) (*nodeGraph
 		for _, entrypoint := range entrypoints {
 			args = append(args, filepath.Join(projectPath, entrypoint))
 		}
-		result, err := execRunFunc(bunBin, args, pexec.Dir(projectPath), pexec.Timeout(bunAPICheckTimeout))
+		result, err := execRunFunc(bunBin, args, pexec.Dir(projectPath), pexec.Env(toolchain.BunEnv(nil)), pexec.Timeout(bunAPICheckTimeout))
 		if err != nil {
 			return nil, fmt.Errorf("node-target check: bundle the graph: %w", err)
 		}

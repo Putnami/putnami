@@ -127,6 +127,12 @@
         "When command-line.json declares test or lint as a phased command with a phase that depends, directly or through its own project's phases, on an upstream phase, the sync writes commands.<command>.dependsOn build, with ^build too in import mode.",
         "The task then waits for the builds rush would run before it, which --only skips."
       ]
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": [
+        "A Rush command takes the job's CPU budget as RUSH_PARALLELISM, unless the environment sets it."
+      ]
     }
   ],
   "decisions": [

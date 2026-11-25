@@ -208,7 +208,9 @@ putnami test . --short
 built and tested concurrently. It is independent from `--parallel N`, which
 maps to `-parallel N` and limits `t.Parallel` tests inside each test binary.
 `package-parallel` has no default, so projects that omit it retain Go's native
-package scheduling.
+package scheduling. Native scheduling follows the job's CPU budget: the scheduler
+exports it as `GOMAXPROCS`, which sets the default of both `-p` and
+`-parallel`, and which an operator-set `GOMAXPROCS` replaces.
 
 ```bash
 # Test at most four packages at once, with up to eight parallel tests per binary

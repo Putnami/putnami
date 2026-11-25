@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/typescript/extension/internal/parse"
 	"go.putnami.dev/typescript/extension/internal/project"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 // typeCheckPatterns are the project files the test type-check reads. tsc's
@@ -123,7 +124,7 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool, c
 		args = append(args, "--project", scratch)
 	}
 
-	result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Timeout(5*time.Minute))
+	result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Env(toolchain.BunEnv(nil)), exec.Timeout(5*time.Minute))
 	if err != nil {
 		return nil, err
 	}

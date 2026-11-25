@@ -81,6 +81,17 @@ type Profile struct {
 	// task of the extension's manifest disables Putnami's cache, and each
 	// task result names the stack id in delegatedTo.
 	Delegated bool `json:"delegated,omitempty"`
+	// CPUEnv names the variables through which the stack's tools take the
+	// job's CPU budget (PUTNAMI_CPU_BUDGET), such as CARGO_BUILD_JOBS: every
+	// step receives each one set to the budget, unless the environment
+	// already sets it. A tool whose control is a flag names {cpus} in its
+	// step instead.
+	CPUEnv []string `json:"cpuEnv,omitempty"`
+	// CPUConfig names the files in which a component's own configuration
+	// sets a width of the stack's tools. When one holds its setting, the
+	// budget binds nothing: no cpuEnv variable is set, and each step
+	// argument that names {cpus} is left out.
+	CPUConfig []CPUConfig `json:"cpuConfig,omitempty"`
 }
 
 // Toolchain is the toolchain check of a profile.
@@ -313,7 +324,11 @@ var (
 )
 
 // stepPlaceholders are the placeholders a step may name.
-var stepPlaceholders = []string{"{root}", "{component}", "{project}", "{output}", "{manifest}", "{runtime}", TargetPlaceholder}
+var stepPlaceholders = []string{"{root}", "{component}", "{project}", "{output}", "{manifest}", "{runtime}", TargetPlaceholder, CPUsPlaceholder}
+
+// CPUsPlaceholder is the thread count a step's tool takes from the job's CPU
+// budget: the budget, else the host's CPUs.
+const CPUsPlaceholder = "{cpus}"
 
 // TargetPlaceholder is the placeholder of a step that runs once per target.
 const TargetPlaceholder = "{target}"
@@ -343,6 +358,9 @@ func (p Profile) Validate() error {
 	}
 	if err := p.Toolchain.validate(); err != nil {
 		return fmt.Errorf("toolchain.%w", err)
+	}
+	if err := p.validateCPUBudget(); err != nil {
+		return err
 	}
 	for i, a := range p.Toolchain.Also {
 		if len(a.Also) > 0 {
@@ -584,13 +602,16 @@ func (t Task) validateBatch(delegated bool) error {
 			return fmt.Errorf("steps[%d]: a step names a program", i)
 		}
 		for _, arg := range step {
+			if err := checkCPUArg(arg); err != nil {
+				return fmt.Errorf("steps[%d]: %w", i, err)
+			}
 			for _, ph := range placeholderExpr.FindAllString(arg, -1) {
 				switch ph {
 				case "{component}", BatchPlaceholder:
 					names = true
-				case "{root}", BatchDirPlaceholder:
+				case "{root}", BatchDirPlaceholder, CPUsPlaceholder:
 				default:
-					return fmt.Errorf("steps[%d]: %s is no batch placeholder; use {root}, {component}, %s or %s", i, ph, BatchPlaceholder, BatchDirPlaceholder)
+					return fmt.Errorf("steps[%d]: %s is no batch placeholder; use {root}, {component}, %s, %s or %s", i, ph, BatchPlaceholder, BatchDirPlaceholder, CPUsPlaceholder)
 				}
 			}
 		}
@@ -727,9 +748,12 @@ func validateSteps(field string, steps [][]string) error {
 			return fmt.Errorf("%s[%d]: a step names a program", field, i)
 		}
 		for _, arg := range step {
+			if err := checkCPUArg(arg); err != nil {
+				return fmt.Errorf("%s[%d]: %w", field, i, err)
+			}
 			for _, ph := range placeholderExpr.FindAllString(arg, -1) {
 				if !slices.Contains(stepPlaceholders, ph) {
-					return fmt.Errorf("%s[%d]: %s is no placeholder; use {root}, {component}, {project}, {output}, {manifest}, {runtime} or {target}", field, i, ph)
+					return fmt.Errorf("%s[%d]: %s is no placeholder; use {root}, {component}, {project}, {output}, {manifest}, {runtime}, {target} or {cpus}", field, i, ph)
 				}
 			}
 		}

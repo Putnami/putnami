@@ -328,6 +328,10 @@
     {
       "id": "tsc-project-does-not-package",
       "text": "The npm packager of package refuses a project that compiles with tsc, naming it, rather than packing a tarball without its compiled code."
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": "Every bun process a build or test task starts, tsc included, runs as many garbage-collector markers as the job's CPU budget (BUN_JSC_numberOfGCMarkers), a bun suite that opts into workers runs as many as the budget, and a Vitest or Jest suite takes it as --maxWorkers unless its configuration sets a worker count; a value the operator set wins, and an application a serve job starts receives none of them."
     }
   ],
   "decisions": [

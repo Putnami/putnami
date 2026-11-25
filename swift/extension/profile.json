@@ -99,7 +99,8 @@
             [
               "swift",
               "build",
-              "--force-resolved-versions"
+              "--force-resolved-versions",
+              "--jobs={cpus}"
             ]
           ],
           "inputs": [

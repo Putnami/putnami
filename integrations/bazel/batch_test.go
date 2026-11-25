@@ -103,8 +103,8 @@ func TestAVerbRunsOneBazelTestOverItsPackages(t *testing.T) {
 	root := repository(t, d, true)
 	rootReal, _ := filepath.EvalSymlinks(root)
 	for task, want := range map[string][2]string{
-		stacks.TaskTest:  {"bazel test --instrumentation_filter=^// --build_event_json_file=", "/build-events.json //api:all //pricing:all"},
-		stacks.TaskBuild: {"bazel build --instrumentation_filter=^// --build_event_json_file=", "/build-events.json //api:all //pricing:all"},
+		stacks.TaskTest:  {"bazel test --local_cpu_resources=2 --instrumentation_filter=^// --build_event_json_file=", "/build-events.json //api:all //pricing:all"},
+		stacks.TaskBuild: {"bazel build --local_cpu_resources=2 --instrumentation_filter=^// --build_event_json_file=", "/build-events.json //api:all //pricing:all"},
 	} {
 		t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
 		results := runBatchJob(t, root, task, "api", "pricing")

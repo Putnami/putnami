@@ -1,5 +1,7 @@
 {
   "id": "turbo",
+  "cpuEnv": ["TURBO_CONCURRENCY"],
+  "cpuConfig": [{"file": "{root}/turbo.json", "pattern": "\"concurrency\"\\s*:"}],
   "delegated": true,
   "markers": [
     "package.json"

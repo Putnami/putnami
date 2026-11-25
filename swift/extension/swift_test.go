@@ -17,6 +17,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/dockertest"
 	"go.putnami.dev/sdk/extension/jsonl"
 	observeswift "go.putnami.dev/tooling/observe/detect/swift"
@@ -42,6 +43,9 @@ func TestMain(m *testing.M) {
 		}
 		os.Exit(0)
 	}
+	// The tests run with a CPU budget of 2, whatever the job that runs them
+	// was granted, so the steps they read expand {cpus} to 2.
+	_ = os.Setenv(cpubudget.Env, "2")
 	// The tests stay away from the developer's Docker configuration.
 	restore := dockertest.IsolateConfig()
 	code := m.Run()
@@ -331,8 +335,8 @@ func TestAPackageRunsSwiftAndReadsItsXunitAndLCOVReports(t *testing.T) {
 	for _, want := range []string{
 		pricing + ": swift --version",
 		pricing + ": swift format lint --strict --configuration " + filepath.Join(root, ".swift-format") + " --recursive Package.swift Sources",
-		pricing + ": swift build --force-resolved-versions\n",
-		pricing + ": swift test --force-resolved-versions --enable-code-coverage --parallel --xunit-output " + filepath.Join(out, "test", "xunit.xml"),
+		pricing + ": swift build --force-resolved-versions --jobs=2\n",
+		pricing + ": swift test --force-resolved-versions --enable-code-coverage --parallel --num-workers 2 --jobs 2 --xunit-output " + filepath.Join(out, "test", "xunit.xml"),
 		pricing + ": swift build --show-bin-path",
 		pricing + ": llvm-cov export -format=lcov -instr-profile " + filepath.Join(pricing, ".build/debug/codecov/default.profdata") +
 			` -ignore-filename-regex (\.build|/Tests)/ ` + filepath.Join(pricing, ".build/debug/PricingPackageTests.xctest"),
@@ -399,9 +403,9 @@ func TestAnXcodeProjectRunsXcodebuildAndReadsItsConvertedResultBundle(t *testing
 	for _, want := range []string{
 		app + ": xcodebuild -version",
 		app + ": swift format lint --strict --configuration " + filepath.Join(app, ".swift-format") + " --recursive AppDelegate.swift Shop Shop.xcodeproj ShopTests\n",
-		app + ": xcodebuild build -scheme Shop -disableAutomaticPackageResolution -destination generic/platform=iOS Simulator CODE_SIGNING_ALLOWED=NO",
+		app + ": xcodebuild build -scheme Shop -disableAutomaticPackageResolution -destination generic/platform=iOS Simulator -jobs 2 CODE_SIGNING_ALLOWED=NO",
 		app + ": xcodebuild -showBuildSettings -scheme Shop -disableAutomaticPackageResolution -json",
-		app + ": xcodebuild test -scheme Shop -disableAutomaticPackageResolution -destination platform=iOS Simulator,id=NEW-UDID -enableCodeCoverage YES -resultBundlePath " + bundle + " CODE_SIGNING_ALLOWED=NO",
+		app + ": xcodebuild test -scheme Shop -disableAutomaticPackageResolution -destination platform=iOS Simulator,id=NEW-UDID -enableCodeCoverage YES -resultBundlePath " + bundle + " -jobs 2 CODE_SIGNING_ALLOWED=NO",
 		app + ": xcrun xcresulttool get test-results tests --path " + bundle,
 		app + ": xcrun xccov view --archive --file " + filepath.Join(app, "Shop/Checkout.swift") + " --json " + bundle,
 	} {
@@ -540,7 +544,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 	if status, _, _, err := runJob(t, root, "App", stacks.TaskBuild); status != "OK" || err != nil {
 		t.Fatalf("build: %s %v", status, err)
 	}
-	if ran := tools.ran(t); !strings.Contains(ran, "xcodebuild build -scheme ShopDev -disableAutomaticPackageResolution -destination platform=macOS CODE_SIGNING_ALLOWED=NO") || strings.Contains(ran, "-showBuildSettings") {
+	if ran := tools.ran(t); !strings.Contains(ran, "xcodebuild build -scheme ShopDev -disableAutomaticPackageResolution -destination platform=macOS -jobs 2 CODE_SIGNING_ALLOWED=NO") || strings.Contains(ran, "-showBuildSettings") {
 		t.Errorf("a step override is honored: %s", ran)
 	}
 

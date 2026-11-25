@@ -10,6 +10,7 @@ import (
 	"go.putnami.dev/python/extension/internal/parse"
 	"go.putnami.dev/python/extension/internal/toolchain"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
@@ -203,6 +204,9 @@ func batchRuffEnv(wsRoot string) map[string]string {
 		"PUTNAMI_WORKING_DIR": wsRoot,
 	}
 	for k, v := range toolchain.UVDirEnv(wsRoot, os.Environ()) {
+		env[k] = v
+	}
+	for k, v := range cpubudget.Vars(ruffThreadVars...) {
 		env[k] = v
 	}
 	return env

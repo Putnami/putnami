@@ -14,6 +14,7 @@
     "swift/stack-extension#publishes-an-application-image",
     "swift/stack-extension#reports-are-attributed",
     "swift/stack-extension#test-filter",
+    "swift/stack-extension#tools-take-the-cpu-budget",
     "swift/stack-extension#workspace-commands",
     "swift/stack-extension#xcode-projects-run-xcodebuild"
   ]

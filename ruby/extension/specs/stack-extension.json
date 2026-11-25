@@ -163,6 +163,12 @@
         "publish with the docker channel pushes the packaged image to registries.oci.publish, or to the docker-registry flag, through the shared publisher, and reports it as a release-set member.",
         "A library publishes nothing."
       ]
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": [
+        "RuboCop and Bundler take the job's CPU budget through PARALLEL_PROCESSOR_COUNT and BUNDLE_JOBS, unless the environment sets them or the stack root's .bundle/config sets BUNDLE_JOBS; Rails' parallel tests keep the build's own setting."
+      ]
     }
   ],
   "decisions": [

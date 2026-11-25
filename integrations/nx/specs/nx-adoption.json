@@ -182,6 +182,12 @@
         "Any other entry is listed and not written.",
         "A target that stays on nx run writes none, and the sync removes an entry Nx no longer resolves."
       ]
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": [
+        "An Nx command takes the job's CPU budget as NX_PARALLEL, unless the environment sets it or nx.json sets parallel."
+      ]
     }
   ],
   "decisions": [

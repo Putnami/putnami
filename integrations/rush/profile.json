@@ -1,5 +1,6 @@
 {
   "id": "rush",
+  "cpuEnv": ["RUSH_PARALLELISM"],
   "delegated": true,
   "markers": ["package.json"],
   "toolchain": {

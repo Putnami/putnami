@@ -206,6 +206,12 @@
         "A last step that runs no nextest gets no argument.",
         "The value is part of the task's key, so a filtered result never answers an unfiltered run."
       ]
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": [
+        "The steps of a crate's tasks take the job's CPU budget: CARGO_BUILD_JOBS, NEXTEST_TEST_THREADS and RUST_TEST_THREADS are set to it unless the environment sets them, and none is set when the stack root's .config/nextest.toml sets test-threads or its .cargo/config.toml sets jobs."
+      ]
     }
   ],
   "decisions": [

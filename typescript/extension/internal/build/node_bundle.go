@@ -12,6 +12,7 @@ import (
 
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/typescript/extension/internal/project"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 // NodeBundleFile names the record a Node bundle directory carries: the
@@ -64,7 +65,7 @@ func RunNodeBundle(bunBin, projectPath, outDir, entrypoint string) (*NodeBundle,
 	metafile := filepath.Join(metaDir, "metafile.json")
 	// bun reads the project's tsconfig.json itself.
 	args := buildNodeBundleArgs(projectPath, outDir, metafile, entrypoint, project.NodeExternals(projectPath))
-	result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Timeout(5*time.Minute))
+	result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Env(toolchain.BunEnv(nil)), exec.Timeout(5*time.Minute))
 	if err != nil {
 		return nil, []string{fmt.Sprintf("Node bundle of %s failed: %v", entrypoint, err)}, nil
 	}

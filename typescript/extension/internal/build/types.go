@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/typescript/extension/internal/parse"
 	"go.putnami.dev/typescript/extension/internal/project"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 // buildTscArgs builds the tsc command args for type declaration generation.
@@ -425,7 +426,7 @@ func RunTypes(bunBin, projectPath, outputPath, tsBuildInfoDir string) (*TypesRes
 
 	args := buildTscArgs(outputPath, tsconfig, sourceFiles, tsBuildInfoFile, typeScriptIgnoreDeprecations(projectPath))
 
-	result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Timeout(5*time.Minute))
+	result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Env(toolchain.BunEnv(nil)), exec.Timeout(5*time.Minute))
 	if err != nil {
 		return nil, err
 	}

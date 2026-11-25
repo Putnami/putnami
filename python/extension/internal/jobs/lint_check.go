@@ -8,6 +8,7 @@ import (
 	"go.putnami.dev/python/extension/internal/toolchain"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
@@ -54,7 +55,7 @@ func LintCheck(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, m
 	cmdArgs := toolchain.UVRunWithToolArgs(uv, "ruff", packageName, wsRoot, ruffArgs...)
 
 	emit.PhaseStart("check")
-	result, err := ruffSingleCheckRun(cmdArgs[0], cmdArgs[1:], wsRoot, MakeEnv(wsRoot, wsRoot, nil))
+	result, err := ruffSingleCheckRun(cmdArgs[0], cmdArgs[1:], wsRoot, cpubudget.Bind(MakeEnv(wsRoot, wsRoot, nil), ruffThreadVars...))
 
 	if err == nil {
 		emit.Metric("lint-errors", 0, "count")

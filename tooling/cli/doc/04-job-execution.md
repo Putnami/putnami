@@ -667,10 +667,19 @@ it alone, in a partial batch, or with the full compatible class. The shared
 subprocess is stamped only after its members miss cache lookup.
 
 The budget reaches the subprocess as `PUTNAMI_CPU_BUDGET` (all extensions) and
-as `GOMAXPROCS` for `@putnami/go` jobs, which bounds `go test`/`go build -p`,
-golangci-lint, and staticcheck. The TypeScript extension maps the budget to
-`RAYON_NUM_THREADS` for Biome. An operator-set `GOMAXPROCS` or
-`RAYON_NUM_THREADS` always wins.
+as `GOMAXPROCS` for `@putnami/go` jobs, which sets the default of `go build -p`
+and of `go test -p` and `-parallel`, and bounds golangci-lint and staticcheck.
+Each extension passes the budget on to the tools its steps start, through the
+SDK's `cpubudget` package: `RAYON_NUM_THREADS` for Biome and ruff,
+`BUN_JSC_numberOfGCMarkers` for bun and the tsc it runs, `--parallel=<budget>`
+for a bun suite that opts into workers, `--maxWorkers` for Vitest and Jest
+unless their configuration sets a worker count, and the ESLint fan-out. The
+stack extensions and the delegated tools take it through their profile's
+`cpuEnv`, `{cpus}` and `cpuConfig` (see the stacks design note's "The CPU
+budget", which lists the tools that take no budget). A variable the operator
+set, such as `GOMAXPROCS` or `RAYON_NUM_THREADS`, and a width the project's own
+configuration sets, always win. An application a serve or run job starts
+receives none of the tool variables.
 
 A job's weight combines two inputs, both execution hints that never affect
 cache keys:

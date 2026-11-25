@@ -361,7 +361,7 @@ type RootStep struct {
 func (s Stack) RootJob(step func(context.Context, RootStep, *jsonl.Emitter) error) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 		in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension], options: ctx.Workspace.Options[s.Extension]}
-		if err := s.atRoot(context.Background(), in, step, emit); err != nil {
+		if err := s.atRoot(context.Background(), in, true, step, emit); err != nil {
 			return statusFailed, nil, err
 		}
 		return statusOK, nil, nil
@@ -369,11 +369,17 @@ func (s Stack) RootJob(step func(context.Context, RootStep, *jsonl.Emitter) erro
 }
 
 // atRoot selects the component's toolchain and runs step at its stack root,
-// under the root's lock.
-func (s Stack) atRoot(ctx context.Context, in runInput, step func(context.Context, RootStep, *jsonl.Emitter) error, emit *jsonl.Emitter) error {
+// under the root's lock. With budget, the step's environment carries the job's
+// CPU budget, as a task's steps do: a root job and a workspace job run the
+// stack's tools, where a locked step may hand its environment to the
+// application it starts, as Java's run does, so it stays unbound.
+func (s Stack) atRoot(ctx context.Context, in runInput, budget bool, step func(context.Context, RootStep, *jsonl.Emitter) error, emit *jsonl.Emitter) error {
 	root, meta, profile, err := s.rootStep(ctx, in, emit)
 	if err != nil {
 		return err
+	}
+	if budget {
+		root.Env, _ = profile.CPUBudget(root.Env, root.Dir, root.Project)
 	}
 	lock, err := lockStackRoot(in.workspaceRoot, meta, profile)
 	if err != nil {
@@ -421,7 +427,7 @@ func (s Stack) rootStep(ctx context.Context, in runInput, emit *jsonl.Emitter) (
 // it before it runs, so it never shares the build directory with a task.
 func (s Stack) Locked(ctx *pctx.Context, emit *jsonl.Emitter, step func(context.Context, RootStep, *jsonl.Emitter) error) error {
 	in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension], options: ctx.Workspace.Options[s.Extension]}
-	return s.atRoot(context.Background(), in, step, emit)
+	return s.atRoot(context.Background(), in, false, step, emit)
 }
 
 // Selected answers the job's component with its toolchain selected and no lock
@@ -469,7 +475,7 @@ func (s Stack) WorkspaceRootJob(missing MissingToolchain, step func(context.Cont
 				emit.DiagnosticWithCode("warning", fmt.Sprintf("%s is left out: the %s toolchain is not on this machine", c.Path, s.Profile.ID), "", 0, 0, CodeToolchainMissing)
 				continue
 			}
-			if err := s.atRoot(background, in, step, emit); err != nil {
+			if err := s.atRoot(background, in, true, step, emit); err != nil {
 				return statusFailed, nil, err
 			}
 		}
@@ -659,7 +665,9 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	if err != nil {
 		return statusFailed, nil, err
 	}
-	env := selected.Env
+	// The task's tools take the job's CPU budget, unless the component
+	// configures their width itself.
+	env, cpus := profile.CPUBudget(selected.Env, rootAbs, in.projectAbs)
 
 	lock, err := lockStackRoot(in.workspaceRoot, meta, profile)
 	if err != nil {
@@ -699,7 +707,12 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 		t.Steps, t.Reports = w.Steps, &reports
 	}
 
-	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir}
+	// A component that configures its tools' width keeps it: each argument
+	// that names {cpus} is left out.
+	if cpus == "" {
+		t.Steps, t.ReportSteps = withoutCPUArgs(t.Steps), withoutCPUArgs(t.ReportSteps)
+	}
+	vars := map[string]string{"{root}": rootAbs, "{component}": meta.Component, "{project}": in.projectAbs, "{output}": outDir, CPUsPlaceholder: cpus}
 	if meta.Manifest != "" {
 		vars["{manifest}"] = filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Manifest))
 	}

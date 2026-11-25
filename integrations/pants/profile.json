@@ -1,5 +1,7 @@
 {
   "id": "pants",
+  "cpuEnv": ["PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM", "PANTS_RULE_THREADS_CORE"],
+  "cpuConfig": [{"file": "{root}/pants.toml", "pattern": "(?m)^\\s*(process_execution_local_parallelism|rule_threads_core)\\s*="}],
   "delegated": true,
   "markers": ["BUILD", "BUILD.pants"],
   "toolchain": {

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/typescript/extension/internal/parse"
 	"go.putnami.dev/typescript/extension/internal/toolchain"
@@ -101,14 +101,10 @@ func biomeConfigRoot(configPath string) string {
 // CLI's GOMAXPROCS override convention for Go tools.
 func biomeExecOptions(runDir string) []exec.Option {
 	opts := []exec.Option{exec.Dir(runDir), exec.Timeout(2 * time.Minute)}
-	if _, overridden := os.LookupEnv("RAYON_NUM_THREADS"); overridden {
-		return opts
+	if vars := cpubudget.Vars("RAYON_NUM_THREADS"); vars != nil {
+		opts = append(opts, exec.Env(vars))
 	}
-	budget, err := strconv.Atoi(os.Getenv("PUTNAMI_CPU_BUDGET"))
-	if err != nil || budget <= 0 {
-		return opts
-	}
-	return append(opts, exec.Env(map[string]string{"RAYON_NUM_THREADS": strconv.Itoa(budget)}))
+	return opts
 }
 
 // Format runs biome format on the project.

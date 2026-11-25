@@ -138,6 +138,12 @@
         "publish with the docker channel pushes the packaged image to registries.oci.publish through the shared publisher, and an application that publishes the docker channel declares it as an oci release-set member.",
         "A library or a Flutter package publishes nothing."
       ]
+    },
+    {
+      "id": "tools-take-the-cpu-budget",
+      "text": [
+        "dart test and flutter test take the job's CPU budget as --concurrency, unless the package's dart_test.yaml sets concurrency."
+      ]
     }
   ],
   "decisions": [

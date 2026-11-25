@@ -549,8 +549,8 @@ func TestATaskRunsBazelOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 	out := filepath.Join(root, ".putnami/out/pricing/test")
 
 	for task, want := range map[string]string{
-		stacks.TaskBuild: "bazel build --instrumentation_filter=^// //pricing:all",
-		stacks.TaskTest:  "bazel test --instrumentation_filter=^// --build_event_json_file=" + out + "/build-events.json //pricing:all",
+		stacks.TaskBuild: "bazel build --local_cpu_resources=2 --instrumentation_filter=^// //pricing:all",
+		stacks.TaskTest:  "bazel test --local_cpu_resources=2 --instrumentation_filter=^// --build_event_json_file=" + out + "/build-events.json //pricing:all",
 	} {
 		t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
 		status, data, events := runJob(t, root, "pricing", task)
@@ -775,7 +775,7 @@ func TestTheTestTaskRunsBazelTestAndReadsOnlyAnLCOVCoverage(t *testing.T) {
 	out := filepath.Join(root, ".putnami/out/pricing/test")
 
 	status, data, events := runJob(t, root, "pricing", stacks.TaskTest)
-	if want := rootReal + " bazel test --instrumentation_filter=^// --build_event_json_file=" + out + "/build-events.json //pricing:all"; status != "OK" || !slices.Contains(stubLog(t), want) {
+	if want := rootReal + " bazel test --local_cpu_resources=2 --instrumentation_filter=^// --build_event_json_file=" + out + "/build-events.json //pricing:all"; status != "OK" || !slices.Contains(stubLog(t), want) {
 		t.Fatalf("status %s, calls %q, want %q: %s", status, stubLog(t), want, events)
 	}
 	if got := data["testSummary"].(map[string]any); got["total"] != 3 || got["passed"] != 3 {

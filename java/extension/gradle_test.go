@@ -178,13 +178,13 @@ func TestABuildWithoutAWrapperRunsThePinnedGradle(t *testing.T) {
 	if status, _, err := runJob(t, g, "api", stacks.TaskBuild); status != "OK" || err != nil {
 		t.Fatalf("build: %s %v", status, err)
 	}
-	if got := ran(t, log); !strings.Contains(got, "gradle-9.8.2 --console=plain :api:assemble\n") {
+	if got := ran(t, log); !strings.Contains(got, "gradle-9.8.2 --console=plain --max-workers=2 :api:assemble\n") {
 		t.Errorf("a JDK 21 runs the newest pinned Gradle: %s", got)
 	}
 	if status, _, err := runFiltered(t, g, "api", "com.acme.QuotesTest"); status != "OK" || err != nil {
 		t.Fatalf("filtered test: %s %v", status, err)
 	}
-	if got := ran(t, log); !strings.Contains(got, "gradle-9.8.2 --console=plain :api:test :api:jacocoTestReport --init-script ") || downloads != 1 {
+	if got := ran(t, log); !strings.Contains(got, "gradle-9.8.2 --console=plain --max-workers=2 :api:test :api:jacocoTestReport --init-script ") || downloads != 1 {
 		t.Errorf("the pinned Gradle is installed once and takes the test filter: %d downloads, %s", downloads, got)
 	}
 
@@ -194,7 +194,7 @@ func TestABuildWithoutAWrapperRunsThePinnedGradle(t *testing.T) {
 	if status, _, err := runJob(t, g, "api", stacks.TaskBuild); status != "OK" || err != nil {
 		t.Fatalf("build on 11: %s %v", status, err)
 	}
-	if got := ran(t, log); !strings.Contains(got, "gradle-8.14.6 --console=plain :api:assemble\n") {
+	if got := ran(t, log); !strings.Contains(got, "gradle-8.14.6 --console=plain --max-workers=2 :api:assemble\n") {
 		t.Errorf("a JDK 11 runs Gradle 8.14.6: %s", got)
 	}
 

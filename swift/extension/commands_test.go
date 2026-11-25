@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
@@ -62,6 +63,7 @@ func TestSwiftPMTestExportsTheLCOVOfTheTestBinary(t *testing.T) {
 		t.Errorf("llvm-cov reads the library of the test runner: %s", ran)
 	}
 	_ = os.RemoveAll(filepath.Join(pkg, ".build"))
+	t.Setenv(cpubudget.Env, "2")
 	if err := cmd([]string{"--output", "out", "--", "-c", "release", "--filter", "ClientTests"}, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)
 	}
@@ -69,6 +71,9 @@ func TestSwiftPMTestExportsTheLCOVOfTheTestBinary(t *testing.T) {
 		t.Errorf("lcov = %s", data)
 	}
 	ran := s.ran(t)
+	if !strings.Contains(ran, "--parallel --num-workers 2 --jobs 2 ") {
+		t.Errorf("swift test takes a budget of 2: %s", ran)
+	}
 	if !strings.Contains(ran, "--xunit-output "+filepath.Join("out", "xunit.xml")+" -c release --filter ClientTests") || !strings.Contains(ran, "swift build --show-bin-path -c release\n") {
 		t.Errorf("the extra arguments reach swift test, and the configuration the bin path: %s", ran)
 	}
@@ -115,10 +120,14 @@ func TestXcodebuildPicksADestinationFromTheSchemePlatform(t *testing.T) {
 			t.Errorf("%v is refused", bad)
 		}
 	}
+	t.Setenv(cpubudget.Env, "2")
 	s.write(t, "settings.json", `note: Using new build system
 [{"buildSettings":{"PLATFORM_NAME":"macosx"}}]`)
 	if err := cmd([]string{"test", "--scheme", "Shop", "--project", "Shop.xcodeproj", "--result-bundle", "out/T.xcresult"}, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(s.ran(t), " -jobs 2 CODE_SIGNING_ALLOWED=NO") {
+		t.Errorf("xcodebuild takes a budget of 2: %s", s.ran(t))
 	}
 	if !strings.Contains(s.ran(t), "xcodebuild test -project Shop.xcodeproj -scheme Shop -disableAutomaticPackageResolution -destination platform=macOS -enableCodeCoverage YES") {
 		t.Errorf("a Mac scheme tests on macOS: %s", s.ran(t))

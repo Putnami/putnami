@@ -252,6 +252,19 @@
               "a-moved-test-waits-for-the-builds-turbo-json-names"
             ]
           }
+        },
+        {
+          "id": "tools-take-the-cpu-budget",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-tools-take-a-budget-of-2"
+            ]
+          }
         }
       ]
     }
