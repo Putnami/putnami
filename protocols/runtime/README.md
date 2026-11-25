@@ -210,3 +210,6 @@ Durable decisions recorded here:
 - [`doc/adr/0002-delete-the-producerless-stream-envelopes.md`](doc/adr/0002-delete-the-producerless-stream-envelopes.md)
   — this package owns the inner subprocess event only; the unversioned outer
   envelopes were deleted rather than frozen once they had no producer.
+- [`doc/adr/0003-a-job-keeps-its-own-process.md`](doc/adr/0003-a-job-keeps-its-own-process.md)
+  — a runtime serves one job per process; a job worker is rejected while
+  runtime starts stay under 5 % of a gate's CPU and wall time.
