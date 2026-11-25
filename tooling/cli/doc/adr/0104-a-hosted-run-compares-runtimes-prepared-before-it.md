@@ -33,7 +33,9 @@ digest of the tree and of the merge base, each with the toolchains its own
 lock pins. When they differ, it prepares, unless the store already holds it,
 the runtime of the tree and the runtime of the merge base, written as raw
 blobs, under those digests. Extensions whose inputs are the same at the merge
-base are skipped: their runtime edge does not fire.
+base are skipped: the hosted comparison answers them unchanged from the two
+digests alone. Outside a source workspace, and when nothing changed since the
+merge base, the command prepares none of these.
 
 ### 2. It is best effort
 
@@ -42,13 +44,15 @@ runtimes do. A runtime it cannot prepare, or that lands under another digest
 than its lock gives, is named on stderr and never fails the command: that
 extension only keeps its consumers in the hosted run.
 
-### 3. A hosted run compares any path extension the store holds
+### 3. A hosted run of a source workspace compares any path extension
 
-The hosted comparison no longer asks whether the extension serves a provider.
-It looks the head runtime and the base runtime up by the digests their locks
-give, prepares neither, and keeps the edge of an extension either is missing
-for. It answers every such extension before it writes the base tree, and
-writes none when no extension is left.
+The hosted comparison no longer asks whether the extension serves a provider,
+and runs only in a workspace whose lock records it as its CLI's source: only
+there did the workspace's own launcher fill the store. Equal locked digests
+answer unchanged; otherwise it looks the head runtime and the base runtime up
+by those digests, prepares neither, and keeps the edge of an extension either
+is missing for. Outside a source workspace it answers every extension before
+it writes the base tree, and writes none.
 
 ## Consequences
 

@@ -26,12 +26,13 @@ import (
 // Reasons CompareExtensionRuntimes gives when it cannot call a runtime
 // unchanged. They end up in the selection's explanation line.
 const (
-	runtimeReasonDiffers         = "its runtime differs from the base's"
-	runtimeReasonBaseNotPrepared = "the base runtime is not in the artifact store"
-	runtimeReasonNoBase          = "the diff has no base commit"
-	runtimeReasonNoBaseExtension = "the extension does not exist at the base"
-	runtimeReasonToolchains      = "its locked prepare toolchains differ from the base's"
-	runtimeReasonHeadNotPrepared = "this tree's runtime is not in the artifact store"
+	runtimeReasonDiffers            = "its runtime differs from the base's"
+	runtimeReasonBaseNotPrepared    = "the base runtime is not in the artifact store"
+	runtimeReasonNoBase             = "the diff has no base commit"
+	runtimeReasonNoBaseExtension    = "the extension does not exist at the base"
+	runtimeReasonToolchains         = "its locked prepare toolchains differ from the base's"
+	runtimeReasonHeadNotPrepared    = "this tree's runtime is not in the artifact store"
+	runtimeReasonNotSourceWorkspace = "a hosted run compares runtimes only in a workspace that builds its own CLI"
 )
 
 // CompareExtensionRuntimes answers, for each candidate project that is an
@@ -92,18 +93,22 @@ func CompareExtensionRuntimes(
 	// writes nothing when none is left.
 	headDigests := make([]string, len(compared))
 	if hosted {
-		pending := 0
+		// Only a source workspace's store holds runtimes this tree's own
+		// `./putnamiw --print-engine` prepared before the run; another
+		// workspace's store holds nothing a hosted run may trust for it.
+		if !extension.SourceWorkspace(root) {
+			for i := range answers {
+				answers[i].Reason = runtimeReasonNotSourceWorkspace
+			}
+			return answers
+		}
 		for i, ext := range compared {
-			digest, reason := hostedHead(root, artifacts, ext)
-			if reason != "" {
-				answers[i].Reason = reason
+			digest, err := sourceBuiltRuntimeDigest(root, ext)
+			if err != nil {
+				answers[i].Reason = "digest this tree's runtime inputs: " + err.Error()
 				continue
 			}
 			headDigests[i] = digest
-			pending++
-		}
-		if pending == 0 {
-			return answers
 		}
 	}
 	baseRoot, cleanup, err := checkoutBase(root, diffBase)
@@ -129,7 +134,8 @@ func CompareExtensionRuntimes(
 
 // compareOneRuntime compares the runtime of ext prepared from this tree with
 // the one prepared from the base tree. A run that holds the run credential
-// looks both up in the artifact store, the head's under hostedHeadDigest, and
+// answers unchanged when the two locked digests are equal, and otherwise looks
+// both up in the artifact store, the head's under hostedHeadDigest, and
 // prepares neither: it compares only the runtimes `putnami extensions
 // prepare` admitted before the run (PrepareComparisonRuntimes).
 func compareOneRuntime(
@@ -180,6 +186,14 @@ func compareOneRuntime(
 		if baseDigest, err = sourceBuiltRuntimeDigest(baseWS.Root, &base); err != nil {
 			return false, "digest the base runtime inputs: " + err.Error()
 		}
+		// The same inputs under the same toolchains prepare the same
+		// runtime: nothing needs to be in the store to say so.
+		if headDigest == baseDigest {
+			return true, ""
+		}
+		if !artifacts.Has(headDigest) {
+			return false, runtimeReasonHeadNotPrepared
+		}
 		if !artifacts.Has(baseDigest) {
 			return false, runtimeReasonBaseNotPrepared
 		}
@@ -207,21 +221,6 @@ func compareOneRuntime(
 		return false, runtimeReasonDiffers
 	}
 	return true, ""
-}
-
-// hostedHead returns the digest under which a hosted run finds the head
-// runtime of ext, the locked one `putnami extensions prepare` admits it under
-// (sourceBuiltRuntimeDigest), or why it cannot compare ext: a hosted run
-// prepares nothing, so a runtime the store does not hold is not compared.
-func hostedHead(root string, artifacts *artifactstore.Store, ext *extension.ExtensionDescription) (string, string) {
-	digest, err := sourceBuiltRuntimeDigest(root, ext)
-	if err != nil {
-		return "", "digest this tree's runtime inputs: " + err.Error()
-	}
-	if !artifacts.Has(digest) {
-		return "", runtimeReasonHeadNotPrepared
-	}
-	return digest, ""
 }
 
 // sourcePreparedExtensionsByProject maps each project of ws to the extension
@@ -347,8 +346,8 @@ func runtimeContentsDigest(dir string) (string, error) {
 // diffBase, whose runtime inputs differ between this tree and the base, the
 // runtime of this tree and the runtime of the base, each under the digest a
 // hosted run computes from its own lock (sourceBuiltRuntimeDigest). An
-// extension whose inputs are the same at the base needs no comparison: its
-// runtime edge does not fire.
+// extension whose inputs are the same at the base needs nothing in the store:
+// the hosted comparison answers it unchanged from the two digests alone.
 //
 // It is best effort and returns one note per extension it could not prepare:
 // a runtime it leaves out only keeps that extension's edge in the hosted run.

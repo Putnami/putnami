@@ -133,6 +133,7 @@ func runtimeComparisonRepo(t *testing.T) (*workspace.Workspace, *extension.Exten
 	extDir := filepath.Join(root, "ext")
 	writeRuntimeFixture(t, extDir, "@putnami/test", "1.2.3")
 	writeRuntimeFile(t, extDir, extension.ManifestFilename, "{}\n")
+	writeRuntimeFile(t, root, "putnami.lock.json", `{"version":5,"cli":{"source":"workspace"}}`+"\n")
 	commitRuntimeRepo(t, root, "base")
 	base := gitOutput(t, root, "rev-parse", "HEAD")
 
@@ -312,5 +313,35 @@ func TestPrepareComparisonRuntimes_SkipsAnUnchangedExtension(t *testing.T) {
 				t.Errorf("an extension with the same inputs at the base was prepared: %d store entries", len(inner))
 			}
 		}
+	}
+}
+
+// A hosted run trusts the store only in a workspace whose own launcher
+// prepared it: elsewhere it compares nothing.
+func TestCompareExtensionRuntimes_AHostedRunOutsideASourceWorkspaceComparesNothing(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "a-hosted-run-compares-runtimes-prepared-before-it", "a-hosted-comparison-prepares-nothing")
+	ws, ext, base := runtimeComparisonRepo(t)
+	writeRuntimeFile(t, ws.Root, "putnami.lock.json", `{"version":5}`+"\n")
+	restore := runcredential.SetForTest("bearer")
+	defer restore()
+	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, []string{"/ext"}, base)
+	if len(got) != 1 || got[0].Unchanged || got[0].Reason != runtimeReasonNotSourceWorkspace {
+		t.Fatalf("a hosted run outside a source workspace compared %+v, want /ext kept", got)
+	}
+}
+
+// The same locked inputs prepare the same runtime: a hosted run says so from
+// the two digests, with nothing in the store.
+func TestCompareExtensionRuntimes_AHostedRunAnswersEqualDigestsUnchanged(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "a-hosted-run-compares-runtimes-prepared-before-it", "a-hosted-comparison-prepares-nothing")
+	ws, ext, base := runtimeComparisonRepo(t)
+	restore := runcredential.SetForTest("bearer")
+	defer restore()
+	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, []string{"/ext"}, base)
+	if len(got) != 1 || !got[0].Unchanged {
+		t.Fatalf("equal digests compared %+v, want /ext unchanged", got)
+	}
+	if ext.RuntimeDigest != "" {
+		t.Errorf("the hosted comparison prepared the head runtime: %q", ext.RuntimeDigest)
 	}
 }

@@ -5,6 +5,9 @@
 - **Amends**: [ADR 0044](0044-selection-is-task-level.md), decision 2 (the
   extension-consumer edge), and the extension-consumer scope of
   [ADR 0042](0042-impacted-plans-from-the-commit-and-records-why.md)
+- **Amended by**: [ADR 0104](0104-a-hosted-run-compares-runtimes-prepared-before-it.md),
+  decision 4: `putnami extensions prepare` admits the runtimes a hosted run
+  compares, and the hosted comparison no longer requires a provider
 - **Scope**: `@putnami/cli-model` (`workspace.TraceChangeImpact`,
   `ChangeImpactOptions.UnchangedRuntimes`), `@putnami/cli`
   (`internal/workspace` impacted selection, `internal/jobs/scheduler`
@@ -107,8 +110,8 @@ left to a later decision.
   keeps it for every later run against that base. Measured on this repository
   with 28 compared extensions: about 10 seconds with a warm artifact store,
   about 50 with an empty one and a warm Go build cache.
-- Until base runtimes are prepared before hosted runs, a hosted run cuts off
-  only the extensions whose base runtime its store already holds.
+- A hosted run cuts off only the extensions whose runtimes its store holds;
+  ADR 0104 has `putnami extensions prepare` admit them before the run.
 - `projects why` and `why_impacted` answer a change to a project as a whole,
   with no diff to compare runtimes against, so they still name the
   extension-consumer edges this decision cuts off on an actual diff.
