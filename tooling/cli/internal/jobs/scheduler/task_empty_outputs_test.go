@@ -931,7 +931,7 @@ func TestFailureToEmptyOnRestoreExecutesTheTask(t *testing.T) {
 		f, bin := newBinFixture(t)
 		f.executed(t, "nothing built", f.run(t, SchedulerConfig{}))
 		writeFileAt(t, filepath.Join(bin, "a"), "stale\n")
-		if err := os.Remove(taskStatsPath(f.ws.Root)); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(TaskStatsPath(f.ws.Root)); err != nil && !os.IsNotExist(err) {
 			t.Fatal(err)
 		}
 		saved := emptyTaskOutput

@@ -315,7 +315,7 @@ func TestTaskStats_LearnedWeightChangeDoesNotRatchetHistoricalDemand(t *testing.
 func TestTaskStats_LoadSanitizesCorruptResourceObservations(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	path := taskStatsPath(root)
+	path := TaskStatsPath(root)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +347,7 @@ func TestTaskStats_LoadSanitizesCorruptResourceObservations(t *testing.T) {
 func TestTaskStats_LoadToleratesCorruptAndWrongVersion(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	path := taskStatsPath(root)
+	path := TaskStatsPath(root)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -373,7 +373,7 @@ func TestTaskStats_LoadToleratesCorruptAndWrongVersion(t *testing.T) {
 func TestTaskStats_LoadSanitizesNegativeUnweightedConcurrency(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	path := taskStatsPath(root)
+	path := TaskStatsPath(root)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -397,7 +397,7 @@ func TestTaskStats_SaveSkipsWhenClean(t *testing.T) {
 	root := t.TempDir()
 	store := loadTaskStats(root)
 	store.save()
-	if _, err := os.Stat(taskStatsPath(root)); !os.IsNotExist(err) {
+	if _, err := os.Stat(TaskStatsPath(root)); !os.IsNotExist(err) {
 		t.Fatal("clean store should not write a stats file")
 	}
 }
@@ -786,7 +786,7 @@ func TestTaskStats_ADryRunIsWeighedAgainstDryRuns(t *testing.T) {
 func TestTaskStats_AnEarlierStoreIsIgnored(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	path := taskStatsPath(root)
+	path := TaskStatsPath(root)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}

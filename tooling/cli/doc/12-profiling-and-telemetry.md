@@ -185,8 +185,10 @@ Each test runs the real CLI in a fixture workspace and reads the counts from its
 `run.orchestration` report (`clitest.RunCounts`). The engine's fixture
 (`clitest.CountsFixture`) runs trivial `/bin/sh` tasks, so what it starts is the
 engine's alone. Each extension's fixture loads the extension from this tree with
-one small project it serves, and runs on one worker, so its tasks run in the
-same order every time. The Go and TypeScript fixtures declare this repository's
+one small project it serves, and runs on one worker from no task history
+(`clitest.ForgetTaskHistory`), so its tasks run in the same order every time:
+with a history, ready tasks dispatch longest first by the durations earlier
+runs measured under the machine's load. The Go and TypeScript fixtures declare this repository's
 registries: a job that resolves a registry credential starts the CLI that
 spawned it, the test binary, which answers with no token, so the start is
 counted and nothing leaves the host.

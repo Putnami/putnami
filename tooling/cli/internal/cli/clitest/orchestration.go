@@ -13,6 +13,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/procstat"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // Counts is what one run of the real CLI started, read from its
@@ -117,7 +118,8 @@ func UnsetHostRunEnvironment(t *testing.T) {
 // The report of the first run of a process covers the process since it
 // started; a test that compares counts first starts one orchestration clock
 // (scheduler.NewOrchestrationClock) in its TestMain, so each run reports its
-// own share only.
+// own share only. A test that holds exact counts calls ForgetTaskHistory
+// first.
 func RunCounts(t *testing.T, wsRoot string, args ...string) Counts {
 	t.Helper()
 	code, out := RunGateArgs(t, wsRoot, append(args, "--output=json")...)
@@ -125,6 +127,22 @@ func RunCounts(t *testing.T, wsRoot string, args ...string) Counts {
 		t.Fatalf("putnami %s exit %d:\n%s", strings.Join(args, " "), code, out)
 	}
 	return ParseCounts(t, out)
+}
+
+// ForgetTaskHistory removes the task history of the workspace at wsRoot.
+//
+// A run dispatches its ready tasks longest first by the durations the runs
+// before it measured (scheduler.TaskStatsPath), and those durations follow the
+// machine's load. Which task runs first decides which input digests a task's
+// outputs invalidate before another task keys them, and so how many times a
+// digest lists its Git candidates. Without the history, ready tasks dispatch in
+// key order; on one worker they also execute in that order, whatever the load
+// of the runs before it.
+func ForgetTaskHistory(t *testing.T, wsRoot string) {
+	t.Helper()
+	if err := os.Remove(scheduler.TaskStatsPath(wsRoot)); err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
 }
 
 // PlanCounts drives one invocation of the real CLI in the workspace at wsRoot

@@ -42,8 +42,9 @@ type extensionCase struct {
 	files map[string]string
 	// setup are the CLI invocations that prepare the workspace before any run.
 	setup [][]string
-	// command is the gate the case runs, on one worker, so its tasks run in
-	// the same order from one run to the next.
+	// command is the gate the case runs, on one worker and from no task
+	// history (clitest.ForgetTaskHistory), so its tasks run in the same order
+	// from one run to the next.
 	command []string
 	// cold is the ledger of a run with --no-cache, every task executed.
 	cold string
@@ -140,7 +141,7 @@ var extensionCases = []extensionCase{
 		files:      typescriptFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:       "engine job 8 · control 2 · git 23 · other 2 | engine git diff 1 · for-each-ref 1 · ls-files 9 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 7 | jobs git check-ignore 2 · ls-files 4 · rev-parse 1",
+		cold:       "engine job 8 · control 2 · git 25 · other 2 | engine git diff 1 · for-each-ref 1 · ls-files 11 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 7 | jobs git check-ignore 2 · ls-files 4 · rev-parse 1",
 		plan:       "engine control 1 · git 9 · other 2 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -224,7 +225,9 @@ func TestTheExtensionCounts(t *testing.T) {
 			if code, out := clitest.RunGateArgs(t, root, tc.command...); code != 0 {
 				t.Fatalf("putnami %v exit %d:\n%s", tc.command, code, out)
 			}
+			clitest.ForgetTaskHistory(t, root)
 			cold := clitest.RunCounts(t, root, append(tc.command, "--no-cache")...)
+			clitest.ForgetTaskHistory(t, root)
 			plan := clitest.PlanCounts(t, root, tc.command...)
 			t.Logf("cold %d tasks: %s", cold.Tasks, cold.Ledger())
 			t.Logf("plan: %s", plan.Ledger())

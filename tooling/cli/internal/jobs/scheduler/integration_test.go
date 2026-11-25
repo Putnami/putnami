@@ -346,7 +346,7 @@ func TestPlanSchedule_DynamicCPUBudgets(t *testing.T) {
 				grant.Job, grant.Budget, runtime.NumCPU())
 		}
 	}
-	if _, err := os.Stat(taskStatsPath(ws.Root)); err != nil {
+	if _, err := os.Stat(TaskStatsPath(ws.Root)); err != nil {
 		t.Fatalf("expected run history to be persisted: %v", err)
 	}
 

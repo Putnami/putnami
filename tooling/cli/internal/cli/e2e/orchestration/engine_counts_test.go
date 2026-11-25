@@ -26,7 +26,9 @@ func TestTheEngineCounts(t *testing.T) {
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 	large := clitest.CountsFixture(t, 5, false)
 	coldLarge := clitest.RunCounts(t, large, "lint,test,build", "--all")
+	clitest.ForgetTaskHistory(t, large)
 	unchanged := clitest.RunCounts(t, large, "lint,test,build", "--all")
+	clitest.ForgetTaskHistory(t, large)
 	plan := clitest.PlanCounts(t, large, "lint,test,build", "--all")
 
 	if cold.Tasks != 6 || coldLarge.Tasks != 15 || unchanged.Tasks != 15 {

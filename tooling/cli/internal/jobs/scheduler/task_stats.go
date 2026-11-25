@@ -71,7 +71,10 @@ type taskStatsStore struct {
 	dirty   bool
 }
 
-func taskStatsPath(workspaceRoot string) string {
+// TaskStatsPath is the file of the workspace's task history: the durations,
+// CPU work and resource observations from which a run orders its queue, longest
+// first, and sizes its CPU budgets.
+func TaskStatsPath(workspaceRoot string) string {
 	return filepath.Join(workspaceRoot, ".putnami", "stats", "tasks.json")
 }
 
@@ -79,7 +82,7 @@ func taskStatsPath(workspaceRoot string) string {
 // other-version files yield an empty store.
 func loadTaskStats(workspaceRoot string) *taskStatsStore {
 	store := &taskStatsStore{
-		path:    taskStatsPath(workspaceRoot),
+		path:    TaskStatsPath(workspaceRoot),
 		entries: make(map[string]*taskStat),
 	}
 	data, err := os.ReadFile(store.path)
