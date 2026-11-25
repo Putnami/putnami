@@ -23,6 +23,7 @@ import (
 	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/sourcebinding"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -578,17 +579,20 @@ func gitCandidateDigest(file fileEntry, buf []byte, statsExecBit bool) []byte {
 		writeField(h, target)
 		return h.Sum(nil)
 	}
-	input, err := os.Open(file.path)
-	if err != nil {
-		return nil
-	}
-	defer input.Close()
-	writeField(h, "git-file-mode")
-	writeField(h, string(sourcebinding.FileMode(file.info.Mode(), file.indexMode, statsExecBit)))
-	if _, err := io.CopyBuffer(h, input, buf); err != nil {
-		return nil
-	}
-	return h.Sum(nil)
+	mode := string(sourcebinding.FileMode(file.info.Mode(), file.indexMode, statsExecBit))
+	return indexedDigest(file.path, "git-file\x00"+mode, func() []byte {
+		input, err := os.Open(file.path)
+		if err != nil {
+			return nil
+		}
+		defer input.Close() //nolint:errcheck // read-only handle
+		writeField(h, "git-file-mode")
+		writeField(h, mode)
+		if _, err := io.CopyBuffer(h, input, buf); err != nil {
+			return nil
+		}
+		return h.Sum(nil)
+	})
 }
 
 // KeyFileSelection carries the collector's input selector provenance into
@@ -1215,16 +1219,9 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 			buf := make([]byte, 128*1024)
 			for i := range indexes {
 				if files[i].exact {
-					file, err := os.Open(files[i].path)
-					if err != nil {
-						continue
-					}
-					h := sha256.New()
-					_, readErr := io.CopyBuffer(h, file, buf)
-					closeErr := file.Close()
-					if readErr == nil && closeErr == nil {
-						digests[i] = h.Sum(nil)
-					}
+					digests[i] = indexedDigest(files[i].path, rawContentVariant, func() []byte {
+						return rawContentDigest(files[i].path, buf)
+					})
 				} else if files[i].gitCandidate {
 					digests[i] = gitCandidateDigest(files[i], buf, sourcebinding.HostStatsExecBit)
 				} else {
@@ -1247,17 +1244,69 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 // cut the syscall count relative to io.Copy's default chunking.
 func fileContentDigest(path string, buf []byte, scope ProjectConfigScope) []byte {
 	if isVersionStamp(path) {
-		return versionStampDigest(path, versionStampNonTreeFields)
+		return indexedDigest(path, "version-stamp\x00tree", func() []byte {
+			return versionStampDigest(path, versionStampNonTreeFields)
+		})
 	}
 	if isProjectConfig(path) {
-		return projectConfigDigest(path, scope)
+		return indexedDigest(path, projectConfigVariant(scope), func() []byte {
+			return projectConfigDigest(path, scope)
+		})
 	}
+	return indexedDigest(path, rawContentVariant, func() []byte {
+		return rawContentDigest(path, buf)
+	})
+}
 
-	file, err := os.Open(path)
+// rawContentVariant is the fileindex variant of a file's raw SHA-256, which
+// the workspace snapshot shares.
+const rawContentVariant = fileindex.RawContent
+
+// errUnreadable is what indexedDigest hands the index for a file its reading
+// could not digest: an unreadable file records nothing.
+var errUnreadable = errors.New("store: unreadable input")
+
+// indexedDigest answers the digest compute reads from path through the
+// machine-local file index (internal/fileindex): a file whose stat is the one
+// recorded with its digest under variant is not read again. variant names how
+// compute reads the file. A nil answer, an unreadable file, is never recorded.
+func indexedDigest(path, variant string, compute func() []byte) []byte {
+	digest, _ := fileindex.Digest(path, variant, func() ([]byte, error) {
+		if digest := compute(); digest != nil {
+			return digest, nil
+		}
+		return nil, errUnreadable
+	})
+	return digest
+}
+
+// projectConfigVariant is the fileindex variant of a project config read
+// under scope: the decoded projection depends on every field of the scope.
+func projectConfigVariant(scope ProjectConfigScope) string {
+	var b strings.Builder
+	b.WriteString("project-config\x00")
+	if scope.Verbatim {
+		b.WriteString("verbatim")
+	}
+	for _, layer := range scope.ExtensionLayers {
+		b.WriteString("\x00layer\x00")
+		b.WriteString(layer)
+	}
+	for _, namespace := range scope.ForeignNamespaces {
+		b.WriteString("\x00foreign\x00")
+		b.WriteString(namespace)
+	}
+	return b.String()
+}
+
+// rawContentDigest is the SHA-256 of the bytes of the file at path, or nil
+// when it cannot be opened or read.
+func rawContentDigest(path string, buf []byte) []byte {
+	file, err := os.Open(path) //nolint:gosec // an input path the collector selected
 	if err != nil {
 		return nil
 	}
-	defer file.Close()
+	defer file.Close() //nolint:errcheck // read-only handle
 
 	h := sha256.New()
 	if _, err := io.CopyBuffer(h, file, buf); err != nil {

@@ -1851,7 +1851,7 @@
             "type": "string",
             "minLength": 1
           },
-          "description": "Candidate-directory-relative patterns whose content determines the probe's answer. Core hashes this bounded set on ordinary loads; the content digest — never a size or an mtime — is the snapshot's validity oracle."
+          "description": "Candidate-directory-relative patterns whose content determines the probe's answer. Core digests this bounded set on ordinary loads; the content digest is the snapshot's validity oracle, never a size or an mtime alone. Core may answer a digest from its machine-local file index under workspace ADR 0009."
         },
         "excludes": {
           "type": "array",

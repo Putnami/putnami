@@ -251,8 +251,8 @@ func TestSynchronize_UnclaimedInputChangeProbesEveryProvider(t *testing.T) {
 	}
 }
 
-// Content, and only content, decides validity. A rewrite to the same length
-// within the same second is a real change that no stat-based oracle can see.
+// The content digest decides validity. A rewrite to the same length within the
+// same second is a real change: with no file index, the content is read.
 func TestSynchronize_SameSizeSameTimestampRewriteInvalidates(t *testing.T) {
 	ws := syncFixture(t)
 	provider := &countingProvider{name: "@putnami/typescript"}

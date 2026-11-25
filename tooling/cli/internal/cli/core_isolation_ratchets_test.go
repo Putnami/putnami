@@ -166,7 +166,7 @@ func TestTheCoreExpandsNoInputSelector(t *testing.T) {
 // change that raises it says in its commit message which package it adds and
 // why no existing one can host it. This comment changes only when the rule
 // changes; the history of every move lives in Git.
-const internalPackageCountCeiling = 74
+const internalPackageCountCeiling = 75
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

@@ -371,12 +371,16 @@ rejected rather than truncated. The wire and the `ServeProbe` helper live in
 - Results are stored normalized and atomically in `.putnami/workspace-index.json`,
   per provider, so a stale snapshot re-probes only the providers whose own
   declared inputs moved and carries every other provider's answer forward.
-- The **content digest** of the declared inputs is the validity oracle — never a
-  size and never an mtime, so a same-size/same-second rewrite still invalidates.
+- The **content digest** of the declared inputs is the validity oracle, never a
+  size or an mtime alone, so a same-size/same-second rewrite still invalidates.
   A glob input's digest covers the whole matched set, so creating or deleting a
   matching file invalidates too.
-- File stats may prioritize work *within* a running process; they may never
-  establish cross-process correctness.
+- Core may answer a content digest from its machine-local file index, by the
+  file's whole stat, under the rule of
+  [workspace ADR 0009](../../workspace/doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md):
+  an entry is trusted only for a regular file on a local filesystem, recorded
+  when its times were more than two seconds older than the filesystem clock read
+  before it was read.
 - Under `--plan` and `--dry-run` core may probe in memory but never writes.
 - A changed input that no adapter claims — `putnami.json`, the workspace config,
   a scope config — invalidates **every** provider: those files decide membership

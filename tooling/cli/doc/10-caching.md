@@ -253,7 +253,18 @@ File hashing algorithm:
 1. **Collect files** — Match project input globs against the project directory and `from: "workspace"` input globs against the workspace root.
 2. **Sort** — Sort file paths lexicographically for determinism.
 3. **Deduplicate** — Remove duplicate paths.
-4. **Hash** — For each file: write the relative path, then stream the file contents through SHA-256.
+4. **Hash** — For each file: write the relative path, then the SHA-256 of its contents.
+
+A file's SHA-256 is read through the machine-local file index
+(`.putnami/file-index`): a file whose stat (device, inode, mode, owner, size,
+modification and status-change times) equals the stat recorded with its digest
+is not read again. An entry is recorded only for a regular file on a local
+filesystem whose times are more than two seconds older than the filesystem clock
+read before the run read any file, so a rewrite in the same timestamp tick is
+read. An index written by another CLI executable, or damaged, is empty. A
+generate asset (`ExtraFiles`) is streamed into its key and does not go through
+the index. [ADR 0009](../../../protocols/workspace/doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md)
+states the rule.
 
 When no patterns are specified, all non-hidden, non-ignored files in the project are hashed (excluding `node_modules/`, `.putnami/`, `out/`, and dotfiles).
 

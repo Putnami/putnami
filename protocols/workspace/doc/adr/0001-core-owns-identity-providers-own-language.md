@@ -38,12 +38,15 @@ different non-empty scalars for one project is a hard error unless the explicit
 file decided the field. Lists are unioned and normalized, never replaced.
 Provider-owned opinions go under `metadata[<extension>]`.
 
-### 4. The digest is canonical, and content is the only oracle
+### 4. The digest is canonical, and content decides validity
 
 `NormalizeProbeResult` collapses authoring order, path spelling, duplicates and
 metadata key order; `ProbeResultDigest` hashes that form. The protocol carries
-no timestamps and no file sizes: stat data may prioritize work, but only content
-digests decide validity. Advisory `diagnostics` are excluded from the digest.
+no timestamps and no file sizes, and only content digests decide validity. A
+content digest the CLI compares may be answered from the machine-local file
+index, by the file's stat, under the rule of
+[ADR 0009](0009-a-files-stat-decides-that-it-is-unchanged.md). Advisory
+`diagnostics` are excluded from the digest.
 
 ### 5. One document in, one document out, bounded
 

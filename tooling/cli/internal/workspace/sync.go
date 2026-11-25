@@ -482,8 +482,9 @@ func probeWorkerCount(total int) int {
 // Skipping an equivalent write is not an optimization: rewriting the index on
 // every sync would move its modification time, and a workspace's tooling has no
 // way to tell "the index was refreshed" from "the workspace changed". The
-// comparison is over CONTENT identity (the digests) plus a full re-hash of the
-// recorded inputs — never over the file's own timestamps.
+// comparison is over CONTENT identity (the digests) plus the current digest of
+// every recorded input, read through the file index (ADR 0009 of
+// protocols/workspace) — never over the index file's own timestamps.
 func finishSync(root string, req SyncRequest, outcome *SyncOutcome, existing, rebuilt *Snapshot) *SyncOutcome {
 	if snapshotStillHolds(root, existing, rebuilt) {
 		outcome.Snapshot = existing

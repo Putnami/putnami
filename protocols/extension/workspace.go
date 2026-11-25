@@ -76,10 +76,11 @@ type WorkspaceAdapter struct {
 	Markers []string `json:"markers"`
 	// Inputs are the candidate-directory-relative path patterns whose CONTENT
 	// determines the probe's answer — the marker itself plus lockfiles and
-	// compiler configuration. They are the bounded set core hashes on ordinary
-	// loads to decide whether the stored snapshot is still valid, so the digest
-	// (never a size or an mtime) is the validity oracle. Every marker must
-	// appear here.
+	// compiler configuration. They are the bounded set core digests on ordinary
+	// loads to decide whether the stored snapshot is still valid, so the content
+	// digest, never a size or an mtime alone, is the validity oracle. Core may
+	// answer a digest from its machine-local file index under workspace ADR 0009.
+	// Every marker must appear here.
 	Inputs []string `json:"inputs"`
 	// Excludes are directory patterns this extension's scan must not descend
 	// into ("node_modules", "dist"). They are additive to AlwaysExcludedDirs and

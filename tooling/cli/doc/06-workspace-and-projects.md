@@ -161,8 +161,11 @@ directories it already knows, and merges the answers.
   extension's runtime input digest, a registry-installed one's version). A
   rebuilt or upgraded provider is asked again on the next command even when
   none of its input files changed; a record without the field is asked once.
-- An ordinary load re-hashes those inputs. When they still match, **no extension
-  process starts** and the recorded answer is replayed.
+- An ordinary load compares each input's content digest with the recorded one.
+  When they still match, **no extension process starts** and the recorded
+  answer is replayed. The current digest is read through the file index
+  (`.putnami/file-index`): a file whose stat is the one recorded with its digest
+  is not read again ([ADR 0009](../../../protocols/workspace/doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md)).
 - When an input moved, exactly the providers that declare it are re-probed;
   everyone else's recorded answer is carried forward.
 - A changed input no provider claims — `putnami.json`, the workspace config, a

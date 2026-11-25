@@ -18,6 +18,7 @@ import (
 	"time"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -25,23 +26,16 @@ import (
 //
 // `.putnami/workspace-index.json` records what core resolved about the
 // workspace and, for every bounded metadata input it resolved that from, the
-// CONTENT digest of that input. Validity is decided by re-hashing those inputs
-// and comparing digests — never by comparing sizes or modification times.
+// CONTENT digest of that input. Validity is decided by comparing each input's
+// current content digest with the recorded one.
 //
-// Why content and nothing else:
-//
-//   - A same-second, same-length rewrite is a real change and a stat-based
-//     oracle cannot see it. Editors, code generators and `sed -i` produce
-//     exactly that shape.
-//   - Stat values are per-machine and per-checkout. Letting one establish
-//     validity would make correctness depend on filesystem timestamp
-//     granularity, on clock skew between a builder and a cache, and on whether
-//     a checkout preserved mtimes — none of which the workspace controls.
-//
-// Stat values are still RECORDED and still used: they order the verification
-// work so a likely-changed input is hashed first and a stale snapshot is
-// rejected sooner. That is prioritization inside one process. It never shortens
-// the path to "valid": declaring a snapshot valid always costs a full re-hash.
+// A current digest is read through the machine-local file index
+// (internal/fileindex, protocols/workspace ADR 0009): a file whose stat equals
+// the stat the index recorded with its digest is not read again, and a file
+// written in the same timestamp tick as the index's clock has no entry and is
+// read. The snapshot's own Size and ModUnixNano are not that stat: they are
+// recorded on this file, which is committed to no machine, and they never
+// decide validity.
 
 // WorkspaceIndexFilename is the snapshot's filename under `.putnami/`.
 const WorkspaceIndexFilename = "workspace-index.json"
@@ -160,8 +154,8 @@ type SnapshotProject struct {
 }
 
 // SnapshotInput is one metadata input and the content digest core resolved it
-// at. Size and ModUnixNano are ADVISORY: they order verification work and are
-// never consulted to decide validity (see the file comment).
+// at. Size and ModUnixNano are ADVISORY: they are never consulted to decide
+// validity (see the file comment).
 type SnapshotInput struct {
 	// Path is workspace-relative and slash-separated, so a snapshot compares
 	// equal across checkouts of the same commit. For Kind == inputKindGlob it
@@ -491,18 +485,28 @@ func hasGlobMeta(pattern string) bool {
 	return strings.ContainsAny(pattern, "*?[")
 }
 
+// fileContentDigest is "sha256:<hex>" of the file's content, read through the
+// machine-local file index (internal/fileindex): a file whose stat is the one
+// recorded with its digest is not read again. Its variant is the raw SHA-256
+// the input hashes of the store share.
 func fileContentDigest(absolute string) (string, error) {
-	file, err := os.Open(absolute) //nolint:gosec // path is workspace-relative, joined under the workspace root
+	digest, err := fileindex.Digest(absolute, fileindex.RawContent, func() ([]byte, error) {
+		file, err := os.Open(absolute) //nolint:gosec // path is workspace-relative, joined under the workspace root
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close() //nolint:errcheck // read-only handle
+
+		h := sha256.New()
+		if _, err := io.Copy(h, file); err != nil {
+			return nil, err
+		}
+		return h.Sum(nil), nil
+	})
 	if err != nil {
 		return "", err
 	}
-	defer file.Close() //nolint:errcheck // read-only handle
-
-	h := sha256.New()
-	if _, err := io.Copy(h, file); err != nil {
-		return "", err
-	}
-	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
+	return "sha256:" + hex.EncodeToString(digest), nil
 }
 
 // Validate re-hashes every recorded input and reports whether the snapshot
@@ -513,10 +517,10 @@ func fileContentDigest(absolute string) (string, error) {
 // changed file to the provider that declared it, so stopping at the first
 // disagreement would mis-attribute the rest and re-probe the wrong providers.
 //
-// Stat data is what statDisagrees exists for elsewhere; it is
-// never consulted to decide validity. An input is only accepted after its
-// CONTENT hashes to the recorded digest, which is what makes a same-size,
-// same-second rewrite detectable.
+// An input is accepted when its content digest, read through the file index,
+// equals the recorded digest. The index answers without reading only for a
+// file whose stat it recorded a tick before its clock, so a same-size rewrite
+// in the same tick is read and detected.
 func (s *Snapshot) Validate(root string) SnapshotValidity {
 	if s == nil {
 		return SnapshotValidity{Reason: "no snapshot"}
@@ -573,7 +577,8 @@ func statDisagrees(root string, input SnapshotInput) bool {
 	return info.Size() != input.Size || info.ModTime().UnixNano() != input.ModUnixNano
 }
 
-// inputStillMatches is the oracle: content, and only content.
+// inputStillMatches is the oracle: the content digest, read through the file
+// index.
 func inputStillMatches(root string, input SnapshotInput) bool {
 	if input.Kind == inputKindGlob {
 		return globInput(root, input.Path).Digest == input.Digest

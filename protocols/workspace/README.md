@@ -304,10 +304,11 @@ Three rules make the wire usable as a cache-key input:
   Nothing that varies between two runs over the same tree enters the digest — no
   timestamps, no absolute paths, no map iteration order — and advisory
   `diagnostics` are excluded so a reworded warning cannot cold a cache key.
-- **Content is the oracle.** The protocol carries no modification times and no
-  file sizes. Consumers may use stat data to *prioritize* work; validity is
-  decided by content digests alone, so a same-size, same-second rewrite still
-  invalidates.
+- **Content decides validity.** The protocol carries no modification times
+  and no file sizes, and validity is decided by content digests, so a
+  same-size, same-second rewrite still invalidates. Core may answer a content
+  digest from its machine-local file index, by the file's whole stat, under the
+  rule of [ADR 0009](doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md).
 
 Merge rules, in force order (`MergeProbeResults`):
 

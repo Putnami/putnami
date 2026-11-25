@@ -52,6 +52,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -733,6 +734,28 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// Each phase below records its wall on the run's orchestration report.
 	clock := req.orchestration
 	phaseStarted := time.Now()
+	// The workspace snapshot and the input hashes read a file's digest through
+	// the workspace's file index (internal/fileindex): a file whose stat it
+	// recorded is not read again. What the run recorded is saved at its end. A
+	// run that only plans (`--plan`, a preview-only `--dry-run`) reads the
+	// index and writes nothing.
+	if req.WorkspaceRoot != "" {
+		open := fileindex.Open
+		if req.Global.Plan || req.previewsOnly() {
+			open = fileindex.OpenReadOnly
+		}
+		index := open(fileindex.Path(req.WorkspaceRoot), fileindex.ExecutableIdentity())
+		restoreIndex := fileindex.Use(index)
+		defer func() {
+			restoreIndex()
+			if req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] file index: %d digests answered, %d files read\n", index.Hits(), index.Reads())
+			}
+			if err := index.Save(); err != nil && req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] file index: %v\n", err)
+			}
+		}()
+	}
 	// Phase 1: load the workspace and resolve extensions — once per run.
 	ws, discovered, code, err := loadRunWorkspace(req)
 	if code != ExitSuccess {

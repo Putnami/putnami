@@ -409,7 +409,9 @@ Platform-specific file system notification APIs (inotify, kqueue, FSEvents) have
 
 ### Why Content-Addressed Caching?
 
-Hash-based keys provide automatic deduplication and correct invalidation without tracking file modification times (which are unreliable across machines). The SHA-256 hash of actual file contents guarantees that identical inputs always produce cache hits, regardless of timestamps.
+Hash-based keys provide automatic deduplication and correct invalidation across machines, whose modification times differ. The SHA-256 hash of actual file contents guarantees that identical inputs always produce cache hits, regardless of timestamps.
+
+A key holds content digests only. On one machine, the file index (`.putnami/file-index`, `internal/fileindex`) answers a file's digest without reading it when the file's stat (device, inode, mode, owner, size, modification and status-change times) equals the stat recorded with the digest. An entry is recorded only for a regular file on a local filesystem whose times are more than two seconds older than the filesystem clock read before the file was read, so a file written in the same timestamp tick is read again. A damaged index, and one another CLI executable wrote, is an empty one. [ADR 0009](../../../protocols/workspace/doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md) states the rule.
 
 ### Why Subprocess-Based Job Execution?
 
