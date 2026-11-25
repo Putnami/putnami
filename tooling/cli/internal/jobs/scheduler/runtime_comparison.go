@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -27,6 +28,10 @@ const (
 	runtimeReasonDiffers         = "its runtime differs from the base's"
 	runtimeReasonBaseNotPrepared = "the base runtime is not in the artifact store"
 	runtimeReasonNoBase          = "the diff has no base commit"
+	runtimeReasonNoBaseExtension = "the extension does not exist at the base"
+	runtimeReasonToolchains      = "its locked prepare toolchains differ from the base's"
+	runtimeReasonNotSourceBuilt  = "a hosted run compares only the runtimes the source build prepared"
+	runtimeReasonHeadNotPrepared = "this tree's runtime is not in the artifact store"
 )
 
 // CompareExtensionRuntimes answers, for each candidate project that is an
@@ -35,13 +40,15 @@ const (
 // (workspace.ImpactedSelectionOptions.CompareRuntimes). A candidate that is no
 // such extension gets no answer.
 //
-// The base runtime comes from a detached worktree of diffBase and lands in the
-// same artifact store, under the digest of the base's inputs, so a later run
-// against the same base finds it. A run that holds the run credential never
-// prepares one: it executes no repository code during the run (ADR 0055), so
-// it only looks the base runtime up in the store, and an extension whose base
-// runtime is not there keeps its edge. Every failure keeps the edge too:
-// selection may only shrink on a proof.
+// The base runtime comes from the files of diffBase, written as raw blobs, and
+// lands in the same artifact store, under the digest of the base's inputs, so
+// a later run against the same base finds it. A run that holds the run
+// credential never prepares one: it executes no repository code during the run
+// (ADR 0055), so it only looks the base runtime up in the store, and an
+// extension whose base runtime is not there keeps its edge; it looks the head runtime up the same
+// way. Two runtimes whose locked prepare toolchains differ never compare
+// unchanged. Every failure keeps the edge too: selection may only shrink on a
+// proof.
 func CompareExtensionRuntimes(
 	ctx context.Context,
 	ws *workspace.Workspace,
@@ -96,8 +103,10 @@ func CompareExtensionRuntimes(
 	return answers
 }
 
-// compareOneRuntime prepares, or loads, the runtime of ext from this tree and
-// from the base worktree, and compares their contents.
+// compareOneRuntime compares the runtime of ext prepared from this tree with
+// the one prepared from the base tree. A run that holds the run credential
+// looks both up in the artifact store and prepares neither: it only compares
+// the runtimes the source build prepared before the run.
 func compareOneRuntime(
 	ctx context.Context,
 	ws, baseWS *workspace.Workspace,
@@ -106,11 +115,6 @@ func compareOneRuntime(
 	ext *extension.ExtensionDescription,
 	hosted bool,
 ) (bool, string) {
-	if err := SynchronizeExtensionRuntimes(ctx, ws, []*extension.ExtensionDescription{ext}, nil); err != nil {
-		return false, "prepare this tree's runtime: " + err.Error()
-	}
-	headDigest := ext.RuntimeDigest
-
 	resolved, err := dirlink.Resolve(ext.Path)
 	if err != nil {
 		resolved = ext.Path
@@ -119,24 +123,53 @@ func compareOneRuntime(
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return false, "the extension is outside the workspace"
 	}
+	// The base is its own description: its toolchains resolve against the
+	// base's lock, never through the head's resolutions.
 	base := *ext
 	base.Path = filepath.Join(baseWS.Root, rel)
-	base.RuntimeExecutable, base.RuntimeDigest = "", ""
+	base.RuntimeExecutable, base.RuntimeDigest, base.RuntimeToolchains = "", "", nil
 	if _, err := os.Stat(filepath.Join(base.Path, extension.ManifestFilename)); err != nil {
-		return false, "the extension does not exist at the base"
+		return false, runtimeReasonNoBaseExtension
 	}
 
-	var baseDigest string
+	// A runtime built by another compiler is another runtime, whatever its
+	// sources: the edge stays when the toolchains the two locks pin for the
+	// preparation differ.
+	refs := ext.Runtime.Prepare.Toolchains
+	headToolchains, err := toolchain.LockedRuntimeToolchainIdentityForRefs(root, ext, refs)
+	if err != nil {
+		return false, "read this tree's locked prepare toolchains: " + err.Error()
+	}
+	baseToolchains, err := toolchain.LockedRuntimeToolchainIdentityForRefs(baseWS.Root, &base, refs)
+	if err != nil {
+		return false, "read the base's locked prepare toolchains: " + err.Error()
+	}
+	if headToolchains != baseToolchains {
+		return false, runtimeReasonToolchains
+	}
+
+	var headDigest, baseDigest string
 	if hosted {
-		// A hosted run looks the base runtime up and prepares nothing.
-		baseDigest, err = runtimeInputDigest(baseWS.Root, &base)
-		if err != nil {
+		if !extension.FromSourceBuild(root, ext) {
+			return false, runtimeReasonNotSourceBuilt
+		}
+		if headDigest, err = sourceBuiltRuntimeDigest(root, ext); err != nil {
+			return false, "digest this tree's runtime inputs: " + err.Error()
+		}
+		if !artifacts.Has(headDigest) {
+			return false, runtimeReasonHeadNotPrepared
+		}
+		if baseDigest, err = sourceBuiltRuntimeDigest(baseWS.Root, &base); err != nil {
 			return false, "digest the base runtime inputs: " + err.Error()
 		}
 		if !artifacts.Has(baseDigest) {
 			return false, runtimeReasonBaseNotPrepared
 		}
 	} else {
+		if err := SynchronizeExtensionRuntimes(ctx, ws, []*extension.ExtensionDescription{ext}, nil); err != nil {
+			return false, "prepare this tree's runtime: " + err.Error()
+		}
+		headDigest = ext.RuntimeDigest
 		if err := SynchronizeExtensionRuntimes(ctx, baseWS, []*extension.ExtensionDescription{&base}, nil); err != nil {
 			return false, "prepare the base runtime: " + err.Error()
 		}

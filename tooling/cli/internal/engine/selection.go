@@ -91,7 +91,11 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 			Tasks:    workspace.NewTaskIndex(ws, extensions, req.inputResolver.Matcher()),
 			RunStart: req.runStart,
 			CompareRuntimes: func(candidates []string, diffBase string) []workspace.RuntimeComparison {
-				return scheduler.CompareExtensionRuntimes(context.Background(), ws, extensions, candidates, diffBase)
+				ctx := req.selectionCtx
+				if ctx == nil {
+					ctx = context.Background()
+				}
+				return scheduler.CompareExtensionRuntimes(ctx, ws, extensions, candidates, diffBase)
 			},
 		})
 		switch {
@@ -152,6 +156,11 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 					iox.Fprintln(req.stdout(), note)
 				}
 				if note := selection.RunWrittenFilesExplanation(); note != "" {
+					iox.Fprintln(req.stdout(), note)
+				}
+				// A selection the runtime comparison shrank says so: each
+				// extension whose consumers it left out, and each it kept.
+				if note := selection.RuntimeComparisonsExplanation(); note != "" {
 					iox.Fprintln(req.stdout(), note)
 				}
 				// The other direction — a selection that is too LARGE — is

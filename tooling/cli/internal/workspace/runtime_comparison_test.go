@@ -71,6 +71,9 @@ func TestImpactedSelection_AnUnchangedRuntimeLeavesItsConsumers(t *testing.T) {
 	if line := selection.RuntimeComparisonsExplanation(); line == "" {
 		t.Error("the selection does not explain the unchanged runtime")
 	}
+	if got := selection.TraceRecord().RuntimeComparisons; len(got) != 1 || got[0].Project != "/ext" || !got[0].Unchanged {
+		t.Errorf("the trace record carries the comparisons %+v, want /ext unchanged", got)
+	}
 }
 
 // An answer that is not a proof leaves the selection as it was.

@@ -321,6 +321,16 @@ type ImpactTraceRecord struct {
 	Seeds            []ImpactTraceSeed  `json:"seeds"`
 	Edges            []ImpactTraceEdge  `json:"edges"`
 	Scopes           []ImpactTraceScope `json:"scopes"`
+	// RuntimeComparisons are the extensions the selection compared with the
+	// runtime the diff's base prepares, and what it found (ADR 0103).
+	RuntimeComparisons []ImpactTraceRuntime `json:"runtimeComparisons,omitempty"`
+}
+
+// ImpactTraceRuntime is one RuntimeComparison in the trace record.
+type ImpactTraceRuntime struct {
+	Project   string `json:"project"`
+	Unchanged bool   `json:"unchanged"`
+	Reason    string `json:"reason,omitempty"`
 }
 
 // TraceRecord is TraceExplanation with nothing left out: the baseline ref and
@@ -364,6 +374,11 @@ func (s ImpactedSelection) TraceRecord() ImpactTraceRecord {
 		if scope := s.Trace.ScopeOf(p.ID); scope != nil {
 			record.Scopes = append(record.Scopes, ImpactTraceScope{Project: p.ID, Tasks: append([]string{}, scope...)})
 		}
+	}
+	for _, comparison := range s.RuntimeComparisons {
+		record.RuntimeComparisons = append(record.RuntimeComparisons, ImpactTraceRuntime{
+			Project: comparison.Project, Unchanged: comparison.Unchanged, Reason: comparison.Reason,
+		})
 	}
 	return record
 }
@@ -711,16 +726,14 @@ func ResolveImpactedBaselineDetailed(ws *Workspace, explicit string) (git.Resolv
 	return resolved, err
 }
 
-// runtimeCandidates lists the projects whose prepared runtime a selection may
-// compare with the diff base's: every selected project that is not a seed, in
-// ws.Projects order. The trace records one edge per project, so it cannot say
-// which extensions fired; the comparer keeps the extensions it prepares from
-// source and ignores the rest.
+// runtimeCandidates lists the extensions a selection compares with the diff
+// base's: those whose runtime fired an extension-consumer edge in the first
+// walk (ImpactTrace.RuntimeEdges), minus the seeds, which are never cut off.
 func runtimeCandidates(impact model.ImpactResult) []string {
-	candidates := make([]string, 0, len(impact.Projects))
-	for _, project := range impact.Projects {
-		if _, seeded := impact.Trace.Seeds[project.ID]; !seeded {
-			candidates = append(candidates, project.ID)
+	candidates := make([]string, 0, len(impact.Trace.RuntimeEdges))
+	for _, id := range impact.Trace.RuntimeEdges {
+		if _, seeded := impact.Trace.Seeds[id]; !seeded {
+			candidates = append(candidates, id)
 		}
 	}
 	return candidates

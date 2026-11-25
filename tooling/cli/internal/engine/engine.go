@@ -426,6 +426,10 @@ type Request struct {
 	// uncommitted paths before the process wrote anything. Nil when none was
 	// recorded.
 	runStart []string
+	// selectionCtx is the run's context while selection runs, so the runtime
+	// comparison of an impacted selection stops with the run (ADR 0103). Nil
+	// outside Engine.run.
+	selectionCtx context.Context
 	// versions is resolved during serial planning and then read by execution
 	// and evidence recovery. Each run, including a watch iteration, owns it.
 	versions cachekey.RunVersions
@@ -866,6 +870,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	if deployNarrowsToChannelMembers(req, releaseSetOptions) {
 		req.Global.ImpactedStrict = true
 	}
+	req.selectionCtx = ctx
 	selectedProjects, code := selectProjects(req, ws, extensions...)
 	clock.Phase(protocolcli.OrchestrationPhaseSelection, phaseStarted)
 	if code != ExitSuccess {

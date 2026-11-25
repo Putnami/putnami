@@ -4,9 +4,14 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/gittest"
+	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -107,5 +112,151 @@ func TestCompareExtensionRuntimes_AnswersOnlyForSourcePreparedExtensions(t *test
 	}
 	if got := CompareExtensionRuntimes(context.Background(), nil, nil, []string{"/app"}, "abc"); got != nil {
 		t.Errorf("no workspace got an answer: %+v", got)
+	}
+}
+
+// runtimeComparisonRepo is a git repository holding one in-workspace
+// extension, /ext, whose prepared runtime copies bin/runtime-template and
+// nothing else, committed once. It returns the workspace, the extension and the
+// base commit; the test then edits the working tree as the head.
+func runtimeComparisonRepo(t *testing.T) (*workspace.Workspace, *extension.ExtensionDescription, string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("shell runtime fixture")
+	}
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	extDir := filepath.Join(root, "ext")
+	writeRuntimeFixture(t, extDir, "@putnami/test", "1.2.3")
+	writeRuntimeFile(t, extDir, extension.ManifestFilename, "{}\n")
+	commitRuntimeRepo(t, root, "base")
+	base := gitOutput(t, root, "rev-parse", "HEAD")
+
+	ext := runtimeTestExtension(extDir)
+	ext.RelPath = "ext"
+	ws := &workspace.Workspace{Root: root, Projects: []*workspace.Project{{ID: "/ext", Name: "ext", Path: "ext"}}}
+	return ws, ext, base
+}
+
+func commitRuntimeRepo(t *testing.T, root, message string) {
+	t.Helper()
+	for _, args := range [][]string{
+		{"init", "--quiet"}, {"config", "commit.gpgsign", "false"}, {"add", "-A"}, {"commit", "--quiet", "-m", message},
+	} {
+		cmd := gittest.Command(root, args...)
+		cmd.Env = append(cmd.Env,
+			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
+			"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+}
+
+func gitOutput(t *testing.T, root string, args ...string) string {
+	t.Helper()
+	out, err := gittest.Command(root, args...).Output()
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// A preparation input that ends up nowhere in the runtime moves the input
+// digest and leaves the runtime byte for byte the same.
+func TestCompareExtensionRuntimes_AnUnlinkedInputLeavesTheRuntimeUnchanged(t *testing.T) {
+	ws, ext, base := runtimeComparisonRepo(t)
+	writeRuntimeFile(t, ext.Path, "cmd/source", "source, edited")
+	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, []string{"/ext"}, base)
+	if len(got) != 1 || !got[0].Unchanged {
+		t.Fatalf("an unlinked input change compared %+v, want /ext unchanged", got)
+	}
+}
+
+// A change to what the runtime is built from keeps the edge.
+func TestCompareExtensionRuntimes_AMovedRuntimeKeepsTheEdge(t *testing.T) {
+	ws, ext, base := runtimeComparisonRepo(t)
+	template, err := os.ReadFile(filepath.Join(ext.Path, "bin", "runtime-template"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeExecutable(t, filepath.Join(ext.Path, "bin", "runtime-template"), string(template)+"# moved\n")
+	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, []string{"/ext"}, base)
+	if len(got) != 1 || got[0].Unchanged || got[0].Reason != runtimeReasonDiffers {
+		t.Fatalf("a moved runtime compared %+v, want /ext kept because it differs", got)
+	}
+}
+
+// An extension the base does not hold keeps the edge.
+func TestCompareExtensionRuntimes_AnExtensionAbsentAtTheBaseKeepsTheEdge(t *testing.T) {
+	ws, ext, base := runtimeComparisonRepo(t)
+	added := filepath.Join(ws.Root, "added")
+	writeRuntimeFixture(t, added, "@putnami/added", "1.0.0")
+	writeRuntimeFile(t, added, extension.ManifestFilename, "{}\n")
+	addedExt := runtimeTestExtension(added)
+	addedExt.Name, addedExt.RelPath = "@putnami/added", "added"
+	ws.Projects = append(ws.Projects, &workspace.Project{ID: "/added", Name: "added", Path: "added"})
+	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext, addedExt}, []string{"/added"}, base)
+	if len(got) != 1 || got[0].Project != "/added" || got[0].Unchanged || got[0].Reason != runtimeReasonNoBaseExtension {
+		t.Fatalf("an extension absent at the base compared %+v, want it kept", got)
+	}
+}
+
+// A run that holds the run credential prepares no runtime, its own or the
+// base's: it compares only the runtimes the source build prepared.
+func TestCompareExtensionRuntimes_AHostedRunPreparesNothing(t *testing.T) {
+	ws, ext, base := runtimeComparisonRepo(t)
+	restore := runcredential.SetForTest("bearer")
+	defer restore()
+	writeRuntimeFile(t, ext.Path, "cmd/source", "source, edited")
+	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, []string{"/ext"}, base)
+	if len(got) != 1 || got[0].Unchanged || got[0].Reason != runtimeReasonNotSourceBuilt {
+		t.Fatalf("a hosted run compared %+v, want /ext kept as not source-built", got)
+	}
+	if ext.RuntimeDigest != "" || ext.RuntimeExecutable != "" {
+		t.Errorf("a hosted run prepared the head runtime: digest %q executable %q", ext.RuntimeDigest, ext.RuntimeExecutable)
+	}
+	if err := runcredential.RequireCustody("test"); err != nil {
+		t.Errorf("a hosted comparison recorded repository code: %v", err)
+	}
+}
+
+// A runtime the two locks pin different prepare toolchains for is another
+// runtime, whatever its sources: the edge stays, and neither side is prepared
+// with the head's resolution.
+func TestCompareExtensionRuntimes_DifferentLockedToolchainsKeepTheEdge(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell runtime fixture")
+	}
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	lock := func(version string) {
+		writeRuntimeFile(t, root, "putnami.lock.json", `{"version":5,"toolchains":{"tool":{"version":"`+version+`",`+
+			`"integrities":{"`+platform+`":"0000000000000000000000000000000000000000000000000000000000000000"},`+
+			`"archives":{"`+platform+`":{"url":"https://example.com/tool-`+version+`.tar.gz","format":"tar.gz","executable":"tool/bin/tool"}}}}}`+"\n")
+	}
+	extDir := filepath.Join(root, "ext")
+	writeRuntimeFixture(t, extDir, "@putnami/test", "1.2.3")
+	writeRuntimeFile(t, extDir, extension.ManifestFilename, "{}\n")
+	lock("1.0.0")
+	commitRuntimeRepo(t, root, "base")
+	base := gitOutput(t, root, "rev-parse", "HEAD")
+	lock("2.0.0")
+
+	ext := runtimeTestExtension(extDir)
+	ext.RelPath = "ext"
+	ext.Runtime.Toolchains = map[string]extensionproto.RuntimeToolchain{"compiler": {Lock: "tool", Optional: true}}
+	ext.Runtime.Prepare.Toolchains = []string{"compiler"}
+	ws := &workspace.Workspace{Root: root, Projects: []*workspace.Project{{ID: "/ext", Name: "ext", Path: "ext"}}}
+	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, []string{"/ext"}, base)
+	if len(got) != 1 || got[0].Unchanged || got[0].Reason != runtimeReasonToolchains {
+		t.Fatalf("a toolchain bump compared %+v, want /ext kept because its toolchains differ", got)
 	}
 }

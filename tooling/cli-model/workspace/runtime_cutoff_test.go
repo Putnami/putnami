@@ -21,6 +21,9 @@ func TestTraceChangeImpact_AnUnchangedRuntimeReachesNoConsumer(t *testing.T) {
 	if got, want := before.Trace.ScopeOf("/apps/web"), []string{"/go/extension", "/python/extension", "/typescript/extension"}; !slices.Equal(got, want) {
 		t.Fatalf("without a proof, /apps/web is scoped to %v, want %v", got, want)
 	}
+	if got, want := before.Trace.RuntimeEdges, []string{"/go/extension", "/python/extension", "/typescript/extension"}; !slices.Equal(got, want) {
+		t.Errorf("the runtime edges that fired are %v, want %v", got, want)
+	}
 
 	partial := TraceChangeImpact(ws, origin, ChangeImpactOptions{
 		UnchangedRuntimes: map[string]bool{"/go/extension": true},
@@ -32,6 +35,9 @@ func TestTraceChangeImpact_AnUnchangedRuntimeReachesNoConsumer(t *testing.T) {
 	all := TraceChangeImpact(ws, origin, ChangeImpactOptions{UnchangedRuntimes: map[string]bool{
 		"/go/extension": true, "/typescript/extension": true, "/python/extension": true,
 	}})
+	if len(all.Trace.RuntimeEdges) != 0 {
+		t.Errorf("with every runtime unchanged, runtime edges still fired from %v", all.Trace.RuntimeEdges)
+	}
 	got := ownerProjectIDs(all.Projects)
 	if slices.Contains(got, "/apps/web") {
 		t.Errorf("with every runtime unchanged, the change still selected /apps/web: %v", got)
