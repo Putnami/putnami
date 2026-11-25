@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -78,7 +78,7 @@ func CompareExtensionRuntimes(
 	if err != nil {
 		root = ws.Root
 	}
-	baseRoot, cleanup, err := checkoutBase(ctx, root, diffBase)
+	baseRoot, cleanup, err := checkoutBase(root, diffBase)
 	if err != nil {
 		for i := range answers {
 			answers[i].Reason = "check out the base: " + err.Error()
@@ -188,31 +188,19 @@ func sourcePreparedExtensionsByProject(
 	return byProject
 }
 
-// checkoutBase checks diffBase out into a detached worktree of the repository
-// at root, and returns its directory with the function that removes it. It
-// reads git objects only: no repository code runs.
-func checkoutBase(ctx context.Context, root, diffBase string) (string, func(), error) {
+// checkoutBase writes the files diffBase holds into a fresh directory and
+// returns it with the function that removes it. It reads raw blobs
+// (putnamigit.WriteFilesAtCommit): no hook, filter or repository code runs.
+func checkoutBase(root, diffBase string) (string, func(), error) {
 	parent, err := os.MkdirTemp("", "putnami-base-runtime-")
 	if err != nil {
 		return "", nil, err
 	}
+	cleanup := func() { _ = os.RemoveAll(parent) }
 	dir := filepath.Join(parent, "tree")
-	git := func(args ...string) error {
-		cmd := exec.CommandContext(ctx, "git", append([]string{"-C", root}, args...)...)
-		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git %s: %v: %s", args[0], err, strings.TrimSpace(string(out)))
-		}
-		return nil
-	}
-	if err := git("worktree", "add", "--detach", "--quiet", dir, diffBase); err != nil {
-		_ = os.RemoveAll(parent)
+	if err := putnamigit.WriteFilesAtCommit(root, diffBase, []string{"."}, dir); err != nil {
+		cleanup()
 		return "", nil, err
-	}
-	cleanup := func() {
-		_ = git("worktree", "remove", "--force", dir)
-		_ = os.RemoveAll(parent)
-		_ = git("worktree", "prune")
 	}
 	return dir, cleanup, nil
 }

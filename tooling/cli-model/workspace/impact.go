@@ -896,11 +896,11 @@ func propagateImpact(
 		consumers:         consumers,
 		moved:             moved,
 		unchangedRuntimes: unchangedRuntimes,
-		seed:       make(map[string]bool, len(seedIDs)),
-		state:      make(map[string]*impactScope, len(seedIDs)),
-		edges:      make(map[string]ImpactEdge),
-		propagated: make(map[string]int),
-		queue:      append([]string(nil), seedIDs...),
+		seed:              make(map[string]bool, len(seedIDs)),
+		state:             make(map[string]*impactScope, len(seedIDs)),
+		edges:             make(map[string]ImpactEdge),
+		propagated:        make(map[string]int),
+		queue:             append([]string(nil), seedIDs...),
 	}
 	for _, id := range seedIDs {
 		w.seed[id] = true
@@ -937,11 +937,11 @@ type impactWalk struct {
 	// unchangedRuntimes cuts off the runtime extension-consumer edge of the
 	// extensions ChangeImpactOptions.UnchangedRuntimes names.
 	unchangedRuntimes map[string]bool
-	seed       map[string]bool
-	state      map[string]*impactScope
-	edges      map[string]ImpactEdge
-	propagated map[string]int
-	queue      []string
+	seed              map[string]bool
+	state             map[string]*impactScope
+	edges             map[string]ImpactEdge
+	propagated        map[string]int
+	queue             []string
 }
 
 func (w *impactWalk) run() {

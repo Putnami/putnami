@@ -624,15 +624,15 @@ func ImpactedSelectionWithOptions(
 	}
 	return ImpactedSelection{
 		RuntimeComparisons: comparisons,
-		Projects:         impact.Projects,
-		Baseline:         resolved.Ref,
-		BaselineSource:   resolved.Source,
-		DiffBase:         diff.Base,
-		ChangedFiles:     diff.Files,
-		UncommittedFiles: diff.Uncommitted,
-		UnownedRootFiles: impact.UnownedRootFiles,
-		RunWrittenFiles:  runWritten,
-		Trace:            impact.Trace,
+		Projects:           impact.Projects,
+		Baseline:           resolved.Ref,
+		BaselineSource:     resolved.Source,
+		DiffBase:           diff.Base,
+		ChangedFiles:       diff.Files,
+		UncommittedFiles:   diff.Uncommitted,
+		UnownedRootFiles:   impact.UnownedRootFiles,
+		RunWrittenFiles:    runWritten,
+		Trace:              impact.Trace,
 	}, nil
 }
 

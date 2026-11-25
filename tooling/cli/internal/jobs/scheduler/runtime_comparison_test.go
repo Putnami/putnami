@@ -10,16 +10,16 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-func writeRuntimeFile(t *testing.T, dir, rel, content string, mode os.FileMode) {
+func writeRuntimeFile(t *testing.T, dir, rel, content string) {
 	t.Helper()
 	path := filepath.Join(dir, filepath.FromSlash(rel))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(content), mode); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(path, mode); err != nil {
+	if err := os.Chmod(path, 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -28,24 +28,24 @@ func writeRuntimeFile(t *testing.T, dir, rel, content string, mode os.FileMode) 
 // executable bits.
 func TestSameRuntimeContents(t *testing.T) {
 	a, b := t.TempDir(), t.TempDir()
-	writeRuntimeFile(t, a, "compiled/putnami-x", "binary", 0o755)
-	writeRuntimeFile(t, b, "compiled/putnami-x", "binary", 0o755)
+	writeExecutable(t, filepath.Join(a, "compiled", "putnami-x"), "binary")
+	writeExecutable(t, filepath.Join(b, "compiled", "putnami-x"), "binary")
 	if same, err := sameRuntimeContents(a, b); err != nil || !same {
 		t.Fatalf("identical runtimes: same=%v err=%v", same, err)
 	}
 
-	writeRuntimeFile(t, b, "compiled/putnami-x", "binary!", 0o755)
+	writeExecutable(t, filepath.Join(b, "compiled", "putnami-x"), "binary!")
 	if same, _ := sameRuntimeContents(a, b); same {
 		t.Error("runtimes with different bytes compare the same")
 	}
 
-	writeRuntimeFile(t, b, "compiled/putnami-x", "binary", 0o644)
+	writeRuntimeFile(t, b, "compiled/putnami-x", "binary")
 	if same, _ := sameRuntimeContents(a, b); same {
 		t.Error("runtimes with different executable bits compare the same")
 	}
 
-	writeRuntimeFile(t, b, "compiled/putnami-x", "binary", 0o755)
-	writeRuntimeFile(t, b, "config/extra.json", "{}", 0o644)
+	writeExecutable(t, filepath.Join(b, "compiled", "putnami-x"), "binary")
+	writeRuntimeFile(t, b, "config/extra.json", "{}")
 	if same, _ := sameRuntimeContents(a, b); same {
 		t.Error("runtimes with different files compare the same")
 	}
@@ -55,7 +55,8 @@ func TestSameRuntimeContents(t *testing.T) {
 	}
 }
 
-// The base checkout is a detached worktree of the commit, removed afterwards.
+// The base checkout holds the commit's files, not the working tree's, and is
+// removed afterwards.
 func TestCheckoutBase(t *testing.T) {
 	root := t.TempDir()
 	git := func(args ...string) {
@@ -70,12 +71,12 @@ func TestCheckoutBase(t *testing.T) {
 	}
 	git("init")
 	git("config", "commit.gpgsign", "false")
-	writeRuntimeFile(t, root, "ext/main.go", "package main // base\n", 0o644)
+	writeRuntimeFile(t, root, "ext/main.go", "package main // base\n")
 	git("add", "-A")
 	git("commit", "-m", "base")
-	writeRuntimeFile(t, root, "ext/main.go", "package main // head\n", 0o644)
+	writeRuntimeFile(t, root, "ext/main.go", "package main // head\n")
 
-	dir, cleanup, err := checkoutBase(context.Background(), root, "HEAD")
+	dir, cleanup, err := checkoutBase(root, "HEAD")
 	if err != nil {
 		t.Fatalf("checkoutBase: %v", err)
 	}
@@ -88,7 +89,7 @@ func TestCheckoutBase(t *testing.T) {
 		t.Errorf("the base checkout %s survives its cleanup: %v", dir, err)
 	}
 
-	if _, _, err := checkoutBase(context.Background(), root, "no-such-ref"); err == nil {
+	if _, _, err := checkoutBase(root, "no-such-ref"); err == nil {
 		t.Error("an unknown base checks out without an error")
 	}
 }

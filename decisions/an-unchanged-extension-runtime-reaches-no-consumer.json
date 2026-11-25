@@ -2,7 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
   "id": "an-unchanged-extension-runtime-reaches-no-consumer",
-  "statement": "an in-workspace extension whose runtime prepared from the tree is byte for byte the one the diff's base prepares fires no extension-consumer edge for a runtime input; a seed, a confined manifest change and any runtime the selection could not compare keep the edge, and a hosted run only looks the base runtime up",
+  "statement": "an extension the change did not touch directly fires no extension-consumer edge for a runtime input when its prepared runtime is byte for byte the one the diff's base prepares; an unproven runtime keeps the edge",
   "settled": "2026-11-25",
   "settledBy": "a build session, for the owner to review on its proposal",
   "adr": "tooling/cli/doc/adr/0103-an-unchanged-extension-runtime-reaches-no-consumer.md",
