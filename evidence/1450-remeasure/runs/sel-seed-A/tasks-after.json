@@ -1,0 +1,5705 @@
+{
+  "version": 4,
+  "tasks": {
+    "/go/framework/api|build~compile": {
+      "cpuMs": 821,
+      "wallMs": 724,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.185350509Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 821,
+          "wallMs": 724,
+          "maxRssBytes": 187809792,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.28349447513812154,
+          "updatedAt": "2026-11-25T14:27:46.185350509Z"
+        }
+      }
+    },
+    "/go/framework/api|build~describe": {
+      "cpuMs": 346,
+      "wallMs": 275,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.340819917Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 346,
+          "wallMs": 275,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.3145454545454546,
+          "updatedAt": "2026-11-25T14:27:45.340819917Z"
+        }
+      }
+    },
+    "/go/framework/api|build~generate": {
+      "cpuMs": 69,
+      "wallMs": 100,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.644391356Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 69,
+          "wallMs": 100,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1725,
+          "updatedAt": "2026-11-25T14:27:44.644391356Z"
+        }
+      }
+    },
+    "/go/framework/api|build~infra": {
+      "cpuMs": 23,
+      "wallMs": 28,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:01.231011772Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 23,
+          "wallMs": 28,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20535714285714285,
+          "updatedAt": "2026-11-25T14:28:01.231011772Z"
+        }
+      }
+    },
+    "/go/framework/api|build~tidy": {
+      "cpuMs": 122,
+      "wallMs": 122,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.501102031Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 122,
+          "wallMs": 122,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25,
+          "updatedAt": "2026-11-25T14:27:44.501102031Z"
+        }
+      }
+    },
+    "/go/framework/api|lint~docs": {
+      "cpuMs": 123,
+      "wallMs": 156,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.077369403Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 123,
+          "wallMs": 156,
+          "maxRssBytes": 109305856,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1971153846153846,
+          "updatedAt": "2026-11-25T14:27:39.077369403Z"
+        }
+      }
+    },
+    "/go/framework/api|lint~golangci-lint": {
+      "cpuMs": 2776,
+      "wallMs": 2726,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:03.961396619Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 2776,
+          "wallMs": 2726,
+          "maxRssBytes": 137822208,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2545854732208364,
+          "updatedAt": "2026-11-25T14:28:03.961396619Z"
+        }
+      }
+    },
+    "/go/framework/api|lint~staticcheck": {
+      "cpuMs": 561,
+      "wallMs": 485,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:04.45221189Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 561,
+          "wallMs": 485,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2891752577319588,
+          "updatedAt": "2026-11-25T14:28:04.45221189Z"
+        }
+      }
+    },
+    "/go/framework/api|test~test": {
+      "cpuMs": 11078,
+      "wallMs": 9809,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:01.143204022Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 11078,
+          "wallMs": 9809,
+          "maxRssBytes": 204959744,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2823427464573351,
+          "updatedAt": "2026-11-25T14:28:01.143204022Z"
+        }
+      }
+    },
+    "/go/framework/api|validate~api": {
+      "cpuMs": 21,
+      "wallMs": 28,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:38.702130662Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 21,
+          "wallMs": 28,
+          "maxRssBytes": 98783232,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1875,
+          "updatedAt": "2026-11-25T14:27:38.702130662Z"
+        }
+      }
+    },
+    "/go/framework/api|validate~cloud-config-member": {
+      "cpuMs": 135,
+      "wallMs": 143,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:38.801605112Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 135,
+          "wallMs": 143,
+          "maxRssBytes": 98783232,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23601398601398602,
+          "updatedAt": "2026-11-25T14:27:38.801605112Z"
+        }
+      }
+    },
+    "/go/framework/api|validate~features": {
+      "cpuMs": 219,
+      "wallMs": 253,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.178571046Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 219,
+          "wallMs": 253,
+          "maxRssBytes": 109305856,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21640316205533597,
+          "updatedAt": "2026-11-25T14:27:39.178571046Z"
+        }
+      }
+    },
+    "/go/framework/api|validate~specs": {
+      "cpuMs": 344,
+      "wallMs": 377,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.497369958Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 344,
+          "wallMs": 377,
+          "maxRssBytes": 116514816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22811671087533156,
+          "updatedAt": "2026-11-25T14:27:39.497369958Z"
+        }
+      }
+    },
+    "/go/framework/app|build~generate": {
+      "cpuMs": 43,
+      "wallMs": 56,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.447525807Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 43,
+          "wallMs": 56,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.19196428571428573,
+          "updatedAt": "2026-11-25T14:27:44.447525807Z"
+        }
+      }
+    },
+    "/go/framework/app|build~tidy": {
+      "cpuMs": 139,
+      "wallMs": 98,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.262797272Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 139,
+          "wallMs": 98,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.35459183673469385,
+          "updatedAt": "2026-11-25T14:27:44.262797272Z"
+        }
+      }
+    },
+    "/go/framework/app|lint~docs": {
+      "cpuMs": 109,
+      "wallMs": 121,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.105083159Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 109,
+          "wallMs": 121,
+          "maxRssBytes": 109436928,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22520661157024793,
+          "updatedAt": "2026-11-25T14:27:39.105083159Z"
+        }
+      }
+    },
+    "/go/framework/app|lint~golangci-lint": {
+      "cpuMs": 2613,
+      "wallMs": 2267,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:59.127331967Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 2613,
+          "wallMs": 2267,
+          "maxRssBytes": 135561216,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2881561535068372,
+          "updatedAt": "2026-11-25T14:27:59.127331967Z"
+        }
+      }
+    },
+    "/go/framework/app|lint~staticcheck": {
+      "cpuMs": 543,
+      "wallMs": 486,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:59.617611984Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 543,
+          "wallMs": 486,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.279320987654321,
+          "updatedAt": "2026-11-25T14:27:59.617611984Z"
+        }
+      }
+    },
+    "/go/framework/app|test~test": {
+      "cpuMs": 2207,
+      "wallMs": 5283,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:56.785600869Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 2207,
+          "wallMs": 5283,
+          "maxRssBytes": 174477312,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.10443876585273519,
+          "updatedAt": "2026-11-25T14:27:56.785600869Z"
+        }
+      }
+    },
+    "/go/framework/app|validate~api": {
+      "cpuMs": 24,
+      "wallMs": 34,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.16113832Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 24,
+          "wallMs": 34,
+          "maxRssBytes": 116514816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17647058823529413,
+          "updatedAt": "2026-11-25T14:27:39.16113832Z"
+        }
+      }
+    },
+    "/go/framework/app|validate~cloud-config-member": {
+      "cpuMs": 130,
+      "wallMs": 156,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.234918131Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 130,
+          "wallMs": 156,
+          "maxRssBytes": 116252672,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20833333333333334,
+          "updatedAt": "2026-11-25T14:27:39.234918131Z"
+        }
+      }
+    },
+    "/go/framework/app|validate~features": {
+      "cpuMs": 221,
+      "wallMs": 258,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.421041511Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 221,
+          "wallMs": 258,
+          "maxRssBytes": 116514816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21414728682170542,
+          "updatedAt": "2026-11-25T14:27:39.421041511Z"
+        }
+      }
+    },
+    "/go/framework/app|validate~specs": {
+      "cpuMs": 325,
+      "wallMs": 366,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.550124862Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 325,
+          "wallMs": 366,
+          "maxRssBytes": 116514816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22199453551912568,
+          "updatedAt": "2026-11-25T14:27:39.550124862Z"
+        }
+      }
+    },
+    "/go/framework/cache|build~generate": {
+      "cpuMs": 23,
+      "wallMs": 26,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.965231933Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 23,
+          "wallMs": 26,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22115384615384615,
+          "updatedAt": "2026-11-25T14:27:42.965231933Z"
+        }
+      }
+    },
+    "/go/framework/cache|build~tidy": {
+      "cpuMs": 107,
+      "wallMs": 101,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.440118811Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 107,
+          "wallMs": 101,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.26485148514851486,
+          "updatedAt": "2026-11-25T14:27:42.440118811Z"
+        }
+      }
+    },
+    "/go/framework/client|build~generate": {
+      "cpuMs": 79,
+      "wallMs": 121,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.670884696Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 79,
+          "wallMs": 121,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16322314049586778,
+          "updatedAt": "2026-11-25T14:27:44.670884696Z"
+        }
+      }
+    },
+    "/go/framework/client|build~tidy": {
+      "cpuMs": 103,
+      "wallMs": 116,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.505956991Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 103,
+          "wallMs": 116,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22198275862068967,
+          "updatedAt": "2026-11-25T14:27:44.505956991Z"
+        }
+      }
+    },
+    "/go/framework/client|lint~docs": {
+      "cpuMs": 119,
+      "wallMs": 154,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.472224097Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 119,
+          "wallMs": 154,
+          "maxRssBytes": 116514816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.19318181818181818,
+          "updatedAt": "2026-11-25T14:27:39.472224097Z"
+        }
+      }
+    },
+    "/go/framework/client|lint~golangci-lint": {
+      "cpuMs": 3040,
+      "wallMs": 3407,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:12.473055337Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 3040,
+          "wallMs": 3407,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22307014969181096,
+          "updatedAt": "2026-11-25T14:28:12.473055337Z"
+        }
+      }
+    },
+    "/go/framework/client|lint~staticcheck": {
+      "cpuMs": 525,
+      "wallMs": 492,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:13.021974419Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 525,
+          "wallMs": 492,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.26676829268292684,
+          "updatedAt": "2026-11-25T14:28:13.021974419Z"
+        }
+      }
+    },
+    "/go/framework/client|test~test": {
+      "cpuMs": 2050,
+      "wallMs": 17076,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:08.956758509Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 2050,
+          "wallMs": 17076,
+          "maxRssBytes": 193761280,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.030012883579292573,
+          "updatedAt": "2026-11-25T14:28:08.956758509Z"
+        }
+      }
+    },
+    "/go/framework/client|test~test-env": {
+      "cpuMs": 20,
+      "wallMs": 27,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.229912876Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 20,
+          "wallMs": 27,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18518518518518517,
+          "updatedAt": "2026-11-25T14:27:45.229912876Z"
+        }
+      }
+    },
+    "/go/framework/client|validate~api": {
+      "cpuMs": 16,
+      "wallMs": 18,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.506455077Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 16,
+          "wallMs": 18,
+          "maxRssBytes": 116514816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2222222222222222,
+          "updatedAt": "2026-11-25T14:27:39.506455077Z"
+        }
+      }
+    },
+    "/go/framework/client|validate~cloud-config-member": {
+      "cpuMs": 156,
+      "wallMs": 157,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.580351166Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 156,
+          "wallMs": 157,
+          "maxRssBytes": 116514816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2484076433121019,
+          "updatedAt": "2026-11-25T14:27:39.580351166Z"
+        }
+      }
+    },
+    "/go/framework/client|validate~features": {
+      "cpuMs": 223,
+      "wallMs": 256,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.996388545Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 223,
+          "wallMs": 256,
+          "maxRssBytes": 116514816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2177734375,
+          "updatedAt": "2026-11-25T14:27:39.996388545Z"
+        }
+      }
+    },
+    "/go/framework/client|validate~specs": {
+      "cpuMs": 338,
+      "wallMs": 365,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.252293699Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 338,
+          "wallMs": 365,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23150684931506849,
+          "updatedAt": "2026-11-25T14:27:40.252293699Z"
+        }
+      }
+    },
+    "/go/framework/config|build~generate": {
+      "cpuMs": 22,
+      "wallMs": 25,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.016693163Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 22,
+          "wallMs": 25,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22,
+          "updatedAt": "2026-11-25T14:27:43.016693163Z"
+        }
+      }
+    },
+    "/go/framework/config|build~tidy": {
+      "cpuMs": 92,
+      "wallMs": 120,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.651187798Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 92,
+          "wallMs": 120,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.19166666666666668,
+          "updatedAt": "2026-11-25T14:27:42.651187798Z"
+        }
+      }
+    },
+    "/go/framework/ctxutil|build~generate": {
+      "cpuMs": 20,
+      "wallMs": 41,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.905518472Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 20,
+          "wallMs": 41,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.12195121951219512,
+          "updatedAt": "2026-11-25T14:27:42.905518472Z"
+        }
+      }
+    },
+    "/go/framework/ctxutil|build~tidy": {
+      "cpuMs": 116,
+      "wallMs": 140,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.390831055Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 116,
+          "wallMs": 140,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20714285714285716,
+          "updatedAt": "2026-11-25T14:27:42.390831055Z"
+        }
+      }
+    },
+    "/go/framework/database|build~generate": {
+      "cpuMs": 49,
+      "wallMs": 69,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.198541221Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 49,
+          "wallMs": 69,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17753623188405798,
+          "updatedAt": "2026-11-25T14:27:46.198541221Z"
+        }
+      }
+    },
+    "/go/framework/database|build~tidy": {
+      "cpuMs": 127,
+      "wallMs": 106,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.91889882Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 127,
+          "wallMs": 106,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.29952830188679247,
+          "updatedAt": "2026-11-25T14:27:45.91889882Z"
+        }
+      }
+    },
+    "/go/framework/database|lint~docs": {
+      "cpuMs": 119,
+      "wallMs": 125,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.887126085Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 119,
+          "wallMs": 125,
+          "maxRssBytes": 116514816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.238,
+          "updatedAt": "2026-11-25T14:27:39.887126085Z"
+        }
+      }
+    },
+    "/go/framework/database|lint~golangci-lint": {
+      "cpuMs": 2943,
+      "wallMs": 2803,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:59.858008264Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 2943,
+          "wallMs": 2803,
+          "maxRssBytes": 138858496,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2624866214769889,
+          "updatedAt": "2026-11-25T14:27:59.858008264Z"
+        }
+      }
+    },
+    "/go/framework/database|lint~staticcheck": {
+      "cpuMs": 614,
+      "wallMs": 543,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:00.406174587Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 614,
+          "wallMs": 543,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2826887661141805,
+          "updatedAt": "2026-11-25T14:28:00.406174587Z"
+        }
+      }
+    },
+    "/go/framework/database|test~test": {
+      "cpuMs": 2537,
+      "wallMs": 2098,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:56.943450723Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 2537,
+          "wallMs": 2098,
+          "maxRssBytes": 244076544,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.3023117254528122,
+          "updatedAt": "2026-11-25T14:27:56.943450723Z"
+        }
+      }
+    },
+    "/go/framework/database|validate~api": {
+      "cpuMs": 17,
+      "wallMs": 19,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.860004938Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 17,
+          "wallMs": 19,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2236842105263158,
+          "updatedAt": "2026-11-25T14:27:39.860004938Z"
+        }
+      }
+    },
+    "/go/framework/database|validate~cloud-config-member": {
+      "cpuMs": 142,
+      "wallMs": 144,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:39.822382003Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 142,
+          "wallMs": 144,
+          "maxRssBytes": 116514816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2465277777777778,
+          "updatedAt": "2026-11-25T14:27:39.822382003Z"
+        }
+      }
+    },
+    "/go/framework/database|validate~features": {
+      "cpuMs": 202,
+      "wallMs": 214,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.093117246Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 202,
+          "wallMs": 214,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23598130841121495,
+          "updatedAt": "2026-11-25T14:27:40.093117246Z"
+        }
+      }
+    },
+    "/go/framework/database|validate~specs": {
+      "cpuMs": 330,
+      "wallMs": 325,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.600304942Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 330,
+          "wallMs": 325,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25384615384615383,
+          "updatedAt": "2026-11-25T14:27:40.600304942Z"
+        }
+      }
+    },
+    "/go/framework/errors|build~generate": {
+      "cpuMs": 21,
+      "wallMs": 43,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.93529807Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 21,
+          "wallMs": 43,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.12209302325581395,
+          "updatedAt": "2026-11-25T14:27:42.93529807Z"
+        }
+      }
+    },
+    "/go/framework/errors|build~tidy": {
+      "cpuMs": 110,
+      "wallMs": 87,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.33751474Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 110,
+          "wallMs": 87,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.3160919540229885,
+          "updatedAt": "2026-11-25T14:27:42.33751474Z"
+        }
+      }
+    },
+    "/go/framework/events|build~generate": {
+      "cpuMs": 43,
+      "wallMs": 41,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.80224636Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 43,
+          "wallMs": 41,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2621951219512195,
+          "updatedAt": "2026-11-25T14:27:44.80224636Z"
+        }
+      }
+    },
+    "/go/framework/events|build~tidy": {
+      "cpuMs": 115,
+      "wallMs": 132,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.665839615Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 115,
+          "wallMs": 132,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2178030303030303,
+          "updatedAt": "2026-11-25T14:27:44.665839615Z"
+        }
+      }
+    },
+    "/go/framework/grpc|build~generate": {
+      "cpuMs": 34,
+      "wallMs": 38,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.989968585Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 34,
+          "wallMs": 38,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2236842105263158,
+          "updatedAt": "2026-11-25T14:27:44.989968585Z"
+        }
+      }
+    },
+    "/go/framework/grpc|build~tidy": {
+      "cpuMs": 150,
+      "wallMs": 120,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.923495059Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 150,
+          "wallMs": 120,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.3125,
+          "updatedAt": "2026-11-25T14:27:44.923495059Z"
+        }
+      }
+    },
+    "/go/framework/grpc|lint~docs": {
+      "cpuMs": 109,
+      "wallMs": 139,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.229260268Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 109,
+          "wallMs": 139,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1960431654676259,
+          "updatedAt": "2026-11-25T14:27:40.229260268Z"
+        }
+      }
+    },
+    "/go/framework/grpc|lint~golangci-lint": {
+      "cpuMs": 2431,
+      "wallMs": 2146,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:04.813660135Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 2431,
+          "wallMs": 2146,
+          "maxRssBytes": 146776064,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2832013047530289,
+          "updatedAt": "2026-11-25T14:28:04.813660135Z"
+        }
+      }
+    },
+    "/go/framework/grpc|lint~staticcheck": {
+      "cpuMs": 597,
+      "wallMs": 508,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:05.324681521Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 597,
+          "wallMs": 508,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2937992125984252,
+          "updatedAt": "2026-11-25T14:28:05.324681521Z"
+        }
+      }
+    },
+    "/go/framework/grpc|test~test": {
+      "cpuMs": 3391,
+      "wallMs": 2939,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:02.563158134Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 3391,
+          "wallMs": 2939,
+          "maxRssBytes": 274296832,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.28844845185437223,
+          "updatedAt": "2026-11-25T14:28:02.563158134Z"
+        }
+      }
+    },
+    "/go/framework/grpc|test~test-env": {
+      "cpuMs": 16,
+      "wallMs": 22,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.669539452Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 16,
+          "wallMs": 22,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18181818181818182,
+          "updatedAt": "2026-11-25T14:27:45.669539452Z"
+        }
+      }
+    },
+    "/go/framework/grpc|validate~api": {
+      "cpuMs": 19,
+      "wallMs": 30,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.268288674Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 19,
+          "wallMs": 30,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.15833333333333333,
+          "updatedAt": "2026-11-25T14:27:40.268288674Z"
+        }
+      }
+    },
+    "/go/framework/grpc|validate~cloud-config-member": {
+      "cpuMs": 129,
+      "wallMs": 131,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.226288466Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 129,
+          "wallMs": 131,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.24618320610687022,
+          "updatedAt": "2026-11-25T14:27:40.226288466Z"
+        }
+      }
+    },
+    "/go/framework/grpc|validate~features": {
+      "cpuMs": 228,
+      "wallMs": 270,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.53959306Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 228,
+          "wallMs": 270,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2111111111111111,
+          "updatedAt": "2026-11-25T14:27:40.53959306Z"
+        }
+      }
+    },
+    "/go/framework/grpc|validate~specs": {
+      "cpuMs": 318,
+      "wallMs": 333,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.976487956Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 318,
+          "wallMs": 333,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23873873873873874,
+          "updatedAt": "2026-11-25T14:27:40.976487956Z"
+        }
+      }
+    },
+    "/go/framework/http|build~generate": {
+      "cpuMs": 39,
+      "wallMs": 77,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.538728896Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 39,
+          "wallMs": 77,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1266233766233766,
+          "updatedAt": "2026-11-25T14:27:44.538728896Z"
+        }
+      }
+    },
+    "/go/framework/http|build~tidy": {
+      "cpuMs": 123,
+      "wallMs": 111,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.377527431Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 123,
+          "wallMs": 111,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.27702702702702703,
+          "updatedAt": "2026-11-25T14:27:44.377527431Z"
+        }
+      }
+    },
+    "/go/framework/inject|build~generate": {
+      "cpuMs": 34,
+      "wallMs": 39,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.98618352Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 34,
+          "wallMs": 39,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21794871794871795,
+          "updatedAt": "2026-11-25T14:27:42.98618352Z"
+        }
+      }
+    },
+    "/go/framework/inject|build~tidy": {
+      "cpuMs": 103,
+      "wallMs": 137,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.529409343Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 103,
+          "wallMs": 137,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18795620437956204,
+          "updatedAt": "2026-11-25T14:27:42.529409343Z"
+        }
+      }
+    },
+    "/go/framework/logger|build~generate": {
+      "cpuMs": 23,
+      "wallMs": 26,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.985325616Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 23,
+          "wallMs": 26,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22115384615384615,
+          "updatedAt": "2026-11-25T14:27:42.985325616Z"
+        }
+      }
+    },
+    "/go/framework/logger|build~tidy": {
+      "cpuMs": 103,
+      "wallMs": 117,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.527260399Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 103,
+          "wallMs": 117,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22008547008547008,
+          "updatedAt": "2026-11-25T14:27:42.527260399Z"
+        }
+      }
+    },
+    "/go/framework/migration|build~generate": {
+      "cpuMs": 29,
+      "wallMs": 44,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.385980603Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 29,
+          "wallMs": 44,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16477272727272727,
+          "updatedAt": "2026-11-25T14:27:44.385980603Z"
+        }
+      }
+    },
+    "/go/framework/migration|build~tidy": {
+      "cpuMs": 97,
+      "wallMs": 82,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.162975988Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 97,
+          "wallMs": 82,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.29573170731707316,
+          "updatedAt": "2026-11-25T14:27:44.162975988Z"
+        }
+      }
+    },
+    "/go/framework/openapi|build~generate": {
+      "cpuMs": 35,
+      "wallMs": 52,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.891820318Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 35,
+          "wallMs": 52,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16826923076923078,
+          "updatedAt": "2026-11-25T14:27:44.891820318Z"
+        }
+      }
+    },
+    "/go/framework/openapi|build~tidy": {
+      "cpuMs": 111,
+      "wallMs": 116,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.802143306Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 111,
+          "wallMs": 116,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23922413793103448,
+          "updatedAt": "2026-11-25T14:27:44.802143306Z"
+        }
+      }
+    },
+    "/go/framework/openapi|lint~docs": {
+      "cpuMs": 118,
+      "wallMs": 147,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.687818028Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 118,
+          "wallMs": 147,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20068027210884354,
+          "updatedAt": "2026-11-25T14:27:40.687818028Z"
+        }
+      }
+    },
+    "/go/framework/openapi|lint~golangci-lint": {
+      "cpuMs": 2418,
+      "wallMs": 2629,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:10.993870374Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 2418,
+          "wallMs": 2629,
+          "maxRssBytes": 131928064,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2299353366298973,
+          "updatedAt": "2026-11-25T14:28:10.993870374Z"
+        }
+      }
+    },
+    "/go/framework/openapi|lint~staticcheck": {
+      "cpuMs": 520,
+      "wallMs": 582,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:11.580072298Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 520,
+          "wallMs": 582,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22336769759450173,
+          "updatedAt": "2026-11-25T14:28:11.580072298Z"
+        }
+      }
+    },
+    "/go/framework/openapi|test~test": {
+      "cpuMs": 8640,
+      "wallMs": 7870,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:08.289409339Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 8640,
+          "wallMs": 7870,
+          "maxRssBytes": 216616960,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2744599745870394,
+          "updatedAt": "2026-11-25T14:28:08.289409339Z"
+        }
+      }
+    },
+    "/go/framework/openapi|test~test-env": {
+      "cpuMs": 18,
+      "wallMs": 25,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.49477564Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 18,
+          "wallMs": 25,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18,
+          "updatedAt": "2026-11-25T14:27:45.49477564Z"
+        }
+      }
+    },
+    "/go/framework/openapi|validate~api": {
+      "cpuMs": 20,
+      "wallMs": 30,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.653270823Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 20,
+          "wallMs": 30,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16666666666666666,
+          "updatedAt": "2026-11-25T14:27:40.653270823Z"
+        }
+      }
+    },
+    "/go/framework/openapi|validate~cloud-config-member": {
+      "cpuMs": 135,
+      "wallMs": 158,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.705421827Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 135,
+          "wallMs": 158,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21360759493670886,
+          "updatedAt": "2026-11-25T14:27:40.705421827Z"
+        }
+      }
+    },
+    "/go/framework/proto|build~generate": {
+      "cpuMs": 23,
+      "wallMs": 33,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.703133731Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 23,
+          "wallMs": 33,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17424242424242425,
+          "updatedAt": "2026-11-25T14:27:44.703133731Z"
+        }
+      }
+    },
+    "/go/framework/proto|build~tidy": {
+      "cpuMs": 119,
+      "wallMs": 121,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.625028769Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 119,
+          "wallMs": 121,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.24586776859504134,
+          "updatedAt": "2026-11-25T14:27:44.625028769Z"
+        }
+      }
+    },
+    "/go/framework/schema|build~generate": {
+      "cpuMs": 22,
+      "wallMs": 33,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.944208052Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 22,
+          "wallMs": 33,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16666666666666666,
+          "updatedAt": "2026-11-25T14:27:42.944208052Z"
+        }
+      }
+    },
+    "/go/framework/schema|build~tidy": {
+      "cpuMs": 108,
+      "wallMs": 139,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.417995448Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 108,
+          "wallMs": 139,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.19424460431654678,
+          "updatedAt": "2026-11-25T14:27:42.417995448Z"
+        }
+      }
+    },
+    "/go/framework/security|build~generate": {
+      "cpuMs": 31,
+      "wallMs": 57,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.735600019Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 31,
+          "wallMs": 57,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.13596491228070176,
+          "updatedAt": "2026-11-25T14:27:44.735600019Z"
+        }
+      }
+    },
+    "/go/framework/security|build~tidy": {
+      "cpuMs": 105,
+      "wallMs": 116,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.531955307Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 105,
+          "wallMs": 116,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22629310344827586,
+          "updatedAt": "2026-11-25T14:27:44.531955307Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|build~generate": {
+      "cpuMs": 28,
+      "wallMs": 40,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.55650038Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 28,
+          "wallMs": 40,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.175,
+          "updatedAt": "2026-11-25T14:27:45.55650038Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|build~tidy": {
+      "cpuMs": 116,
+      "wallMs": 110,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.413355416Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 116,
+          "wallMs": 110,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2636363636363636,
+          "updatedAt": "2026-11-25T14:27:45.413355416Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|lint~docs": {
+      "cpuMs": 109,
+      "wallMs": 134,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:41.074422335Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 109,
+          "wallMs": 134,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20335820895522388,
+          "updatedAt": "2026-11-25T14:27:41.074422335Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|lint~golangci-lint": {
+      "cpuMs": 2395,
+      "wallMs": 2219,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:08.389311067Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 2395,
+          "wallMs": 2219,
+          "maxRssBytes": 133349376,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2698287516899504,
+          "updatedAt": "2026-11-25T14:28:08.389311067Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|lint~staticcheck": {
+      "cpuMs": 559,
+      "wallMs": 638,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:09.030384972Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 559,
+          "wallMs": 638,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21904388714733541,
+          "updatedAt": "2026-11-25T14:28:09.030384972Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|test~test": {
+      "cpuMs": 1655,
+      "wallMs": 1635,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:06.093284618Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 1655,
+          "wallMs": 1635,
+          "maxRssBytes": 247918592,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2530581039755352,
+          "updatedAt": "2026-11-25T14:28:06.093284618Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|test~test-env": {
+      "cpuMs": 27,
+      "wallMs": 31,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.699566798Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 27,
+          "wallMs": 31,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21774193548387097,
+          "updatedAt": "2026-11-25T14:27:45.699566798Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|validate~api": {
+      "cpuMs": 22,
+      "wallMs": 34,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.755774527Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 22,
+          "wallMs": 34,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16176470588235295,
+          "updatedAt": "2026-11-25T14:27:40.755774527Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|validate~cloud-config-member": {
+      "cpuMs": 138,
+      "wallMs": 142,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:40.832426107Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 138,
+          "wallMs": 142,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.24295774647887325,
+          "updatedAt": "2026-11-25T14:27:40.832426107Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|validate~features": {
+      "cpuMs": 212,
+      "wallMs": 222,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:41.218349804Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 212,
+          "wallMs": 222,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23873873873873874,
+          "updatedAt": "2026-11-25T14:27:41.218349804Z"
+        }
+      }
+    },
+    "/go/framework/telemetry|validate~specs": {
+      "cpuMs": 302,
+      "wallMs": 331,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:41.585050593Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 302,
+          "wallMs": 331,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2280966767371601,
+          "updatedAt": "2026-11-25T14:27:41.585050593Z"
+        }
+      }
+    },
+    "/protocols/agentcontext|build~generate": {
+      "cpuMs": 22,
+      "wallMs": 31,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.954079714Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 22,
+          "wallMs": 31,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1774193548387097,
+          "updatedAt": "2026-11-25T14:27:42.954079714Z"
+        }
+      }
+    },
+    "/protocols/agentcontext|build~tidy": {
+      "cpuMs": 99,
+      "wallMs": 126,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.407984829Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 99,
+          "wallMs": 126,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.19642857142857142,
+          "updatedAt": "2026-11-25T14:27:42.407984829Z"
+        }
+      }
+    },
+    "/protocols/analytics|build~generate": {
+      "cpuMs": 22,
+      "wallMs": 37,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.997444291Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 22,
+          "wallMs": 37,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.14864864864864866,
+          "updatedAt": "2026-11-25T14:27:42.997444291Z"
+        }
+      }
+    },
+    "/protocols/analytics|build~tidy": {
+      "cpuMs": 95,
+      "wallMs": 101,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.520180372Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 95,
+          "wallMs": 101,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23514851485148514,
+          "updatedAt": "2026-11-25T14:27:42.520180372Z"
+        }
+      }
+    },
+    "/protocols/architecture|build~generate": {
+      "cpuMs": 42,
+      "wallMs": 46,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.028233906Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 42,
+          "wallMs": 46,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22826086956521738,
+          "updatedAt": "2026-11-25T14:27:43.028233906Z"
+        }
+      }
+    },
+    "/protocols/architecture|build~tidy": {
+      "cpuMs": 83,
+      "wallMs": 102,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.544089555Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 83,
+          "wallMs": 102,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2034313725490196,
+          "updatedAt": "2026-11-25T14:27:42.544089555Z"
+        }
+      }
+    },
+    "/protocols/cache|build~generate": {
+      "cpuMs": 38,
+      "wallMs": 52,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.053921752Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 38,
+          "wallMs": 52,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18269230769230768,
+          "updatedAt": "2026-11-25T14:27:43.053921752Z"
+        }
+      }
+    },
+    "/protocols/cache|build~tidy": {
+      "cpuMs": 98,
+      "wallMs": 129,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.650172276Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 98,
+          "wallMs": 129,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18992248062015504,
+          "updatedAt": "2026-11-25T14:27:42.650172276Z"
+        }
+      }
+    },
+    "/protocols/capabilities|build~generate": {
+      "cpuMs": 29,
+      "wallMs": 25,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.03949925Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 29,
+          "wallMs": 25,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.29,
+          "updatedAt": "2026-11-25T14:27:42.03949925Z"
+        }
+      }
+    },
+    "/protocols/capabilities|build~tidy": {
+      "cpuMs": 92,
+      "wallMs": 85,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:41.866098024Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 92,
+          "wallMs": 85,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.27058823529411763,
+          "updatedAt": "2026-11-25T14:27:41.866098024Z"
+        }
+      }
+    },
+    "/protocols/ci|build~generate": {
+      "cpuMs": 34,
+      "wallMs": 34,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.149070029Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 34,
+          "wallMs": 34,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25,
+          "updatedAt": "2026-11-25T14:27:43.149070029Z"
+        }
+      }
+    },
+    "/protocols/ci|build~tidy": {
+      "cpuMs": 106,
+      "wallMs": 126,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.88777768Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 106,
+          "wallMs": 126,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21031746031746032,
+          "updatedAt": "2026-11-25T14:27:42.88777768Z"
+        }
+      }
+    },
+    "/protocols/clientcontract|build~generate": {
+      "cpuMs": 46,
+      "wallMs": 59,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.080248511Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 46,
+          "wallMs": 59,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.19491525423728814,
+          "updatedAt": "2026-11-25T14:27:43.080248511Z"
+        }
+      }
+    },
+    "/protocols/clientcontract|build~tidy": {
+      "cpuMs": 92,
+      "wallMs": 98,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.643844523Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 92,
+          "wallMs": 98,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23469387755102042,
+          "updatedAt": "2026-11-25T14:27:42.643844523Z"
+        }
+      }
+    },
+    "/protocols/cli|build~generate": {
+      "cpuMs": 41,
+      "wallMs": 60,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.06290032Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 41,
+          "wallMs": 60,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17083333333333334,
+          "updatedAt": "2026-11-25T14:27:43.06290032Z"
+        }
+      }
+    },
+    "/protocols/cli|build~tidy": {
+      "cpuMs": 94,
+      "wallMs": 97,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.626024799Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 94,
+          "wallMs": 97,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2422680412371134,
+          "updatedAt": "2026-11-25T14:27:42.626024799Z"
+        }
+      }
+    },
+    "/protocols/collaboration|build~generate": {
+      "cpuMs": 64,
+      "wallMs": 93,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.77584594Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 64,
+          "wallMs": 93,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17204301075268819,
+          "updatedAt": "2026-11-25T14:27:46.77584594Z"
+        }
+      }
+    },
+    "/protocols/collaboration|build~tidy": {
+      "cpuMs": 103,
+      "wallMs": 107,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.612668217Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 103,
+          "wallMs": 107,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.24065420560747663,
+          "updatedAt": "2026-11-25T14:27:46.612668217Z"
+        }
+      }
+    },
+    "/protocols/config|build~generate": {
+      "cpuMs": 23,
+      "wallMs": 28,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.061599032Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 23,
+          "wallMs": 28,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20535714285714285,
+          "updatedAt": "2026-11-25T14:27:43.061599032Z"
+        }
+      }
+    },
+    "/protocols/config|build~tidy": {
+      "cpuMs": 85,
+      "wallMs": 114,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.740982461Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 85,
+          "wallMs": 114,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18640350877192982,
+          "updatedAt": "2026-11-25T14:27:42.740982461Z"
+        }
+      }
+    },
+    "/protocols/contracts|build~generate": {
+      "cpuMs": 32,
+      "wallMs": 36,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.101474188Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 32,
+          "wallMs": 36,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2222222222222222,
+          "updatedAt": "2026-11-25T14:27:43.101474188Z"
+        }
+      }
+    },
+    "/protocols/contracts|build~tidy": {
+      "cpuMs": 86,
+      "wallMs": 84,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.826701257Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 86,
+          "wallMs": 84,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25595238095238093,
+          "updatedAt": "2026-11-25T14:27:42.826701257Z"
+        }
+      }
+    },
+    "/protocols/database|build~generate": {
+      "cpuMs": 24,
+      "wallMs": 24,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.081118379Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 24,
+          "wallMs": 24,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25,
+          "updatedAt": "2026-11-25T14:27:43.081118379Z"
+        }
+      }
+    },
+    "/protocols/database|build~tidy": {
+      "cpuMs": 84,
+      "wallMs": 100,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.745314948Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 84,
+          "wallMs": 100,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21,
+          "updatedAt": "2026-11-25T14:27:42.745314948Z"
+        }
+      }
+    },
+    "/protocols/diagnostic|build~generate": {
+      "cpuMs": 22,
+      "wallMs": 26,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:41.936602496Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 22,
+          "wallMs": 26,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21153846153846154,
+          "updatedAt": "2026-11-25T14:27:41.936602496Z"
+        }
+      }
+    },
+    "/protocols/diagnostic|build~tidy": {
+      "cpuMs": 96,
+      "wallMs": 591,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:41.667303333Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 96,
+          "wallMs": 591,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.04060913705583756,
+          "updatedAt": "2026-11-25T14:27:41.667303333Z"
+        }
+      }
+    },
+    "/protocols/distribution|build~generate": {
+      "cpuMs": 25,
+      "wallMs": 39,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.109844303Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 25,
+          "wallMs": 39,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16025641025641027,
+          "updatedAt": "2026-11-25T14:27:43.109844303Z"
+        }
+      }
+    },
+    "/protocols/distribution|build~tidy": {
+      "cpuMs": 93,
+      "wallMs": 109,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.760297507Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 93,
+          "wallMs": 109,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21330275229357798,
+          "updatedAt": "2026-11-25T14:27:42.760297507Z"
+        }
+      }
+    },
+    "/protocols/doctor|build~generate": {
+      "cpuMs": 24,
+      "wallMs": 26,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.109796938Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 24,
+          "wallMs": 26,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23076923076923078,
+          "updatedAt": "2026-11-25T14:27:43.109796938Z"
+        }
+      }
+    },
+    "/protocols/doctor|build~tidy": {
+      "cpuMs": 89,
+      "wallMs": 111,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.763234096Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 89,
+          "wallMs": 111,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20045045045045046,
+          "updatedAt": "2026-11-25T14:27:42.763234096Z"
+        }
+      }
+    },
+    "/protocols/events|build~generate": {
+      "cpuMs": 28,
+      "wallMs": 28,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.114993238Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 28,
+          "wallMs": 28,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25,
+          "updatedAt": "2026-11-25T14:27:43.114993238Z"
+        }
+      }
+    },
+    "/protocols/events|build~tidy": {
+      "cpuMs": 91,
+      "wallMs": 98,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.846026456Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 91,
+          "wallMs": 98,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23214285714285715,
+          "updatedAt": "2026-11-25T14:27:42.846026456Z"
+        }
+      }
+    },
+    "/protocols/extension|build~generate": {
+      "cpuMs": 68,
+      "wallMs": 91,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.492789278Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 68,
+          "wallMs": 91,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18681318681318682,
+          "updatedAt": "2026-11-25T14:27:46.492789278Z"
+        }
+      }
+    },
+    "/protocols/extension|build~tidy": {
+      "cpuMs": 119,
+      "wallMs": 132,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.392610994Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 119,
+          "wallMs": 132,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22537878787878787,
+          "updatedAt": "2026-11-25T14:27:46.392610994Z"
+        }
+      }
+    },
+    "/protocols/features|build~generate": {
+      "cpuMs": 66,
+      "wallMs": 88,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.860770417Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 66,
+          "wallMs": 88,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1875,
+          "updatedAt": "2026-11-25T14:27:42.860770417Z"
+        }
+      }
+    },
+    "/protocols/features|build~tidy": {
+      "cpuMs": 102,
+      "wallMs": 90,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.248446377Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 102,
+          "wallMs": 90,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2833333333333333,
+          "updatedAt": "2026-11-25T14:27:42.248446377Z"
+        }
+      }
+    },
+    "/protocols/gomod|build~generate": {
+      "cpuMs": 16,
+      "wallMs": 28,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.14344223Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 16,
+          "wallMs": 28,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.14285714285714285,
+          "updatedAt": "2026-11-25T14:27:43.14344223Z"
+        }
+      }
+    },
+    "/protocols/gomod|build~tidy": {
+      "cpuMs": 85,
+      "wallMs": 91,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.919759823Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 85,
+          "wallMs": 91,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23351648351648352,
+          "updatedAt": "2026-11-25T14:27:42.919759823Z"
+        }
+      }
+    },
+    "/protocols/grpc-services|build~generate": {
+      "cpuMs": 16,
+      "wallMs": 33,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.152248358Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 16,
+          "wallMs": 33,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.12121212121212122,
+          "updatedAt": "2026-11-25T14:27:43.152248358Z"
+        }
+      }
+    },
+    "/protocols/grpc-services|build~tidy": {
+      "cpuMs": 91,
+      "wallMs": 108,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:42.956360228Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 91,
+          "wallMs": 108,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21064814814814814,
+          "updatedAt": "2026-11-25T14:27:42.956360228Z"
+        }
+      }
+    },
+    "/protocols/http-routes|build~generate": {
+      "cpuMs": 24,
+      "wallMs": 36,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.321263303Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 24,
+          "wallMs": 36,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16666666666666666,
+          "updatedAt": "2026-11-25T14:27:43.321263303Z"
+        }
+      }
+    },
+    "/protocols/http-routes|build~tidy": {
+      "cpuMs": 102,
+      "wallMs": 105,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.280866724Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 102,
+          "wallMs": 105,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.24285714285714285,
+          "updatedAt": "2026-11-25T14:27:43.280866724Z"
+        }
+      }
+    },
+    "/protocols/i18n|build~generate": {
+      "cpuMs": 17,
+      "wallMs": 18,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.301775469Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 17,
+          "wallMs": 18,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2361111111111111,
+          "updatedAt": "2026-11-25T14:27:43.301775469Z"
+        }
+      }
+    },
+    "/protocols/i18n|build~tidy": {
+      "cpuMs": 88,
+      "wallMs": 86,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.280771302Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 88,
+          "wallMs": 86,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2558139534883721,
+          "updatedAt": "2026-11-25T14:27:43.280771302Z"
+        }
+      }
+    },
+    "/protocols/identity|build~generate": {
+      "cpuMs": 21,
+      "wallMs": 29,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.312990021Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 21,
+          "wallMs": 29,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1810344827586207,
+          "updatedAt": "2026-11-25T14:27:43.312990021Z"
+        }
+      }
+    },
+    "/protocols/identity|build~tidy": {
+      "cpuMs": 84,
+      "wallMs": 74,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.280611377Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 84,
+          "wallMs": 74,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.28378378378378377,
+          "updatedAt": "2026-11-25T14:27:43.280611377Z"
+        }
+      }
+    },
+    "/protocols/infra|build~generate": {
+      "cpuMs": 43,
+      "wallMs": 69,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.33778586Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 43,
+          "wallMs": 69,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.15579710144927536,
+          "updatedAt": "2026-11-25T14:27:44.33778586Z"
+        }
+      }
+    },
+    "/protocols/infra|build~tidy": {
+      "cpuMs": 99,
+      "wallMs": 83,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.031191149Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 99,
+          "wallMs": 83,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.29819277108433734,
+          "updatedAt": "2026-11-25T14:27:44.031191149Z"
+        }
+      }
+    },
+    "/protocols/job|build~generate": {
+      "cpuMs": 35,
+      "wallMs": 55,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.566037683Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 35,
+          "wallMs": 55,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1590909090909091,
+          "updatedAt": "2026-11-25T14:27:46.566037683Z"
+        }
+      }
+    },
+    "/protocols/job|build~tidy": {
+      "cpuMs": 108,
+      "wallMs": 103,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.503053122Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 108,
+          "wallMs": 103,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2621359223300971,
+          "updatedAt": "2026-11-25T14:27:46.503053122Z"
+        }
+      }
+    },
+    "/protocols/keyring|build~generate": {
+      "cpuMs": 22,
+      "wallMs": 40,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.4426567Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 22,
+          "wallMs": 40,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1375,
+          "updatedAt": "2026-11-25T14:27:43.4426567Z"
+        }
+      }
+    },
+    "/protocols/keyring|build~tidy": {
+      "cpuMs": 92,
+      "wallMs": 81,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.398768247Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 92,
+          "wallMs": 81,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2839506172839506,
+          "updatedAt": "2026-11-25T14:27:43.398768247Z"
+        }
+      }
+    },
+    "/protocols/migration|build~generate": {
+      "cpuMs": 26,
+      "wallMs": 38,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.527261945Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 26,
+          "wallMs": 38,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17105263157894737,
+          "updatedAt": "2026-11-25T14:27:43.527261945Z"
+        }
+      }
+    },
+    "/protocols/migration|build~tidy": {
+      "cpuMs": 91,
+      "wallMs": 90,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.442618473Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 91,
+          "wallMs": 90,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25277777777777777,
+          "updatedAt": "2026-11-25T14:27:43.442618473Z"
+        }
+      }
+    },
+    "/protocols/oci|build~generate": {
+      "cpuMs": 21,
+      "wallMs": 29,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.561960312Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 21,
+          "wallMs": 29,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1810344827586207,
+          "updatedAt": "2026-11-25T14:27:43.561960312Z"
+        }
+      }
+    },
+    "/protocols/oci|build~tidy": {
+      "cpuMs": 94,
+      "wallMs": 100,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.527208197Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 94,
+          "wallMs": 100,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.235,
+          "updatedAt": "2026-11-25T14:27:43.527208197Z"
+        }
+      }
+    },
+    "/protocols/platform|build~generate": {
+      "cpuMs": 20,
+      "wallMs": 30,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.56198135Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 20,
+          "wallMs": 30,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16666666666666666,
+          "updatedAt": "2026-11-25T14:27:43.56198135Z"
+        }
+      }
+    },
+    "/protocols/platform|build~tidy": {
+      "cpuMs": 102,
+      "wallMs": 80,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.527441076Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 102,
+          "wallMs": 80,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.31875,
+          "updatedAt": "2026-11-25T14:27:43.527441076Z"
+        }
+      }
+    },
+    "/protocols/put|build~generate": {
+      "cpuMs": 25,
+      "wallMs": 35,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.675041059Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 25,
+          "wallMs": 35,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17857142857142858,
+          "updatedAt": "2026-11-25T14:27:43.675041059Z"
+        }
+      }
+    },
+    "/protocols/put|build~tidy": {
+      "cpuMs": 125,
+      "wallMs": 84,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.636468654Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 125,
+          "wallMs": 84,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.37202380952380953,
+          "updatedAt": "2026-11-25T14:27:43.636468654Z"
+        }
+      }
+    },
+    "/protocols/qualify|build~generate": {
+      "cpuMs": 24,
+      "wallMs": 36,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.811324144Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 24,
+          "wallMs": 36,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16666666666666666,
+          "updatedAt": "2026-11-25T14:27:43.811324144Z"
+        }
+      }
+    },
+    "/protocols/qualify|build~tidy": {
+      "cpuMs": 95,
+      "wallMs": 101,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.732461573Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 95,
+          "wallMs": 101,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23514851485148514,
+          "updatedAt": "2026-11-25T14:27:43.732461573Z"
+        }
+      }
+    },
+    "/protocols/registry|build~generate": {
+      "cpuMs": 27,
+      "wallMs": 31,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.701034433Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 27,
+          "wallMs": 31,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21774193548387097,
+          "updatedAt": "2026-11-25T14:27:46.701034433Z"
+        }
+      }
+    },
+    "/protocols/registry|build~tidy": {
+      "cpuMs": 99,
+      "wallMs": 89,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.660446526Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 99,
+          "wallMs": 89,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.27808988764044945,
+          "updatedAt": "2026-11-25T14:27:46.660446526Z"
+        }
+      }
+    },
+    "/protocols/runner|build~generate": {
+      "cpuMs": 27,
+      "wallMs": 31,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.899232007Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 27,
+          "wallMs": 31,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21774193548387097,
+          "updatedAt": "2026-11-25T14:27:43.899232007Z"
+        }
+      }
+    },
+    "/protocols/runner|build~tidy": {
+      "cpuMs": 102,
+      "wallMs": 105,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.811216404Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 102,
+          "wallMs": 105,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.24285714285714285,
+          "updatedAt": "2026-11-25T14:27:43.811216404Z"
+        }
+      }
+    },
+    "/protocols/runtime|build~generate": {
+      "cpuMs": 24,
+      "wallMs": 42,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.899414484Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 24,
+          "wallMs": 42,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.14285714285714285,
+          "updatedAt": "2026-11-25T14:27:43.899414484Z"
+        }
+      }
+    },
+    "/protocols/runtime|build~tidy": {
+      "cpuMs": 103,
+      "wallMs": 76,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.811476894Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 103,
+          "wallMs": 76,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.33881578947368424,
+          "updatedAt": "2026-11-25T14:27:43.811476894Z"
+        }
+      }
+    },
+    "/protocols/storage|build~generate": {
+      "cpuMs": 17,
+      "wallMs": 32,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.065796151Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 17,
+          "wallMs": 32,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1328125,
+          "updatedAt": "2026-11-25T14:27:44.065796151Z"
+        }
+      }
+    },
+    "/protocols/storage|build~tidy": {
+      "cpuMs": 93,
+      "wallMs": 66,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:43.899451748Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 93,
+          "wallMs": 66,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.3522727272727273,
+          "updatedAt": "2026-11-25T14:27:43.899451748Z"
+        }
+      }
+    },
+    "/protocols/support|build~generate": {
+      "cpuMs": 19,
+      "wallMs": 30,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.926517399Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 19,
+          "wallMs": 30,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.15833333333333333,
+          "updatedAt": "2026-11-25T14:27:44.926517399Z"
+        }
+      }
+    },
+    "/protocols/support|build~tidy": {
+      "cpuMs": 91,
+      "wallMs": 75,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:44.031243459Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 91,
+          "wallMs": 75,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.30333333333333334,
+          "updatedAt": "2026-11-25T14:27:44.031243459Z"
+        }
+      }
+    },
+    "/protocols/telemetry|build~generate": {
+      "cpuMs": 24,
+      "wallMs": 29,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.491255388Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 24,
+          "wallMs": 29,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20689655172413793,
+          "updatedAt": "2026-11-25T14:27:45.491255388Z"
+        }
+      }
+    },
+    "/protocols/telemetry|build~tidy": {
+      "cpuMs": 100,
+      "wallMs": 104,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.264168093Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 100,
+          "wallMs": 104,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2403846153846154,
+          "updatedAt": "2026-11-25T14:27:45.264168093Z"
+        }
+      }
+    },
+    "/protocols/template|build~generate": {
+      "cpuMs": 19,
+      "wallMs": 25,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.664999727Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 19,
+          "wallMs": 25,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.19,
+          "updatedAt": "2026-11-25T14:27:45.664999727Z"
+        }
+      }
+    },
+    "/protocols/template|build~tidy": {
+      "cpuMs": 99,
+      "wallMs": 100,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.413183614Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 99,
+          "wallMs": 100,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2475,
+          "updatedAt": "2026-11-25T14:27:45.413183614Z"
+        }
+      }
+    },
+    "/protocols/transaction|build~generate": {
+      "cpuMs": 32,
+      "wallMs": 36,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.11428105Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 32,
+          "wallMs": 36,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2222222222222222,
+          "updatedAt": "2026-11-25T14:27:46.11428105Z"
+        }
+      }
+    },
+    "/protocols/transaction|build~tidy": {
+      "cpuMs": 97,
+      "wallMs": 101,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:45.809653745Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 97,
+          "wallMs": 101,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2400990099009901,
+          "updatedAt": "2026-11-25T14:27:45.809653745Z"
+        }
+      }
+    },
+    "/protocols/workspace|build~generate": {
+      "cpuMs": 57,
+      "wallMs": 61,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.284832546Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 57,
+          "wallMs": 61,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2336065573770492,
+          "updatedAt": "2026-11-25T14:27:46.284832546Z"
+        }
+      }
+    },
+    "/protocols/workspace|build~tidy": {
+      "cpuMs": 89,
+      "wallMs": 100,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.175117988Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 89,
+          "wallMs": 100,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2225,
+          "updatedAt": "2026-11-25T14:27:46.175117988Z"
+        }
+      }
+    },
+    "/tooling/cli-documents|build~generate": {
+      "cpuMs": 19,
+      "wallMs": 32,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.409951338Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 19,
+          "wallMs": 32,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1484375,
+          "updatedAt": "2026-11-25T14:27:48.409951338Z"
+        }
+      }
+    },
+    "/tooling/cli-documents|build~tidy": {
+      "cpuMs": 143,
+      "wallMs": 127,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:47.527375602Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 143,
+          "wallMs": 127,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.281496062992126,
+          "updatedAt": "2026-11-25T14:27:47.527375602Z"
+        }
+      }
+    },
+    "/tooling/cli-documents|lint~docs": {
+      "cpuMs": 131,
+      "wallMs": 187,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.581005043Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 131,
+          "wallMs": 187,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1751336898395722,
+          "updatedAt": "2026-11-25T14:27:46.581005043Z"
+        }
+      }
+    },
+    "/tooling/cli-documents|lint~golangci-lint-check-only": {
+      "cpuMs": 2191,
+      "wallMs": 1833,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:07.159711798Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 2191,
+          "wallMs": 1833,
+          "maxRssBytes": 134373376,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2988270594653573,
+          "updatedAt": "2026-11-25T14:28:07.159711798Z"
+        }
+      }
+    },
+    "/tooling/cli-documents|lint~staticcheck-check-only": {
+      "cpuMs": 636,
+      "wallMs": 507,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:07.668547572Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 636,
+          "wallMs": 507,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.3136094674556213,
+          "updatedAt": "2026-11-25T14:28:07.668547572Z"
+        }
+      }
+    },
+    "/tooling/cli-documents|test~test": {
+      "cpuMs": 12037,
+      "wallMs": 13106,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:20.996820965Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 12037,
+          "wallMs": 13106,
+          "maxRssBytes": 454385664,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22960857622462993,
+          "updatedAt": "2026-11-25T14:28:20.996820965Z"
+        }
+      }
+    },
+    "/tooling/cli-documents|validate~cloud-config-member": {
+      "cpuMs": 158,
+      "wallMs": 210,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:46.603044616Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 158,
+          "wallMs": 210,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1880952380952381,
+          "updatedAt": "2026-11-25T14:27:46.603044616Z"
+        }
+      }
+    },
+    "/tooling/cli-documents|validate~features": {
+      "cpuMs": 252,
+      "wallMs": 328,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:47.218321813Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 252,
+          "wallMs": 328,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.19207317073170732,
+          "updatedAt": "2026-11-25T14:27:47.218321813Z"
+        }
+      }
+    },
+    "/tooling/cli-documents|validate~specs": {
+      "cpuMs": 364,
+      "wallMs": 451,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:47.485827246Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 364,
+          "wallMs": 451,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2017738359201774,
+          "updatedAt": "2026-11-25T14:27:47.485827246Z"
+        }
+      }
+    },
+    "/tooling/cli-model|build~generate": {
+      "cpuMs": 55,
+      "wallMs": 55,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:47.062017994Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 55,
+          "wallMs": 55,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25,
+          "updatedAt": "2026-11-25T14:27:47.062017994Z"
+        }
+      }
+    },
+    "/tooling/cli-model|build~tidy": {
+      "cpuMs": 100,
+      "wallMs": 105,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:47.002455205Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 100,
+          "wallMs": 105,
+          "maxRssBytes": 116666368,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23809523809523808,
+          "updatedAt": "2026-11-25T14:27:47.002455205Z"
+        }
+      }
+    },
+    "/tooling/cli|build~generate": {
+      "cpuMs": 703,
+      "wallMs": 659,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.372261028Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 703,
+          "wallMs": 659,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.26669195751138086,
+          "updatedAt": "2026-11-25T14:27:48.372261028Z"
+        }
+      }
+    },
+    "/tooling/cli|build~tidy": {
+      "cpuMs": 191,
+      "wallMs": 174,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:47.396512038Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 191,
+          "wallMs": 174,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2744252873563218,
+          "updatedAt": "2026-11-25T14:27:47.396512038Z"
+        }
+      }
+    },
+    "/tooling/extension-sdk|build~generate": {
+      "cpuMs": 154,
+      "wallMs": 182,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:47.622804328Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 154,
+          "wallMs": 182,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21153846153846154,
+          "updatedAt": "2026-11-25T14:27:47.622804328Z"
+        }
+      }
+    },
+    "/tooling/extension-sdk|build~tidy": {
+      "cpuMs": 143,
+      "wallMs": 149,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:47.220639801Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 143,
+          "wallMs": 149,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23993288590604026,
+          "updatedAt": "2026-11-25T14:27:47.220639801Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|build~generate": {
+      "cpuMs": 259,
+      "wallMs": 388,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:15.848258347Z",
+      "observations": {
+        "4x2": {
+          "cpuMs": 259,
+          "wallMs": 388,
+          "maxRssBytes": 132640768,
+          "grantedConcurrency": 4,
+          "batchSize": 2,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16688144329896906,
+          "updatedAt": "2026-11-25T14:28:15.848258347Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|build~transpile": {
+      "cpuMs": 48,
+      "wallMs": 57,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:16.121378775Z",
+      "observations": {
+        "4x4": {
+          "cpuMs": 48,
+          "wallMs": 57,
+          "maxRssBytes": 132640768,
+          "grantedConcurrency": 4,
+          "batchSize": 4,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21052631578947367,
+          "updatedAt": "2026-11-25T14:28:16.121378775Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|build~types": {
+      "cpuMs": 3643,
+      "wallMs": 2290,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:25.45164475Z",
+      "observations": {
+        "4x4": {
+          "cpuMs": 3643,
+          "wallMs": 2290,
+          "maxRssBytes": 326275072,
+          "grantedConcurrency": 4,
+          "batchSize": 4,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.39770742358078603,
+          "updatedAt": "2026-11-25T14:28:25.45164475Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|lint~check": {
+      "cpuMs": 3103,
+      "wallMs": 2110,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:40.206438048Z",
+      "observations": {
+        "4x2": {
+          "cpuMs": 3103,
+          "wallMs": 2110,
+          "maxRssBytes": 553148416,
+          "grantedConcurrency": 4,
+          "batchSize": 2,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.36765402843601896,
+          "updatedAt": "2026-11-25T14:28:40.206438048Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|lint~docs": {
+      "cpuMs": 142,
+      "wallMs": 171,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:47.665503774Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 142,
+          "wallMs": 171,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20760233918128654,
+          "updatedAt": "2026-11-25T14:27:47.665503774Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|lint~format": {
+      "cpuMs": 270,
+      "wallMs": 171,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:35.944555825Z",
+      "observations": {
+        "4x2": {
+          "cpuMs": 270,
+          "wallMs": 171,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 2,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.39473684210526316,
+          "updatedAt": "2026-11-25T14:28:35.944555825Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|test~generate": {
+      "cpuMs": 449,
+      "wallMs": 277,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:30.946155893Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 449,
+          "wallMs": 277,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.4052346570397112,
+          "updatedAt": "2026-11-25T14:28:30.946155893Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|test~test": {
+      "cpuMs": 1456,
+      "wallMs": 1597,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:32.547511373Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 1456,
+          "wallMs": 1597,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22792736380713838,
+          "updatedAt": "2026-11-25T14:28:32.547511373Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|test~types": {
+      "cpuMs": 4063,
+      "wallMs": 2934,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:35.558514714Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 4063,
+          "wallMs": 2934,
+          "maxRssBytes": 342790144,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.34619972733469667,
+          "updatedAt": "2026-11-25T14:28:35.558514714Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|validate~cloud-config-member": {
+      "cpuMs": 156,
+      "wallMs": 197,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:47.418489601Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 156,
+          "wallMs": 197,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.19796954314720813,
+          "updatedAt": "2026-11-25T14:27:47.418489601Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|validate~features": {
+      "cpuMs": 231,
+      "wallMs": 266,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.008641647Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 231,
+          "wallMs": 266,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21710526315789475,
+          "updatedAt": "2026-11-25T14:27:48.008641647Z"
+        }
+      }
+    },
+    "/typescript/framework/analytics|validate~specs": {
+      "cpuMs": 324,
+      "wallMs": 377,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.340490188Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 324,
+          "wallMs": 377,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21485411140583555,
+          "updatedAt": "2026-11-25T14:27:48.340490188Z"
+        }
+      }
+    },
+    "/typescript/framework/application|build~generate": {
+      "cpuMs": 31,
+      "wallMs": 39,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:13.192874692Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 31,
+          "wallMs": 39,
+          "maxRssBytes": 132603904,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1987179487179487,
+          "updatedAt": "2026-11-25T14:28:13.192874692Z"
+        }
+      }
+    },
+    "/typescript/framework/application|build~infra": {
+      "cpuMs": 23,
+      "wallMs": 59,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:17.109584194Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 23,
+          "wallMs": 59,
+          "maxRssBytes": 133844992,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.09745762711864407,
+          "updatedAt": "2026-11-25T14:28:17.109584194Z"
+        }
+      }
+    },
+    "/typescript/framework/application|build~transpile": {
+      "cpuMs": 102,
+      "wallMs": 126,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:13.36256925Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 102,
+          "wallMs": 126,
+          "maxRssBytes": 132620288,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20238095238095238,
+          "updatedAt": "2026-11-25T14:28:13.36256925Z"
+        }
+      }
+    },
+    "/typescript/framework/application|build~types": {
+      "cpuMs": 3176,
+      "wallMs": 3502,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:17.048656117Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 3176,
+          "wallMs": 3502,
+          "maxRssBytes": 279949312,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22672758423757852,
+          "updatedAt": "2026-11-25T14:28:17.048656117Z"
+        }
+      }
+    },
+    "/typescript/framework/application|lint~check": {
+      "cpuMs": 7582,
+      "wallMs": 3168,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:49.236729525Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 7582,
+          "wallMs": 3168,
+          "maxRssBytes": 561999872,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.5983270202020202,
+          "updatedAt": "2026-11-25T14:28:49.236729525Z"
+        }
+      }
+    },
+    "/typescript/framework/application|lint~docs": {
+      "cpuMs": 151,
+      "wallMs": 211,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.184655461Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 151,
+          "wallMs": 211,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17890995260663506,
+          "updatedAt": "2026-11-25T14:27:48.184655461Z"
+        }
+      }
+    },
+    "/typescript/framework/application|lint~format": {
+      "cpuMs": 1044,
+      "wallMs": 471,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:46.030425665Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 1044,
+          "wallMs": 471,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.554140127388535,
+          "updatedAt": "2026-11-25T14:28:46.030425665Z"
+        }
+      }
+    },
+    "/typescript/framework/application|test~generate": {
+      "cpuMs": 28,
+      "wallMs": 37,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:17.327743829Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 28,
+          "wallMs": 37,
+          "maxRssBytes": 134369280,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1891891891891892,
+          "updatedAt": "2026-11-25T14:28:17.327743829Z"
+        }
+      }
+    },
+    "/typescript/framework/application|test~test": {
+      "cpuMs": 13961,
+      "wallMs": 28017,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:45.376444036Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 13961,
+          "wallMs": 28017,
+          "maxRssBytes": 558649344,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.12457615019452475,
+          "updatedAt": "2026-11-25T14:28:45.376444036Z"
+        }
+      }
+    },
+    "/typescript/framework/application|test~types": {
+      "cpuMs": 3877,
+      "wallMs": 3465,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:20.820765321Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 3877,
+          "wallMs": 3465,
+          "maxRssBytes": 365285376,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2797258297258297,
+          "updatedAt": "2026-11-25T14:28:20.820765321Z"
+        }
+      }
+    },
+    "/typescript/framework/application|validate~api": {
+      "cpuMs": 38,
+      "wallMs": 42,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.430812823Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 38,
+          "wallMs": 42,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2261904761904762,
+          "updatedAt": "2026-11-25T14:27:48.430812823Z"
+        }
+      }
+    },
+    "/typescript/framework/application|validate~cloud-config-member": {
+      "cpuMs": 173,
+      "wallMs": 214,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.225545513Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 173,
+          "wallMs": 214,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20210280373831777,
+          "updatedAt": "2026-11-25T14:27:48.225545513Z"
+        }
+      }
+    },
+    "/typescript/framework/application|validate~features": {
+      "cpuMs": 240,
+      "wallMs": 266,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.452341098Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 240,
+          "wallMs": 266,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22556390977443608,
+          "updatedAt": "2026-11-25T14:27:48.452341098Z"
+        }
+      }
+    },
+    "/typescript/framework/application|validate~specs": {
+      "cpuMs": 329,
+      "wallMs": 362,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.967918282Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 329,
+          "wallMs": 362,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2272099447513812,
+          "updatedAt": "2026-11-25T14:27:48.967918282Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|build~generate": {
+      "cpuMs": 8,
+      "wallMs": 14,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:09.401323299Z",
+      "observations": {
+        "4x3": {
+          "cpuMs": 8,
+          "wallMs": 14,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 3,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.14285714285714285,
+          "updatedAt": "2026-11-25T14:28:09.401323299Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|build~transpile": {
+      "cpuMs": 34,
+      "wallMs": 63,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:09.508350932Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 34,
+          "wallMs": 63,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1349206349206349,
+          "updatedAt": "2026-11-25T14:28:09.508350932Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|build~types": {
+      "cpuMs": 1835,
+      "wallMs": 1568,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:11.079956973Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 1835,
+          "wallMs": 1568,
+          "maxRssBytes": 206417920,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.29257015306122447,
+          "updatedAt": "2026-11-25T14:28:11.079956973Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|lint~check": {
+      "cpuMs": 4701,
+      "wallMs": 2886,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:15.913621284Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 4701,
+          "wallMs": 2886,
+          "maxRssBytes": 547094528,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.4072245322245322,
+          "updatedAt": "2026-11-25T14:28:15.913621284Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|lint~docs": {
+      "cpuMs": 105,
+      "wallMs": 127,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.794642214Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 105,
+          "wallMs": 127,
+          "maxRssBytes": 123977728,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20669291338582677,
+          "updatedAt": "2026-11-25T14:27:48.794642214Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|lint~format": {
+      "cpuMs": 105,
+      "wallMs": 105,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:13.022778092Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 105,
+          "wallMs": 105,
+          "maxRssBytes": 131424256,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25,
+          "updatedAt": "2026-11-25T14:28:13.022778092Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|test~generate": {
+      "cpuMs": 16,
+      "wallMs": 41,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:11.314206614Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 16,
+          "wallMs": 41,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.0975609756097561,
+          "updatedAt": "2026-11-25T14:28:11.314206614Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|test~test": {
+      "cpuMs": 1172,
+      "wallMs": 1237,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:12.555564162Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 1172,
+          "wallMs": 1237,
+          "maxRssBytes": 196313088,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2368633791430881,
+          "updatedAt": "2026-11-25T14:28:12.555564162Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|test~types": {
+      "cpuMs": 1846,
+      "wallMs": 1283,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:12.87566439Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 1846,
+          "wallMs": 1283,
+          "maxRssBytes": 214069248,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.3597038191738114,
+          "updatedAt": "2026-11-25T14:28:12.87566439Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|validate~api": {
+      "cpuMs": 31,
+      "wallMs": 45,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.856682687Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 31,
+          "wallMs": 45,
+          "maxRssBytes": 127647744,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17222222222222222,
+          "updatedAt": "2026-11-25T14:27:48.856682687Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|validate~cloud-config-member": {
+      "cpuMs": 174,
+      "wallMs": 182,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.639906234Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 174,
+          "wallMs": 182,
+          "maxRssBytes": 120610816,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23901098901098902,
+          "updatedAt": "2026-11-25T14:27:48.639906234Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|validate~features": {
+      "cpuMs": 210,
+      "wallMs": 235,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:48.961853195Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 210,
+          "wallMs": 235,
+          "maxRssBytes": 127647744,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22340425531914893,
+          "updatedAt": "2026-11-25T14:27:48.961853195Z"
+        }
+      }
+    },
+    "/typescript/framework/cli-protocol|validate~specs": {
+      "cpuMs": 315,
+      "wallMs": 357,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.380136247Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 315,
+          "wallMs": 357,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22058823529411764,
+          "updatedAt": "2026-11-25T14:27:49.380136247Z"
+        }
+      }
+    },
+    "/typescript/framework/client|build~generate": {
+      "cpuMs": 173,
+      "wallMs": 225,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:14.771653386Z",
+      "observations": {
+        "4x3": {
+          "cpuMs": 173,
+          "wallMs": 225,
+          "maxRssBytes": 132620288,
+          "grantedConcurrency": 4,
+          "batchSize": 3,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1922222222222222,
+          "updatedAt": "2026-11-25T14:28:14.771653386Z"
+        }
+      }
+    },
+    "/typescript/framework/client|build~transpile": {
+      "cpuMs": 48,
+      "wallMs": 57,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:16.125843176Z",
+      "observations": {
+        "4x4": {
+          "cpuMs": 48,
+          "wallMs": 57,
+          "maxRssBytes": 132640768,
+          "grantedConcurrency": 4,
+          "batchSize": 4,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21052631578947367,
+          "updatedAt": "2026-11-25T14:28:16.125843176Z"
+        }
+      }
+    },
+    "/typescript/framework/client|build~types": {
+      "cpuMs": 3643,
+      "wallMs": 2290,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:25.451840049Z",
+      "observations": {
+        "4x4": {
+          "cpuMs": 3643,
+          "wallMs": 2290,
+          "maxRssBytes": 326275072,
+          "grantedConcurrency": 4,
+          "batchSize": 4,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.39770742358078603,
+          "updatedAt": "2026-11-25T14:28:25.451840049Z"
+        }
+      }
+    },
+    "/typescript/framework/client|lint~check": {
+      "cpuMs": 5808,
+      "wallMs": 1825,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:56.536027381Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 5808,
+          "wallMs": 1825,
+          "maxRssBytes": 553459712,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.7956164383561644,
+          "updatedAt": "2026-11-25T14:28:56.536027381Z"
+        }
+      }
+    },
+    "/typescript/framework/client|lint~docs": {
+      "cpuMs": 123,
+      "wallMs": 143,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.069984985Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 123,
+          "wallMs": 143,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21503496503496503,
+          "updatedAt": "2026-11-25T14:27:49.069984985Z"
+        }
+      }
+    },
+    "/typescript/framework/client|lint~format": {
+      "cpuMs": 487,
+      "wallMs": 167,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:54.699573414Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 487,
+          "wallMs": 167,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.7290419161676647,
+          "updatedAt": "2026-11-25T14:28:54.699573414Z"
+        }
+      }
+    },
+    "/typescript/framework/client|test~generate": {
+      "cpuMs": 171,
+      "wallMs": 158,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:25.75707056Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 171,
+          "wallMs": 158,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.27056962025316456,
+          "updatedAt": "2026-11-25T14:28:25.75707056Z"
+        }
+      }
+    },
+    "/typescript/framework/client|test~test": {
+      "cpuMs": 25677,
+      "wallMs": 28653,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:54.418992679Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 25677,
+          "wallMs": 28653,
+          "maxRssBytes": 397418496,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2240341325515653,
+          "updatedAt": "2026-11-25T14:28:54.418992679Z"
+        }
+      }
+    },
+    "/typescript/framework/client|test~types": {
+      "cpuMs": 3604,
+      "wallMs": 2618,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:28.383405976Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 3604,
+          "wallMs": 2618,
+          "maxRssBytes": 337125376,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.34415584415584416,
+          "updatedAt": "2026-11-25T14:28:28.383405976Z"
+        }
+      }
+    },
+    "/typescript/framework/client|validate~api": {
+      "cpuMs": 31,
+      "wallMs": 48,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.194799031Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 31,
+          "wallMs": 48,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16145833333333334,
+          "updatedAt": "2026-11-25T14:27:49.194799031Z"
+        }
+      }
+    },
+    "/typescript/framework/client|validate~cloud-config-member": {
+      "cpuMs": 147,
+      "wallMs": 156,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.119897127Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 147,
+          "wallMs": 156,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23557692307692307,
+          "updatedAt": "2026-11-25T14:27:49.119897127Z"
+        }
+      }
+    },
+    "/typescript/framework/client|validate~features": {
+      "cpuMs": 222,
+      "wallMs": 256,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.409240759Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 222,
+          "wallMs": 256,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.216796875,
+          "updatedAt": "2026-11-25T14:27:49.409240759Z"
+        }
+      }
+    },
+    "/typescript/framework/client|validate~specs": {
+      "cpuMs": 320,
+      "wallMs": 335,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.786305414Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 320,
+          "wallMs": 335,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23880597014925373,
+          "updatedAt": "2026-11-25T14:27:49.786305414Z"
+        }
+      }
+    },
+    "/typescript/framework/database|build~generate": {
+      "cpuMs": 173,
+      "wallMs": 225,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:14.771819612Z",
+      "observations": {
+        "4x3": {
+          "cpuMs": 173,
+          "wallMs": 225,
+          "maxRssBytes": 132620288,
+          "grantedConcurrency": 4,
+          "batchSize": 3,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1922222222222222,
+          "updatedAt": "2026-11-25T14:28:14.771819612Z"
+        }
+      }
+    },
+    "/typescript/framework/database|test~generate": {
+      "cpuMs": 201,
+      "wallMs": 164,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:21.126410593Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 201,
+          "wallMs": 164,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.30640243902439024,
+          "updatedAt": "2026-11-25T14:28:21.126410593Z"
+        }
+      }
+    },
+    "/typescript/framework/migration|build~generate": {
+      "cpuMs": 22,
+      "wallMs": 29,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:12.959452182Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 22,
+          "wallMs": 29,
+          "maxRssBytes": 131424256,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1896551724137931,
+          "updatedAt": "2026-11-25T14:28:12.959452182Z"
+        }
+      }
+    },
+    "/typescript/framework/migration|test~generate": {
+      "cpuMs": 38,
+      "wallMs": 51,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:16.254638236Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 38,
+          "wallMs": 51,
+          "maxRssBytes": 133058560,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18627450980392157,
+          "updatedAt": "2026-11-25T14:28:16.254638236Z"
+        }
+      }
+    },
+    "/typescript/framework/runtime|build~generate": {
+      "cpuMs": 28,
+      "wallMs": 43,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:12.804896721Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 28,
+          "wallMs": 43,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16279069767441862,
+          "updatedAt": "2026-11-25T14:28:12.804896721Z"
+        }
+      }
+    },
+    "/typescript/framework/runtime|test~generate": {
+      "cpuMs": 17,
+      "wallMs": 31,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:16.03362156Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 17,
+          "wallMs": 31,
+          "maxRssBytes": 132640768,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.13709677419354838,
+          "updatedAt": "2026-11-25T14:28:16.03362156Z"
+        }
+      }
+    },
+    "/typescript/framework/spectest|build~generate": {
+      "cpuMs": 8,
+      "wallMs": 14,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:09.401564566Z",
+      "observations": {
+        "4x3": {
+          "cpuMs": 8,
+          "wallMs": 14,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 3,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.14285714285714285,
+          "updatedAt": "2026-11-25T14:28:09.401564566Z"
+        }
+      }
+    },
+    "/typescript/framework/spectest|test~generate": {
+      "cpuMs": 20,
+      "wallMs": 28,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:13.114022101Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 20,
+          "wallMs": 28,
+          "maxRssBytes": 132603904,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17857142857142858,
+          "updatedAt": "2026-11-25T14:28:13.114022101Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|build~generate": {
+      "cpuMs": 259,
+      "wallMs": 388,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:15.848380811Z",
+      "observations": {
+        "4x2": {
+          "cpuMs": 259,
+          "wallMs": 388,
+          "maxRssBytes": 132640768,
+          "grantedConcurrency": 4,
+          "batchSize": 2,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.16688144329896906,
+          "updatedAt": "2026-11-25T14:28:15.848380811Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|build~transpile": {
+      "cpuMs": 48,
+      "wallMs": 57,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:16.125800201Z",
+      "observations": {
+        "4x4": {
+          "cpuMs": 48,
+          "wallMs": 57,
+          "maxRssBytes": 132640768,
+          "grantedConcurrency": 4,
+          "batchSize": 4,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21052631578947367,
+          "updatedAt": "2026-11-25T14:28:16.125800201Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|build~types": {
+      "cpuMs": 3643,
+      "wallMs": 2290,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:25.451809575Z",
+      "observations": {
+        "4x4": {
+          "cpuMs": 3643,
+          "wallMs": 2290,
+          "maxRssBytes": 326275072,
+          "grantedConcurrency": 4,
+          "batchSize": 4,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.39770742358078603,
+          "updatedAt": "2026-11-25T14:28:25.451809575Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|lint~check": {
+      "cpuMs": 4879,
+      "wallMs": 3448,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:40.706039232Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 4879,
+          "wallMs": 3448,
+          "maxRssBytes": 537133056,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.3537558004640371,
+          "updatedAt": "2026-11-25T14:28:40.706039232Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|lint~docs": {
+      "cpuMs": 145,
+      "wallMs": 162,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.457091247Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 145,
+          "wallMs": 162,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22376543209876543,
+          "updatedAt": "2026-11-25T14:27:49.457091247Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|lint~format": {
+      "cpuMs": 140,
+      "wallMs": 186,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:37.235692077Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 140,
+          "wallMs": 186,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1881720430107527,
+          "updatedAt": "2026-11-25T14:28:37.235692077Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|test~generate": {
+      "cpuMs": 228,
+      "wallMs": 183,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:33.328025268Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 228,
+          "wallMs": 183,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.3114754098360656,
+          "updatedAt": "2026-11-25T14:28:33.328025268Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|test~test": {
+      "cpuMs": 382,
+      "wallMs": 469,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:33.808946347Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 382,
+          "wallMs": 469,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20362473347547974,
+          "updatedAt": "2026-11-25T14:28:33.808946347Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|test~types": {
+      "cpuMs": 3729,
+      "wallMs": 3181,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:37.032263433Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 3729,
+          "wallMs": 3181,
+          "maxRssBytes": 324395008,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2930682175416536,
+          "updatedAt": "2026-11-25T14:28:37.032263433Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|validate~api": {
+      "cpuMs": 37,
+      "wallMs": 39,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.628590239Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 37,
+          "wallMs": 39,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23717948717948717,
+          "updatedAt": "2026-11-25T14:27:49.628590239Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|validate~cloud-config-member": {
+      "cpuMs": 159,
+      "wallMs": 180,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.563974092Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 159,
+          "wallMs": 180,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22083333333333333,
+          "updatedAt": "2026-11-25T14:27:49.563974092Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|validate~features": {
+      "cpuMs": 202,
+      "wallMs": 219,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.885968027Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 202,
+          "wallMs": 219,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23059360730593606,
+          "updatedAt": "2026-11-25T14:27:49.885968027Z"
+        }
+      }
+    },
+    "/typescript/framework/ui|validate~specs": {
+      "cpuMs": 309,
+      "wallMs": 304,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:50.224193155Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 309,
+          "wallMs": 304,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25411184210526316,
+          "updatedAt": "2026-11-25T14:27:50.224193155Z"
+        }
+      }
+    },
+    "/typescript/framework/utils|build~generate": {
+      "cpuMs": 8,
+      "wallMs": 14,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:09.401460932Z",
+      "observations": {
+        "4x3": {
+          "cpuMs": 8,
+          "wallMs": 14,
+          "maxRssBytes": 130756608,
+          "grantedConcurrency": 4,
+          "batchSize": 3,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.14285714285714285,
+          "updatedAt": "2026-11-25T14:28:09.401460932Z"
+        }
+      }
+    },
+    "/typescript/framework/utils|test~generate": {
+      "cpuMs": 23,
+      "wallMs": 49,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:13.366157888Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 23,
+          "wallMs": 49,
+          "maxRssBytes": 132620288,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.11734693877551021,
+          "updatedAt": "2026-11-25T14:28:13.366157888Z"
+        }
+      }
+    },
+    "/typescript/framework/web|build~generate": {
+      "cpuMs": 173,
+      "wallMs": 225,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:14.771765389Z",
+      "observations": {
+        "4x3": {
+          "cpuMs": 173,
+          "wallMs": 225,
+          "maxRssBytes": 132620288,
+          "grantedConcurrency": 4,
+          "batchSize": 3,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.1922222222222222,
+          "updatedAt": "2026-11-25T14:28:14.771765389Z"
+        }
+      }
+    },
+    "/typescript/framework/web|build~transpile": {
+      "cpuMs": 48,
+      "wallMs": 57,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:16.12566053Z",
+      "observations": {
+        "4x4": {
+          "cpuMs": 48,
+          "wallMs": 57,
+          "maxRssBytes": 132640768,
+          "grantedConcurrency": 4,
+          "batchSize": 4,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21052631578947367,
+          "updatedAt": "2026-11-25T14:28:16.12566053Z"
+        }
+      }
+    },
+    "/typescript/framework/web|build~types": {
+      "cpuMs": 3643,
+      "wallMs": 2290,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:25.451764073Z",
+      "observations": {
+        "4x4": {
+          "cpuMs": 3643,
+          "wallMs": 2290,
+          "maxRssBytes": 326275072,
+          "grantedConcurrency": 4,
+          "batchSize": 4,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.39770742358078603,
+          "updatedAt": "2026-11-25T14:28:25.451764073Z"
+        }
+      }
+    },
+    "/typescript/framework/web|lint~check": {
+      "cpuMs": 3103,
+      "wallMs": 2110,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:40.206496637Z",
+      "observations": {
+        "4x2": {
+          "cpuMs": 3103,
+          "wallMs": 2110,
+          "maxRssBytes": 553148416,
+          "grantedConcurrency": 4,
+          "batchSize": 2,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.36765402843601896,
+          "updatedAt": "2026-11-25T14:28:40.206496637Z"
+        }
+      }
+    },
+    "/typescript/framework/web|lint~docs": {
+      "cpuMs": 116,
+      "wallMs": 143,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:50.013831015Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 116,
+          "wallMs": 143,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20279720279720279,
+          "updatedAt": "2026-11-25T14:27:50.013831015Z"
+        }
+      }
+    },
+    "/typescript/framework/web|lint~format": {
+      "cpuMs": 270,
+      "wallMs": 171,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:35.944660181Z",
+      "observations": {
+        "4x2": {
+          "cpuMs": 270,
+          "wallMs": 171,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 2,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.39473684210526316,
+          "updatedAt": "2026-11-25T14:28:35.944660181Z"
+        }
+      }
+    },
+    "/typescript/framework/web|test~generate": {
+      "cpuMs": 192,
+      "wallMs": 264,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:25.96063883Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 192,
+          "wallMs": 264,
+          "maxRssBytes": 135811072,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18181818181818182,
+          "updatedAt": "2026-11-25T14:28:25.96063883Z"
+        }
+      }
+    },
+    "/typescript/framework/web|test~test": {
+      "cpuMs": 4659,
+      "wallMs": 6850,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:32.817803304Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 4659,
+          "wallMs": 6850,
+          "maxRssBytes": 307687424,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17003649635036497,
+          "updatedAt": "2026-11-25T14:28:32.817803304Z"
+        }
+      }
+    },
+    "/typescript/framework/web|test~types": {
+      "cpuMs": 4341,
+      "wallMs": 2147,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:28:30.539791335Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 4341,
+          "wallMs": 2147,
+          "maxRssBytes": 376283136,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.5054727526781556,
+          "updatedAt": "2026-11-25T14:28:30.539791335Z"
+        }
+      }
+    },
+    "/typescript/framework/web|validate~api": {
+      "cpuMs": 36,
+      "wallMs": 64,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:50.118658322Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 36,
+          "wallMs": 64,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.140625,
+          "updatedAt": "2026-11-25T14:27:50.118658322Z"
+        }
+      }
+    },
+    "/typescript/framework/web|validate~cloud-config-member": {
+      "cpuMs": 159,
+      "wallMs": 189,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:49.979204794Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 159,
+          "wallMs": 189,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.21031746031746032,
+          "updatedAt": "2026-11-25T14:27:49.979204794Z"
+        }
+      }
+    },
+    "/typescript/framework/web|validate~features": {
+      "cpuMs": 192,
+      "wallMs": 214,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:50.295374709Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 192,
+          "wallMs": 214,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22429906542056074,
+          "updatedAt": "2026-11-25T14:27:50.295374709Z"
+        }
+      }
+    },
+    "/typescript/framework/web|validate~specs": {
+      "cpuMs": 326,
+      "wallMs": 329,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:50.699475372Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 326,
+          "wallMs": 329,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.24772036474164133,
+          "updatedAt": "2026-11-25T14:27:50.699475372Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~agent-attribution": {
+      "cpuMs": 17,
+      "wallMs": 37,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:50.157338429Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 17,
+          "wallMs": 37,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.11486486486486487,
+          "updatedAt": "2026-11-25T14:27:50.157338429Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~architecture": {
+      "cpuMs": 81,
+      "wallMs": 90,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:50.68090224Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 81,
+          "wallMs": 90,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.225,
+          "updatedAt": "2026-11-25T14:27:50.68090224Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~breaking-marker": {
+      "cpuMs": 16,
+      "wallMs": 18,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:50.243697735Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 16,
+          "wallMs": 18,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2222222222222222,
+          "updatedAt": "2026-11-25T14:27:50.243697735Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~codeowners": {
+      "cpuMs": 120,
+      "wallMs": 127,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.496256714Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 120,
+          "wallMs": 127,
+          "maxRssBytes": 128135168,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23622047244094488,
+          "updatedAt": "2026-11-25T14:27:51.496256714Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~decisions": {
+      "cpuMs": 161,
+      "wallMs": 164,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:50.660425976Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 161,
+          "wallMs": 164,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.24542682926829268,
+          "updatedAt": "2026-11-25T14:27:50.660425976Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~docs-links": {
+      "cpuMs": 550,
+      "wallMs": 588,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.121967575Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 550,
+          "wallMs": 588,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.233843537414966,
+          "updatedAt": "2026-11-25T14:27:51.121967575Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~feature-coverage": {
+      "cpuMs": 384,
+      "wallMs": 425,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.087363332Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 384,
+          "wallMs": 425,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22588235294117648,
+          "updatedAt": "2026-11-25T14:27:51.087363332Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~feature-coverage-ratchet": {
+      "cpuMs": 16,
+      "wallMs": 26,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:50.708598534Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 16,
+          "wallMs": 26,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.15384615384615385,
+          "updatedAt": "2026-11-25T14:27:50.708598534Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~recipes": {
+      "cpuMs": 107,
+      "wallMs": 129,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.04271177Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 107,
+          "wallMs": 129,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20736434108527133,
+          "updatedAt": "2026-11-25T14:27:51.04271177Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~specs-ratchet": {
+      "cpuMs": 393,
+      "wallMs": 545,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.865960711Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 393,
+          "wallMs": 545,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18027522935779816,
+          "updatedAt": "2026-11-25T14:27:51.865960711Z"
+        }
+      }
+    },
+    "putnami|validate-workspace~verdict-policy": {
+      "cpuMs": 113,
+      "wallMs": 118,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.26980094Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 113,
+          "wallMs": 118,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.23940677966101695,
+          "updatedAt": "2026-11-25T14:27:51.26980094Z"
+        }
+      }
+    },
+    "putnami|validate~bazel-graph-check": {
+      "cpuMs": 10,
+      "wallMs": 12,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.101903619Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 10,
+          "wallMs": 12,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.20833333333333334,
+          "updatedAt": "2026-11-25T14:27:51.101903619Z"
+        }
+      }
+    },
+    "putnami|validate~clientgen-guard": {
+      "cpuMs": 3100,
+      "wallMs": 3489,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:54.838688717Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 3100,
+          "wallMs": 3489,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.22212668386357123,
+          "updatedAt": "2026-11-25T14:27:54.838688717Z"
+        }
+      }
+    },
+    "putnami|validate~moon-graph-check": {
+      "cpuMs": 9,
+      "wallMs": 13,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.283594416Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 9,
+          "wallMs": 13,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.17307692307692307,
+          "updatedAt": "2026-11-25T14:27:51.283594416Z"
+        }
+      }
+    },
+    "putnami|validate~nx-graph-check": {
+      "cpuMs": 8,
+      "wallMs": 9,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.293701585Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 8,
+          "wallMs": 9,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.2222222222222222,
+          "updatedAt": "2026-11-25T14:27:51.293701585Z"
+        }
+      }
+    },
+    "putnami|validate~pants-graph-check": {
+      "cpuMs": 8,
+      "wallMs": 11,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.305486624Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 8,
+          "wallMs": 11,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.18181818181818182,
+          "updatedAt": "2026-11-25T14:27:51.305486624Z"
+        }
+      }
+    },
+    "putnami|validate~rush-graph-check": {
+      "cpuMs": 8,
+      "wallMs": 8,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.315011429Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 8,
+          "wallMs": 8,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.25,
+          "updatedAt": "2026-11-25T14:27:51.315011429Z"
+        }
+      }
+    },
+    "putnami|validate~turbo-graph-check": {
+      "cpuMs": 9,
+      "wallMs": 10,
+      "samples": 1,
+      "updatedAt": "2026-11-25T14:27:51.326102356Z",
+      "observations": {
+        "4x1": {
+          "cpuMs": 9,
+          "wallMs": 10,
+          "maxRssBytes": 128118784,
+          "grantedConcurrency": 4,
+          "batchSize": 1,
+          "samples": 1,
+          "confidence": 0.25,
+          "saturation": 0.225,
+          "updatedAt": "2026-11-25T14:27:51.326102356Z"
+        }
+      }
+    }
+  }
+}

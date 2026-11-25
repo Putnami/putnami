@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The whole campaign, runs one after another, never overlapping.
+# Stopped after cold-B1 on request: phases 2 and 3 below never ran (see README.md).
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
 A=/home/user/wt-A; B=/home/user/wt-B
