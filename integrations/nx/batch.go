@@ -30,8 +30,9 @@ var (
 // ReadBatch reads the static output of a failed nx run-many over several
 // projects (ADR 0019 of tooling/stacks). A component's target fails when one
 // of its own runs failed, with that run's section, or when Nx lists it among
-// the tasks it did not run; it passes when one of its runs has a section and
-// none failed; it is not named otherwise, and the core fails it as not run.
+// the tasks it did not run or stopped; it passes when one of its runs has a
+// section and none failed; it is not named otherwise, and the core fails it
+// as not run.
 // A run of <target> is <project>:<target> or <project>:<target>:<config>; a
 // quoted target such as <project>:"<target>:x" is another target.
 func ReadBatch(report stacks.BatchReport) map[string]stacks.BatchOutcome {
@@ -99,7 +100,8 @@ func (t task) id() string {
 }
 
 // runMany is what Nx's static output states: each task that ran, with its
-// section, by id, and the ids its summary lists as failed or as not run.
+// section, by id, and the ids its summary lists as failed, as not run or as
+// stopped.
 type runMany struct {
 	sections map[string]string
 	tasks    map[string]task

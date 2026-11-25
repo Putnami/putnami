@@ -2,6 +2,7 @@ package gittest
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -101,6 +102,9 @@ func TestTemplateWritesModesAndNestedFiles(t *testing.T) {
 	}
 	t.Parallel()
 	var tpl template
+	// built holds the modes the build left, after the umask, which the copy
+	// keeps.
+	built := map[string]os.FileMode{}
 	build := func(dir string) error {
 		if err := os.MkdirAll(filepath.Join(dir, "a", "b"), 0o755); err != nil {
 			return err
@@ -108,10 +112,26 @@ func TestTemplateWritesModesAndNestedFiles(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, "a", "b", "read-only"), []byte("r"), 0o444); err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Join(dir, "a", "run"), []byte("x"), 0o755)
+		if err := os.WriteFile(filepath.Join(dir, "a", "run"), []byte("x"), 0o755); err != nil {
+			return err
+		}
+		for _, name := range []string{"a/b/read-only", "a/run"} {
+			info, err := os.Stat(filepath.Join(dir, filepath.FromSlash(name)))
+			if err != nil {
+				return err
+			}
+			built[name] = info.Mode().Perm()
+		}
+		if built["a/run"]&0o100 == 0 || built["a/b/read-only"]&0o222 != 0 {
+			return fmt.Errorf("the build left modes %v, not one executable and one read-only file", built)
+		}
+		return nil
 	}
 	dir := tpl.copy(t, build)
-	for name, want := range map[string]os.FileMode{"a/b/read-only": 0o444, "a/run": 0o755} {
+	if len(built) != 2 {
+		t.Fatalf("the build recorded modes %v, want two", built)
+	}
+	for name, want := range built {
 		info, err := os.Stat(filepath.Join(dir, filepath.FromSlash(name)))
 		if err != nil {
 			t.Fatal(err)

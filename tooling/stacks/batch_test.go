@@ -12,6 +12,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // batchProfile is a delegated profile whose lint runs over several
@@ -54,13 +55,13 @@ func batchStack(t *testing.T, read func(BatchReport) map[string]BatchOutcome) St
 	}
 }
 
-// stubBatchTool puts first on PATH a tool that prints its version, logs each
-// run, prints "output of <arg>" for each target it runs and exits with
-// STUB_EXIT.
+// stubBatchTool puts first on PATH a tool that counts each of its starts in
+// the calls file, prints its version, logs each run, prints "output of <arg>"
+// for each target it runs and exits with STUB_EXIT.
 func stubBatchTool(t *testing.T, root string) {
 	t.Helper()
 	bin := t.TempDir()
-	writeFile(t, bin, "tool", "#!/bin/sh\ncase \"$1\" in --version) echo 'tool 1.0.0'; exit 0;; esac\n"+
+	writeFile(t, bin, "tool", "#!/bin/sh\necho >> "+filepath.Join(root, "calls")+"\ncase \"$1\" in --version) echo 'tool 1.0.0'; exit 0;; esac\n"+
 		"echo \"$*\" >> "+filepath.Join(root, "log")+"\nfor a in \"$@\"; do echo \"output of $a\"; done\nexit ${STUB_EXIT:-0}\n")
 	if err := os.Chmod(filepath.Join(bin, "tool"), 0o755); err != nil {
 		t.Fatal(err)
@@ -114,6 +115,18 @@ func TestABatchRunsOneCommandOverItsComponents(t *testing.T) {
 		if r.Status != statusOK || r.Data["delegatedTo"] != "tool" {
 			t.Errorf("%s = %+v, want a pass delegated to tool", id, r)
 		}
+	}
+}
+
+func TestABatchCountsEveryToolProcessItStarts(t *testing.T) {
+	root := t.TempDir()
+	stubBatchTool(t, root)
+	before := procstat.Take().Of(procstat.Other).Starts
+	runLintBatch(t, batchStack(t, nil), root)
+	started := procstat.Take().Of(procstat.Other).Starts - before
+	calls, _ := os.ReadFile(filepath.Join(root, "calls"))
+	if want := int64(strings.Count(string(calls), "\n")); started != want || want == 0 {
+		t.Errorf("the ledger counted %d tool processes, want the %d the tool saw", started, want)
 	}
 }
 

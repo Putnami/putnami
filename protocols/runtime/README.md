@@ -65,10 +65,10 @@ a producer-less, consumer-less protocol is deleted rather than frozen. See
 ## Schemas and fixtures
 
 - v1 event envelope: [`schemas/event.json`](schemas/event.json); corpus
-  [`fixtures/valid`](fixtures/valid) (3 streams) and
+  [`fixtures/valid`](fixtures/valid) (5 streams) and
   [`fixtures/invalid`](fixtures/invalid) (3 streams).
 - v2 event envelope: [`schemas/event-v2.json`](schemas/event-v2.json); corpus
-  [`fixtures/v2/valid`](fixtures/v2/valid) (4 streams) and
+  [`fixtures/v2/valid`](fixtures/v2/valid) (5 streams) and
   [`fixtures/v2/invalid`](fixtures/v2/invalid) (10 streams).
 - Supporting descriptions: [`schemas/payloads.json`](schemas/payloads.json)
   (typed per-verb payloads), [`schemas/workload.json`](schemas/workload.json),

@@ -120,18 +120,19 @@ func Classify(program string) Kind {
 	return Other
 }
 
-// gitValueOptions are the global git options whose value is the next
-// argument.
+// gitValueOptions are the global git options whose value may be the next
+// argument. "--exec-path" is not one: its value only follows "=".
 var gitValueOptions = map[string]bool{
 	"-C": true, "-c": true, "--git-dir": true, "--work-tree": true, "--namespace": true,
-	"--exec-path": true, "--config-env": true, "--attr-source": true, "--super-prefix": true,
+	"--config-env": true, "--attr-source": true, "--shallow-file": true,
 }
 
 // GitSubcommand names the subcommand of a git argument vector, the program
 // first: the first argument after the global options ("-C <dir>", "-c
-// <name=value>", "--git-dir=<dir>"). A vector that names none counts under its
-// first argument, and a vector with no argument, or an empty subcommand,
-// under "git".
+// <name=value>", "--git-dir=<dir>"). A bare "--exec-path" prints the exec path
+// and runs nothing after it, so it names itself. A vector that names none
+// counts under its first argument, and a vector with no argument, or an empty
+// subcommand, under "git".
 func GitSubcommand(argv []string) string {
 	if len(argv) < 2 {
 		return "git"
@@ -143,6 +144,9 @@ func GitSubcommand(argv []string) string {
 		if gitValueOptions[arg] {
 			i++
 			continue
+		}
+		if arg == "--exec-path" {
+			return arg
 		}
 		if !strings.HasPrefix(arg, "-") {
 			name = arg

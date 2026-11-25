@@ -36,7 +36,10 @@ var repo template
 // update-index --refresh.
 //
 // The first call builds the repository with the environment of its test; a
-// build that fails fails every test of the binary that asks for a copy.
+// build that fails fails every test of the binary that asks for a copy. A test
+// must therefore not call Repo after t.Setenv("PATH", ...) or another change
+// to the environment git reads: when it is the first caller, that environment
+// builds the repository every other test copies.
 func Repo(t testing.TB) string {
 	t.Helper()
 	return repo.copy(t, buildRepo)

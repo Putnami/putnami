@@ -683,8 +683,8 @@ no process of that entry exited before the run ended, and 0 when some did in
 under a millisecond.
 `unreportedProcesses` counts the job and batch processes that reported no CPU of
 their own: a runtime not built on the extension SDK or on a version of it that
-reports, an interactive job, an SDK job that exited before writing its result,
-or a platform without `getrusage`. Their CPU is in no member.
+reports, an interactive job, or an SDK job that exited before writing its
+result. Their CPU is in no member.
 
 A task record carries `orchestration` with `keyMs`, `lockWaitMs` and
 `restoreMs`: the wall the scheduler spent computing its key, waiting for a cache

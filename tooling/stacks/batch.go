@@ -16,6 +16,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // A delegated verb runs as one tool command (ADR 0019): the scheduler hands
@@ -374,7 +375,7 @@ func (s Stack) runBatchRoot(ctx context.Context, task string, members []*batchMe
 		writer := io.MultiWriter(os.Stderr, output)
 		cmd.Stdout = writer
 		cmd.Stderr = writer
-		if err := cmd.Run(); err != nil {
+		if err := procstat.Run(cmd); err != nil {
 			stepErr, failedArgv = err, argv
 			later = i < len(first.task.Batch.Steps)-1
 			break

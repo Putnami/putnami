@@ -722,9 +722,9 @@ type OrchestrationCPU struct {
 	PerTaskMs *int64 `json:"perTaskMs,omitempty"`
 	// UnreportedProcesses counts the job and batch processes that reported no
 	// CPU of their own: a runtime not built on the extension SDK or on a
-	// version of it that reports, an interactive job, an SDK job that exited
-	// before writing its result, or a platform without getrusage. Their CPU is
-	// in no member above. Absent when every one reported.
+	// version of it that reports, an interactive job, or an SDK job that exited
+	// before writing its result. Their CPU is in no member above. Absent when
+	// every one reported.
 	UnreportedProcesses int64 `json:"unreportedProcesses,omitempty"`
 }
 

@@ -78,6 +78,7 @@ func TestDrift_ProcessKinds(t *testing.T) {
 }
 
 func TestTheProcessReportFixtureCarriesAValidReport(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "result-payloads-are-typed-and-bounded", "result-payloads-are-extracted")
 	raw, err := os.ReadFile(filepath.Join("fixtures", "valid", "process-report.jsonl"))
 	if err != nil {
 		t.Fatal(err)

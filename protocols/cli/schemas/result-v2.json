@@ -497,7 +497,7 @@
       "properties": {
         "keyMs": { "$ref": "#/$defs/durationMs", "description": "Wall spent computing the task's cache key." },
         "lockWaitMs": { "$ref": "#/$defs/durationMs", "description": "Wall spent waiting for a cache lease another process held, or for the task-output locks." },
-        "restoreMs": { "$ref": "#/$defs/durationMs", "description": "Wall spent restoring a cache entry." }
+        "restoreMs": { "$ref": "#/$defs/durationMs", "description": "Wall spent restoring a cache entry; for a remote entry it includes the remote lookup and the wait for the remote lease." }
       }
     },
     "orchestrationPhase": {
