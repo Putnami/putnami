@@ -162,6 +162,7 @@
     "cli/init-from-a-monorepo-tool#delegate-import-runs-one-project-on-putnami",
     "cli/init-from-a-monorepo-tool#init-asks-the-mode",
     "cli/init-from-a-monorepo-tool#init-from-bazel",
+    "cli/init-from-a-monorepo-tool#init-from-completes-the-gitignore",
     "cli/init-from-a-monorepo-tool#init-from-moon",
     "cli/init-from-a-monorepo-tool#init-from-nx",
     "cli/init-from-a-monorepo-tool#init-from-pants",

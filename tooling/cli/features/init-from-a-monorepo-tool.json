@@ -336,6 +336,19 @@
             "a-change-to-one-rush-project-runs-rush-build-on-it-and-its-dependents-uncached"
           ]
         }
+      },
+      {
+        "id": "init-from-completes-the-gitignore",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-adds-putnami-and-gen-to-the-repository-gitignore-once"
+          ]
+        }
       }
     ]
   }

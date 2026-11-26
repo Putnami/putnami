@@ -912,6 +912,7 @@ func TestNamedExtensionsResolvesAPathEntryByItsManifest(t *testing.T) {
 // own .gitignore, and init --from adds the directories every Putnami run
 // writes to it, once, and says so. A rerun with --apply adds nothing more.
 func TestInitFromCompletesTheRepositorysGitignore(t *testing.T) {
+	spectest.Proves(t, initFromFeature, "init-from-completes-the-gitignore", "init-from-adds-putnami-and-gen-to-the-repository-gitignore-once")
 	dir := nxRepository(t)
 	gitignorePath := filepath.Join(dir, ".gitignore")
 	if err := os.WriteFile(gitignorePath, []byte("node_modules\ndist\n"), 0o644); err != nil {
@@ -952,5 +953,32 @@ func TestInitFromCompletesTheRepositorysGitignore(t *testing.T) {
 		if got := strings.Contains(out, ".gitignore lists .putnami/ and .gen/"); got != says {
 			t.Errorf("rerun %d reports the .gitignore change: %v, want %v\n%s", i+1, got, says, out)
 		}
+	}
+}
+
+// TestInitFromAddsOnlyWhatTheGitignoreDoesNotIgnore: a line that already
+// ignores .putnami under another spelling keeps init --from from adding it
+// again, and every line of the team's file stays as it was.
+func TestInitFromAddsOnlyWhatTheGitignoreDoesNotIgnore(t *testing.T) {
+	spectest.Proves(t, initFromFeature, "init-from-completes-the-gitignore", "init-from-adds-putnami-and-gen-to-the-repository-gitignore-once")
+	dir := nxRepository(t)
+	gitignorePath := filepath.Join(dir, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte("node_modules\n/.putnami\n# build output\ndist"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want := "node_modules\n/.putnami\n# build output\ndist\n\n# Putnami\n.gen/\n"
+
+	stubInitFrom(t, false, "")
+	out, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), "", []string{"--from", "nx", "--mode", "delegate", "--workspace", "shop"}, LifecycleEnv{})
+	})
+	if err != nil {
+		t.Fatalf("WorkspaceInit: %v\n%s", err, out)
+	}
+	if data, _ := os.ReadFile(gitignorePath); string(data) != want {
+		t.Errorf(".gitignore = %q, want %q", data, want)
+	}
+	if !strings.Contains(out, ".gitignore lists .gen/") || strings.Contains(out, "lists .putnami/") {
+		t.Errorf("init does not say it added .gen/ alone:\n%s", out)
 	}
 }
