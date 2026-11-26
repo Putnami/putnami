@@ -171,29 +171,32 @@ A `git:` pattern selects candidates from the cut (`ls-files --cached --others
 the engine reads both itself, and falls back to Git for every state its reader
 does not read. The witness depends on which of the two answered.
 
-**In-process.** The reader returns, with its answer, what it read, and the
-witness is exactly that:
+**In-process.** The reader's cut (`localCut` in `internal/git`) returns, with
+its answer, what it read, and the witness is built from it alone:
 
 - the index stamp (`git.ReadIndexStamp`: whether the index exists, its size,
   its modification time and the checksum Git writes at its end), taken before
   the read and equal after it. It is the same size and checksum by which the
   reader keeps a parsed index, and it moves whenever Git writes the index, a
-  split index's shared file included;
-- each directory the untracked walk entered, by its stat. That is every
-  directory at or below the pattern's prefix that the ignore rules do not
-  exclude, plus every directory the index tracks. An untracked file or
+  split index's shared file included. A gitlink is an index entry, witnessed
+  by the stamp;
+- each directory of `Directories`, by its stat: the directories the untracked
+  walk read, at, below or above the pattern's prefix. An untracked file or
   directory can become a candidate only in such a directory, and creating it
-  moves that directory's stat. An excluded directory is not entered: below
-  it, nothing becomes a candidate while the ignore sources hold, since Git
-  never re-includes a path below an excluded directory;
-- each directory the walk listed without entering, by its stat: an untracked
-  nested repository, listed as its directory. Creating or removing its `.git`
-  moves its stat and would change whether the walk enters it. A gitlink is
-  witnessed by its index entry, which the stamp covers;
-- each ignore source the walk applied, by its stat, absent ones included
-  (witnessed by the stat of the directory that would hold them): every
-  `.gitignore` of an entered directory, `$GIT_DIR/info/exclude`, and the file
-  `core.excludesFile` names, or the XDG default;
+  moves that directory's stat. A directory excluded as a whole is not read:
+  below it, nothing becomes a candidate while the ignore sources hold, since
+  Git never re-includes a path below an excluded directory;
+- each untracked nested repository the answer lists (`Untracked` with
+  `Repository` set), by the stat of its directory: the walk lists it without
+  reading it, and creating or removing its `.git` moves that stat and would
+  change whether the walk reads it;
+- each file of `RuleFiles`, by its stat: `info/exclude` and the global ignore
+  file when they exist, and the `.gitignore` of each directory the walk read.
+  A `.gitignore` a read directory lacks is witnessed by that directory's
+  stat, which its creation moves. An `info/exclude` or a global ignore file
+  that does not exist is witnessed by the stat of the nearest existing
+  directory above its path; which path the global file has is witnessed by
+  the configuration below;
 - the configuration reading of ADR 0112 §4, by the stats of the files it came
   from (`/etc/gitconfig`, the global and XDG files, the repository's `config`
   and `config.worktree`, absent ones included). A reading the reader takes
