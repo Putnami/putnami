@@ -55,7 +55,7 @@ sampled every 5 s through each run (`samples` in `summary.json`).
 | Unchanged | A | 295 MiB (288–300) | 2.3 | 0.58 | 0.36 |
 | Unchanged | B2 | 722 MiB (720–783) | 0.9 | 0.22 | 0.14 |
 
-- **Peak RSS:** the engine's peak RSS is 2.2–2.4× A's, in every scenario.
+- **Peak RSS:** the engine's peak RSS is 2.1–2.4× A's, in every scenario.
   This is expected from GOGC=200, which lets the heap grow to twice the live
   set before collecting.
 - **Cold-run load:** a cold run stays far above 1.5× the cores, at A and at B2.
