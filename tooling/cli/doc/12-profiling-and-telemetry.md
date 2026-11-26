@@ -174,6 +174,19 @@ a long run reuses pids. A process a tool started is in neither. The processes th
 session is settled, such as the git reads of the run report, are left out by
 their trace time.
 
+### Garbage collection
+
+Every `putnami` process, the engine and the ones it starts, collects garbage at
+200 percent (`debug.SetGCPercent`) unless `GOGC` is set, which then decides as
+it does for any Go program; `GOMEMLIMIT` keeps its meaning. Other programs the
+engine starts are not affected, but a `GOGC` a user exports reaches every Go
+program among them. On unchanged runs of `lint,test,build,validate --all` of
+this repository, against Go's default of 100, the engine's CPU fell from 35.8 s
+to 31.3 s and its peak resident memory rose from 474 MB to 742 MB. A machine
+short of memory sets `GOGC=100`, or a `GOMEMLIMIT`. See
+[ADR 0111](adr/0111-the-cli-collects-garbage-at-200-percent.md), which gives
+the commits, the runs and where each number was read.
+
 ## Orchestration Counts
 
 The tests in `tooling/cli/internal/cli/e2e/orchestration` hold the orchestration

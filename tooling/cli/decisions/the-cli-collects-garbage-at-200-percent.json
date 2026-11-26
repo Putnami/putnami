@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "the-cli-collects-garbage-at-200-percent",
+  "statement": "every putnami process collects garbage at 200 percent unless GOGC is set, which then decides; GOMEMLIMIT keeps its meaning",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0111-the-cli-collects-garbage-at-200-percent.md",
+  "reviewOnly": true
+}

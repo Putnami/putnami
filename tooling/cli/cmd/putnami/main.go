@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -39,8 +40,27 @@ func shutdownTimeoutNow() time.Duration {
 // stderr, replaceable by tests.
 var shutdownNotices io.Writer = os.Stderr
 
+// gcPercent is the garbage collector's target for the CLI process: a run of
+// an unchanged workspace keeps a few hundred megabytes of plan, keys and
+// records live, and Go's default of 100 spent a sixth of the engine's CPU
+// collecting them (tooling/cli/doc/12-profiling-and-telemetry.md).
+const gcPercent = 200
+
 func main() {
+	applyGCTarget(os.Getenv)
 	os.Exit(runMain())
+}
+
+// applyGCTarget sets gcPercent unless GOGC is set, which then decides as it
+// always does, and returns the percent the process collects at.
+func applyGCTarget(getenv func(string) string) int {
+	if getenv("GOGC") != "" {
+		percent := debug.SetGCPercent(-1)
+		debug.SetGCPercent(percent)
+		return percent
+	}
+	debug.SetGCPercent(gcPercent)
+	return gcPercent
 }
 
 func runMain() int {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -299,5 +300,30 @@ func TestWaitForShutdown_ForcedExitKillsTheInteractiveChild(t *testing.T) {
 				t.Fatal("exitFn was not called")
 			}
 		})
+	}
+}
+
+// The CLI collects at gcPercent, unless GOGC is set, which then decides: the
+// percent the runtime read from it, off included, is left as it is.
+func TestTheCLICollectsAtItsGCTargetUnlessGOGCIsSet(t *testing.T) {
+	saved := debug.SetGCPercent(100)
+	t.Cleanup(func() { debug.SetGCPercent(saved) })
+	if got := applyGCTarget(func(string) string { return "" }); got != gcPercent {
+		t.Fatalf("without GOGC the CLI collects at %d, want %d", got, gcPercent)
+	}
+	if got := debug.SetGCPercent(100); got != gcPercent {
+		t.Fatalf("the runtime collects at %d, want %d", got, gcPercent)
+	}
+	for _, runtimePercent := range []int{37, -1} {
+		debug.SetGCPercent(runtimePercent)
+		got := applyGCTarget(func(name string) string {
+			if name == "GOGC" {
+				return "off"
+			}
+			return ""
+		})
+		if now := debug.SetGCPercent(runtimePercent); got != runtimePercent || now != runtimePercent {
+			t.Fatalf("with GOGC set the CLI answered %d and the runtime collects at %d, want both left at %d", got, now, runtimePercent)
+		}
 	}
 }
