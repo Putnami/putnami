@@ -3,7 +3,6 @@ package workspace
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -362,7 +361,7 @@ func collectScopeDirs(workspaceRoot string, projectPaths []string) []string {
 }
 
 func readScopeFile(path string) *ScopeConfig {
-	data, err := os.ReadFile(path)
+	data, err := readConfigFile(path)
 	if err != nil {
 		return nil
 	}

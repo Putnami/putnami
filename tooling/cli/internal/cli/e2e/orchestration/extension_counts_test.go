@@ -460,9 +460,13 @@ func sorted(keys []string) []string {
 
 // unchangedRunReadsNoSource holds that a run of the unchanged workspace reads
 // no source file: every digest of one, the basis digests of the go-embed
-// answers it reads from its records included, is answered from the file
-// index. The files the runs before wrote are recorded once they are older than
-// the index's margin. What it reads is a build stamp each run writes again.
+// answers it reads from its records included, the sources of the extension
+// runtime digest and the configuration files the run parses are answered from
+// the file index. The files the runs before wrote are recorded once they are
+// older than the index's margin. What it reads is a build stamp each run
+// writes again. The extension sources lie in this tree, outside the fixture:
+// on another filesystem than the fixture's index, the index never trusts
+// them, and they are read again.
 func unchangedRunReadsNoSource(t *testing.T, root string, command []string) {
 	t.Helper()
 	time.Sleep(fileindex.Margin + 100*time.Millisecond)
@@ -477,9 +481,17 @@ func unchangedRunReadsNoSource(t *testing.T, root string, command []string) {
 	})
 	clitest.RunCounts(t, root, command...)
 	restore()
+	rootStat, _ := fileindex.Lstat(filepath.Join(root, "putnami.workspace.json"))
 	for _, path := range read {
 		rel, err := filepath.Rel(root, path)
-		if err != nil || strings.HasPrefix(rel, "..") || !strings.Contains(filepath.ToSlash(rel), ".gen/") {
+		if outside := err != nil || strings.HasPrefix(rel, ".."); outside {
+			if st, ok := fileindex.Lstat(path); ok && st.Dev != rootStat.Dev {
+				continue
+			}
+			t.Errorf("a run of the unchanged workspace read %s, want no file but the build stamps it writes again\n%s", path, countsHint)
+			continue
+		}
+		if !strings.Contains(filepath.ToSlash(rel), ".gen/") {
 			t.Errorf("a run of the unchanged workspace read %s, want no file but the build stamps it writes again\n%s", path, countsHint)
 		}
 	}

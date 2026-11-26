@@ -107,6 +107,7 @@ func TestMaterializeTaskOutput_StagingRootKeepsTheParentClean(t *testing.T) {
 }
 
 func testStagingRootKeepsTheParentClean(t *testing.T) {
+	alwaysSwap(t)
 	const restores = 200
 
 	s := NewLocalStore(t.TempDir())
@@ -186,6 +187,7 @@ func testStagingRootKeepsTheParentClean(t *testing.T) {
 // sits in the destination's parent when the swap starts, so the check does see
 // a staging path when there is one.
 func TestMaterializeTaskOutput_BesideDestinationStagingIsVisible(t *testing.T) {
+	alwaysSwap(t)
 	s := NewLocalStore(t.TempDir())
 	entry := ingestDirAndFile(t, s, "beside-control-key")
 	dest := filepath.Join(t.TempDir(), "dist")

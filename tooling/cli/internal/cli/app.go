@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/launch"
@@ -196,6 +197,17 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return ExitUsage
 	}
 	launchedFromPin := launch.ConsumeLaunched()
+
+	// The configuration this process loads before a run (the workspace
+	// configuration, and the projects that extension discovery names) is read
+	// through the workspace's file index, read-only: this process does not yet
+	// know whether its run may write. A file it reads rather than answers is
+	// recorded by the index of a run that records (engine, fileindex.Adopt).
+	if wsRoot != "" {
+		restoreIndex := fileindex.Use(fileindex.OpenReadOnly(fileindex.Path(wsRoot), fileindex.ExecutableIdentity()))
+		defer restoreIndex()
+		defer wsproto.UseConfigReader(fileindex.ReadFile)()
+	}
 
 	cfg := wsproto.Load(wsRoot)
 

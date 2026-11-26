@@ -2,12 +2,14 @@ package cachekey
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"hash"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -20,12 +22,15 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey/framing"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-const extensionRuntimeDigestVersion = "putnami-extension-runtime-v1"
+// extensionRuntimeDigestVersion names the digest's layout. v2 folds each
+// file's SHA-256 where v1 folded its bytes, so the file index answers it.
+const extensionRuntimeDigestVersion = "putnami-extension-runtime-v2"
 
 func isLocalDevExtensionSource(ws *workspace.Workspace, job *jobmodel.ScheduledJob) bool {
 	if ws == nil || ws.Root == "" || job == nil || job.Extension == nil || !job.Extension.LocalSource {
@@ -89,17 +94,11 @@ func ExtensionRuntimeDigestWithToolchains(ext *extension.ExtensionDescription, t
 			return "", fmt.Errorf("stat runtime input %s: %w", rel, err)
 		}
 		framing.HashField(h, "input/"+rel+"/mode", []byte(fmt.Sprintf("%o", info.Mode()&(os.ModeType|0o111))))
-		file, err := os.Open(full)
+		digest, err := runtimeFileDigest(full)
 		if err != nil {
-			return "", fmt.Errorf("open runtime input %s: %w", rel, err)
-		}
-		if err := framing.HashStream(h, "input/"+rel, info.Size(), file); err != nil {
-			_ = file.Close()
 			return "", fmt.Errorf("hash runtime input %s: %w", rel, err)
 		}
-		if err := file.Close(); err != nil {
-			return "", fmt.Errorf("close runtime input %s: %w", rel, err)
-		}
+		framing.HashField(h, "input/"+rel, digest)
 	}
 	replacements, err := RuntimeReplacementClosure(root)
 	if err != nil {
@@ -455,34 +454,49 @@ func hashRuntimeReplacementTree(h hash.Hash, label, root string) error {
 			// mode-only field into a digest whose staging would refuse the tree.
 			return fmt.Errorf("module replacement input %q is not a regular file", rel)
 		}
-		file, err := os.Open(full)
+		digest, err := runtimeFileDigest(full)
 		if err != nil {
-			return err
-		}
-		if err := framing.HashStream(h, label+"/"+rel, info.Size(), file); err != nil {
-			_ = file.Close()
 			return fmt.Errorf("hash runtime replacement %s/%s: %w", label, rel, err)
 		}
-		if err := file.Close(); err != nil {
-			return err
-		}
+		framing.HashField(h, label+"/"+rel, digest)
 	}
 	return nil
+}
+
+// runtimeFileDigest is the raw SHA-256 of the file at full, read through the
+// machine-local file index (internal/fileindex): a file whose stat is the one
+// recorded with its digest is not read again (protocols/workspace ADR 0009).
+// The runtime digest folds this per-file digest rather than the bytes, so an
+// unchanged run answers it with one stat per file.
+func runtimeFileDigest(full string) ([]byte, error) {
+	return fileindex.Digest(full, fileindex.RawContent, func() ([]byte, error) {
+		file, err := os.Open(full) //nolint:gosec // a runtime input the walk enumerated under the extension root
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close() //nolint:errcheck // read-only handle
+		sum := sha256.New()
+		if _, err := io.Copy(sum, file); err != nil {
+			return nil, err
+		}
+		return sum.Sum(nil), nil
+	})
 }
 
 // localDirectivePaths extracts local filesystem operands from simple Go
 // replace directives without invoking the toolchain. Comments and both
 // block/single-line forms are supported.
 func localDirectivePaths(filename, directive string) ([]string, error) {
-	file, err := os.Open(filename)
+	// The module file is read through the file index: an unchanged run
+	// answers its bytes without reading it.
+	data, err := fileindex.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
 
 	var paths []string
 	inBlock := false
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		line := strings.TrimSpace(strings.SplitN(scanner.Text(), "//", 2)[0])
 		if line == "" {

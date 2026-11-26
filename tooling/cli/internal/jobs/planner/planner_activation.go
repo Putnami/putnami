@@ -2,11 +2,11 @@ package planner
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"sort"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -170,10 +170,11 @@ func fileContains(projRoot, relPath, substr string, cache *planCache) bool {
 	return fileContainsUncached(full, substr)
 }
 
-// fileContainsUncached reads the file and reports substring membership. A read
-// error (missing/unreadable file) reports false so activation fails closed.
+// fileContainsUncached reads the file, through the file index, and reports
+// substring membership. A read error (missing/unreadable file) reports false
+// so activation fails closed.
 func fileContainsUncached(path, substr string) bool {
-	data, err := os.ReadFile(path)
+	data, err := fileindex.ReadFile(path)
 	if err != nil {
 		return false
 	}

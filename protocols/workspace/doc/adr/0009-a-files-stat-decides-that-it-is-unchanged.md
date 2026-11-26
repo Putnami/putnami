@@ -5,6 +5,8 @@
 - **Scope**: `go.putnami.dev/protocol/workspace` (`protocols/workspace`): amends
   ADR 0001 §4; `@putnami/cli`: the workspace snapshot
   (`.putnami/workspace-index.json`) and the input hashes of cache keys
+- **Amended**: 2026-11-25, decision 7: the index keeps the bytes of the
+  configuration files a run parses
 
 ## Context
 
@@ -124,6 +126,38 @@ process clock and write nothing: no directory, no clock file, no entry.
 The digest stays canonical and content decides validity. A content digest the
 CLI compares may be answered from this machine's file index under the rule
 above. The protocol still carries no timestamps and no file sizes.
+
+### 7. The bytes of a configuration file are kept under the same rule
+
+Measured on 2026-11-25 on the same container, `strace -f` on the engine
+process of an unchanged `lint,test,build,validate --all --enforce-coverage`
+run once the digests above answered: the engine opened `putnami.json` and
+scope files about 880 times, every run, to parse them again;
+`protocols/putnami.json` alone 98 times in a run of one project. A digest does
+not help a parser, which needs the bytes.
+
+The index therefore holds a second kind of entry: a file, a reading, its stat,
+and the file's bytes with their SHA-256. A file whose stat equals the recorded
+stat answers its recorded bytes without being read. Every rule above applies
+unchanged: the margin, the stat before and after the read, what is never
+trusted, the program identity and the checksum. Such an entry is also
+recorded only for a file of at most 64 KiB whose size is the length read,
+and an entry whose bytes do not have its SHA-256 or its stat's size loads
+the whole index as damaged. The configuration loaders of this module read
+through a reader their caller sets (`UseConfigReader`); with none, they read
+every file; the CLI's planner reads a file an activation gate searches the
+same way. A content entry and a digest entry of one file are two readings
+and never answer for each other. A process reads its configuration before it
+knows whether its run may write, through the index opened read-only; the
+index of a run that records reads the files it read again, under its own
+clock, to record them.
+
+Rejected: keeping the decoded configuration rather than its bytes. A decoded
+value written back loses what its decoding keeps of the authored file (an
+empty list against an absent one, a raw member), so a configuration could
+load otherwise from the record than from the file. Decoding kept bytes is
+the same decoding; it costs well under a millisecond for this workspace's
+files.
 
 ## Rejected alternatives
 

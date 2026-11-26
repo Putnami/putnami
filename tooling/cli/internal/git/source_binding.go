@@ -9,6 +9,7 @@ import (
 	protocaps "go.putnami.dev/protocol/capabilities"
 	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/sourcebinding"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
 
 // hostStatsExecBit reports whether the host filesystem stores the executable
@@ -117,7 +118,7 @@ func (snapshot *SourceBindingSnapshot) ProjectSourceBindingMeasured(projectRoot 
 		if entry.stage != "0" {
 			return "", metrics, fmt.Errorf("enumerate tracked project source: unmerged index stage %s for %q", entry.stage, entry.path)
 		}
-		record, exists, recordErr := sourcebinding.Record(runMeasured, snapshot.repoRoot, projectRoot, entry.path, entry.mode, entry.objectID, hostStatsExecBit)
+		record, exists, recordErr := sourcebinding.RecordThrough(indexedSourceDigest, runMeasured, snapshot.repoRoot, projectRoot, entry.path, entry.mode, entry.objectID, hostStatsExecBit)
 		if recordErr != nil {
 			return "", metrics, recordErr
 		}
@@ -130,7 +131,7 @@ func (snapshot *SourceBindingSnapshot) ProjectSourceBindingMeasured(projectRoot 
 		if !contains(repoPath) {
 			continue
 		}
-		record, exists, recordErr := sourcebinding.Record(runMeasured, snapshot.repoRoot, projectRoot, repoPath, "", "", hostStatsExecBit)
+		record, exists, recordErr := sourcebinding.RecordThrough(indexedSourceDigest, runMeasured, snapshot.repoRoot, projectRoot, repoPath, "", "", hostStatsExecBit)
 		if recordErr != nil {
 			return "", metrics, recordErr
 		}
@@ -170,4 +171,12 @@ func sourceBindingRoots(repoRoot, projectRoot string) (string, string, error) {
 // rule, so a caller that may not import the protocol package reads it here.
 func SourceBindingExcludes(path string) bool {
 	return protocaps.SourceBindingExcludes(path)
+}
+
+// indexedSourceDigest answers a source file's raw SHA-256 through the
+// machine-local file index (internal/fileindex), under protocols/workspace ADR
+// 0009: a file whose stat is the one recorded with its digest is not read
+// again. The record is the one a read would produce.
+func indexedSourceDigest(absPath string, read func() ([]byte, error)) ([]byte, error) {
+	return fileindex.Digest(absPath, fileindex.RawContent, read)
 }

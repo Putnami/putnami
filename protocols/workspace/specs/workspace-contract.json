@@ -192,6 +192,13 @@
       ]
     },
     {
+      "id": "a-caller-may-answer-the-configuration-bytes",
+      "text": [
+        "UseConfigReader makes the loaders of the workspace configuration, of a scope file and of a project configuration take each file's bytes from a reader the caller sets, which may answer bytes it recorded for the same unchanged file instead of reading it.",
+        "With no reader set, or once the returned function restores the previous one, every file is read; a configuration loads the same whichever reader answered its bytes."
+      ]
+    },
+    {
       "id": "the-schemas-and-the-go-types-agree",
       "text": [
         "Each published JSON Schema is held against its Go type by a drift test, so a field that reaches only one of them fails the suite.",

@@ -12,6 +12,8 @@
 package sourcebinding
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -46,6 +48,19 @@ type RunGit func(dir string, args ...string) (string, error)
 // that is deleted before Record reads it, even after Record stats it. runGit
 // reads a gitlink's visible commit.
 func Record(runGit RunGit, repoRoot, projectRoot, repoPath, indexMode, objectID string, statsExecBit bool) (protocaps.SourceBindingFile, bool, error) {
+	return RecordThrough(nil, runGit, repoRoot, projectRoot, repoPath, indexMode, objectID, statsExecBit)
+}
+
+// DigestFile answers the raw SHA-256 of the regular file at absPath. read
+// reads the file and returns that digest; an implementation either calls it
+// or answers a digest it recorded for the same content, such as one a file
+// index keeps by the file's stat. An error read returns is returned as is.
+type DigestFile func(absPath string, read func() ([]byte, error)) ([]byte, error)
+
+// RecordThrough is Record where a regular file's digest is answered by
+// digest; a nil digest reads the file. The record is the same either way: a
+// DigestFile answers the digest of the bytes read would read.
+func RecordThrough(digest DigestFile, runGit RunGit, repoRoot, projectRoot, repoPath, indexMode, objectID string, statsExecBit bool) (protocaps.SourceBindingFile, bool, error) {
 	absPath := filepath.Join(repoRoot, filepath.FromSlash(repoPath))
 	projectRel, err := filepath.Rel(projectRoot, absPath)
 	if err != nil || projectRel == ".." || strings.HasPrefix(projectRel, ".."+string(filepath.Separator)) {
@@ -105,15 +120,31 @@ func Record(runGit RunGit, repoRoot, projectRoot, repoPath, indexMode, objectID 
 	if !info.Mode().IsRegular() {
 		return protocaps.SourceBindingFile{}, false, fmt.Errorf("source path %q has unsupported mode %s", repoPath, info.Mode())
 	}
-	data, err := readFile(absPath)
+	read := func() ([]byte, error) {
+		data, err := readFile(absPath)
+		if err != nil {
+			return nil, err
+		}
+		sum := sha256.Sum256(data)
+		return sum[:], nil
+	}
+	var sum []byte
+	if digest == nil {
+		sum, err = read()
+	} else {
+		sum, err = digest(absPath, read)
+	}
 	if os.IsNotExist(err) {
 		return protocaps.SourceBindingFile{}, false, nil
 	}
 	if err != nil {
 		return protocaps.SourceBindingFile{}, false, fmt.Errorf("read source path %q: %w", repoPath, err)
 	}
+	if len(sum) != sha256.Size {
+		return protocaps.SourceBindingFile{}, false, fmt.Errorf("digest source path %q: %d bytes, want %d", repoPath, len(sum), sha256.Size)
+	}
 	mode := FileMode(info.Mode(), indexMode, statsExecBit)
-	return protocaps.SourceBindingFile{Path: path, Mode: mode, Digest: protocaps.SourceDigest(data)}, true, nil
+	return protocaps.SourceBindingFile{Path: path, Mode: mode, Digest: "sha256:" + hex.EncodeToString(sum)}, true, nil
 }
 
 // FileMode is the source-v1 mode of a regular file. When the host stats the

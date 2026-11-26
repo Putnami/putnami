@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"sort"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -370,7 +369,7 @@ func LoadProjectConfig(projectDir string) *ProjectConfig {
 // to the manifest deadline.
 func LoadProjectConfigWithDiagnostics(projectDir string) (*ProjectConfig, []diag.Diagnostic) {
 	path := ResolveFile(projectDir, ConfigFilename)
-	data, err := os.ReadFile(path)
+	data, err := readConfigFile(path)
 	if err != nil {
 		return nil, nil
 	}

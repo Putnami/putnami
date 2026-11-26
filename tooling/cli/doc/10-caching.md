@@ -273,7 +273,13 @@ filesystem whose times are more than two seconds older than the filesystem clock
 read before the run read any file, so a rewrite in the same timestamp tick is
 read. An index written by another CLI executable, or damaged, is empty. A
 generate asset (`ExtraFiles`) is streamed into its key and does not go through
-the index. [ADR 0009](../../../protocols/workspace/doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md)
+the index. The index also keeps the bytes of each configuration file a run
+parses (`putnami.workspace.json`, the scope and project `putnami.json`) and of
+each file an activation gate searches, at most 64 KiB each, under the same
+rule, so an unchanged run opens none of them. The CLI reads them through the
+index read-only before it knows whether its run may write, and a run that
+records reads those again to record them.
+[ADR 0009](../../../protocols/workspace/doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md)
 states the rule.
 
 When no patterns are specified, all non-hidden, non-ignored files in the project are hashed (excluding `node_modules/`, `.putnami/`, `out/`, and dotfiles).
@@ -559,7 +565,7 @@ producer starts.
 1. Compute the cache key hash.
 2. Check if the task-owned entry exists under `blobs/`, at the address the key and the entry format give (see [Task-owned entries](#task-owned-entries-declared-outputs)).
 3. Read `result.json` to restore the job result (status, data, error, and compact summary events).
-4. Materialize each declared output from the entry's `files/` to its real location.
+4. Materialize each declared output from the entry's `files/` to its real location. A destination that already holds the output (the same files, bytes, permission bits and directories, outside the subtrees it cedes) is left untouched: its bytes are compared with the manifest's digests through the file index, so an unchanged run neither reads the entry's files nor rewrites the output, and the output keeps the stat the index recorded ([ADR 0108](adr/0108-a-cache-hit-reads-its-entry-and-writes-only-what-differs.md)).
 5. Skip subprocess execution.
 
 The skipped task process does not make the hit free: the CLI still computes
@@ -2165,6 +2171,8 @@ A local prepared-runtime key covers the extension identity and version, the
 complete runtime declaration and ordered input patterns, matched file bytes and
 executable modes, the transitive trees of local Go module replacements, the
 host OS/architecture, and the runtime ABI. Inputs are sorted before hashing.
+Each file contributes its SHA-256, read through the file index, so an
+unchanged run takes one stat per runtime source and reads none.
 A replacement tree is enumerated once and consumed by both the digest and the
 staged source view, so the two can never disagree about what a replaced module
 may contain. That enumeration excludes VCS/orchestrator state (`.git`,

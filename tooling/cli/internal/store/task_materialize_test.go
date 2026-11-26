@@ -767,6 +767,7 @@ func TestMaterializeTaskOutput_ReadersNeverSeeACededGap(t *testing.T) {
 }
 
 func testReadersNeverSeeACededGap(t *testing.T, lookUpOwned bool) {
+	alwaysSwap(t)
 	const restores = 300
 
 	s := NewLocalStore(t.TempDir())
@@ -848,4 +849,13 @@ func testReadersNeverSeeACededGap(t *testing.T, lookUpOwned bool) {
 	}
 	assertSameInodes(t, ceded, untouched)
 	t.Logf("%d restores; reader passes %v", restores, passes)
+}
+
+// alwaysSwap makes every restore of the test swap, also over a destination
+// that already holds the restored output, so the test exercises the swap.
+func alwaysSwap(t *testing.T) {
+	t.Helper()
+	saved := keepHeldDestinations
+	keepHeldDestinations = false
+	t.Cleanup(func() { keepHeldDestinations = saved })
 }

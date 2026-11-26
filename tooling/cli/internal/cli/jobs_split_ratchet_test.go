@@ -86,6 +86,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/sdk/extension/releaseset",
 			"go.putnami.dev/tooling/cli/internal/artifactstore",
 			"go.putnami.dev/tooling/cli/internal/extension",
+			"go.putnami.dev/tooling/cli/internal/fileindex",
 			"go.putnami.dev/tooling/cli/internal/git",
 			"go.putnami.dev/tooling/cli/internal/jobs/cachekey/framing",
 			"go.putnami.dev/tooling/cli/internal/jobs/machineprobe",
@@ -107,7 +108,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"them through the workspace, extension and store models, and never imports the scheduler " +
 			"or the runner. It also converts a task's result to and from its cache entry, whose events " +
 			"name protocol features, and reads the tree facts a key holds in the shapes the job " +
-			"protocol hands them to the job",
+			"protocol hands them to the job. It reads a file's digest through the machine-local file index",
 	},
 	{
 		dir: "internal/jobs/planner",
@@ -116,6 +117,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/job",
 			"go.putnami.dev/protocol/workspace",
 			"go.putnami.dev/tooling/cli/internal/extension",
+			"go.putnami.dev/tooling/cli/internal/fileindex",
 			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
 			"go.putnami.dev/tooling/cli/internal/jobs/toolchain",
 			"go.putnami.dev/tooling/cli/internal/workspace",
@@ -133,7 +135,8 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"package (a plan stamps the identities and shared-execution digests the keys fold in, " +
 			"and reads the runtime toolchain identity). It never imports the scheduler or the " +
 			"runner: the scheduler reads the plan and the plan-time halves of the DAG state and the " +
-			"invocation relation, and the engine is the only package that calls Plan. Its tests " +
+			"invocation relation, and the engine is the only package that calls Plan. An activation " +
+			"gate reads a file through the machine-local file index. Its tests " +
 			"read the committed first-party manifests through the protocol packages and write " +
 			"fixture workspaces and a store root",
 	},

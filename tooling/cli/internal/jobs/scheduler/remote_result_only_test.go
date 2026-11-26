@@ -412,6 +412,12 @@ func TestAFailedFullRestoreNeverFallsBackToTheResultOnlyEntry(t *testing.T) {
 	if err := os.Remove(filepath.Join(entry.FilesDir, "lock")); err != nil {
 		t.Fatalf("break the full entry: %v", err)
 	}
+	// A destination that already holds its output is left as it is, without
+	// reading the entry: the restored lock file must differ for the restore
+	// to read the broken payload.
+	if err := os.WriteFile(filepath.Join(consumer.ws.Root, "bun.lock"), []byte("edited\n"), 0o644); err != nil {
+		t.Fatalf("edit the restored lock file: %v", err)
+	}
 
 	resultOnlyRestores := func() int {
 		count := 0

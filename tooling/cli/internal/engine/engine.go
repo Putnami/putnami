@@ -740,7 +740,8 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	phaseStarted := time.Now()
 	// The workspace snapshot and the input hashes read a file's digest through
 	// the workspace's file index (internal/fileindex): a file whose stat it
-	// recorded is not read again. What the run recorded is saved at its end. A
+	// recorded is not read again. The configuration loaders take a file's
+	// bytes from it the same way. What the run recorded is saved at its end. A
 	// run that only plans (`--plan`, a preview-only `--dry-run`) reads the
 	// index and writes nothing.
 	if req.WorkspaceRoot != "" {
@@ -749,8 +750,13 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 			open = fileindex.OpenReadOnly
 		}
 		index := open(fileindex.Path(req.WorkspaceRoot), fileindex.ExecutableIdentity())
+		// The configuration this process read before the run, through the
+		// read-only index the CLI opens at its start, is recorded by the run's.
+		index.Adopt(fileindex.Current())
 		restoreIndex := fileindex.Use(index)
+		restoreConfigReader := wsproto.UseConfigReader(fileindex.ReadFile)
 		defer func() {
+			restoreConfigReader()
 			restoreIndex()
 			if req.Global.Debug {
 				iox.Fprintf(os.Stderr, "[debug] file index: %d digests answered, %d files read\n", index.Hits(), index.Reads())

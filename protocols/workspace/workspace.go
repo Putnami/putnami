@@ -380,7 +380,7 @@ func mergeStoreConfig(target, source *StoreConfig) *StoreConfig {
 }
 
 func readWorkspaceConfigFile(path string) *Config {
-	data, err := os.ReadFile(path)
+	data, err := readConfigFile(path)
 	if err != nil {
 		return nil
 	}

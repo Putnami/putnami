@@ -92,6 +92,9 @@ type key struct{ path, variant string }
 type entry struct {
 	stat   Stat
 	digest [DigestSize]byte
+	// content is the file's bytes for an entry Content recorded, whose
+	// digest is their SHA-256; nil for an entry Digest recorded.
+	content []byte
 	// seen is the generation of the last saving run that recorded or
 	// confirmed the entry. It decides nothing about the file.
 	seen uint64
@@ -111,6 +114,9 @@ type Index struct {
 	confirmed  map[key]bool // loaded entries this process found current
 	generation uint64       // the generation of the loaded file
 	stale      map[key]Stat // loaded entries this process found out of date
+	// unrecorded holds the content readings a read-only index read rather
+	// than answered, for an index that records to read them again (Adopt).
+	unrecorded map[key]bool
 
 	hits, reads atomic.Int64
 }
@@ -127,8 +133,9 @@ func ContentReads() int64 { return contentReads.Load() }
 var readObserver atomic.Pointer[func(path, variant string)]
 
 // ObserveReads makes observe be told the path and the reading of each file
-// whose content an index read rather than answered, and returns a function
-// that removes it. A test names what a run read with it.
+// whose content an index read rather than answered, a missing file excepted,
+// and returns a function that removes it. A test names what a run read with
+// it.
 func ObserveReads(observe func(path, variant string)) (restore func()) {
 	readObserver.Store(&observe)
 	return func() { readObserver.Store(nil) }
@@ -204,12 +211,13 @@ func OpenReadOnly(path, identity string) *Index {
 
 func newIndex(path, identity string) *Index {
 	return &Index{
-		file:      path,
-		identity:  identity,
-		loaded:    map[key]entry{},
-		fresh:     map[key]entry{},
-		confirmed: map[key]bool{},
-		stale:     map[key]Stat{},
+		file:       path,
+		identity:   identity,
+		loaded:     map[key]entry{},
+		fresh:      map[key]entry{},
+		confirmed:  map[key]bool{},
+		stale:      map[key]Stat{},
+		unrecorded: map[key]bool{},
 	}
 }
 
@@ -422,9 +430,148 @@ func Digest(path, variant string, compute func() ([]byte, error)) ([]byte, error
 
 // Digest is the package Digest through idx. A nil idx reads every file.
 func (idx *Index) Digest(path, variant string, compute func() ([]byte, error)) ([]byte, error) {
+	if strings.HasPrefix(variant, contentVariant) {
+		// The variants of content entries are Content's own: a digest under
+		// one would answer for a file's bytes.
+		return read(idx, compute)
+	}
+	var computed []byte
+	e, err := idx.answer(path, variant, func() ([]byte, error) {
+		var err error
+		computed, err = compute()
+		return computed, err
+	}, func(before Stat, digest []byte) (entry, bool) {
+		var e entry
+		if len(digest) != DigestSize {
+			return e, false
+		}
+		e.stat = before
+		copy(e.digest[:], digest)
+		return e, true
+	})
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return computed, nil
+	}
+	return append([]byte(nil), e.digest[:]...), nil
+}
+
+// MaxContent is the largest file Content records: a larger file is read by
+// every run.
+const MaxContent = 64 << 10
+
+// contentVariant prefixes the variant of an entry Content records, so a
+// digest entry and a content entry of one file never answer for each other.
+const contentVariant = "content/"
+
+// Content returns the bytes read returns for the file at path, through the
+// current index: the recorded bytes when the file's stat equals the stat
+// recorded with them under variant, otherwise read's answer. It is the
+// reading of a small file a caller parses on every run, such as a
+// configuration file. read must return the file's bytes as they are; an
+// error is returned as is and records nothing. Only a file of at most
+// MaxContent bytes whose size equals the length read returned is recorded.
+// The caller owns the returned slice.
+func Content(path, variant string, read func() ([]byte, error)) ([]byte, error) {
+	return current.Load().Content(path, variant, read)
+}
+
+// Content is the package Content through idx. A nil idx reads every file.
+func (idx *Index) Content(path, variant string, read func() ([]byte, error)) ([]byte, error) {
+	var data []byte
+	var wasRead bool
+	e, err := idx.answer(path, contentVariant+variant, func() ([]byte, error) {
+		var err error
+		wasRead = true
+		data, err = read()
+		return data, err
+	}, func(before Stat, content []byte) (entry, bool) {
+		var e entry
+		if len(content) > MaxContent || int64(len(content)) != before.Size {
+			return e, false
+		}
+		e.stat = before
+		e.digest = sha256.Sum256(content)
+		e.content = append([]byte{}, content...)
+		return e, true
+	})
+	if err != nil {
+		return nil, err
+	}
+	if wasRead && variant == BytesVariant && idx.enabled() && idx.readOnly && filepath.IsAbs(path) && len(data) <= MaxContent {
+		// Adopt reads the file again as it is, which is this reading only.
+		// A file no run can record (not a regular file, too large, on
+		// another filesystem) is not read again for nothing.
+		if st, ok := lstat(path); ok && st.Dev == idx.dev {
+			idx.mu.Lock()
+			idx.unrecorded[key{path: path, variant: variant}] = true
+			idx.mu.Unlock()
+		}
+	}
+	if e == nil {
+		return data, nil
+	}
+	return append([]byte{}, e.content...), nil
+}
+
+// BytesVariant names the reading of a file whose bytes the index keeps: the
+// file as it is.
+const BytesVariant = "bytes"
+
+// ReadFile reads the file at path through the current index, as os.ReadFile
+// does: a file of at most MaxContent bytes whose stat is the one recorded with
+// its bytes is not read again. The workspace configuration loaders take a
+// file's bytes from it (wsproto.UseConfigReader).
+func ReadFile(path string) ([]byte, error) {
+	return Content(path, BytesVariant, func() ([]byte, error) {
+		return os.ReadFile(path) //nolint:gosec // a file of the workspace a caller names
+	})
+}
+
+// Adopt reads again through idx each file whose bytes (BytesVariant) the
+// read-only index from read rather than answered, so that idx records it under its own clock
+// and rule. A process reads its configuration through a read-only index before
+// it knows whether its run may write; the index of a run that records adopts
+// those reads, and the next run answers them. It does nothing when idx records
+// nothing.
+func (idx *Index) Adopt(from *Index) {
+	if !idx.enabled() || idx.readOnly || from == nil || from == idx {
+		return
+	}
+	from.mu.Lock()
+	pending := make([]key, 0, len(from.unrecorded))
+	for k := range from.unrecorded {
+		pending = append(pending, k)
+	}
+	from.unrecorded = map[key]bool{}
+	from.mu.Unlock()
+	for _, k := range pending {
+		path := k.path
+		_, _ = idx.Content(path, k.variant, func() ([]byte, error) {
+			return os.ReadFile(path) //nolint:gosec // a file the process read through the index before
+		})
+	}
+}
+
+// answer returns the entry recorded for path under variant when the file's
+// stat equals the recorded one. Otherwise it calls compute, records the entry
+// record builds from its answer when the file may be recorded, and returns
+// that entry, or nil when compute's answer is not recorded and the caller
+// keeps it as is.
+func (idx *Index) answer(path, variant string, compute func() ([]byte, error), record func(Stat, []byte) (entry, bool)) (*entry, error) {
 	if !idx.enabled() || !filepath.IsAbs(path) {
 		// A relative path names another file in another working directory.
-		return read(idx, compute)
+		value, err := read(idx, compute)
+		if err != nil {
+			return nil, err
+		}
+		e, ok := record(Stat{}, value)
+		if !ok {
+			return nil, nil
+		}
+		return &e, nil
 	}
 	k := key{path: path, variant: variant}
 	before, ok := lstat(path)
@@ -440,7 +587,7 @@ func (idx *Index) Digest(path, variant string, compute func() ([]byte, error)) (
 			}
 			idx.mu.Unlock()
 			idx.hits.Add(1)
-			return append([]byte(nil), recorded.digest[:]...), nil
+			return &recorded, nil
 		}
 		if loaded, isLoaded := idx.loaded[k]; isLoaded && loaded.stat != before {
 			idx.stale[k] = loaded.stat
@@ -455,25 +602,42 @@ func (idx *Index) Digest(path, variant string, compute func() ([]byte, error)) (
 		delete(idx.fresh, k)
 		idx.mu.Unlock()
 	}
+	if !ok && missing(path) {
+		// A missing file has no content to read: a loader that looks for an
+		// optional file is told so by every run, and that is no read.
+		value, err := compute()
+		if err != nil {
+			return nil, err
+		}
+		e, recordable := record(before, value)
+		if !recordable {
+			return nil, nil
+		}
+		return &e, nil
+	}
 	if observe := readObserver.Load(); observe != nil {
 		(*observe)(path, variant)
 	}
-	digest, err := read(idx, compute)
-	if err != nil || !ok || len(digest) != DigestSize || !idx.recordable(before) {
-		return digest, err
+	value, err := read(idx, compute)
+	if err != nil {
+		return nil, err
 	}
-	// A file that changed while it was read has two stats; its digest answers
-	// for neither.
+	e, recordable := record(before, value)
+	if !recordable {
+		return nil, nil
+	}
+	if !ok || !idx.recordable(before) {
+		return &e, nil
+	}
+	// A file that changed while it was read has two stats; what was read
+	// answers for neither.
 	if after, stillOK := lstat(path); !stillOK || after != before {
-		return digest, nil
+		return &e, nil
 	}
-	var e entry
-	e.stat = before
-	copy(e.digest[:], digest)
 	idx.mu.Lock()
 	idx.fresh[k] = e
 	idx.mu.Unlock()
-	return digest, nil
+	return &e, nil
 }
 
 func read(idx *Index, compute func() ([]byte, error)) ([]byte, error) {
@@ -623,6 +787,12 @@ func readClock(dir string) (uint64, int64, error) {
 // stat this package does not decode.
 func Lstat(path string) (Stat, bool) { return lstat(path) }
 
+// missing reports whether nothing exists at path.
+func missing(path string) bool {
+	_, err := os.Lstat(path)
+	return errors.Is(err, os.ErrNotExist)
+}
+
 // lstat returns the stat of the regular file at path; ok is false for any
 // other kind of file, a missing one, or an undecoded stat.
 func lstat(path string) (Stat, bool) {
@@ -660,12 +830,14 @@ func writeAtomic(target string, data []byte) error {
 // The file: magic, format version, the identity of the program that wrote it,
 // the stamp (the newest clock of a run that wrote it), the generation (the
 // number of saving runs), the entry count, the entries, and the SHA-256 of
-// everything before it.
+// everything before it. An entry is its path and variant, its stat, its
+// digest, its generation and its content: the bytes of a file Content
+// recorded, empty for an entry Digest recorded.
 var magic = []byte("PNFI")
 
-const formatVersion uint32 = 3
+const formatVersion uint32 = 4
 
-const entryFixed = 8 + 8 + 4 + 4 + 4 + 8 + 8 + 8 + DigestSize + 8
+const entryFixed = 8 + 8 + 4 + 4 + 4 + 8 + 8 + 8 + DigestSize + 8 + 4
 
 var errCorrupt = errors.New("fileindex: damaged index")
 
@@ -694,6 +866,8 @@ func encode(f file) []byte {
 		_ = binary.Write(&buf, binary.LittleEndian, e.stat)
 		buf.Write(e.digest[:])
 		_ = binary.Write(&buf, binary.LittleEndian, e.seen)
+		_ = binary.Write(&buf, binary.LittleEndian, uint32(len(e.content)))
+		buf.Write(e.content)
 	}
 	sum := sha256.Sum256(buf.Bytes())
 	buf.Write(sum[:])
@@ -760,6 +934,20 @@ func decode(data []byte) (file, error) {
 			return f, errCorrupt
 		}
 		if binary.Read(r, binary.LittleEndian, &e.seen) != nil {
+			return f, errCorrupt
+		}
+		content, ok := readString()
+		if !ok || len(content) > MaxContent {
+			return f, errCorrupt
+		}
+		if strings.HasPrefix(variant, contentVariant) {
+			// A content entry answers its bytes: they must be the ones its
+			// digest and its stat's size were recorded for.
+			if int64(len(content)) != e.stat.Size || sha256.Sum256([]byte(content)) != e.digest {
+				return f, errCorrupt
+			}
+			e.content = []byte(content)
+		} else if content != "" {
 			return f, errCorrupt
 		}
 		f.entries[key{path: path, variant: variant}] = e

@@ -332,6 +332,19 @@
           }
         },
         {
+          "id": "a-caller-may-answer-the-configuration-bytes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-caller-answers-the-configuration-bytes"
+            ]
+          }
+        },
+        {
           "id": "the-schemas-and-the-go-types-agree",
           "stage": "coded",
           "evidenceKinds": [

@@ -43,6 +43,11 @@ declarations.
   deterministic output either way.
 - `ResolveFile()` and `IsWorkspaceConfig()` centralize file discovery, so no
   consumer re-implements "which file is the workspace root".
+- `UseConfigReader(read)` makes these loaders take each file's bytes from
+  `read`, which may answer bytes it recorded for the same unchanged file
+  instead of reading it; the CLI answers them from its file index. The bytes
+  are decoded as read bytes are, and the returned function restores the
+  previous reader; with none set, every file is read.
 
 `ProjectConfig` also carries two shapes with two authored spellings each —
 `bin` (string or object) and `exports` (string, object of strings, or object of

@@ -974,13 +974,13 @@ func TestAnIndexOfTheLastFormatLoadsEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := append([]byte(nil), data[:len(data)-DigestSize]...)
-	binary.LittleEndian.PutUint32(body[len(magic):], 2)
+	binary.LittleEndian.PutUint32(body[len(magic):], 3)
 	s := sha256.Sum256(body)
 	if err := os.WriteFile(f.index, append(body, s[:]...), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if reads := f.run(map[string]string{a: "alpha"}); reads != 1 {
-		t.Fatalf("an index of format 2 answered: %d reads, want 1", reads)
+		t.Fatalf("an index of format 3 answered: %d reads, want 1", reads)
 	}
 }
 

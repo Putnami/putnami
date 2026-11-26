@@ -225,3 +225,43 @@ func TestRecordOfASymlinkRemovedBeforeTheReadIsAbsent(t *testing.T) {
 		t.Fatalf("Record = %+v, exists %v, %v; want an absent path and no error", record, exists, err)
 	}
 }
+
+// A DigestFile that answers a regular file's digest gives the record a read
+// gives, and an error it returns is the read's.
+func TestRecordThroughADigestFileIsTheRecordOfARead(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	read, ok, err := Record(nil, root, root, "main.go", "100644", "", HostStatsExecBit)
+	if err != nil || !ok {
+		t.Fatalf("Record: %v, %v", ok, err)
+	}
+	var asked []string
+	answered, ok, err := RecordThrough(func(absPath string, readFile func() ([]byte, error)) ([]byte, error) {
+		asked = append(asked, absPath)
+		return readFile()
+	}, nil, root, root, "main.go", "100644", "", HostStatsExecBit)
+	if err != nil || !ok {
+		t.Fatalf("RecordThrough: %v, %v", ok, err)
+	}
+	if answered != read {
+		t.Fatalf("RecordThrough = %+v, want %+v", answered, read)
+	}
+	if len(asked) != 1 || asked[0] != filepath.Join(root, "main.go") {
+		t.Fatalf("the digest was asked for %v", asked)
+	}
+
+	_, ok, err = RecordThrough(func(string, func() ([]byte, error)) ([]byte, error) {
+		return nil, os.ErrNotExist
+	}, nil, root, root, "main.go", "100644", "", HostStatsExecBit)
+	if err != nil || ok {
+		t.Fatalf("a file removed before its digest: ok %v, err %v; want absent", ok, err)
+	}
+	_, _, err = RecordThrough(func(string, func() ([]byte, error)) ([]byte, error) {
+		return []byte("short"), nil
+	}, nil, root, root, "main.go", "100644", "", HostStatsExecBit)
+	if err == nil {
+		t.Fatal("a digest that is not a SHA-256 was accepted")
+	}
+}

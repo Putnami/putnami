@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -84,7 +85,8 @@ var pathExchange = exchangePaths
 var errKeptConflict = errors.New("the restored entry holds bytes at a ceded path")
 
 // MaterializeTaskOutput places one of an entry's recorded outputs at dest and
-// reports whether any bytes were written.
+// reports whether dest now holds it: true when it wrote the output, and when
+// dest already held it and was left untouched (ADR 0108).
 //
 // An output recorded TaskOutputEmpty returns (false, nil) WITHOUT touching dest.
 // That is the binding invariant of the explicit empty state: an empty output is
@@ -151,6 +153,12 @@ func (s *LocalStore) MaterializeTaskOutput(entry *TaskEntry, id, dest, stagingRo
 
 	src := filepath.Join(entry.FilesDir, id)
 	modes := manifestModes(entry.Manifest)
+	if keepHeldDestinations && destinationHolds(entry.Manifest, out.Kind, src, dest, id, keep) {
+		// dest already holds what the restore would write: the same files,
+		// bytes, modes and directories. Leaving it untouched keeps its stat,
+		// so the file index answers its digests on the next run.
+		return true, nil
+	}
 	switch out.Kind {
 	case proto.OutputKindFile:
 		if err := publishAtomically(dest, stagingRoot, false, nil, func(staging string) error {
@@ -785,6 +793,162 @@ func copyFileTo(src, staging string, modes recordedModes, path string) error {
 // reuses the lease owner nonce rather than adding a second source of randomness.
 func randomSuffix() string {
 	return newLeaseOwner()
+}
+
+// destinationHolds reports whether dest already holds exactly what restoring
+// the output id from src would write there: for a file, a regular file with
+// the manifest's mode, size and digest; for a directory, the same tree as
+// src, every directory with src's mode and every regular file with the
+// manifest's mode, size and digest, and nothing else outside the kept
+// subtrees. A file's digest is read through the file index, so an unchanged
+// destination is answered without reading it, under the index's rule
+// (protocols/workspace ADR 0009). src is walked for its directories and
+// stated, never read. A file the manifest does not list, a link or any other
+// kind of file, on either side, answers false, and the restore writes.
+func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep []string) bool {
+	if manifest == nil {
+		return false
+	}
+	files := make(map[string]cache.FileEntry, len(manifest.Files))
+	for _, file := range manifest.Files {
+		files[file.Path] = file
+	}
+	switch kind {
+	case proto.OutputKindFile:
+		// The payload must be there for the restore to read it: a torn entry
+		// is refused as a restore refuses it.
+		payload, err := os.Lstat(src)
+		file, ok := files[id]
+		return err == nil && payload.Mode().IsRegular() && ok &&
+			destinationFileStats(dest, file) && destinationFileDigest(dest, file)
+	case proto.OutputKindDirectory:
+	default:
+		return false
+	}
+	// Bytes at a kept path of the entry are refused by the restore
+	// (refuseCededBytes); the restore, not this check, answers them.
+	for _, sub := range keep {
+		if _, err := os.Lstat(filepath.Join(src, filepath.FromSlash(strings.TrimSuffix(sub, "/")))); !errors.Is(err, fs.ErrNotExist) {
+			return false
+		}
+	}
+	kept := func(rel string) bool {
+		for _, sub := range keep {
+			sub = strings.TrimSuffix(sub, "/")
+			if rel == sub || strings.HasPrefix(rel, sub+"/") {
+				return true
+			}
+		}
+		return false
+	}
+	prefix := id + "/"
+	expected := map[string]bool{}
+	// The digests are taken once every stat agreed, so an output that differs
+	// in its tree, a mode or a size reads none of its files.
+	type digestCheck struct {
+		path string
+		file cache.FileEntry
+	}
+	var digests []digestCheck
+	err := filepath.WalkDir(src, func(p string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dest, filepath.FromSlash(rel))
+		switch {
+		case info.IsDir():
+			held, err := os.Lstat(target)
+			if err != nil || !held.IsDir() || !sameModeBits(held.Mode(), info.Mode().Perm()) {
+				return errNotHeld
+			}
+		case info.Mode().IsRegular():
+			file, ok := files[prefix+rel]
+			if !ok || !destinationFileStats(target, file) {
+				return errNotHeld
+			}
+			digests = append(digests, digestCheck{path: target, file: file})
+		default:
+			return errNotHeld
+		}
+		expected[rel] = true
+		return nil
+	})
+	if err != nil || !expected["."] {
+		return false
+	}
+	// Nothing outside the kept subtrees may be at dest that src lacks: the
+	// restore would remove it.
+	err = filepath.WalkDir(dest, func(p string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(dest, p)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if rel != "." && kept(rel) {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !expected[rel] {
+			return errNotHeld
+		}
+		return nil
+	})
+	if err != nil {
+		return false
+	}
+	for _, check := range digests {
+		if !destinationFileDigest(check.path, check.file) {
+			return false
+		}
+	}
+	return true
+}
+
+// keepHeldDestinations leaves a destination that already holds the restored
+// output untouched. A test of the swap itself turns it off, to swap over a
+// destination that holds the same bytes.
+var keepHeldDestinations = true
+
+// errNotHeld stops a walk of destinationHolds at the first difference.
+var errNotHeld = errors.New("store: destination differs from the entry")
+
+// sameModeBits reports whether mode carries exactly the permission bits perm
+// and none of the setuid, setgid and sticky bits a restore never writes.
+func sameModeBits(mode, perm os.FileMode) bool {
+	return mode&(os.ModePerm|os.ModeSetuid|os.ModeSetgid|os.ModeSticky) == perm
+}
+
+// destinationFileStats reports whether the file at path is a regular file with
+// file's permission bits, and its size when the manifest records one.
+func destinationFileStats(path string, file cache.FileEntry) bool {
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || !sameModeBits(info.Mode(), os.FileMode(file.Mode).Perm()) {
+		return false
+	}
+	return file.Size == 0 || info.Size() == file.Size
+}
+
+// destinationFileDigest reports whether the file at path has file's digest,
+// read through the file index.
+func destinationFileDigest(path string, file cache.FileEntry) bool {
+	digest := indexedDigest(path, rawContentVariant, func() []byte {
+		return rawContentDigest(path, nil)
+	})
+	return digest != nil && "sha256:"+hex.EncodeToString(digest) == file.Digest
 }
 
 // RemoveTaskOutputFile removes the file or symlink at dest without following

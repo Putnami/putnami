@@ -3,6 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "workspace/workspace-contract#a-caller-may-answer-the-basis-file-digests",
+    "workspace/workspace-contract#a-caller-may-answer-the-configuration-bytes",
     "workspace/workspace-contract#a-client-names-its-provider",
     "workspace/workspace-contract#a-fixture-corpus-holds-every-shape",
     "workspace/workspace-contract#a-line-is-a-scope-that-is-not-inherited",

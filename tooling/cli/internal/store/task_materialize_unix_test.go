@@ -18,6 +18,7 @@ import (
 // the old owned directory before a restore exchanged and reclaimed it.
 // Atomic entry replacement gives no snapshot lifetime to that traversal.
 func TestMaterializeTaskOutput_ReclaimsRetiredOwnedDirectory(t *testing.T) {
+	alwaysSwap(t)
 	forEachSwapPath(t, func(t *testing.T) {
 		s := NewLocalStore(t.TempDir())
 		owned := map[string]string{"sub/x.js": "x"}
