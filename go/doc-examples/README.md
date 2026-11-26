@@ -23,5 +23,5 @@
 To check a new document, add its path or a glob that matches it to
 `examples.json`, and a test `filePatterns` entry of `putnami.json` that covers
 it: the declared inputs decide when the check runs again. The test fails when
-a checked document, or a workspace package the examples import, is not one of
-them.
+a checked document, a workspace package the examples import, or a file such a
+package embeds, is not one of them.

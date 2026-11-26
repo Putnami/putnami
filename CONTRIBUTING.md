@@ -348,8 +348,8 @@ gate, at its document and line.
 - A new document outside those folders joins the check by a path or glob in
   the project's `examples.json` and a matching entry in the test
   `filePatterns` of its `putnami.json`, which decide when the check runs again;
-  the check fails when a checked document, or a Go workspace package the
-  examples import, is not a declared input.
+  the check fails when a checked document, a Go workspace package the
+  examples import, or a file such a package embeds, is not a declared input.
 
 A user-visible change also carries its product intent: a feature declaration in
 `putnami.features.json` or `features/<feature>.json`, one spec under `specs/`,

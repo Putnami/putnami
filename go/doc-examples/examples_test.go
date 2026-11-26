@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -70,6 +71,15 @@ func TestDocumentationExamplesTypeCheck(t *testing.T) {
 			t.Errorf("the examples import the package in %s but no test filePatterns entry of putnami.json covers it; add one", rel)
 		}
 	}
+	for _, file := range checker.WorkspaceEmbeds() {
+		rel, err := filepath.Rel(root, file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !covered(inputs, filepath.ToSlash(rel)) {
+			t.Errorf("the examples compile a package that embeds %s but no test filePatterns entry of putnami.json covers it; add one", rel)
+		}
+	}
 	t.Logf("%d Go examples in %d documents, %d findings", len(examples), len(documents), len(findings))
 }
 
@@ -97,18 +107,32 @@ func testInputs(t *testing.T, root, project string) []string {
 	}
 	var inputs []string
 	for _, pattern := range manifest.Options.Test.FilePatterns {
-		inputs = append(inputs, path.Clean(path.Join(filepath.ToSlash(rel), pattern)))
+		exclude := strings.HasPrefix(pattern, "!")
+		pattern = path.Clean(path.Join(filepath.ToSlash(rel), strings.TrimPrefix(pattern, "!")))
+		if exclude {
+			pattern = "!" + pattern
+		}
+		inputs = append(inputs, pattern)
 	}
 	return inputs
 }
 
+// covered reports whether the patterns select name: an include matches it and
+// no `!` exclusion does, the way the engine reads test filePatterns.
 func covered(patterns []string, name string) bool {
+	selected := false
 	for _, pattern := range patterns {
+		if exclusion, ok := strings.CutPrefix(pattern, "!"); ok {
+			if Match(exclusion, name) {
+				return false
+			}
+			continue
+		}
 		if Match(pattern, name) {
-			return true
+			selected = true
 		}
 	}
-	return false
+	return selected
 }
 
 func workspaceRoot(t *testing.T) string {

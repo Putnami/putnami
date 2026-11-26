@@ -14,6 +14,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -75,6 +76,9 @@ type Checker struct {
 	missing map[string]string // import path -> why it does not resolve
 	pkgName map[string]string // import path -> package name
 	dirs    map[string]string // workspace import path -> directory
+	// embeds holds the files the workspace packages embed, absolute. Compiling
+	// a package for its export data reads them.
+	embeds map[string]bool
 	// packages maps a package name to the standard and workspace packages
 	// of that name.
 	packages map[string][]string
@@ -94,6 +98,7 @@ func NewChecker(dir string) (*Checker, error) {
 		missing: map[string]string{},
 		pkgName: map[string]string{},
 		dirs:    map[string]string{},
+		embeds:  map[string]bool{},
 	}
 	c.importer = importer.ForCompiler(c.fset, "gc", c.lookup)
 	// The standard library and the workspace give import paths by name; the
@@ -496,6 +501,18 @@ func (c *Checker) WorkspaceDirs() []string {
 	return dirs
 }
 
+// WorkspaceEmbeds returns the files the workspace packages of WorkspaceDirs
+// embed. Their export data is compiled from them, so they are read as surely
+// as the packages' Go files.
+func (c *Checker) WorkspaceEmbeds() []string {
+	files := make([]string, 0, len(c.embeds))
+	for file := range c.embeds {
+		files = append(files, file)
+	}
+	slices.Sort(files)
+	return files
+}
+
 // carryRounds bounds how many times a fragment takes imports and types from
 // its document.
 const carryRounds = 3
@@ -664,6 +681,7 @@ type listed struct {
 	Dir        string
 	Export     string
 	Standard   bool
+	EmbedFiles []string
 	Error      *struct{ Err string }
 }
 
@@ -688,7 +706,7 @@ func (c *Checker) resolve(paths []string) error {
 	if len(pending) == 0 {
 		return nil
 	}
-	packages, err := c.goList(append([]string{"-e", "-export", "-deps", "-json=ImportPath,Name,Dir,Export,Standard,Error"}, pending...)...)
+	packages, err := c.goList(append([]string{"-e", "-export", "-deps", "-json=ImportPath,Name,Dir,Export,Standard,EmbedFiles,Error"}, pending...)...)
 	if err != nil {
 		return err
 	}
@@ -698,6 +716,9 @@ func (c *Checker) resolve(paths []string) error {
 		}
 		if strings.HasPrefix(pkg.ImportPath, workspaceModule) && pkg.Dir != "" {
 			c.dirs[pkg.ImportPath] = pkg.Dir
+			for _, file := range pkg.EmbedFiles {
+				c.embeds[filepath.Join(pkg.Dir, filepath.FromSlash(file))] = true
+			}
 		}
 		if pkg.Export != "" {
 			c.exports[pkg.ImportPath] = pkg.Export
