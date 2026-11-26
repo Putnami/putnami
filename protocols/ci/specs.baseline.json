@@ -13,6 +13,7 @@
     "ci/ci-contract#commands-run-in-order-with-their-flags",
     "ci/ci-contract#distribution-is-a-closed-vocabulary",
     "ci/ci-contract#environments-follow-channels",
+    "ci/ci-contract#explain-states-one-tag-request",
     "ci/ci-contract#gaps-name-what-is-missing-or-unknown",
     "ci/ci-contract#one-canonical-form-and-digest",
     "ci/ci-contract#producers-reproduce-the-corpus",

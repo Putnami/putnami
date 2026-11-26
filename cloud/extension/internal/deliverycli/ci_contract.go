@@ -536,11 +536,14 @@ func ciExplanationLines(explanation *ciproto.Explanation) []string {
 	case explanation.Matched && explanation.RuleIndex != nil:
 		lines = append(lines, fmt.Sprintf("  First match: rules[%d]", *explanation.RuleIndex))
 	case explanation.ImplicitTag:
-		lines = append(lines, "  No tags rule matched; the tag publishes by convention on its own immutable channel.")
+		lines = append(lines, "  No tags rule matched; the tag convention applies.")
 	default:
 		lines = append(lines, "  No rule matched; the run executes the commands only.")
 	}
-	if len(explanation.Publish) == 0 {
+	switch {
+	case explanation.ImplicitTag:
+		lines = append(lines, "  Publish request: "+describeCITagRequest(explanation.Assumption.Tag))
+	case len(explanation.Publish) == 0:
 		lines = append(lines, "  Publish request: none")
 	}
 	for _, channel := range explanation.Publish {
@@ -556,6 +559,20 @@ func ciExplanationLines(explanation *ciproto.Explanation) []string {
 		lines = append(lines, "  Impact baseline: "+describeCIPublishBaseline(explanation.Baseline))
 	}
 	return append(lines, "  Remote decisions unresolved: "+strings.Join(explanation.Unresolved, "; "))
+}
+
+// describeCITagRequest states what the tag convention requests: a publish of
+// every member with --all, while the commands keep their own selection. The
+// document declares no version line, so the request holds only when the tagged
+// commit carries no other line's tag; with several, the publish is refused
+// without --scope. It is also refused when the tag encodes to no portable
+// channel.
+func describeCITagRequest(tag string) string {
+	channel, err := distribution.EncodeTagAsChannel(tag)
+	if err != nil {
+		return "refused when the commit carries no other line's tag: " + err.Error()
+	}
+	return fmt.Sprintf("immutable channel=%s, a publish of every member with --all, when the commit carries no other line's tag; with several lines' tags, a publish without --scope is refused (authorization unresolved)", channel)
 }
 
 // describeCIPublishBaseline states which head the first publish into an empty

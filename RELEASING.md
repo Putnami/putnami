@@ -148,9 +148,8 @@ A version is derived from git, per **version line** — a scope whose
 
 ```sh
 putnami version get                        # what every line is at, right now
-putnami version tag --scope tooling        # print the proposal, write nothing
-putnami version tag --scope tooling --yes --push
-putnami version tag protocols/v0.4.0 --scope protocols --yes --push   # name the tag
+putnami version tag --scope tooling --dry-run   # print the proposal, write nothing
+putnami version tag protocols/v0.5.0 --scope protocols --dry-run   # name the tag
 ```
 
 `putnami version get`, `putnami version notes` and `putnami version tag` are
@@ -163,9 +162,15 @@ other commit takes the line's last tag advanced by the conventional commits
 that touch the line — breaking is a minor before 1.0, `feat`, `fix` and `perf`
 a patch, anything else nothing, and a commit that touches no `stable` project a
 patch at most — floored at a patch, plus the ordered
-suffix `<yyyymmddHHMMSS>-<sha>`. `version tag` regenerates
-`<line>/CHANGELOG.md` from those same commits, creates the release commit that
-carries it, then the annotated tag on that commit.
+suffix `<yyyymmddHHMMSS>-<sha>`. `version tag --dry-run` prints the changelog
+of a line from those same commits.
+
+With `--yes`, `version tag` writes that changelog to `<line>/CHANGELOG.md`,
+creates the release commit that carries it, then the annotated tag on that
+commit, and `--push` pushes `HEAD` and the tag. A release of this repository
+uses neither flag: `main` refuses a direct push, so the release commit reaches
+it through a pull request. The order is in
+[A tag publishes its line as a cohort](#a-tag-publishes-its-line-as-a-cohort).
 
 A release of several lines goes through one pull request. `version notes`
 writes the changelog of each line in one commit, with no tag and no push:
@@ -230,8 +235,8 @@ git push origin ts/v0.2.0 go/v0.2.0 tooling/v0.2.0 protocols/v0.2.0 python/v0.2.
 ```
 
 `cloud`, `intelligence`, `integrations` and the seven stack lines (`rust`,
-`java`, `swift`, `dart`, `dotnet`, `ruby`, `php`) joined later. Each takes its
-first tag with the explicit form of `putnami version tag`.
+`java`, `swift`, `dart`, `dotnet`, `ruby`, `php`) joined later. A line that
+joins takes its first tag with the next release, by hand like every other line.
 
 ## Publication
 
@@ -258,12 +263,49 @@ them writes nothing on any of them.
 
 ### A tag publishes its line as a cohort
 
-Pushing a line's tag is the release act. On that commit `putnami publish` needs
-no selection flag and no channel: it republishes every member of the line at the
-tag's version and asks the provider for an **immutable** channel named after the
-tag in the portable encoding — `ts/v0.3.0` becomes `ts-v0.3.0`. That channel
-accepts one head and refuses every later move, so the tag names one snapshot
-forever. A dirty tree is refused.
+The release owner publishes on the tagged commit first, then pushes the tags. Do
+not rely on a pushed tag to publish. A release runs in this order:
+
+1. Merge the release pull request into `main`. It carries the
+   `<line>/CHANGELOG.md` of each line, as `putnami version notes` writes it,
+   and the dated heading of [CHANGELOG.md](CHANGELOG.md):
+   [Version lines and their tags](#version-lines-and-their-tags) gives its
+   steps.
+2. Check out its squash commit with a clean tree, and create the tag of each
+   line there by hand, with the loop that section gives. The tags stay local
+   for now:
+
+   ```sh
+   git tag -s tooling/v0.5.0 -m 'Putnami 0.5.0 (tooling 0.5.0)'   # annotated and signed; repeat per line
+   ```
+3. Publish on that commit, with no selection flag and no channel. A dirty tree
+   is refused:
+
+   ```sh
+   putnami publish --scope tooling
+   ```
+
+   `--scope` names the line whose tag names the channel. It is required when the
+   commit carries the tags of several lines.
+4. When the publish succeeds, push each tag of the release by name:
+
+   ```sh
+   git push origin tooling/v0.5.0 ts/v0.5.0   # name every other tag here too
+   ```
+
+The publish republishes every member of the line at the tag's version and asks
+the provider for an **immutable** channel named after the tag in the portable
+encoding: `tooling/v0.5.0` becomes `tooling-v0.5.0`. That channel has no head to
+inherit from, so the set also carries every member of the other lines, each at
+its own line's version. The channel accepts one head and refuses every later
+move, so the tag names one snapshot forever.
+
+A pushed tag is not the release here: a release tags every line on the same
+commit, and a publish without `--scope` refuses a commit that carries the tags
+of several lines. The publish of step 3, which names the line, is the release.
+
+`putnami cloud ci explain --event tag --git-tag tooling/v0.5.0` prints what a
+hosted run of that tag requests. It starts no run and authorizes nothing.
 
 ### Promotion is a channel move
 
@@ -272,7 +314,7 @@ Promotion is one provider call by a person, with no publisher, no build and no
 checkout:
 
 ```sh
-putnami cloud channels set latest --from ts-v0.3.0   # promote the tag's immutable channel
+putnami cloud channels set latest --from tooling-v0.5.0   # promote the tag's immutable channel
 putnami cloud channels status --wait 5m              # desired versus observed per registry
 ```
 

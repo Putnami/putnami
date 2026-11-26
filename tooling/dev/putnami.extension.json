@@ -127,8 +127,8 @@
               "description": "Print the proposed tag and changelog, and write nothing"
             },
             {
-              "command": "putnami version tag --scope tooling --yes --push",
-              "description": "Release the line and push the commit and the tag to origin"
+              "command": "putnami version tag --scope tooling --yes",
+              "description": "Release the line: the release commit, then the annotated tag; push nothing"
             }
           ]
         }

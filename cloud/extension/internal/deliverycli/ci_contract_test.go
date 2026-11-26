@@ -212,6 +212,42 @@ func TestCIExplainNamesTheRuleAndWhatItPublishes(t *testing.T) {
 	}
 }
 
+func TestCIExplainStatesTheImplicitTagRequest(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "explain-states-one-tag-request", "the-cloud-explain-states-the-implicit-tag-request")
+	root := contractWorkspace(t)
+	writeContractJSON(t, filepath.Join(root, ciproto.Filename), map[string]any{
+		"version":  3,
+		"commands": []string{"lint", "test"},
+		"rules":    []any{map[string]any{"tags": "wip/**", "publish": false}},
+	})
+	const refused = `refused when the commit carries no other line's tag: tag "TOOLS/v1.0.0" encodes to "TOOLS-v1.0.0", which is not a portable channel name`
+	for _, tc := range []struct{ tag, request string }{
+		{"tools/v1.0.0", "immutable channel=tools-v1.0.0, a publish of every member with --all, when the commit carries no other line's tag; with several lines' tags, a publish without --scope is refused (authorization unresolved)"},
+		{"TOOLS/v1.0.0", refused},
+		{"wip/one", "none"},
+	} {
+		stdout, err := runCIContract(t, root, map[string]any{"event": "tag", "git-tag": tc.tag}, "explain")
+		if err != nil {
+			t.Fatalf("ci explain %s: %v", tc.tag, err)
+		}
+		text := strings.Join(stdout, "\n") + "\n"
+		if strings.Count(text, "Publish request: ") != 1 || !strings.Contains(text, "  Publish request: "+tc.request) {
+			t.Fatalf("explain %s =\n%s\nwant the one publish statement %q", tc.tag, text, tc.request)
+		}
+		if !strings.Contains(text, "  Commands: putnami lint,test --impacted\n") {
+			t.Fatalf("explain %s =\n%s\nwant the commands with --impacted", tc.tag, text)
+		}
+	}
+	stdout, err := runCIContract(t, root, map[string]any{"event": "tag", "git-tag": "tools/v1.0.0", "output": "json"}, "explain")
+	if err != nil {
+		t.Fatalf("ci explain --output=json: %v", err)
+	}
+	text := strings.Join(stdout, "\n")
+	if !strings.Contains(text, `"implicitTag": true`) || strings.Contains(text, `"publish"`) {
+		t.Fatalf("structured explain = %s; want implicitTag and no publish", text)
+	}
+}
+
 func TestParseCIExplainInputRefusesFactsTheEventIgnores(t *testing.T) {
 	for _, tc := range []struct {
 		params map[string]any

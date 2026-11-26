@@ -64,10 +64,12 @@ them and the error names every head that moved.
 ## Publish a tag as one cohort
 
 When HEAD carries its line's tag, `putnami publish` needs no selection flag and
-no `--channel`:
+no `--channel`. Publish on the tagged commit first, then push the tag by name
+once the publish succeeds. Do not rely on a pushed tag to publish:
 
 ```bash
-git push origin ts/v0.3.0     # CI checks out the tag and runs putnami publish
+putnami publish --scope typescript    # on the tagged commit
+git push origin ts/v0.3.0             # once the publish succeeds
 ```
 
 Every member of that line is republished at the tag's version, and the release

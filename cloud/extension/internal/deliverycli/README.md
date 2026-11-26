@@ -18,7 +18,12 @@ The aggregator in [`internal/cloudcli`](../cloudcli) imports it.
   [`go.putnami.dev/protocol/ci`](../../../../protocols/ci) module. `validate`
   also reads the commands every discovered extension declares, so it reports a
   job no extension serves, and refuses `distribution` and `envs` when no
-  extension serves release sets.
+  extension serves release sets. For a tag that no `tags` rule matches,
+  `explain` prints one publish request, for a commit that carries no other
+  version line's tag: the immutable channel the tag encodes to, with a publish
+  of every member with `--all` while the commands keep their own selection, or
+  a refusal when the tag encodes to no portable channel. It also says that a
+  publish without `--scope` is refused on a commit with several lines' tags.
 - `putnami cloud ci queue [status|enable|disable]` (`queue.go`): a branch's
   merge queue setting. `enable` reads and splits the branch's GitHub rulesets
   with the person's own GitHub credentials (`queue_rules.go`, the one call to

@@ -62,12 +62,21 @@ putnami version get                   # one line per version line: "<line> <vers
 ```bash
 putnami version tag --scope typescript --dry-run   # print the proposed tag and changelog
 putnami version tag --scope typescript --yes       # release commit, then the annotated tag
-putnami version tag --scope typescript --yes --push
 ```
 
 `version tag` refuses a dirty tree and a HEAD that is already tagged for that line. It computes the next version from the same commits, renders the line's changelog into `<line scope dir>/CHANGELOG.md` (the root line writes `CHANGELOG.md`), commits that as `chore(release): <line> <version>`, then puts the annotated tag **on that commit** — so the changelog is inside the release, not one commit behind it. The rendered notes become the tag message. They carry no tracker reference: `#<number>`, `<owner>/<repository>#<number>` and the word before them, such as `issue`, are removed from each commit subject. After such a word the `#` is optional. A one-digit number is a reference only inside brackets that hold nothing else. The section goes under the title of the changelog and its introduction; a missing file is created with its title. An explicit tag name overrides the computed one; `--scope` is required when the workspace declares more than one line.
 
-Pushing the tag is what triggers the cohort publication: a publish on a tagged commit republishes every member of that line at the tag's version and creates an immutable channel named after the tag (see [Commands](03-commands.md#publish-to-a-release-set-channel)).
+Publish on the tagged commit first, then push the tag by name once the publish succeeds. Do not rely on a pushed tag to publish. `version tag --push` pushes `HEAD` and the tag before any publish, so leave it out.
+
+```bash
+git push origin HEAD                  # the release commit, without its tag
+putnami publish --scope typescript    # on the tagged commit, with a clean tree
+git push origin ts/v0.3.0             # once the publish succeeds: the tag alone
+```
+
+When your default branch refuses a direct push, merge the changelog through a pull request, tag the merged commit by hand, then publish on it and push only the tag.
+
+The publish republishes every member of that line at the tag's version and creates an immutable channel named after the tag (see [Commands](03-commands.md#publish-to-a-release-set-channel)). `--scope` is required when `HEAD` carries the tags of several lines: it names the line whose tag names the channel.
 
 ### Notes of several lines: `version notes`
 
