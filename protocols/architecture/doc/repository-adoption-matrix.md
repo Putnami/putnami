@@ -196,10 +196,11 @@ contracts only.
 | Project | Name | Authority it carries |
 |---|---|---|
 | `/tooling/cli` | `@putnami/cli` | Workspace resolution, the planner and scheduler, caching, command dispatch, and the `/tooling/doc` reference. |
-| `/tooling/cli-document-set` | `@putnami/cli-document-set` | The gates over a known set of this repository's documents: the governance surface, the contributor recipe, the first-use block, the project manifests and the shipped manifests. A separate project so that the documents they name key only these tests. |
-| `/tooling/cli-documents` | `@putnami/cli-documents` | The gates over the whole candidate tree: the public-cut scan, the release plan and its verdict. A separate project so that their repository-wide inputs key only these tests. |
+| `/tooling/cli-document-set` | `@putnami/cli-document-set` | The gates that run the CLI against a known set of this repository's documents: the contributor recipe, the CI document's environments and the cloudless fixture. A separate project so that the documents they name key only these tests. |
+| `/tooling/cli-documents` | `@putnami/cli-documents` | The proof, against the CLI's cache-key collector, that the repository checks key exactly the candidate cut their scanner reads. Keyed on that one manifest. |
 | `/tooling/cli-model` | `@putnami/cli-model` | The CLI's data model — the workspace graph, extension descriptions, job definitions — extracted so it can be depended on without the orchestrator. It is an unpublished internal companion and no workspace project may import it. |
 | `/tooling/install-scripts` | `@putnami/install-scripts` | The tests of the CLI's install and smoke scripts. A separate project so that its key holds the scripts and the install pages, not the CLI's sources. |
+| `/tooling/repository-checks` | `@putnami/repository-checks` | The checks that read the repository as text on every change: the public-cut scan, the release plan and its recorded verdict, the governance record, the first-use block, the moved-commands reference, the spelling of every declared pattern and the shipped manifests. It imports nothing from the repository, so its test task depends on no other project. |
 | `/tooling/windows-vet` | `@putnami/windows-vet` | The Windows compile gate: `go vet` of every `go.work` module for windows/amd64. A separate project so that its key holds only the Go sources, module files and `go.work`. |
 
 ### `sdd`

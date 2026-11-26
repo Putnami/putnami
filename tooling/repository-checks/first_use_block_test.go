@@ -1,4 +1,4 @@
-package documentset
+package repositorychecks
 
 import (
 	"os"

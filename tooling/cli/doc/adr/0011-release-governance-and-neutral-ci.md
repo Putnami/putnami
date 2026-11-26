@@ -1,7 +1,7 @@
 # ADR 0011 — Release governance: an owner bound to the license, exceptions that expire, and a contributor path proved by execution
 
 - **Status**: accepted
-- **Scope**: the workspace-root governance record (`GOVERNANCE.md`, `RELEASING.md`, `SECURITY.md`, `CONTRIBUTING.md`), `@putnami/cli` (`tooling/cli`, `tooling/cli-documents`) as the home of the gates, `protocols/support`
+- **Scope**: the workspace-root governance record (`GOVERNANCE.md`, `RELEASING.md`, `SECURITY.md`, `CONTRIBUTING.md`), `@putnami/cli` (`tooling/cli`, `tooling/cli-document-set`, `tooling/repository-checks`) as the home of the gates, `protocols/support`
 
 ## Context
 
@@ -87,7 +87,7 @@ corroboration, not the definition, and it stays a non-required check.
 
 ### 5. Governance completeness is gated, and the gate states its own limit
 
-The same test file asserts that the governance record answers its questions:
+`tooling/repository-checks/governance_test.go` asserts that the governance record answers its questions:
 the roles table names the license as the source of the release owner; the
 exception path names each register and its end; the checklist covers the gate,
 the compatibility budget, the support catalog and the rollback plan; and

@@ -165,25 +165,6 @@ func TestCloudlessReleaseFixture_RemoteOnlyCommandsFailActionably(t *testing.T) 
 	assertArtifactPathsContainNoCloud(t, artifactRoot)
 }
 
-func TestCloudlessReleaseFixture_PublicManifestsHaveNoCloudDependency(t *testing.T) {
-	t.Parallel()
-	repoRoot := cloudlessRepoRoot(t)
-	manifests := []string{filepath.Join(repoRoot, "tooling", "cli", "go.mod")}
-	for _, shippedRoot := range []struct {
-		path, filename string
-	}{
-		{filepath.Join(repoRoot, "go", "framework"), "go.mod"},
-		{filepath.Join(repoRoot, "go", "extension"), "go.mod"},
-		{filepath.Join(repoRoot, "typescript", "extension"), "go.mod"},
-		{filepath.Join(repoRoot, "typescript", "framework"), "package.json"},
-	} {
-		manifests = append(manifests, findShippedManifests(t, shippedRoot.path, shippedRoot.filename)...)
-	}
-	for _, manifest := range manifests {
-		assertManifestContainsNoCloud(t, manifest)
-	}
-}
-
 // TestCloudlessReleaseFixture_WritesNoExecutableFile pins that the fixture
 // executes no file it wrote: its tasks run fixture.sh through /bin/sh, and no
 // fixture file carries an execute bit.
@@ -208,35 +189,6 @@ func TestCloudlessReleaseFixture_WritesNoExecutableFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("walk the cloudless fixture: %v", err)
 	}
-}
-
-func findShippedManifests(t *testing.T, root, filename string) []string {
-	t.Helper()
-	var manifests []string
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			switch entry.Name() {
-			case ".git", ".putnami", "dist", "node_modules", "out", "vendor":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.Name() == filename {
-			manifests = append(manifests, path)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("discover %s files below %s: %v", filename, root, err)
-	}
-	if len(manifests) == 0 {
-		t.Fatalf("discover %s files below %s: none found", filename, root)
-	}
-	sort.Strings(manifests)
-	return manifests
 }
 
 func writeCloudlessReleaseFixture(t *testing.T) string {
@@ -549,35 +501,4 @@ func readCloudlessFile(t *testing.T, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return string(data)
-}
-
-func assertManifestContainsNoCloud(t *testing.T, path string) {
-	t.Helper()
-	contents := readCloudlessFile(t, path)
-	if strings.Contains(contents, "@putnami/cloud") || strings.Contains(contents, "putnami"+"-cloud") {
-		t.Errorf("public distribution manifest %s links a cloud package", path)
-	}
-	if strings.HasSuffix(path, "package.json") && !json.Valid([]byte(contents)) {
-		t.Fatalf("parse %s: invalid JSON", path)
-	}
-}
-
-func cloudlessRepoRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "putnami.workspace.json")); err == nil {
-			if _, err := os.Stat(filepath.Join(dir, "tooling", "cli", "go.mod")); err == nil {
-				return dir
-			}
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("repository root not found")
-		}
-		dir = parent
-	}
 }

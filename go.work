@@ -133,6 +133,7 @@ use (
 	./tooling/observe
 	./integrations/pants
 	./integrations/turbo
+	./tooling/repository-checks
 	./tooling/scaffold
 	./tooling/sdd-extension
 	./tooling/stacks

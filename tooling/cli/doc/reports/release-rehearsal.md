@@ -10,7 +10,7 @@ the rehearsal and stays the final human-approved operation.
 ## What the rehearsal is
 
 `TestReleaseRehearsalReportRecordsTheCurrentVerdict` in
-[`tooling/cli-documents/release_rehearsal_test.go`](../../../cli-documents/release_rehearsal_test.go)
+[`tooling/repository-checks/release_rehearsal_test.go`](../../../repository-checks/release_rehearsal_test.go)
 runs ten checks over the candidate cut — the tracked tree plus every non-ignored
 new file — and renders the verdict block below. The gate fails when the recorded
 block stops matching the tree, not when a check is blocked. A NO-GO is a valid,
@@ -19,13 +19,13 @@ recordable result; a stale record is not.
 Run it with the project gate:
 
 ```
-./putnamiw lint,test,build --projects @putnami/cli-documents --enforce-coverage
+./putnamiw lint,test,build --projects @putnami/repository-checks --enforce-coverage
 ```
 
 Or read the evidence dump directly:
 
 ```
-cd tooling/cli-documents
+cd tooling/repository-checks
 PUTNAMI_NO_RELAUNCH=1 go test ./ -run TestReleaseRehearsalReportRecordsTheCurrentVerdict -v
 ```
 
@@ -140,5 +140,5 @@ or change repository visibility.
 ## Related decisions
 
 - [ADR 0009 — the release rehearsal is a recorded verdict, not a release step](../adr/0009-release-rehearsal-recorded-verdict.md)
-- [`tooling/cli-documents/specs/release-rehearsal.json`](../../../cli-documents/specs/release-rehearsal.json)
+- [`tooling/repository-checks/specs/release-rehearsal.json`](../../../repository-checks/specs/release-rehearsal.json)
 - [`RELEASE.md`](../../../../RELEASE.md)

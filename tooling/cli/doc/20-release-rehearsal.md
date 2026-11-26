@@ -10,13 +10,13 @@ human-approved operation and runs only after a human reads the recorded verdict.
 ## Run it
 
 ```bash
-./putnamiw lint,test,build --projects @putnami/cli-documents --enforce-coverage
+./putnamiw lint,test,build --projects @putnami/repository-checks --enforce-coverage
 ```
 
 To read the evidence dump directly:
 
 ```bash
-cd tooling/cli-documents
+cd tooling/repository-checks
 PUTNAMI_NO_RELAUNCH=1 go test ./ \
   -run TestReleaseRehearsalReportRecordsTheCurrentVerdict -v
 ```
@@ -67,7 +67,7 @@ consequences:
 
 1. Re-record the block in the same change that adds the release input. Other
    changes that touch the same report serialize on it.
-2. A scratch file at a path the plan names reds the `@putnami/cli-documents`
+2. A scratch file at a path the plan names reds the `@putnami/repository-checks`
    test job. Delete it or ignore it rather than re-recording around it.
 
 ## Verdict inputs are cache-key inputs
@@ -75,17 +75,20 @@ consequences:
 The gate only detects drift when it runs. Every file that can move the verdict
 — the report, the plan, the files a check reads, and the target of every
 declared requirement — is covered by `git:**` in `options.test.filePatterns` in
-[`tooling/cli-documents/putnami.json`](../../cli-documents/putnami.json), so a
+[`tooling/repository-checks/putnami.json`](../../repository-checks/putnami.json), so a
 change to one cannot be answered from a cached run. The rehearsal lives in
-`@putnami/cli-documents` for that reason: a project declares cache-key inputs per
-command, so declaring the governance surface here would key the CLI's whole test
-suite on it.
+`@putnami/repository-checks` for that reason: a project declares cache-key inputs
+per command, so declaring the governance surface on the CLI would key the CLI's
+whole test suite on it. The project imports nothing from this repository, so its
+test task depends on no other project's build or tests.
 
-`TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs` enforces this. When
-you narrow that declaration, it fails if a requirement's target is uncovered.
-The public-cut input regression also compares the scanner's candidate set with
-the cache collector and proves that a new unrelated document invalidates the
-verdict while ignored local state does not. Prefix requirements cover every
+`TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs` enforces this: it
+fails when the declaration no longer keys the whole candidate cut, and names each
+verdict-bearing file that Git ignores, since `git:**` does not key an ignored
+path. The public-cut input regression in
+[`tooling/cli-documents`](../../cli-documents/README.md) compares the scanner's
+candidate set with the CLI's cache collector and proves that a new unrelated
+document invalidates the verdict while ignored local state does not. Prefix requirements cover every
 candidate below the prefix, not only its `provenance.json`.
 
 ## The release plan
@@ -138,5 +141,5 @@ assertion is reported as proving nothing.
 - [ADR 0009 — the release rehearsal is a recorded verdict, not a release step](adr/0009-release-rehearsal-recorded-verdict.md)
 - [Release provenance policy](release-provenance.md)
 - [Compatibility and Migration](21-compatibility-and-migration.md)
-- [`tooling/cli-documents/specs/release-rehearsal.json`](../../cli-documents/specs/release-rehearsal.json)
+- [`tooling/repository-checks/specs/release-rehearsal.json`](../../repository-checks/specs/release-rehearsal.json)
 - [`RELEASE.md`](../../../RELEASE.md) — the release contract this rehearsal reads

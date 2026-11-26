@@ -5,8 +5,7 @@
     "go"
   ],
   "extensions": [
-    "/go/extension",
-    "/tooling/sdd-extension"
+    "/go/extension"
   ],
   "disable": {
     "jobs": [
@@ -21,13 +20,11 @@
       "coverage": false,
       "coverage-threshold": 0,
       "filePatterns": [
-        "git:**"
+        "../repository-checks/putnami.json"
       ]
-    },
-    "sdd": {
-      "verification": {
-        "specs": "enforce"
-      }
     }
+  },
+  "featureAuthority": {
+    "none": "A test surface that proves the cache key of the repository checks against the CLI's collector; it ships nothing a user runs."
   }
 }

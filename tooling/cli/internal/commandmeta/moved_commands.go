@@ -5,6 +5,6 @@ package commandmeta
 // its current spelling. A message about a moved or undeclared command cites
 // this URL instead of naming an extension, so it stays true in any workspace
 // and outside one. The page is tooling/doc/02-cli.md, published by
-// sites/putnami.dev; tooling/cli-documents checks that the URL names one of its
-// headings.
+// sites/putnami.dev; tooling/repository-checks reads this declaration and checks
+// that the URL names one of its headings.
 const CommandsThatLeftTheCoreURL = "https://putnami.dev/docs/tooling-%26-workspace/cli#commands-that-left-the-core-cli"

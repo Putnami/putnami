@@ -1,8 +1,8 @@
 # ADR 0009 — The release rehearsal is a recorded verdict, not a release step
 
 - **Status**: accepted
-- **Scope**: the release rehearsal in `tooling/cli-documents`
-  (`@putnami/cli-documents`), its release plan in
+- **Scope**: the release rehearsal in `tooling/repository-checks`
+  (`@putnami/repository-checks`), its release plan in
   `tooling/cli/internal/cli/testdata/release-plan.json`, and the recorded report
   `tooling/cli/doc/reports/release-rehearsal.md`
 
@@ -48,13 +48,14 @@ check.
    property is that nothing the rehearsal runs can change the tree or publish.
 5. **Every verdict-bearing file is a cache-key input.** A drift check served
    from a cache entry keyed without the file reports success without running.
-   `@putnami/cli-documents` declares every Git candidate file of the
+   `@putnami/repository-checks` declares every Git candidate file of the
    repository (`git:**`,
    [ADR 0041](0041-git-candidate-file-inputs.md)) as test inputs, and `TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs`
-   asserts, with `store.SelectsPath` (the matcher the cache key uses), that the
-   report, the plan, every file a check reads and every requirement target is
-   covered. A requirement naming an uncovered path fails with the pattern to
-   add.
+   asserts that the declaration keys the whole candidate cut and that Git
+   ignores none of the report, the plan, the files a check reads and the
+   requirement targets.
+   `@putnami/cli-documents` proves, with the CLI's own cache-key collector, that
+   this declaration keys exactly the files the scanner reads.
 6. **The recorded block carries statuses, never volatile counts.** It holds
    check ids, pass or blocked status, blocking inputs and owners. Artifact
    counts, candidate file counts and scrub totals are logged by the test and

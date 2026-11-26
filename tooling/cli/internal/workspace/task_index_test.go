@@ -331,9 +331,9 @@ func TestTaskIndex_AStepReferenceReachesOnlyADependentThatMayRunItsCommand(t *te
 	}
 }
 
-// A project may declare an input ABOVE its own root, and two projects in this
-// workspace do — `@putnami/cli` watches "../../**/putnami.json" and
-// `@putnami/cli-documents` watches "git:**". The model seeds such a project from
+// A project may declare an input ABOVE its own root, and several projects in
+// this workspace do — `@putnami/cli` watches "../../**/putnami.json" and
+// `@putnami/repository-checks` watches "git:**". The model seeds such a project from
 // a file it does not own, so the index has to attribute that file to its tasks;
 // answering "no task reads this" would drop the claim and leave the drift gate
 // unrun over the very change it exists to watch.

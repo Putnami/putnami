@@ -1,4 +1,4 @@
-package documents
+package repositorychecks
 
 import (
 	"crypto/sha256"
@@ -11,10 +11,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
-	"go.putnami.dev/protocol/features/spectest"
-
-	"go.putnami.dev/tooling/cli/internal/store"
 )
 
 // The release rehearsal answers one question over the current tree:
@@ -44,7 +40,6 @@ const (
 	releaseReportModulePath          = "doc/reports/release-rehearsal.md"
 	releaseReportRepoPath            = cliModuleDir + "/" + releaseReportModulePath
 	releaseRehearsalSourceModule     = "release_rehearsal_test.go"
-	releaseRehearsalSourceRepoPath   = cliDocumentsProjectDir + "/" + releaseRehearsalSourceModule
 	releaseRehearsalBlockBegin       = "<!-- rehearsal:generated:begin -->"
 	releaseRehearsalBlockEnd         = "<!-- rehearsal:generated:end -->"
 	releaseWorkspaceManifestPath     = "putnami.workspace.json"
@@ -72,7 +67,7 @@ const (
 )
 
 // releaseInterestingFiles are read in full because a check reads their content.
-// Every one of them is a declared test input of @putnami/cli-documents
+// Every one of them is a declared test input of @putnami/repository-checks
 // (putnami.json, options.test.filePatterns), so a change to any of them re-runs
 // this gate instead of restoring a stale pass.
 var releaseInterestingFiles = []string{
@@ -290,7 +285,7 @@ var releaseChecks = []releaseCheck{
 // A blocked check does NOT fail it — an unrecorded verdict does.
 func TestReleaseRehearsalReportRecordsTheCurrentVerdict(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "recorded-verdict", "the-verdict-is-deterministic-for-a-tree")
+	proves(t, "cli/release-rehearsal", "recorded-verdict", "the-verdict-is-deterministic-for-a-tree")
 	input := buildReleaseRehearsalInput(t)
 	results := runReleaseRehearsal(input)
 	t.Log(releaseEvidenceDump(input))
@@ -318,14 +313,15 @@ func TestReleaseRehearsalReportRecordsTheCurrentVerdict(t *testing.T) {
 // computed against a different version of that file, so a verdict-bearing file
 // outside the key turns the drift check into a no-op that reports success.
 //
-// It is not a theoretical hole. The recorded report and the release plan are a
-// Markdown file and a testdata JSON file, and neither shape is selected by the
-// Go task's own inputs (**/*.go, go.mod, putnami.json), so both need an
-// explicit declaration. Asserting it here, against the same matcher the cache
-// key uses, is what keeps the declaration honest as the plan names new targets.
+// This project keys on the whole candidate cut: `git:**` selects every
+// tracked or non-ignored path of the repository, inside the project or
+// outside it. @putnami/cli-documents proves that property against the CLI's
+// own cache-key collector (TestPublicCutCandidateInputsInvalidateTheRecordedVerdict);
+// this test proves that each file the verdict rests on is one the declaration
+// covers, so the declaration cannot narrow below what the plan names.
 func TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "keyed-verdict-inputs", "verdict-inputs-are-declared-cache-key-inputs")
+	proves(t, "cli/release-rehearsal", "keyed-verdict-inputs", "verdict-inputs-are-declared-cache-key-inputs")
 	patterns := releaseDeclaredTestInputs(t)
 	plan := releaseCommittedPlan(t)
 
@@ -362,13 +358,21 @@ func TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs(t *testing.T) {
 		}
 	}
 
-	for _, target := range releaseSorted(releaseKeys(required)) {
-		if !store.SelectsPath(releaseProjectRelativePath(target), patterns) {
-			t.Errorf("%s is %s, but no declared test input of @putnami/cli-documents selects it, "+
-				"so a warm cache answers a changed tree with the recorded verdict.\n"+
-				"Add a pattern covering %q to options.test.filePatterns in %s.",
-				target, required[target], releaseProjectRelativePath(target), releaseProjectManifestName)
-		}
+	if !releaseKeySelects(patterns) {
+		t.Fatalf("no declared test input of @putnami/repository-checks keys the whole candidate cut, "+
+			"so a warm cache answers a changed tree with the recorded verdict.\n"+
+			"Declare %q in options.test.filePatterns in %s.", releaseWholeCutPattern, releaseProjectManifestName)
+	}
+	// `git:**` keys a path only when Git tracks it or does not ignore it, so a
+	// verdict-bearing path the ignore rules hide is outside the key.
+	targets := releaseSorted(releaseKeys(required))
+	ignored, err := ignoredCandidates(repositoryRoot(t), targets)
+	if err != nil {
+		t.Fatalf("read the ignore rules: %v", err)
+	}
+	for _, target := range ignored {
+		t.Errorf("%s is %s, but Git ignores it, so the whole-cut declaration does not key it "+
+			"and a warm cache answers its change with the recorded verdict", target, required[target])
 	}
 }
 
@@ -385,7 +389,7 @@ func TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs(t *testing.T) {
 // mutating surface out of THIS file for the guard to stay meaningful.
 func TestReleaseRehearsalPerformsNoDestructiveOperation(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "read-only-rehearsal", "the-rehearsal-performs-no-destructive-operation")
+	proves(t, "cli/release-rehearsal", "read-only-rehearsal", "the-rehearsal-performs-no-destructive-operation")
 	source, err := os.ReadFile(filepath.Join(projectRoot(t), filepath.FromSlash(releaseRehearsalSourceModule)))
 	if err != nil {
 		t.Fatalf("read the rehearsal source: %v", err)
@@ -437,7 +441,7 @@ func TestReleaseRehearsalPerformsNoDestructiveOperation(t *testing.T) {
 
 func TestReleaseRehearsalVerdictIsGoOnlyWhenEveryCheckPasses(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "recorded-verdict", "go-only-when-every-check-passes")
+	proves(t, "cli/release-rehearsal", "recorded-verdict", "go-only-when-every-check-passes")
 	input := releaseRehearsalFixture()
 	block := renderReleaseRehearsalBlock(runReleaseRehearsal(input))
 	if !strings.Contains(block, "**Verdict: GO** — all 10 release checks pass.") {
@@ -459,7 +463,7 @@ func TestReleaseRehearsalVerdictIsGoOnlyWhenEveryCheckPasses(t *testing.T) {
 
 func TestReleaseRehearsalRendersTheSameVerdictForTheSameTree(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "recorded-verdict", "the-verdict-is-deterministic-for-a-tree")
+	proves(t, "cli/release-rehearsal", "recorded-verdict", "the-verdict-is-deterministic-for-a-tree")
 	input := releaseRehearsalFixture()
 	first := renderReleaseRehearsalBlock(runReleaseRehearsal(input))
 
@@ -474,7 +478,7 @@ func TestReleaseRehearsalRendersTheSameVerdictForTheSameTree(t *testing.T) {
 
 func TestReleaseRehearsalReportsEveryRequiredEvidenceItem(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "ten-evidence-items", "every-required-evidence-item-is-reported")
+	proves(t, "cli/release-rehearsal", "ten-evidence-items", "every-required-evidence-item-is-reported")
 	want := []string{
 		"version and artifact manifest", "checksums and provenance", "support report",
 		"migration report", "scrub result", "golden-path result", "governance checklist",
@@ -496,7 +500,7 @@ func TestReleaseRehearsalReportsEveryRequiredEvidenceItem(t *testing.T) {
 
 func TestReleaseRehearsalRejectsAVacuousCheck(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "no-vacuous-check", "a-vacuous-or-undeclared-check-proves-nothing")
+	proves(t, "cli/release-rehearsal", "no-vacuous-check", "a-vacuous-or-undeclared-check-proves-nothing")
 	input := releaseRehearsalFixture()
 	for index, check := range input.plan.Checks {
 		if check.ID == "golden-path-result" {
@@ -511,7 +515,7 @@ func TestReleaseRehearsalRejectsAVacuousCheck(t *testing.T) {
 
 func TestReleaseRehearsalReportsAnUndeclaredCheck(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "no-vacuous-check", "a-vacuous-or-undeclared-check-proves-nothing")
+	proves(t, "cli/release-rehearsal", "no-vacuous-check", "a-vacuous-or-undeclared-check-proves-nothing")
 	input := releaseRehearsalFixture()
 	input.plan.Checks = input.plan.Checks[1:]
 	block := renderReleaseRehearsalBlock(runReleaseRehearsal(input))
@@ -529,7 +533,7 @@ func TestReleaseRehearsalReportsAnUndeclaredCheck(t *testing.T) {
 
 func TestReleaseRequirementKindsReadOnlyTheTreeTheyName(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "read-only-rehearsal", "the-rehearsal-performs-no-destructive-operation")
+	proves(t, "cli/release-rehearsal", "read-only-rehearsal", "the-rehearsal-performs-no-destructive-operation")
 	input := releaseRehearsalFixture()
 	for _, testCase := range []struct {
 		name        string
@@ -594,7 +598,7 @@ func TestReleaseVersionManifestFollowsTheBuilderMatrixAndWorkspaceVersion(t *tes
 
 func TestReleaseChecksumsAndProvenancePinsTheImplementedTrustContract(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "provenance-contract", "the-trust-contract-is-pinned")
+	proves(t, "cli/release-rehearsal", "provenance-contract", "the-trust-contract-is-pinned")
 	input := releaseRehearsalFixture()
 	if blockers := releaseAssertChecksumsAndProvenance(input); len(blockers) != 0 {
 		t.Fatalf("a complete provenance contract blocked: %v", blockers)
@@ -626,7 +630,7 @@ func TestReleaseChecksumsAndProvenancePinsTheImplementedTrustContract(t *testing
 
 func TestReleaseMigrationReportUsesCanonicalImmutableEvidence(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "canonical-migration-evidence", "migration-evidence-is-canonical-and-immutable")
+	proves(t, "cli/release-rehearsal", "canonical-migration-evidence", "migration-evidence-is-canonical-and-immutable")
 	input := releaseRehearsalFixture()
 	if blockers := releaseAssertMigrationReport(input); len(blockers) != 0 {
 		t.Fatalf("canonical migration evidence blocked: %v", blockers)
@@ -688,7 +692,7 @@ func TestReleaseSupportReportRejectsAnUnreviewablePromise(t *testing.T) {
 
 func TestReleaseScrubResultReportsThePublicCutOutcome(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "reused-scrub", "the-scrub-result-comes-from-the-public-cut-scanner")
+	proves(t, "cli/release-rehearsal", "reused-scrub", "the-scrub-result-comes-from-the-public-cut-scanner")
 	input := releaseRehearsalFixture()
 	if blockers := releaseAssertScrubResult(input); len(blockers) != 0 {
 		t.Fatalf("a clean scrub blocked: %v", blockers)
@@ -771,7 +775,7 @@ func TestReleaseLabelScopeBootstrapCoversEveryScopeAndGroup(t *testing.T) {
 
 func TestReleasePublishOrderCoversEveryArtifactChannelPairExactlyOnce(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "publish-order-coverage", "every-artifact-channel-pair-is-claimed-exactly-once")
+	proves(t, "cli/release-rehearsal", "publish-order-coverage", "every-artifact-channel-pair-is-claimed-exactly-once")
 	input := releaseRehearsalFixture()
 	if blockers := releaseAssertPublishOrder(input); len(blockers) != 0 {
 		t.Fatalf("a complete publish order blocked: %v", blockers)
@@ -807,7 +811,7 @@ func TestReleasePublishOrderCoversEveryArtifactChannelPairExactlyOnce(t *testing
 
 func TestReleaseRollbackPlanNamesAReversalForEveryStep(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "rollback-completeness", "every-step-names-a-rollback-and-reversal")
+	proves(t, "cli/release-rehearsal", "rollback-completeness", "every-step-names-a-rollback-and-reversal")
 	input := releaseRehearsalFixture()
 	if blockers := releaseAssertRollbackPlan(input); len(blockers) != 0 {
 		t.Fatalf("a complete rollback plan blocked: %v", blockers)
@@ -834,7 +838,7 @@ func TestReleaseRollbackPlanNamesAReversalForEveryStep(t *testing.T) {
 
 func TestReleaseBlockersAreSortedDeduplicatedAndBounded(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "named-blockers", "blockers-are-named-sorted-and-bounded")
+	proves(t, "cli/release-rehearsal", "named-blockers", "blockers-are-named-sorted-and-bounded")
 	blockers := releaseNormalizeBlockers([]releaseBlocker{
 		{input: "b", owner: "#1"}, {input: "a", owner: "#1"}, {input: "a", owner: "#1"},
 		{input: "c", owner: "#1"}, {input: "d", owner: "#1"}, {input: "e", owner: "#1"},
@@ -852,7 +856,7 @@ func TestReleaseBlockersAreSortedDeduplicatedAndBounded(t *testing.T) {
 
 func TestReleasePlanParsesOnlyDeclarativeReviewedData(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "declarative-plan", "the-plan-is-declarative-reviewed-data")
+	proves(t, "cli/release-rehearsal", "declarative-plan", "the-plan-is-declarative-reviewed-data")
 	valid := releaseFixturePlanJSON
 	if _, err := parseReleasePlan(valid); err != nil {
 		t.Fatalf("the fixture plan did not parse: %v", err)
@@ -880,7 +884,7 @@ func TestReleasePlanParsesOnlyDeclarativeReviewedData(t *testing.T) {
 
 func TestReleaseCommittedPlanMatchesTheGateContract(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "declarative-plan", "the-plan-is-declarative-reviewed-data")
+	proves(t, "cli/release-rehearsal", "declarative-plan", "the-plan-is-declarative-reviewed-data")
 	plan := releaseCommittedPlan(t)
 	if !plan.FinalSwitch.Excluded {
 		t.Fatal("the committed plan does not exclude the private-archive/public-root switch")
@@ -899,7 +903,7 @@ func TestReleaseCommittedPlanMatchesTheGateContract(t *testing.T) {
 
 func TestReleaseCommittedPlanNamesCanonicalProvenanceAndMigrationEvidence(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "canonical-migration-evidence", "migration-evidence-is-canonical-and-immutable")
+	proves(t, "cli/release-rehearsal", "canonical-migration-evidence", "migration-evidence-is-canonical-and-immutable")
 	plan := releaseCommittedPlan(t)
 	want := map[string][]string{
 		"checksums-and-provenance": {
@@ -936,7 +940,7 @@ func TestReleaseCommittedPlanNamesCanonicalProvenanceAndMigrationEvidence(t *tes
 
 func TestReleaseRecordedBlockRequiresExactlyOneGeneratedRegion(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "stable-recorded-fields", "the-recorded-block-is-stable-and-unbreakable")
+	proves(t, "cli/release-rehearsal", "stable-recorded-fields", "the-recorded-block-is-stable-and-unbreakable")
 	body := releaseRehearsalBlockBegin + "\nverdict\n" + releaseRehearsalBlockEnd
 	got, err := releaseRecordedBlock("intro\n" + body + "\noutro\n")
 	if err != nil || got != body {
@@ -955,7 +959,7 @@ func TestReleaseRecordedBlockRequiresExactlyOneGeneratedRegion(t *testing.T) {
 
 func TestReleaseTableCellsCannotBreakTheReport(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "stable-recorded-fields", "the-recorded-block-is-stable-and-unbreakable")
+	proves(t, "cli/release-rehearsal", "stable-recorded-fields", "the-recorded-block-is-stable-and-unbreakable")
 	if got := releaseEscapeCell("a | b\nc"); got != `a \| b c` {
 		t.Fatalf("escaped cell = %q", got)
 	}
@@ -1574,7 +1578,7 @@ func releaseRecordedBlock(report string) (string, error) {
 
 func buildReleaseRehearsalInput(t *testing.T) *releaseRehearsalInput {
 	t.Helper()
-	repoRoot := publicCutRepositoryRoot(t)
+	repoRoot := repositoryRoot(t)
 	files, err := publicCutTrackedFiles(repoRoot)
 	if err != nil {
 		t.Fatalf("enumerate the release candidate: %v", err)
@@ -1733,16 +1737,10 @@ func releaseCommittedPlan(t *testing.T) *releasePlan {
 	return plan
 }
 
-// releaseDeclaredTestInputs returns the file patterns @putnami/cli-documents
+// releaseDeclaredTestInputs returns the file patterns @putnami/repository-checks
 // declares as cache-key inputs of its test task. They are read from the
 // manifest rather than restated here: a copy would let the assertion pass
 // against a list the scheduler does not use.
-//
-// The declaration follows the reader. The verdict-bearing documents
-// used to be declared by @putnami/cli because these gates lived there; they are
-// declared by this project now, and this assertion moved with them so the
-// property it protects is checked against the manifest that actually keys the
-// run.
 func releaseDeclaredTestInputs(t *testing.T) []string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(projectRoot(t), releaseProjectManifestName))
@@ -1765,24 +1763,19 @@ func releaseDeclaredTestInputs(t *testing.T) []string {
 	return manifest.Options.Test.FilePatterns
 }
 
-// releaseProjectRelativePath rewrites a repository-relative path into the form
-// filepath.Rel produces against this project's root, which is the form the
-// cache key's file selection matches: inside the project it is relative, and
-// outside it keeps its "../" prefix. The project's own directory is derived
-// from the two spellings of the rehearsal source so the pair cannot drift
-// apart — the source is the one file that is certainly inside this project.
-//
-// filepath.Rel is used rather than counting separators because a sibling
-// project is one level up, not two: collectFiles matches the CLEANED relative
-// path, so tooling/cli/doc/x is "../cli/doc/x" here and a pattern spelled
-// "../../tooling/cli/doc/**" would select nothing at all.
-func releaseProjectRelativePath(target string) string {
-	projectDir := strings.TrimSuffix(releaseRehearsalSourceRepoPath, releaseRehearsalSourceModule)
-	rel, err := filepath.Rel(filepath.FromSlash(projectDir), filepath.FromSlash(target))
-	if err != nil {
-		return target
+// releaseWholeCutPattern is the declaration that keys this project on the
+// whole candidate cut.
+const releaseWholeCutPattern = "git:**"
+
+// releaseKeySelects reports whether the declared patterns key the whole
+// candidate cut, and so every file a check reads.
+func releaseKeySelects(patterns []string) bool {
+	for _, pattern := range patterns {
+		if pattern == releaseWholeCutPattern {
+			return true
+		}
 	}
-	return filepath.ToSlash(rel)
+	return false
 }
 
 func releaseKeys(values map[string]string) []string {

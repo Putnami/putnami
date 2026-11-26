@@ -9,10 +9,10 @@ module go.putnami.dev/tooling/cli/documents
 go 1.25.7
 
 require (
-	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
 	go.putnami.dev/sdk/extension v0.0.0
 	go.putnami.dev/tooling/cli v0.0.0
+	go.putnami.dev/tooling/repositorychecks v0.0.0
 )
 
 require (
@@ -59,6 +59,7 @@ replace (
 	go.putnami.dev/protocol/workspace => ../../protocols/workspace
 	go.putnami.dev/sdk/extension => ../extension-sdk
 	go.putnami.dev/tooling/cli => ../cli
+	go.putnami.dev/tooling/repositorychecks => ../repository-checks
 )
 
 replace go.putnami.dev/protocol/runner => ../../protocols/runner

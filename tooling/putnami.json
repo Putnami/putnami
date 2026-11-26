@@ -18,6 +18,7 @@
     "local-collaboration",
     "memory-store",
     "observe",
+    "repository-checks",
     "scaffold",
     "sdd-extension",
     "stacks",

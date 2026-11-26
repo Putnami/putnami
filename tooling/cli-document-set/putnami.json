@@ -22,33 +22,13 @@
       "filePatterns": [
         "git:../../**/putnami.json",
         "git:../../**/schema/config.json",
-        "git:../../go/framework/**/go.mod",
-        "git:../../go/extension/**/go.mod",
-        "git:../../typescript/extension/**/go.mod",
-        "git:../../typescript/framework/**/package.json",
-        "git:../../sites/putnami.dev/doc/**/*.md",
-        "git:../doc/**/*.md",
-        "git:../observe/doc/**/*.md",
-        "git:../sdd-extension/doc/**/*.md",
-        "git:../../typescript/doc/framework/**/*.md",
-        "git:../../go/doc/framework/**/*.md",
-        "git:../../python/doc/framework/**/*.md",
-        "git:../../*/extension/doc/*.md",
-        "git:../../integrations/*/doc/*.md",
         "../../CONTRIBUTING.md",
-        "../../GOVERNANCE.md",
-        "../../README.md",
-        "../../RELEASING.md",
-        "../../SECURITY.md",
-        "../../protocols/support/README.md",
         "../../putnami.ci.json",
-        "../../putnami.workspace.json",
-        "../cli/go.mod",
-        "../cli/scripts/smoke-first-use.sh"
+        "../../putnami.workspace.json"
       ]
     }
   },
   "featureAuthority": {
-    "none": "A test surface over the repository's own documents and manifests; it ships nothing a user runs."
+    "none": "A test surface over the repository's contributor recipe, CI document and manifests, run against the CLI; it ships nothing a user runs."
   }
 }

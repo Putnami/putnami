@@ -1,40 +1,37 @@
-package documents
+package repositorychecks
 
 import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
-	"testing"
 	"unicode/utf8"
-
-	"go.putnami.dev/sdk/extension/gittest"
-	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
 
-// The public-cut gate deliberately lives in a test: it is release policy over
-// the repository that will be copied into the history-free public root, not a
-// user-facing CLI command. Its input is the tracked tree plus non-ignored new
-// files from `git ls-files`, so the pre-stage candidate is covered while build
-// output and ignored local credentials are never read.
+// The public-cut scan is release policy over the repository that will be
+// copied into the history-free public root, not a user-facing CLI command. Its
+// input is the candidate cut: the tracked tree plus non-ignored new files, as
+// `git ls-files --cached --others --exclude-standard` lists them, so the
+// pre-stage candidate is covered while build output and ignored local
+// credentials are never read.
 
 const (
 	// The two reviewed inventories stay in the CLI module: GOVERNANCE.md links
-	// them by path, and moving the scanner is not a reason to break a
-	// documented link. They are declared cache-key inputs of THIS project.
+	// them by path. They are inputs of this project's whole-tree cache key.
 	publicCutBaselinePath      = "internal/cli/testdata/public-cut-baseline.tsv"
 	publicCutAllowlistPath     = "internal/cli/testdata/public-cut-allowlist.tsv"
 	publicCutBaselineRepoPath  = cliModuleDir + "/" + publicCutBaselinePath
 	publicCutAllowlistRepoPath = cliModuleDir + "/" + publicCutAllowlistPath
-	publicCutScannerRepoPath   = cliDocumentsProjectDir + "/public_cut_test.go"
+	publicCutScannerRepoPath   = ProjectDir + "/publiccut.go"
 	publicCutMaxTextBytes      = 8 << 20
 )
 
@@ -209,468 +206,8 @@ type publicCutInventoryEntry struct {
 	reason string
 }
 
-func TestPublicCutReleaseGate(t *testing.T) {
-	t.Parallel()
-	repoRoot := publicCutRepositoryRoot(t)
-	files, err := publicCutTrackedFiles(repoRoot)
-	if err != nil {
-		t.Fatalf("enumerate the versioned public cut: %v", err)
-	}
-	if len(files) == 0 {
-		t.Fatal("git ls-files returned no public-cut files — refusing a vacuous release gate")
-	}
-
-	baseline := readPublicCutInventory(t, filepath.Join(cliModuleRoot(t), publicCutBaselinePath), false)
-	allowlist := readPublicCutInventory(t, filepath.Join(cliModuleRoot(t), publicCutAllowlistPath), true)
-	findings := scanPublicCut(files)
-	errors := evaluatePublicCut(findings, baseline, allowlist)
-	if len(errors) == 0 {
-		return
-	}
-
-	for _, gateError := range errors {
-		t.Error(gateError)
-	}
-	if proposed := renderPublicCutBaseline(findings, allowlist); proposed != "" {
-		t.Logf("reviewed baseline matching this tree (never copy blindly):\n%s", proposed)
-	}
-}
-
-func TestPublicCutScannerDetectsEveryCategoryAndSorts(t *testing.T) {
-	t.Parallel()
-	host := "github" + ".com"
-	privateRepo := "Putnami/putnami" + "-cloud"
-	historyRepo := "Putnami/" + "putnami"
-	secret := "AKIA" + strings.Repeat("0", 16)
-	files := []publicCutFile{
-		{path: "z.txt", data: []byte("clone https://" + host + "/" + privateRepo + ".git\n")},
-		{path: "README.md", data: []byte("Putnami Cloud is a legitimate product name.\n")},
-		{path: ".Context/export.json", data: []byte("temporary export\n")},
-		{path: "Apps/api/main.go", data: []byte("package main\n")},
-		{path: "notes.md", data: []byte("see https://" + host + "/" + historyRepo + "/issues/123\n")},
-		{path: "credentials.txt", data: []byte("key=" + secret + "\n")},
-		{path: "deploy.md", data: []byte("import \"go." + "putnami.cloud/identity\"\n")},
-	}
-
-	findings := scanPublicCut(files)
-	wantCategories := map[publicCutCategory]bool{
-		publicCutPrivateRepository: false,
-		publicCutOrphanedHistory:   false,
-		publicCutSecret:            false,
-		publicCutRemovedRoot:       false,
-		publicCutForbiddenFile:     false,
-		publicCutInfrastructure:    false,
-	}
-	for _, finding := range findings {
-		wantCategories[finding.category] = true
-		if strings.Contains(finding.context, secret) {
-			t.Errorf("secret finding leaked its matched value: %+v", finding)
-		}
-	}
-	for category, found := range wantCategories {
-		if !found {
-			t.Errorf("scanner did not produce category %q: %+v", category, findings)
-		}
-	}
-	for i := 1; i < len(findings); i++ {
-		if publicCutFindingLess(findings[i], findings[i-1]) {
-			t.Fatalf("findings are not stable-sorted at %d: %+v then %+v", i, findings[i-1], findings[i])
-		}
-	}
-	for _, finding := range findings {
-		if finding.path == "README.md" {
-			t.Errorf("the product name Putnami Cloud was mistaken for a private repository coordinate: %+v", finding)
-		}
-	}
-}
-
-func TestPublicCutScannerDetectsTrackerReferencesAndPrivateNames(t *testing.T) {
-	t.Parallel()
-	hash := "#"
-	cases := []struct {
-		line string
-		want string
-	}{
-		{"fixed in issue " + hash + "3124.", "issue " + hash + "3124"},
-		{"see PR " + "3974 for context", "pr " + "3974"},
-		{"the pre-" + hash + "3088 default", "pre-" + hash + "3088"},
-		{"(" + hash + "3568) makes the bundle cacheable", hash + "3568"},
-		{"Fixes " + hash + "12, relates to more", hash + "12"},
-		{"see golang/go" + hash + "22315", "golang/go" + hash + "22315"},
-		{"blocked on putnami" + hash + "2931", "putnami" + hash + "2931"},
-		{"cloned into " + "agents" + "-memory", "agents" + "-memory"},
-		{"a consumer named " + "found" + "ry", "found" + "ry"},
-	}
-	for _, tc := range cases {
-		findings := scanPublicCut([]publicCutFile{{path: "doc.md", data: []byte(tc.line + "\n")}})
-		if len(findings) != 1 || findings[0].evidence != tc.want {
-			t.Errorf("%q: findings = %+v, want one with evidence %q", tc.line, findings, tc.want)
-		}
-	}
-
-	clean := []string{
-		"putnami pr create --pr 42 --issue 42",
-		"background: " + hash + "333;",
-		"color: '" + hash + "666'",
-		"see [section 10](" + hash + "10-pending-cells)",
-		"an RSA PKCS" + hash + "1 v1.5 signature",
-		"the &" + hash + "39; entity",
-		"the @putnami/cloud extension and its @" + "putnami" + "-cloud cache segment",
-		"Putnami Cloud is a product name",
-		"row " + hash + "1 of the table",
-	}
-	for _, line := range clean {
-		if findings := scanPublicCut([]publicCutFile{{path: "doc.md", data: []byte(line + "\n")}}); len(findings) != 0 {
-			t.Errorf("%q: a legitimate line was flagged: %+v", line, findings)
-		}
-	}
-}
-
-func TestPublicCutScannerFlagsThePrivateRepositoryNotTheBinaryName(t *testing.T) {
-	t.Parallel()
-	name := "putnami" + "-cloud"
-	owner := "Putnami"
-	host := "github" + ".com"
-	cases := []struct {
-		line string
-		rule string
-		want string
-	}{
-		{"owned by " + owner + "/" + name + " today", "private-repository-coordinate", "putnami/" + name},
-		{"see https://" + host + "/" + owner + "/" + name, "private-repository-coordinate", "https://" + host + "/putnami/" + name},
-		{"git clone https://" + host + "/" + owner + "/" + name + ".git", "private-repository-coordinate", "https://" + host + "/putnami/" + name + ".git"},
-		{"git clone git@" + host + ":" + owner + "/" + name + ".git", "private-repository-coordinate", "git@" + host + ":putnami/" + name + ".git"},
-		{"git clone git@" + host + ":" + owner + "/" + name, "private-repository-coordinate", "git@" + host + ":putnami/" + name},
-		{"a fork at https://" + host + "/someone/" + name + ".", "private-repository-name", "https://" + host + "/someone/" + name},
-		{"git clone git@" + host + ":someone/" + name + ".git", "private-repository-name", "git@" + host + ":someone/" + name + ".git"},
-		{"git clone ssh://git@git.example.com/team/" + name + ".git", "private-repository-name", "ssh://git@git.example.com/team/" + name + ".git"},
-		{"cd ../" + name + " && make", "private-repository-name", "../" + name},
-		{"read ../../" + name + "/README.md", "private-repository-name", "../../" + name},
-	}
-	for _, tc := range cases {
-		findings := scanPublicCut([]publicCutFile{{path: "doc.md", data: []byte(tc.line + "\n")}})
-		if len(findings) != 1 || findings[0].category != publicCutPrivateRepository || findings[0].rule != tc.rule || findings[0].evidence != tc.want {
-			t.Errorf("%q: findings = %+v, want one %s finding with evidence %q", tc.line, findings, tc.rule, tc.want)
-		}
-	}
-
-	binaryNames := []string{
-		"the " + name + " binary",
-		`const reporterBinary = "` + name + `"`,
-		name + " credential-provider: ready",
-		`filepath.Join(root, ".putnami", "bin", "extensions", "` + name + `")`,
-		".putnami/bin/extensions/" + name,
-		"the archive's compiled/" + name + ", or compiled/" + name + ".exe on Windows",
-		"[`cmd/" + name + "`](../../cmd/" + name + ")",
-		"example.com/fork/" + name,
-		"archive-" + name + "-linux-x64.tar.gz",
-	}
-	for _, line := range binaryNames {
-		if findings := scanPublicCut([]publicCutFile{{path: "doc.md", data: []byte(line + "\n")}}); len(findings) != 0 {
-			t.Errorf("%q: the binary name was flagged as the private repository: %+v", line, findings)
-		}
-	}
-}
-
-func TestPublicCutScannerDetectsHistoryRefsAndPrivateInfrastructure(t *testing.T) {
-	t.Parallel()
-	cloud := "putnami" + ".cloud"
-	cases := []struct {
-		line     string
-		category publicCutCategory
-		rule     string
-		want     string
-	}{
-		{"git fetch origin refs/" + "pull/1/head", publicCutOrphanedHistory, "pull-request-ref", "refs/" + "pull/1"},
-		{`  "issue"` + `: 7,`, publicCutOrphanedHistory, "json-tracker-number", `"issue"` + `: 7`},
-		{`{"pr"` + `:42}`, publicCutOrphanedHistory, "json-tracker-number", `"pr"` + `:42`},
-		{"require go." + cloud + "/example v0.0.0", publicCutInfrastructure, "private-module-host", "go." + cloud},
-		{"stack registry." + cloud + "/example/stack", publicCutInfrastructure, "private-module-host", "registry." + cloud},
-		{"--target-url https://example.preview." + cloud, publicCutInfrastructure, "environment-host", "example.preview." + cloud},
-		{"collector: https://example-service-" + "abcdefghij-ew.a.run" + ".app", publicCutInfrastructure, "cloud-run-service-url", "example-service-" + "abcdefghij-ew.a.run" + ".app"},
-		{"callers: example-" + "reader@putnami.iam" + ".gserviceaccount.com", publicCutInfrastructure, "deployment-service-account", "example-" + "reader@putnami.iam" + ".gserviceaccount.com"},
-	}
-	for _, tc := range cases {
-		findings := scanPublicCut([]publicCutFile{{path: "doc.md", data: []byte(tc.line + "\n")}})
-		if len(findings) != 1 || findings[0].category != tc.category || findings[0].rule != tc.rule || findings[0].evidence != tc.want {
-			t.Errorf("%q: findings = %+v, want one %s/%s with evidence %q", tc.line, findings, tc.category, tc.rule, tc.want)
-		}
-	}
-
-	clean := []string{
-		"discoveryUri: https://auth." + cloud + "/.well-known/openid-configuration",
-		"endpoint: https://storage." + cloud,
-		`"url": "https://cache.` + cloud + `"`,
-		"audience: https://users-abc.a.run" + ".app",
-		"runtime@proj.iam" + ".gserviceaccount.com",
-		`{"issues": [], "prNumber": "draft"}`,
-		"git fetch origin refs/heads/main",
-	}
-	for _, line := range clean {
-		if findings := scanPublicCut([]publicCutFile{{path: "doc.md", data: []byte(line + "\n")}}); len(findings) != 0 {
-			t.Errorf("%q: a legitimate line was flagged: %+v", line, findings)
-		}
-	}
-}
-
-func TestPublicCutScannerDetectsSecretsInsideBinaryWithoutLeakingBytes(t *testing.T) {
-	t.Parallel()
-	secret := "AKIA" + strings.Repeat("0", 16)
-	data := append([]byte{0, 1, 2}, []byte("prefix "+secret+" suffix")...)
-	findings := scanPublicCut([]publicCutFile{{path: "fixture.bin", data: data, binary: true}})
-	if len(findings) != 1 || findings[0].category != publicCutSecret {
-		t.Fatalf("binary secret findings = %+v, want one high-confidence-secret", findings)
-	}
-	if findings[0].context != "[binary content redacted]" || strings.Contains(findings[0].context, secret) || strings.ContainsRune(findings[0].context, 0) {
-		t.Fatalf("binary secret context was not safely redacted: %q", findings[0].context)
-	}
-}
-
-func TestPublicCutScannerDetectsPrivateReferencesInsideBinaryWithoutLeakingBytes(t *testing.T) {
-	t.Parallel()
-	host := "github" + ".com"
-	history := "https://" + host + "/Putnami/" + "putnami/issues/321"
-	privateRepo := "git@" + host + ":Putnami/putnami" + "-cloud.git"
-	data := append([]byte{0, 1, 2}, []byte(history+"\n"+privateRepo)...)
-	findings := scanPublicCut([]publicCutFile{{path: "references.bin", data: data, binary: true}})
-
-	want := map[publicCutCategory]int{publicCutOrphanedHistory: 1, publicCutPrivateRepository: 1}
-	for _, finding := range findings {
-		want[finding.category]--
-		if finding.context != "[binary content redacted]" || strings.Contains(finding.context, history) || strings.Contains(finding.context, privateRepo) || strings.ContainsRune(finding.context, 0) {
-			t.Fatalf("binary reference context was not safely redacted: %q", finding.context)
-		}
-	}
-	if len(findings) != 2 || want[publicCutOrphanedHistory] != 0 || want[publicCutPrivateRepository] != 0 {
-		t.Fatalf("binary reference findings = %+v, want one orphaned-history and one private-repository", findings)
-	}
-}
-
-func TestPublicCutScannerPathRulesIgnoreCase(t *testing.T) {
-	t.Parallel()
-	findings := scanPublicCut([]publicCutFile{
-		{path: "Apps/api/main.go", data: []byte("package main\n")},
-		{path: "nested/.CoNtExT/export.json", data: []byte("{}\n")},
-		{path: "assets/.Ds_StOrE", binary: true},
-	})
-	byRule := make(map[string]bool)
-	for _, finding := range findings {
-		byRule[finding.rule] = true
-	}
-	for _, rule := range []string{"retired-root:apps", "private-workspace-state", "os-metadata"} {
-		if !byRule[rule] {
-			t.Errorf("mixed-case path did not trigger %q: %+v", rule, findings)
-		}
-	}
-}
-
-func TestPublicCutScannerAllowlistIsExactAndOnlyShrinks(t *testing.T) {
-	t.Parallel()
-	finding := publicCutFinding{
-		category: publicCutPrivateRepository,
-		path:     "doc/example.md",
-		line:     3,
-		rule:     "fixture-coordinate",
-		evidence: "example.invalid/private/repository",
-		context:  "intentional fixture",
-	}
-	entry := publicCutInventoryEntry{key: finding.key(), count: 1, reason: "Exact documentation fixture."}
-
-	if errors := evaluatePublicCut([]publicCutFinding{finding}, nil, inventoryMap(entry)); len(errors) != 0 {
-		t.Fatalf("exact allowlist entry did not cover its intentional finding: %v", errors)
-	}
-	if errors := evaluatePublicCut(nil, nil, inventoryMap(entry)); !publicCutErrorsContain(errors, "allowlist entry is stale") {
-		t.Fatalf("unused allowlist entry did not fail: %v", errors)
-	}
-	if errors := evaluatePublicCut([]publicCutFinding{finding, finding}, nil, inventoryMap(entry)); !publicCutErrorsContain(errors, "allowlist is narrower") {
-		t.Fatalf("additional finding hid behind an allowlist entry: %v", errors)
-	}
-}
-
-func TestPublicCutScannerRejectsNewDebt(t *testing.T) {
-	t.Parallel()
-	oldFinding := publicCutFinding{
-		category: publicCutOrphanedHistory,
-		path:     "old.md",
-		line:     1,
-		rule:     "history",
-		evidence: "old-reference",
-		context:  "old",
-	}
-	newFinding := publicCutFinding{
-		category: publicCutOrphanedHistory,
-		path:     "new.md",
-		line:     7,
-		rule:     "history",
-		evidence: "new-reference",
-		context:  "new",
-	}
-	baseline := inventoryMap(publicCutInventoryEntry{key: oldFinding.key(), count: 1, reason: "Existing debt."})
-	errors := evaluatePublicCut([]publicCutFinding{newFinding, oldFinding}, baseline, nil)
-	if !publicCutErrorsContain(errors, "new debt: orphaned-history new.md:7") {
-		t.Fatalf("new finding did not fail with category and exact path: %v", errors)
-	}
-}
-
-func TestPublicCutScannerRequiresBaselineToShrink(t *testing.T) {
-	t.Parallel()
-	finding := publicCutFinding{
-		category: publicCutOrphanedHistory,
-		path:     "history.md",
-		line:     4,
-		rule:     "history",
-		evidence: "reference",
-		context:  "history",
-	}
-	baseline := inventoryMap(publicCutInventoryEntry{key: finding.key(), count: 2, reason: "Two existing references."})
-	if errors := evaluatePublicCut([]publicCutFinding{finding}, baseline, nil); !publicCutErrorsContain(errors, "baseline must shrink") {
-		t.Fatalf("removed debt left a stale baseline without failing: %v", errors)
-	}
-	baseline[finding.key()] = publicCutInventoryEntry{key: finding.key(), count: 1, reason: "One existing reference."}
-	if errors := evaluatePublicCut([]publicCutFinding{finding}, baseline, nil); len(errors) != 0 {
-		t.Fatalf("lowered baseline did not pass: %v", errors)
-	}
-}
-
-func TestPublicCutScannerSecretsAreUnwaivable(t *testing.T) {
-	t.Parallel()
-	finding := publicCutFinding{
-		category:   publicCutSecret,
-		path:       "fixture.txt",
-		line:       1,
-		rule:       "synthetic-secret",
-		evidence:   "sha256:invalid",
-		context:    "[REDACTED]",
-		unwaivable: true,
-	}
-	entry := publicCutInventoryEntry{key: finding.key(), count: 1, reason: "Attempted waiver."}
-	errors := evaluatePublicCut([]publicCutFinding{finding}, inventoryMap(entry), inventoryMap(entry))
-	if !publicCutErrorsContain(errors, "unwaivable") {
-		t.Fatalf("secret was hidden by baseline/allowlist: %v", errors)
-	}
-
-	finding.path = "internal/example_test.go"
-	entry = publicCutInventoryEntry{key: finding.key(), count: 1, reason: "Exact synthetic test fixture."}
-	if errors := evaluatePublicCut([]publicCutFinding{finding}, nil, inventoryMap(entry)); len(errors) != 0 {
-		t.Fatalf("exact synthetic secret fixture allowlist did not pass: %v", errors)
-	}
-}
-
-func TestPublicCutInventoryKeepsSecretsOutOfBaselineAndNonFixtures(t *testing.T) {
-	t.Parallel()
-	entry := publicCutInventoryEntry{
-		key: publicCutKey{
-			category: publicCutSecret,
-			path:     "README.md",
-			rule:     "synthetic-secret",
-			evidence: "sha256:invalid",
-		},
-		count:  1,
-		reason: "Attempted secret waiver.",
-	}
-	line := serializePublicCutInventoryEntry(entry) + "\n"
-	if _, err := parsePublicCutInventory(line, false); err == nil || !strings.Contains(err.Error(), "never baseline-eligible") {
-		t.Fatalf("secret baseline entry was accepted: %v", err)
-	}
-	if _, err := parsePublicCutInventory(line, true); err == nil || !strings.Contains(err.Error(), "test/fixture") {
-		t.Fatalf("secret allowlist entry outside an exact fixture was accepted: %v", err)
-	}
-}
-
-func TestPublicCutScannerControlFilesAreSelfSafe(t *testing.T) {
-	t.Parallel()
-	repoRoot := publicCutRepositoryRoot(t)
-	paths := []string{publicCutScannerRepoPath, publicCutBaselineRepoPath, publicCutAllowlistRepoPath}
-	files := make([]publicCutFile, 0, len(paths))
-	for _, path := range paths {
-		data, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(path)))
-		if err != nil {
-			t.Fatalf("read scanner control file %s: %v", path, err)
-		}
-		files = append(files, publicCutFile{path: path, data: data})
-	}
-	if findings := scanPublicCut(files); len(findings) != 0 {
-		t.Fatalf("scanner control files recursively triggered their own gate: %+v", findings)
-	}
-}
-
-// publicCutCandidateRepo is a repository that stages unusual names, deletes
-// one of them from the work tree, and holds an untracked candidate and an
-// ignored file. It returns the root and the candidate paths in sorted order.
-func publicCutCandidateRepo(t *testing.T) (root string, want []string) {
-	t.Helper()
-	root = t.TempDir()
-	publicCutRunGit(t, root, "init", "-q")
-	tracked := []string{".gitignore", "name with spaces.txt", "name\nwith-newline.txt", "tracked-deleted.txt"}
-	want = []string{".gitignore", "candidate.txt", "name with spaces.txt", "name\nwith-newline.txt"}
-	if runtime.GOOS == "windows" {
-		// A Windows file name cannot contain a newline; the other unusual
-		// names still run.
-		tracked = slices.DeleteFunc(tracked, func(name string) bool { return strings.Contains(name, "\n") })
-		want = slices.DeleteFunc(want, func(name string) bool { return strings.Contains(name, "\n") })
-	}
-	for _, name := range tracked {
-		contents := []byte("tracked\n")
-		if name == ".gitignore" {
-			contents = []byte("ignored.txt\n")
-		}
-		if err := os.WriteFile(filepath.Join(root, name), contents, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(root, "candidate.txt"), []byte("candidate\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "ignored.txt"), []byte("ignored\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	publicCutRunGit(t, root, append([]string{"add", "--"}, tracked...)...)
-	if err := os.Remove(filepath.Join(root, "tracked-deleted.txt")); err != nil {
-		t.Fatal(err)
-	}
-	sort.Strings(want)
-	return root, want
-}
-
-func TestPublicCutCandidateRepoIsTheSameOnAForeignMachine(t *testing.T) {
-	gittest.AssertMachineIndependent(t, func() string {
-		root, _ := publicCutCandidateRepo(t)
-		return root
-	})
-}
-
-func TestPublicCutTrackedFilesIncludeNonIgnoredCandidatesAndHandleUnusualNames(t *testing.T) {
-	t.Parallel()
-	root, want := publicCutCandidateRepo(t)
-
-	files, err := publicCutTrackedFiles(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var got []string
-	for _, file := range files {
-		got = append(got, file.path)
-	}
-	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
-		t.Fatalf("candidate paths = %q, want %q (non-ignored included, ignored/deleted excluded, names preserved)", got, want)
-	}
-}
-
-func publicCutRepositoryRoot(t *testing.T) string {
-	t.Helper()
-	out, err := gittest.Command(projectRoot(t), "rev-parse", "--show-toplevel").Output()
-	if err != nil {
-		t.Fatalf("resolve repository root: %v", err)
-	}
-	root := strings.TrimSpace(string(out))
-	if root == "" {
-		t.Fatal("git returned an empty repository root")
-	}
-	return root
-}
-
 func publicCutTrackedFiles(root string) ([]publicCutFile, error) {
-	paths, err := gitutil.CandidatePaths(root)
+	paths, err := candidatePaths(root)
 	if err != nil {
 		return nil, err
 	}
@@ -710,6 +247,84 @@ func publicCutTrackedFiles(root string) ([]publicCutFile, error) {
 		files = append(files, file)
 	}
 	return files, nil
+}
+
+// candidatePaths lists the candidate cut of the repository at root: every
+// tracked path and every non-ignored untracked path, relative to root, sorted
+// and unique. A tracked path deleted from the work tree is listed;
+// publicCutTrackedFiles drops it.
+func candidatePaths(root string) ([]string, error) {
+	cmd := exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	cmd.Dir = root
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	data, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git ls-files: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	if len(data) == 0 {
+		return nil, nil
+	}
+	if data[len(data)-1] != 0 {
+		return nil, fmt.Errorf("git ls-files did not terminate its NUL-delimited output")
+	}
+	parts := bytes.Split(data[:len(data)-1], []byte{0})
+	paths := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if len(part) == 0 {
+			return nil, fmt.Errorf("git ls-files returned an empty candidate path")
+		}
+		paths = append(paths, string(part))
+	}
+	sort.Strings(paths)
+	return slices.Compact(paths), nil
+}
+
+// ignoredCandidates returns the paths among paths, relative to root, that the
+// candidate cut leaves out: untracked paths Git's ignore rules match. A path
+// need not exist; a tracked path is never ignored.
+func ignoredCandidates(root string, paths []string) ([]string, error) {
+	cmd := exec.Command("git", "check-ignore", "-z", "--stdin")
+	cmd.Dir = root
+	cmd.Stdin = strings.NewReader(strings.Join(paths, "\x00") + "\x00")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	data, err := cmd.Output()
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("git check-ignore: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	var ignored []string
+	for _, part := range bytes.Split(bytes.TrimSuffix(data, []byte{0}), []byte{0}) {
+		if len(part) > 0 {
+			ignored = append(ignored, string(part))
+		}
+	}
+	sort.Strings(ignored)
+	return ignored, nil
+}
+
+// candidatePathsOnly lists the candidate cut of the repository at root
+// without reading its files: the paths ReadCandidateCut would return.
+func candidatePathsOnly(root string) ([]string, error) {
+	paths, err := candidatePaths(root)
+	if err != nil {
+		return nil, err
+	}
+	present := paths[:0]
+	for _, rel := range paths {
+		if _, err := os.Lstat(filepath.Join(root, filepath.FromSlash(rel))); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("candidate path %q: %w", rel, err)
+		}
+		present = append(present, filepath.ToSlash(rel))
+	}
+	return present, nil
 }
 
 func scanPublicCut(files []publicCutFile) []publicCutFinding {
@@ -991,19 +606,6 @@ func publicCutFindingLess(a, b publicCutFinding) bool {
 	return strings.Join(left, "\x00") < strings.Join(right, "\x00")
 }
 
-func readPublicCutInventory(t *testing.T, path string, allowlist bool) map[publicCutKey]publicCutInventoryEntry {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read public-cut inventory %s: %v", path, err)
-	}
-	entries, err := parsePublicCutInventory(string(data), allowlist)
-	if err != nil {
-		t.Fatalf("parse public-cut inventory %s: %v", path, err)
-	}
-	return entries
-}
-
 func parsePublicCutInventory(data string, allowlist bool) (map[publicCutKey]publicCutInventoryEntry, error) {
 	entries := make(map[publicCutKey]publicCutInventoryEntry)
 	previous := ""
@@ -1169,26 +771,4 @@ func renderPublicCutBaseline(findings []publicCutFinding, allowlist map[publicCu
 		}))
 	}
 	return strings.Join(lines, "\n")
-}
-
-func inventoryMap(entries ...publicCutInventoryEntry) map[publicCutKey]publicCutInventoryEntry {
-	result := make(map[publicCutKey]publicCutInventoryEntry, len(entries))
-	for _, entry := range entries {
-		result[entry.key] = entry
-	}
-	return result
-}
-
-func publicCutErrorsContain(errors []string, fragment string) bool {
-	for _, err := range errors {
-		if strings.Contains(err, fragment) {
-			return true
-		}
-	}
-	return false
-}
-
-func publicCutRunGit(t *testing.T, root string, args ...string) {
-	t.Helper()
-	gittest.Run(t, root, args...)
 }

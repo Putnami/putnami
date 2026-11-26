@@ -414,10 +414,11 @@ project — `generate`, `tsc` and `tsc-auto`, and `config-merge`, `generate` and
 `describe` — declare it, so a test fixture keys and selects the steps that run
 the tests, and no dependent's tests through `^generate`
 ([ADR 0089](adr/0089-a-step-may-read-no-command-option-layer.md)). That is why the gates reading this repository's own
-documents — the governance surface and the contributor recipe in
-[`tooling/cli-document-set`](../../cli-document-set/README.md), the release plan,
-its recorded verdict and the public-cut candidate in
-[`tooling/cli-documents`](../../cli-documents/README.md) — live outside
+documents — the public-cut scan, the release plan and its recorded verdict, and
+the governance record in
+[`tooling/repository-checks`](../../repository-checks/README.md), and the
+contributor recipe in
+[`tooling/cli-document-set`](../../cli-document-set/README.md) — live outside
 `@putnami/cli`: editing `CONTRIBUTING.md` now re-runs small suites instead of
 the CLI's whole test task.
 

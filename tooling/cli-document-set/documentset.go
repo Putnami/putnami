@@ -1,13 +1,13 @@
-// Package documentset holds the gates that read a known set of this
-// repository's documents: the governance surface, the neutral-contributor
-// recipe, the first-use block, the published documentation the CLI cites, the
-// project manifests and the environments of putnami.ci.json.
+// Package documentset holds the gates that run the CLI against a known set of
+// this repository's documents: the neutral-contributor recipe of
+// CONTRIBUTING.md, the gate and the environments of putnami.ci.json, the
+// project manifests those environments follow, and the cloudless release
+// fixture.
 //
-// They live apart from the whole-tree gates of @putnami/cli-documents because a
-// cache key is per project and per command, never per task. The whole-tree
-// gates key on every candidate file, so any change runs them; these key on the
-// documents they read, so a change runs them exactly when it touches one of
-// those documents.
+// The checks that only read files as text live in @putnami/repository-checks,
+// which imports nothing from this repository. These gates need the CLI's
+// code, so they key on the documents they read: a change runs them when it
+// touches one of those documents or the code they compile.
 //
 // The package carries no production code on purpose: it is a test surface over
 // the repository, not a library. Its module path is a child of the CLI's so it

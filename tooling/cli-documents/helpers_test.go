@@ -1,6 +1,7 @@
 package documents
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,23 +9,8 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
-// The gates in this project read the repository itself, so every one of them
-// needs the same two anchors: where the repository root is, and where the CLI
-// module it reasons about lives. Both are derived by walking up from the test's
-// working directory — the project root — rather than from a relative literal,
-// so a test that moves inside the project keeps working.
-
-// cliDocumentsProjectDir is this project's path from the repository root. It is
-// the form the cache key's file selection is relative to, so it is stated once
-// and derived from, never spelled again.
-const cliDocumentsProjectDir = "tooling/cli-documents"
-
-// cliModuleDir is the CLI module this project reads. The gates read its
-// committed release plan, its recorded rehearsal verdict and its manifest, all
-// of which stay where the documentation links point at them.
-const cliModuleDir = "tooling/cli"
-
-// repositoryRoot walks up to the directory holding putnami.workspace.json.
+// repositoryRoot walks up from the test's working directory, the project root,
+// to the directory holding putnami.workspace.json.
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -43,15 +29,37 @@ func repositoryRoot(t *testing.T) string {
 	}
 }
 
-// cliModuleRoot returns the root of the CLI module these gates read.
-func cliModuleRoot(t *testing.T) string {
-	t.Helper()
-	return filepath.Join(repositoryRoot(t), filepath.FromSlash(cliModuleDir))
+// projectRelativePath returns a repository-relative path in the form
+// filepath.Rel produces against a project root — the form collectFiles and
+// store.SelectsPath both match.
+func projectRelativePath(projectDir, target string) string {
+	rel, err := filepath.Rel(filepath.FromSlash(projectDir), filepath.FromSlash(target))
+	if err != nil {
+		return target
+	}
+	return filepath.ToSlash(rel)
 }
 
-// projectRoot returns this project's own root — the directory holding the
-// manifest whose declared test inputs key these gates.
-func projectRoot(t *testing.T) string {
+// declaredTestFilePatterns reads options.test.filePatterns of one project.
+func declaredTestFilePatterns(t *testing.T, projectDir string) []string {
 	t.Helper()
-	return filepath.Join(repositoryRoot(t), filepath.FromSlash(cliDocumentsProjectDir))
+	manifest := filepath.Join(repositoryRoot(t), filepath.FromSlash(projectDir), "putnami.json")
+	data, err := os.ReadFile(manifest)
+	if err != nil {
+		t.Fatalf("read %s: %v", manifest, err)
+	}
+	var parsed struct {
+		Options struct {
+			Test struct {
+				FilePatterns []string `json:"filePatterns"`
+			} `json:"test"`
+		} `json:"options"`
+	}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("parse %s: %v", manifest, err)
+	}
+	if len(parsed.Options.Test.FilePatterns) == 0 {
+		t.Fatalf("%s declares no test filePatterns, so nothing is keyed", manifest)
+	}
+	return parsed.Options.Test.FilePatterns
 }

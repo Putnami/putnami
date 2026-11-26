@@ -32,6 +32,7 @@ func authoredCLIDomain() *arch.Builder {
 			"/tooling/cli-documents",
 			"/tooling/cli-model",
 			"/tooling/install-scripts",
+			"/tooling/repository-checks",
 			"/tooling/windows-vet",
 		).
 		Owns(

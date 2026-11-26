@@ -1,6 +1,6 @@
 # ADR 0001 — Known-document-set gates key on their documents
 
-- **Status**: accepted
+- **Status**: accepted; the checks that only read text moved to `@putnami/repository-checks` ([its ADR 0001](../../../repository-checks/doc/adr/0001-text-checks-depend-on-nothing.md))
 - **Date**: 2026-11-25
 - **Scope**: `@putnami/cli-document-set`, `@putnami/cli-documents`
 
@@ -30,8 +30,8 @@ project is in that project's scope, and the scope boundary forbids its import of
 
 ## Consequences
 
-- `@putnami/cli-documents` keeps `git:**`, so it still runs for every change,
-  with a smaller suite. Moving the whole-tree gates out of the per-change gate
-  is left to the engine review.
+- The whole-tree gates keep `git:**` and run for every change. They now live
+  in `@putnami/repository-checks`, which depends on no other project, together
+  with the gates of this project that only read text.
 - A change outside the named documents and manifests no longer runs the
   document-set gates.
