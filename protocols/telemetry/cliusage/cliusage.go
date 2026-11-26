@@ -155,6 +155,7 @@ var Commands = []string{
 	"validate-workspace",
 	"version",
 	"version-get",
+	"version-notes",
 	"version-tag",
 	"workspace-fetch",
 	"workspace-install",

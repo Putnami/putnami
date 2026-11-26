@@ -18,13 +18,13 @@ const versionFeature = "tooling/version-commands"
 
 // versionCommands are the manifest's commands and tasks, sorted: one for each
 // subcommand of the version group.
-var versionCommands = []string{"version-get", "version-tag"}
+var versionCommands = []string{"version-get", "version-notes", "version-tag"}
 
 // TestTheManifestDeclaresTheVersionGroup pins how putnami reaches the version
-// commands: the version group defaults to get, both subcommands are
+// commands: the version group defaults to get, every subcommand is
 // interactive, so putnami opens the host channel for them, and each runs the
-// executable with its own arguments in the workspace root, uncached. tag
-// declares dry-run, the global flag putnami forwards only to a command that
+// executable with its own arguments in the workspace root, uncached. notes and
+// tag declare dry-run, the global flag putnami forwards only to a command that
 // declares it.
 func TestTheManifestDeclaresTheVersionGroup(t *testing.T) {
 	t.Parallel()
@@ -37,10 +37,10 @@ func TestTheManifestDeclaresTheVersionGroup(t *testing.T) {
 	if !declared || group.Default != "get" {
 		t.Fatalf("version group %+v, want one whose default is get", group)
 	}
-	if got := slices.Sorted(maps.Keys(group.Subcommands)); !slices.Equal(got, []string{"get", "tag"}) {
-		t.Fatalf("version subcommands %v, want get and tag", got)
+	if got := slices.Sorted(maps.Keys(group.Subcommands)); !slices.Equal(got, []string{"get", "notes", "tag"}) {
+		t.Fatalf("version subcommands %v, want get, notes and tag", got)
 	}
-	for sub, command := range map[string]string{"get": "version-get", "tag": "version-tag"} {
+	for sub, command := range map[string]string{"get": "version-get", "notes": "version-notes", "tag": "version-tag"} {
 		subcommand := group.Subcommands[sub]
 		if subcommand.Command != command || !subcommand.Interactive || subcommand.RunsWithoutWorkspace() {
 			t.Errorf("version %s = %+v, want the interactive command %s that needs a workspace", sub, subcommand, command)
@@ -61,8 +61,13 @@ func TestTheManifestDeclaresTheVersionGroup(t *testing.T) {
 			t.Errorf("task %s caches its result", command)
 		}
 	}
-	if _, ok := manifest.Commands["version-tag"].Flags["dry-run"]; !ok {
-		t.Error("version-tag does not declare dry-run, so putnami would not forward --dry-run")
+	for _, command := range []string{"version-notes", "version-tag"} {
+		if _, ok := manifest.Commands[command].Flags["dry-run"]; !ok {
+			t.Errorf("%s does not declare dry-run, so putnami would not forward --dry-run", command)
+		}
+	}
+	if flags := slices.Sorted(maps.Keys(manifest.Commands["version-notes"].Flags)); !slices.Equal(flags, []string{"dry-run", "yes"}) {
+		t.Errorf("version-notes declares the flags %v, want dry-run and yes", flags)
 	}
 	for _, name := range []string{"scope", "push", "yes"} {
 		if _, ok := manifest.Commands["version-tag"].Flags[name]; !ok {
@@ -93,6 +98,8 @@ func TestRunDispatchesTheVersionCommands(t *testing.T) {
 		{[]string{"version", "tag", "a", "b", "--putnamiContext", context}, 2, "usage: putnami version tag"},
 		{[]string{"version", "get", "--putnamiContext", context}, 1, "run `putnami version get` (a hosted run opens no channel; " + wire.SocketEnv + " and " + wire.TokenEnv + " not set)"},
 		{[]string{"version", "tag", "--scope", "tooling", "--putnamiContext", context}, 1, "run `putnami version tag`"},
+		{[]string{"version", "notes", "--putnamiContext", context}, 2, "usage: putnami version notes <line>@<version>..."},
+		{[]string{"version", "notes", "tooling@1.0.0", "--putnamiContext", context}, 1, "run `putnami version notes`"},
 		{[]string{"version", "get"}, 1, "this command needs an interactive launch by putnami"},
 	} {
 		var stdout, stderr bytes.Buffer
@@ -125,6 +132,23 @@ func TestRunReadsTheOutputModeAndDryRunFromTheJobContext(t *testing.T) {
 		}
 		if stdout.Len() != 0 {
 			t.Errorf("%s: stdout %q, want nothing", mode, stdout.String())
+		}
+	}
+}
+
+// TestNotesRefuseStructuredOutput pins that the output mode of the job context
+// reaches notes, which refuses structured output before it reads anything.
+func TestNotesRefuseStructuredOutput(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, versionFeature, "notes-refusals", "notes-refuse-structured-output")
+	for _, mode := range []string{"json", "jsonl"} {
+		var stdout, stderr bytes.Buffer
+		context := writeJobContext(t, `{"output":"`+mode+`","dry-run":true}`)
+		if code := run([]string{"version", "notes", "tooling@1.0.0", "--putnamiContext", context}, &stdout, &stderr); code != 2 {
+			t.Errorf("%s: exit %d, want 2", mode, code)
+		}
+		if want := "--output=" + mode + " is not supported by \"version notes\"\n"; stderr.String() != want || stdout.Len() != 0 {
+			t.Errorf("%s: stderr %q and stdout %q, want %q alone", mode, stderr.String(), stdout.String(), want)
 		}
 	}
 }

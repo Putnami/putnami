@@ -85,7 +85,7 @@ func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
 	if len(candidates) == 0 {
 		return Release{}, false, nil
 	}
-	slices.SortFunc(candidates, func(a, b Release) int { return compareVersions(b.Version, a.Version) })
+	slices.SortFunc(candidates, func(a, b Release) int { return CompareVersions(b.Version, a.Version) })
 
 	// One line per candidate, in order: "<object> <type> <size>" for the
 	// object the tag peels to, or "<name> missing".
@@ -222,10 +222,10 @@ func releaseVersion(tag, prefix, suffix string) (string, bool) {
 	return version, true
 }
 
-// compareVersions orders two release versions: negative when a is the lower,
-// positive when a is the higher. Numbers compare by length, then by digits, so
-// no number overflows.
-func compareVersions(a, b string) int {
+// CompareVersions orders two MAJOR.MINOR.PATCH release versions, such as the
+// ones Version returns: negative when a is the lower, positive when a is the
+// higher. Numbers compare by length, then by digits, so no number overflows.
+func CompareVersions(a, b string) int {
 	as, bs := strings.Split(a, "."), strings.Split(b, ".")
 	for i := range as {
 		if len(as[i]) != len(bs[i]) {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -52,17 +51,8 @@ func (c Command) tag(ctx context.Context, args []string) error {
 	if len(rest) > 1 {
 		return protocolcli.Usagef("%s", tagUsage)
 	}
-	result, err := c.versionLines(ctx, parsed.Scope)
+	result, err := c.releasableLines(ctx, "version tag", "tag HEAD", parsed.Scope)
 	if err != nil {
-		return err
-	}
-	// A release never reads its version from a recorded view: the view may
-	// be older than the commits it releases.
-	if recorded := result.RecordedGraph; recorded != nil {
-		return fmt.Errorf("version: %s reads the dependency graph, which could not be refreshed: %s",
-			supportCatalog, recorded.RefreshError)
-	}
-	if err := c.requireSourceRevisionAtHead(ctx, result.SourceRevision); err != nil {
 		return err
 	}
 	line, err := resolveTagLine(result.Lines, parsed.Scope)
@@ -83,7 +73,7 @@ func (c Command) tag(ctx context.Context, args []string) error {
 		fmt.Fprintln(c.Stdout, notes)
 		return nil
 	}
-	if err := c.requireCleanGitTree(ctx); err != nil {
+	if err := c.requireCleanGitTree(ctx, "tagging"); err != nil {
 		return err
 	}
 	if exists, err := c.gitTagExists(ctx, tagName); err != nil {
@@ -102,8 +92,7 @@ func (c Command) tag(ctx context.Context, args []string) error {
 // release writes the changelog, commits it, tags the commit and, with push,
 // pushes HEAD and the tag to origin.
 func (c Command) release(ctx context.Context, scopePath, version, tagName, notes string, push bool) error {
-	changelogPath := filepath.Join(c.Root, filepath.FromSlash(changelogRelPath(scopePath)))
-	if err := PrependChangelog(changelogPath, changelogTitle(scopePath), notes); err != nil {
+	if err := PrependChangelog(c.changelogPath(scopePath), changelogTitle(scopePath), notes); err != nil {
 		return err
 	}
 	if err := c.runGit(ctx, "add", "--", changelogRelPath(scopePath)); err != nil {
@@ -135,6 +124,27 @@ func (c Command) release(ctx context.Context, scopePath, version, tagName, notes
 	return nil
 }
 
+// releasableLines asks the host for the lines scope names, for a command that
+// releases HEAD. A refusal names the command and its purpose, what the command
+// does with HEAD.
+//
+// A release never reads its version from a recorded view: the view may be older
+// than the commits it releases.
+func (c Command) releasableLines(ctx context.Context, command, purpose, scope string) (wire.VersionLinesResult, error) {
+	result, err := c.versionLines(ctx, scope)
+	if err != nil {
+		return wire.VersionLinesResult{}, err
+	}
+	if recorded := result.RecordedGraph; recorded != nil {
+		return wire.VersionLinesResult{}, fmt.Errorf("version: %s reads the dependency graph, which could not be refreshed: %s",
+			supportCatalog, recorded.RefreshError)
+	}
+	if err := c.requireSourceRevisionAtHead(ctx, command, purpose, result.SourceRevision); err != nil {
+		return wire.VersionLinesResult{}, err
+	}
+	return result, nil
+}
+
 // requireSourceRevisionAtHead refuses a release while the host is bound to a
 // commit other than HEAD. A release computes its version from HEAD's history
 // and puts the release commit and its tag on top of HEAD, so a tag always
@@ -142,16 +152,16 @@ func (c Command) release(ctx context.Context, scopePath, version, tagName, notes
 // repository, and releasing under it would record one commit's release
 // against another's identity. A binding that names HEAD itself changes
 // nothing, so it is accepted.
-func (c Command) requireSourceRevisionAtHead(ctx context.Context, bound string) error {
+func (c Command) requireSourceRevisionAtHead(ctx context.Context, command, purpose, bound string) error {
 	head, err := c.gitOutput(ctx, "rev-parse", "HEAD")
 	if err != nil {
-		return fmt.Errorf("version tag: read HEAD: %w", err)
+		return fmt.Errorf("%s: read HEAD: %w", command, err)
 	}
 	head = strings.TrimSpace(head)
 	if bound != strings.ToLower(head) {
 		return protocolcli.InvalidConfigf(
-			"version tag releases the checked-out commit %s, but %s binds this run to %s; unset it to tag HEAD",
-			head, sourceRevisionEnv, bound)
+			"%s releases the checked-out commit %s, but %s binds this run to %s; unset it to %s",
+			command, head, sourceRevisionEnv, bound, purpose)
 	}
 	return nil
 }
@@ -211,13 +221,15 @@ func (c Command) coAuthorTrailer(ctx context.Context) string {
 	return fmt.Sprintf("Co-Authored-By: %s <%s>", name, email)
 }
 
-func (c Command) requireCleanGitTree(ctx context.Context) error {
+// requireCleanGitTree refuses a tree with a change or an untracked file, and
+// names the step the tree is not ready for.
+func (c Command) requireCleanGitTree(ctx context.Context, step string) error {
 	output, err := c.gitOutput(ctx, "status", "--porcelain")
 	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(output) != "" {
-		return protocolcli.InvalidConfigf("git tree is not clean; commit or discard changes before tagging")
+		return protocolcli.InvalidConfigf("git tree is not clean; commit or discard changes before %s", step)
 	}
 	return nil
 }

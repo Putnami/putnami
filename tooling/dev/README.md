@@ -5,8 +5,8 @@ composition and qualification. The extension's manifest declares the eleven
 development verbs, in the order help lists them, with the description,
 aliases, related commands and default traits of each. It runs none of them:
 the language extensions declare and run the jobs of every verb. Its
-executable serves `putnami version get`, `putnami version tag`,
-`putnami compose` and `putnami qualify`.
+executable serves `putnami version get`, `putnami version notes`,
+`putnami version tag`, `putnami compose` and `putnami qualify`.
 
 The Go, TypeScript and Python extensions name `@putnami/dev` in their
 `extensionDependencies`, so installing any of them installs this extension
@@ -15,7 +15,8 @@ How a loaded vocabulary drives help, aliases, completion and default traits is
 [ADR 0067](../cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md);
 what this extension declares is [ADR 0001](doc/adr/0001-the-dev-extension-declares-the-development-verbs.md).
 How it serves the version commands is
-[ADR 0002](doc/adr/0002-the-dev-extension-serves-version-get-and-tag.md), and
+[ADR 0002](doc/adr/0002-the-dev-extension-serves-version-get-and-tag.md) and
+[ADR 0004](doc/adr/0004-version-notes-writes-every-line-in-one-commit.md), and
 how it serves compose and qualify is
 [ADR 0003](doc/adr/0003-the-dev-executable-serves-compose-and-qualify.md).
 
@@ -64,18 +65,19 @@ dependency of every language extension the repository loads by path.
 | Command | What it does |
 |---|---|
 | `putnami version get [--scope <line>]` | Prints each version line with the version HEAD has on it, or only the line `--scope` names. `--output=json` and `--output=jsonl` print one result envelope. |
+| `putnami version notes <line>@<version>... [--dry-run] [--yes]` | Prepares the notes of several lines: writes each line's `CHANGELOG.md` as `version tag` does, in one commit on the current branch, with no tag and no push. Then names the other files the last release modified. Without `--yes`, it only proposes the notes. |
 | `putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]` | Releases one line: writes the release under the title of the line's `CHANGELOG.md`, commits it, and puts an annotated tag on that commit. `--push` pushes HEAD and the tag. Without `--yes`, it only proposes the release. |
 
 `putnami version` runs `get`. A workspace with more than one line names the
 line to release with `--scope`. A `<tag>` replaces the proposed release when
 it matches the line's tag pattern.
 
-Both are interactive subcommands. putnami launches the executable in the
+All three are interactive subcommands. putnami launches the executable in the
 workspace root and opens a host RPC channel, through which the command asks
 the core for the version lines (`version.lines`). The core computes every
-version; the executable prints it, and `version tag` runs git to commit, tag
-and push. A hosted run (`--credential-fd`) opens no channel, so neither
-command runs there.
+version; the executable prints it, `version notes` runs git to commit, and
+`version tag` runs git to commit, tag and push. A hosted run
+(`--credential-fd`) opens no channel, so none of them runs there.
 
 A usage error exits 2. `version tag` refuses with exit status 2 when the
 workspace has several lines and no `--scope`, when HEAD is already tagged,
@@ -84,6 +86,16 @@ the line's pattern, when `PUTNAMI_SOURCE_REVISION` binds the run to a commit
 other than HEAD, and under `--output=json` or `--output=jsonl`. A failure of
 git or of the host exits 1, and so does a dependency graph the host could not
 refresh.
+
+`version notes` names the root line with `/`, such as `/@1.0.0`. It refuses with
+exit status 2 a line it does not know or that you name twice, a version that is
+not `MAJOR.MINOR.PATCH` or not above the line's last release, a version whose
+tag exists or whose section the changelog already holds, a tagged HEAD, a run
+bound to another commit, and `--output=json` or `--output=jsonl`. Without
+`--dry-run`, it also refuses a tree that is not clean, the default branch and a
+detached HEAD; `--dry-run` prints the notes there. The default branch is the
+one `origin/HEAD` points at, else `main` or `master`. A failure exits 1, as
+for `version tag`.
 
 ## Compose and qualify
 

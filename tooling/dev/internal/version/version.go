@@ -1,12 +1,13 @@
-// Package version serves `putnami version get` and `putnami version tag`:
-// it prints the version every version line is at, and releases one line
-// with its changelog, its release commit and its annotated tag.
+// Package version serves `putnami version get`, `putnami version notes` and
+// `putnami version tag`: it prints the version every version line is at, writes
+// the changelogs of several lines in one commit, and releases one line with its
+// changelog, its release commit and its annotated tag.
 //
 // It computes no version. The putnami process that launched the executable
 // answers version.lines through the host RPC channel with the versions, the
 // proposed releases and the commits the core computes from git, and this
-// package prints and releases from that answer. `version tag` runs git itself
-// to commit, tag and push.
+// package prints and releases from that answer. It runs git itself to read the
+// last release and to commit, tag and push.
 package version
 
 import (
@@ -14,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wire "go.putnami.dev/protocol/extension/hostrpc"
@@ -115,4 +117,9 @@ func changelogRelPath(scopePath string) string {
 		return "CHANGELOG.md"
 	}
 	return scopePath + "/CHANGELOG.md"
+}
+
+// changelogPath is the absolute path of a line's changelog.
+func (c Command) changelogPath(scopePath string) string {
+	return filepath.Join(c.Root, filepath.FromSlash(changelogRelPath(scopePath)))
 }

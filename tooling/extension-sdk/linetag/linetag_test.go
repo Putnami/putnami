@@ -285,6 +285,25 @@ func TestVersionReadsOnlyAReleaseTagOfTheLine(t *testing.T) {
 	}
 }
 
+func TestCompareVersionsOrdersReleasesNumerically(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		a, b string
+		sign int
+	}{
+		{"1.2.3", "1.2.3", 0},
+		{"0.9.0", "0.10.0", -1},
+		{"2.0.0", "1.99.99", 1},
+		{"1.2.10", "1.2.9", 1},
+		{"99999999999999999999.0.0", "99999999999999999998.0.0", 1},
+	} {
+		got := CompareVersions(c.a, c.b)
+		if (got < 0 && c.sign >= 0) || (got > 0 && c.sign <= 0) || (got == 0 && c.sign != 0) {
+			t.Errorf("CompareVersions(%s, %s) = %d, want the sign %d", c.a, c.b, got, c.sign)
+		}
+	}
+}
+
 func TestAnUnusablePatternIsAnError(t *testing.T) {
 	t.Parallel()
 	dir := repository(t)
