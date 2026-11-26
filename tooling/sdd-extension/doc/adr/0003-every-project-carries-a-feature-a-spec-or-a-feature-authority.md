@@ -56,8 +56,9 @@ warning named 7 of them.
    `options.sdd.featureCoverage`, pass with a note. A shallow clone fails: its
    history can stop before the merge base. The step reads Git history, which
    the candidate cut does not hold, so it is never cached, like
-   `breaking-marker-validate`. Both change gates run `validate --impacted`:
-   Contributor CI names the base branch with `--baseline`, and the hosted
+   `breaking-marker-validate`. Both change gates run it with `--impacted`:
+   Contributor CI's squash commit checks run `validate-workspace` and name the
+   base branch with `--baseline`, and the hosted
    Putnami CI runner resolves the trunk or the nearest epic branch. Both
    check out the whole history, so the rule holds on every pull request.
 6. **The workspace opts in.** Without `options.sdd.featureCoverage`, the step
@@ -145,8 +146,8 @@ false.
   fails every entry the merge base does not list.
 - A run without an impacted baseline does not refuse a new entry. Without
   `--impacted-strict`, a baseline that does not resolve selects every project
-  and names no baseline, so the step passes with a note. Contributor CI passes
-  `--impacted-strict`. The hosted Putnami CI runner does not, and relies on
+  and names no baseline, so the step passes with a note. Contributor CI's
+  squash commit checks pass `--impacted-strict`. The hosted Putnami CI runner does not, and relies on
   its full checkout to hold the trunk.
 - A `featureAuthority` now passes a gate, not a warning: a reviewer reads
   every new `none` reason and every new `owner`.

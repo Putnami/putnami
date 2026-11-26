@@ -40,7 +40,8 @@ is too late.
    request sets it in the environment of the `putnami` process: the title, a
    blank line and the body when the repository squashes with the body, the
    title alone otherwise. It runs `validate` again when the title or the body
-   is edited. Contributor CI sets it on `pull_request` events. The hosted
+   is edited. Contributor CI sets it on `pull_request` events, in its squash
+   commit checks, which run `validate-workspace` alone. The hosted
    Putnami CI runner does not set it yet.
 4. **The range is the run's impacted baseline to `HEAD`.** The step reads the
    baseline that `--impacted` resolved from the job context. A set message in
@@ -76,8 +77,8 @@ is too late.
 - A pull request whose commits declare a break fails the gate when its title
   drops the marker, on every runner that sets the variable.
 - Until the hosted Putnami CI runner sets the variable, only Contributor CI
-  checks the marker. Contributor CI does not run when the title or the body is
-  edited, so an edit after the last push is checked at the next push.
+  checks the marker. Its squash commit checks run at each push and at each
+  edit of the title, the body or the base branch.
 - The step checks the default squash message only. A person who rewrites the
   message in the merge dialog can still drop the marker.
 - The step does not run when `--impacted` selects no project: the run then
@@ -94,7 +95,8 @@ is too late.
   system's limit for one environment variable (128 KiB on Linux) cannot be
   passed, and the runner fails before the gate starts.
 - A stale baseline counts the commits it lacks. The runner fetches the base
-  branch before the gate, as Contributor CI does with its full clone.
+  branch before the gate, as Contributor CI's squash commit checks do with
+  their full clone.
 - A repository that changes its squash setting changes what its runner writes
   in the variable in the same step.
 - The gate runs the CLI and the extension of the pull request itself. A pull
