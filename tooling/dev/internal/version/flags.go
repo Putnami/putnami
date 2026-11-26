@@ -6,8 +6,8 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 )
 
-// flags are the flags of `version get` and `version tag`. A version is
-// derived from git per line, so the only selector is the line.
+// flags are the flags of the version commands. A version is derived from git
+// per line, so the only selector is the line.
 type flags struct {
 	Scope  string
 	Push   bool

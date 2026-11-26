@@ -88,7 +88,7 @@
       "id": "tooling/version-commands",
       "type": "feature",
       "name": "Version commands",
-      "outcome": "A user reads the version every version line is at with putnami version get, and releases one line with putnami version tag, which writes its changelog, its release commit and its tag, from the versions the core computes",
+      "outcome": "A user reads the version every version line is at with putnami version get, and releases one line with putnami version tag, which writes its changelog, its release commit and its tag, or prepares the notes of several lines in one commit with putnami version notes, from the versions and commits the core computes",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -186,6 +186,61 @@
           }
         },
         {
+          "id": "notes-write-every-line-in-one-commit",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-commit-holds-every-changelog",
+              "notes-tag-and-push-nothing",
+              "notes-name-the-other-files-of-the-last-release"
+            ]
+          }
+        },
+        {
+          "id": "notes-are-reviewable-first",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "notes-dry-run-prints-the-result",
+              "notes-without-yes-write-nothing"
+            ]
+          }
+        },
+        {
+          "id": "notes-refusals",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "notes-need-lines-and-versions",
+              "notes-refuse-an-unknown-line",
+              "notes-refuse-a-version-that-is-no-release",
+              "notes-refuse-a-version-that-does-not-increase",
+              "notes-refuse-an-existing-tag",
+              "notes-refuse-a-tagged-head",
+              "notes-refuse-a-version-already-noted",
+              "notes-refuse-a-run-bound-to-another-commit",
+              "notes-refuse-a-dirty-tree",
+              "notes-refuse-the-default-branch",
+              "notes-refuse-a-detached-head",
+              "notes-refuse-structured-output",
+              "notes-refuse-a-recorded-graph",
+              "notes-report-a-git-failure"
+            ]
+          }
+        },
+        {
           "id": "usage-and-host-errors",
           "stage": "coded",
           "evidenceKinds": [
@@ -218,6 +273,7 @@
       "surface": {
         "commands": [
           "version get",
+          "version notes",
           "version tag"
         ]
       }

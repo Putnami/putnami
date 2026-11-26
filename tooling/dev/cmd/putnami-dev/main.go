@@ -4,6 +4,7 @@
 //
 //	putnami-dev __putnami runtime-info          (the runtime handshake)
 //	putnami-dev version get [flags]             (putnami version get)
+//	putnami-dev version notes [flags]           (putnami version notes)
 //	putnami-dev version tag [flags]             (putnami version tag)
 //	putnami-dev compose up <project> [flags]    (putnami compose <project>)
 //	putnami-dev qualify run <project> [flags]   (putnami qualify <project>)
@@ -29,6 +30,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"syscall"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -74,7 +76,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	contextFile := contextPath(args)
 	args = withoutContext(args)
 	switch {
-	case len(args) >= 2 && args[0] == "version" && (args[1] == "get" || args[1] == "tag"):
+	case len(args) >= 2 && args[0] == "version" && slices.Contains([]string{"get", "notes", "tag"}, args[1]):
 		return runVersion(args[1], args[2:], contextFile, stdout, stderr)
 	case len(args) >= 2 && args[0] == "compose" && args[1] == "up":
 		return runWorkload(compose.CommandPath, args[2:], contextFile, stdout, stderr, func(launch workloadLaunch) int {
@@ -93,7 +95,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			})
 		})
 	}
-	fmt.Fprintln(stderr, "putnami-dev: unknown invocation; this runtime answers the Putnami runtime handshake and the version get and tag, compose up and qualify run commands")
+	fmt.Fprintln(stderr, "putnami-dev: unknown invocation; this runtime answers the Putnami runtime handshake and the version get, notes and tag, compose up and qualify run commands")
 	return 2
 }
 
@@ -232,8 +234,11 @@ func runVersion(sub string, args []string, contextFile string, stdout, stderr io
 	command.Root = root
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if sub == "get" {
+	switch sub {
+	case "get":
 		return command.Get(ctx, args)
+	case "notes":
+		return command.Notes(ctx, args)
 	}
 	return command.Tag(ctx, args)
 }

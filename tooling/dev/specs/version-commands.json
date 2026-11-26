@@ -4,12 +4,14 @@
   "feature": "tooling/version-commands",
   "outcomes": [
     "A user reads the version every version line is at with putnami version get, and releases one line with putnami version tag, which writes its changelog, its release commit and its tag",
+    "A user prepares the release notes of several lines with putnami version notes, which writes every line's changelog in one commit to review before any tag",
     "A release is reviewable before it happens: version tag prints the proposed tag and its changelog and writes nothing without --yes",
     "The versions come from the putnami process that launched the command, so version get prints and version tag releases what the core computes from git"
   ],
   "nonGoals": [
     "Computing a version: the core computes every version, proposed release and line history, and answers them through version.lines",
-    "Running from a hosted run or from a putnami process that opens no host channel"
+    "Running from a hosted run or from a putnami process that opens no host channel",
+    "Knowing the layout of a workspace: version notes names the other files the last release modified and writes none of them"
   ],
   "requirements": [
     {
@@ -49,6 +51,24 @@
       ]
     },
     {
+      "id": "notes-write-every-line-in-one-commit",
+      "text": [
+        "putnami version notes <line>@<version>... --yes writes the notes of each named line into its CHANGELOG.md as version tag renders them, at the named version, and makes one commit on the current branch that names every line and version with the human's Co-Authored-By trailer. / names the root line. It tags and pushes nothing.",
+        "It then names the other files of the workspace that the last release commits of the lines modified, and writes none."
+      ]
+    },
+    {
+      "id": "notes-are-reviewable-first",
+      "text": "Without --yes, version notes writes nothing: --dry-run prints, for each named line in order, the changelog file, the line, the version and the notes, then the files it names, and otherwise it prints the lines and versions and asks for --yes."
+    },
+    {
+      "id": "notes-refusals",
+      "text": [
+        "version notes exits 2 and writes nothing for no line, a line named twice or unknown, a version that is not MAJOR.MINOR.PATCH or not above the line's last release, an existing tag, a tagged HEAD, a version its CHANGELOG.md already holds, a host bound to another commit, and the output mode json or jsonl. Without --dry-run, it also exits 2 and writes nothing for a dirty tree, the default branch and a detached HEAD.",
+        "It exits 1 for a dependency graph the host could not refresh and for a failure of git."
+      ]
+    },
+    {
       "id": "usage-and-host-errors",
       "text": [
         "An unexpected argument or --scope without a value exits 2 with the reason on standard error.",
@@ -59,13 +79,14 @@
     {
       "id": "version-group-runs-the-executable",
       "text": [
-        "The manifest declares the version command group, whose default is get, with interactive get and tag subcommands that run the executable in the workspace root without a cache. tag declares the dry-run flag the core forwards.",
-        "The executable runs version get and version tag with the job context argument putnami appends removed."
+        "The manifest declares the version command group, whose default is get, with interactive get, notes and tag subcommands that run the executable in the workspace root without a cache. notes and tag declare the dry-run flag the core forwards.",
+        "The executable runs version get, version notes and version tag with the job context argument putnami appends removed."
       ]
     }
   ],
   "decisions": [
     "tooling/dev/doc/adr/0002-the-dev-extension-serves-version-get-and-tag.md",
+    "tooling/dev/doc/adr/0004-version-notes-writes-every-line-in-one-commit.md",
     "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md"
   ]
 }

@@ -158,8 +158,8 @@ putnami version tag --scope tooling --yes --push
 putnami version tag protocols/v0.4.0 --scope protocols --yes --push   # name the tag
 ```
 
-`putnami version get` and `putnami version tag` are commands of
-`@putnami/dev`, which every language extension depends on. They read the
+`putnami version get`, `putnami version notes` and `putnami version tag` are
+commands of `@putnami/dev`, which every language extension depends on. They read the
 versions the core computes, and need an interactive launch: a terminal or a
 CI step, not a hosted run.
 
@@ -171,6 +171,41 @@ patch at most — floored at a patch, plus the ordered
 suffix `<yyyymmddHHMMSS>-<sha>`. `version tag` regenerates
 `<line>/CHANGELOG.md` from those same commits, creates the release commit that
 carries it, then the annotated tag on that commit.
+
+A release of several lines goes through one pull request. `version notes`
+writes the changelog of each line in one commit, with no tag and no push:
+
+```sh
+git switch -c chore/release-0.6.0
+putnami version notes go@0.6.0 tooling@0.6.0 --dry-run
+putnami version notes go@0.6.0 tooling@0.6.0 --yes
+```
+
+It then names the other files the last release modified: the root
+`CHANGELOG.md`, whose release heading takes its date, and the release series in
+`tooling/cli/internal/cli/testdata/release-plan.json` and in
+`tooling/cli/doc/reports/release-rehearsal.md`. Update them on the same branch.
+Each line's section heading carries the day the notes were written, so write
+them on the day of the release, or correct the date on the branch. The notes
+list the commits the branch holds: when `main` moves before the merge, drop the
+notes commit, rebase, and run `version notes` again.
+
+After the merge, the release owner checks out the merge commit with a clean
+tree and creates the signed tag of each line there by hand. `version tag` would
+write each section a second time:
+
+```sh
+for tag in go/v0.6.0 tooling/v0.6.0; do
+  git tag -s "$tag" -m "Putnami 0.6.0 (${tag%/v*} 0.6.0)"
+done
+```
+
+Name each line by its tag, from the `LINE` column of `putnami scopes list`:
+the `typescript` line tags `ts/v{version}`.
+
+Then publish that commit and push the tags as
+[A tag publishes its line as a cohort](#a-tag-publishes-its-line-as-a-cohort)
+says.
 
 A shallow clone is refused: its history and tags are a fraction of the
 repository, so every version computed from it would be a plausible number

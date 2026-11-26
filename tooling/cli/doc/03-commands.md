@@ -530,7 +530,7 @@ No built-in starter opts into agent content, so `init` does not install `@putnam
 
 ### `version`
 
-`putnami version get` and `putnami version tag` are commands of `@putnami/dev`, which every language extension depends on: see [its version commands](../../dev/README.md#the-version-commands). The core computes the versions they print and release. In a workspace without `@putnami/dev`, `putnami version` is a usage error that links the [commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli).
+`putnami version get`, `putnami version notes` and `putnami version tag` are commands of `@putnami/dev`, which every language extension depends on: see [its version commands](../../dev/README.md#the-version-commands). The core computes the versions they print and release. In a workspace without `@putnami/dev`, `putnami version` is a usage error that links the [commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli).
 
 There is no `version set` and no `version bump`: a version is **derived from git**, never declared. A commit carrying a release tag of its line has the tag's version; any other commit takes the line's last release advanced by the conventional commits that touch the line, plus an ordered pre-release suffix. See [Version Management](14-version-management.md).
 
