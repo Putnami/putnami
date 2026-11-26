@@ -340,11 +340,35 @@ def median_range(xs):
             "max": round(max(xs), 2), "n": len(xs)}
 
 
+def task_reuse(path):
+    """Tasks the run executed, against those a cache served, from tasks[]."""
+    with open(path) as f:
+        tasks = json.load(f).get("tasks") or []
+    out = {"executed": 0, "localCache": 0, "coalesced": 0, "skipped": 0, "failed": 0, "total": len(tasks)}
+    for t in tasks:
+        reuse, status = t.get("reuse"), t.get("status")
+        if reuse == "local-cache":
+            out["localCache"] += 1
+        elif reuse == "coalesced":
+            out["coalesced"] += 1
+        elif status == "success":
+            out["executed"] += 1
+        elif status == "skipped":
+            out["skipped"] += 1
+        else:
+            out["failed"] += 1
+    return out
+
+
 def report():
     runs = []
     for p in sorted(glob.glob(f"{DATA}/*/summary.json")):
         with open(p) as f:
-            runs.append(json.load(f))
+            r = json.load(f)
+        sp = os.path.join(os.path.dirname(p), "session.json")
+        if r.get("session") and os.path.exists(sp):
+            r["session"]["tasks"] = task_reuse(sp)
+        runs.append(r)
     groups = {}
     for r in runs:
         if r.get("excluded"):
@@ -362,8 +386,8 @@ def report():
             "sharePct": median_range([r["acct"]["sharePct"] for r in rs]),
             "unattributedS": median_range([r["acct"].get("unattributedS") for r in rs]),
             "shareUpperPct": median_range([r["acct"].get("shareUpperPct") for r in rs]),
-            "executed": median_range([dig(r, "session", "counts", "succeeded") for r in rs]),
-            "localCacheHits": median_range([dig(r, "session", "reuse", "localCache") for r in rs]),
+            "executed": median_range([dig(r, "session", "tasks", "executed") for r in rs]),
+            "localCacheHits": median_range([dig(r, "session", "tasks", "localCache") for r in rs]),
             "maxReadyWaitS": median_range([(dig(r, "session", "maxReadyWaitMs") or 0) / 1000
                                            if dig(r, "session", "maxReadyWaitMs") is not None else None for r in rs]),
             "orchestrationTotalS": median_range([
