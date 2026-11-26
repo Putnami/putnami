@@ -228,17 +228,13 @@ func (s *Scheduler) executeJobGroup(
 	for i := range work {
 		defer work[i].release()
 	}
-	s.acquireGroupCPUBudget(work)
-
 	// The capacity report counts the ceiling granted, wherever admission
 	// charged CPU for it.
-	granted := 0
-	if reservesCPU {
-		granted = work[0].job.CPUBudget
-	}
+	granted := s.acquireGroupCPUBudget(work, reservesCPU)
 	s.capacity.grant(granted)
 	runs := s.runWorkItems(ctx, work)
 	s.capacity.release(granted)
+	s.resources.releaseCeiling(granted)
 	for i := range work {
 		completed = append(completed, s.closeTask(ctx, work[i], runs[work[i].job.Key()], mu, hashes))
 	}
@@ -456,8 +452,13 @@ func (s *Scheduler) plannedCeiling(job *ScheduledJob) (cpuRecommendation, int) {
 }
 
 // acquireGroupCPUBudget takes the ONE CPU ceiling the work items share and
-// stamps it on every member. Ceilings are not aggregate reservations: there is
-// no live claim to release, so peer lifetime cannot affect a grant.
+// stamps it on every member. When the execution reserves CPU (reservesCPU), it
+// answers that ceiling, which the caller hands back to releaseCeiling once the
+// subprocess ends, and zero otherwise. A task with history is granted its
+// planned ceiling, raised to the CPUs the running ceilings leave free
+// (resourcePool.grantCeiling). A task with no history, or a batch with such a
+// member, keeps its planned ceiling, the whole machine. An execution that
+// reserves no CPU keeps its planned ceiling.
 //
 // The ceiling stays group-scoped for a batch, deliberately:
 // what a budget bounds is a SUBPROCESS — it is exported as PUTNAMI_CPU_BUDGET
@@ -468,23 +469,40 @@ func (s *Scheduler) plannedCeiling(job *ScheduledJob) (cpuRecommendation, int) {
 // planned member instead receives its class's fixed maximum recommendation, so
 // the shared tool has enough threads for its most demanding member without
 // making physical concurrency depend on runtime group membership.
-func (s *Scheduler) acquireGroupCPUBudget(work []taskWork) {
+func (s *Scheduler) acquireGroupCPUBudget(work []taskWork, reservesCPU bool) int {
 	if s.cpuAlloc == nil || len(work) == 0 {
-		return
+		return 0
+	}
+	// Every grant takes what the running ceilings leave free
+	// (resourcePool.grantCeiling).
+	grant := func(budget int, cold bool) int {
+		budget = min(max(budget, 1), s.cpuAlloc.totalCPU)
+		if !reservesCPU {
+			return budget
+		}
+		return s.resources.grantCeiling(budget, cold)
+	}
+	granted := func(budget int) int {
+		if reservesCPU {
+			return budget
+		}
+		return 0
 	}
 	key := work[0].job.Key()
 	if len(work) == 1 {
 		job := work[0].job
 		recommendation, budget := s.plannedCeiling(job)
+		budget = grant(budget, !recommendation.fromHistory)
 		job.CPUBudget = s.cpuAlloc.recordGrant(key, job.EffectiveCPUWeight(), job.ExpectedCPUWorkMs, budget)
 		job.CPUBudgetHistoryEligible = recommendation.fromHistory
 		job.CPUBudgetUnweightedCeiling = recommendation.unweightedCeiling
-		return
+		return granted(job.CPUBudget)
 	}
 
 	weight := 0.0
 	weightedWork := 0.0
 	budget := 0
+	cold := false
 	key += "#batch"
 	// A batch is one subprocess with one tool-native thread pool. Take the fixed
 	// class ceiling (defensively, the max of every member's class) rather than
@@ -495,9 +513,11 @@ func (s *Scheduler) acquireGroupCPUBudget(work []taskWork) {
 		memberWeight := job.EffectiveCPUWeight()
 		weight += memberWeight
 		weightedWork += memberWeight * job.ExpectedCPUWorkMs
-		_, memberBudget := s.plannedCeiling(job)
+		memberRecommendation, memberBudget := s.plannedCeiling(job)
 		budget = max(budget, memberBudget)
+		cold = cold || !memberRecommendation.fromHistory
 	}
+	budget = grant(budget, cold)
 	expectedCPU := 0.0
 	if weight > 0 {
 		expectedCPU = weightedWork / weight
@@ -510,6 +530,7 @@ func (s *Scheduler) acquireGroupCPUBudget(work []taskWork) {
 		work[i].job.CPUBudgetHistoryEligible = false
 		work[i].job.CPUBudgetUnweightedCeiling = 0
 	}
+	return granted(budget)
 }
 
 // taskRun is what the runner returns for ONE work item: the result its last

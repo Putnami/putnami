@@ -1547,7 +1547,8 @@
         "verification": {
           "kind": "acceptance",
           "checks": [
-            "admission-charges-the-granted-ceiling",
+            "admission-charges-the-measured-occupancy",
+            "a-task-with-history-is-granted-at-least-the-cpus-left-free",
             "a-cold-task-is-granted-the-machine-and-charged-one-cpu",
             "the-worker-count-follows-the-cpu-capacity"
           ]

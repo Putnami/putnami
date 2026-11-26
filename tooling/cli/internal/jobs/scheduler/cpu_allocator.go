@@ -62,7 +62,9 @@ func normalizeCPUBudgetPolicy(value string) cpuBudgetPolicy {
 //
 // A task with no history receives the whole machine, and admission charges
 // it one CPU (bootstrapCPUCharge). That grant is not persisted as proven
-// concurrency; the next run uses the first execution's measured evidence.
+// concurrency; the next run uses the first execution's measured evidence. A
+// task with history is granted at least the CPUs the running ceilings leave
+// free (resourcePool.grantCeiling).
 type cpuAllocator struct {
 	mu       sync.Mutex
 	totalCPU int
@@ -78,6 +80,13 @@ type cpuRecommendation struct {
 	budget            int
 	unweightedCeiling int
 	fromHistory       bool
+	// demandMilli is the occupancy the history measured, CPU over wall time,
+	// scaled by the weight, in thousandths of a CPU; zero without a measured
+	// wall time. Admission charges it (planChargeMilli).
+	demandMilli int
+	// lifted reports that the critical-path lift raised the ceiling above
+	// the weighted occupancy answer.
+	lifted bool
 }
 
 func newCPUAllocator(totalCPU int, policy cpuBudgetPolicy) *cpuAllocator {
@@ -141,13 +150,22 @@ func (a *cpuAllocator) recommend(
 	// The weight scales the occupancy answer before the lift, so a weight never
 	// multiplies the lift: the lift is already a share of the machine.
 	demand := weightedCores(unweightedCeiling, weight, a.totalCPU)
+	lifted := false
 	if a.policy == cpuBudgetPolicyCriticalPath {
-		demand = max(demand, min(criticalityCeiling, a.totalCPU))
+		lift := min(criticalityCeiling, a.totalCPU)
+		lifted = lift > demand
+		demand = max(demand, lift)
+	}
+	demandMilli := 0
+	if expectedWallMs > 0 {
+		demandMilli = int(math.Ceil(math.Round(expectedCPUMs/expectedWallMs*weight*1e6) / 1e3))
 	}
 	return cpuRecommendation{
 		budget:            min(max(demand, 1), a.totalCPU),
 		unweightedCeiling: unweightedCeiling,
 		fromHistory:       true,
+		demandMilli:       demandMilli,
+		lifted:            lifted,
 	}
 }
 

@@ -19,7 +19,7 @@ import (
 // block another session that runs the same task, such as one the running task
 // started: that session claims the lease and the locks at once.
 func TestScheduler_ATaskWaitingForCPUHoldsNoLeaseAndNoLock(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	for _, tc := range []struct {
 		name      string
 		cacheable bool
@@ -40,7 +40,7 @@ func TestScheduler_ATaskWaitingForCPUHoldsNoLeaseAndNoLock(t *testing.T) {
 			pools := make(chan *resourcePool, 1)
 			var held resourceReservation
 			waiting.onResourcePool = func(pool *resourcePool) {
-				held, _ = pool.tryAcquire(resourceRequest{cpu: pool.cpuCapacity})
+				held, _ = pool.tryAcquire(resourceRequest{cpuMilli: pool.cpuCapacityMilli})
 				pools <- pool
 			}
 			first := runAsync(ctx, waiting)
@@ -80,20 +80,20 @@ func TestScheduler_ATaskWaitingForCPUHoldsNoLeaseAndNoLock(t *testing.T) {
 // node took CPU before its lease claim, and gives it back before it waits for
 // its leader.
 func TestAFollowerHoldsNoCPUWhileItsLeaderRuns(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-granted-ceiling")
+	spectest.Proves(t, "cli/job-planning-execution", "the-scheduler-admits-the-cpu-it-grants", "admission-charges-the-measured-occupancy")
 	f := newOutputRaceFixture(t)
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(f.root, "store")))
 	job := f.job(f.noopScript(t), true)
 	job.SharedExecutionID = "shared"
 	s := f.scheduler(job, outputRaceSessionA, cache)
 	s.resources = newResourcePool(2, 0, nil)
-	s.resourcePlanByJob = map[string]scheduledResourcePlan{job.Key(): {ceiling: 1, charge: 1}}
+	s.resourcePlanByJob = map[string]scheduledResourcePlan{job.Key(): {ceiling: 1, chargeMilli: 1 * milliCPU}}
 	leader := &sharedExecutionSlot{done: make(chan struct{})}
 	s.sharedSlots = map[string]*sharedExecutionSlot{job.SharedExecutionID: leader}
 	held := make(chan int, 1)
 	s.onSharedFollowerWait = func(*ScheduledJob) {
 		s.resources.mu.Lock()
-		held <- s.resources.cpuUsed
+		held <- s.resources.cpuUsedMilli
 		s.resources.mu.Unlock()
 	}
 	admission := newGroupAdmission(s, []*ScheduledJob{job})

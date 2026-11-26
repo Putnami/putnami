@@ -2,8 +2,8 @@
   "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
   "id": "admission-charges-the-cpu-it-grants",
-  "statement": "a task with history reserves the CPU ceiling it is granted once its cache missed, a cache hit none; a task with none gets the whole machine and reserves one CPU; auto runs one worker per CPU",
-  "settled": "2026-11-24",
+  "statement": "a task with history reserves its measured occupancy, at least one CPU, once its cache missed and is granted at least the free CPUs; a cold task gets the machine and reserves one CPU; a waiter starts while CPU is free; auto runs one worker per CPU",
+  "settled": "2026-11-25",
   "settledBy": "fdumay",
   "adr": "tooling/cli/doc/adr/0100-admission-charges-the-cpu-it-grants.md",
   "reviewOnly": true

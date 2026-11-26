@@ -434,7 +434,8 @@ func applyTaskTuning(planned []*ScheduledJob, stats *taskStatsStore) {
 }
 
 // measuredLiftCap bounds a learned weight by the task's own measured use:
-// admission charges the ceiling it grants, so the weight may lift the
+// admission charges the occupancy it measured, at most the ceiling it grants,
+// so the weight may lift the
 // history-derived ceiling up to the highest occupancy the task's history
 // recorded (its moving average or any of its observations), rounded up, and
 // no further. A value of 1 or below leaves the ceiling where history put it.

@@ -126,5 +126,5 @@ func (a *groupAdmission) release() {
 
 // reservesCPU reports whether the held reservation charges CPU.
 func (a *groupAdmission) reservesCPU() bool {
-	return a != nil && a.held && (a.hold.request.cpu > 0 || a.scheduler.resources == nil)
+	return a != nil && a.held && (a.hold.request.cpuMilli > 0 || a.scheduler.resources == nil)
 }

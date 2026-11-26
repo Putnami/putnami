@@ -535,21 +535,30 @@ Worker count bounds how many dispatches run at once, cache lookups included.
 Each physical subprocess holds a reservation it takes from stable machine
 capacity when it starts and returns exactly once when it ends; a cache hit,
 which starts none, holds none. Waiting subprocesses start in the coordinator's
-longest-first order, the first never overtaken:
+longest-first order, the first never overtaken; the first starts while any CPU
+is unreserved, even when its charge is larger than what is free, so a
+fractional charge never leaves a CPU idle behind it:
 
-- **CPU**: the ceiling the subprocess is granted. It is exported to the child
-  and limits tool-native parallelism. For a task with history admission
-  charges exactly that much, so those ceilings never sum above the CPU
-  capacity; a task with no history is granted the whole capacity and charged
-  one CPU (first cold, below). A serve step, which runs until the run is interrupted, reserves
-  none, so it never holds CPU a finite task waits for. It is deterministic for the same machine, task history, and plan;
-  live peers and acquisition order never change it. How it is *derived* is a
-  policy — see below.
+- **CPU**: the ceiling the subprocess is granted is exported to the child
+  and limits tool-native parallelism. Admission counts thousandths of a CPU.
+  A task with history is charged the occupancy it measured (CPU over wall
+  time, at the granted ceiling when its history holds an observation there),
+  scaled by its weight, at least one CPU and at most its ceiling; a
+  ceiling the critical-path lift raised is charged whole. A task with history
+  is granted its planned ceiling raised to the CPUs the running ceilings leave
+  free, so the last task of a run has the whole machine. A task with no
+  history is granted the whole capacity and charged one CPU (first cold,
+  below). A serve step, which runs
+  until the run is interrupted, reserves none, so it never holds CPU a finite
+  task waits for and keeps its planned ceiling. The planned ceiling of a task
+  with history is deterministic for the same machine, task history, and plan;
+  live peers and acquisition order only raise what it is granted. How it is
+  *derived* is a policy — see below.
 - **Memory**: the learned or first-cold envelope described below.
 
 [ADR 0100](adr/0100-admission-charges-the-cpu-it-grants.md) records why a
-history-backed ceiling is no longer allowed to exceed what admission charges
-for it, and why a cold task keeps the first-cold rule.
+history-backed task is charged its measured occupancy and granted the CPUs
+left free, and why a cold task keeps the first-cold rule.
 
 CPU capacity is the machine's logical CPUs clamped to its captured cgroup
 bandwidth quota. At the opening environment sample, memory capacity captures
@@ -614,7 +623,8 @@ long pole under `--all` and an ordinary job in a single-project run; freezing on
 plan's shape into task history would make a grant depend on which projects the
 previous run selected. Only the occupancy-derived, plan-independent ceiling
 travels into `.putnami/stats/tasks.json`. Both policies are equally
-deterministic: the same machine, history and plan give the same grants.
+deterministic: the same machine, history and plan give the same planned
+ceilings, which the CPUs left free may only raise when a task starts.
 
 The bootstrap distinguishes two kinds of cache miss:
 
@@ -623,14 +633,16 @@ The bootstrap distinguishes two kinds of cache miss:
   while admission charges one CPU, raised by an explicit CPU weight, and uses
   the declared resource class for memory: 512 MiB for a light task or 1280 MiB
   for a declared-heavy task, clamped to the machine. Charging a cold task its
-  whole ceiling, or a seed of it, leaves CPUs idle on a fresh checkout until
-  every tool honors its grant (ADR 0100 has the measurement). The grant is
+  whole ceiling, or a seed of it, left CPUs idle on a fresh checkout, as
+  measured before every tool a job starts honored its grant (ADR 0100 has the
+  measurement; the rule is to be measured again). The grant is
   never persisted as proven CPU demand; the execution still records its
   measured RSS and actual observation ceiling so the next regular-cold run has
   contextual evidence.
 - **Regular cold** means the build/task cache missed but a learned profile is
   present. The ceiling comes from CPU/wall demand and configured/learned weight,
-  and admission charges it. RAM admission uses peak RSS from the nearest observed ceiling,
+  and admission charges the occupancy it measured, at least one CPU and at
+  most that ceiling. RAM admission uses peak RSS from the nearest observed ceiling,
   retains the measured high-water mark when the new ceiling is lower, scales it
   when the ceiling is higher, and adds confidence/saturation headroom.
 
@@ -650,8 +662,8 @@ interrupted, so many serves can leave less memory to the finite tasks. The waite
 start in the coordinator's longest-first order, so goroutine timing never
 picks who runs first.
 
-For a batch, members share the maximum CPU ceiling, and admission charges it
-once, because there is one tool-native pool. First-cold memory similarly uses one shared physical-process
+For a batch, members share the maximum CPU ceiling, and admission charges
+their largest charge once, because there is one tool-native pool. First-cold memory similarly uses one shared physical-process
 class envelope rather than multiplying it by the number of logical rows.
 Learned singleton memory estimates add because shared-config tools may retain
 several projects' inputs concurrently. A learned batch RSS is already one
@@ -744,8 +756,8 @@ of worker count and any waiting is visible without external trace analysis.
   starvation rather than dependency stalls.
 - **Critical path** — the longest dependency chain weighted by measured job
   durations, with its total duration and the jobs along it.
-- **CPU budgets** — every deterministic singleton or shared-batch subprocess
-  grant (job/group, effective weight, expected CPU work, cores), so "why did
+- **CPU budgets** — every singleton or shared-batch subprocess grant
+  (job/group, effective weight, expected CPU work, cores), so "why did
   this task only get one core" is
   answerable from the run itself.
 - **Capacity** — `run.orchestration.capacity`: the CPU capacity, the worker
@@ -753,8 +765,9 @@ of worker count and any waiting is visible without external trace analysis.
   aside) with the
   machine's one-minute load, sampled from the run's start to its end, with
   both peaks. `--trace-profile` prints the peaks.
-- **Resource reservations** — the CPU/RAM admission claim for each executed
-  job/group (retries reuse the same claim; a cache hit has none), sorted by
+- **Resource reservations** — the CPU/RAM admission charge for each executed
+  job/group, its CPU rounded up to whole CPUs (retries reuse the same charge;
+  a cache hit has none), sorted by
   public group key and
   bounded to keep session metadata finite. Internal reservation identifiers are
   never serialized.
