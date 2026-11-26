@@ -12,7 +12,8 @@
   witness (section 3)
 - **Scope**: `@putnami/cli` (`internal/store`: the input digests of cache keys;
   `internal/fileindex`: the record's envelope; `internal/jobs/cachekey`: the
-  key inputs and the prune precompute; `internal/git`: the cut's witness)
+  key inputs, the prune precompute and the release baselines of the tree
+  facts; `internal/git`: the cut's witness)
 
 ## Context
 
@@ -72,6 +73,25 @@ The third column keeps collecting the 646 selector digests and the empty
 pattern set: they are 5 s of engine CPU, so the witness must cover a digest
 whose files an extension listed, not only one whose names decide its
 selection.
+
+The container's clone had no tags. On a full clone with this repository's 36
+tags, measured the same way the same evening (medians of three unchanged runs
+after a priming run), the release baselines that tasks declaring the
+`releaseBaseline` runtime input key on add their own Git reads: 736 engine Git
+calls instead of 130, of which 166 `log`, 150 `ls-tree`, about 180 `rev-parse`,
+64 `for-each-ref` and 32 `cat-file`, and 4.9 s of Git CPU. Each of the 150
+baselines a run reads asks Git for its tag's commit, the object that commit
+holds at the project, and the commits since the tag that touch the project.
+The same throwaway build, answering also each baseline from the previous run
+with no witness:
+
+| Measure, full clone | Main | Baselines answered | Baselines and digests answered |
+|---|---|---|---|
+| Wall | 34.7 s | 31.2 s | 26.9 s |
+| Engine CPU | 44.5 s | 41.2 s | 29.3 s |
+| Longest ready wait | 12.5 s | 11.1 s | 10.2 s |
+| Engine Git calls | 736 | 227 | 189 |
+| Git CPU | 4.9 s | 3.5 s | 3.5 s |
 
 ## Decision
 
@@ -225,9 +245,51 @@ The witness says the listing is unchanged. It does not answer the run's own
 read of the cut, which ADR 0112 §3 keeps reading afresh when a write of the
 run asks it. Until ADR 0112's reader lands, no `git:` digest is recorded.
 
-### 4. The key and how each of its inputs is witnessed
+### 4. A release baseline is recorded by the commits it names
 
-The record holds input digests, not keys. Every other input of the key is
+A task that declares the `releaseBaseline` runtime input keys on its
+project's release baseline (ADR 0110): the repository's state, the line's tag
+pattern, the line's last release tag, the object that tag's commit holds at
+the project's prefix, and whether a commit since the tag that touches the
+project declares a breaking change. The run records each baseline it reads,
+keyed by the project's directory and the tag pattern, with its tag's commit
+and the project's prefix.
+
+Every part of a baseline but the repository's state is a function of commit
+ids, the prefix and the pattern: Git's objects are named by their content, so
+the object a commit holds at a path, and the commits between two commits that
+touch it, never change. The witness is therefore what names those commits,
+and the run reads it once anyway, through the shared tag reads of ADR 0112 §7
+and the repository state of ADR 0110:
+
+- the commit HEAD names;
+- every tag name with the object it peels to (a fingerprint of the whole
+  list, not only of the pattern's tags: an untagged line keys on whether the
+  repository has any tag);
+- the repository's state: inside a work tree, not shallow, and the root's
+  prefix, from which the project's prefix follows;
+- that nothing rewrites history as Git reads it: no replace ref (no
+  `refs/replace` directory and no `refs/replace/` line in `packed-refs`, read
+  in-process), no `info/grafts` file, and none of `GIT_REPLACE_REF_BASE`,
+  `GIT_NO_REPLACE_OBJECTS`, `GIT_GRAFT_FILE` set;
+- the configuration witness of section 3, since a commit encoding setting
+  changes the bytes of a commit's message that the breaking-change check
+  parses.
+
+A baseline whose witness holds is answered with no Git call of its own: no
+`rev-parse` of its tag, no `ls-tree`, no `log`. One whose witness moved is read
+again, as today, and recorded again. A shallow repository, a repository
+outside every work tree and one with no commit read their state as today and
+record nothing: their baselines take no per-project read. The breaking-change
+check is the CLI's code, so another CLI build empties the record (section 6).
+
+The files a job of such a task receives at the baseline
+(`releaseBaselineFiles`) are extracted only for a task that runs; a cache hit
+extracts nothing, and the extraction is unchanged.
+
+### 5. The key and how each of its inputs is witnessed
+
+The record holds input digests and release baselines, not keys. Every other input of the key is
 computed by the run that uses it, as today, and a key is composed every run
 from them, the recorded digests and the keys of its dependencies. The table
 lists every field `CacheKey.ComputeHashUsing` folds (`store/cache.go`,
@@ -239,7 +301,7 @@ lists every field `CacheKey.ComputeHashUsing` folds (`store/cache.go`,
 | Extension implementation digest | Computed by the run: an installed extension's tree digest, kept per store entry (`implementationdigest`, ADR 0102); a local extension's runtime digest from the runtime sync, whose files the file index answers |
 | Toolchain version | Computed by the run: the CLI's Go version and each toolchain's identity from the lock and the recorded probes (ADR 0102) |
 | Runtime identity: host platform | Computed by the run |
-| Runtime identity: release baseline | Read once per run (ADR 0110) |
+| Runtime identity: release baseline | **Recorded baselines**, under the witness of section 4; read again, once per project and pattern (ADR 0110), when it moves |
 | Runtime identity: tree facts (repository state, tracked files, ignored directories, candidate listings) | Read once per run from the run's Git reads (ADR 0002 and 0004 of `protocols/job`; in-process under ADR 0112) |
 | OS class, source state, emptied outputs | Computed by the run |
 | Task, task contract digest, project, project metadata digest | Computed by the run from the manifests and the workspace snapshot, which ADR 0009 validates |
@@ -277,7 +339,7 @@ collection made with no record and no memo. A difference is a false hit and
 fails the test. A second test checks each directory witness on the
 file systems the machine offers (tmpfs, overlayfs where it can mount one).
 
-### 5. Where the record lives and how runs share it
+### 6. Where the record lives and how runs share it
 
 The record is `.putnami/input-record` in each worktree, beside the file index:
 the stats of a worktree's files are its own, so another worktree's entries
@@ -301,12 +363,14 @@ envelope and rules:
   holds at most 16,384 entries (2,169 on this repository) and 1,048,576
   witnessed paths. A run that only confirms entries writes nothing until they
   come halfway to being dropped, as the file index does.
+- **Release baselines.** The same file holds the baselines of section 4,
+  under the same rules, as a second kind of entry.
 - **What writes nothing.** `--plan`, a preview-only `--dry-run`, and a process
   that cannot read the clock read the record and write nothing.
 
 A damaged or missing record costs a collection, never a stale digest.
 
-### 6. The interface the machine process reuses
+### 7. The interface the machine process reuses
 
 The machine process, one per machine and user and shared by its worktrees, will hold each
 worktree's record in memory between runs. This record is what it holds, and
@@ -337,8 +401,15 @@ references of 2,169 entries, which a synthetic record of that shape decodes in
 4 ms): engine CPU from 42.7 s
 to about 27.5 s, wall from 30.7 s to about 24.5 s, key time summed from 20.0 s
 to about 6.5 s, engine Git calls from 130 to about 90, and the prune
-precompute from 4.3 s to about 1.8 s of engine CPU. The implementation
-measures them again on the same protocol.
+precompute from 4.3 s to about 1.8 s of engine CPU. On a full clone with its
+tags, from the second bound: engine CPU from 44.5 s to about 29.5 s, wall
+from 34.7 s to about 27 s, engine Git calls from 736 to about 190, Git CPU
+from 4.9 s to about 3.5 s. The implementation measures them again on the same
+protocol, on both clones.
+
+- The 189 Git calls left on a full clone include 32 `for-each-ref`, 16 `log`
+  and 16 `cat-file` that no baseline makes; their readers are outside this
+  decision.
 
 - The longest ready wait goes from 11.8 s to about 9.3 s, not under 5 s. On
   an unchanged run it is set by how fast four workers drain 2,239 cache hits,
@@ -365,8 +436,8 @@ measures them again on the same protocol.
   answered, the rest of the key costs about 2 s of engine CPU (measured above),
   and 1.6 s of it goes with a per-run memo of the option scope and the tree
   facts. A recorded key would also need a witness for every other input:
-  parameters, environment, manifests, toolchain probes, tree facts, the
-  release baseline. Each is a way to serve a stale key on every machine that
+  parameters, environment, manifests, toolchain probes, the other tree
+  facts. Each is a way to serve a stale key on every machine that
   shares the store, for well under a second. An input digest is shared by the
   tasks that read the same files (3,343 lookups for 2,169 digests), so a
   changed file moves one record entry, not the record of each task.
