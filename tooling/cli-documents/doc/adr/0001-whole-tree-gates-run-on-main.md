@@ -39,8 +39,8 @@ outside the project; both name the workflow below, which their tests read.
 `@putnami/windows-vet` declares no dependency.
 
 [`.github/workflows/whole-tree-gates.yml`](../../../../.github/workflows/whole-tree-gates.yml)
-sets the variable, generates the clients with `putnami client-generate --all`,
-and runs both projects with `--no-cache`. It runs on every push to `main`, and
+sets the variable, generates the clients with `putnami client-generate`, and
+runs both projects with `--no-cache`. It runs on every push to `main`, and
 on a pull request that changes one of the two projects, the workflow, `go.work`,
 or a file that records or repairs a verdict: the rehearsal report, the release
 plan, the public-cut baseline and allowlist. A test in each project fails when
@@ -77,12 +77,18 @@ Rejected:
 - A pull request no longer proves that the public cut holds no new debt, that
   the recorded rehearsal verdict matches the tree, or that a Go change compiles
   for Windows. `main` proves each after the merge. The pull request that
-  repairs a red run changes a path the workflow names, so it runs the gates
-  before it merges.
+  re-records the verdict or shrinks the public-cut baseline changes a path the
+  workflow names, so it runs the gates before it merges. The repair of a red
+  Windows vet is a Go change: `workflow_dispatch` on its branch proves it.
 - No declared input keys the tree these gates read, so a run of them is honest
   only without a cache. The documented commands and the workflow pass
   `--no-cache`.
 - The hosted per-change gate does not run them on `main` either: only the
   workflow does.
 - A new module that generates a Go client needs no declaration here:
-  `client-generate --all` covers it.
+  `client-generate --all` covers it, unless it carries a tag the workspace
+  disables. The workflow names such a module in a second step, and a test of
+  the Windows gate fails on `main` when one is missing.
+- Both projects set `options.test.count` to 1: `go test` otherwise replays a
+  stored pass when no file it tracks moved, and it tracks neither the candidate
+  tree nor the generated clients.

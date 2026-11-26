@@ -75,9 +75,123 @@ func TestEveryGoWorkModuleVetsForWindows(t *testing.T) {
 	cmd.Dir = root
 	cmd.Env = env
 	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("%s go vet work: %v\n%s\nMove the Unix-only code behind a _unix.go file or a //go:build unix constraint, next to a Windows counterpart.",
+		t.Fatalf("%s go vet work: %v\n%s\nA missing generated client means a generation step of "+wholeTreeGatesWorkflowPath+" did not run. Otherwise move the Unix-only code behind a _unix.go file or a //go:build unix constraint, next to a Windows counterpart.",
 			strings.Join(windowsVetPlatform, " "), err, output)
 	}
+}
+
+// TestTheWorkflowGeneratesEveryGoClient keeps the workflow's generation steps
+// equal to the go.work modules that generate a client. Git holds no generated
+// client, so `go vet work` type-checks one only when a step generated it. A
+// module generates a client when its putnami.json declares a Go generatedFrom
+// or the clientgen extension. `client-generate --all` covers it unless it
+// carries a tag the workspace disables; the workflow must then name it in a
+// `client-generate --projects` step.
+func TestTheWorkflowGeneratesEveryGoClient(t *testing.T) {
+	requireWholeTreeGates(t)
+	root := repositoryRoot(t)
+	var workspace struct {
+		Disable struct {
+			Tags []string `json:"tags"`
+		} `json:"disable"`
+	}
+	data, err := os.ReadFile(filepath.Join(root, "putnami.workspace.json"))
+	if err != nil {
+		t.Fatalf("read putnami.workspace.json: %v", err)
+	}
+	if err := json.Unmarshal(data, &workspace); err != nil {
+		t.Fatalf("parse putnami.workspace.json: %v", err)
+	}
+	disabled := map[string]bool{}
+	for _, tag := range workspace.Disable.Tags {
+		disabled[tag] = true
+	}
+	workflow, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(wholeTreeGatesWorkflowPath)))
+	if err != nil {
+		t.Fatalf("read the workflow that runs the gate on main: %v", err)
+	}
+	named := map[string]bool{}
+	for _, raw := range strings.Split(string(workflow), "\n") {
+		line := strings.TrimSpace(raw)
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		if _, ids, ok := strings.Cut(line, generateNamedClientsCommand); ok {
+			for _, id := range strings.Split(strings.TrimSpace(ids), ",") {
+				named[id] = true
+			}
+		}
+	}
+	want := map[string]bool{}
+	for _, dir := range goOutputLines(t, root, windowsVetEnv(root), "list", "-m", "-f", "{{.Dir}}") {
+		config, ok := readProjectConfig(t, filepath.Join(dir, "putnami.json"))
+		if !ok || !config.generatesGoClient() {
+			continue
+		}
+		skippedByAll := false
+		for _, tag := range config.Tags {
+			skippedByAll = skippedByAll || disabled[tag]
+		}
+		if !skippedByAll {
+			continue
+		}
+		rel, err := filepath.Rel(root, dir)
+		if err != nil {
+			t.Fatalf("module %s is outside the repository: %v", dir, err)
+		}
+		id := "/" + filepath.ToSlash(rel)
+		want[id] = true
+		if !named[id] {
+			t.Errorf("%s generates a Go client and carries a tag the workspace disables, so %q skips it: "+
+				"name it in a %q step of %s", id, generateClientsCommand, generateNamedClientsCommand+"<ids>", wholeTreeGatesWorkflowPath)
+		}
+	}
+	for id := range named {
+		if !want[id] {
+			t.Errorf("%s names %s in a %q step, but %q already covers it or it generates no Go client: remove it",
+				wholeTreeGatesWorkflowPath, id, generateNamedClientsCommand+"<ids>", generateClientsCommand)
+		}
+	}
+}
+
+// projectConfig is the part of a putnami.json that says whether a project
+// generates a Go client, and which tags it carries.
+type projectConfig struct {
+	Tags          []string `json:"tags"`
+	Extensions    []string `json:"extensions"`
+	GeneratedFrom *struct {
+		Language string `json:"language"`
+	} `json:"generatedFrom"`
+}
+
+func (c projectConfig) generatesGoClient() bool {
+	if c.GeneratedFrom != nil && c.GeneratedFrom.Language == "go" {
+		return true
+	}
+	for _, extension := range c.Extensions {
+		if extension == "/tooling/clientgen-extension" {
+			return true
+		}
+	}
+	return false
+}
+
+// readProjectConfig reads one putnami.json, reporting false when the file does
+// not exist.
+func readProjectConfig(t *testing.T, file string) (projectConfig, bool) {
+	t.Helper()
+	data, err := os.ReadFile(file)
+	if errors.Is(err, os.ErrNotExist) {
+		return projectConfig{}, false
+	}
+	if err != nil {
+		t.Fatalf("read %s: %v", file, err)
+	}
+	var config projectConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("parse %s: %v", file, err)
+	}
+	return config, true
 }
 
 // TestTheGateRunsOnMainWithoutACache keeps the halves of the switch together.
@@ -99,11 +213,16 @@ func TestTheGateRunsOnMainWithoutACache(t *testing.T) {
 			Test struct {
 				FilePatterns []string `json:"filePatterns"`
 				EnvInputs    []string `json:"envInputs"`
+				Count        int      `json:"count"`
 			} `json:"test"`
 		} `json:"options"`
 	}
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		t.Fatalf("parse the gate's own putnami.json: %v", err)
+	}
+	if manifest.Options.Test.Count != 1 {
+		t.Errorf("options.test.count = %d, want 1: go test replays a stored pass when no file it tracks moved, "+
+			"and it tracks neither the generated clients nor the modules the gate vets", manifest.Options.Test.Count)
 	}
 	for _, dependency := range manifest.Dependencies {
 		t.Errorf("putnami.json depends on %s: a change that reaches it plans this gate and every other "+
@@ -169,6 +288,10 @@ func TestWorkflowProblemsNameEachMissingPart(t *testing.T) {
 // generated client, and `go vet work` type-checks the modules that import one,
 // so the workflow runs it before the gate.
 const generateClientsCommand = "./putnamiw client-generate --all"
+
+// generateNamedClientsCommand prefixes the ids of the modules that command
+// skips because they carry a tag the workspace disables.
+const generateNamedClientsCommand = "./putnamiw client-generate --projects "
 
 // workflowProblems reports what a workflow lacks to run the gate on main: a
 // push trigger on main, the variable that turns the gate on, the generation of

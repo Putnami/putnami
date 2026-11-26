@@ -22,12 +22,15 @@ Run it on any tree with:
 
 ```bash
 ./putnamiw client-generate --all
+./putnamiw client-generate --projects /go/samples/service-to-service
 PUTNAMI_WHOLE_TREE_GATES=1 ./putnamiw test --projects @putnami/windows-vet --no-cache
 ```
 
 Git holds no generated client, and `go vet work` type-checks the modules that
-import one, so the first command generates them. `--no-cache` is part of the
-second: the project declares no input for the sources the gate reads, so a
+import one, so the first two commands generate them: `--all` skips a project
+that carries a tag the workspace disables, and the second command names those.
+`TestTheWorkflowGeneratesEveryGoClient` fails when one is missing. `--no-cache`
+is part of the last command: the project declares no input for the sources the gate reads, so a
 stored verdict says nothing about another tree. The variable is declared under
 `options.test.envInputs`: a run with it never restores the skip a run without
 it stored. `TestTheGateRunsOnMainWithoutACache` keeps the declarations and the

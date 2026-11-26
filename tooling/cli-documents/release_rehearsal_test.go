@@ -328,7 +328,12 @@ func TestReleaseRehearsalReportRecordsTheCurrentVerdict(t *testing.T) {
 func TestReleaseRehearsalNeverReplaysACachedVerdict(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/release-rehearsal", "no-cached-verdict", "a-changed-tree-never-replays-a-cached-verdict")
-	patterns, envInputs := releaseDeclaredTestInputs(t)
+	patterns, envInputs, count := releaseDeclaredTestInputs(t)
+
+	if count != 1 {
+		t.Errorf("%s declares options.test.count = %d, want 1: go test replays a stored pass when no file "+
+			"it tracks moved, and it does not track the candidate tree", releaseProjectManifestName, count)
+	}
 
 	if !slices.Contains(envInputs, wholeTreeGatesEnv) {
 		t.Errorf("%s does not declare %s under options.test.envInputs, so a run with the variable set "+
@@ -1811,8 +1816,9 @@ func releaseCommittedPlan(t *testing.T) *releasePlan {
 // releaseDeclaredTestInputs returns the file patterns and the environment
 // variables @putnami/cli-documents declares as cache-key inputs of its test
 // task. They are read from the manifest rather than restated here: a copy would
-// let the assertion pass against a list the scheduler does not use.
-func releaseDeclaredTestInputs(t *testing.T) (filePatterns, envInputs []string) {
+// let the assertion pass against a list the scheduler does not use. count is
+// the declared `go test -count`.
+func releaseDeclaredTestInputs(t *testing.T) (filePatterns, envInputs []string, count int) {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(projectRoot(t), releaseProjectManifestName))
 	if err != nil {
@@ -1823,6 +1829,7 @@ func releaseDeclaredTestInputs(t *testing.T) (filePatterns, envInputs []string) 
 			Test struct {
 				FilePatterns []string `json:"filePatterns"`
 				EnvInputs    []string `json:"envInputs"`
+				Count        int      `json:"count"`
 			} `json:"test"`
 		} `json:"options"`
 	}
@@ -1832,7 +1839,7 @@ func releaseDeclaredTestInputs(t *testing.T) (filePatterns, envInputs []string) 
 	if len(manifest.Options.Test.FilePatterns) == 0 {
 		t.Fatal("the project declares no test filePatterns, so no release input is keyed")
 	}
-	return manifest.Options.Test.FilePatterns, manifest.Options.Test.EnvInputs
+	return manifest.Options.Test.FilePatterns, manifest.Options.Test.EnvInputs, manifest.Options.Test.Count
 }
 
 // releaseProjectRelativePath rewrites a repository-relative path into the form

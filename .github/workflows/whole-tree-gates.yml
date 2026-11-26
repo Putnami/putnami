@@ -112,9 +112,13 @@ jobs:
       # Git holds no generated client, and `go vet work` type-checks the
       # modules that import one. The Windows gate declares no dependency on
       # them, since a dependency plans the gate for every change that reaches
-      # it, so this step generates them.
+      # it, so these steps generate them. `--all` skips a project that carries
+      # a tag the workspace disables (e2e): the second command names those, and
+      # TestTheWorkflowGeneratesEveryGoClient keeps its list complete.
       - name: Generate the clients
         run: ./putnamiw client-generate --all
+      - name: Generate the clients of the projects --all skips
+        run: ./putnamiw client-generate --projects /go/samples/service-to-service
 
       # --no-cache executes every task of the plan: a stored verdict of either
       # gate was computed for another tree.

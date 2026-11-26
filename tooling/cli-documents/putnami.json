@@ -28,7 +28,8 @@
       ],
       "envInputs": [
         "PUTNAMI_WHOLE_TREE_GATES"
-      ]
+      ],
+      "count": 1
     },
     "sdd": {
       "verification": {
