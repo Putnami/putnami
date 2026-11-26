@@ -1,6 +1,6 @@
 # ADR 0014 — A TypeScript job reads the tree from its context
 
-- **Status**: accepted
+- **Status**: accepted, amended by [ADR 0015](0015-the-tsc-output-check-reads-the-candidate-cut-its-key-holds.md) (point 1)
 - **Scope**: `@putnami/typescript` (`typescript/extension`): the `build-tsc`,
   `lint-all`, `lint-check` and `validate-api` tasks
 - **Applies**: [protocols/job ADR 0002](../../../../protocols/job/doc/adr/0002-a-job-reads-the-tree-facts-its-key-holds.md);

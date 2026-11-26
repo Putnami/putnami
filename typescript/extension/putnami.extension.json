@@ -1630,7 +1630,7 @@
       }
     },
     "build-tsc": {
-      "description": "Compile a project with the tsc its package.json build script runs, into the outDir its tsconfig names, where the packages that depend on it resolve its main and exports (ADR 0010). The task resolves the compiler itself: a project that compiles with Bun compiles nothing here and reports no output. It refuses an outDir that is unset, outside the project, not ignored by Git or holding a tracked file, empties its outputs, since the engine empties no pathFrom output, and runs node_modules/typescript/bin/tsc with Bun. tsc -b on a config with references runs as tsc -p: Putnami builds or restores each reference first, through ^tsc and readByDependents, and tsc -b would rebuild a restored reference in place, because a restored file keeps the time its blob was stored. The key reads the project's files Git does not ignore, so the ignored output never keys its own build, and the top-level JSON and tsconfig files of the dependency closure, a shared configuration package or a reference's config included. On the node runtime, the task then refuses a Bun API in the source, as the transpile does. The files the Git index tracks under the project come from the job context, through the trackedFiles runtime input; whether Git ignores each output, a file or a directory not created yet, is asked of Git in one check-ignore, which also tells a work tree from a directory outside every repository (ADR 0014).",
+      "description": "Compile a project with the tsc its package.json build script runs, into the outDir its tsconfig names, where the packages that depend on it resolve its main and exports (ADR 0010). The task resolves the compiler itself: a project that compiles with Bun compiles nothing here and reports no output. It refuses an outDir that is unset or outside the project, and an output that holds a tracked file or a file Git does not ignore, empties its outputs, since the engine empties no pathFrom output, and runs node_modules/typescript/bin/tsc with Bun. tsc -b on a config with references runs as tsc -p: Putnami builds or restores each reference first, through ^tsc and readByDependents, and tsc -b would rebuild a restored reference in place, because a restored file keeps the time its blob was stored. The key reads the project's files Git does not ignore, so the ignored output never keys its own build, and the top-level JSON and tsconfig files of the dependency closure, a shared configuration package or a reference's config included. On the node runtime, the task then refuses a Bun API in the source, as the transpile does. The check reads the candidate cut its key holds from the job context, through the candidateFiles runtime input, and starts no Git: an output that holds a path the index tracks, or an untracked path Git does not ignore, is refused, so an output Git does not ignore is refused by the first build whose key holds the files tsc emitted into it (ADR 0015).",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1683,7 +1683,7 @@
         "extensionVersion": {
           "from": "runtime"
         },
-        "trackedFiles": {
+        "candidateFiles": {
           "from": "runtime"
         }
       },

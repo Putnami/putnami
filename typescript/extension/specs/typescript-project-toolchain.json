@@ -319,7 +319,7 @@
     },
     {
       "id": "tsc-output-restores-at-outdir",
-      "text": "With tsc, build declares the config's outDir, and its declarationDir and .tsbuildinfo where they lie outside the outDir, as its outputs. A run empties them before tsc starts, a cache hit restores them in place, and every job of a project that depends on it runs after it, as do the compile, serve and run jobs of the project. An outDir that is unset, outside the project, the project itself, not ignored by Git, or holding a file Git tracks fails the build before tsc runs, naming the setting."
+      "text": "With tsc, build declares the outDir, and the declarationDir and .tsbuildinfo outside it, as outputs: a run empties them before tsc, a cache hit restores them in place, and the project's dependents and its compile, serve and run jobs follow it. An outDir unset, outside the project or the project itself, or an output holding a file Git tracks or does not ignore, fails the build before tsc runs; an output Git does not ignore may pass while empty, and fails once the files tsc emitted into it key the build."
     },
     {
       "id": "tsc-key-follows-what-tsc-reads",

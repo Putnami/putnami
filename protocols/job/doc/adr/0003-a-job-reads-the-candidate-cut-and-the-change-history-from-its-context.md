@@ -1,6 +1,6 @@
 # ADR 0003 — A job reads the candidate cut and the change history from its context
 
-- **Status**: accepted
+- **Status**: accepted, amended by [ADR 0004](0004-a-write-reads-the-cut-again-only-for-the-keys-it-reaches.md) (point 2)
 - **Scope**: `go.putnami.dev/protocol/job` (`tree`),
   `go.putnami.dev/protocol/extension` (runtime input names),
   `@putnami/cli` (`internal/jobs`), `go.putnami.dev/sdk/extension`

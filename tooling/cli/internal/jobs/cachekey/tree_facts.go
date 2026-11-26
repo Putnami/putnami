@@ -52,13 +52,13 @@ type TreeFacts struct {
 	// projects of that line that declare releaseBaseline. SetPlanned fills it.
 	lineDirectories map[string][]string
 
-	// cutMu guards the candidate cut: the current read, whether a write of
-	// the run has made it stale, and the read each job's key took.
-	cutMu    sync.Mutex
-	cut      *cutRead
-	cutStale bool
-	cutSeq   int
-	jobCuts  map[string]*cutRead
+	// cutMu guards the candidate cut: the current read, the writes of the run
+	// since it, and the read each job's key took.
+	cutMu   sync.Mutex
+	cut     *cutRead
+	pending []pendingWrite
+	cutSeq  int
+	jobCuts map[string]*cutRead
 	// putnamiOnce asks Git once whether its rules exclude the workspace's
 	// .putnami directory as a whole (putnamigit.IgnoresDirectory).
 	putnamiOnce    sync.Once
@@ -71,9 +71,13 @@ type TreeFacts struct {
 // cutRead is one read of the workspace's candidate cut, and what is derived
 // from it once: its encoding, its digest and the listing file of the run.
 type cutRead struct {
-	seq        int
-	files      []protocoljob.CandidateFile
-	err        error
+	seq   int
+	files []protocoljob.CandidateFile
+	err   error
+	// stamp is the stamp of the index file taken before the read, and
+	// stamped whether one could be taken (putnamigit.ReadIndexStamp).
+	stamp      putnamigit.IndexStamp
+	stamped    bool
 	sourceOnce sync.Once
 	source     store.CandidateCut
 
@@ -88,6 +92,15 @@ type cutRead struct {
 	// below the workspace's .putnami directory (candidateReachesPutnami).
 	putnamiOnce   sync.Once
 	putnamiListed bool
+}
+
+// pendingWrite is a write of the run since the current read of the cut: the
+// slash paths, relative to the workspace root and with case folded, it names
+// and lands at once its symbolic links are followed (reachedPath), and whether
+// it lands under the workspace's .putnami directory.
+type pendingWrite struct {
+	paths   []string
+	putnami bool
 }
 
 type onceHistory struct {
@@ -167,12 +180,37 @@ func (t *TreeFacts) TrackedWith(read func(dir string) ([]string, error)) ([]stri
 // the read (putnamigit.ReadIndexStamp), and whether one could be taken. The
 // stamp precedes the read, so a stamp that still matches later says the read
 // is current.
+//
+// When the run has read the candidate cut already, the tracked paths are the
+// cut's tracked entries, and the stamp is the one taken before that read: the
+// cut lists every path of the index with its mode (`ls-files --stage`), so the
+// index is not read a second time.
 func (t *TreeFacts) TrackedRead(read func(dir string) ([]string, error)) ([]string, putnamigit.IndexStamp, bool, error) {
 	t.tracked.once.Do(func() {
+		t.cutMu.Lock()
+		cut := t.cut
+		t.cutMu.Unlock()
+		if cut != nil && cut.err == nil && cut.stamped {
+			t.trackedStamp, t.trackedStamped = cut.stamp, true
+			t.tracked.paths = trackedOfCut(cut.files)
+			return
+		}
 		t.trackedStamp, t.trackedStamped = putnamigit.ReadIndexStamp(t.root)
 		t.tracked.paths, t.tracked.err = read(t.root)
 	})
 	return t.tracked.paths, t.trackedStamp, t.trackedStamped, t.tracked.err
+}
+
+// trackedOfCut is the TrackedPaths listing a candidate cut holds: its paths
+// the index tracks, an unmerged one included, sorted and unique as the cut is.
+func trackedOfCut(files []protocoljob.CandidateFile) []string {
+	paths := []string{}
+	for _, file := range files {
+		if file.Mode != protocoljob.CandidateModeUntracked {
+			paths = append(paths, file.Path)
+		}
+	}
+	return paths
 }
 
 // Ignored returns the directories Git ignores entirely under the workspace
@@ -206,31 +244,93 @@ func (t *TreeFacts) Prime(planned []*jobmodel.ScheduledJob) {
 }
 
 // currentCut returns the current read of the workspace's candidate cut
-// (putnamigit.CandidateFiles), reading it again when a write of the run made
-// the last read stale (InvalidateCut). Outside every repository its error is a
-// *gitread.UnmanagedError (putnamigit.OutsideRepository).
+// (putnamigit.CandidateFiles), reading it again when a write of the run since
+// the last read may have changed it (InvalidateCut). Outside every repository
+// its error is a *gitread.UnmanagedError (putnamigit.OutsideRepository).
 func (t *TreeFacts) currentCut() *cutRead {
+	return t.currentCutFor(workspaceDirectories)
+}
+
+// workspaceDirectories names the whole workspace for currentCutFor.
+var workspaceDirectories = []string{"."}
+
+// currentCutFor returns a read of the cut whose listing at or below
+// directories holds every write of the run: the current read, read again
+// when a write since it reached one of directories (stale).
+func (t *TreeFacts) currentCutFor(directories []string) *cutRead {
 	t.cutMu.Lock()
 	defer t.cutMu.Unlock()
-	if t.cut == nil || t.cutStale {
+	if t.cut == nil || t.stale(directories) {
 		t.readCut()
 	}
 	return t.cut
 }
 
-// readCut reads the cut again and makes it the current read. The caller holds
-// cutMu.
+// stale reports whether a write of the run since the current read may have
+// changed the cut at or below one of directories: it lies at, below or above
+// one of them. A write under an excluded .putnami changes nothing
+// (putnamiExcluded), which is asked of Git only when such a write alone
+// reaches the directories. The caller holds cutMu.
+func (t *TreeFacts) stale(directories []string) bool {
+	putnami := false
+	for _, write := range t.pending {
+		if !write.reaches(directories) {
+			continue
+		}
+		if !write.putnami {
+			return true
+		}
+		putnami = true
+	}
+	if !putnami {
+		return false
+	}
+	if !t.putnamiExcluded() {
+		return true
+	}
+	// The current read stays excluded until the next read, which clears the
+	// writes: those under .putnami change nothing.
+	kept := t.pending[:0]
+	for _, write := range t.pending {
+		if !write.putnami {
+			kept = append(kept, write)
+		}
+	}
+	t.pending = kept
+	return false
+}
+
+// reaches reports whether the write lies at, below or above one of
+// directories, slash paths relative to the workspace root ("." for the root),
+// with case folded, as a case-insensitive file system resolves a path.
+func (w pendingWrite) reaches(directories []string) bool {
+	for _, written := range w.paths {
+		for _, directory := range directories {
+			directory = strings.ToLower(directory)
+			if directory == "." || written == "." || written == directory ||
+				strings.HasPrefix(written, directory+"/") || strings.HasPrefix(directory, written+"/") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// readCut reads the cut again and makes it the current read, which holds
+// every write of the run so far. The caller holds cutMu.
 func (t *TreeFacts) readCut() {
 	t.cutSeq++
 	read := &cutRead{seq: t.cutSeq}
+	read.stamp, read.stamped = putnamigit.ReadIndexStamp(t.root)
 	read.files, read.err = candidateFiles(t.root)
-	t.cut, t.cutStale = read, false
+	t.cut, t.pending = read, nil
 }
 
-// keyCut is the read a key of the job takes: the current one, recorded so the
-// job's context carries the read its key holds (contextCut).
-func (t *TreeFacts) keyCut(jobKey string) *cutRead {
-	read := t.currentCut()
+// keyCut is the read a key of the job takes for directories: the current one,
+// read again when a write since it reached them, recorded so the job's
+// context carries the read its key holds (contextCut).
+func (t *TreeFacts) keyCut(jobKey string, directories []string) *cutRead {
+	read := t.currentCutFor(directories)
 	t.cutMu.Lock()
 	t.jobCuts[jobKey] = read
 	t.cutMu.Unlock()
@@ -250,34 +350,74 @@ func (t *TreeFacts) contextCut(jobKey string) *cutRead {
 	return t.currentCut()
 }
 
-// InvalidateCut marks the read of the candidate cut stale when a task of the
-// run wrote one of paths, absolute paths under the workspace: a file it
-// created or removed may change what the cut lists, so the next key or
-// context reads the cut again. A path under the workspace's .putnami
-// directory, where the store and every command output live, leaves the cut as
-// it is when Git's rules exclude that directory as a whole and the cut lists
-// nothing below it; Git is asked once per run, at the first such write. A task
-// that may have rewritten anything passes the workspace root.
+// InvalidateCut records that a task of the run wrote paths, absolute paths
+// under the workspace: a file it created or removed may change what the cut
+// lists at, below or above the path, so the next key or context whose
+// directories the write reaches reads the cut again, and one whose
+// directories it does not reach keeps the current read, whose listing there
+// the write did not change. A .gitignore reaches the whole directory that
+// holds it, whose listing its rules change, and a write under a .git reaches
+// the directory that holds it, the repository whose index and exclude rules it
+// holds: the workspace's own reaches every directory. A path under
+// the workspace's .putnami directory, where the store and every command output
+// live, leaves the cut as it is when Git's rules exclude that directory as a
+// whole and the cut lists nothing below it; Git is asked once per run,
+// only when such writes alone reach a key's directories, and those writes are
+// dropped once the current read is known to exclude .putnami. A task that may have
+// rewritten anything passes the workspace root.
 func (t *TreeFacts) InvalidateCut(paths []string) {
 	if t == nil {
 		return
+	}
+	// The paths are resolved before the lock is taken: a key waits on it.
+	resolvedRoot := resolvedPath(t.root)
+	writes := make([]pendingWrite, 0, len(paths))
+	for _, path := range paths {
+		write := pendingWrite{putnami: t.inPutnami(path)}
+		for _, candidate := range [][2]string{{t.root, path}, {resolvedRoot, resolvedPath(path)}} {
+			rel, err := filepath.Rel(candidate[0], candidate[1])
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				continue
+			}
+			write.paths = append(write.paths, reachedPath(filepath.ToSlash(rel)))
+		}
+		if len(write.paths) > 0 {
+			writes = append(writes, write)
+		}
 	}
 	t.cutMu.Lock()
 	defer t.cutMu.Unlock()
 	if t.cut == nil {
 		return
 	}
-	for _, path := range paths {
-		rel, err := filepath.Rel(t.root, path)
-		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			continue
+	t.pending = append(t.pending, writes...)
+}
+
+// reachedPath is the directory a write of rel, a slash path relative to the
+// workspace root, can change the cut at, below or above, with case folded: rel
+// itself, the directory of a .gitignore, whose rules apply to that whole
+// directory, and the directory holding a .git, the repository whose index and
+// exclude rules it holds ("." for the workspace's own).
+func reachedPath(rel string) string {
+	rel = strings.ToLower(rel)
+	segments := strings.Split(rel, "/")
+	for i, segment := range segments {
+		if segment == ".git" {
+			return parentOf(segments[:i])
 		}
-		if t.inPutnami(path) && t.putnamiExcluded() {
-			continue
-		}
-		t.cutStale = true
-		return
 	}
+	if segments[len(segments)-1] == ".gitignore" {
+		return parentOf(segments[:len(segments)-1])
+	}
+	return rel
+}
+
+// parentOf joins segments, "." when there are none.
+func parentOf(segments []string) string {
+	if len(segments) == 0 {
+		return "."
+	}
+	return strings.Join(segments, "/")
 }
 
 // atTopLevel reports whether the workspace root is the top of its work tree,
@@ -361,7 +501,7 @@ func (t *TreeFacts) ExcludesFromCandidates(paths []string) bool {
 	}
 	t.cutMu.Lock()
 	defer t.cutMu.Unlock()
-	if t.cut == nil || t.cutStale {
+	if t.cut == nil || t.stale(workspaceDirectories) {
 		t.readCut()
 	}
 	return t.putnamiExcluded()
@@ -701,7 +841,7 @@ func (t *TreeFacts) Close() {
 	// The listing files were in the removed directory: a later context reads
 	// and writes the cut again.
 	t.cutMu.Lock()
-	t.cut, t.cutStale, t.jobCuts = nil, false, map[string]*cutRead{}
+	t.cut, t.pending, t.jobCuts = nil, nil, map[string]*cutRead{}
 	t.cutMu.Unlock()
 	if root != "" {
 		_ = os.RemoveAll(root)
@@ -841,7 +981,7 @@ func treeFactIdentity(ws *workspace.Workspace, job *jobmodel.ScheduledJob, cache
 			identity = append(identity, name+"="+listingDigest(directory, paths))
 		case extproto.RuntimeInputCandidateFiles:
 			directories := CandidateDirectories(ws, job)
-			files, found, err := facts.keyCut(job.Key()).under(directories)
+			files, found, err := facts.keyCut(job.Key(), directories).under(directories)
 			if err != nil {
 				return nil, fmt.Errorf("read the candidate cut: %w", err)
 			}
@@ -851,7 +991,7 @@ func treeFactIdentity(ws *workspace.Workspace, job *jobmodel.ScheduledJob, cache
 			}
 			identity = append(identity, name+"="+candidatesDigest(directories, files))
 		case extproto.RuntimeInputWorkspaceCandidateFiles:
-			_, digest, found, err := facts.keyCut(job.Key()).encodedFiles()
+			_, digest, found, err := facts.keyCut(job.Key(), workspaceDirectories).encodedFiles()
 			if err != nil {
 				return nil, fmt.Errorf("read the candidate cut: %w", err)
 			}

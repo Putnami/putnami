@@ -1,6 +1,7 @@
 package cachekey
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -156,5 +157,130 @@ func TestAWriteUnderAPutnamiDirectoryGitListsReadsTheCutAgain(t *testing.T) {
 	facts.currentCut()
 	if reads.Load() != 2 {
 		t.Fatalf("a write under a .putnami Git lists read the cut %d times, want twice", reads.Load())
+	}
+}
+
+// A write of the run reads the cut again only for a key whose directories it
+// reaches, at, below or above them: a key of another project keeps the
+// current read, whose listing there the write did not change. A write under
+// .git, where Git keeps its own exclude rules, reaches every key. A write
+// under .putnami asks Git whether .putnami is excluded only once a key it
+// reaches asks for the cut, here the workspace's.
+func TestAWriteReadsTheCutAgainOnlyForTheKeysItReaches(t *testing.T) {
+	spectest.Proves(t, treeFactsFeature, "candidate-cut-and-history-follow-the-key", "a-write-of-the-run-reads-the-cut-again")
+	root := treeFactsRepo(t)
+	writeFileAt(t, filepath.Join(root, ".gitignore"), "dist/\n.putnami\n")
+	ws := treeFactsWorkspace(root)
+	var reads, asks atomic.Int32
+	savedFiles, savedIgnores := candidateFiles, ignoresDirectory
+	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, error) { reads.Add(1); return savedFiles(dir) }
+	ignoresDirectory = func(root, rel string) bool { asks.Add(1); return savedIgnores(root, rel) }
+	t.Cleanup(func() { candidateFiles, ignoresDirectory = savedFiles, savedIgnores })
+	key := extension.TaskCacheKey{Files: []string{"main.go"}, Runtime: []string{extproto.RuntimeInputCandidateFiles}}
+	app, lib := cutJob(ws.ProjectByID("/app"), key), cutJob(ws.ProjectByID("/lib"), key)
+	facts := NewTreeFacts(root)
+	facts.Prime([]*jobmodel.ScheduledJob{app, lib})
+	appKeyed, _ := candidateIdentity(t, ws, app, facts)
+	libKeyed, _ := candidateIdentity(t, ws, lib, facts)
+
+	writeFileAt(t, filepath.Join(root, "app", "gen", "doc.md"), "# generated\n")
+	facts.InvalidateCut([]string{filepath.Join(root, "app", "gen"), filepath.Join(root, ".putnami", "out", "app")})
+	if again, carried := candidateIdentity(t, ws, lib, facts); again != libKeyed || again != carried || reads.Load() != 1 {
+		t.Fatalf("a write under app read the cut again for lib's key (%d reads)", reads.Load())
+	}
+	if asks.Load() != 0 {
+		t.Fatal("a write under .putnami asked Git before a key it reaches asked for the cut")
+	}
+	if again, carried := candidateIdentity(t, ws, app, facts); again == appKeyed || again != carried || reads.Load() != 2 {
+		t.Fatalf("a write under app kept app's key (%d reads)", reads.Load())
+	}
+	// A write above the directory reaches it.
+	facts.InvalidateCut([]string{root})
+	if candidateIdentity(t, ws, lib, facts); reads.Load() != 3 {
+		t.Fatalf("a write of the workspace root kept lib's read (%d reads)", reads.Load())
+	}
+	// A write under .git reaches every key.
+	facts.InvalidateCut([]string{filepath.Join(root, ".git", "info", "exclude")})
+	if candidateIdentity(t, ws, lib, facts); reads.Load() != 4 {
+		t.Fatalf("a write under .git kept lib's read (%d reads)", reads.Load())
+	}
+	// The workspace's cut is reached by a write under .putnami, which Git
+	// excludes: it asks once and reads nothing again.
+	facts.InvalidateCut([]string{filepath.Join(root, ".putnami", "out", "lib")})
+	facts.currentCut()
+	if reads.Load() != 4 || asks.Load() != 1 {
+		t.Fatalf("a write under an excluded .putnami: %d reads, %d asks; want 4 and 1", reads.Load(), asks.Load())
+	}
+	// The excluded writes are dropped: another one asks nothing more, and a
+	// write outside .putnami still reaches the key.
+	facts.InvalidateCut([]string{filepath.Join(root, ".putnami", "out", "other"), filepath.Join(root, "lib", "gen")})
+	if candidateIdentity(t, ws, lib, facts); reads.Load() != 5 || asks.Load() != 1 {
+		t.Fatalf("after the drop: %d reads, %d asks; want 5 and 1", reads.Load(), asks.Load())
+	}
+}
+
+// A key that keeps the current read after a write holds the cut a fresh read
+// gives: a .gitignore written above the key's directory, at the workspace root,
+// and a write a symbolic link leads into the key's directory both reach it.
+func TestAKeptReadIsTheCutAFreshReadGives(t *testing.T) {
+	spectest.Proves(t, treeFactsFeature, "candidate-cut-and-history-follow-the-key", "a-write-of-the-run-reads-the-cut-again")
+	root := treeFactsRepo(t)
+	writeFileAt(t, filepath.Join(root, ".gitignore"), "dist/\n.putnami\n")
+	writeFileAt(t, filepath.Join(root, "lib", "extra.txt"), "untracked\n")
+	if err := os.MkdirAll(filepath.Join(root, "lib", "out"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "lib", "out"), filepath.Join(root, "app", "out")); err != nil {
+		t.Fatal(err)
+	}
+	ws := treeFactsWorkspace(root)
+	key := extension.TaskCacheKey{Files: []string{"lib.go"}, Runtime: []string{extproto.RuntimeInputCandidateFiles}}
+	lib := cutJob(ws.ProjectByID("/lib"), key)
+	facts := NewTreeFacts(root)
+	facts.Prime([]*jobmodel.ScheduledJob{lib})
+	candidateIdentity(t, ws, lib, facts)
+	for _, step := range []struct {
+		name  string
+		write func() string
+	}{
+		{"a .gitignore at the workspace root", func() string {
+			path := filepath.Join(root, ".gitignore")
+			writeFileAt(t, path, "dist/\n.putnami\nextra.txt\n")
+			return path
+		}},
+		{"a repository nested at the directory", func() string {
+			treeKeyedGit(t, filepath.Join(root, "lib"), "init", "-q")
+			return filepath.Join(root, "lib", ".git")
+		}},
+		{"a write through a link into the directory", func() string {
+			path := filepath.Join(root, "app", "out", "gen.txt")
+			writeFileAt(t, path, "generated\n")
+			return path
+		}},
+	} {
+		facts.InvalidateCut([]string{step.write()})
+		kept, carried := candidateIdentity(t, ws, lib, facts)
+		fresh, _ := candidateIdentity(t, ws, lib, NewTreeFacts(root))
+		if kept != fresh || carried != fresh {
+			t.Errorf("after %s: key %q, context %q, a fresh read %q", step.name, kept, carried, fresh)
+		}
+	}
+}
+
+// reachedPath maps a write to the directory whose cut it can change.
+func TestReachedPath(t *testing.T) {
+	for rel, want := range map[string]string{
+		"lib/out/x.js":               "lib/out/x.js",
+		".gitignore":                 ".",
+		"packages/.gitignore":        "packages",
+		".git/info/exclude":          ".",
+		".GIT":                       ".",
+		"packages/.git/info/exclude": "packages",
+		"packages/.git":              "packages",
+		"Lib/Out":                    "lib/out",
+	} {
+		if got := reachedPath(rel); got != want {
+			t.Errorf("reachedPath(%q) = %q, want %q", rel, got, want)
+		}
 	}
 }

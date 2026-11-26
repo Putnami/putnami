@@ -7,7 +7,6 @@ import (
 
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
-	"go.putnami.dev/sdk/extension/treefacts"
 	"go.putnami.dev/typescript/extension/internal/build"
 )
 
@@ -45,7 +44,7 @@ func runBuildTsc(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string,
 	if err != nil {
 		return tscRefused(emit, err)
 	}
-	if err := build.CheckTscOutputs(ctx.WorkspaceRoot, projectPath, plan, treefacts.From(ctx)); err != nil {
+	if err := build.CheckTscOutputs(ctx.WorkspaceRoot, projectPath, plan, ctx); err != nil {
 		return tscRefused(emit, err)
 	}
 	if err := build.CleanTscOutputs(plan); err != nil {

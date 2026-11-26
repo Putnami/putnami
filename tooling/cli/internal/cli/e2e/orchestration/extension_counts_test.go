@@ -150,8 +150,8 @@ var extensionCases = []extensionCase{
 		files:       goFiles,
 		setup:       [][]string{{"projects", "sync"}},
 		command:     []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:        "engine job 9 · cli 1 · git 17 | engine git check-ignore 1 · for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:         "engine job 9 · cli 1 · git 18 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:        "engine job 9 · cli 1 · git 16 | engine git for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:         "engine job 9 · cli 1 · git 17 | engine git check-ignore 1 · for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:        "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:     true,
 	},
@@ -167,8 +167,8 @@ var extensionCases = []extensionCase{
 		files:      typescriptFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:       "engine job 8 · control 1 · git 24 | engine git check-ignore 1 · for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
-		was:        "engine job 8 · control 1 · git 25 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
+		cold:       "engine job 8 · control 1 · git 23 | engine git for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 8 · control 1 · git 24 | engine git check-ignore 1 · for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 	},
@@ -250,7 +250,7 @@ var extensionCases = []extensionCase{
 		files:      webFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"build", "--all", "--max-parallel", "1"},
-		cold:       "engine job 5 · control 1 · git 20 | engine git for-each-ref 1 · ls-files 8 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
+		cold:       "engine job 5 · control 1 · git 21 | engine git for-each-ref 1 · ls-files 9 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		was:        "engine job 5 · control 1 · git 20 | engine git for-each-ref 1 · ls-files 8 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
 		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
@@ -351,43 +351,7 @@ func TestTheExtensionCounts(t *testing.T) {
 	held := 0
 	for _, tc := range extensionCases {
 		t.Run(tc.name, func(t *testing.T) {
-			for name, value := range clitest.OuterRunEnvironment {
-				t.Setenv(name, value)
-			}
-			clitest.UnsetHostRunEnvironment(t)
-			tools := requireOffline(t, tc)
-			t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
-			// The engine probes each candidate of a pinned toolchain until one
-			// answers with the pinned release: the pinned Go through GOROOT and
-			// the case's pinned tools first on PATH make the first candidate
-			// answer, whatever else the host's PATH holds. They stay where the
-			// machine keeps them, outside the cases' Putnami home: each names its
-			// own executable through its probe's self, so it answers from a
-			// record once probed.
-			goroot := goRoot(t)
-			requireRecordable(t, filepath.Join(goroot, "bin", "go"))
-			for _, tool := range tools {
-				if filepath.Base(tool) == "bun" {
-					requireRecordable(t, tool)
-				}
-			}
-			putnamiHome(t, home)
-			t.Setenv("GOROOT", goroot)
-			dirs := []string{filepath.Join(goroot, "bin")}
-			for _, tool := range tools {
-				dirs = append(dirs, filepath.Dir(tool))
-			}
-			t.Setenv("PATH", strings.Join(append(dirs, os.Getenv("PATH")), string(os.PathListSeparator)))
-			t.Setenv("PUTNAMI_STORE_DIR", t.TempDir())
-			root := extensionWorkspace(t, tc)
-			for _, args := range tc.setup {
-				if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
-					t.Fatalf("putnami %v exit %d:\n%s", args, code, out)
-				}
-			}
-			// An install writes the lock again, without the pins of the
-			// runtimes the workspace compiles from this tree.
-			clitest.PinToolchains(t, repoRoot, root, tc.toolchains...)
+			root := prepareExtensionCase(t, home, tc)
 			// The first run prepares the extension runtimes, so the runs counted
 			// build none. It runs on every worker, in the order its tasks take
 			// there.
@@ -436,6 +400,51 @@ func TestTheExtensionCounts(t *testing.T) {
 		spectest.Proves(t, "cli/job-planning-execution", "unchanged-planning-reads-records",
 			"planning-an-unchanged-workspace-starts-only-git")
 	}
+}
+
+// prepareExtensionCase writes the case's workspace, with the case's pinned
+// tools first on PATH and its own store, runs its setup and returns its root.
+// home is the Putnami home the cases share.
+func prepareExtensionCase(t *testing.T, home string, tc extensionCase) string {
+	t.Helper()
+	for name, value := range clitest.OuterRunEnvironment {
+		t.Setenv(name, value)
+	}
+	clitest.UnsetHostRunEnvironment(t)
+	tools := requireOffline(t, tc)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	// The engine probes each candidate of a pinned toolchain until one
+	// answers with the pinned release: the pinned Go through GOROOT and
+	// the case's pinned tools first on PATH make the first candidate
+	// answer, whatever else the host's PATH holds. They stay where the
+	// machine keeps them, outside the cases' Putnami home: each names its
+	// own executable through its probe's self, so it answers from a
+	// record once probed.
+	goroot := goRoot(t)
+	requireRecordable(t, filepath.Join(goroot, "bin", "go"))
+	for _, tool := range tools {
+		if filepath.Base(tool) == "bun" {
+			requireRecordable(t, tool)
+		}
+	}
+	putnamiHome(t, home)
+	t.Setenv("GOROOT", goroot)
+	dirs := []string{filepath.Join(goroot, "bin")}
+	for _, tool := range tools {
+		dirs = append(dirs, filepath.Dir(tool))
+	}
+	t.Setenv("PATH", strings.Join(append(dirs, os.Getenv("PATH")), string(os.PathListSeparator)))
+	t.Setenv("PUTNAMI_STORE_DIR", t.TempDir())
+	root := extensionWorkspace(t, tc)
+	for _, args := range tc.setup {
+		if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
+			t.Fatalf("putnami %v exit %d:\n%s", args, code, out)
+		}
+	}
+	// An install writes the lock again, without the pins of the
+	// runtimes the workspace compiles from this tree.
+	clitest.PinToolchains(t, repoRoot, root, tc.toolchains...)
+	return root
 }
 
 // everyWorker is command without its --max-parallel limit.

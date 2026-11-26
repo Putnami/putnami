@@ -1,6 +1,6 @@
 # ADR 0010 — A tsc build declares its outDir through pathFrom
 
-- **Status**: accepted
+- **Status**: accepted, amended by [ADR 0015](0015-the-tsc-output-check-reads-the-candidate-cut-its-key-holds.md) (when an output Git does not ignore fails the build)
 - **Scope**: `@putnami/typescript` (`typescript/extension`), the `build-tsc`
   task and the `compiler` parameter of `build`, `test` and `package`;
   `@putnami/nx` and `@putnami/turbo`, whose import maps a `tsc` build
@@ -49,7 +49,8 @@ Two facts constrain the answer:
    a dependent project runs after the task.
 3. **The task empties its outputs itself.** The engine never empties a
    `pathFrom` output, so `build-tsc` removes them before `tsc` starts, after
-   it has checked that Git ignores them and tracks no file in them.
+   it has checked that Git ignores them and tracks no file in them (from the
+   files they hold, ADR 0015).
 4. **A config with references runs as `tsc -p`.** The task runs the build
    script's command with its arguments, except `tsc -b` on a config that
    declares `references`, which runs as `tsc -p` on the same config. Putnami
@@ -94,8 +95,9 @@ Two facts constrain the answer:
   `tsc-output` write resource, which runs them one after the other.
 - A `tsc -b` script on a config with references does not run as written. Its
   emit is the same, and the build order of the references moves to Putnami.
-- In a Git work tree, an `outDir` that Git does not ignore, or that holds a
-  tracked file, fails the build and names the setting. Outside one, the build
+- In a Git work tree, an `outDir` that holds a tracked file fails the build
+  and names the setting; one that Git does not ignore fails it from the first
+  run whose key holds the files tsc emitted into it (ADR 0015). Outside one, the build
   checks neither, and the `git:` key needs a work tree anyway.
 
 ## Alternatives

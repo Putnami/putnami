@@ -12,7 +12,6 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	job "go.putnami.dev/protocol/job"
 	"go.putnami.dev/sdk/extension/exec"
-	"go.putnami.dev/sdk/extension/treefacts"
 )
 
 const tscFeature = "typescript/typescript-project-toolchain"
@@ -310,67 +309,73 @@ func TestCheckTscOutputsRefusesAnUnignoredOrTrackedOutput(t *testing.T) {
 	}
 }
 
-func TestCheckTscOutputsReadsTheTrackedFilesOfItsContext(t *testing.T) {
+// The check reads the candidate cut its key holds from the job context and
+// starts no Git (doc/adr/0015): a tracked path in an output refuses it, an
+// untracked one, which Git does not ignore, refuses it too, and an output that
+// holds nothing yet passes.
+func TestCheckTscOutputsReadsTheCandidateCutOfItsContext(t *testing.T) {
 	spectest.Proves(t, tscFeature, "tsc-output-restores-at-outdir", "an-unusable-outdir-fails-before-tsc-runs")
-	plan := func(t *testing.T, gitignore string) (string, string, *TscPlan) {
-		t.Helper()
-		root, project := tscWorkspace(t, map[string]string{
-			".gitignore":             gitignore,
-			"libs/lib/package.json":  libPackage("tsc -b"),
-			"libs/lib/tsconfig.json": libConfig,
+	root, project := tscWorkspace(t, map[string]string{
+		"libs/lib/package.json":  libPackage("tsc -b"),
+		"libs/lib/tsconfig.json": libConfig,
+	})
+	plan, err := PlanTsc(project, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	context := func(files ...job.CandidateFile) *job.Context {
+		return &job.Context{WorkspaceRoot: root, Tree: &job.Tree{
+			Directory:            "libs/lib",
+			CandidateDirectories: []string{"libs/lib"},
+			CandidateFiles:       append([]job.CandidateFile{{Path: "libs/lib/package.json", Mode: job.CandidateModeRegular}}, files...),
+		}}
+	}
+	tracked := func(path string) job.CandidateFile {
+		return job.CandidateFile{Path: path, Mode: job.CandidateModeRegular}
+	}
+	untracked := func(path string) job.CandidateFile {
+		return job.CandidateFile{Path: path, Mode: job.CandidateModeUntracked}
+	}
+	t.Setenv("PATH", "")
+
+	for _, tc := range []struct {
+		name  string
+		files []job.CandidateFile
+		code  string
+		names string
+	}{
+		{"outputs not built yet", nil, "", ""},
+		{"files beside the outputs", []job.CandidateFile{tracked("libs/lib/distribution.md"), untracked("libs/lib/dist.txt")}, "", ""},
+		{"a tracked file in the outDir", []job.CandidateFile{tracked("libs/lib/dist/index.js")}, CodeTscOutputTracked, "dist/index.js"},
+		{"an unmerged file in the outDir", []job.CandidateFile{{Path: "libs/lib/dist/index.js", Mode: job.CandidateModeUnmerged}}, CodeTscOutputTracked, "dist/index.js"},
+		{"a tracked .tsbuildinfo", []job.CandidateFile{tracked("libs/lib/tsconfig.tsbuildinfo")}, CodeTscOutputTracked, "tsconfig.tsbuildinfo"},
+		{"an outDir Git does not ignore", []job.CandidateFile{untracked("libs/lib/dist/index.js")}, CodeTscOutputIgnored, "dist/index.js"},
+		{"a .tsbuildinfo Git does not ignore", []job.CandidateFile{untracked("libs/lib/tsconfig.tsbuildinfo")}, CodeTscOutputIgnored, "tsconfig.tsbuildinfo"},
+		// Outputs are checked in order: the unignored outDir refuses before
+		// the tracked .tsbuildinfo that follows it.
+		{"an unignored outDir before a tracked .tsbuildinfo", []job.CandidateFile{tracked("libs/lib/tsconfig.tsbuildinfo"), untracked("libs/lib/dist/index.js")}, CodeTscOutputIgnored, "dist/index.js"},
+		// Within one output, a tracked file refuses first.
+		{"a tracked and an untracked file in the outDir", []job.CandidateFile{untracked("libs/lib/dist/a.js"), tracked("libs/lib/dist/b.js")}, CodeTscOutputTracked, "dist/b.js"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := CheckTscOutputs(root, project, plan, context(tc.files...))
+			if tc.code == "" {
+				if err != nil {
+					t.Errorf("CheckTscOutputs = %v, want the outputs accepted", err)
+				}
+				return
+			}
+			if !isTscError(err, tc.code) || !strings.Contains(err.Error(), tc.names) {
+				t.Errorf("CheckTscOutputs = %v, want %s naming %s", err, tc.code, tc.names)
+			}
 		})
-		plan, err := PlanTsc(project, root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return root, project, plan
-	}
-	context := func(root string, tracked ...string) *treefacts.Facts {
-		return treefacts.From(&job.Context{WorkspaceRoot: root, Tree: &job.Tree{
-			Directory:    "libs/lib",
-			TrackedFiles: append([]string{"libs/lib/package.json"}, tracked...),
-		}})
 	}
 
-	t.Run("without git", func(t *testing.T) {
-		root, project, plan := plan(t, "")
-		t.Setenv("PATH", "")
-		if err := CheckTscOutputs(root, project, plan, context(root)); err != nil {
-			t.Errorf("without a git program = %v, want nothing checked", err)
-		}
-		// The context alone refuses a tracked file in the outDir, with no git.
-		err := CheckTscOutputs(root, project, plan, context(root, "libs/lib/dist/index.js"))
-		if !isTscError(err, CodeTscOutputTracked) || !strings.Contains(err.Error(), "dist/index.js") {
-			t.Errorf("a tracked file in the outDir = %v, want %s naming it", err, CodeTscOutputTracked)
-		}
-		// And whatever output holds it.
-		err = CheckTscOutputs(root, project, plan, context(root, "libs/lib/tsconfig.tsbuildinfo"))
-		if !isTscError(err, CodeTscOutputTracked) || !strings.Contains(err.Error(), "tsconfig.tsbuildinfo") {
-			t.Errorf("a tracked .tsbuildinfo = %v, want %s naming it", err, CodeTscOutputTracked)
-		}
-	})
-
-	t.Run("in a work tree", func(t *testing.T) {
-		if _, err := osexec.LookPath("git"); err != nil {
-			t.Skip("git is not on PATH")
-		}
-		root, project, ignoring := plan(t, "node_modules\ndist/\n*.tsbuildinfo\n")
-		if out, err := osexec.Command("git", "-C", root, "init", "-q").CombinedOutput(); err != nil {
-			t.Fatalf("git init: %v: %s", err, out)
-		}
-		if err := CheckTscOutputs(root, project, ignoring, context(root, "libs/lib/distribution.md")); err != nil {
-			t.Errorf("a tracked file beside the outDir = %v, want the outputs accepted", err)
-		}
-		// Outputs are checked in order: the outDir Git does not ignore refuses
-		// before the tracked .tsbuildinfo that follows it.
-		if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte("node_modules\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		err := CheckTscOutputs(root, project, ignoring, context(root, "libs/lib/tsconfig.tsbuildinfo"))
-		if !isTscError(err, CodeTscOutputIgnored) || !strings.Contains(err.Error(), "dist") {
-			t.Errorf("an unignored outDir before a tracked .tsbuildinfo = %v, want %s naming dist", err, CodeTscOutputIgnored)
-		}
-	})
+	// A context without the cut, an older CLI's, is checked with Git; without
+	// a git program, nothing is checked.
+	if err := CheckTscOutputs(root, project, plan, &job.Context{WorkspaceRoot: root}); err != nil {
+		t.Errorf("no cut and no git program = %v, want nothing checked", err)
+	}
 }
 
 // A project inside a repository nested in the workspace's, a clone or a
@@ -408,11 +413,11 @@ func TestCheckTscOutputsAsksGitInANestedRepository(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// The workspace's index lists nothing under the project.
-			facts := treefacts.From(&job.Context{WorkspaceRoot: root, Tree: &job.Tree{
-				Directory: "libs/inner/lib", TrackedFiles: []string{},
-			}})
-			err = CheckTscOutputs(root, project, plan, facts)
+			// The workspace's cut lists nothing under the project.
+			ctx := &job.Context{WorkspaceRoot: root, Tree: &job.Tree{
+				Directory: "libs/inner/lib", CandidateDirectories: []string{"libs/inner/lib"}, CandidateFiles: []job.CandidateFile{},
+			}}
+			err = CheckTscOutputs(root, project, plan, ctx)
 			if !isTscError(err, CodeTscOutputTracked) || !strings.Contains(err.Error(), "dist/index.js") {
 				t.Errorf("a tracked file in the outDir of a nested repository = %v, want %s naming it", err, CodeTscOutputTracked)
 			}
@@ -473,4 +478,89 @@ func relOrEmpty(base, path string) string {
 		return path
 	}
 	return filepath.ToSlash(rel)
+}
+
+// The cut lists a symbolic link, a submodule or a nested repository as one
+// entry and nothing below it. An output below such an entry would pass a
+// check that reads only the entries at or below the output, and emptying it
+// would delete what Git tracks through the link or in the inner repository:
+// the check refuses it.
+func TestCheckTscOutputsRefusesAnOutputBelowAOneEntryPath(t *testing.T) {
+	spectest.Proves(t, tscFeature, "tsc-output-restores-at-outdir", "an-unusable-outdir-fails-before-tsc-runs")
+	for _, tc := range []struct {
+		name  string
+		entry job.CandidateFile
+		code  string
+	}{
+		{"a tracked symbolic link", job.CandidateFile{Path: "libs/lib/gen", Mode: job.CandidateModeSymlink}, CodeTscOutputTracked},
+		{"a submodule", job.CandidateFile{Path: "libs/lib/gen", Mode: job.CandidateModeSubmodule}, CodeTscOutputTracked},
+		{"an untracked nested repository", job.CandidateFile{Path: "libs/lib/gen", Mode: job.CandidateModeUntracked}, CodeTscOutputIgnored},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, project := tscWorkspace(t, map[string]string{
+				"libs/lib/package.json": libPackage("tsc -b"),
+				"libs/lib/tsconfig.json": `{"compilerOptions": {"composite": true, "rootDir": "src",` +
+					` "outDir": "gen/dist", "declaration": true}, "include": ["src"]}`,
+			})
+			plan, err := PlanTsc(project, root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", "")
+			ctx := &job.Context{WorkspaceRoot: root, Tree: &job.Tree{
+				Directory:            "libs/lib",
+				CandidateDirectories: []string{"libs/lib"},
+				CandidateFiles:       []job.CandidateFile{tc.entry, {Path: "libs/lib/package.json", Mode: job.CandidateModeRegular}},
+			}}
+			err = CheckTscOutputs(root, project, plan, ctx)
+			if !isTscError(err, tc.code) || !strings.Contains(err.Error(), "gen/dist") || !strings.Contains(err.Error(), "below gen") {
+				t.Errorf("an outDir below %s = %v, want %s naming gen/dist below gen", tc.name, err, tc.code)
+			}
+		})
+	}
+}
+
+// An output below a symbolic link is refused before anything is emptied,
+// whatever the cut says: the link may lead out of the project, or to a
+// directory of the project whose tracked files the cut lists under another
+// path.
+func TestCheckTscOutputsRefusesAnOutputBelowASymbolicLink(t *testing.T) {
+	spectest.Proves(t, tscFeature, "tsc-output-restores-at-outdir", "an-unusable-outdir-fails-before-tsc-runs")
+	for _, tc := range []struct {
+		name   string
+		target func(root, project string) string
+		cut    []job.CandidateFile
+	}{
+		{"out of the project", func(root, _ string) string { return filepath.Join(root, "outside") }, nil},
+		{"to a directory of the project holding a tracked file", func(_, project string) string { return filepath.Join(project, "real") },
+			[]job.CandidateFile{{Path: "libs/lib/real/dist/tracked.js", Mode: job.CandidateModeRegular}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, project := tscWorkspace(t, map[string]string{
+				"libs/lib/package.json": libPackage("tsc -b"),
+				"libs/lib/tsconfig.json": `{"compilerOptions": {"composite": true, "rootDir": "src",` +
+					` "outDir": "gen/dist", "declaration": true}, "include": ["src"]}`,
+				"libs/lib/real/dist/tracked.js": "",
+				"outside/keep.txt":              "kept",
+			})
+			// The link is ignored, so it is not in the cut.
+			if err := os.Symlink(tc.target(root, project), filepath.Join(project, "gen")); err != nil {
+				t.Fatal(err)
+			}
+			plan, err := PlanTsc(project, root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", "")
+			ctx := &job.Context{WorkspaceRoot: root, Tree: &job.Tree{
+				Directory:            "libs/lib",
+				CandidateDirectories: []string{"libs/lib"},
+				CandidateFiles:       append([]job.CandidateFile{{Path: "libs/lib/package.json", Mode: job.CandidateModeRegular}}, tc.cut...),
+			}}
+			err = CheckTscOutputs(root, project, plan, ctx)
+			if !isTscError(err, CodeTscOutDir) || !strings.Contains(err.Error(), "below the symbolic link gen") {
+				t.Errorf("an outDir below a link %s = %v, want %s naming the link", tc.name, err, CodeTscOutDir)
+			}
+		})
+	}
 }

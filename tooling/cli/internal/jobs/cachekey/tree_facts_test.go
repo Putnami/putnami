@@ -368,3 +368,35 @@ func TestABuildOutputDirectoryDoesNotMoveALintKey(t *testing.T) {
 		t.Fatalf("building into dist moved the lint key (%s != %s)", before, after)
 	}
 }
+
+// A run that has read the candidate cut answers the tracked paths from it,
+// with the index stamp taken before that read, and reads the index no second
+// time: the cut lists every path of the index. Without a cut, the index is
+// read.
+func TestTheTrackedPathsComeFromTheCutTheRunRead(t *testing.T) {
+	spectest.Proves(t, treeFactsFeature, "candidate-cut-and-history-follow-the-key", "a-candidate-cut-is-keyed-and-carried")
+	root := treeFactsRepo(t)
+	treeKeyedGit(t, root, "rm", "-q", "--cached", "other/other.go")
+	writeFileAt(t, filepath.Join(root, "lib", "new.go"), "package lib\n")
+	want, err := putnamigit.TrackedPaths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reads atomic.Int32
+	read := func(dir string) ([]string, error) { reads.Add(1); return putnamigit.TrackedPaths(dir) }
+
+	facts := NewTreeFacts(root)
+	facts.currentCut()
+	paths, stamp, stamped, err := facts.TrackedRead(read)
+	if err != nil || !slices.Equal(paths, want) || reads.Load() != 0 {
+		t.Fatalf("tracked from the cut = %v (%v), %d index reads; want %v and none", paths, err, reads.Load(), want)
+	}
+	if current, ok := putnamigit.ReadIndexStamp(root); !stamped || !ok || current != stamp {
+		t.Fatalf("the stamp of the cut's read %v (%v) is not the index's %v", stamp, stamped, current)
+	}
+
+	fresh := NewTreeFacts(root)
+	if paths, _, _, err := fresh.TrackedRead(read); err != nil || !slices.Equal(paths, want) || reads.Load() != 1 {
+		t.Fatalf("tracked without a cut = %v (%v), %d index reads; want %v and one", paths, err, reads.Load(), want)
+	}
+}

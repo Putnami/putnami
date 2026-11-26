@@ -543,21 +543,30 @@ anyway:
 |---|---|
 | `typescript-tsc-unsupported-script` | An explicit `tsc` with a `build` script that does not run `tsc` alone |
 | `typescript-tsc-outdir` | No `outDir`, an `outFile`, `noEmit`, or an output outside the project or equal to it |
-| `typescript-tsc-output-not-ignored` | An output Git does not ignore: add it to `.gitignore`, or the emitted files would key their own build |
+| `typescript-tsc-output-not-ignored` | An output that holds a file Git does not ignore: add it to `.gitignore`, or the emitted files key their own build |
 | `typescript-tsc-tracked-output` | An output that holds a file Git tracks, which emptying it would delete |
 | `typescript-tsc-config` | The config the command names does not exist |
 
-The build reads the files the Git index tracks under the project from its
-job context, through the `trackedFiles` runtime input, so adding a path under
-the project to the index, or removing one, moves its key. Whether Git ignores
-each output is asked of Git, in one `git check-ignore` for every output: an
-output may be a file, such as a `.tsbuildinfo`, or a directory the build has
-not created yet, which no fact of the context answers. The same call tells a
-work tree from a directory outside every repository, so the key holds no
-repository state, and a shallow and a complete clone share it. A repository
-Git refuses, such as one owned by another user, fails the build. A project
-inside a repository nested in the workspace's, such as a submodule, is
-checked against that repository's index, with Git ([ADR 0014](adr/0014-a-typescript-job-reads-the-tree-from-its-context.md)).
+The two Git checks read the project's candidate cut, the one its `git:` key
+reads, from its job context through the `candidateFiles` runtime input, and
+start no Git: an output that holds a path the index tracks is refused as
+tracked, and one that holds an untracked path is refused as one Git does not
+ignore. An output below a path the cut lists as one entry, a symbolic link,
+a submodule or a nested repository, is refused the same way, and one below
+any symbolic link, an ignored one included, fails as `typescript-tsc-outdir`,
+since emptying it would delete, through the link, files Git tracks or files
+outside the project.
+An output the build has not created holds nothing, so an output Git
+does not ignore is refused by the first build whose key holds the files tsc
+emitted into it: a build can succeed in a fresh checkout, then fails from the
+next build that reads the emitted files, in the same run or the next one, and
+names a file. Adding a path under
+the project to the index, or removing one, moves the key. A project inside a
+repository nested in the workspace's, such as a submodule, and a CLI that
+writes no cut, are checked with Git: the tracked files listed and one
+`git check-ignore` for every output, which also tells a work tree from a
+directory outside every repository
+([ADR 0015](adr/0015-the-tsc-output-check-reads-the-candidate-cut-its-key-holds.md)).
 
 ### Phase 3: Types
 

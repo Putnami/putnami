@@ -11,7 +11,9 @@ import (
 	"strings"
 	"time"
 
+	job "go.putnami.dev/protocol/job"
 	"go.putnami.dev/sdk/extension/exec"
+	"go.putnami.dev/sdk/extension/gitcandidate"
 	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/treefacts"
@@ -288,25 +290,73 @@ func installedTsc(projectPath, workspaceRoot string) (string, bool) {
 }
 
 // CheckTscOutputs refuses outputs Putnami cannot own in a Git work tree: one
-// Git does not ignore, which would enter the build's own key, and one that
-// holds a file Git tracks, which emptying it would delete. Outputs are checked
-// in order, each for a tracked file first. Outside a work tree, or without a
-// git program, it checks nothing.
+// that holds a file Git tracks, which emptying it would delete, and one that
+// holds a file Git does not ignore, which enters the build's own key. Outputs
+// are checked in order, each for a tracked file first.
 //
-// The tracked files come from facts, which answer from the job context when
-// the task declares `trackedFiles`. Whether Git ignores an output is asked of
-// Git, in one `check-ignore --no-index` for every output: an output may be a
-// file, or a directory the build has not created yet, and no tree fact answers
-// either (doc/adr/0014). That call also tells a work tree from a directory
-// outside every repository, so the task keys no repository state. A project
+// The check reads the candidate cut the build's key holds, from the job
+// context when the task declares `candidateFiles` (doc/adr/0015): a path the
+// index tracks carries its index mode, and an untracked path in the cut is one
+// Git does not ignore. It starts no Git. An output the build has not created
+// yet holds nothing, so a build whose outputs Git does not ignore is refused
+// by the first job whose key holds the files tsc emitted into them. A project
 // inside a repository nested in the workspace's, such as a submodule, has its
-// files tracked by that repository's index, which the context's listing does
-// not read: the check asks Git there.
-func CheckTscOutputs(workspaceRoot, projectPath string, plan *TscPlan, facts *treefacts.Facts) error {
-	if treefacts.NestedRepository(workspaceRoot, projectPath) {
-		facts = nil
+// files in that repository's index, which the context's cut does not read;
+// it, and a context without the cut, an older CLI's, are checked with Git
+// (gitCheckTscOutputs), which checks nothing outside a work tree or without a
+// git program.
+func CheckTscOutputs(workspaceRoot, projectPath string, plan *TscPlan, ctx *job.Context) error {
+	if err := outputsStayInProject(projectPath, plan); err != nil {
+		return err
 	}
-	tracked, err := facts.TrackedFiles(projectPath)
+	if treefacts.NestedRepository(workspaceRoot, projectPath) {
+		return gitCheckTscOutputs(projectPath, plan)
+	}
+	cut, ok := gitcandidate.ContextCut(ctx, projectPath)
+	if !ok {
+		return gitCheckTscOutputs(projectPath, plan)
+	}
+	rel := slashRel(projectPath, plan.Config)
+	for _, output := range plan.Outputs() {
+		path := slashRel(projectPath, output)
+		var untracked string
+		for _, file := range cut {
+			if strings.HasPrefix(path, file.Path+"/") {
+				// The cut lists a symbolic link, a submodule or a nested
+				// repository as one entry and nothing below it: what Git
+				// tracks through it is unknown, and emptying the output would
+				// delete it.
+				if file.Mode != job.CandidateModeUntracked {
+					return tscErrorf(CodeTscOutputTracked, rel, "%s is an output of tsc below %s, which Git tracks as one entry, a symbolic link or a submodule: building empties the output through it, so move the output out of it", path, file.Path)
+				}
+				return tscErrorf(CodeTscOutputIgnored, rel, "%s is an output of tsc below %s, which Git does not ignore and lists as one entry, a symbolic link or a nested repository: building empties the output through it, so move the output out of it", path, file.Path)
+			}
+			if file.Path != path && !strings.HasPrefix(file.Path, path+"/") {
+				continue
+			}
+			if file.Mode != job.CandidateModeUntracked {
+				return tscErrorf(CodeTscOutputTracked, rel, "%s is an output of tsc, and Git tracks %s in it: building empties it, so move the committed files out of it or stop tracking them", path, file.Path)
+			}
+			if untracked == "" {
+				untracked = file.Path
+			}
+		}
+		if untracked != "" {
+			return tscErrorf(CodeTscOutputIgnored, rel, "%s is an output of tsc that Git does not ignore, and it holds %s: add it to .gitignore, so the files tsc emits do not key the build that emits them", path, untracked)
+		}
+	}
+	return nil
+}
+
+// gitCheckTscOutputs is CheckTscOutputs read from Git, for a context that
+// carries no candidate cut of the project: the tracked files are listed with
+// Git, and whether Git ignores each output, a file or a directory the build
+// has not created yet, is asked in one `check-ignore --no-index`, whose
+// refusal outside every repository, or without a git program, tells that
+// there is nothing to check.
+func gitCheckTscOutputs(projectPath string, plan *TscPlan) error {
+	// A nil Facts carries no context, so it lists the tracked files with Git.
+	tracked, err := (*treefacts.Facts)(nil).TrackedFiles(projectPath)
 	if err != nil {
 		if gitread.Unmanaged(projectPath) != nil {
 			return nil
@@ -335,7 +385,6 @@ func CheckTscOutputs(workspaceRoot, projectPath string, plan *TscPlan, facts *tr
 		ignored, err := ignoredProbes(projectPath, probes)
 		if err != nil {
 			if gitread.Unmanaged(projectPath) != nil {
-				// Without git, only what the context lists is checked.
 				return trackedErr
 			}
 			return err
@@ -348,6 +397,36 @@ func CheckTscOutputs(workspaceRoot, projectPath string, plan *TscPlan, facts *tr
 		}
 	}
 	return trackedErr
+}
+
+// outputsStayInProject refuses an output with a symbolic link between the
+// project directory and it: the check reads the path as written, and emptying
+// the output would delete, through the link, files the check did not read,
+// tracked ones or ones outside the project. An output that is itself a link is
+// removed without being followed.
+func outputsStayInProject(projectPath string, plan *TscPlan) error {
+	for _, output := range plan.Outputs() {
+		rel, err := filepath.Rel(projectPath, output)
+		if err != nil {
+			return fmt.Errorf("locate the tsc output %s: %w", output, err)
+		}
+		dir := projectPath
+		parts := strings.Split(rel, string(filepath.Separator))
+		for _, part := range parts[:len(parts)-1] {
+			dir = filepath.Join(dir, part)
+			info, err := os.Lstat(dir)
+			if errors.Is(err, os.ErrNotExist) {
+				break
+			}
+			if err != nil {
+				return fmt.Errorf("read %s: %w", dir, err)
+			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				return tscErrorf(CodeTscOutDir, slashRel(projectPath, plan.Config), "%s is an output of tsc below the symbolic link %s: building empties the output through the link, so name a path without one", slashRel(projectPath, output), slashRel(projectPath, dir))
+			}
+		}
+	}
+	return nil
 }
 
 // firstTracked returns the first tracked path, in the listing's order, that

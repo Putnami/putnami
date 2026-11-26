@@ -1,11 +1,12 @@
 package scheduler
 
 // invalidateWritten records that a task of the run wrote paths, absolute
-// paths an execution, a restore or a stamp wrote: the run's read of the
-// candidate cut is marked stale first, then every memoized input digest the
-// paths can move is dropped. In this order a key computed between the two
-// steps reads the cut again and memoizes nothing the drop keeps, so no later
-// key reuses a digest of the cut before the write (protocols/job ADR 0003).
+// paths an execution, a restore or a stamp wrote: the write is recorded
+// against the run's read of the candidate cut first, then every memoized input
+// digest the paths can move is dropped. In this order a key computed between
+// the two steps that the write reaches reads the cut again and memoizes nothing
+// the drop keeps, so no later key reuses a digest of the cut before the write
+// (protocols/job ADR 0003 and 0004).
 func (s *Scheduler) invalidateWritten(paths []string) {
 	if len(paths) == 0 {
 		return

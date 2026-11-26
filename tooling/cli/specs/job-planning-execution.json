@@ -235,7 +235,7 @@
     },
     {
       "id": "candidate-cut-and-history-follow-the-key",
-      "text": "A task that declares candidateFiles keys on the candidate cut its git: inputs cover, with each path's index mode, and one that declares workspaceCandidateFiles on the workspace's cut, which its job reads from one file of the run. A task that declares changeHistory gets the history since the run's impacted baseline only when its cache is disabled, and the history moves no key. A write of the run outside .putnami reads the cut again for the next key or uncached job. A task that declares none keeps its key."
+      "text": "A task that declares candidateFiles keys on the candidate cut its git: inputs cover, with each path's index mode, and one that declares workspaceCandidateFiles on the workspace's cut, which its job reads from one file of the run. A task that declares changeHistory gets the history since the run's impacted baseline only when its cache is disabled, and the history moves no key. A write outside .putnami reads the cut again for the next key or uncached job it reaches. A task that declares none keeps its key."
     },
     {
       "id": "executed-directory-output-starts-empty",
