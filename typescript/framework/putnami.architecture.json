@@ -219,6 +219,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/web",
+          "producerProject": "/protocols/http-routes"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/web",
           "producerProject": "/protocols/i18n"
         }
       ],
