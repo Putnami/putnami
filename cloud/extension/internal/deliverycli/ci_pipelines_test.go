@@ -880,3 +880,83 @@ func TestCIPipelineReadsWithoutALinkAskForTheWorkspace(t *testing.T) {
 		t.Errorf("a broken manifest gives %v, want its parse error", run.err)
 	}
 }
+
+// ciHostedRunVerbs are the verbs that read or act on the workspace's hosted
+// runs, each with the workspace route its first call reaches.
+var ciHostedRunVerbs = []struct {
+	name  string
+	args  []string
+	route string
+}{
+	{"list", []string{"list"}, "GET /v1/workspaces/ws-acme/runs"},
+	{"view", []string{"view", "run-9"}, "GET /v1/workspaces/ws-acme/runs/run-9"},
+	{"logs", []string{"logs", "run-9"}, "GET /v1/workspaces/ws-acme/runs/run-9/logs"},
+	{"start", []string{"start", "--repo", "acme/app", "--sha", pipelineSHA, "--reason", "why", "--yes"}, "POST /v1/workspaces/ws-acme/runs"},
+	{"cancel", []string{"cancel", "run-9", "--reason", "why", "--yes"}, "POST /v1/workspaces/ws-acme/runs/run-9/cancel"},
+	{"retry", []string{"retry", "run-9", "--reason", "why", "--yes"}, "POST /v1/workspaces/ws-acme/runs/run-9/retry"},
+	{"status", []string{"status"}, "GET /v1/workspaces/ws-acme/ci/status"},
+	{"usage", []string{"usage"}, "GET /v1/workspaces/ws-acme/ci/usage"},
+	{"insights", []string{"insights", "run-9"}, "GET /v1/workspaces/ws-acme/runs/run-9"},
+	{"timings", []string{"timings", "run-9"}, "GET /v1/workspaces/ws-acme/runs/run-9"},
+	{"results", []string{"results", "run-9"}, "GET /v1/workspaces/ws-acme/runs/run-9"},
+}
+
+func TestCIHostedRunVerbsRunWithoutAWorkspace(t *testing.T) {
+	spectest.Proves(t, pipelineFeature, "reads-outside-a-workspace", "hosted-run-verbs-run-without-a-workspace")
+	def, _ := url.Parse(clicore.DefaultControlPlaneURL)
+	for _, c := range ciHostedRunVerbs {
+		t.Run(c.name, func(t *testing.T) {
+			fake := &ciFakeServer{responses: map[string]ciStubResponse{
+				"GET /v1/workspaces": {status: http.StatusOK, body: map[string]any{"workspaces": []any{map[string]any{"id": "ws-acme", "slug": "acme"}}}},
+			}}
+			ioctx, root := unlinkedCIIO(t, fake)
+			run := runPipelineCIIn(ioctx, root, append(c.args, "--workspace", "acme")...)
+			if run.err != nil && strings.Contains(run.err.Error(), "cloud setup") {
+				t.Fatalf("%s asks for putnami cloud setup: %v", c.name, run.err)
+			}
+			var reached bool
+			for _, request := range fake.requests {
+				if !strings.HasPrefix(request.Path, "/v1/workspaces/") {
+					continue
+				}
+				if request.Host != def.Host {
+					t.Errorf("%s %s host = %s, want the default %s", request.Method, request.Path, request.Host, def.Host)
+				}
+				if request.Method+" "+request.Path == c.route {
+					reached = true
+				}
+			}
+			if !reached {
+				t.Errorf("%s never reached %s: %+v (err %v)", c.name, c.route, fake.requests, run.err)
+			}
+			if entries, err := os.ReadDir(root); err != nil || len(entries) != 0 {
+				t.Errorf("%s left %v in the directory (%v)", c.name, entries, err)
+			}
+
+			// Without --workspace, the verb names it before any call.
+			fake = &ciFakeServer{}
+			ioctx, root = unlinkedCIIO(t, fake)
+			runPipelineCIIn(ioctx, root, c.args...).refuses(t, clicore.ExitUsage, "pass --workspace")
+			if len(fake.requests) != 0 {
+				t.Errorf("%s refused after %+v", c.name, fake.requests)
+			}
+		})
+	}
+}
+
+func TestCIListOfHostedRunsRefusesPipelineFlags(t *testing.T) {
+	spectest.Proves(t, pipelineFeature, "lists-the-pipelines-of-any-ci", "list-of-hosted-runs-refuses-pipeline-flags")
+	for _, flag := range []string{"--pipeline=" + githubFixture.ref, "--job=lint", "--raw"} {
+		fake := &ciFakeServer{}
+		name, _, _ := strings.Cut(flag, "=")
+		runPipelineCI(t, fake, "list", flag).refuses(t, clicore.ExitUsage, name+" does not apply with the list of hosted runs")
+		if len(fake.requests) != 0 {
+			t.Errorf("%s: a refused list called %+v", flag, fake.requests)
+		}
+	}
+	// A switch set to false is no flag: list reads the hosted runs.
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/runs": {status: http.StatusOK, body: map[string]any{"runs": []any{}}},
+	}}
+	runPipelineCI(t, fake, "list", "--raw=false").wants(t)
+}

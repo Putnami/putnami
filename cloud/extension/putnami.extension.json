@@ -309,7 +309,7 @@
           ]
         },
         "ci": {
-          "description": "Read the runs, jobs and logs of any CI (list --commit|--change, providers, view --pipeline, logs --pipeline), also outside a Putnami workspace with --workspace, operate workspace CI runs and recovery (list, view <run>, logs <run>, start, cancel <run>, retry <run>, status, usage, repair, pause|drain|resume), turn a branch's merge queue on or off (queue [enable|disable]), report an outcome (report), and author putnami.ci.json (init, validate, fmt, explain). Run ids abbreviate: any unambiguous prefix works wherever <run> appears, and `list` prints ids at that width. `putnami cloud ci help` prints every verb with its flags.",
+          "description": "Read the runs, jobs and logs of any CI (list --commit|--change, providers, view --pipeline, logs --pipeline), operate workspace CI runs and recovery (list, view <run>, logs <run>, start, cancel <run>, retry <run>, status, usage, insights <run>, timings <run>, results <run>, repair, pause|drain|resume); the reads and the run verbs also work outside a Putnami workspace with --workspace; turn a branch's merge queue on or off (queue [enable|disable]), report an outcome (report), and author putnami.ci.json (init, validate, fmt, explain). Run ids abbreviate: any unambiguous prefix works wherever <run> appears, and `list` prints ids at that width. `putnami cloud ci help` prints every verb with its flags.",
           "command": "cloud-ci",
           "interactive": true,
           "workspace": "optional",

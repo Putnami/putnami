@@ -1408,7 +1408,8 @@
               "list-reads-a-gitlab-ci-pipeline",
               "list-resolves-the-commit-and-the-origin-repository",
               "list-json-keeps-every-pipeline-member",
-              "list-without-a-commit-or-change-lists-hosted-runs"
+              "list-without-a-commit-or-change-lists-hosted-runs",
+              "list-of-hosted-runs-refuses-pipeline-flags"
             ]
           }
         },
@@ -1475,7 +1476,8 @@
             "kind": "acceptance",
             "checks": [
               "pipeline-reads-run-without-a-workspace",
-              "pipeline-reads-without-a-link-ask-for-the-workspace"
+              "pipeline-reads-without-a-link-ask-for-the-workspace",
+              "hosted-run-verbs-run-without-a-workspace"
             ]
           }
         }

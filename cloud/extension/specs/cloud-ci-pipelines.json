@@ -17,7 +17,7 @@
       "text": [
         "putnami cloud ci list --commit <revision> or --change <number> prints the pipelines of each CI in the same columns, with the reference the other commands take; structured output prints one pipeline per line, every member kept.",
         "--commit takes any revision Git resolves; the repository is --repo, else the origin remote's, with a GitLab project's full group path.",
-        "Without both flags, list keeps reading the workspace's hosted runs."
+        "Without both flags, list keeps reading the workspace's hosted runs, and refuses --pipeline, --job and --raw before any read."
       ]
     },
     {
@@ -48,6 +48,7 @@
       "id": "reads-outside-a-workspace",
       "text": [
         "list --commit or --change, providers, view --pipeline and logs --pipeline run in a repository with no Putnami workspace: --workspace names the Cloud workspace, and the control plane is the default one unless a flag or the environment names another.",
+        "The hosted-run verbs take --workspace the same way, not putnami cloud setup.",
         "With no link and no --workspace, the command refuses before any read and names --workspace."
       ]
     }

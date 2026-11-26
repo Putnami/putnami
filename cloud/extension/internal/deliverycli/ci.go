@@ -1,6 +1,8 @@
 // putnami cloud ci — the workspace-scoped operator surface for delivery (CI)
 // runs and the pipeline circuit-breaker. Every verb drives the control-plane
-// API with the workspace-scoped bearer (clicore.ResolveWorkspaceContext): list,
+// API with the workspace-scoped bearer (clicore.ResolveWorkspaceContext, or
+// resolveCIContext for the hosted-run verbs, which also take --workspace
+// outside a Putnami workspace): list,
 // view, start, cancel, retry, logs (history + live SSE tail), status, and the
 // repair and the pause/drain/resume pipeline modes. There is NO direct Cloud
 // Run, database, or image-registry access — the CLI only ever talks to the
@@ -601,7 +603,7 @@ func ciHelp(params map[string]any, ioctx clicore.IO) error {
 		ioctx.Stdout(fmt.Sprintf("  putnami %-70s %s", c["command"], c["description"]))
 	}
 	ioctx.Stdout("")
-	ioctx.Stdout("list --commit/--change, providers, view --pipeline and logs --pipeline read any CI, and run outside a Putnami workspace with --workspace.")
+	ioctx.Stdout("list --commit/--change, providers, view --pipeline and logs --pipeline read any CI. They and the hosted-run verbs run outside a Putnami workspace with --workspace.")
 	ioctx.Stdout("<run> takes any unambiguous run-id prefix, not the full 64 characters; `list` prints ids at that width.")
 	ioctx.Stdout("`logs --level` matches each entry's OWN findings, not the severity of the pipe that carried them.")
 	ioctx.Stdout("`view <run>` on a failed run lists each failed task with its error, diagnostics and last output lines, derived by the control plane from the")
@@ -703,11 +705,21 @@ func ciList(params map[string]any, args []string, workspaceRoot string, env map[
 	if ciListsPipelines(params) {
 		return ciPipelineList(params, args, workspaceRoot, env, ioctx)
 	}
+	// --pipeline, --job and --raw select a pipeline of any CI or its log: the
+	// list of hosted runs refuses them rather than dropping them in silence.
+	// --raw is a switch, so --raw=false sets nothing.
+	ciListRefusal := "the list of hosted runs; view and logs take it"
+	if err := ciRefuseFlags(params, ciListRefusal, "pipeline", "job"); err != nil {
+		return err
+	}
+	if clicore.Truthy(clicore.Param(params, "raw")) {
+		return clicore.NewError("--raw does not apply with "+ciListRefusal, clicore.ExitUsage)
+	}
 	filters, err := parseCIListFilters(params)
 	if err != nil {
 		return err
 	}
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -1010,7 +1022,7 @@ func ciView(params map[string]any, args []string, workspaceRoot string, env map[
 	if run == "" {
 		return clicore.NewError("cloud ci view requires a run id: `putnami cloud ci view <run>`", clicore.ExitUsage)
 	}
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -1220,7 +1232,7 @@ func ciStart(params map[string]any, workspaceRoot string, env map[string]string,
 	if err := ciConfirm(params, ioctx, fmt.Sprintf("Start a CI run for %s@%s?", repo, shortSHA(sha))); err != nil {
 		return err
 	}
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -1260,7 +1272,7 @@ func ciCancel(params map[string]any, args []string, workspaceRoot string, env ma
 	if err != nil {
 		return err
 	}
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -1314,7 +1326,7 @@ func ciRetry(params map[string]any, args []string, workspaceRoot string, env map
 		Size:        size,
 		Reason:      reason,
 	}
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -1385,7 +1397,7 @@ func ciLogs(params map[string]any, args []string, workspaceRoot string, env map[
 	if run == "" {
 		return clicore.NewError("cloud ci logs requires a run id: `putnami cloud ci logs <run>`", clicore.ExitUsage)
 	}
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -1743,7 +1755,7 @@ func ciStatus(params map[string]any, args []string, workspaceRoot string, env ma
 	if extra := clicore.Positionals(args)[1:]; len(extra) > 0 {
 		return clicore.NewError("cloud ci status takes no name; got "+strings.Join(extra, " "), clicore.ExitUsage)
 	}
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -1858,7 +1870,7 @@ type CIUsageBilledDay struct {
 }
 
 func ciUsage(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -2061,7 +2073,7 @@ func ciInsights(params map[string]any, args []string, workspaceRoot string, env 
 	if run == "" {
 		return clicore.NewError("cloud ci insights requires a run id: `putnami cloud ci insights <run>`", clicore.ExitUsage)
 	}
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -2289,7 +2301,7 @@ func ciTimings(params map[string]any, args []string, workspaceRoot string, env m
 	if err != nil {
 		return err
 	}
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}

@@ -290,7 +290,11 @@ putnami cloud ci providers                       # the CIs Cloud reads, and why 
 They also run in a repository with no Putnami workspace, once the extension is
 in your user scope (`putnami extensions install --user @putnami/cloud`) and you
 are signed in. Pass `--workspace <id, slug or name>` there. The control plane
-is the default one unless a flag or the environment names another.
+is the default one unless a flag or the environment names another. The verbs of
+the hosted runs (`list`, `view <run>`, `logs <run>`, `start`, `cancel`,
+`retry`, `status`, `usage`, `insights`, `timings` and `results`) take
+`--workspace` the same way. `list` without `--commit` or `--change` lists the
+hosted runs and refuses `--pipeline`, `--job` and `--raw`.
 
 ## CI usage
 

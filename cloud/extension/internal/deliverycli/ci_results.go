@@ -130,7 +130,7 @@ func ciResults(params map[string]any, args []string, workspaceRoot string, env m
 	if run == "" {
 		return clicore.NewError("cloud ci results requires a run id: `putnami cloud ci results <run>`", clicore.ExitUsage)
 	}
-	ctx, err := clicore.ResolveWorkspaceContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}

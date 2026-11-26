@@ -200,11 +200,12 @@ func ciRefuseFlags(params map[string]any, with string, names ...string) error {
 	return nil
 }
 
-// resolvePipelineContext is clicore.ResolveWorkspaceContext for a read that
-// also runs in a repository with no Putnami workspace: the workspace comes
-// from --workspace, the link or the delegated session, and the control plane is
-// the default one when nothing names another.
-func resolvePipelineContext(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO) (*clicore.WorkspaceContext, error) {
+// resolveCIContext is clicore.ResolveWorkspaceContext for the cloud ci verbs
+// that also run in a repository with no Putnami workspace (the pipeline reads
+// and the hosted-run verbs): the workspace comes from --workspace, the link or
+// the delegated session, and the control plane is the default one when nothing
+// names another.
+func resolveCIContext(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO) (*clicore.WorkspaceContext, error) {
 	link, err := clicore.ReadCloudLink(workspaceRoot)
 	if err != nil && !errors.Is(err, clicore.ErrWorkspaceNotConfigured) {
 		return nil, err
@@ -434,7 +435,7 @@ func ciPipelineList(params map[string]any, args []string, workspaceRoot string, 
 	if err != nil {
 		return err
 	}
-	ctx, err := resolvePipelineContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -551,7 +552,7 @@ func ciNoteProviders(reqCtx context.Context, ctx *clicore.WorkspaceContext, note
 // --- providers ---
 
 func ciProviders(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {
-	ctx, err := resolvePipelineContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -592,7 +593,7 @@ func ciPipelineView(params map[string]any, args []string, workspaceRoot string, 
 	if err := ciRefuseFlags(params, "view --pipeline", "raw"); err != nil {
 		return err
 	}
-	ctx, err := resolvePipelineContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
@@ -814,7 +815,7 @@ func ciPipelineLogs(params map[string]any, args []string, workspaceRoot string, 
 	if err := ciRefuseFlags(params, "--pipeline", "follow", "phase", "project", "q", "level", "from", "to", "cursor", "limit"); err != nil {
 		return err
 	}
-	ctx, err := resolvePipelineContext(params, workspaceRoot, env, ioctx)
+	ctx, err := resolveCIContext(params, workspaceRoot, env, ioctx)
 	if err != nil {
 		return err
 	}
