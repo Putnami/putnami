@@ -1,0 +1,5307 @@
+{
+ "id": "m2-cold3-A-cold",
+ "commit": "A",
+ "sha": "a9bf099de0117a126df3766b76d91fd1f9362400",
+ "scenario": "cold",
+ "label": "m2-cold3",
+ "prep": {},
+ "machine": {
+  "nproc": 4,
+  "cpuModel": "Intel(R) Xeon(R) Processor @ 2.30GHz"
+ },
+ "loadBefore": [
+  0.48,
+  1.02,
+  2.46
+ ],
+ "idleWaitS": 40.0,
+ "busyBefore": [],
+ "rc": 0,
+ "wallS": 1322.59,
+ "outerWallS": 1323.14,
+ "unshareRc": 0,
+ "cgroup": {
+  "usageS": 4393.371638,
+  "userS": 3663.490613,
+  "systemS": 729.881024,
+  "v1UsageS": 4393.371638534,
+  "leftInCgroup": []
+ },
+ "leftover": 7,
+ "samples": {
+  "engineVmHWMKiB": 244132,
+  "loadSamples": [
+   [
+    0.0,
+    0.48
+   ],
+   [
+    5.0,
+    0.52
+   ],
+   [
+    10.0,
+    0.56
+   ],
+   [
+    15.0,
+    0.6
+   ],
+   [
+    20.0,
+    0.63
+   ],
+   [
+    25.0,
+    0.66
+   ],
+   [
+    30.0,
+    0.69
+   ],
+   [
+    35.0,
+    0.71
+   ],
+   [
+    40.0,
+    1.54
+   ],
+   [
+    45.0,
+    1.97
+   ],
+   [
+    50.0,
+    2.14
+   ],
+   [
+    55.0,
+    2.77
+   ],
+   [
+    60.0,
+    3.11
+   ],
+   [
+    65.0,
+    3.18
+   ],
+   [
+    70.0,
+    3.56
+   ],
+   [
+    75.1,
+    4.24
+   ],
+   [
+    80.1,
+    4.38
+   ],
+   [
+    85.1,
+    4.19
+   ],
+   [
+    90.1,
+    4.25
+   ],
+   [
+    95.1,
+    4.39
+   ],
+   [
+    100.1,
+    4.12
+   ],
+   [
+    105.1,
+    4.03
+   ],
+   [
+    110.1,
+    4.11
+   ],
+   [
+    115.1,
+    4.18
+   ],
+   [
+    120.1,
+    4.33
+   ],
+   [
+    125.1,
+    4.06
+   ],
+   [
+    130.1,
+    4.38
+   ],
+   [
+    135.1,
+    4.19
+   ],
+   [
+    140.1,
+    4.33
+   ],
+   [
+    145.1,
+    5.03
+   ],
+   [
+    150.1,
+    6.22
+   ],
+   [
+    155.1,
+    6.69
+   ],
+   [
+    160.1,
+    6.23
+   ],
+   [
+    165.1,
+    5.97
+   ],
+   [
+    170.1,
+    5.57
+   ],
+   [
+    175.1,
+    5.21
+   ],
+   [
+    180.1,
+    5.11
+   ],
+   [
+    185.1,
+    5.58
+   ],
+   [
+    190.2,
+    5.7
+   ],
+   [
+    195.2,
+    5.48
+   ],
+   [
+    200.2,
+    5.2
+   ],
+   [
+    205.2,
+    4.86
+   ],
+   [
+    210.2,
+    4.56
+   ],
+   [
+    215.2,
+    4.43
+   ],
+   [
+    220.2,
+    4.32
+   ],
+   [
+    225.2,
+    4.37
+   ],
+   [
+    230.2,
+    4.26
+   ],
+   [
+    235.2,
+    4.24
+   ],
+   [
+    240.2,
+    5.34
+   ],
+   [
+    245.2,
+    5.55
+   ],
+   [
+    250.2,
+    5.35
+   ],
+   [
+    255.2,
+    5.16
+   ],
+   [
+    260.2,
+    5.07
+   ],
+   [
+    265.2,
+    4.98
+   ],
+   [
+    270.2,
+    4.66
+   ],
+   [
+    275.2,
+    4.37
+   ],
+   [
+    280.2,
+    4.58
+   ],
+   [
+    285.2,
+    4.45
+   ],
+   [
+    290.2,
+    4.26
+   ],
+   [
+    295.3,
+    5.68
+   ],
+   [
+    300.3,
+    7.31
+   ],
+   [
+    305.3,
+    8.24
+   ],
+   [
+    310.3,
+    9.82
+   ],
+   [
+    315.3,
+    10.48
+   ],
+   [
+    320.3,
+    10.68
+   ],
+   [
+    325.3,
+    10.31
+   ],
+   [
+    330.3,
+    11.0
+   ],
+   [
+    335.3,
+    11.08
+   ],
+   [
+    340.3,
+    10.6
+   ],
+   [
+    345.3,
+    9.83
+   ],
+   [
+    350.3,
+    10.24
+   ],
+   [
+    355.3,
+    9.66
+   ],
+   [
+    360.3,
+    9.21
+   ],
+   [
+    365.3,
+    8.95
+   ],
+   [
+    370.4,
+    8.63
+   ],
+   [
+    375.4,
+    8.34
+   ],
+   [
+    380.4,
+    7.91
+   ],
+   [
+    385.4,
+    7.44
+   ],
+   [
+    390.4,
+    6.92
+   ],
+   [
+    395.4,
+    6.85
+   ],
+   [
+    400.4,
+    6.38
+   ],
+   [
+    405.4,
+    6.11
+   ],
+   [
+    410.4,
+    6.1
+   ],
+   [
+    415.4,
+    6.01
+   ],
+   [
+    420.4,
+    5.77
+   ],
+   [
+    425.4,
+    5.39
+   ],
+   [
+    430.4,
+    5.52
+   ],
+   [
+    435.4,
+    5.32
+   ],
+   [
+    440.4,
+    5.05
+   ],
+   [
+    445.4,
+    4.73
+   ],
+   [
+    450.4,
+    4.43
+   ],
+   [
+    455.4,
+    4.23
+   ],
+   [
+    460.4,
+    4.05
+   ],
+   [
+    465.4,
+    3.81
+   ],
+   [
+    470.4,
+    3.58
+   ],
+   [
+    475.4,
+    3.38
+   ],
+   [
+    480.4,
+    3.19
+   ],
+   [
+    485.4,
+    3.01
+   ],
+   [
+    490.4,
+    3.73
+   ],
+   [
+    495.4,
+    3.51
+   ],
+   [
+    500.4,
+    3.63
+   ],
+   [
+    505.4,
+    3.42
+   ],
+   [
+    510.4,
+    3.23
+   ],
+   [
+    515.4,
+    3.05
+   ],
+   [
+    520.4,
+    2.88
+   ],
+   [
+    525.4,
+    2.73
+   ],
+   [
+    530.5,
+    2.59
+   ],
+   [
+    535.5,
+    2.47
+   ],
+   [
+    540.5,
+    2.67
+   ],
+   [
+    545.5,
+    2.54
+   ],
+   [
+    550.5,
+    2.73
+   ],
+   [
+    555.5,
+    2.67
+   ],
+   [
+    560.5,
+    3.34
+   ],
+   [
+    565.5,
+    4.92
+   ],
+   [
+    570.5,
+    6.52
+   ],
+   [
+    575.5,
+    7.76
+   ],
+   [
+    580.5,
+    8.66
+   ],
+   [
+    585.5,
+    9.33
+   ],
+   [
+    590.5,
+    10.03
+   ],
+   [
+    595.5,
+    10.98
+   ],
+   [
+    600.5,
+    12.43
+   ],
+   [
+    605.5,
+    13.43
+   ],
+   [
+    610.5,
+    13.88
+   ],
+   [
+    615.5,
+    15.01
+   ],
+   [
+    620.5,
+    15.81
+   ],
+   [
+    625.6,
+    16.39
+   ],
+   [
+    630.6,
+    16.52
+   ],
+   [
+    635.6,
+    16.96
+   ],
+   [
+    640.6,
+    18.08
+   ],
+   [
+    645.6,
+    18.64
+   ],
+   [
+    650.6,
+    19.71
+   ],
+   [
+    655.6,
+    20.69
+   ],
+   [
+    660.6,
+    21.36
+   ],
+   [
+    665.6,
+    22.85
+   ],
+   [
+    670.6,
+    24.22
+   ],
+   [
+    675.6,
+    25.49
+   ],
+   [
+    680.6,
+    25.13
+   ],
+   [
+    685.7,
+    27.28
+   ],
+   [
+    690.7,
+    27.5
+   ],
+   [
+    695.7,
+    27.62
+   ],
+   [
+    700.7,
+    26.93
+   ],
+   [
+    705.7,
+    27.49
+   ],
+   [
+    710.7,
+    26.73
+   ],
+   [
+    715.7,
+    26.35
+   ],
+   [
+    720.7,
+    26.0
+   ],
+   [
+    725.7,
+    25.44
+   ],
+   [
+    730.7,
+    24.53
+   ],
+   [
+    735.7,
+    24.16
+   ],
+   [
+    740.8,
+    24.39
+   ],
+   [
+    745.8,
+    24.44
+   ],
+   [
+    750.8,
+    24.33
+   ],
+   [
+    755.8,
+    23.1
+   ],
+   [
+    760.8,
+    21.97
+   ],
+   [
+    765.8,
+    21.09
+   ],
+   [
+    770.8,
+    20.2
+   ],
+   [
+    775.8,
+    19.54
+   ],
+   [
+    780.8,
+    18.7
+   ],
+   [
+    785.8,
+    18.64
+   ],
+   [
+    790.8,
+    18.35
+   ],
+   [
+    795.8,
+    17.76
+   ],
+   [
+    800.8,
+    17.38
+   ],
+   [
+    805.8,
+    16.95
+   ],
+   [
+    810.8,
+    17.83
+   ],
+   [
+    815.8,
+    18.01
+   ],
+   [
+    820.8,
+    17.85
+   ],
+   [
+    825.9,
+    16.58
+   ],
+   [
+    830.9,
+    16.21
+   ],
+   [
+    835.9,
+    17.08
+   ],
+   [
+    840.9,
+    17.39
+   ],
+   [
+    845.9,
+    16.72
+   ],
+   [
+    850.9,
+    16.1
+   ],
+   [
+    855.9,
+    15.69
+   ],
+   [
+    860.9,
+    15.32
+   ],
+   [
+    865.9,
+    14.73
+   ],
+   [
+    870.9,
+    14.11
+   ],
+   [
+    875.9,
+    13.7
+   ],
+   [
+    880.9,
+    14.45
+   ],
+   [
+    885.9,
+    13.77
+   ],
+   [
+    890.9,
+    14.75
+   ],
+   [
+    895.9,
+    15.01
+   ],
+   [
+    900.9,
+    16.85
+   ],
+   [
+    905.9,
+    17.66
+   ],
+   [
+    910.9,
+    18.81
+   ],
+   [
+    916.0,
+    21.07
+   ],
+   [
+    921.0,
+    22.67
+   ],
+   [
+    926.0,
+    23.73
+   ],
+   [
+    931.0,
+    23.43
+   ],
+   [
+    936.0,
+    25.16
+   ],
+   [
+    941.0,
+    25.71
+   ],
+   [
+    946.0,
+    26.77
+   ],
+   [
+    950.0,
+    26.77
+   ],
+   [
+    955.0,
+    26.87
+   ],
+   [
+    960.0,
+    25.84
+   ],
+   [
+    965.0,
+    24.89
+   ],
+   [
+    970.0,
+    24.9
+   ],
+   [
+    975.0,
+    25.71
+   ],
+   [
+    980.0,
+    25.73
+   ],
+   [
+    985.0,
+    24.63
+   ],
+   [
+    990.1,
+    25.3
+   ],
+   [
+    995.1,
+    24.4
+   ],
+   [
+    1000.1,
+    23.17
+   ],
+   [
+    1005.1,
+    23.63
+   ],
+   [
+    1010.1,
+    23.9
+   ],
+   [
+    1015.1,
+    23.19
+   ],
+   [
+    1020.1,
+    22.77
+   ],
+   [
+    1025.1,
+    22.39
+   ],
+   [
+    1030.1,
+    21.96
+   ],
+   [
+    1035.1,
+    21.16
+   ],
+   [
+    1040.1,
+    20.27
+   ],
+   [
+    1045.1,
+    19.93
+   ],
+   [
+    1050.1,
+    19.93
+   ],
+   [
+    1055.2,
+    20.42
+   ],
+   [
+    1060.2,
+    22.63
+   ],
+   [
+    1065.2,
+    22.66
+   ],
+   [
+    1070.2,
+    22.2
+   ],
+   [
+    1075.2,
+    22.11
+   ],
+   [
+    1080.2,
+    23.38
+   ],
+   [
+    1085.2,
+    23.75
+   ],
+   [
+    1090.2,
+    24.17
+   ],
+   [
+    1095.2,
+    24.16
+   ],
+   [
+    1100.2,
+    24.3
+   ],
+   [
+    1105.2,
+    24.2
+   ],
+   [
+    1110.2,
+    24.02
+   ],
+   [
+    1115.3,
+    23.22
+   ],
+   [
+    1120.3,
+    22.48
+   ],
+   [
+    1125.3,
+    21.64
+   ],
+   [
+    1130.3,
+    21.27
+   ],
+   [
+    1135.3,
+    20.37
+   ],
+   [
+    1140.3,
+    19.86
+   ],
+   [
+    1145.3,
+    19.07
+   ],
+   [
+    1150.3,
+    18.1
+   ],
+   [
+    1155.3,
+    17.61
+   ],
+   [
+    1160.3,
+    18.12
+   ],
+   [
+    1165.3,
+    18.35
+   ],
+   [
+    1170.3,
+    18.09
+   ],
+   [
+    1175.3,
+    17.12
+   ],
+   [
+    1180.3,
+    16.63
+   ],
+   [
+    1185.3,
+    15.94
+   ],
+   [
+    1190.3,
+    14.98
+   ],
+   [
+    1195.3,
+    14.1
+   ],
+   [
+    1200.3,
+    13.85
+   ],
+   [
+    1205.3,
+    13.86
+   ],
+   [
+    1210.3,
+    13.88
+   ],
+   [
+    1215.3,
+    13.4
+   ],
+   [
+    1220.4,
+    13.21
+   ],
+   [
+    1225.4,
+    13.03
+   ],
+   [
+    1230.4,
+    12.63
+   ],
+   [
+    1235.4,
+    12.82
+   ],
+   [
+    1240.4,
+    12.43
+   ],
+   [
+    1245.4,
+    12.16
+   ],
+   [
+    1250.4,
+    12.07
+   ],
+   [
+    1255.4,
+    12.3
+   ],
+   [
+    1260.4,
+    12.84
+   ],
+   [
+    1265.4,
+    13.01
+   ],
+   [
+    1270.4,
+    13.01
+   ],
+   [
+    1275.4,
+    12.85
+   ],
+   [
+    1280.4,
+    12.94
+   ],
+   [
+    1285.4,
+    12.79
+   ],
+   [
+    1290.4,
+    12.48
+   ],
+   [
+    1295.5,
+    12.28
+   ],
+   [
+    1300.5,
+    12.1
+   ],
+   [
+    1305.5,
+    12.17
+   ],
+   [
+    1310.5,
+    12.32
+   ],
+   [
+    1315.5,
+    12.13
+   ],
+   [
+    1320.5,
+    12.04
+   ]
+  ],
+  "loadMax": 27.62,
+  "loadMaxPerCpu": 6.905,
+  "loadMedianPerCpu": 3.158
+ },
+ "remoteCacheLines": [],
+ "acct": {
+  "putnamiS": 1317.71,
+  "toolsS": 2666.86,
+  "harnessS": 0.0,
+  "sharePct": 33.07,
+  "processes": 119205,
+  "byComm": [
+   {
+    "side": "tools",
+    "comm": "compile",
+    "count": 7488,
+    "cpuS": 1296.5
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami",
+    "count": 1518,
+    "cpuS": 1064.92
+   },
+   {
+    "side": "tools",
+    "comm": "node",
+    "count": 71,
+    "cpuS": 285.18
+   },
+   {
+    "side": "tools",
+    "comm": "go",
+    "count": 10321,
+    "cpuS": 183.59
+   },
+   {
+    "side": "tools",
+    "comm": "link",
+    "count": 1180,
+    "cpuS": 175.95
+   },
+   {
+    "side": "tools",
+    "comm": "bun",
+    "count": 918,
+    "cpuS": 167.15
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-cloud",
+    "count": 1276,
+    "cpuS": 123.19
+   },
+   {
+    "side": "tools",
+    "comm": "vet",
+    "count": 4019,
+    "cpuS": 108.04
+   },
+   {
+    "side": "tools",
+    "comm": "golangci-lint",
+    "count": 453,
+    "cpuS": 94.26
+   },
+   {
+    "side": "tools",
+    "comm": "biome",
+    "count": 172,
+    "cpuS": 61.41
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-sdd",
+    "count": 605,
+    "cpuS": 47.5
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-go",
+    "count": 1986,
+    "cpuS": 47.34
+   },
+   {
+    "side": "tools",
+    "comm": "staticcheck",
+    "count": 242,
+    "cpuS": 34.23
+   },
+   {
+    "side": "tools",
+    "comm": "deliverycli.tes",
+    "count": 2,
+    "cpuS": 31.49
+   },
+   {
+    "side": "putnami",
+    "comm": "git",
+    "count": 50338,
+    "cpuS": 20.02
+   },
+   {
+    "side": "tools",
+    "comm": "cli.test",
+    "count": 93,
+    "cpuS": 13.22
+   },
+   {
+    "side": "tools",
+    "comm": "scheduler.test",
+    "count": 197,
+    "cpuS": 11.78
+   },
+   {
+    "side": "tools",
+    "comm": "nxdelegation.te",
+    "count": 2,
+    "cpuS": 9.03
+   },
+   {
+    "side": "tools",
+    "comm": "extension.test",
+    "count": 64,
+    "cpuS": 7.11
+   },
+   {
+    "side": "tools",
+    "comm": "chrome",
+    "count": 65,
+    "cpuS": 7.02
+   },
+   {
+    "side": "tools",
+    "comm": "installscripts.",
+    "count": 378,
+    "cpuS": 6.38
+   },
+   {
+    "side": "tools",
+    "comm": "documents.test",
+    "count": 2,
+    "cpuS": 6.16
+   },
+   {
+    "side": "tools",
+    "comm": "claude",
+    "count": 38,
+    "cpuS": 5.47
+   },
+   {
+    "side": "tools",
+    "comm": "store.test",
+    "count": 15,
+    "cpuS": 5.28
+   },
+   {
+    "side": "tools",
+    "comm": "rushimport.test",
+    "count": 2,
+    "cpuS": 5.12
+   },
+   {
+    "side": "tools",
+    "comm": "python",
+    "count": 17,
+    "cpuS": 5.02
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-ts",
+    "count": 540,
+    "cpuS": 4.78
+   },
+   {
+    "side": "tools",
+    "comm": "cloudcli.test",
+    "count": 2,
+    "cpuS": 4.36
+   },
+   {
+    "side": "tools",
+    "comm": "remotecache.tes",
+    "count": 3,
+    "cpuS": 4.26
+   },
+   {
+    "side": "tools",
+    "comm": "provider.test",
+    "count": 7,
+    "cpuS": 4.26
+   },
+   {
+    "side": "tools",
+    "comm": "memory.test",
+    "count": 2,
+    "cpuS": 4.0
+   },
+   {
+    "side": "tools",
+    "comm": "security.test",
+    "count": 1,
+    "cpuS": 3.88
+   },
+   {
+    "side": "tools",
+    "comm": "readers.test",
+    "count": 1,
+    "cpuS": 3.61
+   },
+   {
+    "side": "tools",
+    "comm": "engine.test",
+    "count": 97,
+    "cpuS": 3.45
+   },
+   {
+    "side": "tools",
+    "comm": "credentialcusto",
+    "count": 116,
+    "cpuS": 3.22
+   },
+   {
+    "side": "tools",
+    "comm": "turbodelegation",
+    "count": 2,
+    "cpuS": 3.17
+   },
+   {
+    "side": "tools",
+    "comm": "verify.test",
+    "count": 2,
+    "cpuS": 3.03
+   },
+   {
+    "side": "tools",
+    "comm": "lifecycle.test",
+    "count": 106,
+    "cpuS": 3.02
+   },
+   {
+    "side": "tools",
+    "comm": "cover",
+    "count": 1669,
+    "cpuS": 3.01
+   },
+   {
+    "side": "tools",
+    "comm": "pkg.test",
+    "count": 4,
+    "cpuS": 2.92
+   },
+   {
+    "side": "tools",
+    "comm": "distributioncli",
+    "count": 2,
+    "cpuS": 2.77
+   },
+   {
+    "side": "tools",
+    "comm": "output.test",
+    "count": 1,
+    "cpuS": 2.69
+   },
+   {
+    "side": "tools",
+    "comm": "uv",
+    "count": 85,
+    "cpuS": 2.37
+   },
+   {
+    "side": "tools",
+    "comm": "configcli.test",
+    "count": 1,
+    "cpuS": 2.35
+   },
+   {
+    "side": "tools",
+    "comm": "runtimecli.test",
+    "count": 2,
+    "cpuS": 2.29
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-clientg",
+    "count": 49,
+    "cpuS": 2.2
+   },
+   {
+    "side": "tools",
+    "comm": "cc1",
+    "count": 230,
+    "cpuS": 2.09
+   },
+   {
+    "side": "tools",
+    "comm": "observe.test",
+    "count": 2,
+    "cpuS": 2.09
+   },
+   {
+    "side": "tools",
+    "comm": "clicore.test",
+    "count": 15,
+    "cpuS": 1.83
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-ts.test",
+    "count": 11,
+    "cpuS": 1.82
+   },
+   {
+    "side": "tools",
+    "comm": "gocacheprog.tes",
+    "count": 8,
+    "cpuS": 1.74
+   },
+   {
+    "side": "tools",
+    "comm": "publication.tes",
+    "count": 111,
+    "cpuS": 1.65
+   },
+   {
+    "side": "tools",
+    "comm": "moonadoption.te",
+    "count": 2,
+    "cpuS": 1.63
+   },
+   {
+    "side": "tools",
+    "comm": "specgate.test",
+    "count": 3,
+    "cpuS": 1.57
+   },
+   {
+    "side": "tools",
+    "comm": "datacli.test",
+    "count": 1,
+    "cpuS": 1.55
+   },
+   {
+    "side": "tools",
+    "comm": "workspace.test",
+    "count": 29,
+    "cpuS": 1.55
+   },
+   {
+    "side": "tools",
+    "comm": "collaboration.t",
+    "count": 34,
+    "cpuS": 1.5
+   },
+   {
+    "side": "tools",
+    "comm": "toolchain.test",
+    "count": 8,
+    "cpuS": 1.4
+   },
+   {
+    "side": "tools",
+    "comm": "portable.test",
+    "count": 52,
+    "cpuS": 1.37
+   },
+   {
+    "side": "tools",
+    "comm": "agentctx.test",
+    "count": 2,
+    "cpuS": 1.33
+   },
+   {
+    "side": "tools",
+    "comm": "planner.test",
+    "count": 2,
+    "cpuS": 1.3
+   },
+   {
+    "side": "tools",
+    "comm": "sessionreporter",
+    "count": 22,
+    "cpuS": 1.29
+   },
+   {
+    "side": "tools",
+    "comm": "bash",
+    "count": 8843,
+    "cpuS": 1.28
+   },
+   {
+    "side": "tools",
+    "comm": "infraagg.test",
+    "count": 1,
+    "cpuS": 1.27
+   },
+   {
+    "side": "tools",
+    "comm": "completion.test",
+    "count": 6,
+    "cpuS": 1.27
+   },
+   {
+    "side": "tools",
+    "comm": "clientgencache.",
+    "count": 2,
+    "cpuS": 1.17
+   },
+   {
+    "side": "tools",
+    "comm": "inputresolve.te",
+    "count": 21,
+    "cpuS": 1.16
+   },
+   {
+    "side": "tools",
+    "comm": "runtime-clients",
+    "count": 4,
+    "cpuS": 1.14
+   },
+   {
+    "side": "tools",
+    "comm": "apicheck.test",
+    "count": 4,
+    "cpuS": 1.12
+   },
+   {
+    "side": "tools",
+    "comm": "devversion.test",
+    "count": 2,
+    "cpuS": 1.12
+   },
+   {
+    "side": "tools",
+    "comm": "sdd.test",
+    "count": 2,
+    "cpuS": 1.12
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-contrib",
+    "count": 241,
+    "cpuS": 1.09
+   },
+   {
+    "side": "tools",
+    "comm": "collabcli.test",
+    "count": 1,
+    "cpuS": 1.07
+   },
+   {
+    "side": "tools",
+    "comm": "php",
+    "count": 106,
+    "cpuS": 0.99
+   },
+   {
+    "side": "tools",
+    "comm": "workspace_state",
+    "count": 2,
+    "cpuS": 0.99
+   },
+   {
+    "side": "tools",
+    "comm": "admission.test",
+    "count": 39,
+    "cpuS": 0.97
+   },
+   {
+    "side": "tools",
+    "comm": "oci.test",
+    "count": 2,
+    "cpuS": 0.94
+   },
+   {
+    "side": "tools",
+    "comm": "git.test",
+    "count": 4,
+    "cpuS": 0.93
+   },
+   {
+    "side": "tools",
+    "comm": "agentsession.te",
+    "count": 2,
+    "cpuS": 0.87
+   },
+   {
+    "side": "tools",
+    "comm": "pytest",
+    "count": 4,
+    "cpuS": 0.86
+   },
+   {
+    "side": "tools",
+    "comm": "python3",
+    "count": 20,
+    "cpuS": 0.85
+   },
+   {
+    "side": "tools",
+    "comm": "telemetry.putna",
+    "count": 1,
+    "cpuS": 0.84
+   },
+   {
+    "side": "tools",
+    "comm": "pantsdelegation",
+    "count": 2,
+    "cpuS": 0.8
+   },
+   {
+    "side": "tools",
+    "comm": "registry.test",
+    "count": 1,
+    "cpuS": 0.76
+   },
+   {
+    "side": "tools",
+    "comm": "finalize.test",
+    "count": 2,
+    "cpuS": 0.73
+   },
+   {
+    "side": "tools",
+    "comm": "runcredential.t",
+    "count": 27,
+    "cpuS": 0.72
+   },
+   {
+    "side": "tools",
+    "comm": "npm ci",
+    "count": 2,
+    "cpuS": 0.68
+   },
+   {
+    "side": "tools",
+    "comm": "storage.test",
+    "count": 2,
+    "cpuS": 0.65
+   },
+   {
+    "side": "tools",
+    "comm": "toolchainlock.t",
+    "count": 32,
+    "cpuS": 0.64
+   },
+   {
+    "side": "tools",
+    "comm": "publicationoutb",
+    "count": 1,
+    "cpuS": 0.64
+   },
+   {
+    "side": "tools",
+    "comm": "features.test",
+    "count": 3,
+    "cpuS": 0.62
+   },
+   {
+    "side": "tools",
+    "comm": "jobs.test",
+    "count": 16,
+    "cpuS": 0.62
+   },
+   {
+    "side": "tools",
+    "comm": "cachekey.test",
+    "count": 2,
+    "cpuS": 0.62
+   },
+   {
+    "side": "tools",
+    "comm": "events.test",
+    "count": 2,
+    "cpuS": 0.61
+   },
+   {
+    "side": "tools",
+    "comm": "regularfile.tes",
+    "count": 1,
+    "cpuS": 0.61
+   },
+   {
+    "side": "tools",
+    "comm": "agencycli.test",
+    "count": 1,
+    "cpuS": 0.6
+   },
+   {
+    "side": "tools",
+    "comm": "hostrpc.test",
+    "count": 3,
+    "cpuS": 0.6
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-sdd.tes",
+    "count": 2,
+    "cpuS": 0.6
+   },
+   {
+    "side": "tools",
+    "comm": "hostedcold.test",
+    "count": 2,
+    "cpuS": 0.58
+   },
+   {
+    "side": "tools",
+    "comm": "runtime",
+    "count": 323,
+    "cpuS": 0.57
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-binary",
+    "count": 55,
+    "cpuS": 0.57
+   },
+   {
+    "side": "tools",
+    "comm": "postgres",
+    "count": 99,
+    "cpuS": 0.57
+   },
+   {
+    "side": "tools",
+    "comm": "nx.test",
+    "count": 3,
+    "cpuS": 0.57
+   },
+   {
+    "side": "tools",
+    "comm": "dockerpublish.t",
+    "count": 1,
+    "cpuS": 0.56
+   },
+   {
+    "side": "tools",
+    "comm": "workspacewarnin",
+    "count": 2,
+    "cpuS": 0.56
+   },
+   {
+    "side": "tools",
+    "comm": "tscbuild.test",
+    "count": 2,
+    "cpuS": 0.53
+   },
+   {
+    "side": "tools",
+    "comm": "npm pack .",
+    "count": 2,
+    "cpuS": 0.52
+   },
+   {
+    "side": "tools",
+    "comm": "build.test",
+    "count": 4,
+    "cpuS": 0.5
+   },
+   {
+    "side": "tools",
+    "comm": "bazeldelegation",
+    "count": 2,
+    "cpuS": 0.5
+   },
+   {
+    "side": "tools",
+    "comm": "gitbase.test",
+    "count": 2,
+    "cpuS": 0.5
+   },
+   {
+    "side": "tools",
+    "comm": "providertest.te",
+    "count": 4,
+    "cpuS": 0.47
+   },
+   {
+    "side": "tools",
+    "comm": "devworkload.tes",
+    "count": 23,
+    "cpuS": 0.44
+   },
+   {
+    "side": "tools",
+    "comm": "sourcecli.test",
+    "count": 1,
+    "cpuS": 0.42
+   },
+   {
+    "side": "tools",
+    "comm": "depsupgrade.tes",
+    "count": 11,
+    "cpuS": 0.42
+   },
+   {
+    "side": "tools",
+    "comm": "initchannel.tes",
+    "count": 12,
+    "cpuS": 0.41
+   },
+   {
+    "side": "tools",
+    "comm": "versioncmd.test",
+    "count": 10,
+    "cpuS": 0.41
+   },
+   {
+    "side": "tools",
+    "comm": "runnersource.te",
+    "count": 2,
+    "cpuS": 0.41
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-observe",
+    "count": 2,
+    "cpuS": 0.4
+   },
+   {
+    "side": "tools",
+    "comm": "npm config get",
+    "count": 1,
+    "cpuS": 0.4
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-client-",
+    "count": 50,
+    "cpuS": 0.39
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-go.test",
+    "count": 14,
+    "cpuS": 0.39
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-dart",
+    "count": 7,
+    "cpuS": 0.38
+   },
+   {
+    "side": "tools",
+    "comm": "screens.test",
+    "count": 2,
+    "cpuS": 0.38
+   },
+   {
+    "side": "tools",
+    "comm": "packaging.test",
+    "count": 2,
+    "cpuS": 0.38
+   },
+   {
+    "side": "tools",
+    "comm": "qualify.test",
+    "count": 57,
+    "cpuS": 0.37
+   },
+   {
+    "side": "tools",
+    "comm": "workspaceinstal",
+    "count": 9,
+    "cpuS": 0.36
+   },
+   {
+    "side": "tools",
+    "comm": "bootstrap.test",
+    "count": 2,
+    "cpuS": 0.36
+   },
+   {
+    "side": "tools",
+    "comm": "telemetry.test",
+    "count": 8,
+    "cpuS": 0.35
+   },
+   {
+    "side": "tools",
+    "comm": "gitread.test",
+    "count": 4,
+    "cpuS": 0.35
+   },
+   {
+    "side": "tools",
+    "comm": "extensions.test",
+    "count": 2,
+    "cpuS": 0.35
+   },
+   {
+    "side": "tools",
+    "comm": "test.test",
+    "count": 2,
+    "cpuS": 0.34
+   },
+   {
+    "side": "tools",
+    "comm": "rushdelegation.",
+    "count": 2,
+    "cpuS": 0.33
+   },
+   {
+    "side": "tools",
+    "comm": "doc-examples.te",
+    "count": 2,
+    "cpuS": 0.32
+   },
+   {
+    "side": "tools",
+    "comm": "openapi.test",
+    "count": 3,
+    "cpuS": 0.32
+   },
+   {
+    "side": "tools",
+    "comm": "client.test",
+    "count": 1,
+    "cpuS": 0.32
+   },
+   {
+    "side": "tools",
+    "comm": "ci.test",
+    "count": 4,
+    "cpuS": 0.31
+   },
+   {
+    "side": "tools",
+    "comm": "compose.test",
+    "count": 144,
+    "cpuS": 0.31
+   },
+   {
+    "side": "tools",
+    "comm": "where.test",
+    "count": 2,
+    "cpuS": 0.31
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-swift",
+    "count": 7,
+    "cpuS": 0.3
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-dotnet",
+    "count": 7,
+    "cpuS": 0.3
+   },
+   {
+    "side": "tools",
+    "comm": "runnerprovider.",
+    "count": 3,
+    "cpuS": 0.3
+   },
+   {
+    "side": "tools",
+    "comm": "host-binary",
+    "count": 5,
+    "cpuS": 0.29
+   },
+   {
+    "side": "tools",
+    "comm": "depsedit.test",
+    "count": 2,
+    "cpuS": 0.29
+   },
+   {
+    "side": "tools",
+    "comm": "screenshots.tes",
+    "count": 1,
+    "cpuS": 0.28
+   },
+   {
+    "side": "tools",
+    "comm": "removedroots.te",
+    "count": 2,
+    "cpuS": 0.28
+   },
+   {
+    "side": "tools",
+    "comm": "hooks.test",
+    "count": 3,
+    "cpuS": 0.28
+   },
+   {
+    "side": "tools",
+    "comm": "npm install",
+    "count": 1,
+    "cpuS": 0.28
+   },
+   {
+    "side": "tools",
+    "comm": "agentartifact.t",
+    "count": 1,
+    "cpuS": 0.27
+   },
+   {
+    "side": "tools",
+    "comm": "projectsetup.te",
+    "count": 2,
+    "cpuS": 0.26
+   },
+   {
+    "side": "tools",
+    "comm": "http.test",
+    "count": 3,
+    "cpuS": 0.26
+   },
+   {
+    "side": "tools",
+    "comm": "moon.test",
+    "count": 3,
+    "cpuS": 0.26
+   },
+   {
+    "side": "tools",
+    "comm": "launch.test",
+    "count": 12,
+    "cpuS": 0.26
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-php",
+    "count": 9,
+    "cpuS": 0.25
+   },
+   {
+    "side": "tools",
+    "comm": "pants.test",
+    "count": 3,
+    "cpuS": 0.25
+   },
+   {
+    "side": "tools",
+    "comm": "userskills.test",
+    "count": 1,
+    "cpuS": 0.25
+   },
+   {
+    "side": "tools",
+    "comm": "api.test",
+    "count": 2,
+    "cpuS": 0.24
+   },
+   {
+    "side": "tools",
+    "comm": "logger.test",
+    "count": 1,
+    "cpuS": 0.24
+   },
+   {
+    "side": "tools",
+    "comm": "evidence.test",
+    "count": 1,
+    "cpuS": 0.24
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-rust",
+    "count": 7,
+    "cpuS": 0.23
+   },
+   {
+    "side": "tools",
+    "comm": "jobflags.test",
+    "count": 2,
+    "cpuS": 0.23
+   },
+   {
+    "side": "tools",
+    "comm": "analyze.test",
+    "count": 1,
+    "cpuS": 0.23
+   },
+   {
+    "side": "tools",
+    "comm": "ts-items-client",
+    "count": 2,
+    "cpuS": 0.23
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-java",
+    "count": 7,
+    "cpuS": 0.23
+   },
+   {
+    "side": "tools",
+    "comm": "code-sign",
+    "count": 52,
+    "cpuS": 0.22
+   },
+   {
+    "side": "tools",
+    "comm": "reportstream.te",
+    "count": 1,
+    "cpuS": 0.22
+   },
+   {
+    "side": "tools",
+    "comm": "publicationuplo",
+    "count": 1,
+    "cpuS": 0.22
+   },
+   {
+    "side": "tools",
+    "comm": "serveenv.test",
+    "count": 6,
+    "cpuS": 0.21
+   },
+   {
+    "side": "tools",
+    "comm": "stacks.test",
+    "count": 3,
+    "cpuS": 0.2
+   },
+   {
+    "side": "tools",
+    "comm": "credentialprovi",
+    "count": 15,
+    "cpuS": 0.2
+   },
+   {
+    "side": "tools",
+    "comm": "publish.test",
+    "count": 2,
+    "cpuS": 0.19
+   },
+   {
+    "side": "tools",
+    "comm": "agentartifacts.",
+    "count": 1,
+    "cpuS": 0.19
+   },
+   {
+    "side": "tools",
+    "comm": "provider",
+    "count": 35,
+    "cpuS": 0.19
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-memory-",
+    "count": 52,
+    "cpuS": 0.19
+   },
+   {
+    "side": "tools",
+    "comm": "swift.test",
+    "count": 1,
+    "cpuS": 0.19
+   },
+   {
+    "side": "tools",
+    "comm": "bazel.test",
+    "count": 3,
+    "cpuS": 0.18
+   },
+   {
+    "side": "tools",
+    "comm": "userscope.test",
+    "count": 2,
+    "cpuS": 0.18
+   },
+   {
+    "side": "tools",
+    "comm": "workspacejob.te",
+    "count": 4,
+    "cpuS": 0.17
+   },
+   {
+    "side": "tools",
+    "comm": "doctor.test",
+    "count": 3,
+    "cpuS": 0.17
+   },
+   {
+    "side": "tools",
+    "comm": "rush.test",
+    "count": 3,
+    "cpuS": 0.17
+   },
+   {
+    "side": "tools",
+    "comm": "lint.test",
+    "count": 24,
+    "cpuS": 0.17
+   },
+   {
+    "side": "tools",
+    "comm": "treefingerprint",
+    "count": 2,
+    "cpuS": 0.16
+   },
+   {
+    "side": "tools",
+    "comm": "cliagg.test",
+    "count": 1,
+    "cpuS": 0.16
+   },
+   {
+    "side": "tools",
+    "comm": "impactplan.test",
+    "count": 2,
+    "cpuS": 0.16
+   },
+   {
+    "side": "tools",
+    "comm": "linetag.test",
+    "count": 2,
+    "cpuS": 0.15
+   },
+   {
+    "side": "tools",
+    "comm": "turbo.test",
+    "count": 2,
+    "cpuS": 0.15
+   },
+   {
+    "side": "tools",
+    "comm": "runner.test",
+    "count": 1,
+    "cpuS": 0.15
+   },
+   {
+    "side": "tools",
+    "comm": "doccov.test",
+    "count": 1,
+    "cpuS": 0.15
+   },
+   {
+    "side": "tools",
+    "comm": "version.test",
+    "count": 2,
+    "cpuS": 0.15
+   },
+   {
+    "side": "tools",
+    "comm": "describe.sh",
+    "count": 30,
+    "cpuS": 0.15
+   },
+   {
+    "side": "tools",
+    "comm": "apisurface.test",
+    "count": 4,
+    "cpuS": 0.14
+   },
+   {
+    "side": "tools",
+    "comm": "app.test",
+    "count": 2,
+    "cpuS": 0.14
+   },
+   {
+    "side": "tools",
+    "comm": "docslinks.test",
+    "count": 2,
+    "cpuS": 0.14
+   },
+   {
+    "side": "tools",
+    "comm": "grpc.test",
+    "count": 2,
+    "cpuS": 0.14
+   },
+   {
+    "side": "tools",
+    "comm": "nodev.test",
+    "count": 2,
+    "cpuS": 0.14
+   },
+   {
+    "side": "tools",
+    "comm": "watch.test",
+    "count": 6,
+    "cpuS": 0.14
+   },
+   {
+    "side": "tools",
+    "comm": "codegen.test",
+    "count": 3,
+    "cpuS": 0.13
+   },
+   {
+    "side": "tools",
+    "comm": "dbtestenv.test",
+    "count": 2,
+    "cpuS": 0.13
+   },
+   {
+    "side": "tools",
+    "comm": "groupdefault.te",
+    "count": 2,
+    "cpuS": 0.13
+   },
+   {
+    "side": "tools",
+    "comm": "hostedbootstrap",
+    "count": 2,
+    "cpuS": 0.13
+   },
+   {
+    "side": "tools",
+    "comm": "sessions.test",
+    "count": 1,
+    "cpuS": 0.13
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-ruby",
+    "count": 8,
+    "cpuS": 0.12
+   },
+   {
+    "side": "tools",
+    "comm": "clibin.test",
+    "count": 3,
+    "cpuS": 0.12
+   },
+   {
+    "side": "tools",
+    "comm": "githooks.test",
+    "count": 2,
+    "cpuS": 0.12
+   },
+   {
+    "side": "tools",
+    "comm": "asm",
+    "count": 2079,
+    "cpuS": 0.12
+   },
+   {
+    "side": "tools",
+    "comm": "observabilitycl",
+    "count": 1,
+    "cpuS": 0.11
+   },
+   {
+    "side": "tools",
+    "comm": "pinnedarchive.t",
+    "count": 1,
+    "cpuS": 0.11
+   },
+   {
+    "side": "tools",
+    "comm": "invocationdir.t",
+    "count": 2,
+    "cpuS": 0.11
+   },
+   {
+    "side": "tools",
+    "comm": "runtime.test",
+    "count": 2,
+    "cpuS": 0.1
+   },
+   {
+    "side": "tools",
+    "comm": "scripts.test",
+    "count": 4,
+    "cpuS": 0.1
+   },
+   {
+    "side": "tools",
+    "comm": "platform.test",
+    "count": 3,
+    "cpuS": 0.1
+   },
+   {
+    "side": "tools",
+    "comm": "gitlab.test",
+    "count": 4,
+    "cpuS": 0.1
+   },
+   {
+    "side": "tools",
+    "comm": "helpscope.test",
+    "count": 1,
+    "cpuS": 0.1
+   },
+   {
+    "side": "tools",
+    "comm": "refstore.test",
+    "count": 2,
+    "cpuS": 0.1
+   },
+   {
+    "side": "tools",
+    "comm": "nodeworkspace.t",
+    "count": 1,
+    "cpuS": 0.1
+   },
+   {
+    "side": "tools",
+    "comm": "workspaceclient",
+    "count": 2,
+    "cpuS": 0.1
+   },
+   {
+    "side": "tools",
+    "comm": "docker",
+    "count": 28,
+    "cpuS": 0.09
+   },
+   {
+    "side": "tools",
+    "comm": "architecture.te",
+    "count": 2,
+    "cpuS": 0.09
+   },
+   {
+    "side": "tools",
+    "comm": "template.test",
+    "count": 2,
+    "cpuS": 0.09
+   },
+   {
+    "side": "tools",
+    "comm": "artifactstore.t",
+    "count": 8,
+    "cpuS": 0.09
+   },
+   {
+    "side": "tools",
+    "comm": "filestore.test",
+    "count": 1,
+    "cpuS": 0.09
+   },
+   {
+    "side": "tools",
+    "comm": "reports.test",
+    "count": 1,
+    "cpuS": 0.09
+   },
+   {
+    "side": "tools",
+    "comm": "machineprobe.te",
+    "count": 1,
+    "cpuS": 0.09
+   },
+   {
+    "side": "tools",
+    "comm": "toolchainpins.t",
+    "count": 1,
+    "cpuS": 0.09
+   },
+   {
+    "side": "tools",
+    "comm": "sessionstream.t",
+    "count": 1,
+    "cpuS": 0.09
+   },
+   {
+    "side": "tools",
+    "comm": "serve.test",
+    "count": 31,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "database.test",
+    "count": 2,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "gitcandidate.te",
+    "count": 2,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "gomodpublish.te",
+    "count": 1,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "cacheprovider.t",
+    "count": 5,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "servedependency",
+    "count": 2,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "cachecmd.test",
+    "count": 2,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "migrate.test",
+    "count": 1,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "shared.test",
+    "count": 6,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "progress.test",
+    "count": 1,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "docker-buildx",
+    "count": 6,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "ld",
+    "count": 17,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "config.test",
+    "count": 2,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "registrycred.te",
+    "count": 30,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "putpublish.test",
+    "count": 1,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "releaseset.test",
+    "count": 22,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "infra.test",
+    "count": 1,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "epic.test",
+    "count": 1,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "curl",
+    "count": 347,
+    "cpuS": 0.07
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-dev",
+    "count": 108,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "action.test",
+    "count": 2,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "ruby.test",
+    "count": 1,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "env.test",
+    "count": 1,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "fixtureproc.tes",
+    "count": 2,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "iox.test",
+    "count": 1,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "layout.test",
+    "count": 1,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "lockfile.test",
+    "count": 1,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "mapgen.test",
+    "count": 1,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "fix.sh",
+    "count": 5,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "one-fails.sh",
+    "count": 4,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "retry.sh",
+    "count": 5,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "cp",
+    "count": 431,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "cachepolicy.tes",
+    "count": 3,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "parse.test",
+    "count": 3,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "generate.sh",
+    "count": 41,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "ctxutil.test",
+    "count": 1,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "capabilities.te",
+    "count": 1,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "job.test",
+    "count": 1,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "imagepkg.test",
+    "count": 2,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "proof.test",
+    "count": 4,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "clientcontract.",
+    "count": 1,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "changeplan.test",
+    "count": 1,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "authoring.test",
+    "count": 1,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "cmderr.test",
+    "count": 1,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "framing.test",
+    "count": 1,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "serve.bundled-l",
+    "count": 2,
+    "cpuS": 0.06
+   },
+   {
+    "side": "tools",
+    "comm": "useragent.test",
+    "count": 1,
+    "cpuS": 0.06
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-rush",
+    "count": 109,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "cgo",
+    "count": 450,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "contracts.test",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "migration.test",
+    "count": 3,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "gittest.test",
+    "count": 2,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "goembed.test",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "hostenv.test",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "memberprobe.tes",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "registryorigin.",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "specreport.test",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-java.te",
+    "count": 2,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "objectcachetest",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "putnami.test",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "abort.test",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "clitest.test",
+    "count": 2,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "upload.test",
+    "count": 3,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "commandmeta.tes",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "configcmd.test",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "jsonutil.test",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "profiler.test",
+    "count": 1,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "docker-compose",
+    "count": 6,
+    "cpuS": 0.05
+   },
+   {
+    "side": "tools",
+    "comm": "php8.3",
+    "count": 3,
+    "cpuS": 0.04
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-pants",
+    "count": 124,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "identitycli.tes",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "infracli.test",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "cache.test",
+    "count": 2,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "parallel.test",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "schema.test",
+    "count": 2,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "authoredmember.",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "context.test",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "initdb",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "exec.test",
+    "count": 13,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "freshbearer.tes",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "registryhttp.te",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "manifest.test",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "putnamihome.tes",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "recorded.test",
+    "count": 2,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "treearchive.tes",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "tscscript.test",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "uvtoolchain.tes",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "putnami",
+    "comm": "git-receive-pac",
+    "count": 175,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "estimate.test",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "specs.test",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-credent",
+    "count": 15,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "procdeadline.te",
+    "count": 2,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "reporter-compil",
+    "count": 5,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "project.test",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "machine.test",
+    "count": 1,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "cancel-one.sh",
+    "count": 2,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "equivalent.sh",
+    "count": 3,
+    "cpuS": 0.04
+   },
+   {
+    "side": "tools",
+    "comm": "hometest.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "configextract.t",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "darc.test",
+    "count": 2,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "skipguard.test",
+    "count": 4,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "inject.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "logtest.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "migratecli.test",
+    "count": 2,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "agentcontext.te",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "bundle.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "cliusage.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "transaction.tes",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "filelock.test",
+    "count": 4,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "genresult.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "npmpublish.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "robustio.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "runtimeinfo.tes",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "scratch.test",
+    "count": 6,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "distribution.te",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "grpc-services.t",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "support.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-python.",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-ruby.te",
+    "count": 2,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "stackstest.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "language.test",
+    "count": 2,
+    "cpuS": 0.03
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-dev.tes",
+    "count": 2,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "dart.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "dotnet.test",
+    "count": 1,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "split-failure.s",
+    "count": 3,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "rm",
+    "count": 1587,
+    "cpuS": 0.02
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-moon",
+    "count": 113,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "gcc",
+    "count": 692,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "gosource.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "run.test",
+    "count": 4,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "errors.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "proto.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "areas.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "attribution.tes",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "coverage.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "dirlink.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "collabhelper.te",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "dockertest.test",
+    "count": 2,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "envkeys.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "retry.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "jsonl.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "ownerperm.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "pkgmeta.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "privatebroker.t",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "sourcebinding.t",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "sitecontent.tes",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "http-routes.tes",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "put.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "schematest.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "spectest.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "prepare",
+    "count": 69,
+    "cpuS": 0.02
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-local-c",
+    "count": 39,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "ps",
+    "count": 174,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "cargo.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "gradle.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "golang.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "testjob.test",
+    "count": 5,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "report-budget.s",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "awk",
+    "count": 1281,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-python",
+    "count": 15,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-nx",
+    "count": 125,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-dart.te",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-dotnet.",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "usersclient.tes",
+    "count": 8,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "configmerge.tes",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "providerprobe.t",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "releaseversion.",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "tools.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "gofmt",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "procguard.test",
+    "count": 5,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "profiles.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "resultv2.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "keyringstore.te",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-php.tes",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "connect.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "ruff",
+    "count": 5,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-rust.te",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "imageload.test",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "host.test",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-github-",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "github.test",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-jira-co",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "composer.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "maven.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "python.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "components.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "decisions.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "lockdiff.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "test-exec",
+    "count": 77,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "errs.test",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "serve-linux-x64",
+    "count": 4,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "app-bin",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "harness",
+    "comm": "accton",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "dirname",
+    "count": 471,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mkdir",
+    "count": 1557,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mktemp",
+    "count": 401,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "grep",
+    "count": 1073,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cat",
+    "count": 880,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sha256sum",
+    "count": 234,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "date",
+    "count": 75,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mv",
+    "count": 444,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "ln",
+    "count": 133,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-bazel",
+    "count": 80,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-turbo",
+    "count": 135,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "ldd",
+    "count": 122,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sh",
+    "count": 1059,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "as",
+    "count": 161,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "collect2",
+    "count": 17,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pg_ctl",
+    "count": 10,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "psql",
+    "count": 8,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "covdata",
+    "count": 36,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "env",
+    "count": 263,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "flutter",
+    "count": 78,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "dart",
+    "count": 108,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "tojunit",
+    "count": 4,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "format_coverage",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "gzip",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "tar",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "activate.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "dotnet",
+    "count": 210,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cut",
+    "count": 59,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "tok.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "basename",
+    "count": 299,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "openapiutil.tes",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "fake-binary",
+    "count": 15,
+    "cpuS": 0.0
+   },
+   {
+    "side": "harness",
+    "comm": "sleep",
+    "count": 23,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "clientgen.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-runtime",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "git-upload-pack",
+    "count": 342,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "conformance.tes",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "runtime-emitter",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "probe",
+    "count": 8,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "lsof",
+    "count": 4,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "app",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "p.test",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "q.test",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "lib.test",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "clean.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "racy.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "racemod.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "a.test",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "b.test",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sort",
+    "count": 39,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "chmod",
+    "count": 574,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "go.exe",
+    "count": 4,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "failmod.test",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "seq",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "x.test",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sub.test",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "covmod.test",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "covempty.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "covoptout.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "envtest.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "envmanual.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "slowmod.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "specmod.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "measuremod.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "locale",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "docker-credenti",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "proctree.test",
+    "count": 58,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "testprovider.te",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "replay",
+    "count": 11,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sed",
+    "count": 495,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "git-submodule",
+    "count": 45,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "git-sh-i18n--en",
+    "count": 10,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "uname",
+    "count": 462,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "interop",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "widgetsclient.t",
+    "count": 7,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "deploysclient.t",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "test_project.te",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-bazel.t",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "bazel",
+    "count": 121,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "tr",
+    "count": 1338,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "find",
+    "count": 75,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-moon.te",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "moon",
+    "count": 76,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-nx.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "npx",
+    "count": 76,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "nx",
+    "count": 7,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-pants.t",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pants",
+    "count": 200,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-rush.te",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "rush",
+    "count": 42,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "rushx",
+    "count": 4,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-turbo.t",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "turbo",
+    "count": 68,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sdkmanager",
+    "count": 4,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "javac",
+    "count": 86,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "gradlew",
+    "count": 53,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mvn",
+    "count": 23,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "gradle",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "java",
+    "count": 6,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "phpunit",
+    "count": 16,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "analytics.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "gomod.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "phpstan",
+    "count": 4,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "php-cs-fixer",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "codehost.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "i18n.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "keyring.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "ruby",
+    "count": 88,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "bundle",
+    "count": 133,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "ld-linux-x86-64",
+    "count": 22,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "rustc",
+    "count": 147,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cargo",
+    "count": 123,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "rustup",
+    "count": 7,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cargo-zigbuild",
+    "count": 12,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-swift.t",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "swift",
+    "count": 121,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "llvm-cov",
+    "count": 11,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "xcodebuild",
+    "count": 49,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "xcrun",
+    "count": 35,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "main2",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "true",
+    "count": 52,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "echo",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sleep",
+    "count": 314,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "false",
+    "count": 6,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "swiftly",
+    "count": 10,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "tail",
+    "count": 411,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "rspec",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "imagetest.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "kit",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "probe-tool",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "tool",
+    "count": 48,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "alttool",
+    "count": 8,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "collect",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "stubtool",
+    "count": 11,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "stubjava",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "childenv.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mkfifo",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "signature-verif",
+    "count": 10,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "stat",
+    "count": 8,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "chromium",
+    "count": 8,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "chrome_crashpad",
+    "count": 12,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnamiw",
+    "count": 24,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cliargs.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "parent.test",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pre-commit",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "gh",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "readlink",
+    "count": 137,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "head",
+    "count": 227,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "fixture.sh",
+    "count": 23,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pre-push",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "touch",
+    "count": 35,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "fresh.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "observe.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "dump-stdout.sh",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "dump-file.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "probe.sh",
+    "count": 19,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "install.sh",
+    "count": 13,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "xargs",
+    "count": 16,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "glab",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-gitlab-",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "od",
+    "count": 87,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "putnami.asset",
+    "count": 49,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "codex",
+    "count": 19,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "jira.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "openssl",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "ls",
+    "count": 138,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "argv.sh",
+    "count": 7,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "linear.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-linear-",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "run.sh",
+    "count": 40,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sudo",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "doas",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pkexec",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "run0",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "memberglob.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "level3.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pre-receive",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "emit.sh",
+    "count": 93,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "toml.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "fixture-go",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "yaml.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "crash.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "interrupt.sh",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cmd.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cache-command",
+    "count": 27,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "copy-context.sh",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "wc",
+    "count": 8,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "jq",
+    "count": 12,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "on-install",
+    "count": 26,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "acme",
+    "count": 4,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-source-",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-go-1.0.",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-ts-2.0.",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-go-dev",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-go-1.0",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-go-2.0",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "structurizr.tes",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "wsview.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "held",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "reader",
+    "count": 4,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "holder",
+    "count": 12,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "plain",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "failing",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "task",
+    "count": 20,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "publish",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "compiler",
+    "count": 94,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "id",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "locale-check",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pre-build",
+    "count": 18,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "prepared-runtim",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "read-stamp.sh",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "ship.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "build-exec",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "catalog.test",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pnpmworkspace.t",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "main-linux-x64",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "emit-test-resul",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-acme",
+    "count": 28,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-runner",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "report-env.sh",
+    "count": 7,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "build.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "check.sh",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "batch.sh",
+    "count": 7,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "delegated-step.",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "job.sh",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pgid.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "fake-cloud-publ",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "failing-lint.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "self-kill.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "leaky-backgroun",
+    "count": 11,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "block.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "noisy-batch.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "blocking.sh",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "second-b.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "second-cached.s",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "blocking-hook.s",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "noop.sh",
+    "count": 9,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "writing-hook.sh",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "serve-generate-",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "serving.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "blocking-genera",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "blocking-serve.",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "hold.sh",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "read.sh",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "write.sh",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "blocking-read.s",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "compile.sh",
+    "count": 8,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "test-run.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "other-read.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "infra.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "serve.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "prebuild.sh",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cold-job.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "source-fix.sh",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "fail",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "slow",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "rmdir",
+    "count": 4,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "transpile.sh",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "lib.sh",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "app.sh",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "print-held.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "timeout-batch.s",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "intrude.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "consume.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "exclusive-write",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "prepare.sh",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "format.sh",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "no-code.sh",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "ok.sh",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "result-probe.sh",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "windowsvet.test",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "harness",
+    "comm": "ps",
+    "count": 2,
+    "cpuS": 0.0
+   }
+  ],
+  "unattributedS": 408.8,
+  "shareOfTotalPct": 29.99,
+  "shareUpperPct": 39.3
+ },
+ "session": {
+  "sessionId": "20261126-162213-a45356",
+  "taskStatus": {
+   "success": 1706,
+   "skipped": 531
+  },
+  "counts": {
+   "total": 2212,
+   "succeeded": 1681,
+   "failed": 0,
+   "canceled": 0,
+   "skipped": 531
+  },
+  "reuse": {
+   "localCache": 19,
+   "remoteCache": 0,
+   "coalesced": 160
+  },
+  "durationMs": 1300654,
+  "maxReadyWaitMs": 854650,
+  "orchestrationCpu": null,
+  "readyWait": [
+   {
+    "command": "validate",
+    "jobs": 558,
+    "totalMs": 75024301,
+    "maxMs": 493539
+   },
+   {
+    "command": "test",
+    "jobs": 508,
+    "totalMs": 73009862,
+    "maxMs": 777693
+   },
+   {
+    "command": "lint",
+    "jobs": 447,
+    "totalMs": 25069006,
+    "maxMs": 854650
+   },
+   {
+    "command": "build",
+    "jobs": 669,
+    "totalMs": 6530754,
+    "maxMs": 604572
+   },
+   {
+    "command": "validate-workspace",
+    "jobs": 11,
+    "totalMs": 4840747,
+    "maxMs": 487660
+   },
+   {
+    "command": "client-generate",
+    "jobs": 19,
+    "totalMs": 212,
+    "maxMs": 18
+   }
+  ],
+  "remoteCache": null
+ }
+}

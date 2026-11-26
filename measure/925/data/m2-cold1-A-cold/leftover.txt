@@ -1,0 +1,9 @@
+    PID    PPID ELAPSED     TIME COMMAND         COMMAND
+      1       0    1329 00:00:00 bash            bash /home/user/putnami/measure/925/run-inner.sh /home/user/m925/A /home/user/m925/data/m2-cold1-A-cold lint,test,build,validate --all --enforce-coverage
+  22961       1    1074 00:00:00 postgres        /usr/lib/postgresql/16/bin/postgres -D /tmp/putnami-test-pg-0/putnami-test-pg-12d84ca9cdadfe40 -p 44195
+  22962   22961    1074 00:00:00 postgres        postgres: checkpointer 
+  22963   22961    1074 00:00:00 postgres        postgres: background writer 
+  22974   22961    1074 00:00:00 postgres        postgres: walwriter 
+  22975   22961    1074 00:00:00 postgres        postgres: autovacuum launcher 
+  22976   22961    1074 00:00:00 postgres        postgres: logical replication launcher 
+ 281621       1       0 00:00:00 ps              ps -eo pid,ppid,etimes,time,comm,args
