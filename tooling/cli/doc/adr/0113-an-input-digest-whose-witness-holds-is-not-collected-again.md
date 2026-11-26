@@ -1,4 +1,4 @@
-# ADR 0112 — An input digest whose witness holds is not collected again
+# ADR 0113 — An input digest whose witness holds is not collected again
 
 - **Status**: proposed
 - **Date**: 2026-11-26
@@ -7,6 +7,9 @@
   decision), and extends the rule of `protocols/workspace`
   [ADR 0009](../../../../protocols/workspace/doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md)
   from a file to a directory
+- **Depends on**: ADR 0112, "The engine reads the Git index and the work tree
+  itself" (proposed beside this one), whose in-process reader gives the cut's
+  witness (section 3)
 - **Scope**: `@putnami/cli` (`internal/store`: the input digests of cache keys;
   `internal/fileindex`: the record's envelope; `internal/jobs/cachekey`: the
   key inputs and the prune precompute; `internal/git`: the cut's witness)
@@ -163,39 +166,61 @@ the collection spelled them.
 
 ### 3. The cut's witness
 
-A `git:` pattern selects candidates from the cut, `ls-files --cached --others
---exclude-standard`, and from the index modes. What decides that listing is
-witnessed as:
+A `git:` pattern selects candidates from the cut (`ls-files --cached --others
+--exclude-standard`) and their index modes. Since ADR 0112,
+the engine reads both itself, and falls back to Git for every state its reader
+does not read. The witness depends on which of the two answered.
+
+**In-process.** The reader returns, with its answer, what it read, and the
+witness is exactly that:
 
 - the index stamp (`git.ReadIndexStamp`: whether the index exists, its size,
-  its modification time and the checksum Git writes at its end), which moves
-  whenever Git writes the index;
-- each ignore source the listing applied, by its stat: every `.gitignore` in a
-  directory the cut's walk entered, `$GIT_DIR/info/exclude`, the file
-  `core.excludesFile` names, and the configuration files that can name it or
-  change how the listing reads the tree (the repository's `config` and
-  `config.worktree`, the global and XDG configuration files), with the values
-  of the environment variables that select them (`HOME`, `XDG_CONFIG_HOME`,
-  `GIT_CONFIG_GLOBAL`, `GIT_CONFIG_NOSYSTEM`, `GIT_CONFIG_SYSTEM`);
-- each directory the untracked walk entered, by its stat: every directory at
-  or below the pattern's prefix that Git's rules do not exclude as a whole. An
-  untracked file can become a candidate only in such a directory, which its
-  creation moves; one in an excluded directory stays excluded while the ignore
-  sources hold, since Git does not reinclude below an excluded directory.
+  its modification time and the checksum Git writes at its end), taken before
+  the read and equal after it. It is the same size and checksum by which the
+  reader keeps a parsed index, and it moves whenever Git writes the index, a
+  split index's shared file included;
+- each directory the untracked walk entered, by its stat. That is every
+  directory at or below the pattern's prefix that the ignore rules do not
+  exclude, plus every directory the index tracks. An untracked file or
+  directory can become a candidate only in such a directory, and creating it
+  moves that directory's stat. An excluded directory is not entered: below
+  it, nothing becomes a candidate while the ignore sources hold, since Git
+  never re-includes a path below an excluded directory;
+- each directory the walk listed without entering, by its stat: an untracked
+  nested repository, listed as its directory. Creating or removing its `.git`
+  moves its stat and would change whether the walk enters it. A gitlink is
+  witnessed by its index entry, which the stamp covers;
+- each ignore source the walk applied, by its stat, absent ones included
+  (witnessed by the stat of the directory that would hold them): every
+  `.gitignore` of an entered directory, `$GIT_DIR/info/exclude`, and the file
+  `core.excludesFile` names, or the XDG default;
+- the configuration reading of ADR 0112 §4, by the stats of the files it came
+  from (`/etc/gitconfig`, the global and XDG files, the repository's `config`
+  and `config.worktree`, absent ones included). A reading the reader takes
+  again each time, because it also came from another file, from no file, or
+  with a conditional include, gives no witness;
+- the values of the environment variables that select those files or make
+  the reader fall back: `HOME`, `XDG_CONFIG_HOME`, `GIT_CONFIG_GLOBAL`,
+  `GIT_CONFIG_SYSTEM`, `GIT_CONFIG_NOSYSTEM`, and the variables of ADR 0112 §5
+  (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_COMMON_DIR`,
+  `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`,
+  `GIT_CEILING_DIRECTORIES`, `GIT_DISCOVERY_ACROSS_FILESYSTEM`), recorded
+  unset.
 
-Whatever reads the cut gives this witness. With the engine's in-process
-reader of the Git index, the walk it makes is the list of directories and the
-ignore files it read are the sources. With Git, the run lists the excluded directories once
-(`ls-files --others --ignored --exclude-standard --directory`, the
-`ignoredDirectories` tree fact), only in a run that records a `git:` digest,
-and takes every other directory below the prefix. A cut read with no usable
-stamp (`$GIT_DIR` set, a ceiling that hides the repository, `index.skipHash`,
-an index Git has not written), in a submodule or a nested repository below the
-prefix, or behind a link, gives no witness, and the digest is collected.
+**Git fallback.** When the reader answers "unsupported" (ADR 0112 §5: a
+workspace below the work tree's root, a submodule or a separate git dir, a
+linked worktree's split index, a sparse index, `index.skipHash`, an
+environment override, an ignore file it cannot read, and the others listed
+there), a `git:` digest gets no record and is collected every run, as today.
+Git reports neither the directories it entered nor the ignore files it read.
+Rebuilding them beside it would be a second reading of Git's walk, which is
+exactly the reading those states keep out of the engine. A recorded digest
+whose witness was taken in-process, looked up in a run whose reader falls
+back, is not answered: the run collects it through Git.
 
-The witness says the listing is unchanged; it does not answer the run's own
-cut read. Whether a run reads the cut from a record is decided by the design
-record of that in-process reader.
+The witness says the listing is unchanged. It does not answer the run's own
+read of the cut, which ADR 0112 §3 keeps reading afresh when a write of the
+run asks it. Until ADR 0112's reader lands, no `git:` digest is recorded.
 
 ### 4. The key and how each of its inputs is witnessed
 
@@ -212,7 +237,7 @@ lists every field `CacheKey.ComputeHashUsing` folds (`store/cache.go`,
 | Toolchain version | Computed by the run: the CLI's Go version and each toolchain's identity from the lock and the recorded probes (ADR 0102) |
 | Runtime identity: host platform | Computed by the run |
 | Runtime identity: release baseline | Read once per run (ADR 0110) |
-| Runtime identity: tree facts (repository state, tracked files, ignored directories, candidate listings) | Read once per run from the run's Git reads (ADR 0002 and 0004 of `protocols/job`; in-process with the engine's own reader of the Git index) |
+| Runtime identity: tree facts (repository state, tracked files, ignored directories, candidate listings) | Read once per run from the run's Git reads (ADR 0002 and 0004 of `protocols/job`; in-process under ADR 0112) |
 | OS class, source state, emptied outputs | Computed by the run |
 | Task, task contract digest, project, project metadata digest | Computed by the run from the manifests and the workspace snapshot, which ADR 0009 validates |
 | Embedded version | Computed by the run before any key (D-010) |
