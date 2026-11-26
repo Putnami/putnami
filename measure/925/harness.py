@@ -484,6 +484,11 @@ def report():
             "orchestrationTotalS": median_range([
                 (dig(r, "session", "orchestrationCpu", "totalMs") or 0) / 1000
                 if dig(r, "session", "orchestrationCpu") else None for r in rs]),
+            "engineVmHWMMiB": median_range([dig(r, "samples", "engineVmHWMKiB") / 1024
+                                            if dig(r, "samples", "engineVmHWMKiB") else None for r in rs]),
+            "loadMax": median_range([dig(r, "samples", "loadMax") for r in rs]),
+            "loadMaxPerCpu": median_range([dig(r, "samples", "loadMaxPerCpu") for r in rs]),
+            "loadMedianPerCpu": median_range([dig(r, "samples", "loadMedianPerCpu") for r in rs]),
             "rc": [r["rc"] for r in rs],
         })
     with open(f"{DATA}/results.json", "w") as f:
