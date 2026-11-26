@@ -10,8 +10,8 @@
 # store and a reachable private cache, so "it passes there" says nothing about a
 # fresh clone on a stranger's machine.
 #
-# What it proves changes rarely, and the full gate takes 13 to 39 minutes on a
-# GitHub runner, so it does not run on pull requests: it runs every night on
+# What it proves changes rarely, and on a pull request it took a median of
+# about 7 minutes and up to 39 per head, so it does not run on pull requests: it runs every night on
 # main, on demand, and before a release (RELEASING.md). A failed nightly run
 # opens an issue, and the next green one closes it. A pull request runs only
 # the squash checks: the squash commit keeps the breaking marker the commits of
@@ -66,7 +66,10 @@ jobs:
   # ends well before Putnami CI and never lengthens the merge wait.
   squash:
     name: squash commit checks
-    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.state == 'open' &&
+      !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:

@@ -245,8 +245,7 @@ Where the cases run: Contributor CI provisions Go (`actions/setup-go`), the
 pinned Bun (`oven-sh/setup-bun`), uv (`astral-sh/setup-uv`), from its
 restored cache the Go lint tools under `~/.putnami/tools/go`, and the
 toolchains `putnami.lock.json` pins, which `putnami install` installs; it
-fetches no language package offline. The gate selects these tests when a pull
-request impacts `@putnami/cli`; then the engine tests run, and so do the sdd,
+fetches no language package offline. Its nightly gate selects every project; then the engine tests run, and so do the sdd,
 cloud, shell (`bash` and `make` of the runner), Bazel, Pants, moon,
 Turborepo, Nx and Rush cases; the Go case runs when the restored tool cache
 holds `~/.putnami/tools/go`; the TypeScript, clientgen and web cases run once

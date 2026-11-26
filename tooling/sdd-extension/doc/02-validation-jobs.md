@@ -331,7 +331,8 @@ the verdict.
 
   A gate that compares a pull request with its base branch runs
   `putnami validate --impacted --impacted-strict --baseline origin/<base>` on a
-  full history, as Contributor CI does. The hosted Putnami CI runner runs
+  full history; Contributor CI's squash commit checks run `validate-workspace`
+  with the same flags. The hosted Putnami CI runner runs
   `--impacted` alone, which resolves the trunk or the nearest epic branch. A
   run without `--impacted` enforces nothing here. The step is never cached (see
   [below](#feature-coverage-ratchet-validate--never-cached)).

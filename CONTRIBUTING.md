@@ -258,8 +258,8 @@ broke and is worth fixing on its own. The nightly run and the default run on
 demand gate every project (`--all`). A failed nightly run opens an issue, and
 the next green one closes it.
 
-It does not run on pull requests: what it proves changes rarely, and it took
-13 to 39 minutes per pull request head. A pull request that is not a draft
+It does not run on pull requests: what it proves changes rarely, and it took a
+median of about 7 minutes and up to 39 per pull request head. A pull request that is not a draft
 runs only its squash commit checks, `validate-workspace` with the squash
 message: the breaking marker and the agent attribution above. They run when a
 pull request opens, reopens, receives a push, leaves draft, or has its title,
