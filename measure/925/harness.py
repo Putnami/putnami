@@ -28,15 +28,16 @@ import shutil
 import statistics
 import subprocess
 import sys
+import threading
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.environ.get("M925_ROOT", "/home/user/m925")
-WORKTREES = {"A": f"{ROOT}/A", "B": f"{ROOT}/B"}
+WORKTREES = {"A": f"{ROOT}/A", "B": f"{ROOT}/B", "B2": f"{ROOT}/B2"}
 STATE = f"{ROOT}/state"
 DATA = os.environ.get("M925_DATA", f"{ROOT}/data")
 SHARED_GO_MOD = os.path.expanduser("~/.putnami/cache/go/mod")
-ARGS = ["lint,test,build,validate", "--all", "--enforce-coverage"]
+ARGS = os.environ.get("M925_ARGS", "lint,test,build,validate --all --enforce-coverage").split()
 EDIT_FILE = "go/framework/parallel/parallel.go"
 EDIT_ANCHOR = "// before invoking user work."
 IDLE_LOAD = 0.5
@@ -53,6 +54,8 @@ def run_env(commit):
     env = dict(os.environ)
     # No session upload: the measurement must not publish anything.
     env.pop("PUTNAMI_SESSION_REPORTER", None)
+    # Each binary keeps its own GC default (B2 sets GOGC=200 unless GOGC is set).
+    env.pop("GOGC", None)
     # No remote cache: the provider is never started (documented core switch).
     env["PUTNAMI_CACHE_TRUST"] = "none"
     env["PUTNAMI_STORE_DIR"] = f"{STATE}/{commit}/store"
@@ -201,6 +204,70 @@ def latest_session(wt, since):
     return best[1] if best else None
 
 
+def children(pid):
+    try:
+        with open(f"/proc/{pid}/task/{pid}/children") as f:
+            return [int(x) for x in f.read().split()]
+    except OSError:
+        return []
+
+
+def comm(pid):
+    try:
+        with open(f"/proc/{pid}/comm") as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def vm_hwm_kib(pid):
+    try:
+        with open(f"/proc/{pid}/status") as f:
+            for line in f:
+                if line.startswith("VmHWM:"):
+                    return int(line.split()[1])
+    except OSError:
+        pass
+    return None
+
+
+class Sampler(threading.Thread):
+    """Samples from outside the run's cgroup, so it costs the run nothing.
+
+    - the engine's peak RSS (VmHWM of the CLI process that putnamiw execs
+      into, a child of the namespace's init), every second; VmHWM only grows,
+      so the last sample is the peak up to one second before exit;
+    - the 1-minute load average, every 5 seconds.
+    """
+
+    def __init__(self, unshare_pid):
+        super().__init__(daemon=True)
+        self.unshare_pid = unshare_pid
+        self.stop = threading.Event()
+        self.engine_pid = None
+        self.engine_hwm = None
+        self.load = []
+
+    def run(self):
+        t0 = time.time()
+        next_load = t0
+        while not self.stop.is_set():
+            now = time.time()
+            if now >= next_load:
+                self.load.append([round(now - t0, 1), loadavg()[0]])
+                next_load += 5
+            if self.engine_pid is None:
+                for init in children(self.unshare_pid):
+                    for c in children(init):
+                        if comm(c) == "putnami":
+                            self.engine_pid = c
+            if self.engine_pid is not None:
+                v = vm_hwm_kib(self.engine_pid)
+                if v is not None:
+                    self.engine_hwm = v
+            self.stop.wait(1.0)
+
+
 def run(commit, scenario, label):
     wt = WORKTREES[commit]
     sha = sh(["git", "-C", wt, "rev-parse", "HEAD"]).strip()
@@ -228,9 +295,23 @@ def run(commit, scenario, label):
     inner = os.path.join(HERE, "run-inner.sh")
     script = (f'echo $$ > {cg2}/cgroup.procs && echo $$ > {cg1}/cgroup.procs && '
               f'exec unshare --pid --fork --mount-proc {inner} "$@"')
-    proc = subprocess.run(["bash", "-c", script, "bash", wt, out, *ARGS],
-                          env=run_env(commit))
+    proc = subprocess.Popen(["bash", "-c", script, "bash", wt, out, *ARGS],
+                            env=run_env(commit))
+    sampler = Sampler(proc.pid)
+    sampler.start()
+    proc.wait()
     outer_wall = time.time() - t0
+    sampler.stop.set()
+    sampler.join()
+    loads = [x[1] for x in sampler.load]
+    ncpu = os.cpu_count()
+    samples = {
+        "engineVmHWMKiB": sampler.engine_hwm,
+        "loadSamples": sampler.load,
+        "loadMax": max(loads) if loads else None,
+        "loadMaxPerCpu": round(max(loads) / ncpu, 3) if loads else None,
+        "loadMedianPerCpu": round(statistics.median(loads) / ncpu, 3) if loads else None,
+    }
     stat = read_kv(f"{cg2}/cpu.stat")
     with open(f"{cg1}/cpuacct.usage") as f:
         v1_ns = int(f.read())
@@ -265,6 +346,7 @@ def run(commit, scenario, label):
                    "systemS": stat["system_usec"] / 1e6, "v1UsageS": v1_ns / 1e9,
                    "leftInCgroup": left_in_cg},
         "leftover": timing["leftover"],
+        "samples": samples,
         "remoteCacheLines": remote_lines,
         "acct": acct_summary(recs),
         "session": session_summary(f"{out}/session.json") if sess_path else None,
@@ -281,7 +363,8 @@ def run(commit, scenario, label):
     a = summary["acct"]
     print(f"{rid}: rc={summary['rc']} wall={summary['wallS']}s cpu={summary['cgroup']['usageS']:.1f}s "
           f"putnami={a['putnamiS']}s tools={a['toolsS']}s share={a['sharePct']}% "
-          f"load={load[0]} leftover={summary['leftover']}", flush=True)
+          f"load={load[0]} leftover={summary['leftover']} hwm={samples['engineVmHWMKiB']}KiB "
+          f"loadmax={samples['loadMax']}", flush=True)
     return summary
 
 
@@ -323,6 +406,10 @@ SEQUENCES = {
     # A complete run precedes each one: the last cold run, then each previous run.
     "small": [("A", "small"), ("B", "small")] * 3,
     "unchanged": [("A", "unchanged"), ("B", "unchanged")] * 3,
+    # Final main (B2) against A, same protocol.
+    "cold-b2": [("A", "cold"), ("B2", "cold"), ("A", "cold"), ("B2", "cold")],
+    "small-b2": [("A", "small"), ("B2", "small")] * 3,
+    "unchanged-b2": [("A", "unchanged"), ("B2", "unchanged")] * 3,
 }
 
 
