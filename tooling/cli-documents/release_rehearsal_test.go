@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -36,9 +37,9 @@ import (
 
 const (
 	// The plan and the recorded report stay in the CLI module: RELEASE.md and
-	// ADR 0009 link them by path. Both are declared cache-key inputs of THIS
-	// project, which is what TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs
-	// checks.
+	// ADR 0009 link them by path. The plan is a declared cache-key input of
+	// THIS project, which TestReleaseRehearsalNeverReplaysACachedVerdict
+	// checks; the report is read only by the rehearsal, which runs uncached.
 	releasePlanModulePath            = "internal/cli/testdata/release-plan.json"
 	releasePlanRepoPath              = cliModuleDir + "/" + releasePlanModulePath
 	releaseReportModulePath          = "doc/reports/release-rehearsal.md"
@@ -72,9 +73,8 @@ const (
 )
 
 // releaseInterestingFiles are read in full because a check reads their content.
-// Every one of them is a declared test input of @putnami/cli-documents
-// (putnami.json, options.test.filePatterns), so a change to any of them re-runs
-// this gate instead of restoring a stale pass.
+// The rehearsal that reads them runs without a cache (requireWholeTreeGates),
+// so none of them needs to be a declared input.
 var releaseInterestingFiles = []string{
 	releaseWorkspaceManifestPath,
 	releaseSeriesChangelogPath,
@@ -289,6 +289,7 @@ var releaseChecks = []releaseCheck{
 // renders the verdict for this tree and compares it with the committed report.
 // A blocked check does NOT fail it — an unrecorded verdict does.
 func TestReleaseRehearsalReportRecordsTheCurrentVerdict(t *testing.T) {
+	requireWholeTreeGates(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/release-rehearsal", "recorded-verdict", "the-verdict-is-deterministic-for-a-tree")
 	input := buildReleaseRehearsalInput(t)
@@ -312,64 +313,138 @@ func TestReleaseRehearsalReportRecordsTheCurrentVerdict(t *testing.T) {
 	}
 }
 
-// TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs pins the property
-// the recorded verdict rests on. The gate above only fails on drift if it RUNS:
-// a task whose cache key ignores a file can be answered from a warm entry
-// computed against a different version of that file, so a verdict-bearing file
-// outside the key turns the drift check into a no-op that reports success.
+// TestReleaseRehearsalNeverReplaysACachedVerdict pins the property the recorded
+// verdict rests on. The gate above only fails on drift if it RUNS: a task whose
+// cache key ignores a file can be answered from a warm entry computed against
+// another version of that file.
 //
-// It is not a theoretical hole. The recorded report and the release plan are a
-// Markdown file and a testdata JSON file, and neither shape is selected by the
-// Go task's own inputs (**/*.go, go.mod, putnami.json), so both need an
-// explicit declaration. Asserting it here, against the same matcher the cache
-// key uses, is what keeps the declaration honest as the plan names new targets.
-func TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs(t *testing.T) {
+// The verdict reads the whole candidate tree, and only a whole-tree pattern
+// keys that. Such a pattern selects this project for every change of the
+// repository, so the project does not declare one. Instead the gate runs only
+// where wholeTreeGatesEnv is set, the variable is a declared key input, and the
+// workflow that sets it on main runs without a cache. A run without the
+// variable skips the gate and reads the documents the manifest declares, so its
+// key is complete too.
+func TestReleaseRehearsalNeverReplaysACachedVerdict(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/release-rehearsal", "keyed-verdict-inputs", "verdict-inputs-are-declared-cache-key-inputs")
-	patterns := releaseDeclaredTestInputs(t)
-	plan := releaseCommittedPlan(t)
+	spectest.Proves(t, "cli/release-rehearsal", "no-cached-verdict", "a-changed-tree-never-replays-a-cached-verdict")
+	patterns, envInputs := releaseDeclaredTestInputs(t)
 
-	required := map[string]string{
-		releaseReportRepoPath: "the recorded verdict",
-		releasePlanRepoPath:   "the release plan",
-		// The artifact scan reads every project manifest in the tree, so a new
-		// publishable project must be able to block the publish-order check.
-		"a/b/" + releaseProjectManifestName: "the project manifests the artifact scan reads",
-	}
-	for _, file := range releaseInterestingFiles {
-		required[file] = "a file a check reads in full"
-	}
-	for _, file := range releaseGovernanceFiles {
-		required[file] = "the governance surface"
-	}
-	for _, axis := range plan.FreshRoot.LabelAxes {
-		if axis.Authority != "" {
-			required[axis.Authority] = "the authority for label axis " + axis.Prefix
-		}
-	}
-	for _, check := range plan.Checks {
-		for _, requirement := range check.Requirements {
-			target := requirement.Target
-			switch requirement.Kind {
-			case releaseRequirementIgnoreEntry:
-				target = releaseIgnoreFilePath
-			case releaseRequirementTreePrefix:
-				// A prefix is satisfied by any path under it, so the pattern has
-				// to select the files, not the directory name.
-				target += "any-candidate-file"
-			}
-			required[target] = "the target of a declared requirement of check " + check.ID
-		}
+	if !slices.Contains(envInputs, wholeTreeGatesEnv) {
+		t.Errorf("%s does not declare %s under options.test.envInputs, so a run with the variable set "+
+			"restores the skip a run without it stored and the whole-tree gates never execute",
+			releaseProjectManifestName, wholeTreeGatesEnv)
 	}
 
-	for _, target := range releaseSorted(releaseKeys(required)) {
+	// What the tests that always run read outside the project.
+	documents := map[string]string{
+		releasePlanRepoPath:        "the release plan",
+		publicCutBaselineRepoPath:  "the public-cut baseline",
+		publicCutAllowlistRepoPath: "the public-cut allowlist",
+		wholeTreeGatesWorkflowPath: "the workflow that runs the whole-tree gates on main",
+	}
+	for _, target := range releaseSorted(releaseKeys(documents)) {
 		if !store.SelectsPath(releaseProjectRelativePath(target), patterns) {
 			t.Errorf("%s is %s, but no declared test input of @putnami/cli-documents selects it, "+
-				"so a warm cache answers a changed tree with the recorded verdict.\n"+
+				"so a warm cache answers a change to it.\n"+
 				"Add a pattern covering %q to options.test.filePatterns in %s.",
-				target, required[target], releaseProjectRelativePath(target), releaseProjectManifestName)
+				target, documents[target], releaseProjectRelativePath(target), releaseProjectManifestName)
 		}
 	}
+
+	// A change anywhere else must not select this project: its test task pulls
+	// the prerequisite steps of every project the CLI module depends on.
+	for _, pattern := range patterns {
+		if strings.Contains(pattern, "*") {
+			t.Errorf("options.test.filePatterns declares %q: a wildcard selects this project for changes "+
+				"its always-run tests never read. Name each document instead.", pattern)
+		}
+	}
+	for _, elsewhere := range []string{
+		"dart/samples/application/lib/app.dart",
+		"go/samples/library/strings.go",
+		"sites/putnami.dev/doc/new.md",
+		"a/b/" + releaseProjectManifestName,
+	} {
+		if store.SelectsPath(releaseProjectRelativePath(elsewhere), patterns) {
+			t.Errorf("a declared test input of @putnami/cli-documents selects %s, so every such change "+
+				"plans this project and its prerequisites", elsewhere)
+		}
+	}
+
+	workflow, err := os.ReadFile(filepath.Join(repositoryRoot(t), filepath.FromSlash(wholeTreeGatesWorkflowPath)))
+	if err != nil {
+		t.Fatalf("read the workflow that runs the whole-tree gates on main: %v", err)
+	}
+	if problems := wholeTreeGatesWorkflowProblems(string(workflow), "@putnami/cli-documents"); len(problems) != 0 {
+		t.Errorf("%s no longer runs the whole-tree gates of @putnami/cli-documents on main:\n- %s",
+			wholeTreeGatesWorkflowPath, strings.Join(problems, "\n- "))
+	}
+}
+
+// TestWholeTreeGatesWorkflowProblemsNameEachMissingPart keeps the workflow
+// check from passing on a workflow that lost its trigger, its variable or its
+// cache switch.
+func TestWholeTreeGatesWorkflowProblemsNameEachMissingPart(t *testing.T) {
+	t.Parallel()
+	complete := "on:\n  push:\n    branches: [main]\njobs:\n  gates:\n    env:\n      " + wholeTreeGatesEnv + ": '1'\n    steps:\n" +
+		"      - run: ./putnamiw test --projects @putnami/cli-documents,@putnami/windows-vet --no-cache\n"
+	if problems := wholeTreeGatesWorkflowProblems(complete, "@putnami/cli-documents"); len(problems) != 0 {
+		t.Fatalf("a complete workflow reports %v", problems)
+	}
+	for name, broken := range map[string]string{
+		"no push to main": strings.Replace(complete, "branches: [main]", "branches: [release]", 1),
+		"no variable":     strings.Replace(complete, wholeTreeGatesEnv, "ANOTHER_VARIABLE", 1),
+		"cached":          strings.Replace(complete, " --no-cache", "", 1),
+		"another project": strings.Replace(complete, "@putnami/cli-documents,", "", 1),
+		"commented out":   strings.Replace(complete, "      - run:", "      # - run:", 1),
+	} {
+		if problems := wholeTreeGatesWorkflowProblems(broken, "@putnami/cli-documents"); len(problems) != 1 {
+			t.Errorf("%s: problems = %v, want exactly one", name, problems)
+		}
+	}
+}
+
+// wholeTreeGatesWorkflowProblems reports what a workflow lacks to run the
+// whole-tree gates of one project on main: a push trigger on main, the variable
+// that turns the gates on, and a test command over the project that uses no
+// cache. It reads lines, not YAML: comment lines are dropped, and each part
+// must stand on one line.
+func wholeTreeGatesWorkflowProblems(workflow, project string) []string {
+	var pushesToMain, setsVariable, runsUncached bool
+	inPush := false
+	for _, raw := range strings.Split(workflow, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		indent := len(raw) - len(strings.TrimLeft(raw, " "))
+		switch {
+		case indent == 2 && line == "push:":
+			inPush = true
+		case indent <= 2:
+			inPush = false
+		case inPush && line == "branches: [main]":
+			pushesToMain = true
+		}
+		if value, ok := strings.CutPrefix(line, wholeTreeGatesEnv+":"); ok && strings.TrimSpace(value) != "''" {
+			setsVariable = true
+		}
+		if strings.Contains(line, "./putnamiw test ") && strings.Contains(line, project) && strings.Contains(line, " --no-cache") {
+			runsUncached = true
+		}
+	}
+	var problems []string
+	if !pushesToMain {
+		problems = append(problems, "it does not run on a push to main (on.push.branches: [main])")
+	}
+	if !setsVariable {
+		problems = append(problems, "it does not set "+wholeTreeGatesEnv)
+	}
+	if !runsUncached {
+		problems = append(problems, "no step runs ./putnamiw test over "+project+" with --no-cache")
+	}
+	return problems
 }
 
 // TestReleaseRehearsalPerformsNoDestructiveOperation pins the hard invariant:
@@ -1733,17 +1808,11 @@ func releaseCommittedPlan(t *testing.T) *releasePlan {
 	return plan
 }
 
-// releaseDeclaredTestInputs returns the file patterns @putnami/cli-documents
-// declares as cache-key inputs of its test task. They are read from the
-// manifest rather than restated here: a copy would let the assertion pass
-// against a list the scheduler does not use.
-//
-// The declaration follows the reader. The verdict-bearing documents
-// used to be declared by @putnami/cli because these gates lived there; they are
-// declared by this project now, and this assertion moved with them so the
-// property it protects is checked against the manifest that actually keys the
-// run.
-func releaseDeclaredTestInputs(t *testing.T) []string {
+// releaseDeclaredTestInputs returns the file patterns and the environment
+// variables @putnami/cli-documents declares as cache-key inputs of its test
+// task. They are read from the manifest rather than restated here: a copy would
+// let the assertion pass against a list the scheduler does not use.
+func releaseDeclaredTestInputs(t *testing.T) (filePatterns, envInputs []string) {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(projectRoot(t), releaseProjectManifestName))
 	if err != nil {
@@ -1753,6 +1822,7 @@ func releaseDeclaredTestInputs(t *testing.T) []string {
 		Options struct {
 			Test struct {
 				FilePatterns []string `json:"filePatterns"`
+				EnvInputs    []string `json:"envInputs"`
 			} `json:"test"`
 		} `json:"options"`
 	}
@@ -1762,7 +1832,7 @@ func releaseDeclaredTestInputs(t *testing.T) []string {
 	if len(manifest.Options.Test.FilePatterns) == 0 {
 		t.Fatal("the project declares no test filePatterns, so no release input is keyed")
 	}
-	return manifest.Options.Test.FilePatterns
+	return manifest.Options.Test.FilePatterns, manifest.Options.Test.EnvInputs
 }
 
 // releaseProjectRelativePath rewrites a repository-relative path into the form

@@ -20,11 +20,6 @@ import (
 // and derived from, never spelled again.
 const documentSetProjectDir = "tooling/cli-document-set"
 
-// cliDocumentsProjectDir is the project of the whole-tree gates. It keys on
-// every candidate file, so the documents its gates read need no
-// declaration here.
-const cliDocumentsProjectDir = "tooling/cli-documents"
-
 // cliModuleDir is the CLI module whose declared test inputs must stay free of
 // the repository documents these gates read.
 const cliModuleDir = "tooling/cli"

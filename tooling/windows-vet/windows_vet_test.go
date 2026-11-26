@@ -20,18 +20,41 @@ import (
 //
 // It names the modules through the go command's `work` pattern, which matches
 // every package of every go.work module. One root `./...` would stop at each
-// nested go.mod. The project's test inputs are the tracked Go sources, go.mod
-// and go.sum files of the repository, go.work, and the committed contracts the
-// generated clients come from, so a change to any of them selects this gate and
-// changes its cache key. The generated clients themselves are not in Git: the
-// project depends on every Go module that generates one, so the planner runs
-// each client-generate before this gate.
+// nested go.mod. The generated clients are not in Git: the project depends on
+// every Go module that generates one, so the planner runs each client-generate
+// before this gate.
+//
+// The gate reads every Go source of the repository. A file pattern that keys
+// those sources selects this project, and the client generation it depends on,
+// for every Go change. The project declares none: the gate runs only where
+// wholeTreeGatesEnv is set, on main, and that run uses no cache.
+
+// wholeTreeGatesEnv names the variable that turns the gate on. The manifest
+// declares it under options.test.envInputs, so a run with it set never shares a
+// cache key with a run without it.
+const wholeTreeGatesEnv = "PUTNAMI_WHOLE_TREE_GATES"
+
+// wholeTreeGatesWorkflowPath is the workflow that runs the gate on every push
+// to main, from the repository root.
+const wholeTreeGatesWorkflowPath = ".github/workflows/whole-tree-gates.yml"
+
+// requireWholeTreeGates skips a test that reads the whole workspace unless
+// wholeTreeGatesEnv is set.
+func requireWholeTreeGates(t *testing.T) {
+	t.Helper()
+	if os.Getenv(wholeTreeGatesEnv) == "" {
+		t.Skipf("%s is not set: this gate reads every go.work module and runs on main (%s). "+
+			"Run it here with %s=1 ./putnamiw test --projects @putnami/windows-vet --no-cache.",
+			wholeTreeGatesEnv, wholeTreeGatesWorkflowPath, wholeTreeGatesEnv)
+	}
+}
 
 // windowsVetPlatform is the platform the gate compiles for: the only Windows
 // target Putnami supports (D-W1).
 var windowsVetPlatform = []string{"GOOS=windows", "GOARCH=amd64"}
 
 func TestEveryGoWorkModuleVetsForWindows(t *testing.T) {
+	requireWholeTreeGates(t)
 	root := repositoryRoot(t)
 	env := windowsVetEnv(root)
 
@@ -65,6 +88,7 @@ func TestEveryGoWorkModuleVetsForWindows(t *testing.T) {
 // module generates a client when its putnami.json declares a Go generatedFrom
 // or the clientgen extension.
 func TestTheGateDependsOnEveryGoModuleThatGeneratesAClient(t *testing.T) {
+	requireWholeTreeGates(t)
 	root := repositoryRoot(t)
 	want := map[string]bool{}
 	for _, dir := range goOutputLines(t, root, windowsVetEnv(root), "list", "-m", "-f", "{{.Dir}}") {
@@ -95,6 +119,86 @@ func TestTheGateDependsOnEveryGoModuleThatGeneratesAClient(t *testing.T) {
 		if !want[id] {
 			t.Errorf("%s generates no Go client, so remove it from the dependencies of tooling/windows-vet/putnami.json", id)
 		}
+	}
+}
+
+// TestTheGateRunsOnMainWithoutACache keeps the two halves of the switch
+// together: the manifest declares the variable as a key input and no file
+// pattern that reaches another project, and the workflow sets the variable on
+// a push to main and runs the gate without a cache. Without the first half a
+// run with the variable restores the skip a run without it stored; without the
+// second the gate runs nowhere, or replays a verdict for another tree.
+func TestTheGateRunsOnMainWithoutACache(t *testing.T) {
+	data, err := os.ReadFile("putnami.json")
+	if err != nil {
+		t.Fatalf("read the gate's own putnami.json: %v", err)
+	}
+	var manifest struct {
+		Options struct {
+			Test struct {
+				FilePatterns []string `json:"filePatterns"`
+				EnvInputs    []string `json:"envInputs"`
+			} `json:"test"`
+		} `json:"options"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("parse the gate's own putnami.json: %v", err)
+	}
+	declaresVariable, declaresWorkflow := false, false
+	for _, name := range manifest.Options.Test.EnvInputs {
+		declaresVariable = declaresVariable || name == wholeTreeGatesEnv
+	}
+	workflowPattern := "../../" + wholeTreeGatesWorkflowPath
+	for _, pattern := range manifest.Options.Test.FilePatterns {
+		if pattern == workflowPattern {
+			declaresWorkflow = true
+			continue
+		}
+		t.Errorf("options.test.filePatterns declares %q: a pattern over the workspace selects this gate, "+
+			"and the client generation it depends on, for changes the tests that always run never read", pattern)
+	}
+	if !declaresVariable {
+		t.Errorf("putnami.json does not declare %s under options.test.envInputs", wholeTreeGatesEnv)
+	}
+	if !declaresWorkflow {
+		t.Errorf("putnami.json does not declare %s under options.test.filePatterns, though this test reads it", workflowPattern)
+	}
+
+	workflow, err := os.ReadFile(filepath.Join(repositoryRoot(t), filepath.FromSlash(wholeTreeGatesWorkflowPath)))
+	if err != nil {
+		t.Fatalf("read the workflow that runs the gate on main: %v", err)
+	}
+	var pushesToMain, setsVariable, runsUncached bool
+	inPush := false
+	for _, raw := range strings.Split(string(workflow), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		indent := len(raw) - len(strings.TrimLeft(raw, " "))
+		switch {
+		case indent == 2 && line == "push:":
+			inPush = true
+		case indent <= 2:
+			inPush = false
+		case inPush && line == "branches: [main]":
+			pushesToMain = true
+		}
+		if value, ok := strings.CutPrefix(line, wholeTreeGatesEnv+":"); ok && strings.TrimSpace(value) != "''" {
+			setsVariable = true
+		}
+		if strings.Contains(line, "./putnamiw test ") && strings.Contains(line, "@putnami/windows-vet") && strings.Contains(line, " --no-cache") {
+			runsUncached = true
+		}
+	}
+	if !pushesToMain {
+		t.Errorf("%s does not run on a push to main (on.push.branches: [main])", wholeTreeGatesWorkflowPath)
+	}
+	if !setsVariable {
+		t.Errorf("%s does not set %s", wholeTreeGatesWorkflowPath, wholeTreeGatesEnv)
+	}
+	if !runsUncached {
+		t.Errorf("%s has no step that runs ./putnamiw test over @putnami/windows-vet with --no-cache", wholeTreeGatesWorkflowPath)
 	}
 }
 

@@ -463,8 +463,11 @@ An extension manifest whose task declares a `git:` input requires CLI contract
 without the membership. An older CLI refuses the manifest instead of replaying a
 verdict across a `chmod` or a membership change.
 
-The document gates declare `git:**` instead of a fixed list of repository
-documents, so the public-cut scanner and its cache key cover the same tree.
+`git:**` is the only input that keys what a repository scanner reads, and it
+selects the declaring project for every change. The public-cut scan and the
+release rehearsal of [`tooling/cli-documents`](../../cli-documents/README.md)
+therefore declare no input for the tree: they run on `main` behind a declared
+`envInputs` variable, without a cache.
 See [ADR 0041](adr/0041-git-candidate-file-inputs.md) and
 [ADR 0063](adr/0063-a-git-input-keys-the-executable-bit.md).
 

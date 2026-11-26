@@ -13,8 +13,8 @@ environments of `putnami.ci.json` follow.
 A project declares cache-key inputs per **command**, never per task
 (`options.test.filePatterns` folds into the key of every `test~*` task). The
 whole-tree gates of [`@putnami/cli-documents`](../cli-documents/README.md), the
-public cut and the release rehearsal, read every candidate file, so that
-project keys on `git:**` and any change runs its suite. These gates read a set
+public cut and the release rehearsal, read every candidate file, so they run
+on `main`, without a cache. These gates read a set
 of files they can name, so they key on those files and run only for a change
 that touches one of them:
 

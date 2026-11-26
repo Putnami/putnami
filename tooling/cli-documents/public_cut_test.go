@@ -210,6 +210,7 @@ type publicCutInventoryEntry struct {
 }
 
 func TestPublicCutReleaseGate(t *testing.T) {
+	requireWholeTreeGates(t)
 	t.Parallel()
 	repoRoot := publicCutRepositoryRoot(t)
 	files, err := publicCutTrackedFiles(repoRoot)

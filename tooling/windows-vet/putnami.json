@@ -39,13 +39,10 @@
       "coverage": false,
       "coverage-threshold": 0,
       "filePatterns": [
-        "git:../../**/*.go",
-        "git:../../**/*.s",
-        "git:../../**/go.mod",
-        "git:../../**/go.sum",
-        "git:../../**/schema/openapi.json",
-        "git:../../**/putnami.json",
-        "../../go.work"
+        "../../.github/workflows/whole-tree-gates.yml"
+      ],
+      "envInputs": [
+        "PUTNAMI_WHOLE_TREE_GATES"
       ]
     }
   },

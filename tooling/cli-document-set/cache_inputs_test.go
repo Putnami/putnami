@@ -33,28 +33,35 @@ const cliProjectDir = cliModuleDir
 // a whole-tree gate of @putnami/cli-documents reads it too (CONTRIBUTING.md,
 // SECURITY.md): each project's key must cover what its own gates read, whatever
 // another project declares. The other files are read by
-// the whole-tree gates alone. A file a test of @putnami/cli also reads
+// the whole-tree gates alone, which run on main without a cache and key on no
+// document (wholeTreeGatesUncached): only their absence from the CLI's inputs
+// is checked. A file a test of @putnami/cli also reads
 // (putnami.workspace.json, putnami.ci.json, putnami.support.json,
 // decisions.json, the first-use smoke script, the agent-artifact trees) is
 // absent here on purpose: it is honestly declared twice, because two readers
 // exist.
+// wholeTreeGatesUncached marks a file only the whole-tree gates of
+// @putnami/cli-documents read. Those gates run where PUTNAMI_WHOLE_TREE_GATES
+// is set, without a cache, so no project keys the file.
+const wholeTreeGatesUncached = ""
+
 var documentsOwnedRepositoryFiles = map[string]string{
-	".github/PULL_REQUEST_TEMPLATE.md": cliDocumentsProjectDir,
-	".gitignore":                       cliDocumentsProjectDir,
-	"CODE_OF_CONDUCT.md":               cliDocumentsProjectDir,
+	".github/PULL_REQUEST_TEMPLATE.md": wholeTreeGatesUncached,
+	".gitignore":                       wholeTreeGatesUncached,
+	"CODE_OF_CONDUCT.md":               wholeTreeGatesUncached,
 	"CONTRIBUTING.md":                  documentSetProjectDir,
 	"GOVERNANCE.md":                    documentSetProjectDir,
-	"LICENSE.md":                       cliDocumentsProjectDir,
+	"LICENSE.md":                       wholeTreeGatesUncached,
 	"README.md":                        documentSetProjectDir,
-	"RELEASE.md":                       cliDocumentsProjectDir,
+	"RELEASE.md":                       wholeTreeGatesUncached,
 	"RELEASING.md":                     documentSetProjectDir,
 	"SECURITY.md":                      documentSetProjectDir,
-	"tooling/extension-sdk/pkgmeta/platforms.go":                  cliDocumentsProjectDir,
-	"protocols/cli/testdata/prior-releases/provenance.json":       cliDocumentsProjectDir,
-	"protocols/extension/testdata/prior-releases/provenance.json": cliDocumentsProjectDir,
+	"tooling/extension-sdk/pkgmeta/platforms.go":                  wholeTreeGatesUncached,
+	"protocols/cli/testdata/prior-releases/provenance.json":       wholeTreeGatesUncached,
+	"protocols/extension/testdata/prior-releases/provenance.json": wholeTreeGatesUncached,
 	"protocols/support/README.md":                                 documentSetProjectDir,
 	"sites/putnami.dev/doc/01-getting-started/index.md":           documentSetProjectDir,
-	"tooling/CHANGELOG.md":                                        cliDocumentsProjectDir,
+	"tooling/CHANGELOG.md":                                        wholeTreeGatesUncached,
 }
 
 // TestRepositoryDocumentsAreKeyedToThisProjectOnly is the regression guard for
@@ -68,8 +75,7 @@ func TestRepositoryDocumentsAreKeyedToThisProjectOnly(t *testing.T) {
 	t.Parallel()
 	cliPatterns := declaredTestFilePatterns(t, cliProjectDir)
 	readerPatterns := map[string][]string{
-		documentSetProjectDir:  declaredTestFilePatterns(t, documentSetProjectDir),
-		cliDocumentsProjectDir: declaredTestFilePatterns(t, cliDocumentsProjectDir),
+		documentSetProjectDir: declaredTestFilePatterns(t, documentSetProjectDir),
 	}
 
 	files := make([]string, 0, len(documentsOwnedRepositoryFiles))
@@ -79,7 +85,7 @@ func TestRepositoryDocumentsAreKeyedToThisProjectOnly(t *testing.T) {
 	sort.Strings(files)
 	for _, file := range files {
 		reader := documentsOwnedRepositoryFiles[file]
-		if !store.SelectsPath(projectRelativePath(reader, file), readerPatterns[reader]) {
+		if reader != wholeTreeGatesUncached && !store.SelectsPath(projectRelativePath(reader, file), readerPatterns[reader]) {
 			t.Errorf("%s is read by a gate in %s, but no declared test input of that project "+
 				"selects it, so a warm cache answers a changed document with the previous verdict.",
 				file, reader)

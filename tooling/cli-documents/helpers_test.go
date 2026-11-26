@@ -55,3 +55,27 @@ func projectRoot(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(repositoryRoot(t), filepath.FromSlash(cliDocumentsProjectDir))
 }
+
+// wholeTreeGatesEnv names the variable that turns on the gates reading the
+// whole candidate tree: the public-cut release gate and the release rehearsal's
+// recorded verdict. The manifest declares it under options.test.envInputs, so a
+// run with it set never shares a cache key with a run without it.
+const wholeTreeGatesEnv = "PUTNAMI_WHOLE_TREE_GATES"
+
+// wholeTreeGatesWorkflowPath is the workflow that runs those gates on every
+// push to main, from the repository root.
+const wholeTreeGatesWorkflowPath = ".github/workflows/whole-tree-gates.yml"
+
+// requireWholeTreeGates skips a gate that reads the whole candidate tree unless
+// wholeTreeGatesEnv is set. No file pattern short of the whole tree keys such a
+// gate, and a whole-tree pattern selects this project for every change of the
+// repository. The gate therefore runs where the variable is set, on main, and
+// that run uses no cache.
+func requireWholeTreeGates(t *testing.T) {
+	t.Helper()
+	if os.Getenv(wholeTreeGatesEnv) == "" {
+		t.Skipf("%s is not set: this gate reads the whole candidate tree and runs on main (%s). "+
+			"Run it here with %s=1 ./putnamiw test --projects @putnami/cli-documents --no-cache.",
+			wholeTreeGatesEnv, wholeTreeGatesWorkflowPath, wholeTreeGatesEnv)
+	}
+}

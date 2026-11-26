@@ -43,11 +43,18 @@ func TestPublicCutInputsRepoIsTheSameOnAForeignMachine(t *testing.T) {
 	})
 }
 
-// Exercise the actual declaration, collector and scanner together. A marker
-// in an unrelated project's new document must invalidate a warm pass before
+// publicCutCandidatePatterns is the only declaration that keys what the
+// scanner reads. The project does not declare it, since it selects the project
+// for every change of the repository; the whole-tree gates run without a cache
+// instead (requireWholeTreeGates). The test below keeps the two enumerations
+// equal, so a run that does key on the whole tree keys what the scanner reads.
+var publicCutCandidatePatterns = []string{"git:**"}
+
+// Exercise the whole-tree pattern, the collector and the scanner together. A
+// marker in an unrelated project's new document must move the key before
 // staging; ignored manifests and private worktree state must remain invisible.
 func TestPublicCutCandidateInputsInvalidateTheRecordedVerdict(t *testing.T) {
-	patterns := declaredTestFilePatterns(t, cliDocumentsProjectDir)
+	patterns := publicCutCandidatePatterns
 	root, write := publicCutInputsRepo(t)
 	project := filepath.Join(root, cliDocumentsProjectDir)
 	if err := os.MkdirAll(project, 0o755); err != nil {
@@ -75,7 +82,7 @@ func TestPublicCutCandidateInputsInvalidateTheRecordedVerdict(t *testing.T) {
 		t.Fatal("unrelated non-ignored candidate document reused the old release key")
 	}
 	if !store.SelectsPath(projectRelativePath(cliDocumentsProjectDir, path), patterns) {
-		t.Fatal("candidate document does not select its declared reader under --impacted")
+		t.Fatal("the whole-tree pattern does not select a candidate document")
 	}
 	files, err := publicCutTrackedFiles(root)
 	if err != nil {

@@ -67,26 +67,41 @@ consequences:
 
 1. Re-record the block in the same change that adds the release input. Other
    changes that touch the same report serialize on it.
-2. A scratch file at a path the plan names reds the `@putnami/cli-documents`
-   test job. Delete it or ignore it rather than re-recording around it.
+2. A scratch file at a path the plan names reds the drift check where it
+   runs. Delete it or ignore it rather than re-recording around it.
 
-## Verdict inputs are cache-key inputs
+## The drift check runs on main, without a cache
 
-The gate only detects drift when it runs. Every file that can move the verdict
-— the report, the plan, the files a check reads, and the target of every
-declared requirement — is covered by `git:**` in `options.test.filePatterns` in
+The gate only detects drift when it runs. Every file of the candidate tree can
+move the verdict, and only a whole-tree input (`git:**`) keys that; such an
+input selects `@putnami/cli-documents`, and the prerequisite steps of the
+projects it depends on, for every change of the repository. The project
+declares none. The drift check and the public-cut release gate run only when
+`PUTNAMI_WHOLE_TREE_GATES` is set, and skip otherwise:
+
+- the [whole-tree gates workflow](../../../.github/workflows/whole-tree-gates.yml)
+  sets the variable on every push to `main` and runs the project with
+  `--no-cache`, so a changed tree is never answered from a cached run;
+- a pull request runs them only when it changes `tooling/cli-documents`,
+  `tooling/windows-vet` or that workflow. A pull request that moves the verdict
+  without recording it therefore passes its own gate and reds the workflow on
+  `main`: re-record the block there.
+
+Run the drift check on any tree with:
+
+```bash
+PUTNAMI_WHOLE_TREE_GATES=1 ./putnamiw test --projects @putnami/cli-documents --no-cache
+```
+
+The variable is declared under `options.test.envInputs` in
 [`tooling/cli-documents/putnami.json`](../../cli-documents/putnami.json), so a
-change to one cannot be answered from a cached run. The rehearsal lives in
-`@putnami/cli-documents` for that reason: a project declares cache-key inputs per
-command, so declaring the governance surface here would key the CLI's whole test
-suite on it.
-
-`TestReleaseRehearsalVerdictInputsAreDeclaredCacheKeyInputs` enforces this. When
-you narrow that declaration, it fails if a requirement's target is uncovered.
-The public-cut input regression also compares the scanner's candidate set with
-the cache collector and proves that a new unrelated document invalidates the
-verdict while ignored local state does not. Prefix requirements cover every
-candidate below the prefix, not only its `provenance.json`.
+run with it never restores the skip a run without it stored. The tests that
+always run read the release plan and the public-cut baseline and allowlist,
+which `options.test.filePatterns` names. `TestReleaseRehearsalNeverReplaysACachedVerdict`
+enforces the declarations and the workflow's trigger, variable and cache
+switch. The public-cut input regression compares the scanner's candidate set
+with what `git:**` collects and proves that a new unrelated document moves that
+key while ignored local state does not.
 
 ## The release plan
 

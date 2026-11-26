@@ -4,10 +4,11 @@
 // live in tooling/cli-document-set, which keys on those documents alone.
 //
 // They live in their own project because a cache key is per project and per
-// command, never per task. Declaring CONTRIBUTING.md as a test input of
-// @putnami/cli folded it into the key of EVERY test task of the CLI, so a
-// documentation edit re-ran the CLI's whole suite. Here the same declaration
-// keys one small suite instead.
+// command, never per task, and only a whole-tree input keys what they read.
+// Such an input selects its project for every change of the repository, so
+// this project declares none: the two whole-tree gates run on main, without a
+// cache, where PUTNAMI_WHOLE_TREE_GATES is set, and skip elsewhere. The tests
+// that always run key on the project and on the documents its manifest names.
 //
 // The package carries no production code on purpose: it is a test surface over
 // the repository, not a library. Its module path is a child of the CLI's so it

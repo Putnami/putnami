@@ -1,0 +1,107 @@
+# Whole-tree gates — the gates that read the whole repository, on main.
+#
+# Two gates read more than any change touches:
+#
+#   - @putnami/cli-documents: the public-cut scan and the release rehearsal's
+#     recorded verdict read every candidate file of the repository;
+#   - @putnami/windows-vet: `GOOS=windows go vet work` reads every Go source of
+#     every go.work module (decision D-W11).
+#
+# A file pattern that keys such a gate selects its project, and the
+# prerequisite steps of the projects it depends on, for every change. The two
+# projects declare no such pattern. Their whole-tree tests run only when
+# PUTNAMI_WHOLE_TREE_GATES is set, and skip otherwise, so the per-change gate
+# (`putnami lint,test,build,validate --impacted`) plans neither.
+#
+# This workflow is where they run: on every push to main, with the variable set
+# and with --no-cache, since no declared input keys the tree they read. A pull
+# request runs them only when it changes one of the two projects or this file.
+# `workflow_dispatch` runs them on any ref.
+#
+# A red run on main means the merged tree fails a gate its pull request did not
+# run: the public cut holds new debt, the recorded rehearsal verdict is behind
+# the tree, or a Unix-only symbol reached a go.work module. Fix it on main.
+#
+# Like the credential-free gate, the job reads no secret.
+name: Whole-tree gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - tooling/cli-documents/**
+      - tooling/windows-vet/**
+      - .github/workflows/whole-tree-gates.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: whole-tree-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: public cut, release rehearsal and Windows vet
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # The switch the two projects read. Its value carries no meaning: any
+      # non-empty value turns the gates on.
+      PUTNAMI_WHOLE_TREE_GATES: '1'
+      # A contributor holds none of these; see contributor-ci.yml.
+      PUTNAMI_CLOUD_TOKEN: ''
+      PUTNAMI_CACHE_URL: ''
+      PUTNAMI_CACHE_TOKEN: ''
+      PUTNAMI_TOKEN: ''
+      CONFIG_SERVER_URL: ''
+      CONFIG_SERVER_TOKEN: ''
+      DO_NOT_TRACK: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache: false
+
+      # Keep this Bun pin equal to package.json#packageManager, as
+      # contributor-ci.yml does: a generated client of the Windows gate comes
+      # from a TypeScript sample.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Restore toolchain and dependency caches
+        id: dependency-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.putnami/cache/go
+            ~/.putnami/toolchains
+            ~/.putnami/artifacts
+            ~/.bun/install/cache
+            ~/.putnami/tools/go
+          key: putnami-${{ runner.os }}-${{ hashFiles('putnami.lock.json', 'go.work.sum', 'bun.lock', 'go/extension/tools/versions.json') }}
+          restore-keys: |
+            putnami-${{ runner.os }}-
+
+      - name: Install the workspace
+        run: ./putnamiw install
+
+      # See contributor-ci.yml: without a credential the remote cache only
+      # prints a resolution failure for every job.
+      - name: Turn the remote cache off
+        run: |
+          echo '{"enabled": false}' > .putnami/cache.json
+
+      # The planner runs the client generation the Windows gate depends on
+      # before it. --no-cache executes every task of the plan: a stored verdict
+      # of either gate was computed for another tree.
+      - name: Run the whole-tree gates
+        run: ./putnamiw test --projects @putnami/cli-documents,@putnami/windows-vet --no-cache
