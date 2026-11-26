@@ -1,0 +1,503 @@
+{
+ "id": "m1-small3-A-small",
+ "commit": "A",
+ "sha": "a9bf099de0117a126df3766b76d91fd1f9362400",
+ "scenario": "small",
+ "label": "m1-small3",
+ "prep": {
+  "edit": 3
+ },
+ "machine": {
+  "nproc": 4,
+  "cpuModel": "Intel(R) Xeon(R) Processor @ 2.30GHz"
+ },
+ "loadBefore": [
+  0.47,
+  1.67,
+  5.88
+ ],
+ "idleWaitS": 115.0,
+ "busyBefore": [],
+ "rc": 0,
+ "wallS": 147.62,
+ "outerWallS": 148.15,
+ "unshareRc": 0,
+ "cgroup": {
+  "usageS": 342.555321,
+  "userS": 263.902805,
+  "systemS": 78.652515,
+  "v1UsageS": 342.55532119,
+  "leftInCgroup": []
+ },
+ "leftover": 6,
+ "remoteCacheLines": [],
+ "acct": {
+  "putnamiS": 279.31,
+  "toolsS": 37.41,
+  "harnessS": 0.0,
+  "sharePct": 88.19,
+  "processes": 3623,
+  "byComm": [
+   {
+    "side": "putnami",
+    "comm": "putnami",
+    "count": 78,
+    "cpuS": 225.16
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-sdd",
+    "count": 265,
+    "cpuS": 17.28
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-go",
+    "count": 485,
+    "cpuS": 16.07
+   },
+   {
+    "side": "tools",
+    "comm": "go",
+    "count": 282,
+    "cpuS": 15.61
+   },
+   {
+    "side": "tools",
+    "comm": "link",
+    "count": 67,
+    "cpuS": 12.87
+   },
+   {
+    "side": "putnami",
+    "comm": "git",
+    "count": 1911,
+    "cpuS": 10.85
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-cloud",
+    "count": 77,
+    "cpuS": 6.57
+   },
+   {
+    "side": "tools",
+    "comm": "documents.test",
+    "count": 2,
+    "cpuS": 5.81
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-clientg",
+    "count": 3,
+    "cpuS": 2.11
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-ts",
+    "count": 61,
+    "cpuS": 1.26
+   },
+   {
+    "side": "tools",
+    "comm": "compile",
+    "count": 82,
+    "cpuS": 1.15
+   },
+   {
+    "side": "tools",
+    "comm": "golangci-lint",
+    "count": 6,
+    "cpuS": 1.07
+   },
+   {
+    "side": "tools",
+    "comm": "php",
+    "count": 1,
+    "cpuS": 0.32
+   },
+   {
+    "side": "tools",
+    "comm": "doc-examples.te",
+    "count": 2,
+    "cpuS": 0.28
+   },
+   {
+    "side": "tools",
+    "comm": "staticcheck",
+    "count": 3,
+    "cpuS": 0.12
+   },
+   {
+    "side": "tools",
+    "comm": "host-binary",
+    "count": 1,
+    "cpuS": 0.07
+   },
+   {
+    "side": "tools",
+    "comm": "postgres",
+    "count": 16,
+    "cpuS": 0.03
+   },
+   {
+    "side": "tools",
+    "comm": "windowsvet.test",
+    "count": 2,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "parallel.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-nx",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "php8.3",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "vet",
+    "count": 9,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "docker",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "psql",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "harness",
+    "comm": "accton",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "dirname",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "bash",
+    "count": 28,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mkdir",
+    "count": 9,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mktemp",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "xargs",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "grep",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "awk",
+    "count": 6,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cat",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sha256sum",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "rm",
+    "count": 12,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sed",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "asm",
+    "count": 51,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cgo",
+    "count": 33,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "gcc",
+    "count": 33,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mv",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "chmod",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "date",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "ln",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-turbo",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-bazel",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-dotnet",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-dart",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-moon",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-pants",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-rush",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-python",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-rust",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-java",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-php",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-ruby",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-swift",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "uv",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "bun",
+    "count": 8,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cover",
+    "count": 8,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pg_ctl",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sh",
+    "count": 16,
+    "cpuS": 0.0
+   },
+   {
+    "side": "harness",
+    "comm": "sleep",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sleep",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "basename",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "tail",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "harness",
+    "comm": "ps",
+    "count": 2,
+    "cpuS": 0.0
+   }
+  ],
+  "unattributedS": 25.84,
+  "shareOfTotalPct": 81.54,
+  "shareUpperPct": 89.08
+ },
+ "session": {
+  "sessionId": "20261126-122458-d096ae",
+  "taskStatus": {
+   "success": 1706,
+   "skipped": 531
+  },
+  "counts": {
+   "total": 2212,
+   "succeeded": 1681,
+   "failed": 0,
+   "canceled": 0,
+   "skipped": 531
+  },
+  "reuse": {
+   "localCache": 1741,
+   "remoteCache": 0,
+   "coalesced": 3
+  },
+  "durationMs": 139982,
+  "maxReadyWaitMs": 123692,
+  "orchestrationCpu": null,
+  "readyWait": [
+   {
+    "command": "validate",
+    "jobs": 558,
+    "totalMs": 35530937,
+    "maxMs": 123692
+   },
+   {
+    "command": "lint",
+    "jobs": 447,
+    "totalMs": 15203146,
+    "maxMs": 121798
+   },
+   {
+    "command": "build",
+    "jobs": 669,
+    "totalMs": 9771808,
+    "maxMs": 119719
+   },
+   {
+    "command": "test",
+    "jobs": 508,
+    "totalMs": 8228240,
+    "maxMs": 102150
+   },
+   {
+    "command": "validate-workspace",
+    "jobs": 11,
+    "totalMs": 1211207,
+    "maxMs": 123113
+   },
+   {
+    "command": "client-generate",
+    "jobs": 19,
+    "totalMs": 67546,
+    "maxMs": 32101
+   }
+  ],
+  "remoteCache": null
+ }
+}

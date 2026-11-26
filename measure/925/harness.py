@@ -21,6 +21,7 @@ Usage:
 """
 
 import glob
+import gzip
 import json
 import os
 import shutil
@@ -342,7 +343,8 @@ def median_range(xs):
 
 def task_reuse(path):
     """Tasks the run executed, against those a cache served, from tasks[]."""
-    with open(path) as f:
+    opener = gzip.open if path.endswith(".gz") else open
+    with opener(path, "rt") as f:
         tasks = json.load(f).get("tasks") or []
     out = {"executed": 0, "localCache": 0, "coalesced": 0, "skipped": 0, "failed": 0, "total": len(tasks)}
     for t in tasks:
@@ -366,6 +368,8 @@ def report():
         with open(p) as f:
             r = json.load(f)
         sp = os.path.join(os.path.dirname(p), "session.json")
+        if not os.path.exists(sp):
+            sp += ".gz"
         if r.get("session") and os.path.exists(sp):
             r["session"]["tasks"] = task_reuse(sp)
         runs.append(r)

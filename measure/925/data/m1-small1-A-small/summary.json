@@ -1,0 +1,515 @@
+{
+ "id": "m1-small1-A-small",
+ "commit": "A",
+ "sha": "a9bf099de0117a126df3766b76d91fd1f9362400",
+ "scenario": "small",
+ "label": "m1-small1",
+ "prep": {
+  "edit": 1
+ },
+ "machine": {
+  "nproc": 4,
+  "cpuModel": "Intel(R) Xeon(R) Processor @ 2.30GHz"
+ },
+ "loadBefore": [
+  0.47,
+  8.37,
+  12.74
+ ],
+ "idleWaitS": 220.0,
+ "busyBefore": [],
+ "rc": 0,
+ "wallS": 160.31,
+ "outerWallS": 160.86,
+ "unshareRc": 0,
+ "cgroup": {
+  "usageS": 401.295919,
+  "userS": 312.148516,
+  "systemS": 89.147402,
+  "v1UsageS": 401.295919351,
+  "leftInCgroup": []
+ },
+ "leftover": 6,
+ "remoteCacheLines": [],
+ "acct": {
+  "putnamiS": 305.2,
+  "toolsS": 68.22,
+  "harnessS": 0.0,
+  "sharePct": 81.73,
+  "processes": 3760,
+  "byComm": [
+   {
+    "side": "putnami",
+    "comm": "putnami",
+    "count": 78,
+    "cpuS": 247.29
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-sdd",
+    "count": 265,
+    "cpuS": 17.88
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-go",
+    "count": 485,
+    "cpuS": 17.41
+   },
+   {
+    "side": "tools",
+    "comm": "go",
+    "count": 282,
+    "cpuS": 16.56
+   },
+   {
+    "side": "tools",
+    "comm": "biome",
+    "count": 6,
+    "cpuS": 16.02
+   },
+   {
+    "side": "tools",
+    "comm": "link",
+    "count": 67,
+    "cpuS": 13.4
+   },
+   {
+    "side": "putnami",
+    "comm": "git",
+    "count": 2007,
+    "cpuS": 11.64
+   },
+   {
+    "side": "tools",
+    "comm": "bun",
+    "count": 16,
+    "cpuS": 8.72
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-cloud",
+    "count": 80,
+    "cpuS": 6.83
+   },
+   {
+    "side": "tools",
+    "comm": "documents.test",
+    "count": 2,
+    "cpuS": 5.88
+   },
+   {
+    "side": "tools",
+    "comm": "node",
+    "count": 1,
+    "cpuS": 3.22
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-clientg",
+    "count": 3,
+    "cpuS": 2.28
+   },
+   {
+    "side": "tools",
+    "comm": "golangci-lint",
+    "count": 6,
+    "cpuS": 2.21
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-ts",
+    "count": 81,
+    "cpuS": 1.79
+   },
+   {
+    "side": "tools",
+    "comm": "compile",
+    "count": 84,
+    "cpuS": 1.26
+   },
+   {
+    "side": "tools",
+    "comm": "php",
+    "count": 1,
+    "cpuS": 0.34
+   },
+   {
+    "side": "tools",
+    "comm": "doc-examples.te",
+    "count": 2,
+    "cpuS": 0.34
+   },
+   {
+    "side": "tools",
+    "comm": "staticcheck",
+    "count": 3,
+    "cpuS": 0.11
+   },
+   {
+    "side": "tools",
+    "comm": "host-binary",
+    "count": 1,
+    "cpuS": 0.08
+   },
+   {
+    "side": "tools",
+    "comm": "vet",
+    "count": 9,
+    "cpuS": 0.03
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-dart",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "tools",
+    "comm": "parallel.test",
+    "count": 1,
+    "cpuS": 0.02
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-dotnet",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-moon",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-nx",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-python",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-rust",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-swift",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "php8.3",
+    "count": 1,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "docker",
+    "count": 2,
+    "cpuS": 0.01
+   },
+   {
+    "side": "tools",
+    "comm": "postgres",
+    "count": 16,
+    "cpuS": 0.01
+   },
+   {
+    "side": "harness",
+    "comm": "accton",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "dirname",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "bash",
+    "count": 28,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mkdir",
+    "count": 9,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mktemp",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "xargs",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "grep",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "awk",
+    "count": 6,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cat",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sha256sum",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "rm",
+    "count": 12,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sed",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "asm",
+    "count": 51,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cgo",
+    "count": 33,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "gcc",
+    "count": 33,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "mv",
+    "count": 5,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "chmod",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "date",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "ln",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-bazel",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-pants",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-rush",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-turbo",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-java",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-php",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "putnami",
+    "comm": "putnami-ruby",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "uv",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "windowsvet.test",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "cover",
+    "count": 9,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sh",
+    "count": 16,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "sleep",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "basename",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "tail",
+    "count": 1,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "pg_ctl",
+    "count": 3,
+    "cpuS": 0.0
+   },
+   {
+    "side": "tools",
+    "comm": "psql",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "harness",
+    "comm": "ps",
+    "count": 2,
+    "cpuS": 0.0
+   },
+   {
+    "side": "harness",
+    "comm": "sleep",
+    "count": 1,
+    "cpuS": 0.0
+   }
+  ],
+  "unattributedS": 27.88,
+  "shareOfTotalPct": 76.05,
+  "shareUpperPct": 83.0
+ },
+ "session": {
+  "sessionId": "20261126-121025-066608",
+  "taskStatus": {
+   "success": 1706,
+   "skipped": 531
+  },
+  "counts": {
+   "total": 2212,
+   "succeeded": 1681,
+   "failed": 0,
+   "canceled": 0,
+   "skipped": 531
+  },
+  "reuse": {
+   "localCache": 1729,
+   "remoteCache": 0,
+   "coalesced": 3
+  },
+  "durationMs": 151951,
+  "maxReadyWaitMs": 134201,
+  "orchestrationCpu": null,
+  "readyWait": [
+   {
+    "command": "validate",
+    "jobs": 558,
+    "totalMs": 38379942,
+    "maxMs": 134201
+   },
+   {
+    "command": "lint",
+    "jobs": 447,
+    "totalMs": 16406910,
+    "maxMs": 132828
+   },
+   {
+    "command": "build",
+    "jobs": 669,
+    "totalMs": 10593126,
+    "maxMs": 126705
+   },
+   {
+    "command": "test",
+    "jobs": 508,
+    "totalMs": 8732635,
+    "maxMs": 115086
+   },
+   {
+    "command": "validate-workspace",
+    "jobs": 11,
+    "totalMs": 1313477,
+    "maxMs": 133542
+   },
+   {
+    "command": "client-generate",
+    "jobs": 19,
+    "totalMs": 50026,
+    "maxMs": 37057
+   }
+  ],
+  "remoteCache": null
+ }
+}
