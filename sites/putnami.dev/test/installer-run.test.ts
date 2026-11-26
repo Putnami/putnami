@@ -14,7 +14,7 @@ import {
 const WORKSPACE_ROOT = joinPath(import.meta.dir, '..', '..', '..');
 const readScript = (name: string) => readFileSync(joinPath(WORKSPACE_ROOT, 'tooling', 'cli', 'scripts', name), 'utf8');
 const INSTALL_SCRIPT = readScript('install.sh');
-const INSTALL_PS1_SCRIPT = readScript('install.ps1');
+const INSTALL_PS1_SCRIPT = readScript('install-suspended.ps1');
 const RUN_PLACEHOLDER_LINE = INSTALL_SH.placeholder;
 
 describe('installer run form', () => {
@@ -78,7 +78,7 @@ describe('installer run form', () => {
       expect(changed).toEqual([[RUN_PLACEHOLDER_LINE, 'RUN_COMMAND_DEFAULT="deploy"']]);
     });
 
-    it('sets the one placeholder line of the shipped Windows installer and changes nothing else', () => {
+    it('sets the one placeholder line of the served Windows script and changes nothing else', () => {
       const baked = bakeRunCommand(INSTALL_PS1_SCRIPT, 'deploy', INSTALL_PS1);
       expect(baked).toBeDefined();
       const before = INSTALL_PS1_SCRIPT.split('\n');

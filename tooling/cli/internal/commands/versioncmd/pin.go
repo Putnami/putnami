@@ -22,8 +22,10 @@ import (
 // defaultPinPlatforms are the platforms `putnami pin` records without being
 // asked: the archive matrix the release pipeline builds for the CLI, which is
 // the extension SDK's distribution matrix (pkgmeta.ArchivePlatforms). A
-// platform outside it (e.g. windows/arm64, or a future arch) still needs one
-// explicit `putnami pin <version>` run from that machine.
+// platform outside it (windows/amd64, windows/arm64, or a future arch) is
+// recorded when a previous pin already carried it and the pinned version
+// publishes it, or by one explicit `putnami pin <version>` run from that
+// machine. A version that publishes none drops it, with a notice.
 var defaultPinPlatforms = distributionPinPlatforms()
 
 func distributionPinPlatforms() []string {

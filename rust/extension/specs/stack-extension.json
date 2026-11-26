@@ -123,7 +123,7 @@
     {
       "id": "package-builds-each-platform",
       "text": [
-        "package compiles the crate's binary in release mode with cargo zigbuild for the platforms its channels need: --platform for docker, linux/amd64 by default, and --platforms for archives, the five archive platforms by default.",
+        "package compiles the crate's binary in release mode with cargo zigbuild for the platforms its channels need: --platform for docker, linux/amd64 by default, and --platforms for archives, the four archive platforms by default.",
         "A Linux binary links against glibc 2.36, the libc of the image base, and a library crate compiles nothing."
       ]
     },

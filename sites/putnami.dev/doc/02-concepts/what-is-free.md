@@ -7,7 +7,7 @@ optional offers.
 
 ## What the repository gives you
 
-- The `putnami` CLI, on macOS, Linux, and Windows.
+- The `putnami` CLI, on macOS and Linux. Windows support is suspended for now.
 - The language extensions: Go, TypeScript, and the experimental Python one.
 - The Go and TypeScript frameworks: web, API, auth, persistence, events,
   storage, and validation.

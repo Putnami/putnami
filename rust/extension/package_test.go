@@ -133,7 +133,7 @@ func TestPackageCompilesEachPlatformItsChannelsNeed(t *testing.T) {
 			want:   []string{"x86_64-unknown-linux-gnu.2.36", "x86_64-pc-windows-gnu"},
 		},
 		"the publish field": {publish: []string{"archives"}, want: []string{
-			"x86_64-unknown-linux-gnu.2.36", "aarch64-unknown-linux-gnu.2.36", "x86_64-apple-darwin", "aarch64-apple-darwin", "x86_64-pc-windows-gnu",
+			"x86_64-unknown-linux-gnu.2.36", "aarch64-unknown-linux-gnu.2.36", "x86_64-apple-darwin", "aarch64-apple-darwin",
 		}},
 		"no binary channel": {},
 	} {

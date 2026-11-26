@@ -23,7 +23,7 @@ publication.
 
 ## Overview
 
-- **archives**: cross-compiles the release matrix — by default the 5 platforms (linux-x64, linux-arm64, darwin-x64, darwin-arm64, windows-x64) — and packages each as a `.tar.gz` archive. The windows-x64 archive carries each program as `compiled/<name>.exe`. It packages the platforms at the same time, within the task's CPU grant.
+- **archives**: cross-compiles the release matrix — by default the 4 platforms (linux-x64, linux-arm64, darwin-x64, darwin-arm64) — and packages each as a `.tar.gz` archive. Windows support is suspended, so the default leaves Windows out; a project that names `windows/amd64` in `platforms` also gets a windows-x64 archive, which carries each program as `compiled/<name>.exe`. It packages the platforms at the same time, within the task's CPU grant.
 - **docker**: builds a Docker image locally using `gcr.io/distroless/static:nonroot` as the base; consumes the binary the `package` pipeline's own cross-compile step produced — **one** binary, for the image's `--platform`
 - **go**: prepares Go module source for publishing by stripping `replace` directives and stamping the version
 - **deployment**: writes the workload's deployment declaration, the payload of a release-set member of kind `deployment`, to `<project>/.gen/deployment.json`
@@ -86,7 +86,7 @@ putnami package . --docker --platform linux/arm64
 Every input to this decision — `--target`, `platforms`, `--platform`, the
 channel flags, and the project's `publish` declaration — is resolved before the
 task runs and participates in its **cache key**. Changing the image platform
-changes the key, so a five-platform cache entry can never be served to a
+changes the key, so a four-platform cache entry can never be served to a
 one-platform request.
 
 ## Usage

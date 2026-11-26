@@ -21,8 +21,7 @@
     "repository-checks",
     "scaffold",
     "sdd-extension",
-    "stacks",
-    "windows-vet"
+    "stacks"
   ],
   "line": {}
 }

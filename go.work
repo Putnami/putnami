@@ -137,7 +137,6 @@ use (
 	./tooling/scaffold
 	./tooling/sdd-extension
 	./tooling/stacks
-	./tooling/windows-vet
 	./typescript/extension
 	./typescript/samples/10-service-to-service/clients/go
 )

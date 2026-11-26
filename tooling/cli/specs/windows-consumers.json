@@ -3,7 +3,8 @@
   "protocolVersion": 1,
   "feature": "cli/windows-consumers",
   "outcomes": [
-    "A user on Windows 10 version 1803 or later or Windows 11, on amd64, installs the CLI with irm https://putnami.dev/install.ps1 | iex, without administrator rights, and the next terminal runs putnami",
+    "Windows support is suspended since 2026-11-26: Putnami builds, vets and publishes no Windows binary, https://putnami.dev/install.ps1 and install.sh on a Windows shell install nothing and say why, and the outcomes below are the Windows experience last proven on a Windows test host on 2026-09-28, unverified since",
+    "When support is put back, a user on Windows 10 version 1803 or later or Windows 11, on amd64, installs the CLI with irm https://putnami.dev/install.ps1 | iex, without administrator rights, and the next terminal runs putnami",
     "putnami init --project webapp --extension ts --template typescript-web then putnami serve webapp give the same result on Windows as on macOS and Linux",
     "A missing Windows prerequisite is named where it is missing, with the way to fix it, instead of surfacing later as an unrelated failure",
     "Upgrading or switching the CLI on Windows replaces a running putnami.exe without Developer Mode"
@@ -16,17 +17,25 @@
   ],
   "requirements": [
     {
+      "id": "windows-is-suspended",
+      "text": [
+        "The distribution matrix, which every archive packager, putnami pin and the platforms token all read, holds no Windows key, so no release builds or publishes a Windows archive.",
+        "A project that names windows/amd64, or windows, in its platforms still reaches the known windows-x64 key, and its archive carries compiled/<name>.exe.",
+        "https://putnami.dev/install.ps1 serves a notice that requests nothing, installs nothing and fails with the reason, whatever its run query."
+      ]
+    },
+    {
       "id": "powershell-installer-trust",
       "text": [
-        "install.ps1, served at https://putnami.dev/install.ps1, hashes the download and compares it with the digest the registry advertised or --sha256 states before it extracts, runs or installs it.",
+        "install.ps1, the Windows installer kept in tooling/cli/scripts, hashes the download and compares it with the digest the registry advertised or --sha256 states before it extracts, runs or installs it.",
         "A mismatch stops the install; a missing digest stops it unless PUTNAMI_UNSAFE_INSTALL=1 is set.",
         "The script runs no elevation command, the only registry value it sets is the user's Path in HKCU\\Environment, and it opens the machine Path read-only."
       ]
     },
     {
-      "id": "windows-shells-get-the-powershell-installer",
+      "id": "windows-shells-are-told-windows-is-suspended",
       "text": [
-        "install.sh run from Git Bash, MSYS2 or Cygwin installs nothing: it prints the install.ps1 one-liner to type in a PowerShell window, and for cmd.exe or the current shell a download of install.ps1 run with powershell -File, never the one-liner passed to powershell -c, which Microsoft Defender blocks.",
+        "install.sh run from Git Bash, MSYS2 or Cygwin installs nothing and requests nothing: it says that Putnami does not support Windows for now and that no Windows build is published, names the supported platforms, and points to no Windows installer.",
         "It exits non-zero."
       ]
     },
@@ -41,7 +50,7 @@
     {
       "id": "windows-executables-by-name",
       "text": [
-        "A windows/amd64 archive carries its executable at compiled/<name>.exe. putnami pin records windows/amd64 from any host and reads compiled/putnami.exe.",
+        "A windows/amd64 archive carries its executable at compiled/<name>.exe. putnami pin records no Windows platform by default, and keeps a windows/amd64 entry a lock already holds, verified against compiled/putnami.exe of the version it pins.",
         "On Windows the CLI runs an installed extension's declared runtime under its .exe name, never the unsuffixed file, and a missing runtime error names the .exe the extension must ship."
       ]
     },

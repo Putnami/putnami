@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "windows-support-is-suspended",
+  "statement": "Windows support is suspended since 2026-11-26: no Windows binary is built, vetted or published, platforms all omits windows/amd64, and the Windows code stays unverified; last proven on a Windows VM in QA (ADR 0052); restoring it starts with the Windows vet",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md",
+  "check": {
+    "kind": "json-value",
+    "files": [
+      "features/windows-consumers.json"
+    ],
+    "pointer": "/feature/target",
+    "rule": "equals",
+    "value": "modeled",
+    "whenMissing": "violated"
+  }
+}

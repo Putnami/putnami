@@ -93,8 +93,8 @@ costs is decided by two things, and only two:
 Nature supplies defaults; **intent is authoritative**. Ordinary validation
 (`build`) never compiles for a platform you did not ask for, because no step of
 `build` consumes the binaries and Go cross-compiles share no `GOCACHE` objects
-across `GOOS`/`GOARCH` — five platforms is five full compiles, not one compile
-and four cheap variations.
+across `GOOS`/`GOARCH` — four platforms is four full compiles, not one compile
+and three cheap variations.
 
 Cross-compile and publish-path `go` invocations retry a bounded number of times
 when they fail with an ENOENT referencing the machine-global `GOCACHE` root:
@@ -107,7 +107,7 @@ persistent failure still surfaces after the bounded attempts.
 | **Library** | no `package main` in the module | `go build ./...`, host platform | no — the compile *is* the evidence | `--target` / `platforms` only |
 | **Local runnable** | `package main`, run with `serve` / `run` | entrypoints, host platform | yes, into the command output dir | `--target` / `platforms` only |
 | **Container workload** | `package main` + deployable workload (infra requirements) | entrypoints, host platform | yes | `putnami package --docker` |
-| **Distributed binary** | `package main` published as an archive | entrypoints, host platform | yes | `putnami package --archives` (all five archive platforms) |
+| **Distributed binary** | `package main` published as an archive | entrypoints, host platform | yes | `putnami package --archives` (all four archive platforms) |
 | **Sample** | ordinary project under a samples tree | same as its own nature | per its nature | not requested by default |
 | **Template** | `"type": "template"`; sources are `*.template` files | nothing — no extension activates, so no job is planned | no | n/a |
 
@@ -202,7 +202,12 @@ code, so no word means one thing to one flag and something else to the other:
 | `linux` | every archive platform for that OS (`linux/amd64`, `linux/arm64`) |
 | `freebsd` | an OS outside the archive matrix keeps the host architecture |
 | `host` | the machine running the build |
-| `all` | the five archive platforms |
+| `windows`, `windows/amd64` | `windows/amd64`, archived as `windows-x64` with `compiled/<name>.exe` |
+| `all` | the four archive platforms: `linux` and `darwin`, on `amd64` and `arm64` |
+
+`all`, and a project that declares no `platforms`, mean the distribution matrix.
+Windows support is suspended, so Windows is outside it: a project that wants a
+Windows binary or archive names `windows/amd64` (or `windows`) in `platforms`.
 
 `platforms` additionally accepts a list — a JSON array in `putnami.json`, or a
 comma-separated string on the command line. Duplicates are dropped and the
@@ -509,7 +514,7 @@ putnami build . --target windows/amd64
 # An explicit set, in one invocation
 putnami build . --platforms linux/amd64,darwin/arm64
 
-# The five archive platforms, without going through `package`
+# The four archive platforms, without going through `package`
 putnami build . --platforms all
 ```
 

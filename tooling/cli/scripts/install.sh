@@ -33,7 +33,6 @@ set -e
 BINARY_NAME="putnami"
 DEFAULT_REGISTRY_URL="https://put.putnami.dev"
 INSTALL_SCRIPT_URL="https://putnami.dev/install.sh"
-INSTALL_PS1_URL="https://putnami.dev/install.ps1"
 
 # The command to run after installing. The site sets the value of this one line
 # for https://putnami.dev/install.sh?run=<command> and changes nothing else in
@@ -71,8 +70,8 @@ COMMAND_MAP_ENTRY_PATTERN="^([^${BLANKS}]+)[${BLANKS}]+([^${BLANKS}]+)\$"
 COMMAND_MAP_MAX_BYTES=1048576
 
 # Host and binary targets this script installs: the darwin|linux x amd64|arm64
-# part of the repository's First Public-Release Contract. Its windows/amd64
-# target installs through install.ps1. Anything else is refused, not warned
+# part of the repository's First Public-Release Contract. Windows support is
+# suspended: no Windows build is published. Anything else is refused, not warned
 # about — a warning that is followed by an install produces a broken binary at
 # the moment the user first runs it, with no evidence of why.
 SUPPORTED_MATRIX="darwin (macOS) and linux, on amd64 or arm64"
@@ -238,14 +237,11 @@ require_supported_platform() {
     local os="$1"
     local arch="$2"
 
-    # A Windows shell (Git Bash, MSYS2, Cygwin) cannot install the native
-    # Windows CLI from here; the PowerShell installer does. Microsoft Defender
-    # blocks the one-liner passed to powershell on a command line, so a shell
-    # other than PowerShell downloads the script and runs it with -File.
+    # A Windows shell (Git Bash, MSYS2, Cygwin) installs nothing: Windows
+    # support is suspended and no Windows build is published.
     if [[ "$os" == "windows" ]]; then
-        print_error "install.sh does not install on Windows. Use the PowerShell installer:"
-        print_hint "In a PowerShell window: irm ${INSTALL_PS1_URL} | iex"
-        print_hint "From cmd.exe or this shell: curl.exe -fsSLo install.ps1 ${INSTALL_PS1_URL} && powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1"
+        print_error "Putnami does not support Windows for now: no Windows build is published, so there is nothing to install."
+        print_hint "Supported: ${SUPPORTED_MATRIX}."
         exit 1
     fi
     if [[ "$os" == "unknown" ]]; then
@@ -1284,8 +1280,7 @@ print_usage() {
     echo "stderr, the command's output to stdout, and the exit status is the command's."
     echo "Nothing is written to the current directory."
     echo ""
-    echo "Supported platforms: ${SUPPORTED_MATRIX}."
-    echo "On Windows, in a PowerShell window: irm ${INSTALL_PS1_URL} | iex"
+    echo "Supported platforms: ${SUPPORTED_MATRIX}. Windows support is suspended."
 }
 
 # Main installation flow

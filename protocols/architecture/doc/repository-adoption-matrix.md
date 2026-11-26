@@ -201,7 +201,6 @@ contracts only.
 | `/tooling/cli-model` | `@putnami/cli-model` | The CLI's data model — the workspace graph, extension descriptions, job definitions — extracted so it can be depended on without the orchestrator. It is an unpublished internal companion and no workspace project may import it. |
 | `/tooling/install-scripts` | `@putnami/install-scripts` | The tests of the CLI's install and smoke scripts. A separate project so that its key holds the scripts and the install pages, not the CLI's sources. |
 | `/tooling/repository-checks` | `@putnami/repository-checks` | The checks that read the repository as text on every change: the public-cut scan, the release plan and its recorded verdict, the governance record, the first-use block, the moved-commands reference, the spelling of every declared pattern and the shipped manifests. It imports nothing from the repository, so its test task depends on no other project. |
-| `/tooling/windows-vet` | `@putnami/windows-vet` | The Windows compile gate: `go vet` of every `go.work` module for windows/amd64. A separate project so that its key holds only the Go sources, module files and `go.work`. |
 
 ### `sdd`
 

@@ -1,6 +1,11 @@
 # ADR 0052 — Windows consumers: junctions, Job Objects, LF checkouts, long paths and one home
 
-- **Status**: accepted
+- **Status**: suspended since 2026-11-26, by decision
+  [`windows-support-is-suspended`](../../decisions/windows-support-is-suspended.json):
+  Putnami neither builds, vets nor publishes Windows binaries, and the Windows
+  code this record describes stays in the tree unverified. It was last proven
+  on a Windows VM in QA on 2026-09-28. Putting support back starts with the
+  Windows vet.
 - **Scope**: `@putnami/cli` (`tooling/cli`), `putnami-extension-sdk`
   (`dirlink`, `proctree`, `filelock`), `@putnami/go`, `@putnami/typescript`
   and `@putnami/python` on native `windows/amd64`
@@ -27,7 +32,7 @@ Five Unix assumptions fail on native Windows:
   long paths itself; its Git, Bun and Go children need the Windows setting.
 - `HOME` and `os.UserHomeDir` resolve to different directories.
 
-The Windows decisions are D-W1 to D-W12 in `tooling/cli/decisions/`. This
+The Windows decisions are D-W1 to D-W10 and D-W12 in `tooling/cli/decisions/`. This
 record gives the reasons for D-W4, D-W6, D-W7, D-W8, D-W9 and D-W12, and owns
 the Windows installer.
 
@@ -150,14 +155,15 @@ every sign-in and sign-out.
   and a later switch deletes the aside file. When the new file cannot move in,
   the old one moves back; when that fails, the old one stays aside and the error
   names its path.
-- The release smoke has a `windows/amd64` candidate job on a Windows host
-  created for the run and deleted after it (D-W11). The nightly `latest`
-  monitor stays on the four macOS and Linux targets.
+- The release smoke had a `windows/amd64` candidate job on a Windows host
+  created for the run and deleted after it. While support is suspended, no
+  Windows job runs, and the nightly `latest` monitor stays on the four macOS
+  and Linux targets.
 
 The other decisions, D-W1 (target), D-W2 (`.tar.gz` archives with
 `compiled/<name>.exe`, the CLI's own raw executables excepted), D-W3 (hooks through `sh -c` from Git for Windows), D-W5
-(OS-class cache-key field on Windows only), D-W10 (`LockFileEx` locks) and D-W11
-(the proof host), need no further reason here.
+(OS-class cache-key field on Windows only), and D-W10 (`LockFileEx` locks)
+need no further reason here.
 
 ## Enforceable invariants
 

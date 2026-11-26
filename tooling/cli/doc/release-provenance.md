@@ -40,8 +40,9 @@ records:
   that plane is configured, or the named human release owner for a manual run;
 - every target artifact's operating system, architecture, resolved version, and
   authoritative SHA-256; and
-- the five target-specific smoke results (four macOS and Linux, one
-  `windows/amd64`) and the release owner's approval.
+- the four target-specific smoke results, on macOS and Linux, and the release
+  owner's approval. While Windows support is suspended, the release has no
+  `windows/amd64` target.
 
 The builder is the identity that executed the approved package plan, not the
 registry that later serves its output. A retry is a new builder run and gets a

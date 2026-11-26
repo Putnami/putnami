@@ -106,9 +106,6 @@ type reviewedClaims struct {
 // experimental stay unpinned on purpose — a subject that is still moving must
 // be able to move.
 var reviewedStableSubjects = map[subjectIdentity]reviewedClaims{
-	// Windows consumers on windows/amd64. The evidence is in the
-	// owning project's "Install on Windows" support section.
-	{SubjectKindFeature, "cli/windows-consumers"}:                {},
 	{SubjectKindPackage, "@putnami/application"}:                 {},
 	{SubjectKindPackage, "@putnami/cli"}:                         {},
 	{SubjectKindPackage, "@putnami/cli-protocol"}:                {},

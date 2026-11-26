@@ -7,6 +7,9 @@
 # To run one command, in a PowerShell window:
 #   irm "https://putnami.dev/install.ps1?run=<command>" | iex
 #
+# Windows support is suspended: the site serves install-suspended.ps1 at that
+# URL, and this installer is kept, unverified, for when support is put back.
+#
 # This script installs the Putnami CLI on Windows into %USERPROFILE%\.putnami\bin.
 # With a command to run (?run=, --run, or PUTNAMI_RUN), it then pins the extension
 # that provides the command for the current user and runs `putnami <command>` in

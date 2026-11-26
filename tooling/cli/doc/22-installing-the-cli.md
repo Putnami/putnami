@@ -4,7 +4,8 @@ This document is the authority for three things: what
 `curl -fsSL https://putnami.dev/install.sh | bash` does, including its
 [run form](#run-one-command-without-a-workspace), what
 `irm https://putnami.dev/install.ps1 | iex` does on Windows, and what the release
-smoke proves about them. [ADR 0012](adr/0012-install-trust-and-release-smoke.md)
+smoke proves about them. Windows support is suspended since 2026-11-26: see
+[Windows is suspended](#windows-is-suspended). [ADR 0012](adr/0012-install-trust-and-release-smoke.md)
 and [ADR 0052](adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md)
 record why.
 
@@ -203,6 +204,12 @@ matching ignores the query, so each route covers every variant.
 
 ### Run one command on Windows
 
+Windows support is suspended: `/install.ps1?run=<command>` serves the notice
+described in [Windows is suspended](#windows-is-suspended),
+which installs nothing and runs nothing. The rest of this section describes the
+Windows installer kept in the repository, `tooling/cli/scripts/install.ps1`,
+which is unverified until support is put back.
+
 In a PowerShell window, type:
 
 ```powershell
@@ -368,9 +375,10 @@ into `~/.putnami/bin` (the default) and link from there yourself.
 
 ## Supported platforms
 
-`install.sh` installs `darwin`|`linux` × `amd64`|`arm64`, and `install.ps1`
-installs `windows/amd64`. Together they cover the matrix of the
+`install.sh` installs `darwin`|`linux` × `amd64`|`arm64`, the matrix of the
 [First Public-Release Contract](../../../README.md#first-public-release-contract).
+Windows support is suspended: no Windows build is published, and
+`https://putnami.dev/install.ps1` installs nothing.
 Anything else **exits non-zero** before
 the prerequisite check and before any network call — a warning followed by an
 install just moves the failure to the first `putnami` invocation, where the
@@ -379,9 +387,12 @@ warning is no longer on screen.
 | Detected by `install.sh` | What happens |
 |---|---|
 | `Darwin` / `Linux` × `x86_64`, `amd64`, `arm64`, `aarch64` | Installs. |
-| `CYGWIN*`, `MINGW*`, `MSYS*` | `install.sh does not install on Windows. Use the PowerShell installer:`, then the `install.ps1` one-liner to type in a PowerShell window, and for `cmd.exe` or the current shell a `curl.exe` download run with `powershell -File`. Installs nothing. |
+| `CYGWIN*`, `MINGW*`, `MSYS*` | `Putnami does not support Windows for now: no Windows build is published, so there is nothing to install.`, plus the supported set. Installs nothing and points to no Windows installer. |
 | Any other `uname -s` | `Unsupported operating system: <value>`, plus the supported set. |
 | Any other `uname -m` | `Unsupported architecture: <value>`, plus the supported set. |
+
+The Windows installer kept in the repository, unverified while support is
+suspended, refuses the same way:
 
 | Detected by `install.ps1` | What happens |
 |---|---|
@@ -398,8 +409,9 @@ The installer sends Go's `GOARCH` vocabulary, so `uname -m` is normalized to
 `amd64` or `arm64` and sent as `?arch=amd64`. This is the same vocabulary
 `putnami upgrade` sends (`runtime.GOARCH`) to the same endpoint.
 
-The registry stores artifacts under `darwin-x64`, `linux-x64` and
-`windows-x64`. Its download
+The registry stores artifacts under `darwin-x64` and `linux-x64`, and under
+`windows-x64` for the releases that published one before Windows support was
+suspended. Its download
 handler normalizes the query first — `amd64` and `x86_64` both map to `x64`, and
 `aarch64` maps to `arm64` — so `arch=amd64` resolves the `x64` artifact. If you
 are reading published artifact names and wondering where `amd64` went: the alias
@@ -517,7 +529,31 @@ the CLI works without them.
 Only the `~/.zfunc` fallback needs a line in `.zshrc`, and it is appended with
 its own `compinit` rather than inserted before yours.
 
+## Windows is suspended
+
+Putnami does not support Windows for now. Since 2026-11-26, Putnami neither
+builds, vets nor publishes Windows binaries: the release carries no
+`windows-x64` archive, and `https://putnami.dev/install.ps1` serves a short
+script that installs nothing, requests nothing and fails with that reason.
+`install.sh` run from Git Bash, MSYS2 or Cygwin says the same.
+
+Windows support was last verified on 2026-09-28, on a Windows Server 2022 test
+host created for each QA run, as [Support status](#support-status) records. The
+Windows code stays in the tree and the sections below still describe it, but
+nothing has verified it since. Support comes back when users ask for it, and
+putting it back starts with the Windows vet of every Go module
+([`windows-support-is-suspended`](../decisions/windows-support-is-suspended.json)).
+
+A project of your own can still target Windows: `platforms: ["windows/amd64"]`,
+or `--platforms windows/amd64`, cross-compiles it and packages it under
+`windows-x64`. Only `all`, and a project that declares no `platforms`, leave
+Windows out.
+
 ## Install on Windows
+
+This section describes `tooling/cli/scripts/install.ps1`, the Windows installer
+kept in the repository. While Windows support is suspended, the site does not
+serve it, and no Windows build exists for it to install.
 
 Open a PowerShell window and type, from an empty directory:
 
@@ -663,9 +699,13 @@ These platform differences are decisions, recorded in
 
 ### Support status
 
-- **Status**: `stable`, recorded as the `cli/windows-consumers` feature entry
-  in the reviewed [`putnami.support.json`](../../../putnami.support.json).
-- **Scope**: consumers who install published Putnami artifacts on
+- **Status**: `experimental`, not on by default, recorded as the
+  `cli/windows-consumers` feature entry in the reviewed
+  [`putnami.support.json`](../../../putnami.support.json). Windows support is
+  suspended since 2026-11-26
+  ([`windows-support-is-suspended`](../decisions/windows-support-is-suspended.json)):
+  no Windows build is published, and nothing verifies the Windows code.
+- **Scope when support is put back**: consumers who install published Putnami artifacts on
   `windows/amd64`, on Windows 10 version 1803 or later or on Windows 11
   ([D-W1](../decisions/D-W1.json)), with the
   [prerequisites](#prerequisites) above: Git for Windows for `sh` (D-W3),
@@ -674,12 +714,15 @@ These platform differences are decisions, recorded in
 - **Not covered**: `windows/arm64`, which the release does not build and
   `install.ps1` refuses. Contributors to this repository stay on macOS and
   Linux: `putnamiw` and the contributor gate do not run on Windows.
-- **Evidence**: four test runs on a Windows Server 2022 host created for each
-  run and deleted after it (D-W11). The last run had 0 product failures across
-  145 Go test packages, and it passed the Go, TypeScript and junction-root
-  consumer flows. The contributor gate runs `GOOS=windows go vet` on every
-  `go.work` module (D-W11). The [Evidence](#evidence) table names the test for
-  each Windows claim.
+- **Last verified**: on 2026-09-28, by four test runs on a Windows Server 2022
+  host created for each run and deleted after it
+  ([ADR 0052](adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md)).
+  The last run had 0 product failures across 145 Go test packages, and it
+  passed the Go, TypeScript and junction-root consumer flows. Nothing has run
+  on Windows since, and the contributor gate no longer runs
+  `GOOS=windows go vet`. The [Evidence](#evidence) table names the test for
+  each Windows claim; those tests that run on macOS and Linux check the Windows
+  code paths, not Windows itself.
 - **Not proven**: how Microsoft Defender treats the https forms of the one-line
   install. [Install on Windows](#install-on-windows) describes the forms that
   were tested, and on which host.
@@ -693,27 +736,22 @@ maintainer CI intentionally has no schedule or operating-system matrix: per
 execution plane is the automation boundary for those post-publication
 invocations instead of adding a second GitHub Actions surface.
 
-Any configured plane must fan the candidate channel out to five jobs before
-promotion: the four actual Unix runners and one `windows/amd64` job. It also runs
-the default public endpoint against `latest` nightly on the four Unix runners.
-The `windows/amd64` job runs the PowerShell port of the same legs,
-`smoke-check-release.ps1`, through `install.ps1`, on a Windows host that is
-created for the run and deleted after it
-([D-W11](adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md)).
-That host does not exist between runs, so `latest` has no nightly Windows job:
+Any configured plane must fan the candidate channel out to four jobs before
+promotion, on the four actual Unix runners. It also runs the default public
+endpoint against `latest` nightly on the same four runners. While Windows
+support is suspended, no `windows/amd64` job runs: the release builds no Windows
+archive for it to install. `smoke-check-release.ps1`, the PowerShell port of the
+same legs, stays in the tree for when support is put back
+([`windows-support-is-suspended`](../decisions/windows-support-is-suspended.json)):
 
 | Invocation | Required actual runners | Blocks / escalation |
 |---|---|---|
 | `smoke-check-release.sh <candidate-channel>` | `darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64` | Blocks promotion; page the release owner with the failing leg and artifacts. |
-| `smoke-check-release.ps1 <candidate-channel>` | `windows/amd64` | Blocks promotion, like the four Unix runners. |
 | `smoke-check-release.sh latest` (default installer URL) | the four Unix runners | Nightly public monitor; page the release owner and stop the next release until triaged. |
 | `smoke-first-use.sh <candidate-channel>` | `linux/amd64`, `linux/arm64`, with Docker | Blocks promotion. See [The first-use smoke](#the-first-use-smoke). |
 
-The Windows host has no Docker, so the smoke does not run `putnami compose`
-there.
-
 When that external plane is not configured or is unavailable, the release owner
-runs the same five candidate jobs manually before promotion and the same four
+runs the same four candidate jobs manually before promotion and the same four
 Unix `latest` jobs nightly until automation is configured or restored; one local
 host is not a matrix substitute:
 
@@ -883,11 +921,7 @@ To install an older CLI on a machine:
 curl -fsSL https://putnami.dev/install.sh | bash -s -- --version 1.2.3
 ```
 
-On Windows, in a PowerShell window:
-
-```powershell
-$env:PUTNAMI_VERSION = '1.2.3'; irm https://putnami.dev/install.ps1 | iex
-```
+Windows support is suspended, so no version installs on Windows.
 
 To make one workspace run an older CLI, without touching what is installed:
 
@@ -944,7 +978,9 @@ map is served the same way: removing an entry is a pull request against
 | A stale `--version` stamp refuses and leaves nothing behind | `TestInstallRefusesStaleVersionStamp` |
 | `--download-url` requires `--sha256`, honors a matching one, and rejects a conflicting or malformed one | `TestDownloadURLRequiresAnExpectedDigest` |
 | A non-writable install directory refuses before the download, naming the remedy | `TestInstallRefusesUnwritableInstallDirectoryBeforeDownloading` |
-| A Windows shell gets the `install.ps1` one-liner and nothing installed; unknown `uname` values refuse, naming the detected value and the matrix | `TestInstallRefusesUnsupportedPlatforms` |
+| A Windows shell is told that Windows support is suspended and gets nothing installed and no installer to run; unknown `uname` values refuse, naming the detected value and the matrix | `TestInstallRefusesUnsupportedPlatforms` |
+| The site serves at `/install.ps1` a notice that requests nothing, installs nothing and fails with the reason | `TestTheSiteServesAWindowsNoticeThatInstallsNothing` |
+| No release builds a Windows archive, a project that names `windows/amd64` still reaches `windows-x64`, and a lock that holds a Windows entry keeps it | `TestTheDistributionMatrixHoldsNoWindowsKey`, `TestAnExplicitWindowsTargetKeepsItsKey`, `TestCLIPinKeepsTheWindowsEntryALockHolds` |
 | `uname -m` maps onto `GOARCH` vocabulary | `TestInstallScriptSpeaksGOARCHVocabulary` |
 | Plaintext non-loopback registries refuse; loopback and the opt-in do not | `TestInstallRefusesPlaintextNonLoopbackRegistry`, `TestInstallAcceptsPlaintextRegistryWithExplicitOptIn`, `TestInstallAcceptsLoopbackHTTPRegistryWithoutOptIn` |
 | An `https://` registry that redirects to `http://` is refused before the host is resolved, and the refusal names the downgrade; a redirect that keeps `https://`, and a plaintext loopback registry that redirects within plaintext, are followed | `TestInstallRefusesARedirectFromHTTPSToPlaintext` |

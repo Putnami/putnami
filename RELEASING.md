@@ -93,7 +93,7 @@ satisfied is either fixed or waived through the
 8. **The CLI provenance record is complete.** It follows the
    [release provenance policy](tooling/cli/doc/release-provenance.md): full
    source commit and clean-tree state, exact Putnami version, builder actor or
-   execution-run identity, every target's authoritative SHA-256, all five smoke
+   execution-run identity, every target's authoritative SHA-256, all four smoke
    results, and the release owner's approval. Current archives are unsigned and
    are not claimed to be byte-for-byte reproducible; the record must say so
    instead of upgrading the checksum into a signature or reproducibility claim.
@@ -101,17 +101,16 @@ satisfied is either fixed or waived through the
    the candidate to a pre-release channel. When an external release execution
    plane is configured, it must run
    `tooling/cli/scripts/smoke-check-release.sh <channel>` on actual
-   `darwin/amd64`, `darwin/arm64`, `linux/amd64`, and `linux/arm64` runners, and
-   `tooling/cli/scripts/smoke-check-release.ps1 <channel>` on a `windows/amd64`
-   host created for the run and deleted after it, before promotion, retaining
-   `SMOKE_DIAGNOSTICS_DIR` on failure. Each fetches its public installer
-   (`install.sh`, or `install.ps1` on Windows), executes the exact TypeScript
+   `darwin/amd64`, `darwin/arm64`, `linux/amd64`, and `linux/arm64` runners
+   before promotion, retaining `SMOKE_DIAGNOSTICS_DIR` on failure. While
+   Windows support is suspended, no `windows/amd64` smoke runs: the release
+   builds no Windows archive. Each fetches the public installer
+   (`install.sh`), executes the exact TypeScript
    init/serve path, verifies generated locks/config state, and requires
    typed readiness, a real HTTP response, and graceful shutdown. Each hands
    `<channel>` to `init` as `PUTNAMI_CHANNEL`, so the extensions, the template
    and the starter's dependencies come from the candidate's release set, not
    from `latest`; `<channel>` is a channel name, never an exact version. The
-   Windows host has no Docker, so `putnami compose` is not smoked there. The
    plane also runs `tooling/cli/scripts/smoke-first-use.sh <channel>` on
    `linux/amd64` and `linux/arm64` runners with Docker: it pastes the
    documented block into an image that holds Bash, `curl`, `tar` and a SHA-256
@@ -119,11 +118,10 @@ satisfied is either fixed or waived through the
    A failed or missing runner blocks promotion and is escalated to the release
    owner. If
    the execution plane is not configured or is unavailable, the release owner
-   runs the same five candidate jobs manually: four Unix runners and one
-   Windows host; one host is not a substitute. Any configured plane also runs
+   runs the same four candidate jobs manually, on the four Unix runners; one
+   host is not a substitute. Any configured plane also runs
    `latest` nightly through the default public installer URL on the four Unix
-   runners, and escalates failure before the next release. The Windows host
-   exists only for a run, so `latest` has no nightly Windows job. Until that
+   runners, and escalates failure before the next release. Until that
    automation is configured or restored, the release owner runs the same
    four-target Unix `latest` smoke nightly. This post-publication schedule
    remains outside maintainer CI by the accepted neutral-CI decision — see

@@ -27,8 +27,8 @@ putnami serve webapp
 The second line makes `putnami` reachable in the shell you are in. It changes
 nothing when the command is already reachable.
 
-Supported platforms are macOS and Linux, on `amd64` or `arm64`, and Windows on
-`amd64`, which has its own installer, below. Anything else stops with an error
+Supported platforms are macOS and Linux, on `amd64` or `arm64`. Windows is not
+supported for now: see [On Windows](#on-windows). Anything else stops with an error
 naming what it detected, rather than installing a binary that cannot run.
 
 Prerequisites are Bash, `curl`, `tar`, either `sha256sum` or `shasum`, network
@@ -76,44 +76,11 @@ install script is only needed once per machine.
 
 ### On Windows
 
-On Windows 10 version 1803 or later, or Windows 11, on `amd64`, open a
-PowerShell window and type the same path. The installer runs inside that
-window and adds the install directory to its `PATH`, so the block needs no
-extra line:
-
-```powershell
-irm https://putnami.dev/install.ps1 | iex
-putnami init --project webapp --extension ts --template typescript-web
-putnami serve webapp
-```
-
-Microsoft Defender blocks the first line when it is passed to `powershell -c`
-on a command line. From `cmd.exe` or Git Bash, download the installer and run
-it as a file:
-
-```
-curl.exe -fsSLo install.ps1 https://putnami.dev/install.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1
-```
-
-The PowerShell installer verifies the download the same way, never asks for
-administrator rights, installs into `%USERPROFILE%\.putnami\bin`, and adds that
-directory to your user `PATH`. Terminals that were already open keep their old
-`PATH`; the installer prints the line to run in them.
-
-Windows on `amd64` is supported for people who install and use Putnami. The
-release gate runs these PowerShell commands on a Windows host created for each
-QA run. Windows on `arm64` is not supported, and contributors to Putnami itself
-work on macOS or Linux.
-
-Windows needs a few more things:
-
-- **Git for Windows.** Workspace hooks run with `sh`, which Git for Windows
-  provides.
-- **Long paths.** Enable `LongPathsEnabled` in Windows and set
-  `git config --global core.longpaths true`. `putnami doctor` checks both and
-  prints the command for each.
-- **Docker Desktop**, only for `putnami compose`.
+Putnami does not support Windows for now. Windows support is suspended since
+2026-11-26: no Windows build is published, and
+`https://putnami.dev/install.ps1` installs nothing and says so. Support was last
+verified on 2026-09-28, on a Windows Server 2022 test host; it comes back when
+users ask for it. Use macOS or Linux, on `amd64` or `arm64`.
 
 Prefer not to run an install script?
 Read the [CLI reference](/docs/tooling-&-workspace/cli) for the command surface and install notes.
@@ -143,7 +110,7 @@ HTTP 200 from every page of the starter and exit status 0 from
 `putnami lint,test,build api`.
 
 This guarantee is deliberately narrow. It does not promise support for every
-shell or Linux distribution, Windows on `arm64`, other architectures, offline
+shell or Linux distribution, Windows, other architectures, offline
 installation, proxy-specific configuration, production deployment, or stable
 source details in every future generated app. The Go starter is gated on Linux
 only, and the experimental Python starter is not gated. The checksum proves the bytes match the

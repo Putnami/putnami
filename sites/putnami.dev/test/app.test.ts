@@ -302,11 +302,13 @@ describe('putnami.dev', () => {
     });
 
     /**
-     * The Windows counterpart of install.sh, what `irm https://putnami.dev/install.ps1 | iex`
-     * executes. tooling/install-scripts pins its behavior on the
-     * repository copy; these assertions cover the publishing seam.
+     * What `irm https://putnami.dev/install.ps1 | iex` executes while Windows
+     * support is suspended: a script that installs nothing and requests
+     * nothing, and fails with the reason. tooling/install-scripts pins its
+     * behavior on the repository copy; these assertions cover the publishing
+     * seam.
      */
-    it('should serve an install.ps1 that still verifies what it downloads', async () => {
+    it('should serve an install.ps1 that says Windows is suspended and installs nothing', async () => {
       const res = await fetch(`${baseUrl}/install.ps1`);
       expect(res.status).toBe(200);
       const bytes = new Uint8Array(await res.arrayBuffer());
@@ -315,53 +317,29 @@ describe('putnami.dev', () => {
       expect(bytes.every((byte) => byte < 0x80)).toBe(true);
       const script = new TextDecoder().decode(bytes);
 
-      expect(script).toContain('Set-StrictMode -Version 3.0');
-      // Hashes the download and compares it with the advertised digest, and
-      // says "verified" only after that.
-      expect(script).toContain('$actual = Get-FileSha256 $AssetFile');
-      expect(script).toContain('if ($actual -cne $expected) {');
-      expect(script).toContain('Integrity verified');
-      expect(script).toContain('refusing to install an unverified binary');
-      expect(script).toContain('PUTNAMI_UNSAFE_INSTALL');
-      expect(script).toContain('refusing to install a stale build');
-      expect(script).toContain('https://putnami.dev/install.ps1');
-      expect(script).not.toContain('put.putnami.dev/install.ps1');
-    });
-
-    it('should serve an install.ps1 that never escalates privileges', async () => {
-      const res = await fetch(`${baseUrl}/install.ps1`);
-      expect(res.status).toBe(200);
-      const script = await res.text();
-
-      const executable = script
+      expect(script).toContain('Putnami does not support Windows for now');
+      expect(script).toContain('no Windows build is published');
+      expect(script).toMatch(/^throw '/m);
+      const code = script
         .split('\n')
-        .map((line) =>
-          line
-            .replace(/'[^']*'/g, ' ')
-            .replace(/"[^"]*"/g, ' ')
-            .replace(/#.*$/, ''),
-        )
+        .filter((line) => !line.startsWith('#'))
+        .map((line) => line.replace(/'[^']*'/g, ' '))
         .join('\n')
         .toLowerCase();
-
-      // Non-vacuity: the stripped text still holds the script's code.
-      expect(executable).toContain('function confirm-downloadintegrity');
-      expect(executable).toContain('function add-userpathentry');
-
-      for (const escalator of ['runas', 'start-process', 'set-executionpolicy', 'hklm:', 'gsudo', 'sudo']) {
-        expect(executable).not.toMatch(new RegExp(`(^|[^\\w.-])${escalator}([^\\w.-]|$)`));
+      for (const request of ['invoke-webrequest', 'invoke-restmethod', 'irm', 'iwr', 'curl', 'start-process']) {
+        expect(code).not.toMatch(new RegExp(`(^|[^\\w.-])${request}([^\\w.-]|$)`));
       }
     });
 
     /**
-     * `irm "https://putnami.dev/install.ps1?run=<command>" | iex`: the Windows
-     * installer with the command set in its one placeholder line, served like
-     * the static script. The installer side is pinned by
-     * tooling/install-scripts.
+     * `irm "https://putnami.dev/install.ps1?run=<command>" | iex`: the served
+     * script with the command set in its one placeholder line, served like the
+     * static script. While Windows support is suspended the served script is
+     * the suspension notice, which installs nothing whatever the command.
      */
     describe('install.ps1?run=<command>', () => {
       const repositoryScript = () =>
-        readFileSync(joinPath(WORKSPACE_ROOT, 'tooling', 'cli', 'scripts', 'install.ps1'), 'utf8');
+        readFileSync(joinPath(WORKSPACE_ROOT, 'tooling', 'cli', 'scripts', 'install-suspended.ps1'), 'utf8');
 
       it('serves the repository script unchanged without ?run=, whatever else the query holds', async () => {
         const plain = await fetch(`${baseUrl}/install.ps1`);
@@ -450,7 +428,7 @@ describe('putnami.dev', () => {
           expect({ query, status: res.status }).toEqual({ query, status: 400 });
           expect(res.headers.get('content-type')).toContain('text/plain');
           expect(res.headers.get('cache-control')).toBe('no-store');
-          expect(body).not.toContain('Set-StrictMode');
+          expect(body).not.toContain('RunCommandDefault');
           expect(body).not.toContain('id');
         }
       });
@@ -672,20 +650,17 @@ describe('putnami.dev', () => {
     });
 
     /**
-     * Microsoft Defender blocks the install one-liner passed to powershell on
-     * a command line (Trojan:Win32/Commando.A!ml). The page gives the one-liner
-     * to type in a PowerShell window, and gives cmd.exe a download run with
-     * -File.
+     * Windows support is suspended: the page says so, and gives no Windows
+     * install command.
      */
-    it('should give Windows install commands that Defender lets run', async () => {
+    it('should say that Windows is not supported for now', async () => {
       const res = await fetch(`${baseUrl}/docs/getting-started`);
       expect(res.status).toBe(200);
       const text = (await res.text()).replace(/<[^>]+>/g, '');
 
-      expect(text).toContain('PowerShell window');
-      expect(text).toContain('curl.exe -fsSLo install.ps1 https://putnami.dev/install.ps1');
-      expect(text).toContain('powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1');
-      expect(text).not.toMatch(/powershell(\.exe)?\s[^\n]*-c(ommand)?\s+(["']|&quot;|&#39;|&#x27;)?[^\n]*\birm\b/i);
+      expect(text).toContain('Putnami does not support Windows for now');
+      expect(text).not.toContain('irm https://putnami.dev/install.ps1');
+      expect(text).not.toContain('curl.exe -fsSLo install.ps1');
     });
 
     it('should lead a team with an existing repository from the docs home to its starting page', async () => {

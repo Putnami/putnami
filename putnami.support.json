@@ -5,7 +5,8 @@
     {
       "id": "cli/windows-consumers",
       "kind": "feature",
-      "status": "stable"
+      "status": "experimental",
+      "default": false
     },
     {
       "id": "@putnami/analytics",

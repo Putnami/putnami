@@ -427,12 +427,12 @@ func TestParsePlatformSpec(t *testing.T) {
 			want: []string{"linux/amd64", "darwin/arm64"}},
 		{name: "host token", entries: []string{"host"}, want: []string{host.GOOS + "/" + host.GOARCH}},
 		{name: "all token", entries: []string{"all"},
-			want: []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64", "windows/amd64"}},
+			want: []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64"}},
 		{name: "duplicates collapse", entries: []string{"linux/amd64", "linux/amd64"},
 			want: []string{"linux/amd64"}},
 		{name: "os expands to its matrix members", entries: []string{"darwin"},
 			want: []string{"darwin/amd64", "darwin/arm64"}},
-		{name: "windows expands to its matrix member", entries: []string{"windows"},
+		{name: "windows expands to its known member outside the matrix", entries: []string{"windows"},
 			want: []string{"windows/amd64"}},
 		{name: "unknown platform is synthesized", entries: []string{"windows/arm64"},
 			want: []string{"windows/arm64"}},
@@ -605,7 +605,7 @@ func names(targets []Target) []string {
 // binary; an archive channel owes the declared release matrix; a channel that
 // carries no binary owes nothing.
 func TestDistributionTargetsScopeByChannel(t *testing.T) {
-	full := []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64", "windows/amd64"}
+	full := []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64"}
 
 	tests := []struct {
 		name string

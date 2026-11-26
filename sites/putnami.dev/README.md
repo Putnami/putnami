@@ -60,7 +60,7 @@ there:
 | `/docs/12-monorepo-tools/<tool>.md` | `integrations/<tool>/doc/01-<tool>.md`, one page per monorepo tool integration | `putnami.json` `generate.assets` copy |
 | `/docs/platform` | `cloud/doc-contents-platform` bundle (published by the Cloud workspace), pinned by `content.lock.json` | `src/plugins/content-bundle.plugin.ts` |
 | `/schemas/…` | `protocols/*/schemas/*.json` | `src/plugins/schemas.plugin.ts` |
-| `/install.sh`, `/install-commands.txt`, `/install.ps1`, `/LICENSE.md` | `tooling/cli/scripts/install.sh`, `tooling/cli/scripts/install-commands.txt`, `tooling/cli/scripts/install.ps1`, `LICENSE.md` | `putnami.json` `generate.assets` copy |
+| `/install.sh`, `/install-commands.txt`, `/install.ps1`, `/LICENSE.md` | `tooling/cli/scripts/install.sh`, `tooling/cli/scripts/install-commands.txt`, `tooling/cli/scripts/install-suspended.ps1`, `LICENSE.md` | `putnami.json` `generate.assets` copy |
 
 A `generate.assets` source that no longer exists is not silently dropped. The
 nineteen sources another domain owns are declared imports of the `public-docs`
@@ -159,8 +159,8 @@ evidence, never authority — emitting one cannot create a cross-domain permissi
 | `/install.sh` | Install script (`curl -fsSL https://putnami.dev/install.sh \| bash`) |
 | `/install.sh?run=<command>` | The same script with `<command>` set in its one `RUN_COMMAND_DEFAULT=""` line (`src/plugins/installer-run.plugin.ts`); a `run` value that is not one `^[a-z][a-z0-9-]{0,63}$` is a 400 |
 | `/install-commands.txt` | Command map the installers read for `?run=`: which extension provides each command. Unsigned, trusted as far as `install.sh` or `install.ps1` from the same origin |
-| `/install.ps1` | Windows install script (`irm https://putnami.dev/install.ps1 \| iex`, typed in a PowerShell window) |
-| `/install.ps1?run=<command>` | The same script with `<command>` set in its one `$RunCommandDefault = ''` line (`src/plugins/installer-run.plugin.ts`); a `run` value that is not one `^[a-z][a-z0-9-]{0,63}$` is a 400 |
+| `/install.ps1` | The Windows notice: Windows support is suspended, so the script installs nothing, requests nothing, and fails with that reason |
+| `/install.ps1?run=<command>` | The same notice with `<command>` set in its one `$RunCommandDefault = ''` line, which changes nothing (`src/plugins/installer-run.plugin.ts`); a `run` value that is not one `^[a-z][a-z0-9-]{0,63}$` is a 400 |
 | `/dl/:artifact` | Binary resolver redirect (302) using query params (`version`, `target`, `platform`) |
 | `/llms.txt`, `/doc-markdown` | Agent-facing documentation index and raw markdown |
 | `/release.json` | The Putnami version the CLI's `latest` channel points at, shown in the footer |
@@ -324,6 +324,6 @@ public/
 ├── docs/        # Built documentation content
 ├── install.sh   # CLI install script
 ├── install-commands.txt # Command map for install.sh?run=<command> and install.ps1?run=<command>
-├── install.ps1  # CLI install script for Windows
+├── install.ps1  # The Windows notice: Windows support is suspended
 └── search-index.json
 ```

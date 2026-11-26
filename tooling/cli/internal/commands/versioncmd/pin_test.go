@@ -176,7 +176,6 @@ func TestCLIPinSetShowRemove(t *testing.T) {
 // (not the local one reused), from one fake put endpoint standing in for the
 // registry's per-platform manifest.
 func TestCLIPinRecordsEveryDefaultPlatform(t *testing.T) {
-	spectest.Proves(t, "cli/windows-consumers", "windows-executables-by-name", "pin-records-windows-amd64-from-any-host")
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	ws := t.TempDir()
 
@@ -198,10 +197,9 @@ func TestCLIPinRecordsEveryDefaultPlatform(t *testing.T) {
 	}
 
 	want := append([]string{lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH)}, defaultPinPlatforms...)
-	// Windows is in the default matrix: a pin from any host records it,
-	// read from the Windows archive's compiled/putnami.exe.
-	if !slices.Contains(defaultPinPlatforms, "windows/amd64") {
-		t.Errorf("defaultPinPlatforms = %v, want windows/amd64 recorded from every host", defaultPinPlatforms)
+	// The default set is the distribution matrix, which holds no Windows key.
+	if !slices.Equal(defaultPinPlatforms, []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64"}) {
+		t.Errorf("defaultPinPlatforms = %v, want the four macOS and Linux platforms", defaultPinPlatforms)
 	}
 	for _, platform := range want {
 		platformOS, platformArch, ok := lockfile.SplitPlatformKey(platform)
@@ -216,6 +214,50 @@ func TestCLIPinRecordsEveryDefaultPlatform(t *testing.T) {
 			t.Errorf("integrity for %s = %q, want %q (one `putnami pin` call should record every default platform, each against its own archive)",
 				platform, got, wantSHA)
 		}
+	}
+}
+
+// TestCLIPinKeepsTheWindowsEntryALockHolds pins a lock whose earlier pin
+// carried windows/amd64. Windows is outside the default set, yet re-pinning a
+// version that publishes it records it again, read from the Windows archive's
+// compiled/putnami.exe: a lock that holds a Windows entry is read as before.
+func TestCLIPinKeepsTheWindowsEntryALockHolds(t *testing.T) {
+	spectest.Proves(t, "cli/windows-consumers", "windows-executables-by-name", "pin-keeps-the-windows-entry-a-lock-holds")
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
+	ws := t.TempDir()
+
+	lf := lockfile.NewLockFile()
+	earlier := lockfile.LockEntry{Version: "2.9.0", Source: "https://registry.example.test/putnami/cli/download"}
+	earlier.SetPlatformIntegrity("windows/amd64", strings.Repeat("a", 64))
+	lf.SetCLI(earlier)
+	if err := lockfile.WriteLockFile(ws, lf); err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(defaultPinPlatforms, "windows/amd64") {
+		t.Fatalf("defaultPinPlatforms = %v, want no Windows key", defaultPinPlatforms)
+	}
+
+	srv := platformArchiveServer(t, nil) // every platform published, Windows included
+	defer srv.Close()
+	t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
+	if err := CLIPinForVersion(context.Background(), ws, []string{"3.0.0"}, ""); err != nil {
+		t.Fatalf("CLIPin: %v", err)
+	}
+
+	read, err := lockfile.ReadLockFile(ws)
+	if err != nil || read == nil {
+		t.Fatalf("read lock after pin: lf=%v err=%v", read, err)
+	}
+	entry, ok := read.GetCLI()
+	if !ok {
+		t.Fatal("no CLI pin written")
+	}
+	_, wantSHA, err := buildTarGzArchive("binary-for-windows/amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := entry.IntegrityFor("windows", "amd64"); got != wantSHA {
+		t.Errorf("windows/amd64 integrity = %q, want %q, the digest of the new version's compiled/putnami.exe", got, wantSHA)
 	}
 }
 
@@ -443,5 +485,39 @@ func TestCLIPinReplacesTheSourceWorkspaceSentinel(t *testing.T) {
 	}
 	if entry.IntegrityFor(runtime.GOOS, runtime.GOARCH) == "" {
 		t.Error("a real pin must record this platform's digest")
+	}
+}
+
+// No release builds or publishes a Windows archive: the distribution matrix
+// every packager and `putnami pin` read holds no Windows key.
+func TestTheDistributionMatrixHoldsNoWindowsKey(t *testing.T) {
+	spectest.Proves(t, "cli/windows-consumers", "windows-is-suspended", "the-distribution-matrix-holds-no-windows-key")
+	for _, platform := range pkgmeta.ArchivePlatforms() {
+		if platform.GOOS == "windows" {
+			t.Errorf("the distribution matrix holds %s", platform.Suffix)
+		}
+	}
+	for _, platform := range defaultPinPlatforms {
+		if strings.HasPrefix(platform, "windows/") {
+			t.Errorf("putnami pin records %s by default", platform)
+		}
+	}
+}
+
+// A project that names windows/amd64 still reaches the windows-x64 key, and
+// its archive carries compiled/<name>.exe.
+func TestAnExplicitWindowsTargetKeepsItsKey(t *testing.T) {
+	spectest.Proves(t, "cli/windows-consumers", "windows-is-suspended", "an-explicit-windows-target-keeps-its-key")
+	var found []pkgmeta.ArchivePlatform
+	for _, platform := range pkgmeta.KnownArchivePlatforms() {
+		if platform.GOOS == "windows" {
+			found = append(found, platform)
+		}
+	}
+	if len(found) != 1 || found[0].GOARCH != "amd64" || found[0].Suffix != "windows-x64" {
+		t.Fatalf("known Windows platforms = %#v, want windows/amd64 under windows-x64", found)
+	}
+	if got := pkgmeta.ExecutableName(found[0].GOOS, "compiled/putnami"); got != "compiled/putnami.exe" {
+		t.Errorf("windows-x64 archive executable = %q, want compiled/putnami.exe", got)
 	}
 }

@@ -24,7 +24,8 @@
         "../cli/doc/14-version-management.md",
         "../cli/doc/22-installing-the-cli.md",
         "../cli/internal/commands/versioncmd/version_switch.go",
-        "../extension-sdk/filelock/filelock_windows.go"
+        "../extension-sdk/filelock/filelock_windows.go",
+        "../../sites/putnami.dev/putnami.json"
       ]
     }
   },

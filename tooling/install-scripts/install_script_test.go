@@ -470,16 +470,14 @@ func TestInstallRefusesUnwritableInstallDirectoryBeforeDownloading(t *testing.T)
 }
 
 func TestInstallRefusesUnsupportedPlatforms(t *testing.T) {
-	spectest.Proves(t, "cli/windows-consumers", "windows-shells-get-the-powershell-installer", "install-sh-sends-a-windows-shell-to-install-ps1")
+	spectest.Proves(t, "cli/windows-consumers", "windows-shells-are-told-windows-is-suspended", "install-sh-tells-a-windows-shell-windows-is-suspended")
 	requireBash(t)
-	// A Windows shell gets the two forms that install there: the one-liner
-	// typed in a PowerShell window, and for cmd.exe or this shell a download
-	// run with -File. Never the one-liner passed to powershell on a command
-	// line, which Microsoft Defender blocks as Trojan:Win32/Commando.A!ml.
+	// A Windows shell is told that Windows support is suspended, and is sent to
+	// no installer: no Windows build is published.
 	windowsRedirect := []string{
-		"install.sh does not install on Windows",
-		"In a PowerShell window: irm https://putnami.dev/install.ps1 | iex",
-		"curl.exe -fsSLo install.ps1 https://putnami.dev/install.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1",
+		"Putnami does not support Windows for now",
+		"no Windows build is published",
+		"darwin (macOS) and linux",
 	}
 	tests := []struct {
 		name    string
@@ -488,9 +486,9 @@ func TestInstallRefusesUnsupportedPlatforms(t *testing.T) {
 		wants   []string
 		never   []string
 	}{
-		{"windows git bash", "MINGW64_NT-10.0-19045", "x86_64", windowsRedirect, []string{`-c "irm`}},
-		{"windows msys2", "MSYS_NT-10.0-22631", "x86_64", windowsRedirect, []string{`-c "irm`}},
-		{"windows cygwin", "CYGWIN_NT-10.0-19045", "x86_64", windowsRedirect, []string{`-c "irm`}},
+		{"windows git bash", "MINGW64_NT-10.0-19045", "x86_64", windowsRedirect, []string{"install.ps1"}},
+		{"windows msys2", "MSYS_NT-10.0-22631", "x86_64", windowsRedirect, []string{"install.ps1"}},
+		{"windows cygwin", "CYGWIN_NT-10.0-19045", "x86_64", windowsRedirect, []string{"install.ps1"}},
 		{"unknown os", "Plan9", "x86_64", []string{"Unsupported operating system", "darwin (macOS) and linux"}, nil},
 		{"unknown arch", "Linux", "riscv64", []string{"Unsupported architecture: riscv64", "amd64 or arm64"}, nil},
 	}
@@ -1227,7 +1225,7 @@ func TestHelpDocumentsTheContract(t *testing.T) {
 		"PUTNAMI_RUN",
 		"PUTNAMI_COMMAND_MAP_URL",
 		"https://putnami.dev/install-commands.txt",
-		"irm https://putnami.dev/install.ps1 | iex",
+		"Windows support is suspended",
 	} {
 		if !res.contains(want) {
 			t.Fatalf("--help does not mention %q:\n%s", want, res.output)

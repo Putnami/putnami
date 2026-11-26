@@ -1,7 +1,9 @@
 package installscript
 
-// Evidence for scripts/install.ps1, the Windows installer served at
-// https://putnami.dev/install.ps1. It keeps the trust model of install.sh.
+// Evidence for scripts/install.ps1, the Windows installer kept for when Windows
+// support is put back; while it is suspended, the site serves
+// install-suspended.ps1 at https://putnami.dev/install.ps1. It keeps the trust
+// model of install.sh.
 //
 // The static tests read the script and run on every host. The behavior tests
 // run the real script under PowerShell 7 (pwsh) when it is installed, and skip

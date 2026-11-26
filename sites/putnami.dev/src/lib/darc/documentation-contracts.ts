@@ -111,7 +111,7 @@ const MONOREPO_TOOL_REFERENCES = ['bazel', 'moon', 'nx', 'pants', 'rush', 'turbo
  * The site's own `/sites/putnami.dev/doc` is absent on purpose: it is this
  * domain's own documentation, and a domain does not import from itself.
  * `/tooling/cli/scripts/install.sh`, `/tooling/cli/scripts/install-commands.txt`,
- * `/tooling/cli/scripts/install.ps1` and `/LICENSE.md` are absent for the same
+ * `/tooling/cli/scripts/install-suspended.ps1` and `/LICENSE.md` are absent for the same
  * kind of reason — release artifacts and a workspace-root legal file are not
  * documentation facts any domain owns.
  */

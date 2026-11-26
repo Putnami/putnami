@@ -293,13 +293,12 @@ the next `putnami upgrade` of that workspace follows `latest` again. See
 
 After a candidate is published, any configured external release execution plane
 runs `tooling/cli/scripts/smoke-check-release.sh <channel>` on the four supported
-macOS/Linux × amd64/arm64 targets, and its PowerShell port
-`smoke-check-release.ps1` on a `windows/amd64` host, before promotion: five
-candidate jobs. It then runs `latest` nightly through the default public
-installer URL on the four macOS/Linux targets; the Windows host exists only for
-a run, so `latest` has no nightly Windows job. The repository intentionally does not
+macOS/Linux × amd64/arm64 targets before promotion: four candidate jobs. While
+Windows support is suspended, no `windows/amd64` job runs. It then runs `latest`
+nightly through the default public installer URL on the same four targets. The
+repository intentionally does not
 duplicate that post-publication matrix in GitHub Actions; the release owner runs
-the same five candidate jobs manually if no plane is configured or it is
+the same four candidate jobs manually if no plane is configured or it is
 unavailable, plus the same four-target `latest` smoke nightly until automation
 is configured or restored.
 
@@ -400,13 +399,13 @@ The launcher stays out of the way only where there is no pin to betray: no works
 
 ### Per-platform digests
 
-The pin records a digest per `os/arch`. A single `putnami pin <version>` records the current platform, every platform in the default matrix (`darwin/arm64`, `darwin/amd64`, `linux/amd64`, `linux/arm64`, `windows/amd64`), and every platform an earlier pin already carried — each verified against *that platform's own* archive, not copied from the local one. Re-pinning the *same* version fills in any gap without re-downloading a platform already verified for it; re-pinning a *different* version re-verifies every one of those platforms against the new version's own archives.
+The pin records a digest per `os/arch`. A single `putnami pin <version>` records the current platform, every platform in the default matrix (`darwin/arm64`, `darwin/amd64`, `linux/amd64`, `linux/arm64`), and every platform an earlier pin already carried, `windows/amd64` included: a re-pin of the same version keeps its digest, and a version that publishes no Windows archive drops it with the notice below — each verified against *that platform's own* archive, not copied from the local one. Re-pinning the *same* version fills in any gap without re-downloading a platform already verified for it; re-pinning a *different* version re-verifies every one of those platforms against the new version's own archives.
 
 If the new version does not publish an archive for a platform the previous pin carried, that platform's digest is dropped — carrying it forward unverified would let the lock claim a binary Putnami never built — and `pin` says so on stderr, naming the platform and the version. Everything else survives.
 
-A platform outside the default five (for example `windows/arm64`, or another architecture Putnami does not build by default) is not attempted automatically; add it with one `putnami pin <version>` run from that machine, which appends its digest to the same entry alongside the platforms already recorded.
+A platform outside the default four (for example `windows/amd64`, which no release publishes while Windows support is suspended, `windows/arm64`, or another architecture Putnami does not build by default) is not attempted automatically; add it with one `putnami pin <version>` run from that machine, which appends its digest to the same entry alongside the platforms already recorded.
 
-A platform with no digest has nothing to verify the download against, so the pin cannot be honored there and `putnami` fails closed until someone runs `putnami pin <version>` (from that platform, if it is outside the default five) to record it.
+A platform with no digest has nothing to verify the download against, so the pin cannot be honored there and `putnami` fails closed until someone runs `putnami pin <version>` (from that platform, if it is outside the default four) to record it.
 
 ### Security
 
@@ -575,16 +574,7 @@ curl -fsSL https://putnami.dev/install.sh | bash -s -- --variant go --version 1.
 curl -fsSL https://putnami.dev/install.sh | bash -s -- --install-dir ~/.local/bin
 ```
 
-On Windows, the PowerShell installer takes the same options through environment
-variables. Type these in a PowerShell window:
-
-```powershell
-# Install the newest stable Go variant into %USERPROFILE%\.putnami\bin
-irm https://putnami.dev/install.ps1 | iex
-
-# Install a specific version
-$env:PUTNAMI_VERSION = '1.2.0'; irm https://putnami.dev/install.ps1 | iex
-```
+Windows support is suspended, so no installer installs on Windows.
 
 Three properties matter for the layouts and the upgrade path in this document:
 

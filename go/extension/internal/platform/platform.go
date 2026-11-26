@@ -31,10 +31,14 @@ type Target struct {
 // `platforms` / `--target` request, because the cross-compiles of one module
 // share no GOCACHE objects — they are full compiles whose binaries no step
 // of `build` consumes.
-var ArchivePlatforms = archiveTargets()
+var ArchivePlatforms = archiveTargets(pkgmeta.ArchivePlatforms())
 
-func archiveTargets() []Target {
-	platforms := pkgmeta.ArchivePlatforms()
+// knownTargets is every platform a request resolves by name: the
+// distribution matrix, then windows/amd64, which is outside the matrix while
+// Windows support is suspended and is built only when a project names it.
+var knownTargets = archiveTargets(pkgmeta.KnownArchivePlatforms())
+
+func archiveTargets(platforms []pkgmeta.ArchivePlatform) []Target {
 	targets := make([]Target, 0, len(platforms))
 	for _, platform := range platforms {
 		targets = append(targets, Target{GOOS: platform.GOOS, GOARCH: platform.GOARCH, Suffix: platform.Suffix})
@@ -73,7 +77,7 @@ func HostTarget() Target {
 // identically. Order is the order requested, with duplicates dropped, so the
 // resolved set is a deterministic function of the spec alone.
 //
-// An `os`-only entry expands to every distribution target for that OS, matching
+// An `os`-only entry expands to every known target for that OS, matching
 // how `--target linux` has always behaved.
 // An entry that is not a platform is an ERROR rather than a synthesized GOOS.
 func ParsePlatformSpec(entries []string) ([]Target, error) {
@@ -138,10 +142,12 @@ func validPlatformWord(s string) bool {
 // as `GOOS=host go build` — a documented word producing a cryptic toolchain
 // error, because two call paths disagreed about the vocabulary they shared.
 //
-// A request that names a distribution platform reuses that entry (and with it
-// the archive suffix consumers already index by); an `os`-only request expands
-// to every distribution platform for that OS; anything else is synthesized so a
-// target outside the matrix (windows/arm64, linux/riscv64) still compiles.
+// A request that names a known platform reuses that entry (and with it the
+// archive suffix consumers already index by); an `os`-only request expands to
+// every known platform for that OS; anything else is synthesized so a target
+// outside the matrix (windows/arm64, linux/riscv64) still compiles. The known
+// platforms are the distribution matrix and windows/amd64, so `windows` and
+// `windows/amd64` resolve to windows-x64 although `all` leaves it out.
 //
 // A request that cannot be a platform is rejected here rather than synthesized,
 // so a malformed parameter or a typo fails with a message naming the value
@@ -162,7 +168,7 @@ func TargetsFor(request string) ([]Target, error) {
 	}
 
 	var selected []Target
-	for _, p := range ArchivePlatforms {
+	for _, p := range knownTargets {
 		if p.GOOS != goosVal {
 			continue
 		}
@@ -402,7 +408,7 @@ func PlatformsSpec(raw json.RawMessage) ([]string, error) {
 // SuffixFromDockerPlatform converts a Docker platform string (e.g. "linux/amd64")
 // to the archive suffix (e.g. "linux-x64").
 func SuffixFromDockerPlatform(dockerPlatform string) string {
-	for _, p := range ArchivePlatforms {
+	for _, p := range knownTargets {
 		if dockerPlatform == p.GOOS+"/"+p.GOARCH {
 			return p.Suffix
 		}

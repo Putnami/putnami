@@ -652,7 +652,7 @@ func TestCrossCompilationTargetParsing(t *testing.T) {
 // all keeps the matrix. Every case reads from ctx.Params or the project's
 // publish declaration — both plan-time and both in the task's cache key.
 func TestSelectDistributionPlatforms(t *testing.T) {
-	fullMatrix := []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64", "windows/amd64"}
+	fullMatrix := []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64"}
 
 	tests := []struct {
 		name    string
@@ -835,7 +835,7 @@ func TestRequestedPlatforms(t *testing.T) {
 			want: []string{"linux/arm64", "darwin/amd64"}},
 		{name: "host token", spec: []string{"host"}, want: []string{hostName}},
 		{name: "all token restores the release matrix", spec: []string{"all"},
-			want: []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64", "windows/amd64"}},
+			want: []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64"}},
 		{name: "duplicates collapse, order preserved", spec: []string{"darwin/arm64,linux/amd64,darwin/arm64"},
 			want: []string{"darwin/arm64", "linux/amd64"}},
 		{name: "os-only entry expands", spec: []string{"linux"}, want: []string{"linux/amd64", "linux/arm64"}},

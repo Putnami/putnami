@@ -204,7 +204,7 @@ Each channel has a flag, and the project's `publish` field adds to them.
 
 The compile step runs `cargo zigbuild --release` for each platform the channels
 need: `--platform` for the image, `linux/amd64` by default, and `--platforms`
-for archives, the five archive platforms by default. A Linux binary links
+for archives, the four archive platforms by default. A Linux binary links
 against glibc 2.36, the libc of the image base. A crate with several binaries
 states `package.default-run`.
 

@@ -153,7 +153,6 @@ func TestContentExtensionDryRunReportsWithoutWriting(t *testing.T) {
 	if got, want := result["archives"], []string{
 		"acme-contributor-linux-x64.tar.gz", "acme-contributor-linux-arm64.tar.gz",
 		"acme-contributor-darwin-x64.tar.gz", "acme-contributor-darwin-arm64.tar.gz",
-		"acme-contributor-windows-x64.tar.gz",
 	}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("archives = %v, want %v", got, want)
 	}

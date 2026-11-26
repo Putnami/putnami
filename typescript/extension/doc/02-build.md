@@ -650,9 +650,10 @@ emit `jsxDEV` calls, which `react/jsx-dev-runtime` does not provide under
 | `bun-linux-arm64` | `<name>-linux-arm64` |
 | `bun-darwin-x64` | `<name>-darwin-x64` |
 | `bun-darwin-arm64` | `<name>-darwin-arm64` |
-| `bun-windows-x64` | `<name>-windows-x64.exe` |
 
-Use `--compile-target` to build for a single platform.
+Use `--compile-target` to build for a single platform. Windows support is
+suspended, so the matrix leaves Windows out: `--compile-target bun-windows-x64`
+still builds `<name>-windows-x64.exe`.
 
 The matrix is **not** what a channel-bound compile produces: under
 `package --docker` this phase compiles exactly the image's target (see

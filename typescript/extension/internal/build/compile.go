@@ -21,13 +21,13 @@ var execRunFunc = exec.Run
 //
 // They are the DISTRIBUTION matrix, not a default every compile owes: a compile
 // bound to a package channel resolves the one target that channel consumes (see
-// ResolveCompileTargets).
+// ResolveCompileTargets). Windows support is suspended, so the matrix holds no
+// Windows target; `--compile-target bun-windows-x64` still names one.
 var DefaultBunTargets = []string{
 	"bun-linux-x64",
 	"bun-linux-arm64",
 	"bun-darwin-x64",
 	"bun-darwin-arm64",
-	"bun-windows-x64",
 }
 
 // DefaultDockerPlatform is the image platform assumed when none is named. It

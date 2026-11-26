@@ -37,7 +37,7 @@
           "to": "public/install-commands.txt"
         },
         {
-          "from": "/tooling/cli/scripts/install.ps1",
+          "from": "/tooling/cli/scripts/install-suspended.ps1",
           "to": "public/install.ps1"
         },
         {

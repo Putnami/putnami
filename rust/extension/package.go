@@ -75,9 +75,10 @@ func Jobs(stack stacks.Stack) map[string]cli.JobFunc {
 // platformName is the os/arch form of a platform.
 func platformName(p pkgmeta.ArchivePlatform) string { return p.GOOS + "/" + p.GOARCH }
 
-// findPlatform resolves an os/arch name.
+// findPlatform resolves an os/arch name among the known platforms: the
+// distribution matrix and windows/amd64, which only a named request reaches.
 func findPlatform(name string) (pkgmeta.ArchivePlatform, error) {
-	all := pkgmeta.ArchivePlatforms()
+	all := pkgmeta.KnownArchivePlatforms()
 	for _, p := range all {
 		if platformName(p) == name {
 			return p, nil
@@ -118,7 +119,7 @@ func dockerPlatform(ctx *pctx.Context) (pkgmeta.ArchivePlatform, error) {
 }
 
 // archivePlatforms are the platforms of --platforms: a comma-separated list, or
-// all five when it is empty or all.
+// the distribution matrix when it is empty or all.
 func archivePlatforms(ctx *pctx.Context) ([]pkgmeta.ArchivePlatform, error) {
 	spec := strings.TrimSpace(ctx.Params.String("platforms"))
 	if spec == "" || spec == "all" {

@@ -33,7 +33,6 @@ func authoredCLIDomain() *arch.Builder {
 			"/tooling/cli-model",
 			"/tooling/install-scripts",
 			"/tooling/repository-checks",
-			"/tooling/windows-vet",
 		).
 		Owns(
 			arch.Concept("cli.workspace-documentation", archproto.OwnershipFact,

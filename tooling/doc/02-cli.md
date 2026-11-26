@@ -13,23 +13,14 @@ verification, agent access through the CLI, and diagnostic recall.
 curl -fsSL https://putnami.dev/install.sh | bash
 ```
 
-Supported platforms are macOS and Linux on `amd64` or `arm64`. On Windows 10
-version 1803 or later, or Windows 11, on `amd64`, type this in a PowerShell
-window:
+Supported platforms are macOS and Linux on `amd64` or `arm64`. Putnami does not
+support Windows for now: Windows support is suspended since 2026-11-26, no
+Windows build is published, and `https://putnami.dev/install.ps1` installs
+nothing. See
+[Windows is suspended](../cli/doc/22-installing-the-cli.md#windows-is-suspended).
 
-```powershell
-irm https://putnami.dev/install.ps1 | iex
-```
-
-From `cmd.exe`, download the installer and run it as a file; see
-[Install on Windows](../cli/doc/22-installing-the-cli.md#install-on-windows).
-
-It installs into `%USERPROFILE%\.putnami\bin` and adds that directory to your
-user `PATH`. Windows also needs Git for Windows for `sh`, and Win32 long paths
-enabled; `putnami doctor` checks the long-path settings.
-
-Both installers compare the download against the SHA-256 the registry advertises
-for it and refuse to install anything they cannot verify. The macOS and Linux
+The installer compares the download against the SHA-256 the registry advertises
+for it and refuses to install anything it cannot verify. The macOS and Linux
 installer never uses `sudo`: it installs into `~/.putnami/bin` and links `putnami` only into a directory that is
 already on your `PATH` and writable by you. If it cannot, it prints the exact
 `export PATH=…` line to run and appends it to your shell startup file. See the

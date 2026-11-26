@@ -196,7 +196,7 @@
         },
         "platforms": {
           "type": "string",
-          "description": "Archive platforms: all, or a comma-separated list (linux/amd64,darwin/arm64). Defaults to the five archive platforms"
+          "description": "Archive platforms: all, or a comma-separated list (linux/amd64,darwin/arm64). Defaults to the four archive platforms, the distribution matrix, which leaves Windows out while Windows support is suspended; name windows/amd64 to build one"
         },
         "platform": {
           "type": "string",

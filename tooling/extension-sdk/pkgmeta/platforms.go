@@ -17,8 +17,14 @@ var archivePlatforms = []ArchivePlatform{
 	{GOOS: "linux", GOARCH: "arm64", Suffix: "linux-arm64"},
 	{GOOS: "darwin", GOARCH: "amd64", Suffix: "darwin-x64"},
 	{GOOS: "darwin", GOARCH: "arm64", Suffix: "darwin-arm64"},
-	{GOOS: "windows", GOARCH: "amd64", Suffix: "windows-x64"},
 }
+
+// windowsArchivePlatform is the registry platform key of a windows/amd64
+// archive. It is outside the distribution matrix: Windows support is
+// suspended, so no archive is built for it unless a project names it. A
+// request that names it resolves to this key, so an explicit Windows target
+// and a lock that records one keep the spelling they had.
+var windowsArchivePlatform = ArchivePlatform{GOOS: "windows", GOARCH: "amd64", Suffix: "windows-x64"}
 
 // windowsExecutableSuffix is the file name suffix Windows requires of a
 // program it starts.
@@ -47,6 +53,15 @@ func ExecutableName(goos, name string) string {
 // the same keys. The result is a copy the caller may modify.
 func ArchivePlatforms() []ArchivePlatform {
 	return append([]ArchivePlatform(nil), archivePlatforms...)
+}
+
+// KnownArchivePlatforms returns every registry platform key a request may
+// name: the distribution matrix, in publication order, then the windows/amd64
+// key that only an explicit request reaches. A resolver of os/arch names reads
+// this list; a packager that builds by default reads ArchivePlatforms. The
+// result is a copy the caller may modify.
+func KnownArchivePlatforms() []ArchivePlatform {
+	return append(ArchivePlatforms(), windowsArchivePlatform)
 }
 
 // ArchivePlatformSuffixes returns the archive filename suffix of every entry of

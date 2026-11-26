@@ -2,10 +2,12 @@
  * The run form of the CLI installers: `/install.sh?run=<command>` and
  * `/install.ps1?run=<command>`.
  *
- * `curl -fsSL "https://putnami.dev/install.sh?run=<command>" | bash`, and on
- * Windows `irm "https://putnami.dev/install.ps1?run=<command>" | iex`, install the
- * CLI, pin the extension that `/install-commands.txt` names for `<command>`,
- * and run `putnami <command>` in the caller's directory. A script piped into
+ * `curl -fsSL "https://putnami.dev/install.sh?run=<command>" | bash` installs
+ * the CLI, pins the extension that `/install-commands.txt` names for
+ * `<command>`, and runs `putnami <command>` in the caller's directory. While
+ * Windows support is suspended, `/install.ps1` is a notice that installs
+ * nothing; it keeps the placeholder line, so its run form is served the same
+ * way and changes nothing. A script piped into
  * bash or iex receives no arguments, so the command travels inside the script:
  * this plugin serves the bytes of the installer with the value of its one
  * placeholder line, `RUN_COMMAND_DEFAULT=""` in install.sh and

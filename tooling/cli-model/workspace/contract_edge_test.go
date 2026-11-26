@@ -182,8 +182,8 @@ func TestChangeImpact_AContractMatchesInEverySpellingOfTheChangedPath(t *testing
 	for _, changed := range []string{
 		"./services/catalog/schema/openapi.json",
 		"services/catalog/schema/../schema/openapi.json",
-		// The host spelling: a backslash path on Windows, which only the
-		// Windows QA VM runs (D-W11); the slash form elsewhere.
+		// The host spelling: a backslash path on Windows, which only a
+		// Windows host runs; the slash form elsewhere.
 		filepath.FromSlash("services/catalog/schema/openapi.json"),
 	} {
 		result := TraceChangeImpact(ws, []string{changed}, ChangeImpactOptions{})

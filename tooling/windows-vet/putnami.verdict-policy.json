@@ -1,6 +1,0 @@
-{
-  "$schema": "https://putnami.dev/schemas/putnami-verdict-policy.json",
-  "gaps": {
-    "no-requirement": "inform"
-  }
-}

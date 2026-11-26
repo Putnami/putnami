@@ -5,11 +5,26 @@
   "feature": {
     "id": "cli/windows-consumers",
     "type": "feature",
-    "name": "Windows consumer install and golden path",
-    "outcome": "A user on Windows 10 version 1803 or later or Windows 11, on amd64, installs the CLI with one PowerShell line that verifies what it downloads and needs no administrator rights, then initializes and serves the TypeScript starter as on macOS and Linux, with every Windows prerequisite named where it is missing",
+    "name": "Windows consumer install and golden path, suspended",
+    "outcome": "Windows support is suspended since 2026-11-26: Putnami builds, vets and publishes no Windows binary, a Windows user is told so and nothing is installed, and the Windows code that stays in the tree is unverified. When support is put back, a user on Windows 10 version 1803 or later or Windows 11, on amd64, installs the CLI with one PowerShell line and serves the TypeScript starter as on macOS and Linux",
     "owner": "tooling",
-    "target": "coded",
+    "target": "modeled",
     "requirements": [
+      {
+        "id": "windows-is-suspended",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-distribution-matrix-holds-no-windows-key",
+            "an-explicit-windows-target-keeps-its-key",
+            "the-site-serves-a-notice-that-installs-nothing"
+          ]
+        }
+      },
       {
         "id": "powershell-installer-trust",
         "stage": "coded",
@@ -25,7 +40,7 @@
         }
       },
       {
-        "id": "windows-shells-get-the-powershell-installer",
+        "id": "windows-shells-are-told-windows-is-suspended",
         "stage": "coded",
         "evidenceKinds": [
           "attestation"
@@ -33,7 +48,7 @@
         "verification": {
           "kind": "acceptance",
           "checks": [
-            "install-sh-sends-a-windows-shell-to-install-ps1"
+            "install-sh-tells-a-windows-shell-windows-is-suspended"
           ]
         }
       },
@@ -63,7 +78,7 @@
         "verification": {
           "kind": "acceptance",
           "checks": [
-            "pin-records-windows-amd64-from-any-host",
+            "pin-keeps-the-windows-entry-a-lock-holds",
             "pin-reads-the-windows-archive-executable",
             "an-installed-runtime-resolves-under-its-exe-name",
             "an-unsuffixed-runtime-is-named-not-run"

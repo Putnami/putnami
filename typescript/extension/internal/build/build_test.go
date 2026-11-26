@@ -1351,8 +1351,11 @@ func TestResolveCompileOutputFile_WindowsX64(t *testing.T) {
 	if got != want {
 		t.Errorf("resolveCompileOutputFile() = %q, want %q", got, want)
 	}
-	if !slices.Contains(DefaultBunTargets, "bun-windows-x64") {
-		t.Errorf("DefaultBunTargets = %v, want the windows-x64 distribution target", DefaultBunTargets)
+	if slices.Contains(DefaultBunTargets, "bun-windows-x64") {
+		t.Errorf("DefaultBunTargets = %v, want no Windows target while Windows support is suspended", DefaultBunTargets)
+	}
+	if targets, err := ResolveCompileTargets(CompileTargetRequest{CompileTarget: "bun-windows-x64"}); err != nil || !slices.Equal(targets, []string{"bun-windows-x64"}) {
+		t.Errorf("an explicit Windows target resolves to %v, %v, want [bun-windows-x64]", targets, err)
 	}
 }
 

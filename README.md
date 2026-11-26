@@ -29,27 +29,19 @@ putnami init --project webapp --extension ts --template typescript-web
 putnami serve webapp
 ```
 
-On Windows 10 version 1803 or later, or Windows 11, on `amd64`, in PowerShell:
-
-```powershell
-irm https://putnami.dev/install.ps1 | iex
-putnami init --project webapp --extension ts --template typescript-web
-putnami serve webapp
-```
+Putnami does not support Windows for now: Windows support is suspended since
+2026-11-26, and no Windows build is published.
 
 Open the local URL that `putnami serve` prints. You are running the full system
 locally.
 
 You do not install Bun: Putnami installs Bun under `~/.putnami` for the
-TypeScript starter when the machine holds none that fits. Windows needs Git for
-Windows, Win32 long paths enabled, and Docker Desktop for `putnami compose`;
-`putnami doctor` checks the long-path settings. The installer verifies each
+TypeScript starter when the machine holds none that fits. The installer verifies each
 download against the digest the registry advertises, refuses what it cannot
 verify, and never asks for `sudo` or administrator rights. `putnami upgrade
 --global` updates the CLI later.
 
-Every prerequisite, the `PATH` rules, and the workaround when Microsoft Defender
-blocks the Windows one-liner are in
+Every prerequisite, the `PATH` rules, and the state of Windows support are in
 [Installing the CLI](tooling/cli/doc/22-installing-the-cli.md). The
 [getting-started guide](https://putnami.dev/docs/getting-started) covers the
 rest of the first run.
@@ -219,17 +211,17 @@ targets:
 |---|---|---|
 | macOS (`darwin`) | Supported | Supported |
 | Linux | Supported | Supported |
-| Windows 10 version 1803 or later, Windows 11 | Supported | Not supported |
+| Windows | Suspended | Not supported |
 
-`install.sh` and `install.ps1` refuse any other platform before they download
-anything, and name what they detected. The release does not build
-`windows/arm64` (decision [D-W1](tooling/cli/decisions/D-W1.json)).
+`install.sh` refuses any other platform before it downloads anything, and names
+what it detected. Windows support is suspended since 2026-11-26 (decision
+[`windows-support-is-suspended`](tooling/cli/decisions/windows-support-is-suspended.json)):
+the release builds, vets and publishes no Windows binary, and
+`https://putnami.dev/install.ps1` installs nothing. It was last verified on
+2026-09-28, on a Windows test host, and comes back when users ask for it.
+Contributors to this repository work on macOS or Linux.
 
-Windows support covers people who install the published CLI, extensions, and
-templates. Contributors to this repository work on macOS or Linux, because
-`putnamiw` and the contributor checks do not run on Windows.
-
-Each release runs the Quick Start commands on all five supported targets, with
+Each release runs the Quick Start commands on all four supported targets, with
 an empty home, config, and cache and no credentials, and sends a real HTTP
 request to the generated starter. On Linux, each release also pastes the Quick
 Start block into an image that holds Bash, `curl`, `tar` and a SHA-256 tool and
