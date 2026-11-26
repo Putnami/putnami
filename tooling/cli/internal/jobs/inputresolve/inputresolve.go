@@ -7,16 +7,19 @@
 // The core knows no selector. An extension answers which files a selector
 // reads in a project and the basis it computed them from
 // (wsproto.InputBasis); the resolver checks the answer against the request,
-// hashes the tree as the basis selects it (wsproto.InputBasisDigest), and asks
-// again for one input when that digest changes. An error answer, a failed call
+// hashes the tree as the basis selects it (wsproto.InputBasisDigestFrom, each
+// file's bytes answered through the machine-local file index), and asks again
+// for one input when that digest changes. An error answer, a failed call
 // and a rejected answer fail the input (store.ErrInputSelector), and none is
 // kept.
 package inputresolve
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -27,6 +30,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -337,7 +341,7 @@ func (r *Resolver) exact(key, dir string) (store.InputExpansion, bool) {
 	if !ok {
 		return store.InputExpansion{}, false
 	}
-	digest, err := wsproto.InputBasisDigest(dir, answer.expansion.Basis)
+	digest, err := basisDigest(dir, answer.expansion.Basis)
 	if err == nil && digest == answer.digest {
 		return answer.expansion, true
 	}
@@ -347,6 +351,33 @@ func (r *Resolver) exact(key, dir string) (store.InputExpansion, bool) {
 	}
 	r.mu.Unlock()
 	return store.InputExpansion{}, false
+}
+
+// basisDigest is wsproto.InputBasisDigest of the tree under dir as basis
+// selects it, with each selected file's bytes answered through the
+// machine-local file index (internal/fileindex, protocols/workspace ADR 0009):
+// a file whose stat is the one recorded with its raw SHA-256 is not read
+// again. The digest is the protocol's, so a kept answer holds exactly while
+// the protocol's digest does.
+func basisDigest(dir string, basis wsproto.InputBasis) (string, error) {
+	return wsproto.InputBasisDigestFrom(dir, basis, indexedFileDigest)
+}
+
+// indexedFileDigest is the raw SHA-256 of the file at abs, read through the
+// file index under the raw-content reading every input hash shares.
+func indexedFileDigest(abs string) ([]byte, error) {
+	return fileindex.Digest(abs, fileindex.RawContent, func() ([]byte, error) {
+		file, err := os.Open(abs) //nolint:gosec // a path the basis walk listed under the project directory
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close() //nolint:errcheck // read-only handle
+		h := sha256.New()
+		if _, err := io.Copy(h, file); err != nil {
+			return nil, err
+		}
+		return h.Sum(nil), nil
+	})
 }
 
 // staleAnswerAsks bounds how many times ResolveInput asks for one input while
@@ -360,7 +391,7 @@ func (r *Resolver) recorded(extensionName, key, dir string) (store.InputExpansio
 	if !ok {
 		return store.InputExpansion{}, false
 	}
-	digest, err := wsproto.InputBasisDigest(dir, answer.expansion.Basis)
+	digest, err := basisDigest(dir, answer.expansion.Basis)
 	if err != nil || digest != answer.digest {
 		return store.InputExpansion{}, false
 	}
@@ -388,7 +419,7 @@ func (r *Resolver) recorded(extensionName, key, dir string) (store.InputExpansio
 // stale alike, and an error once evenStale.
 func (r *Resolver) keep(extensionName, key, dir string, answer wsproto.InputResolveAnswer, evenStale bool) (store.InputExpansion, bool, error) {
 	expansion := store.InputExpansion{Files: slices.Clone(answer.Files), Basis: answer.Basis}
-	digest, err := wsproto.InputBasisDigest(dir, answer.Basis)
+	digest, err := basisDigest(dir, answer.Basis)
 	if err != nil {
 		// A path the walk listed and that is gone when it reads it was
 		// removed in between: the answer is stale for the same reason.

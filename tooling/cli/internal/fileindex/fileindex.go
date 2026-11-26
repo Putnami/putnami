@@ -123,6 +123,17 @@ var contentReads atomic.Int64
 // started, whichever index it went through. A test reads it around a run.
 func ContentReads() int64 { return contentReads.Load() }
 
+// readObserver, when set, is told each file an index read again.
+var readObserver atomic.Pointer[func(path, variant string)]
+
+// ObserveReads makes observe be told the path and the reading of each file
+// whose content an index read rather than answered, and returns a function
+// that removes it. A test names what a run read with it.
+func ObserveReads(observe func(path, variant string)) (restore func()) {
+	readObserver.Store(&observe)
+	return func() { readObserver.Store(nil) }
+}
+
 // current is the index Digest goes through; nil reads every file.
 var current atomic.Pointer[Index]
 
@@ -444,6 +455,9 @@ func (idx *Index) Digest(path, variant string, compute func() ([]byte, error)) (
 		delete(idx.fresh, k)
 		idx.mu.Unlock()
 	}
+	if observe := readObserver.Load(); observe != nil {
+		(*observe)(path, variant)
+	}
 	digest, err := read(idx, compute)
 	if err != nil || !ok || len(digest) != DigestSize || !idx.recordable(before) {
 		return digest, err
@@ -603,6 +617,11 @@ func readClock(dir string) (uint64, int64, error) {
 	}
 	return st.Dev, st.ModNano, nil
 }
+
+// Lstat returns the stat the index compares for the regular file at path; ok
+// is false for any other kind of file, a missing one, and on a platform whose
+// stat this package does not decode.
+func Lstat(path string) (Stat, bool) { return lstat(path) }
 
 // lstat returns the stat of the regular file at path; ok is false for any
 // other kind of file, a missing one, or an undecoded stat.

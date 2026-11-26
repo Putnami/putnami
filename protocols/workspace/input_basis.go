@@ -50,7 +50,24 @@ const (
 // A basis that ValidateInputResolveResult would refuse, a root that is
 // missing, relative or not a directory, and any error of the walk are errors.
 func InputBasisDigest(root string, basis InputBasis) (string, error) {
-	records, _, err := walkInputBasis(root, basis, true)
+	return InputBasisDigestFrom(root, basis, nil)
+}
+
+// FileContentDigest returns the sha256 of the bytes of the regular file at
+// abs, an absolute path.
+type FileContentDigest func(abs string) ([]byte, error)
+
+// InputBasisDigestFrom is InputBasisDigest with the sha256 of each regular
+// file a content set selects answered by fileDigest, which a caller backs
+// with what it already knows of a file's bytes. The digest is the one
+// InputBasisDigest returns as long as fileDigest answers the sha256 of the
+// file's current bytes. A nil fileDigest reads every file; a digest that is
+// not a sha256 is an error.
+func InputBasisDigestFrom(root string, basis InputBasis, fileDigest FileContentDigest) (string, error) {
+	if fileDigest == nil {
+		fileDigest = readFileContentDigest
+	}
+	records, _, err := walkInputBasis(root, basis, true, fileDigest)
 	if err != nil {
 		return "", err
 	}
@@ -60,7 +77,7 @@ func InputBasisDigest(root string, basis InputBasis) (string, error) {
 // walkInputBasis returns the records of the tree under root that basis
 // selects, and the number of paths it visited. With prune false it walks the
 // whole tree, which yields the same records.
-func walkInputBasis(root string, basis InputBasis, prune bool) ([]string, int, error) {
+func walkInputBasis(root string, basis InputBasis, prune bool, fileDigest FileContentDigest) ([]string, int, error) {
 	if diags := validateInputBasis("basis", basis); diag.HasErrors(diags) {
 		return nil, 0, fmt.Errorf("input basis rejected: %s", formatProbeDiagnostics(diags))
 	}
@@ -93,7 +110,7 @@ func walkInputBasis(root string, basis InputBasis, prune bool) ([]string, int, e
 		rel = filepath.ToSlash(rel)
 		kind := inputBasisKind(entry.Type())
 		if selectsAny(content, rel) {
-			payload, err := inputBasisContentPayload(abs, kind)
+			payload, err := inputBasisContentPayload(abs, kind, fileDigest)
 			if err != nil {
 				return err
 			}
@@ -154,24 +171,37 @@ func inputBasisKind(mode fs.FileMode) string {
 
 // inputBasisContentPayload is what a content record binds beside the kind: the
 // sha256 of a regular file's bytes, a link's target text, or nothing.
-func inputBasisContentPayload(abs, kind string) (string, error) {
+func inputBasisContentPayload(abs, kind string, fileDigest FileContentDigest) (string, error) {
 	switch kind {
 	case inputBasisKindFile:
-		file, err := os.Open(abs)
+		digest, err := fileDigest(abs)
 		if err != nil {
 			return "", err
 		}
-		defer file.Close()
-		h := sha256.New()
-		if _, err := io.Copy(h, file); err != nil {
-			return "", err
+		if len(digest) != sha256.Size {
+			return "", fmt.Errorf("digest of %s is %d bytes, not a sha256", abs, len(digest))
 		}
-		return hex.EncodeToString(h.Sum(nil)), nil
+		return hex.EncodeToString(digest), nil
 	case inputBasisKindSymlink:
 		return os.Readlink(abs)
 	default:
 		return "", nil
 	}
+}
+
+// readFileContentDigest reads the file at abs and returns the sha256 of its
+// bytes.
+func readFileContentDigest(abs string) ([]byte, error) {
+	file, err := os.Open(abs)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, file); err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
 }
 
 // basisSet is one pattern set, split once into its includes and exclusions.

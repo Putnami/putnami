@@ -277,11 +277,11 @@ func TestInputBasisDigestPruningKeepsTheRecords(t *testing.T) {
 	root := basisFixtureTree(t)
 	for name, basis := range pruningBases {
 		t.Run(name, func(t *testing.T) {
-			pruned, prunedVisits, err := walkInputBasis(root, basis, true)
+			pruned, prunedVisits, err := walkInputBasis(root, basis, true, readFileContentDigest)
 			if err != nil {
 				t.Fatal(err)
 			}
-			full, fullVisits, err := walkInputBasis(root, basis, false)
+			full, fullVisits, err := walkInputBasis(root, basis, false, readFileContentDigest)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -296,8 +296,8 @@ func TestInputBasisDigestPruningKeepsTheRecords(t *testing.T) {
 			}
 		})
 	}
-	_, prunedVisits, _ := walkInputBasis(root, pruningBases["nothing matches"], true)
-	_, fullVisits, _ := walkInputBasis(root, pruningBases["nothing matches"], false)
+	_, prunedVisits, _ := walkInputBasis(root, pruningBases["nothing matches"], true, readFileContentDigest)
+	_, fullVisits, _ := walkInputBasis(root, pruningBases["nothing matches"], false, readFileContentDigest)
 	if prunedVisits >= fullVisits {
 		t.Fatalf("a basis that selects nothing visited %d paths, as many as the full walk's %d", prunedVisits, fullVisits)
 	}
@@ -308,7 +308,7 @@ func TestInputBasisDigestPruningKeepsTheRecords(t *testing.T) {
 func TestInputBasisDigestWalksADirectoryAClassReaches(t *testing.T) {
 	spectest.Proves(t, "workspace/workspace-contract", "the-input-basis-digest-is-host-independent", "the-digest-binds-what-the-basis-selects")
 	root := basisFixtureTree(t)
-	records, _, err := walkInputBasis(root, pruningBases["class across a slash"], true)
+	records, _, err := walkInputBasis(root, pruningBases["class across a slash"], true, readFileContentDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ func TestInputBasisDigestIsDeterministic(t *testing.T) {
 		t.Fatalf("digest %q is not a sha256 hex digest", want)
 	}
 
-	records, _, err := walkInputBasis(first, goLikeBasis, true)
+	records, _, err := walkInputBasis(first, goLikeBasis, true, readFileContentDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,5 +429,49 @@ func mustMkdir(t *testing.T, root, rel string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(rel)), 0o755); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// A caller that answers each file's sha256 gets the digest that reading the
+// files gives, and its answers are all the file contents the digest reads.
+func TestInputBasisDigestFromTakesTheCallersFileDigests(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-caller-may-answer-the-basis-file-digests", "a-caller-answers-the-file-digests")
+	root := goLikeTree(t)
+	want := basisDigest(t, root, goLikeBasis)
+
+	var asked []string
+	got, err := InputBasisDigestFrom(root, goLikeBasis, func(abs string) ([]byte, error) {
+		rel, err := filepath.Rel(root, abs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		asked = append(asked, filepath.ToSlash(rel))
+		return readFileContentDigest(abs)
+	})
+	if err != nil {
+		t.Fatalf("InputBasisDigestFrom: %v", err)
+	}
+	if got != want {
+		t.Fatalf("a caller's file digests give %s, reading the files gives %s", got, want)
+	}
+	slices.Sort(asked)
+	if wantAsked := []string{"go.mod", "internal/a.go", "main.go"}; !slices.Equal(asked, wantAsked) {
+		t.Fatalf("the digest asked for %v, want the selected files %v", asked, wantAsked)
+	}
+
+	if got, err := InputBasisDigestFrom(root, goLikeBasis, nil); err != nil || got != want {
+		t.Fatalf("a nil reader gives %s, %v; want %s", got, err, want)
+	}
+
+	// An answer the caller makes up moves the digest: the caller vouches for it.
+	fake := make([]byte, 32)
+	if got, err := InputBasisDigestFrom(root, goLikeBasis, func(string) ([]byte, error) { return fake, nil }); err != nil || got == want {
+		t.Fatalf("made-up file digests give %s, %v; want a digest other than %s", got, err, want)
+	}
+	if _, err := InputBasisDigestFrom(root, goLikeBasis, func(string) ([]byte, error) { return []byte("short"), nil }); err == nil {
+		t.Fatal("an answer that is not a sha256 digested without an error")
+	}
+	if _, err := InputBasisDigestFrom(root, goLikeBasis, func(string) ([]byte, error) { return nil, os.ErrPermission }); err == nil {
+		t.Fatal("a caller's error digested without an error")
 	}
 }

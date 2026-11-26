@@ -319,6 +319,19 @@
           }
         },
         {
+          "id": "a-caller-may-answer-the-basis-file-digests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-caller-answers-the-file-digests"
+            ]
+          }
+        },
+        {
           "id": "the-schemas-and-the-go-types-agree",
           "stage": "coded",
           "evidenceKinds": [

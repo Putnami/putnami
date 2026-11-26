@@ -117,10 +117,12 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	cache "go.putnami.dev/protocol/cache"
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
 
 const (
@@ -337,13 +339,87 @@ func (s *LocalStore) LookupTaskEntry(key string) (*TaskEntry, error) {
 	address := TaskEntryAddress(key)
 	blobDir := s.blobDir(address)
 
-	entry := loadTaskEntry(blobDir, address)
+	entry := s.loadTaskEntryOnce(blobDir, address)
 	if entry == nil || entry.Key != key {
 		return nil, nil
 	}
 
 	writeLastUsed(blobDir, time.Now(), s.gen)
 	return entry, nil
+}
+
+// taskEntryFileStat is the stat of one file loadTaskEntry reads; a file that
+// is absent or not a regular file has ok false.
+type taskEntryFileStat struct {
+	stat fileindex.Stat
+	ok   bool
+}
+
+// taskEntryStats is the stat of each file loadTaskEntry reads from a blob
+// directory: the descriptor first, then the result, metadata and manifest.
+type taskEntryStats [4]taskEntryFileStat
+
+func statTaskEntry(blobDir string) taskEntryStats {
+	stat := func(name string) taskEntryFileStat {
+		st, ok := fileindex.Lstat(filepath.Join(blobDir, name))
+		return taskEntryFileStat{stat: st, ok: ok}
+	}
+	return taskEntryStats{stat(entryDescriptorFilename), stat("result.json"), stat("meta.json"), stat(manifestFilename)}
+}
+
+// settled reports whether every file of stats is a tick older than now, by
+// the file index's margin (protocols/workspace ADR 0009): a write after the
+// load then moves a recorded time, whatever the filesystem's tick.
+func (stats taskEntryStats) settled(now time.Time) bool {
+	limit := now.Add(-fileindex.Margin).UnixNano()
+	for _, file := range stats {
+		if file.ok && (file.stat.ModNano >= limit || file.stat.ChangeNano >= limit) {
+			return false
+		}
+	}
+	return stats[0].ok
+}
+
+// taskEntryReads counts the entries loadTaskEntryOnce read from disk. A test
+// reads it around a lookup.
+var taskEntryReads atomic.Int64
+
+// taskEntryMemo is a task entry a handle loaded and the stat of its files
+// when it was loaded.
+type taskEntryMemo struct {
+	stats taskEntryStats
+	entry *TaskEntry
+}
+
+// loadTaskEntryOnce is loadTaskEntry, read once per handle while every file
+// it read has the stat it had: the same file, mode, size, and modification
+// and status-change times. A planning lookup and the scheduler's lookup of
+// one task thereby read its four files once, not twice. An entry whose files
+// were written less than the file index's margin before the load, and every
+// entry on a platform whose stat the file index does not decode, is read
+// again on each lookup. The caller holds the store's shared lock.
+func (s *LocalStore) loadTaskEntryOnce(blobDir, address string) *TaskEntry {
+	now := time.Now()
+	stats := statTaskEntry(blobDir)
+	if cached, ok := s.loaded.Load(address); ok {
+		if memo, ok := cached.(taskEntryMemo); ok && memo.stats == stats {
+			clone := *memo.entry
+			return &clone
+		}
+		s.loaded.Delete(address)
+	}
+	taskEntryReads.Add(1)
+	entry := loadTaskEntry(blobDir, address)
+	if entry == nil {
+		return nil
+	}
+	// A file written while it was read has two stats; the entry answers for
+	// neither.
+	if stats.settled(now) && statTaskEntry(blobDir) == stats {
+		s.loaded.Store(address, taskEntryMemo{stats: stats, entry: entry})
+	}
+	clone := *entry
+	return &clone
 }
 
 // loadTaskEntry reads a published task-owned entry from its blob directory, or

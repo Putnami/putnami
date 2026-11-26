@@ -295,6 +295,8 @@ input-resolve call of
 [section 7 of the workspace protocol](../../../protocols/workspace/README.md#7-input-resolve-v1),
 keeps each answer while the digest of its basis holds, and hashes the relative
 path and exact bytes of every file the answer lists, an ignored file included.
+The basis digest takes each selected file's SHA-256 through the file index, so
+an unchanged run reads the answer's record and no file the index holds.
 A failed call, a rejected or error answer, an unlisted selector, a listed file
 that cannot be read, or a selection that combines a selector with `git:`
 patterns Git cannot enumerate fails the task before cache restore or

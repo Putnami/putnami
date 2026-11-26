@@ -52,6 +52,11 @@ type LocalStore struct {
 	// entry metadata. It is the in-run budget's cheap measure of how much this
 	// run has grown the store (gc_trigger.go), so it is read without a walk.
 	added atomic.Int64
+
+	// loaded holds the task entries this handle loaded, by address
+	// (taskEntryMemo); one lookup of a planned task and the next of the same
+	// entry read its files once.
+	loaded sync.Map
 }
 
 // manifestFilename is the per-entry CAS file manifest written inside a blob.

@@ -8,10 +8,13 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -265,6 +268,9 @@ func TestTheExtensionCounts(t *testing.T) {
 			if plan.Ledger() == tc.plan {
 				held++
 			}
+			if tc.name == "go" {
+				unchangedRunReadsNoSource(t, root, tc.command)
+			}
 		})
 	}
 	// Each extension's plan holds its git calls alone: the handshakes, the
@@ -273,6 +279,33 @@ func TestTheExtensionCounts(t *testing.T) {
 	if held > 0 {
 		spectest.Proves(t, "cli/job-planning-execution", "unchanged-planning-reads-records",
 			"planning-an-unchanged-workspace-starts-only-git")
+	}
+}
+
+// unchangedRunReadsNoSource holds that a run of the unchanged workspace reads
+// no source file: every digest of one, the basis digests of the go-embed
+// answers it reads from its records included, is answered from the file
+// index. The files the runs before wrote are recorded once they are older than
+// the index's margin. What it reads is a build stamp each run writes again.
+func unchangedRunReadsNoSource(t *testing.T, root string, command []string) {
+	t.Helper()
+	time.Sleep(fileindex.Margin + 100*time.Millisecond)
+	clitest.RunCounts(t, root, command...)
+	time.Sleep(fileindex.Margin + 100*time.Millisecond)
+	var mu sync.Mutex
+	var read []string
+	restore := fileindex.ObserveReads(func(path, _ string) {
+		mu.Lock()
+		defer mu.Unlock()
+		read = append(read, path)
+	})
+	clitest.RunCounts(t, root, command...)
+	restore()
+	for _, path := range read {
+		rel, err := filepath.Rel(root, path)
+		if err != nil || strings.HasPrefix(rel, "..") || !strings.Contains(filepath.ToSlash(rel), ".gen/") {
+			t.Errorf("a run of the unchanged workspace read %s, want no file but the build stamps it writes again\n%s", path, countsHint)
+		}
 	}
 }
 

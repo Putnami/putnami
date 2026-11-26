@@ -185,6 +185,13 @@
       ]
     },
     {
+      "id": "a-caller-may-answer-the-basis-file-digests",
+      "text": [
+        "InputBasisDigestFrom returns the InputBasisDigest of a tree with the sha256 of each file a content set selects answered by its caller, which may back it with what it already knows of the file's bytes.",
+        "A nil reader reads every file, and an answer that is not a sha256 is an error."
+      ]
+    },
+    {
       "id": "the-schemas-and-the-go-types-agree",
       "text": [
         "Each published JSON Schema is held against its Go type by a drift test, so a field that reaches only one of them fails the suite.",

@@ -470,6 +470,10 @@ handled, err := workspace.ServeInputResolve(os.Args[1:], os.Stdin, os.Stdout, an
   unchanged, so a consumer keeps it until a write changes what the basis
   selects. An extension computes the same digest in its tests, to prove that
   its basis covers what it reads.
+  `InputBasisDigestFrom(projectDir, basis, fileDigest)` computes the same
+  digest with each selected file's sha256 answered by its caller, which backs
+  it with what it already knows of the file's bytes; a nil reader reads every
+  file.
 
 The core asks from CLI contract 14 on (`protocol/cli`
 `InputSelectorsContract`): a manifest that lists or names a selector is
