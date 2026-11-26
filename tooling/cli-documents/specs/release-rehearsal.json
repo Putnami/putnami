@@ -65,10 +65,10 @@
       "text": "The release plan is reviewed data with unknown fields rejected, so no plan field can introduce an executable step into the rehearsal."
     },
     {
-      "id": "keyed-verdict-inputs",
+      "id": "no-cached-verdict",
       "text": [
-        "Every file that can move the verdict — the recorded report, the release plan, the files a check reads, and the target of every declared requirement — is a declared cache-key input of the owning project, so a changed tree can never be answered from a cached run of the drift check.",
-        "The gate asserts that coverage against the matcher the cache key itself uses."
+        "A changed tree is never answered from a cached run of the drift check: it runs only where PUTNAMI_WHOLE_TREE_GATES is set, a declared cache-key input, and the workflow that sets it on main runs without a cache.",
+        "Without the variable the drift check is skipped, and the outside documents the other tests read are declared inputs. The gate asserts the declarations and the workflow's trigger, variable and cache switch."
       ]
     },
     {

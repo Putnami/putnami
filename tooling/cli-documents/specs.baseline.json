@@ -4,8 +4,8 @@
   "executableRequirements": [
     "cli/release-rehearsal#canonical-migration-evidence",
     "cli/release-rehearsal#declarative-plan",
-    "cli/release-rehearsal#keyed-verdict-inputs",
     "cli/release-rehearsal#named-blockers",
+    "cli/release-rehearsal#no-cached-verdict",
     "cli/release-rehearsal#no-vacuous-check",
     "cli/release-rehearsal#provenance-contract",
     "cli/release-rehearsal#publish-order-coverage",

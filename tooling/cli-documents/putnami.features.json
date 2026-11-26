@@ -143,7 +143,7 @@
           }
         },
         {
-          "id": "keyed-verdict-inputs",
+          "id": "no-cached-verdict",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -151,7 +151,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "verdict-inputs-are-declared-cache-key-inputs"
+              "a-changed-tree-never-replays-a-cached-verdict"
             ]
           }
         },
