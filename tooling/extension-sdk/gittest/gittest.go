@@ -33,12 +33,14 @@ const (
 const DefaultBranch = "main"
 
 // Environ returns environ without its GIT_ variables, plus an empty global and
-// system configuration, no global ignore or attributes file, and DefaultBranch
-// as the branch git init creates. It sets no identity: a fixture that commits
+// system configuration, no global ignore or attributes file, DefaultBranch as
+// the branch git init creates, and no automatic maintenance or garbage
+// collection: a command never leaves a background process that writes in the
+// fixture's .git while a test reads it. It sets no identity: a fixture that commits
 // sets its own, in its repository configuration or in GIT_AUTHOR_ and
 // GIT_COMMITTER_ variables it appends.
 func Environ(environ []string) []string {
-	env := make([]string, 0, len(environ)+12)
+	env := make([]string, 0, len(environ)+16)
 	for _, entry := range environ {
 		if !strings.HasPrefix(entry, "GIT_") {
 			env = append(env, entry)
@@ -48,13 +50,17 @@ func Environ(environ []string) []string {
 		"GIT_CONFIG_GLOBAL="+os.DevNull,
 		"GIT_CONFIG_SYSTEM="+os.DevNull,
 		"GIT_CONFIG_NOSYSTEM=1",
-		"GIT_CONFIG_COUNT=3",
+		"GIT_CONFIG_COUNT=5",
 		"GIT_CONFIG_KEY_0=init.defaultBranch",
 		"GIT_CONFIG_VALUE_0="+DefaultBranch,
 		"GIT_CONFIG_KEY_1=core.excludesFile",
 		"GIT_CONFIG_VALUE_1="+os.DevNull,
 		"GIT_CONFIG_KEY_2=core.attributesFile",
 		"GIT_CONFIG_VALUE_2="+os.DevNull,
+		"GIT_CONFIG_KEY_3=maintenance.auto",
+		"GIT_CONFIG_VALUE_3=false",
+		"GIT_CONFIG_KEY_4=gc.auto",
+		"GIT_CONFIG_VALUE_4=0",
 	)
 }
 

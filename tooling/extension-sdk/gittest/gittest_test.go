@@ -200,3 +200,20 @@ func TestDescribeIgnoresTheDatesOfTwoBranches(t *testing.T) {
 		t.Fatalf("Describe depends on commit dates\n--- branch first ---\n%s\n--- main first ---\n%s", a, b)
 	}
 }
+
+// TestAFixtureRunsNoAutomaticMaintenance holds that a fixture's git commands
+// leave no background maintenance or garbage collection behind. Since git
+// 2.56 a commit can start one that writes, then removes, a lock under .git
+// while the test that built the fixture reads the directory.
+func TestAFixtureRunsNoAutomaticMaintenance(t *testing.T) {
+	dir := Repo(t)
+	for key, want := range map[string]string{"maintenance.auto": "false", "gc.auto": "0"} {
+		out, err := Command(dir, "config", "--get", key).Output()
+		if err != nil {
+			t.Fatalf("git config --get %s: %v", key, err)
+		}
+		if got := strings.TrimSpace(string(out)); got != want {
+			t.Errorf("git config --get %s = %q, want %q", key, got, want)
+		}
+	}
+}
