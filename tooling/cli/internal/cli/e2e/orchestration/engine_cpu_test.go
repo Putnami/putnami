@@ -21,8 +21,9 @@ const engineCPUGrowth = 1.5
 const engineThreads = 4
 
 // engineCPUPerTask is the engine's CPU per task recorded on the larger plan,
-// with coverage on a 4-core Linux container. Hosts differ, so it is only a
-// backstop: the test fails at four times it.
+// with coverage on a 4-core Linux container. The test fails at twice it, a
+// margin that absorbs the hosts' differences; the growth below does not depend
+// on the host.
 const engineCPUPerTask = 900 * time.Microsecond
 
 // TestTheEngineCPUPerTask holds the CPU the engine process spends per task
@@ -54,8 +55,8 @@ func TestTheEngineCPUPerTask(t *testing.T) {
 		t.Errorf("engine CPU per task grows %.2f times from 300 to 1,200 tasks, at least %.1f: the engine repeats work for each pending task; %s",
 			growth, engineCPUGrowth, countsHint)
 	}
-	if large >= 4*engineCPUPerTask {
-		t.Errorf("engine CPU per task = %s on 1,200 tasks, at least four times the recorded %s; %s",
+	if large >= 2*engineCPUPerTask {
+		t.Errorf("engine CPU per task = %s on 1,200 tasks, at least twice the recorded %s; %s",
 			large, engineCPUPerTask, countsHint)
 	}
 }

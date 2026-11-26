@@ -24,6 +24,9 @@ import (
 type extensionCase struct {
 	// name is the extension, as a subtest names it.
 	name string
+	// extensions are the extensions built here whose processes the case's
+	// ledgers hold, by name.
+	extensions []string
 	// links are the directories of this tree the workspace links, by their
 	// path in the workspace: the extensions it loads under .ext, which the
 	// project scan never enters, and the packages an install would put in
@@ -128,6 +131,7 @@ var clientgenFiles = map[string]string{
 var extensionCases = []extensionCase{
 	{
 		name:        "go",
+		extensions:  []string{"@putnami/go"},
 		provisioned: goLintTools,
 		links:       map[string]string{".ext/go": "go/extension", ".ext/dev": "tooling/dev"},
 		tools:       []string{"go"},
@@ -141,6 +145,7 @@ var extensionCases = []extensionCase{
 	},
 	{
 		name:        "typescript",
+		extensions:  []string{"@putnami/typescript"},
 		provisioned: pinnedBun,
 		links: map[string]string{
 			".ext/typescript": "typescript/extension", ".ext/dev": "tooling/dev",
@@ -156,6 +161,7 @@ var extensionCases = []extensionCase{
 	},
 	{
 		name:       "sdd",
+		extensions: []string{"@putnami/sdd"},
 		links:      map[string]string{".ext/sdd": "tooling/sdd-extension"},
 		toolchains: []string{"go"},
 		files:      sddFiles,
@@ -167,6 +173,7 @@ var extensionCases = []extensionCase{
 	},
 	{
 		name:        "clientgen",
+		extensions:  []string{"@putnami/clientgen"},
 		provisioned: pinnedBun,
 		links: map[string]string{
 			".ext/typescript": "typescript/extension", ".ext/dev": "tooling/dev", ".ext/clientgen": "tooling/clientgen-extension",
@@ -185,6 +192,7 @@ var extensionCases = []extensionCase{
 	},
 	{
 		name:        "rust",
+		extensions:  []string{"@putnami/rust"},
 		provisioned: rustTestTools,
 		links:       map[string]string{".ext/rust": "rust/extension", ".ext/dev": "tooling/dev"},
 		tools:       []string{"cargo"},
@@ -195,6 +203,120 @@ var extensionCases = []extensionCase{
 		cold:        "engine job 4 · git 17 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		was:         "engine job 4 · git 18 | engine git diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git ls-files 1",
 		plan:        "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+	},
+	{
+		name:       "shell",
+		extensions: []string{"sample/shell-extension"},
+		links:      map[string]string{".ext/shell": "tooling/samples/shell-extension"},
+		tools:      []string{"bash", "make"},
+		files:      shellFiles,
+		setup:      [][]string{{"projects", "sync"}},
+		command:    []string{"test", "--all", "--max-parallel", "1"},
+		cold:       "engine job 2 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 2 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+	},
+	{
+		name:        "web",
+		extensions:  []string{"@putnami/application", "@putnami/web"},
+		provisioned: pinnedBun,
+		links: map[string]string{
+			".ext/typescript": "typescript/extension", ".ext/dev": "tooling/dev",
+			".ext/application": "typescript/framework/application", ".ext/web": "typescript/framework/web",
+			"node_modules/typescript": "node_modules/typescript", "node_modules/@biomejs/biome": "node_modules/@biomejs/biome",
+		},
+		requires:   []string{"typescript/framework/application/node_modules", "typescript/framework/web/node_modules"},
+		toolchains: []string{"bun", "go"},
+		files:      webFiles,
+		setup:      [][]string{{"projects", "sync"}},
+		command:    []string{"build", "--all", "--max-parallel", "1"},
+		cold:       "engine job 5 · control 1 · git 20 | engine git for-each-ref 1 · ls-files 8 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
+		was:        "engine job 5 · control 1 · git 20 | engine git for-each-ref 1 · ls-files 8 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
+		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+	},
+	{
+		name:       "cloud",
+		extensions: []string{"@putnami/cloud"},
+		links:      map[string]string{".ext/cloud": "cloud/extension"},
+		toolchains: []string{"go"},
+		files:      cloudFiles,
+		setup:      [][]string{{"projects", "sync"}},
+		command:    []string{"validate", "--all", "--max-parallel", "1"},
+		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+	},
+	{
+		name:       "bazel",
+		extensions: []string{"@putnami/bazel"},
+		links:      map[string]string{".ext/bazel": "integrations/bazel", ".ext/dev": "tooling/dev"},
+		toolchains: []string{"go"},
+		files:      bazelFiles,
+		setup:      [][]string{{"projects", "sync"}},
+		command:    []string{"validate", "--all", "--max-parallel", "1"},
+		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+	},
+	{
+		name:       "pants",
+		extensions: []string{"@putnami/pants"},
+		links:      map[string]string{".ext/pants": "integrations/pants", ".ext/dev": "tooling/dev"},
+		toolchains: []string{"go"},
+		files:      pantsFiles,
+		setup:      [][]string{{"projects", "sync"}},
+		command:    []string{"validate", "--all", "--max-parallel", "1"},
+		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+	},
+	{
+		name:       "moon",
+		extensions: []string{"@putnami/moon"},
+		links:      map[string]string{".ext/moon": "integrations/moon", ".ext/dev": "tooling/dev"},
+		toolchains: []string{"go"},
+		files:      moonFiles,
+		setup:      [][]string{{"projects", "sync"}},
+		command:    []string{"validate", "--all", "--max-parallel", "1"},
+		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+	},
+	{
+		name:       "turbo",
+		extensions: []string{"@putnami/turbo"},
+		links:      map[string]string{".ext/turbo": "integrations/turbo", ".ext/dev": "tooling/dev"},
+		toolchains: []string{"go"},
+		files:      turboFiles,
+		setup:      [][]string{{"projects", "sync"}},
+		command:    []string{"validate", "--all", "--max-parallel", "1"},
+		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+	},
+	{
+		name:       "nx",
+		extensions: []string{"@putnami/nx"},
+		links:      map[string]string{".ext/nx": "integrations/nx", ".ext/dev": "tooling/dev"},
+		toolchains: []string{"go"},
+		files:      nxFiles,
+		setup:      [][]string{{"projects", "sync"}},
+		command:    []string{"validate", "--all", "--max-parallel", "1"},
+		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+	},
+	{
+		name:       "rush",
+		extensions: []string{"@putnami/rush"},
+		links:      map[string]string{".ext/rush": "integrations/rush", ".ext/dev": "tooling/dev"},
+		toolchains: []string{"go"},
+		files:      rushFiles,
+		setup:      [][]string{{"projects", "sync"}},
+		command:    []string{"validate", "--all", "--max-parallel", "1"},
+		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 }
 

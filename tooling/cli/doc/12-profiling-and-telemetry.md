@@ -224,30 +224,57 @@ The counts are the same on a developer's machine, in a Putnami job and in CI:
   nor under the machine's Putnami home: Go's lint tools, Rust's
   `cargo-nextest` and `cargo-llvm-cov` (on `PATH` first, as `@putnami/rust`
   looks for them), and the pinned Bun (the `bun` on `PATH` when it is that
-  release). The Python extension holds no count: its test task resolves pytest
-  and ruff from the network.
+  release). The integrations read the graph export their tool writes in CI
+  (`bazel-graph.json`, `pants-graph.json`, `moon-graph.json`) or the
+  manifests, so no case runs Bazel, Pants, moon, Turborepo, Nx or Rush.
 
-Where the cases run: in Contributor CI, the engine tests and the sdd case run
-on every pull request; the Go case runs when the restored tool cache holds
-`~/.putnami/tools/go`; the TypeScript and clientgen cases run once the gate's
-install has provisioned the pinned Bun and the repository's `node_modules`; the
-Rust case is skipped, since that workflow installs no Rust toolchain. It runs
-where `cargo` and the Rust test tools are on the machine.
+Where the cases run: Contributor CI provisions Go (`actions/setup-go`), the
+pinned Bun (`oven-sh/setup-bun`), uv (`astral-sh/setup-uv`), from its
+restored cache the Go lint tools under `~/.putnami/tools/go`, and the
+toolchains `putnami.lock.json` pins, which `putnami install` installs; it
+fetches no language package offline. The gate selects these tests when a pull
+request impacts `@putnami/cli`; then the engine tests run, and so do the sdd,
+cloud, shell (`bash` and `make` of the runner), Bazel, Pants, moon,
+Turborepo, Nx and Rush cases; the Go case runs when the restored tool cache
+holds `~/.putnami/tools/go`; the TypeScript, clientgen and web cases run once
+the gate's install has provisioned the pinned Bun and the repository's
+`node_modules`; the Rust case is skipped, since that workflow installs no Rust
+toolchain. It runs where `cargo` and the Rust test tools are on the machine.
+
+Every extension built here is either the subject of a case, by its
+`extensions`, or listed in `skippedExtensions` with the reason it holds no
+count; `TestEveryExtensionBuiltHereIsCounted` walks the `putnami.extension.json`
+files of this tree and fails on an extension in neither list. The cases count
+Go, TypeScript, sdd, clientgen,
+Rust, `@putnami/application` and `@putnami/web` (the hooks of a TypeScript
+build), `@putnami/cloud` (`validate`), the sample `sample/shell-extension`
+(`test`), and the Bazel, Pants, moon, Turborepo, Nx and Rush integrations
+(`validate`, their graph check). The skipped ones and why:
+
+- `@putnami/python`, `@putnami/java`, `@putnami/dotnet`, `@putnami/dart`,
+  `@putnami/swift` and `@putnami/ruby`: their tasks run a toolchain
+  Contributor CI does not provision (Python's resolve ruff and pytest from the
+  package index).
+- `@putnami/php`: the pinned PHP is installed, but its lint and test tasks run
+  PHPStan and PHPUnit from `vendor/bin`, which Composer fetches from Packagist.
+- `@putnami/dev`: its commands are interactive and print no run report, and it
+  declares no hook or provider, so the fixtures that load it hold no process it
+  starts.
+- `@putnami/github-collaboration`, `@putnami/gitlab-collaboration`,
+  `@putnami/jira-collaboration`, `@putnami/linear-collaboration`,
+  `@putnami/local-collaboration` and `@putnami/memory-store`: providers with no
+  command or task, which no run plans.
+- `@putnami/events`: no command, task or hook.
+- `@putnami/analytics`: its manifest names its extension dependencies under no
+  CLI contract, so a workspace that loads it from this tree skips it.
+- `@putnami/scaffold`: its task compiles its runtime with this repository's
+  `go.work`, which a fixture workspace does not have.
+- `@putnami/contributor` and `@putnami/observe`: their commands print their own
+  output in place of the run's result, so no orchestration report is read.
 
 The sources, manifests, prepare scripts and embedded profiles of the counted
-extensions are inputs of `@putnami/cli`'s test task, so a pull request that
-changes one runs these tests again. The counted extensions are Go, TypeScript,
-sdd, clientgen and Rust, with `@putnami/dev`, which the Go, TypeScript and Rust
-fixtures load. The other extensions built here hold no count yet:
-`@putnami/analytics`, `@putnami/application`, `@putnami/bazel`,
-`@putnami/cloud`, `@putnami/contributor`, `@putnami/dart`, `@putnami/dotnet`,
-`@putnami/events`, `@putnami/github-collaboration`,
-`@putnami/gitlab-collaboration`, `@putnami/java`, `@putnami/jira-collaboration`,
-`@putnami/linear-collaboration`, `@putnami/local-collaboration`,
-`@putnami/memory-store`, `@putnami/moon`, `@putnami/nx`, `@putnami/observe`,
-`@putnami/pants`, `@putnami/php`, `@putnami/python`, `@putnami/ruby`,
-`@putnami/rush`, `@putnami/scaffold`, `@putnami/swift`, `@putnami/turbo`,
-`@putnami/web` and the sample `sample/shell-extension`.
+extensions, the framework sources the web hooks import, and every extension
+manifest, are inputs of `@putnami/cli`'s test task, so a pull request that changes one runs these tests again.
 
 | Count | What it is | How it is lowered |
 |---|---|---|
@@ -255,7 +282,7 @@ fixtures load. The other extensions built here hold no count yet:
 | Processes started by planning an unchanged workspace | Every process `--dry-run` starts on the workspace: git, toolchain probes, control processes. A plan reports no `run.orchestration`, so the test reads the process-wide ledger around it (`clitest.PlanCounts`). The engine's fixture also holds a whole run of the unchanged workspace, every task found in the cache. Each extension's plan is its git calls alone: a runtime handshake, a toolchain probe and an input-resolve answer are read from what the runs before recorded, and the workspace snapshot answers for the workspace probe ([ADR 0102](adr/0102-planning-reads-recorded-facts.md)), whether its toolchains are Putnami home releases or system toolchains that name their own executable ([ADR 0105](adr/0105-a-toolchain-that-names-its-own-executable-is-recorded.md)). | A probe or a read that does not depend on the change is answered from what the run already knows, or from state kept between runs. |
 | CLI starts per job | The `putnami` processes the SDK jobs start, such as a registry credential a job resolves itself. The Go fixture's jobs start none: a task declares `nativeRegistryCredential`, and the engine materializes it once per origin and per 4-minute window, which its own ledger counts. | The engine materializes what jobs ask the CLI for once per run and hands it to them. |
 | Extension processes per run | The job, batch and control processes the engine starts. | Ready tasks share a batch process, or one extension process runs many jobs. |
-| Engine CPU per task | The CLI process's own CPU per task on 300 and on 1,200 trivial batchable tasks run with `--no-cache` on four workers, the least of three runs after a first one. The test fails when it grows 1.5 times from the smaller plan to the larger, and, as a backstop, at four times its recorded value on the larger. | Work the engine repeats per task or per pending candidate is done once per run, or once per job. |
+| Engine CPU per task | The CLI process's own CPU per task on 300 and on 1,200 trivial batchable tasks run with `--no-cache` on four workers, the least of three runs after a first one. The test fails when it grows 1.5 times from the smaller plan to the larger, and at twice its recorded value on the larger. | Work the engine repeats per task or per pending candidate is done once per run, or once per job. |
 
 Each extension case holds two ledgers, one line each: the run with
 `--no-cache`, every task executed, and the plan of the unchanged workspace. A
@@ -274,7 +301,7 @@ container, most often below 1.0, and work repeated for each pending task reads
 1.6 to 2.3. The test runs the engine with `GOMAXPROCS` 4, since a Putnami job
 sets it to its CPU budget and the engine's CPU depends on it. The recorded value is measured with
 coverage on a 4-core Linux container; a change that lowers it lowers the
-recorded value. The race detector multiplies the CPU, so a run with `-race`
+recorded value, and a change that raises it past twice that value fails. The race detector multiplies the CPU, so a run with `-race`
 skips that test.
 
 ## Cache Economics Benchmark
