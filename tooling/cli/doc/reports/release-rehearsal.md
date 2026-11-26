@@ -16,17 +16,19 @@ new file — and renders the verdict block below. The gate fails when the record
 block stops matching the tree, not when a check is blocked. A NO-GO is a valid,
 recordable result; a stale record is not.
 
-Run it with the project gate:
+It runs only when `PUTNAMI_WHOLE_TREE_GATES` is set, and without a cache; a run
+without the variable skips it and proves nothing about this report (see
+[The drift check runs on main, without a cache](../20-release-rehearsal.md#the-drift-check-runs-on-main-without-a-cache)):
 
 ```
-./putnamiw lint,test,build --projects @putnami/cli-documents --enforce-coverage
+PUTNAMI_WHOLE_TREE_GATES=1 ./putnamiw test --projects @putnami/cli-documents --no-cache
 ```
 
 Or read the evidence dump directly:
 
 ```
 cd tooling/cli-documents
-PUTNAMI_NO_RELAUNCH=1 go test ./ -run TestReleaseRehearsalReportRecordsTheCurrentVerdict -v
+PUTNAMI_WHOLE_TREE_GATES=1 PUTNAMI_NO_RELAUNCH=1 go test ./ -count=1 -run TestReleaseRehearsalReportRecordsTheCurrentVerdict -v
 ```
 
 The declared inputs live in

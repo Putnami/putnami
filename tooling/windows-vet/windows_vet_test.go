@@ -20,14 +20,13 @@ import (
 //
 // It names the modules through the go command's `work` pattern, which matches
 // every package of every go.work module. One root `./...` would stop at each
-// nested go.mod. The generated clients are not in Git: the project depends on
-// every Go module that generates one, so the planner runs each client-generate
-// before this gate.
+// nested go.mod. The generated clients are not in Git: the workflow that runs
+// this gate generates them first (generateClientsCommand).
 //
 // The gate reads every Go source of the repository. A file pattern that keys
-// those sources selects this project, and the client generation it depends on,
-// for every Go change. The project declares none: the gate runs only where
-// wholeTreeGatesEnv is set, on main, and that run uses no cache.
+// those sources selects this project for every Go change. The project declares
+// none: the gate runs only where wholeTreeGatesEnv is set, on main, and that
+// run uses no cache.
 
 // wholeTreeGatesEnv names the variable that turns the gate on. The manifest
 // declares it under options.test.envInputs, so a run with it set never shares a
@@ -81,60 +80,22 @@ func TestEveryGoWorkModuleVetsForWindows(t *testing.T) {
 	}
 }
 
-// TestTheGateDependsOnEveryGoModuleThatGeneratesAClient keeps the project's
-// dependencies equal to the go.work modules that generate a client. Git holds
-// no generated client, so `go vet work` type-checks one only when the planner
-// ran its client-generate first, and the planner does so for a dependency. A
-// module generates a client when its putnami.json declares a Go generatedFrom
-// or the clientgen extension.
-func TestTheGateDependsOnEveryGoModuleThatGeneratesAClient(t *testing.T) {
-	requireWholeTreeGates(t)
-	root := repositoryRoot(t)
-	want := map[string]bool{}
-	for _, dir := range goOutputLines(t, root, windowsVetEnv(root), "list", "-m", "-f", "{{.Dir}}") {
-		config, ok := readProjectConfig(t, filepath.Join(dir, "putnami.json"))
-		if !ok || !config.generatesGoClient() {
-			continue
-		}
-		rel, err := filepath.Rel(root, dir)
-		if err != nil {
-			t.Fatalf("module %s is outside the repository: %v", dir, err)
-		}
-		want["/"+filepath.ToSlash(rel)] = true
-	}
-	own, ok := readProjectConfig(t, "putnami.json")
-	if !ok {
-		t.Fatal("the gate's own putnami.json is missing")
-	}
-	got := map[string]bool{}
-	for _, dependency := range own.Dependencies {
-		got[dependency] = true
-	}
-	for id := range want {
-		if !got[id] {
-			t.Errorf("%s generates a Go client, so add it to the dependencies of tooling/windows-vet/putnami.json", id)
-		}
-	}
-	for id := range got {
-		if !want[id] {
-			t.Errorf("%s generates no Go client, so remove it from the dependencies of tooling/windows-vet/putnami.json", id)
-		}
-	}
-}
-
-// TestTheGateRunsOnMainWithoutACache keeps the two halves of the switch
-// together: the manifest declares the variable as a key input and no file
-// pattern that reaches another project, and the workflow sets the variable on
-// a push to main and runs the gate without a cache. Without the first half a
-// run with the variable restores the skip a run without it stored; without the
-// second the gate runs nowhere, or replays a verdict for another tree.
+// TestTheGateRunsOnMainWithoutACache keeps the halves of the switch together.
+// The manifest declares the variable as a key input, no file pattern that
+// reaches another project and no dependency: each of the last two selects this
+// project for changes its always-run tests never read. The workflow sets the
+// variable on a push to main, generates the clients Git does not hold, and
+// runs the gate without a cache. Without the declaration a run with the
+// variable restores the skip a run without it stored; without the workflow the
+// gate runs nowhere, or replays a verdict for another tree.
 func TestTheGateRunsOnMainWithoutACache(t *testing.T) {
 	data, err := os.ReadFile("putnami.json")
 	if err != nil {
 		t.Fatalf("read the gate's own putnami.json: %v", err)
 	}
 	var manifest struct {
-		Options struct {
+		Dependencies []string `json:"dependencies"`
+		Options      struct {
 			Test struct {
 				FilePatterns []string `json:"filePatterns"`
 				EnvInputs    []string `json:"envInputs"`
@@ -143,6 +104,10 @@ func TestTheGateRunsOnMainWithoutACache(t *testing.T) {
 	}
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		t.Fatalf("parse the gate's own putnami.json: %v", err)
+	}
+	for _, dependency := range manifest.Dependencies {
+		t.Errorf("putnami.json depends on %s: a change that reaches it plans this gate and every other "+
+			"dependency's steps, then skips the gate. The workflow generates the clients instead.", dependency)
 	}
 	declaresVariable, declaresWorkflow := false, false
 	for _, name := range manifest.Options.Test.EnvInputs {
@@ -154,8 +119,8 @@ func TestTheGateRunsOnMainWithoutACache(t *testing.T) {
 			declaresWorkflow = true
 			continue
 		}
-		t.Errorf("options.test.filePatterns declares %q: a pattern over the workspace selects this gate, "+
-			"and the client generation it depends on, for changes the tests that always run never read", pattern)
+		t.Errorf("options.test.filePatterns declares %q: a pattern over the workspace selects this gate "+
+			"for changes the tests that always run never read", pattern)
 	}
 	if !declaresVariable {
 		t.Errorf("putnami.json does not declare %s under options.test.envInputs", wholeTreeGatesEnv)
@@ -168,9 +133,52 @@ func TestTheGateRunsOnMainWithoutACache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the workflow that runs the gate on main: %v", err)
 	}
-	var pushesToMain, setsVariable, runsUncached bool
+	for _, problem := range workflowProblems(string(workflow)) {
+		t.Errorf("%s %s", wholeTreeGatesWorkflowPath, problem)
+	}
+}
+
+// TestWorkflowProblemsNameEachMissingPart keeps the workflow check from passing
+// on a workflow that lost its trigger, its variable, its client generation or
+// its cache switch.
+func TestWorkflowProblemsNameEachMissingPart(t *testing.T) {
+	complete := "on:\n  push:\n    branches: [main]\njobs:\n  gates:\n    env:\n      " + wholeTreeGatesEnv + ": '1'\n    steps:\n" +
+		"      - run: " + generateClientsCommand + "\n" +
+		"      - run: ./putnamiw test --projects @putnami/cli-documents,@putnami/windows-vet --no-cache\n"
+	if problems := workflowProblems(complete); len(problems) != 0 {
+		t.Fatalf("a complete workflow reports %v", problems)
+	}
+	for name, broken := range map[string]string{
+		"no push to main":   strings.Replace(complete, "branches: [main]", "branches: [release]", 1),
+		"no variable":       strings.Replace(complete, wholeTreeGatesEnv, "ANOTHER_VARIABLE", 1),
+		"empty variable":    strings.Replace(complete, ": '1'", ": ''", 1),
+		"no generation":     strings.Replace(complete, "      - run: "+generateClientsCommand+"\n", "", 1),
+		"generation last":   strings.Replace(strings.Replace(complete, "      - run: "+generateClientsCommand+"\n", "", 1), "--no-cache\n", "--no-cache\n      - run: "+generateClientsCommand+"\n", 1),
+		"cached":            strings.Replace(complete, " --no-cache", "", 1),
+		"another project":   strings.Replace(complete, ",@putnami/windows-vet", "", 1),
+		"gate commented":    strings.Replace(complete, "      - run: ./putnamiw test", "      # - run: ./putnamiw test", 1),
+		"trigger commented": strings.Replace(complete, "    branches: [main]", "    # branches: [main]", 1),
+	} {
+		if problems := workflowProblems(broken); len(problems) != 1 {
+			t.Errorf("%s: problems = %v, want exactly one", name, problems)
+		}
+	}
+}
+
+// generateClientsCommand generates every client of the workspace. Git holds no
+// generated client, and `go vet work` type-checks the modules that import one,
+// so the workflow runs it before the gate.
+const generateClientsCommand = "./putnamiw client-generate --all"
+
+// workflowProblems reports what a workflow lacks to run the gate on main: a
+// push trigger on main, the variable that turns the gate on, the generation of
+// the clients, and after it a test command over this project that uses no
+// cache. It reads lines, not YAML: comment lines are dropped, and each part
+// must stand on one line.
+func workflowProblems(workflow string) []string {
+	var pushesToMain, setsVariable, generatesClients, runsUncached, runsAfterGeneration bool
 	inPush := false
-	for _, raw := range strings.Split(string(workflow), "\n") {
+	for _, raw := range strings.Split(workflow, "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -187,59 +195,31 @@ func TestTheGateRunsOnMainWithoutACache(t *testing.T) {
 		if value, ok := strings.CutPrefix(line, wholeTreeGatesEnv+":"); ok && strings.TrimSpace(value) != "''" {
 			setsVariable = true
 		}
+		if strings.HasSuffix(line, generateClientsCommand) {
+			generatesClients = true
+		}
 		if strings.Contains(line, "./putnamiw test ") && strings.Contains(line, "@putnami/windows-vet") && strings.Contains(line, " --no-cache") {
 			runsUncached = true
+			runsAfterGeneration = generatesClients
 		}
 	}
+	var problems []string
 	if !pushesToMain {
-		t.Errorf("%s does not run on a push to main (on.push.branches: [main])", wholeTreeGatesWorkflowPath)
+		problems = append(problems, "does not run on a push to main (on.push.branches: [main])")
 	}
 	if !setsVariable {
-		t.Errorf("%s does not set %s", wholeTreeGatesWorkflowPath, wholeTreeGatesEnv)
+		problems = append(problems, "does not set "+wholeTreeGatesEnv)
+	}
+	if !generatesClients {
+		problems = append(problems, "has no step that runs "+generateClientsCommand)
 	}
 	if !runsUncached {
-		t.Errorf("%s has no step that runs ./putnamiw test over @putnami/windows-vet with --no-cache", wholeTreeGatesWorkflowPath)
+		problems = append(problems, "has no step that runs ./putnamiw test over @putnami/windows-vet with --no-cache")
 	}
-}
-
-// projectConfig is the part of a putnami.json that says whether a project
-// generates a Go client.
-type projectConfig struct {
-	Dependencies  []string `json:"dependencies"`
-	Extensions    []string `json:"extensions"`
-	GeneratedFrom *struct {
-		Language string `json:"language"`
-	} `json:"generatedFrom"`
-}
-
-func (c projectConfig) generatesGoClient() bool {
-	if c.GeneratedFrom != nil && c.GeneratedFrom.Language == "go" {
-		return true
+	if generatesClients && runsUncached && !runsAfterGeneration {
+		problems = append(problems, "runs the gate before the client generation")
 	}
-	for _, extension := range c.Extensions {
-		if extension == "/tooling/clientgen-extension" {
-			return true
-		}
-	}
-	return false
-}
-
-// readProjectConfig reads one putnami.json, reporting false when the file does
-// not exist.
-func readProjectConfig(t *testing.T, file string) (projectConfig, bool) {
-	t.Helper()
-	data, err := os.ReadFile(file)
-	if errors.Is(err, os.ErrNotExist) {
-		return projectConfig{}, false
-	}
-	if err != nil {
-		t.Fatalf("read %s: %v", file, err)
-	}
-	var config projectConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		t.Fatalf("parse %s: %v", file, err)
-	}
-	return config, true
+	return problems
 }
 
 // windowsVetEnv is the caller's environment pinned to the repository's go.work

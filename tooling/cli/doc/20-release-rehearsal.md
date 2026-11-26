@@ -83,9 +83,11 @@ declares none. The drift check and the public-cut release gate run only when
   sets the variable on every push to `main` and runs the project with
   `--no-cache`, so a changed tree is never answered from a cached run;
 - a pull request runs them only when it changes `tooling/cli-documents`,
-  `tooling/windows-vet` or that workflow. A pull request that moves the verdict
-  without recording it therefore passes its own gate and reds the workflow on
-  `main`: re-record the block there.
+  `tooling/windows-vet`, that workflow, the recorded report, the release plan
+  or the public-cut baseline or allowlist. A pull request that moves the
+  verdict without recording it therefore passes its own gate and reds the
+  workflow on `main`: the pull request that re-records the block runs the
+  drift check itself.
 
 Run the drift check on any tree with:
 

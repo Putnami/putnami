@@ -30,9 +30,12 @@ reads ignored local worktrees and private state the scanner excludes.
   candidate reads take precedence when ordinary patterns overlap.
 - An enumeration failure or an unsupported non-regular candidate produces no
   key.
-- A repository scanner declares `git:**` (the documents project does) and
-  shares candidate enumeration with its scan, so its key and its scan read one
-  set.
+- A repository scanner declares `git:**` and shares candidate enumeration with
+  its scan, so its key and its scan read one set. The documents project did
+  until
+  [its ADR 0001](../../../cli-documents/doc/adr/0001-whole-tree-gates-run-on-main.md):
+  the input selects its project for every change, so its scan now runs on
+  `main` without a cache, and a test keeps the two enumerations equal.
 
 ## Consequences
 

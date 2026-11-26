@@ -1,6 +1,7 @@
 # ADR 0009 — The release rehearsal is a recorded verdict, not a release step
 
-- **Status**: accepted
+- **Status**: accepted; decision 5 amended by
+  [ADR 0001 of `@putnami/cli-documents`](../../../cli-documents/doc/adr/0001-whole-tree-gates-run-on-main.md)
 - **Scope**: the release rehearsal in `tooling/cli-documents`
   (`@putnami/cli-documents`), its release plan in
   `tooling/cli/internal/cli/testdata/release-plan.json`, and the recorded report
@@ -55,6 +56,12 @@ check.
    report, the plan, every file a check reads and every requirement target is
    covered. A requirement naming an uncovered path fails with the pattern to
    add.
+
+   *Amended.* The project no longer declares `git:**`, which selected it for
+   every change of the repository. The drift check runs where
+   `PUTNAMI_WHOLE_TREE_GATES` is set, on `main`, without a cache, and
+   `TestReleaseRehearsalNeverReplaysACachedVerdict` replaces the test above.
+   The rule stands: a drift check is never answered from a cache.
 6. **The recorded block carries statuses, never volatile counts.** It holds
    check ids, pass or blocked status, blocking inputs and owners. Artifact
    counts, candidate file counts and scrub totals are logged by the test and
@@ -68,7 +75,8 @@ check.
 
 - Changing a release input (the licence, the support catalog, the builder
   platform matrix, the governance surface, the ignore guard) forces a fresh
-  recorded verdict.
+  recorded verdict. Since the amendment of decision 5, the run on `main` after
+  the merge is what demands it, not the pull request's own gate.
 - The candidate cut includes untracked, non-ignored files, so a locally drafted
   release input turns the rehearsal red until the block is re-recorded.
 - The rehearsal proves nothing about built artifacts. Digest and provenance

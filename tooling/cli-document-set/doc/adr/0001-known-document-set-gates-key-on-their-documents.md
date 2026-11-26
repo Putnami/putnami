@@ -32,6 +32,8 @@ project is in that project's scope, and the scope boundary forbids its import of
 
 - `@putnami/cli-documents` keeps `git:**`, so it still runs for every change,
   with a smaller suite. Moving the whole-tree gates out of the per-change gate
-  is left to the engine review.
+  is left to the engine review. *Superseded:*
+  [ADR 0001 of `@putnami/cli-documents`](../../../cli-documents/doc/adr/0001-whole-tree-gates-run-on-main.md)
+  moves them to `main` without an engine change.
 - A change outside the named documents and manifests no longer runs the
   document-set gates.

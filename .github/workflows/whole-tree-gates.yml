@@ -15,8 +15,10 @@
 #
 # This workflow is where they run: on every push to main, with the variable set
 # and with --no-cache, since no declared input keys the tree they read. A pull
-# request runs them only when it changes one of the two projects or this file.
-# `workflow_dispatch` runs them on any ref.
+# request runs them only when it changes one of the two projects, this file, or
+# a file that records or repairs a verdict: the rehearsal report, the release
+# plan, the public-cut baseline and allowlist, and go.work. `workflow_dispatch`
+# runs them on any ref.
 #
 # A red run on main means the merged tree fails a gate its pull request did not
 # run: the public cut holds new debt, the recorded rehearsal verdict is behind
@@ -33,14 +35,21 @@ on:
     paths:
       - tooling/cli-documents/**
       - tooling/windows-vet/**
+      - tooling/cli/doc/reports/release-rehearsal.md
+      - tooling/cli/internal/cli/testdata/release-plan.json
+      - tooling/cli/internal/cli/testdata/public-cut-baseline.tsv
+      - tooling/cli/internal/cli/testdata/public-cut-allowlist.tsv
+      - go.work
       - .github/workflows/whole-tree-gates.yml
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push of a pull request replaces its run. On main every merged tree
+# keeps its own result, so a red run names the merge that broke a gate.
 concurrency:
-  group: whole-tree-gates-${{ github.ref }}
+  group: whole-tree-gates-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -100,8 +109,28 @@ jobs:
         run: |
           echo '{"enabled": false}' > .putnami/cache.json
 
-      # The planner runs the client generation the Windows gate depends on
-      # before it. --no-cache executes every task of the plan: a stored verdict
-      # of either gate was computed for another tree.
+      # Git holds no generated client, and `go vet work` type-checks the
+      # modules that import one. The Windows gate declares no dependency on
+      # them, since a dependency plans the gate for every change that reaches
+      # it, so this step generates them.
+      - name: Generate the clients
+        run: ./putnamiw client-generate --all
+
+      # --no-cache executes every task of the plan: a stored verdict of either
+      # gate was computed for another tree.
       - name: Run the whole-tree gates
         run: ./putnamiw test --projects @putnami/cli-documents,@putnami/windows-vet --no-cache
+
+      # Store the caches the restore step above names, also after a red gate,
+      # as contributor-ci.yml does. An exact hit is already stored.
+      - name: Save toolchain and dependency caches
+        if: always() && steps.dependency-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.putnami/cache/go
+            ~/.putnami/toolchains
+            ~/.putnami/artifacts
+            ~/.bun/install/cache
+            ~/.putnami/tools/go
+          key: ${{ steps.dependency-cache.outputs.cache-primary-key }}

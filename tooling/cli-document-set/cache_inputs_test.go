@@ -23,6 +23,11 @@ import (
 
 const cliProjectDir = cliModuleDir
 
+// wholeTreeGatesUncached marks a file only the whole-tree gates of
+// @putnami/cli-documents read. Those gates run where PUTNAMI_WHOLE_TREE_GATES
+// is set, without a cache, so no project keys the file.
+const wholeTreeGatesUncached = ""
+
 // documentsOwnedRepositoryFiles are the repository files the two document
 // projects — and only they among the CLI's test projects — read, each with the
 // project that must key it. Keeping them out of @putnami/cli's declared test
@@ -40,11 +45,6 @@ const cliProjectDir = cliModuleDir
 // decisions.json, the first-use smoke script, the agent-artifact trees) is
 // absent here on purpose: it is honestly declared twice, because two readers
 // exist.
-// wholeTreeGatesUncached marks a file only the whole-tree gates of
-// @putnami/cli-documents read. Those gates run where PUTNAMI_WHOLE_TREE_GATES
-// is set, without a cache, so no project keys the file.
-const wholeTreeGatesUncached = ""
-
 var documentsOwnedRepositoryFiles = map[string]string{
 	".github/PULL_REQUEST_TEMPLATE.md": wholeTreeGatesUncached,
 	".gitignore":                       wholeTreeGatesUncached,

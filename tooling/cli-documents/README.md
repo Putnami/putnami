@@ -16,7 +16,9 @@ read every candidate file of the repository. They run only when
 
 - the [whole-tree gates workflow](../../.github/workflows/whole-tree-gates.yml)
   sets the variable on every push to `main`, and on a pull request that changes
-  this project, `tooling/windows-vet` or the workflow itself;
+  this project, `tooling/windows-vet`, the workflow itself, or a file that
+  records or repairs a verdict: the rehearsal report, the release plan and the
+  public-cut baseline and allowlist;
 - the per-change gate, `putnami lint,test,build,validate --impacted`, does not
   set it, so a change elsewhere in the repository plans neither this project
   nor the prerequisite steps of the projects it depends on.
