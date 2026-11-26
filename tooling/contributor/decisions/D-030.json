@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-030",
+  "statement": "code starts without the owner's approval; the owner approves first only a change that takes a one-way door or touches a sensitive zone",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+  "reviewOnly": true
+}

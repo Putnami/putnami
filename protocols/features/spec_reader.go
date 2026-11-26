@@ -259,7 +259,7 @@ func ReadSpecSource(reader SpecReader, input SpecInput) SpecProjection {
 
 // specTextBoundFindings marks each text over the native bound. The projection
 // keeps the text whole, because a market format does not bound it and refusing
-// it would fail a first report run; only enforce asks for the split. (D-043)
+// it would fail a first report run; only enforce asks for the split. (ADR 0006 §22)
 func specTextBoundFindings(spec *Spec, referencePath string, reading SpecReading) []diag.Diagnostic {
 	var findings []diag.Diagnostic
 	mark := func(field, kind, split string, text string) {
@@ -405,7 +405,7 @@ func compareFileScenarios(projection SpecProjection, declared map[string][]strin
 // requirementIDFromName gives a requirement with no anchor the ID its name maps
 // to. A name that maps to none takes requirement-<ordinal>, its 1-based place
 // among the requirements, so the ID comes from its position: the requirement is
-// unanchored, report reads it and enforce asks for an anchor. (D-057)
+// unanchored, report reads it and enforce asks for an anchor. (D-042)
 func requirementIDFromName(name string, ordinal int) (id string, unanchored bool) {
 	if id, ok := NormalizeRequirementName(name); ok {
 		return id, false

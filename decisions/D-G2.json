@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-G2",
+  "statement": "a check run under CI writes no source, and its failure names the command that fixes it",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "go/extension/doc/adr/0014-a-check-run-in-ci-writes-no-source.md",
+  "reviewOnly": true
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-029",
+  "statement": "the main session runs a change's stages in sequence; a workflow profile may move a stage to a separate agent, and the default profile moves only review",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+  "reviewOnly": true
+}

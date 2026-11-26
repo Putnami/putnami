@@ -33,8 +33,8 @@ several issues of an epic, each in its own session, never slices of one issue.
 6. Report the slice: what it delivered, its gate session, and the tokens spent
    against its estimate. `"$PUTNAMI_CLI" agent stage code` prints the
    session's tokens so far. A slice 50 % over its estimate, or one that leaves
-   its declared projects, stops for the owner when an envelope was approved,
-   and is reported otherwise.
+   its declared projects, stops for the owner when it is an epic child with an
+   approved envelope, and is reported otherwise.
 
 ## One intent, gated phases
 

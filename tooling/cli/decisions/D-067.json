@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-067",
+  "statement": "init without a language flag proposes the languages whose markers it finds, asking in a terminal; without one it declares nothing it would have to ask, and names the command",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0086-init-declares-the-languages-a-repository-holds.md",
+  "reviewOnly": true
+}

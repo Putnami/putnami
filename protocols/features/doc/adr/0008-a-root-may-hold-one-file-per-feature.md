@@ -1,11 +1,15 @@
 # ADR 0008 — A root may hold one file per feature, and a requirement text may be a list of sentences
 
-- **Status**: accepted
+- **Status**: accepted; amended on 2026-11-26: decision `one-file-per-feature`
+  moved to `protocols/features/decisions/` and now reads only that a root
+  holds its authored features in `putnami.features.json` or as
+  `features/<feature>.json`, never both. The requirement-text and baseline
+  clauses are this ADR's format detail
 - **Scope**: `go.putnami.dev/protocol/features` (`protocols/features`) and
   every reader of authored features: `@putnami/sdd`, `@putnami/contributor`,
   the CLI declaration digest, `go.putnami.dev/app` and
   `@putnami/application`
-- **Records**: decision `one-file-per-feature`, in `decisions/one-file-per-feature.json`
+- **Records**: decision `one-file-per-feature`, in `protocols/features/decisions/one-file-per-feature.json`
 
 ## Context
 

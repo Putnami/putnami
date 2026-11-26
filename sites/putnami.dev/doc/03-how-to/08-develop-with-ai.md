@@ -55,8 +55,9 @@ correction reuses existing intent and design. Focused `spec`, `design`,
 `design` covers a prototype and an ADR. `content-bump` remains an explicit-only utility.
 
 `putnami change estimate --issue <id>` sizes a plan S, M or L before code
-starts. An S plan starts at once; a plan with important design decisions or a
-sensitive slice waits for the owner to approve the study and a cost envelope.
+starts. Code starts without the owner's approval; only a change that takes a
+one-way door or touches a sensitive zone waits for the owner to approve the
+study, the plan and the estimate.
 When one outcome needs several issues, `epic` plans them in dependency order,
 has the owner approve one envelope, and runs one `build` session per issue,
 wave by wave.

@@ -1,6 +1,9 @@
 # ADR 0019 — A delegated verb runs as one tool command
 
-- **Status**: accepted
+- **Status**: accepted; amended on 2026-11-26: decision
+  `delegate-runs-one-process-per-task` is renamed
+  `a-delegated-verb-runs-as-one-tool-command`, moves to
+  `tooling/stacks/decisions/`, and no longer lists the command of each tool
 - **Date**: 2026-11-24
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), `@putnami/cli` (the
   scheduler's batching), `integrations/moon` (`@putnami/moon`),
@@ -14,8 +17,8 @@
 
 ## Context
 
-A delegated task starts its own tool process on its own project (ADR 0008,
-`delegate-runs-one-process-per-task`), and the tasks of one stack root hold
+A delegated task starts its own tool process on its own project (ADR 0008, the
+decision then named `delegate-runs-one-process-per-task`), and the tasks of one stack root hold
 the root's lock, so they also run one after the other. On a warm cache, the
 tool alone runs the same work several times faster. Measured on 2026-11-11
 against the canary of that day, on the second run of an unchanged tree:

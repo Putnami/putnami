@@ -2,8 +2,8 @@
 
 - **Status**: accepted, superseded in part by
   [ADR 0004](0004-the-contributor-extension-ships-a-compiled-executable.md):
-  §1, the extension runs an executable. Amended by decision D-013
-  (`decisions/D-013.json`): `putnami migrate agent-content` is deleted. A clone that
+  §1, the extension runs an executable. Amended by decision D-013,
+  retired on 2026-11-26 once done: `putnami migrate agent-content` is deleted. A clone that
   still holds ownership records of the superseded artifacts deletes the
   records its install refusal names.
 - **Scope**: `@putnami/contributor` (`tooling/contributor`), this repository's

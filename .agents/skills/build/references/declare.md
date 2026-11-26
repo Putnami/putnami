@@ -57,8 +57,8 @@ One issue is one proposal, with no line or time cap. Work that needs several
 proposals is several issues, ordered in an epic the
 [epic](../../epic/SKILL.md) workflow plans and launches.
 
-A sensitive zone is one the project declares in its specification; a project
-that declares none has two: data migrations and the public API. State the
+The plan names the sensitive zones each slice touches; data migrations and
+the public API are always sensitive. State the
 impact of the change on security, performance, costs, screens and
 infrastructure, and mark a one-way door: a change hard to undo once released.
 
@@ -66,6 +66,6 @@ infrastructure, and mark a one-way door: a change hard to undo once released.
 
 Run `"$PUTNAMI_CLI" change estimate --issue <issue>`, with the same id as
 the plan, and apply the launch rule of
-the skill core. When the owner must approve, give them the study, the plan,
-the estimate and the envelope, and wait. Record the estimate of each slice: the
+the skill core. When the owner must approve, give them the study, the plan
+and the estimate, and wait. Record the estimate of each slice: the
 slice report compares it with the tokens spent.

@@ -58,7 +58,7 @@ func SpecNativeGaps(projection SpecProjection, feature Feature) []SpecGap {
 	// A native spec has no section, no context link and no scenario, so the
 	// rewrite removes those gaps. specs init --from refuses a source enforce
 	// refuses, such as an unanchored requirement or a text over the 512-byte
-	// bound (D-043, D-056), so until those are fixed the step says so.
+	// bound (ADR 0006 §22, sdd ADR 0004 point 8), so until those are fixed the step says so.
 	command := fmt.Sprintf("`putnami specs init %s --from %s:%s`", feature.ID, reference.Format, reference.Path)
 	rewrite := "; or draft a native spec with " + command
 	if diag.HasErrors(projection.EnforceOnly(VerificationModeEnforce)) {

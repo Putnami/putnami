@@ -524,7 +524,7 @@ type SpecInitOptions struct {
 // authored outcome, an empty requirement list, and no decisions, because
 // inventing a requirement sentence or an ADR link would put words the team
 // never agreed to into a durable artifact. With --from it copies the text of
-// the external spec the feature's manifest entry names (D-046, D-056).
+// the external spec the feature's manifest entry names (D-046).
 func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecInitOptions) (SpecInitReport, error) {
 	if !validSpecSelector(selector) {
 		return SpecInitReport{}, protocolcli.Usagef("specs init requires a valid <feature-id>")

@@ -314,7 +314,7 @@ installed, and the compatibility window for them has ended:
   names them; run `putnami install` without the run credential and commit
   the lock.
 - **No command moves them.** `putnami migrate agent-content` is deleted, with
-  no transition window (decision D-013); its rollback is gone with it.
+  no transition window ([ADR 0047](adr/0047-extension-owned-agent-content.md)); its rollback is gone with it.
 - **Older CLIs** fail on an updated workspace instead of skipping its
   content. A CLI before contract 5 refuses the extension package with
   `extension requires a newer putnami`. A CLI that predates the `extension:`

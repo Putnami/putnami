@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-011",
+  "statement": "@putnami/contributor ships a compiled executable and owns the change noun",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md",
+  "reviewOnly": true
+}

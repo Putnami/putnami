@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-027",
+  "statement": "a change runs one contribution loop from talk to merge, whose stages the build skill lists; deployment after merge is CI/CD, not a stage",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+  "reviewOnly": true
+}

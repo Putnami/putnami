@@ -36,12 +36,12 @@ stage's reference only.
 | Validate | Puts the attention points in front of the owner, and returns to code on a change request | `validate.md` |
 | Merge | Verifies the dossier and marks the proposal ready; merges only with authority | `merge.md` |
 
-Code waits for the owner only when the plan spans several slices with
-important design or spec decisions, or touches a sensitive zone: the owner
-then approves the study and a cost envelope first. An S plan, or several
-slices with no important new decision, starts at once. After an approval,
-build stops only when it exceeds the envelope, must change the approved
-design, or contradicts an ADR.
+Code starts without the owner's approval. It waits only for a change that
+takes a one-way door or touches a sensitive zone: the owner then approves the
+study, the plan and the estimate first. The plan names the sensitive zones it
+touches, and data migrations and the public API are always sensitive. After
+an approval, build stops only when it must change the approved design or
+contradicts an ADR.
 
 The main session runs every stage. A workflow profile in the
 [repository policy](02-repository-policy.md) can move a stage to a separate

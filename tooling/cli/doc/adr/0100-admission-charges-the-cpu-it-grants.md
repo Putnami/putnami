@@ -1,6 +1,6 @@
 # ADR 0100 — Admission charges the CPU it grants
 
-- **Status**: accepted, amended 2026-11-25
+- **Status**: accepted, amended 2026-11-25; decision admission-charges-the-cpu-it-grants retired on 2026-11-26; this ADR remains the record
 - **Date**: 2026-11-24
 - **Scope**: `@putnami/cli` (`internal/jobs/scheduler`), `run.orchestration`
   of the `result-v2` contract (`go.putnami.dev/protocol/cli`, one more

@@ -5,7 +5,7 @@ import { specTest } from '@putnami/runtime/spectest';
 
 // The committed fold table the Go mapping reads is what the runtime's NFKD
 // gives, and the runtime's NFKD maps the golden names to the golden IDs.
-// PUTNAMI_UPDATE_GOLDEN=1 rewrites the table. (D-057)
+// PUTNAMI_UPDATE_GOLDEN=1 rewrites the table. (D-042, protocols/features ADR 0006)
 const IDENTITY = {
   feature: 'features/feature-contracts',
   requirement: 'requirement-identity-mapping',
@@ -69,7 +69,7 @@ function serializeTable(table: FoldTable): string {
   return `{\n  "unicode": ${JSON.stringify(table.unicode)},\n  "drop": [\n${drop}\n  ],\n  "fold": {\n${fold}\n  }\n}\n`;
 }
 
-/** The D-057 mapping, with the runtime's NFKD in place of the Go table. */
+/** The requirement-name mapping of protocols/features, with the runtime's NFKD in place of the Go table. */
 function requirementId(name: string): string | null {
   const folded = name.normalize('NFKD').replace(/\p{M}/gu, '');
   let id = '';

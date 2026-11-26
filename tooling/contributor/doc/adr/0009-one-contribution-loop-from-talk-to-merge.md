@@ -1,6 +1,8 @@
 # ADR 0009 — One contribution loop from talk to merge
 
-- **Status**: accepted
+- **Status**: accepted; amended on 2026-11-26: decisions D-027, D-029 to
+  D-034 are rewritten and move to `tooling/contributor/decisions/`, and
+  decision D-035 retired on 2026-11-26; this ADR remains the record
 - **Scope**: `@putnami/contributor` skills and agents, the `missions`
   contract, and this repository's issue labels
 
@@ -111,3 +113,31 @@ there names the default profile.
 
 Restore the per-unit stages in the workflow record and the tier workers in
 `build`. The labels stay: they describe issues, not the workflow.
+
+## Amendment of 2026-11-26
+
+The decisions this ADR records moved to `tooling/contributor/decisions/`, the
+registry of `@putnami/contributor`, and their statements now name the
+principle rather than the numbers and names above. Where a section and a
+decision differ, the decision holds.
+
+- §1 (D-027): the loop's stages are the ones the `build` skill lists; the
+  decision no longer pins the eight names.
+- §3 (D-029, D-035): the main session runs a change's stages in sequence; a
+  workflow profile may move a stage to a separate agent, and the default
+  profile moves only review. D-035, whose check repeated
+  `profiles.default.review.runs` of the contributor policy, is merged into
+  D-029; the policy holds the value.
+- §4 (D-030): code starts without the owner's approval. The owner approves
+  first only a change that takes a one-way door or touches a sensitive zone.
+  The study and cost envelope for a multi-slice plan are no longer required.
+- §4 (D-031): SDD declares no sensitive zones. A change plan names the ones it
+  touches, and data migrations and the public API are always sensitive.
+- §5 (D-032): a change's working artefacts stay out of Git; the decision no
+  longer names the `.putnami/` folder.
+- §6 (D-033): a task selects a workflow profile through the label that the
+  policy's `tasks.profileLabel` names. The `type/`, `priority/` and `scope/`
+  label names are repository configuration, not a decision.
+- §7 (D-034): a profile becomes an issue type's default on a recorded paired
+  comparison on one base that shows a lower cost and no more findings or
+  rework. The five pairs and the four-of-five rule are no longer required.

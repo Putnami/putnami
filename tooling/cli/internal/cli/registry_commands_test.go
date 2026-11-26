@@ -442,7 +442,7 @@ func TestCmdCLI_ListGlobalNeedsNoWorkspace(t *testing.T) {
 }
 
 // The core serves no version command: the installed-binary commands moved to
-// the cli noun with no alias (D-018), and version get and tag to @putnami/dev
+// the cli noun with no alias, and version get and tag to @putnami/dev
 // (D-010). The catalog documents none of them, and the version root is refused
 // as a root that left the core.
 func TestVersionIsNoCoreCommand(t *testing.T) {

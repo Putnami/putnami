@@ -1,6 +1,7 @@
 # ADR 0048 — Separate agent artifacts move to extension content in one explicit, journaled step
 
-- **Status**: superseded by decision D-013 (`decisions/D-013.json`):
+- **Status**: superseded by decision D-013, which retired on 2026-11-26 once
+  done; [ADR 0047](0047-extension-owned-agent-content.md) remains its record:
   `putnami migrate agent-content` is deleted, with no transition window. A
   workspace that still declares or records a superseded artifact is refused
   with nothing written, and the refusal says which entry to replace or which

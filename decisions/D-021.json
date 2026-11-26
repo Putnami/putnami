@@ -2,8 +2,8 @@
   "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
   "id": "D-021",
-  "statement": "an extension manifest declares the kind of each command it adds, in an additive contract rung that ships with the traits that replace verb-name checks",
-  "settled": "2026-10-18",
+  "statement": "an extension manifest declares the kind and traits of each command it adds; the core decides no behaviour from a verb name",
+  "settled": "2026-11-26",
   "settledBy": "fdumay",
   "adr": "tooling/cli/doc/adr/0074-deployment-follows-the-declared-release-set-trait.md",
   "reviewOnly": true

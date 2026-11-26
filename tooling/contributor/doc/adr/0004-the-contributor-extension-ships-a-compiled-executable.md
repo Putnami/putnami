@@ -3,6 +3,10 @@
 - **Status**: accepted, superseded in part by
   [ADR 0005](0005-the-contributor-executable-serves-the-change-noun.md): §1,
   the executable serves the change noun
+- **Amended**: 2026-11-26: decision D-011 moved to
+  `tooling/contributor/decisions/` and now reads that `@putnami/contributor`
+  ships a compiled executable and owns the change noun, without the list of
+  its subcommands
 - **Scope**: `@putnami/contributor` (`tooling/contributor`): its manifest, its
   Go module and its packaging
 - **Supersedes in part**: [ADR 0001](0001-one-contributor-extension.md) §1, on
@@ -14,7 +18,7 @@ ADR 0001 §1 made the extension content-only: its manifest declared only
 `agentContent`, and the native verifier, publication and policy helpers stayed
 in the core CLI (`putnami tree verify`, `putnami proposals finalize`,
 `putnami contributor language|machine-load`, `putnami sessions
-export|summary`). Decision D-011 in the root `decisions/` registry settles that
+export|summary`). Decision D-011 (now in `tooling/contributor/decisions/`) settles that
 `@putnami/contributor` ships a compiled executable and owns those commands.
 This record fixes what the extension ships before any of them moves.
 

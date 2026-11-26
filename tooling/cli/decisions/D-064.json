@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-064",
+  "statement": "init --from adopts in import or delegate mode: import by default where the tool's extension supports it, else delegate; --mode chooses and skips the question",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

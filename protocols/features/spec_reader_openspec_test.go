@@ -83,7 +83,7 @@ func TestBrownfieldOpenSpecSpecsParseWithPositionedFindings(t *testing.T) {
 }
 
 // TestSampledSpecsOverABoundBlockOnlyInEnforce reads the sampled files that a
-// D-043 bound refused before: report reads them, and enforce fails each with a
+// ADR 0006 §22 bound refused before: report reads them, and enforce fails each with a
 // finding that names the line and the split.
 func TestSampledSpecsOverABoundBlockOnlyInEnforce(t *testing.T) {
 	t.Parallel()

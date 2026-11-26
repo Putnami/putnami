@@ -543,7 +543,7 @@ func TestContributorEpicLaunchesChildrenAndNeverCodes(t *testing.T) {
 	for _, want := range []string{
 		"a child of an approved [epic]",
 		"it also stops past 150 % of that share or at a sensitive zone its plan did not name",
-		"stop only when the work exceeds the envelope",
+		"stop only when the work must change the approved design, contradicts an ADR, or, for an epic child, exceeds its envelope",
 	} {
 		if !strings.Contains(build, want) {
 			t.Errorf("build SKILL.md lacks %q", want)

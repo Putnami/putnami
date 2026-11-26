@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-042",
+  "statement": "a requirement ID survives reordering: a name-derived ID is stable, and a positional ID needs an explicit anchor before its project enforces specs",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0006-the-spec-source-contract.md",
+  "reviewOnly": true
+}

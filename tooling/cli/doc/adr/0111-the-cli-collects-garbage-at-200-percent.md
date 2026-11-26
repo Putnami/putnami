@@ -1,6 +1,6 @@
 # ADR 0111 — The CLI collects garbage at 200 percent
 
-- **Status**: accepted
+- **Status**: accepted; decision the-cli-collects-garbage-at-200-percent retired on 2026-11-26; this ADR remains the record
 - **Date**: 2026-11-26
 - **Scope**: `@putnami/cli` (`cmd/putnami`: every process started from the
   `putnami` binary)

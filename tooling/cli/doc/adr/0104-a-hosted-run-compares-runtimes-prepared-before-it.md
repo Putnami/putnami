@@ -1,6 +1,6 @@
 # ADR 0104 — A hosted run compares runtimes prepared before it
 
-- **Status**: accepted
+- **Status**: accepted; decision a-hosted-run-compares-runtimes-prepared-before-it retired on 2026-11-26; this ADR remains the record
 - **Date**: 2026-11-25
 - **Amends**: [ADR 0103](0103-an-unchanged-extension-runtime-reaches-no-consumer.md),
   decision 4 (a hosted run looks the base runtime up and prepares nothing)

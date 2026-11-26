@@ -1,6 +1,6 @@
 # ADR 0103 — An unchanged extension runtime reaches no consumer
 
-- **Status**: accepted
+- **Status**: accepted; decision an-unchanged-extension-runtime-reaches-no-consumer retired on 2026-11-26; this ADR remains the record
 - **Date**: 2026-11-25
 - **Amends**: [ADR 0044](0044-selection-is-task-level.md), decision 2 (the
   extension-consumer edge), and the extension-consumer scope of

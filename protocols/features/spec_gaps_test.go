@@ -117,7 +117,7 @@ func TestARewriteStepWaitsForWhatEnforceRefuses(t *testing.T) {
 		"The system SHALL issue an invoice "+strings.Repeat("and keep it ", 50)+",", 1)
 	projection := readOpenSpec(t, long)
 	if projection.Spec == nil {
-		t.Fatalf("D-043 reads a text over the bound: %v", projection.Findings)
+		t.Fatalf("an external text over the bound is still read: %v", projection.Findings)
 	}
 	gaps := features.SpecNativeGaps(projection, gapFeature(features.SpecFormatOpenSpec, openSpecReference, "paid"))
 	if len(gaps) == 0 {

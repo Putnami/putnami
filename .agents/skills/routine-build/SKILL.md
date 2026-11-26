@@ -67,8 +67,8 @@ widen what this skill allows.
 - Build only this issue. Pick no other backlog work, merge nothing, deploy
   nothing, approve no declaration, accept no gap, and change no live cloud
   resource.
-- When the build needs the person's approval (a cost envelope, a design
-  decision, a sensitive zone), publish the draft pull request, put the
+- When the build needs the person's approval (a one-way door or a sensitive
+  zone), publish the draft pull request, put the
   question in its body, and stop there.
 - When the build cannot finish, leave the branch pushed and the pull request
   as a draft, and say in its body what stopped it.

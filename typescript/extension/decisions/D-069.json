@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-069",
+  "statement": "a TypeScript library whose build runs tsc alone builds with that tsc and declares the outDir its tsconfig names as its output",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md",
+  "reviewOnly": true
+}

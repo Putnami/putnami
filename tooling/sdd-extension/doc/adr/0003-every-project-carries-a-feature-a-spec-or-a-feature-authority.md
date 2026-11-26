@@ -1,6 +1,11 @@
 # ADR 0003 — Every project carries a feature, a spec or a featureAuthority
 
-- **Status**: accepted
+- **Status**: accepted; point 4 superseded on 2026-11-26: the debt list is
+  empty, and decision D-025 no longer names it or checks that
+  `putnami.workspace.json` keeps it. The statement now reads that every
+  workspace project carries a feature of its own, a spec or a reviewed
+  `featureAuthority`, and that `validate-workspace` fails one that carries
+  none
 - **Scope**: `@putnami/sdd` (`feature-coverage-validate` and
   `feature-coverage-ratchet-validate`, steps of `validate-workspace`), every
   workspace that sets
@@ -58,8 +63,8 @@ warning named 7 of them.
 6. **The workspace opts in.** Without `options.sdd.featureCoverage`, the step
    passes with a note that counts the projects that would fail. A block the
    step cannot read fails closed: an unknown member, a missing `debt`, an
-   entry that is not a project id, or a duplicate entry. In this repository,
-   the check of D-025 fails a `putnami.workspace.json` that drops the list.
+   entry that is not a project id, or a duplicate entry. Until 2026-11-26, the
+   check of D-025 failed a `putnami.workspace.json` that dropped the list.
 7. **The step reads the candidate cut.** It reads the manifests and the specs
    through the Git candidate files, so an ignored document covers nothing, and
    the task is cached on the input `git:**`. That key also holds the workspace

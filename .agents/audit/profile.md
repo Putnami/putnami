@@ -41,8 +41,7 @@ Role labels come from the project tags and the scope:
 | scope `go`, `typescript`, `python` or `protocols`, no extension or sample tag | `role/framework` |
 | scope `sites`, no other role tag | `role/site` |
 
-Issue types use the `type/` labels that decision D-033 (`decisions/D-033.json`)
-allows:
+Issue types use this repository's `type/` labels:
 
 | Issue | Label |
 | --- | --- |

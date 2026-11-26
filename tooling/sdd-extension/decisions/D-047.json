@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-047",
+  "statement": "a project opts into the market spec formats it reads in options.sdd.specFormats, its list over the workspace's, none by default",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+  "reviewOnly": true
+}

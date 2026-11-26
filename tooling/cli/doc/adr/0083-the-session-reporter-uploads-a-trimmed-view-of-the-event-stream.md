@@ -1,10 +1,15 @@
 # ADR 0083 — The session reporter uploads a trimmed view of the event stream
 
-- **Status**: accepted
+- **Status**: accepted; decisions D-R2 and D-R3 retired on 2026-11-26; this
+  ADR remains the record
+- **Amended**: 2026-11-26: decision D-R1 is rewritten and absorbs D-R2 and
+  D-R3. It reads that the session reporter's upload keeps every event of a
+  failed task, in order, and is bounded. The bound of point 8 and the shared
+  records of point 6 are this ADR's detail, held by the reporter's tests
 - **Date**: 2026-10-28
 - **Amends**: [ADR 0033](0033-native-session-reporting.md), durable delivery
 - **Scope**: `@putnami/cli` (`internal/sessionreporter`), feature
-  `cli/native-session-reporting`, decisions D-R1, D-R2 and D-R3
+  `cli/native-session-reporting`, decision D-R1
 
 ## Context
 

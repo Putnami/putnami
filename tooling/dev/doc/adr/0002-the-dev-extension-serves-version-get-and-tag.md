@@ -2,13 +2,20 @@
 
 - **Status**: accepted, superseded in part by
   [ADR 0003](0003-the-dev-executable-serves-compose-and-qualify.md): §1, the
-  manifest's CLI contract 11
+  manifest's CLI contract 11; decision D-018 retired on 2026-11-26; this ADR
+  remains the record
+- **Amended**: 2026-11-26: decision D-010 is rewritten and absorbs D-018. It
+  reads that the core CLI computes a tree's version before any cache key and
+  that `@putnami/dev` owns the version noun. The `changelog` command it named
+  never shipped, so the decision no longer names it. D-018's move of
+  `version list|use` to `cli list|use` is done
 - **Scope**: `@putnami/dev` (`tooling/dev`): its manifest, its runtime and its
   Go module
 - **Supersedes in part**: [ADR 0001](0001-the-dev-extension-declares-the-development-verbs.md)
   §1, on the manifest declaring no command, command group, task or runtime,
   and §4, on the executable answering only the runtime handshake
-- **Decisions**: D-010, D-014 and D-018 of the root `decisions/` registry;
+- **Decisions**: D-010 and D-014 of the root `decisions/` registry, and D-018
+  (retired);
   [ADR 0071](../../../cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md)
   of `@putnami/cli`
 

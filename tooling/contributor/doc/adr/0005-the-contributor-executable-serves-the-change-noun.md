@@ -1,6 +1,7 @@
 # ADR 0005 — The contributor executable serves the change noun
 
-- **Status**: accepted
+- **Status**: accepted; decision D-016 retired on 2026-11-26; this ADR remains the record
+  (its rename is done, and D-011 now names the change noun)
 - **Scope**: `@putnami/contributor` (`tooling/contributor`): its manifest, its
   runtime and its callers
 - **Supersedes in part**: [ADR 0004](0004-the-contributor-extension-ships-a-compiled-executable.md)
@@ -8,7 +9,7 @@
 
 ## Context
 
-Decision D-011 in the root `decisions/` registry settles that `@putnami/contributor`
+Decision D-011 (now in `tooling/contributor/decisions/`) settles that `@putnami/contributor`
 owns the change commands. D-016 names them: `change verify`, `change finalize`
 and `change language` replace `tree verify`, `proposals finalize` and
 `contributor language`. D-014 settles that an extension command calls the

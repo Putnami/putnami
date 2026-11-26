@@ -1,15 +1,21 @@
 # ADR 0086 — `init` declares the languages a repository holds
 
-- **Status**: accepted
+- **Status**: accepted; decision D-008 retired on 2026-11-26, since D-007 and
+  `init --help` already state it; this ADR remains the record
+- **Amended**: 2026-11-26: decision D-067 moved to `tooling/cli/decisions/`
+  and now reads that `init` without a language flag proposes the languages
+  whose markers it finds, asking in a terminal, and that without a terminal it
+  declares nothing it would have to ask and names the command. The decision
+  no longer lists the cases point 5 describes
 - **Date**: 2026-11-10
-- **Decision**: D-067 of the root `decisions/` registry; D-008 stays as written
+- **Decision**: D-067 of `tooling/cli/decisions/`
 - **Scope**: `@putnami/cli` (`internal/commands/lifecycle`: `workspace_init.go`,
   `init_languages.go`, `init_languages.json`; `internal/workspace`:
   `project_scan.go`; `internal/commandmeta`)
 
 ## Context
 
-D-008 settles that `putnami init --extension <language>` installs that
+D-008 settled that `putnami init --extension <language>` installs that
 language extension, and that its dependencies bring the rest. `init` accepted
 three languages, `ts`, `go` and `py`, from a table in the CLI that paired each
 with a starter template. The seven stack extensions (`@putnami/rust`, `java`,
@@ -88,7 +94,7 @@ After it installs the declared extensions, and after the starter project when
 `--project` is given, `init` looks for the markers of the declared languages,
 by the walk of point 7. When it finds one, it runs `putnami projects sync`,
 then installs the extensions the sync declared, as `init --from` does
-([D-064](../../../../decisions/D-064.json)). A language whose markers are absent is
+([D-064](../../decisions/D-064.json)). A language whose markers are absent is
 declared and installed, and nothing is synchronized.
 
 ### 5. Without `--extension`, `init` proposes what it detects

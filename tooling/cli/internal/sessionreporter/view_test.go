@@ -283,7 +283,7 @@ func TestAFailingTaskSendsItsHeldLinesInOrderBeforeItsEnd(t *testing.T) {
 }
 
 // TestASharedBatchLineLeavesAtItsFirstFailingMember attributes batch lines to
-// the members their context names (D-R3): a shared debug line leaves just
+// the members their context names (ADR 0083 point 6): a shared debug line leaves just
 // before the first failing member's task:end and is dropped when every member
 // passes; a shared info line leaves at the first member's end.
 func TestASharedBatchLineLeavesAtItsFirstFailingMember(t *testing.T) {
@@ -369,7 +369,7 @@ func TestSessionEndAndTheFinalMarkerReleaseWhatIsHeld(t *testing.T) {
 }
 
 // TestHeldRecordsPastTheCapReleaseTheTaskThatHoldsTheMost lowers the cap
-// (D-R2): past it, the owner that holds the most releases every record, as a
+// (ADR 0083 point 8): past it, the owner that holds the most releases every record, as a
 // failure would, and sends live from then on. A tie goes to the owner whose
 // first held record comes first, then to the smaller owner key, a shared
 // record counts once, and a record that names a live owner leaves live.

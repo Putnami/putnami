@@ -11,8 +11,8 @@
   `internal/extension`), `@putnami/cli-model` (`extension`),
   `go.putnami.dev/protocol/extension` and `go.putnami.dev/protocol/cli`
   (contract rung 9), and the `@putnami/dev` extension
-- **Decisions**: D-006, D-007, D-009, D-010 and D-012 of the root
-  `decisions/` registry
+- **Decisions**: D-006, D-007, D-010 and D-012 of the root `decisions/`
+  registry, and D-009, which moved to `tooling/cli/decisions/` on 2026-11-26
 
 ## Context
 

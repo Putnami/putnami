@@ -16,7 +16,7 @@ import (
 )
 
 // viewHeldCap is the most records the view holds at once, a record several
-// owners hold counted once (D-R2). Past it, the owner that holds the most
+// owners hold counted once (ADR 0083 point 8). Past it, the owner that holds the most
 // releases them, as a failure would, and sends live from then on. Only tests
 // lower it.
 var viewHeldCap = 1_000_000
@@ -379,7 +379,7 @@ func (v *view) taskEnd(key, status string) {
 }
 
 // releaseLargest releases every record of the owner that holds the most, as
-// a failure would, and makes it live (D-R2). A tie goes to the owner whose
+// a failure would, and makes it live (ADR 0083 point 8). A tie goes to the owner whose
 // first held record comes first, then to the smaller owner key.
 func (v *view) releaseLargest() {
 	var largest *viewOwner

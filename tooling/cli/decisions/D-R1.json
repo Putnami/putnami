@@ -2,8 +2,8 @@
   "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
   "id": "D-R1",
-  "statement": "from a task's first debug line to its task:end, the session reporter's upload holds every task:event of that task, so a failed task's lines keep their order and its info, warn and diagnostic events leave at its end",
-  "settled": "2026-10-28",
+  "statement": "the session reporter's upload keeps every event of a failed task, in order, and is bounded",
+  "settled": "2026-11-26",
   "settledBy": "fdumay",
   "adr": "doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md",
   "reviewOnly": true

@@ -87,21 +87,20 @@ design.
 ## When code waits
 
 At the end of declare, `"$PUTNAMI_CLI" change estimate --issue <id>` sizes the
-plan S, M or L.
+plan S, M or L. The size informs the slice reports; it does not make code
+wait.
 
-- An S plan: code starts, even with open design questions.
-- Several slices and no important new decision: code starts, and the owner
-  validates at the end.
-- Several slices with important design or spec decisions, or a slice that
-  touches a sensitive zone: the owner approves the study and a cost envelope
-  (tokens, minutes, slices) before code.
+Code starts without the owner's approval, even with open design questions,
+and the owner validates at the end. The owner approves first only a change
+that takes a one-way door or touches a sensitive zone: give them the study,
+the plan and the estimate before code.
 
 A decision the owner settled in talk or in the task counts as approved, and
 so does a child of an approved [epic](../epic/SKILL.md): its envelope is the
 share its mandate names, and it also stops past 150 % of that share or at a
 sensitive zone its plan did not name. After approval, stop only when the work
-exceeds the envelope, must change the approved design, or contradicts an
-ADR. Slice reports inform; they do not ask.
+must change the approved design, contradicts an ADR, or, for an epic child,
+exceeds its envelope. Slice reports inform; they do not ask.
 
 ## Who runs each stage
 

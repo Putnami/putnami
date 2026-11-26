@@ -1,6 +1,17 @@
 # ADR 0006 — The spec source contract
 
-- **Status**: accepted
+- **Status**: accepted; decisions D-043, D-049 to D-054 and D-057 retired on
+  2026-11-26; this ADR remains the record
+- **Amended**: 2026-11-26: the decisions it records moved out of the root
+  registry. D-048, D-055 and D-042 sit in `protocols/features/decisions/`,
+  D-041 and D-047 in `tooling/sdd-extension/decisions/`. D-042 absorbs D-052
+  and D-057: a requirement ID survives reordering, a name-derived ID is
+  stable, and a positional ID needs an explicit anchor before its project
+  enforces specs. D-041 absorbs D-051, D-047 absorbs D-049, and D-055 now
+  reads that `protocols/features` depends on no third-party module and that a
+  reader's vocabulary is committed data. D-050, D-053 and D-054 and the bounds
+  of D-043 and D-057 are this ADR's detail, held by the reader tests and the
+  conformance fixtures; the decision marks below cite the retired ids
 - **Scope**: `go.putnami.dev/protocol/features` (`protocols/features`) and
   `@putnami/sdd` (`tooling/sdd-extension`)
 - **Implements**:

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-055",
+  "statement": "protocols/features depends on no third-party module; a reader's vocabulary is committed data",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0006-the-spec-source-contract.md",
+  "reviewOnly": true
+}

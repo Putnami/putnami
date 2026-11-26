@@ -2,9 +2,9 @@
   "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
   "id": "evidence-version-1-changes-only-by-addition",
-  "statement": "the change evidence document keeps version 1 by addition only: a new optional member, vocabulary value or looser bound; removing, renaming, retyping, requiring, unrequiring or narrowing what version 1 holds opens version 2",
-  "settled": "2026-11-22",
-  "settledBy": "a build session, for the owner to review on its proposal",
+  "statement": "a published protocol version changes only by addition; removing, renaming, retyping, requiring or narrowing opens a new version",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
   "adr": "protocols/evidence/doc/adr/0005-version-1-changes-only-by-addition.md",
   "reviewOnly": true
 }

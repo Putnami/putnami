@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "proxy-safe-traceparent-header",
+  "statement": "a client copies its traceparent into x-putnami-traceparent, and a server parents its span to that header's span when it has the trace ID of traceparent and another parent ID",
+  "settled": "2026-11-19",
+  "settledBy": "a build session, for the owner to review on its proposal",
+  "check": {
+    "kind": "json-value",
+    "files": [
+      "fixtures/conventions/proxy-safe-traceparent.json"
+    ],
+    "pointer": "/header",
+    "rule": "equals",
+    "value": "x-putnami-traceparent",
+    "whenMissing": "violated"
+  }
+}

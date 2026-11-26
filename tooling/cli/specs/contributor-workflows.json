@@ -90,8 +90,8 @@
       "text": [
         "Build runs the loop talk, declare, show, code, check, prove, validate, merge from a core under 2,000 tokens and one reference per stage, read only at that stage.",
         "It reports each stage with putnami agent stage and sizes its plan with putnami change estimate before code.",
-        "Code starts without the owner unless the plan spans several slices with important design or spec decisions or touches a sensitive zone;",
-        "the owner then approves the study and a cost envelope first."
+        "Code starts without the owner's approval unless the change takes a one-way door or touches a sensitive zone;",
+        "the owner then approves the study, the plan and the estimate first."
       ]
     },
     {

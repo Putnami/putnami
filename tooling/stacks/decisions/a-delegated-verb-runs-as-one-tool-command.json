@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "a-delegated-verb-runs-as-one-tool-command",
+  "statement": "a delegated verb runs one tool command over its projects; when it fails, a project passes only on the success the tool reports for it",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md",
+  "reviewOnly": true
+}

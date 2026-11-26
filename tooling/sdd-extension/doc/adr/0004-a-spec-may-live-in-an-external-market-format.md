@@ -1,9 +1,18 @@
 # ADR 0004 — A spec may live in an external market format
 
-- **Status**: accepted
+- **Status**: accepted; decisions D-043 and D-056 retired on 2026-11-26; this
+  ADR remains the record
 - **Settled**: 2026-11-04, decisions D-039 to D-047 of the root
   `decisions/` registry; D-056, taken on 2026-11-05 by a build session for the
   owner to review, details decision 8
+- **Amended**: 2026-11-26: D-039, D-041, D-044 to D-047 moved to
+  `tooling/sdd-extension/decisions/`, and D-040 and D-042 to
+  `protocols/features/decisions/`. D-041 absorbs D-051, D-042 absorbs D-052
+  and D-057, D-046 absorbs D-056, and D-047 absorbs D-049. D-046 now reads
+  that `specs init` writes one new native spec from the source the feature
+  names, never overwrites, copies only source text and has no bulk
+  migration; `O_EXCL` and the flag list of point 8 are this ADR's detail.
+  D-047 now also says how a project's list resolves over the workspace's
 - **Amends**:
   [ADR 0007](../../../cli/doc/adr/0007-read-mostly-spec-surface.md), §1 and
   §2: `specs init --from` drafts a native spec from an external one

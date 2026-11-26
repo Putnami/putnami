@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-046",
+  "statement": "specs init writes one new native spec from the source the feature names, never overwrites, copies only source text, and has no bulk migration",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+  "reviewOnly": true
+}

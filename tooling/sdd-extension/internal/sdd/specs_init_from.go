@@ -66,7 +66,7 @@ type specDraft struct {
 // gate cannot disagree about what the source says. It refuses a --from that is
 // not the feature's reference, a source the discovery could not project, and a
 // projection that enforce would refuse: an unanchored positional requirement
-// would give the native spec an ID that depends on order (D-042, D-056).
+// would give the native spec an ID that depends on order (D-042, D-046).
 func (repository *specRepository) draftFromExternalSpec(feature string, from featureproto.SpecReference) (specDraft, []diag.Diagnostic, error) {
 	reference, field, manifest, found := repository.specReferenceOf(feature)
 	if !found {

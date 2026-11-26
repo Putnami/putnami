@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "cloud-config-refresh-is-opt-in",
+  "statement": "the Cloud remote config and secrets sources refresh only when CONFIG_SERVER_REFRESH sets a positive period, and a refresh that fails, a revoked or deleted config included, keeps the tree the process already holds until the next start",
+  "settled": "2026-11-19",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

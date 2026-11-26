@@ -1244,7 +1244,7 @@ func TestCodeownersSyncDeclaresItWritesSources(t *testing.T) {
 	}
 }
 
-// TestSpecTasksKeyEveryExtensionAReaderReads pins D-050: a task input cannot
+// TestSpecTasksKeyEveryExtensionAReaderReads pins features ADR 0006 §9: a task input cannot
 // depend on a manifest's path, so each extension a format's reader sees has a
 // static input on both cached spec tasks.
 func TestSpecTasksKeyEveryExtensionAReaderReads(t *testing.T) {

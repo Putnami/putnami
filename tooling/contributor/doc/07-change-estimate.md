@@ -117,8 +117,8 @@ The sessions record no endpoint and no screen, so the allowance of 2 files per
 endpoint and 3 per screen is fixed, not fitted. The size thresholds are not
 fitted either. The smallest bucket's sessions ran 31 to 86 minutes end to end,
 so S stops at 90 minutes on the high bound: a slice of 5 files or fewer, with
-no sensitive zone, is the change whose code starts without waiting for an
-approval.
+no sensitive zone. The size informs the slice reports; whether code waits for
+an approval depends only on a one-way door or a sensitive zone.
 
 ## Change the coefficients
 

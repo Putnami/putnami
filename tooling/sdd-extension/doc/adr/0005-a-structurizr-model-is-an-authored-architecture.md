@@ -1,6 +1,7 @@
 # ADR 0005 — A Structurizr model is an authored architecture
 
-- **Status**: accepted
+- **Status**: accepted; decisions D-061 and D-062 moved to
+  `tooling/sdd-extension/decisions/` on 2026-11-26
 - **Settled**: 2026-11-07, decisions D-061 and D-062 of the root
   `decisions/` registry, approved by the owner with the plan of the Structurizr import
 - **Amends**: nothing. `architecture sync` still never writes an import, and

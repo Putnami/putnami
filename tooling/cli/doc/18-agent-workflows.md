@@ -162,7 +162,7 @@ CLI never installs a separately declared artifact: every command refuses the
 declaration with nothing written. Every command also refuses an `extension:`
 opt-in while this clone still records an artifact the content supersedes,
 because two ownership records would claim the same files. No command moves
-them for you: `putnami migrate agent-content` is deleted (decision D-013).
+them for you: `putnami migrate agent-content` is deleted ([ADR 0047](adr/0047-extension-owned-agent-content.md)).
 
 To replace them:
 

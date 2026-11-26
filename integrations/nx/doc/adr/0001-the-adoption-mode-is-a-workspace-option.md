@@ -4,7 +4,12 @@
   [ADR 0002](0002-a-delegated-workspace-imports-the-projects-a-list-names.md)
   and by
   [ADR 0017 of `tooling/stacks`](../../../../tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md):
-  the sync declares `@putnami/typescript`, only when a target moves to it
+  the sync declares `@putnami/typescript`, only when a target moves to it.
+  Amended on 2026-11-26: decision D-064 moved to `tooling/cli/decisions/` and
+  now reads that `init --from` adopts in import or delegate mode, import by
+  default where the tool's extension supports it, else delegate, and that
+  `--mode` chooses and skips the question. Bazel and Pants, which only
+  delegate, adopt in delegate mode without a terminal
 - **Date**: 2026-11-09
 - **Scope**: `integrations/nx` (`@putnami/nx`) and `tooling/cli`
   (`putnami init --from`); builds on

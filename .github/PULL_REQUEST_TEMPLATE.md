@@ -8,6 +8,12 @@
 
 -
 
+## Deletes
+
+<!-- What this PR deletes: code, files, options, decisions or docs. Write "Nothing" when it deletes nothing. -->
+
+-
+
 ## Type
 
 <!-- Check the one that applies. -->

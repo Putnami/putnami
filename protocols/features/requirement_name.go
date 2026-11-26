@@ -12,7 +12,7 @@ import (
 // asciiFoldTable lists the code points Unicode NFKD less its combining marks
 // drops, and the whole decomposition of each code point whose decomposition
 // holds an ASCII letter or digit. Its non-ASCII characters are separators.
-// (D-057)
+// (D-042, ADR 0006)
 //
 //go:embed unicode/ascii-fold.json
 var asciiFoldTable []byte
@@ -62,7 +62,7 @@ func (f asciiFold) drops(r rune) bool {
 // lowercases ASCII letters, keeps ASCII digits, turns each other run of
 // characters into one hyphen and trims the ends. A letter with no ASCII
 // decomposition, such as ß, stays a separator. A name with nothing left, or
-// longer than the bound, has no ID. (D-057)
+// longer than the bound, has no ID. (D-042, ADR 0006)
 func NormalizeRequirementName(name string) (string, bool) {
 	folds := asciiFolds()
 	var out []byte

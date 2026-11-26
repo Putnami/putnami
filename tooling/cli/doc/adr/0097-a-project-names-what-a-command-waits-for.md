@@ -58,12 +58,13 @@ per task. Three adoptions lost the order their tool kept:
 - The adoption syncs write these entries from what the tool declares: Rush's
   build order and phased commands, `turbo.json`'s `dependsOn`, moon's
   resolved `deps`. A delegated Rush task keeps one tool process on its own
-  project (`delegate-runs-one-process-per-task`): `rush test --only` stays,
+  project (the decision then named `delegate-runs-one-process-per-task`): `rush test --only` stays,
   and waits for the `rush build --to` the project's build task runs.
 
 ## Amendment, 2026-11-24
 
-`delegate-runs-one-process-per-task` now runs a delegated verb of moon and
+The decision now named `a-delegated-verb-runs-as-one-tool-command`
+(`tooling/stacks/decisions/`) runs a delegated verb of moon and
 Nx as one tool command over its projects
 ([stacks ADR 0019](../../../stacks/doc/adr/0019-a-delegated-verb-runs-as-one-tool-command.md)),
 on measurements of 2026-11-11 on an unchanged tree: `moon run` alone took
