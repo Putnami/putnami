@@ -1,8 +1,10 @@
 package git
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	pathpkg "path"
 	"regexp"
@@ -12,6 +14,7 @@ import (
 
 	protocoljob "go.putnami.dev/protocol/job"
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // CandidateFiles is the candidate cut of the work tree at root as a `git:`
@@ -66,13 +69,41 @@ func CandidateFiles(root string) ([]protocoljob.CandidateFile, error) {
 // tag: "<mode> <object> <stage>\t<path>".
 var stageEntry = regexp.MustCompile(`(?s)^([0-7]{6}) [0-9a-f]{40,64} ([0-3])\t(.+)$`)
 
-// IgnoresDirectory reports whether Git's ignore rules exclude the directory
-// rel of the work tree at root as a whole: Git then lists nothing below it,
-// whatever a task writes there. A failure, a missing directory included,
-// answers false.
-func IgnoresDirectory(root, rel string) bool {
-	_, _, err := gitread.RunCapture(root, "check-ignore", "-q", "--", rel)
-	return err == nil
+// IgnoresDirectories returns which of rels, slash paths relative to the work
+// tree at root, Git's ignore rules exclude as a whole, asked in one git call:
+// Git then lists nothing below such a directory, whatever a task writes there.
+// A missing directory may answer not excluded. A failure is an error: Git
+// refuses the whole question when one path lies beyond a link or in a nested
+// repository.
+func IgnoresDirectories(root string, rels []string) (map[string]bool, error) {
+	ignored := map[string]bool{}
+	if len(rels) == 0 {
+		return ignored, nil
+	}
+	var input bytes.Buffer
+	for _, rel := range rels {
+		input.WriteString(rel)
+		input.WriteByte(0)
+	}
+	cmd := exec.Command(gitread.Executable(), "check-ignore", "-z", "--stdin")
+	cmd.Dir = root
+	cmd.Env = gitread.RepositoryEnvironment(os.Environ())
+	cmd.Stdin = &input
+	data, err := procstat.Output(cmd, procstat.Git)
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 {
+		// Exit status 1: none of them is ignored.
+		return ignored, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("git check-ignore: %w", err)
+	}
+	for _, rel := range bytes.Split(data, []byte{0}) {
+		if len(rel) > 0 {
+			ignored[string(rel)] = true
+		}
+	}
+	return ignored, nil
 }
 
 // workspaceConfigMaxBytes bounds the workspace config a change history reads

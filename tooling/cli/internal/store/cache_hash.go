@@ -86,7 +86,9 @@ type fileEntry struct {
 // globDoubleStar expands a pattern containing "**" by walking the tree under
 // dir. The segment before "**" is treated as a literal directory prefix.
 // Heavy non-project directories are skipped for performance.
-func globDoubleStar(dir, pattern string) []string {
+//
+// It also reports whether a match is a symbolic link.
+func globDoubleStar(dir, pattern string) ([]string, bool) {
 	pattern = filepath.ToSlash(pattern)
 	parts := strings.SplitN(pattern, "**", 2)
 	prefix := strings.Trim(strings.TrimSuffix(parts[0], "/"), "/")
@@ -97,6 +99,7 @@ func globDoubleStar(dir, pattern string) []string {
 	}
 
 	var matches []string
+	linked := false
 	_ = filepath.WalkDir(searchRoot, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -119,10 +122,11 @@ func globDoubleStar(dir, pattern string) []string {
 		}
 		if wsproto.MatchFilePattern(filepath.ToSlash(rel), pattern) {
 			matches = append(matches, p)
+			linked = linked || d.Type()&os.ModeSymlink != 0
 		}
 		return nil
 	})
-	return matches
+	return matches, linked
 }
 
 // collectFiles returns a sorted, deduplicated list of files matching
@@ -149,41 +153,45 @@ func globDoubleStar(dir, pattern string) []string {
 //     wsproto.SelectsPath states. The empty pattern set never selects one. An
 //     input selector that lists one selects it: the extension read it.
 func collectFiles(dir string, patterns []string, expander InputExpander) ([]fileEntry, error) {
-	return collectFilesWith(nil, dir, patterns, expander)
+	files, _, err := collectFilesWith(nil, dir, patterns, expander)
+	return files, err
 }
 
 // collectFilesWith is collectFiles, listing a whole work tree's candidate cut
 // from cut when it reads one (collectGitFilesWith).
-func collectFilesWith(cut CandidateSource, dir string, patterns []string, expander InputExpander) ([]fileEntry, error) {
+//
+// It also returns what the collection learned beside its files
+// (collectionFacts).
+func collectFilesWith(cut CandidateSource, dir string, patterns []string, expander InputExpander) ([]fileEntry, collectionFacts, error) {
 	dir, err := gitInputDirectory(dir, patterns)
 	if err != nil {
-		return nil, err
+		return nil, collectionFacts{}, err
 	}
 	if len(patterns) == 0 {
 		files, err := collectDefaultFiles(dir)
 		if err != nil {
-			return nil, err
+			return nil, collectionFacts{}, err
 		}
-		return sortedUniqueFileEntries(files), nil
+		return sortedUniqueFileEntries(files), collectionFacts{}, nil
 	}
 	selectors, others, err := splitInputSelectors(patterns)
 	if err != nil {
-		return nil, err
+		return nil, collectionFacts{}, err
 	}
-	files, err := collectPatternFilesWith(cut, dir, others)
+	files, facts, err := collectPatternFilesWith(cut, dir, others)
 	if err != nil {
 		if len(selectors) > 0 {
-			return nil, fmt.Errorf("%w: input selection unavailable: %w", ErrInputSelector, err)
+			return nil, collectionFacts{}, fmt.Errorf("%w: input selection unavailable: %w", ErrInputSelector, err)
 		}
-		return nil, err
+		return nil, collectionFacts{}, err
 	}
 	for _, selector := range selectors {
 		files, err = appendSelectorFiles(dir, files, expander, selector)
 		if err != nil {
-			return nil, err
+			return nil, collectionFacts{}, err
 		}
 	}
-	return sortedUniqueFileEntries(files), nil
+	return sortedUniqueFileEntries(files), facts, nil
 }
 
 // namesInputSelector reports whether a pattern of patterns names an input
@@ -219,7 +227,7 @@ func splitInputSelectors(patterns []string) (selectors, others []string, err err
 // candidate includes of patterns select under dir, less the exclusions,
 // listing a whole work tree's candidate cut from cut when it reads one
 // (collectGitFilesWith).
-func collectPatternFilesWith(cut CandidateSource, dir string, patterns []string) ([]fileEntry, error) {
+func collectPatternFilesWith(cut CandidateSource, dir string, patterns []string) ([]fileEntry, collectionFacts, error) {
 	includes, excludes := wsproto.SplitFilePatterns(patterns)
 	var ordinaryPatterns, gitPatterns []string
 	for _, pattern := range includes {
@@ -229,15 +237,29 @@ func collectPatternFilesWith(cut CandidateSource, dir string, patterns []string)
 			ordinaryPatterns = append(ordinaryPatterns, pattern)
 		}
 	}
-	files := collectOrdinaryFiles(dir, ordinaryPatterns, excludes)
+	var facts collectionFacts
+	files, linked := collectOrdinaryFiles(dir, ordinaryPatterns, excludes)
+	facts.matchedLink = linked
 	if len(gitPatterns) > 0 {
-		candidates, err := collectGitFilesWith(cut, dir, gitPatterns, excludes)
+		candidates, fromCut, absent, err := collectGitFilesWith(cut, dir, gitPatterns, excludes)
 		if err != nil {
-			return nil, err
+			return nil, collectionFacts{}, err
 		}
-		files = append(files, candidates...)
+		files, facts.cut, facts.absent = append(files, candidates...), fromCut, absent
 	}
-	return files, nil
+	return files, facts, nil
+}
+
+// collectionFacts is what a collection learned beside the files it selected:
+// the read of the cut its Git candidates were listed from, nil when Git listed
+// them or patterns name none, and whether an ordinary pattern matched a
+// symbolic link (collectOrdinaryFiles).
+type collectionFacts struct {
+	// absent holds the selected Git candidates the listing names that are
+	// absent from the work tree, relative to the collection's directory.
+	absent      []string
+	cut         *CandidateCut
+	matchedLink bool
 }
 
 // selectorExpansionAttempts bounds how many times one selector is expanded
@@ -324,16 +346,66 @@ func collectDefaultFiles(dir string) ([]fileEntry, error) {
 	return files, err
 }
 
-func collectOrdinaryFiles(dir string, patterns, excludes []string) []fileEntry {
+// collectOrdinaryFiles returns the files the ordinary patterns select under
+// dir, less the exclusions, and whether a pattern matched a symbolic link,
+// selected or not, or a file a link leads to: a write where the link leads,
+// which may lie outside the digest's region, changes what the digest reads or
+// adds a file the names of the selection do not show.
+func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry, bool) {
 	var files []fileEntry
+	matchedLink := false
+	// throughLink reports whether a match below root, a pattern's static
+	// prefix, is a symbolic link or lies under a directory below root that is
+	// one; linkFree memoizes the directories. A link at or above root is in
+	// the digest's region (FileInputRegion follows it).
+	linkFree := map[string]bool{}
+	throughLink := func(root, path string) bool {
+		if path == root {
+			return false
+		}
+		if info, err := os.Lstat(path); err != nil || info.Mode()&os.ModeSymlink != 0 {
+			return err == nil
+		}
+		for current := filepath.Dir(path); current != root && strings.HasPrefix(current, root+string(filepath.Separator)); current = filepath.Dir(current) {
+			free, known := linkFree[current]
+			if !known {
+				info, err := os.Lstat(current)
+				free = err == nil && info.Mode()&os.ModeSymlink == 0
+				linkFree[current] = free
+			}
+			if !free {
+				return true
+			}
+		}
+		return false
+	}
 	for _, pattern := range patterns {
 		slashed := filepath.ToSlash(pattern)
 		sweptByGlob := strings.ContainsAny(slashed[strings.LastIndex(slashed, "/")+1:], "*?[")
 		var matches []string
 		if strings.Contains(pattern, "**") {
-			matches = globDoubleStar(dir, pattern)
+			var linked bool
+			matches, linked = globDoubleStar(dir, pattern)
+			matchedLink = matchedLink || linked
 		} else {
 			matches, _ = filepath.Glob(filepath.Join(dir, pattern))
+			// A glob before the last segment can reach a directory link
+			// whose target holds no match yet: no name says where a later
+			// write adds one.
+			if before, _, nested := strings.Cut(filepath.ToSlash(pattern), "/"); nested && before != "" {
+				if segments := strings.Split(filepath.ToSlash(pattern), "/"); slices.ContainsFunc(segments[:len(segments)-1], func(segment string) bool {
+					return strings.ContainsAny(segment, globMetacharacters)
+				}) {
+					matchedLink = true
+				}
+			}
+			root, _ := patternRoot(dir, pattern)
+			for _, match := range matches {
+				// Glob follows a directory link on the way, too.
+				if throughLink(root, match) {
+					matchedLink = true
+				}
+			}
 		}
 		for _, match := range matches {
 			if wsproto.IsNamedOnlyInput(match) && !wsproto.PatternNamesFile(pattern, match) {
@@ -345,7 +417,7 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string) []fileEntry {
 			}
 		}
 	}
-	return files
+	return files, matchedLink
 }
 
 // ordinaryFileEntry stats one match of an ordinary pattern, following links.
@@ -499,7 +571,11 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 // (go.putnami.dev/protocol/job, doc/adr/0003). The paths are then relative to
 // dir; the selection, the refusals and the digest are the ones the Git
 // listing gives.
-func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []string) ([]fileEntry, error) {
+//
+// It also returns the read of the cut it listed from, nil when it asked Git,
+// and the selected candidates the listing names that are absent from the work
+// tree, relative to dir: a write that restores one moves the digest.
+func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []string) ([]fileEntry, *CandidateCut, []string, error) {
 	var root string
 	var paths []string
 	var index gitutil.IndexModes
@@ -515,24 +591,25 @@ func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []s
 		cmd.Dir = dir
 		out, err := procstat.Output(cmd, procstat.Git)
 		if err != nil {
-			return nil, fmt.Errorf("resolve Git input repository: %w", err)
+			return nil, nil, nil, fmt.Errorf("resolve Git input repository: %w", err)
 		}
 		root = strings.TrimSuffix(string(out), "\n")
 		prefixes := gitInputPrefixes(root, dir, includes)
 		paths, err = candidatePaths(root, prefixes...)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 		index, err = gitutil.ReadIndexModes(root, prefixes...)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 	}
 	var files []fileEntry
+	var absent []string
 	for _, path := range paths {
 		rel, err := filepath.Rel(dir, filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 		// The includes are all "git:" patterns, which SelectsPath matches as
 		// MatchFilePattern does, less a file only a naming pattern selects.
@@ -540,22 +617,26 @@ func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []s
 			continue
 		}
 		if index.Unmerged[path] {
-			return nil, fmt.Errorf("git candidate %q has an unmerged index entry", path)
+			return nil, nil, nil, fmt.Errorf("git candidate %q has an unmerged index entry", path)
 		}
 		full := filepath.Join(dir, rel)
 		info, err := os.Lstat(full)
 		if os.IsNotExist(err) {
+			absent = append(absent, filepath.ToSlash(rel))
 			continue // An unstaged tracked deletion is absent from the cut.
 		}
 		if err != nil {
-			return nil, fmt.Errorf("git candidate %q: %w", path, err)
+			return nil, nil, nil, fmt.Errorf("git candidate %q: %w", path, err)
 		}
 		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
-			return nil, fmt.Errorf("git candidate %q is not a regular file or symlink", path)
+			return nil, nil, nil, fmt.Errorf("git candidate %q is not a regular file or symlink", path)
 		}
 		files = append(files, fileEntry{path: full, info: info, gitCandidate: true, indexMode: index.Modes[path]})
 	}
-	return files, nil
+	if fromCut {
+		return files, &read, absent, nil
+	}
+	return files, nil, absent, nil
 }
 
 // CandidateCut is one read of the candidate cut of a work tree's directory:
@@ -1213,17 +1294,48 @@ func hashFiles(dir string, patterns []string, expander InputExpander, scope Proj
 // hashFilesWith is hashFiles, listing a whole work tree's candidate cut from
 // cut when it reads one (collectGitFilesWith).
 func hashFilesWith(cut CandidateSource, dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, error) {
+	hash, _, err := collectAndHashFiles(cut, dir, patterns, expander, scope)
+	return hash, err
+}
+
+// witnessedHashFiles is hashFilesWith with the witness of what the digest read
+// (newSelectionWitness), nil when the names of its files alone do not decide
+// its selection.
+func witnessedHashFiles(cut CandidateSource, dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, *selectionWitness, error) {
+	hash, collected, err := collectAndHashFiles(cut, dir, patterns, expander, scope)
+	if err != nil {
+		return "", nil, err
+	}
+	if collected.facts.matchedLink {
+		// A write where the link leads, which may lie outside the digest's
+		// region, can move it unseen: the digest is not memoized.
+		return hash, &selectionWitness{unmemoized: true}, nil
+	}
+	return hash, newSelectionWitness(collected.dir, patterns, collected.files, collected.facts), nil
+}
+
+// collectedFiles is the directory a digest collected its files under and the
+// files it selected.
+type collectedFiles struct {
+	dir   string
+	files []fileEntry
+	facts collectionFacts
+}
+
+// collectAndHashFiles is hashFilesWith, also returning what it collected.
+func collectAndHashFiles(cut CandidateSource, dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, collectedFiles, error) {
 	projectDir := dir
 	dir, err := gitInputDirectory(dir, patterns)
 	if err != nil {
-		return "", err
+		return "", collectedFiles{}, err
 	}
 	var files []fileEntry
+	var facts collectionFacts
 	var digests [][]byte
 	for attempt := 1; ; attempt++ {
-		files, err = collectFilesWith(cut, dir, patterns, expander)
+		files, facts, err = collectFilesWith(cut, dir, patterns, expander)
 		if err != nil {
-			return "", err
+			return "", collectedFiles{}, err
 		}
 		digests = hashFileContents(files, scope, projectDir)
 		unread := -1
@@ -1239,7 +1351,7 @@ func hashFilesWith(cut CandidateSource, dir string, patterns []string, expander 
 		// A listed file that vanished between its stat and its read makes
 		// the list stale, as in appendSelectorFiles: collect again.
 		if _, statErr := os.Lstat(files[unread].path); attempt == selectorExpansionAttempts || !errors.Is(statErr, os.ErrNotExist) {
-			return "", fmt.Errorf("%w: cannot read %s", ErrInputSelector, files[unread].path)
+			return "", collectedFiles{}, fmt.Errorf("%w: cannot read %s", ErrInputSelector, files[unread].path)
 		}
 	}
 
@@ -1258,7 +1370,7 @@ func hashFilesWith(cut CandidateSource, dir string, patterns []string, expander 
 		h.Write([]byte{0})
 	}
 
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return hex.EncodeToString(h.Sum(nil)), collectedFiles{dir: dir, files: files, facts: facts}, nil
 }
 
 // hashFileContents returns the SHA-256 digest of each file's bytes, indexed to

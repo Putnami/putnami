@@ -245,14 +245,14 @@ func TestDigestSpanningAnInvalidationIsNotMemoized(t *testing.T) {
 	cm := NewCacheManager(nil)
 	original := memoizedHashFiles
 	t.Cleanup(func() { memoizedHashFiles = original })
-	memoizedHashFiles = func(dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, error) {
-		hash, err := original(dir, patterns, expander, scope)
+	memoizedHashFiles = func(cut CandidateSource, dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, *selectionWitness, error) {
+		hash, witness, err := original(cut, dir, patterns, expander, scope)
 		// The writer lands its output and invalidates while this digest of the
 		// old bytes is still in flight.
 		writeRegionFile(t, layer, "new layer")
 		cm.InvalidateFileHashesUnder([]string{filepath.Dir(layer)})
 		memoizedHashFiles = original
-		return hash, err
+		return hash, witness, err
 	}
 
 	stale, err := cm.HashFiles(dir, []string{".gen/**"}, nil, ProjectConfigScope{})
@@ -289,14 +289,14 @@ func TestDigestSpanningUnrelatedInvalidationsIsMemoizedWhileTheyAreRemembered(t 
 			cm := NewCacheManager(nil)
 			original := memoizedHashFiles
 			t.Cleanup(func() { memoizedHashFiles = original })
-			memoizedHashFiles = func(dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, error) {
-				hash, err := original(dir, patterns, expander, scope)
+			memoizedHashFiles = func(cut CandidateSource, dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, *selectionWitness, error) {
+				hash, witness, err := original(cut, dir, patterns, expander, scope)
 				// Other tasks land outputs elsewhere while this digest is in flight.
 				for range tc.invalidations {
 					cm.InvalidateFileHashesUnder([]string{filepath.Join(dir, "elsewhere")})
 				}
 				memoizedHashFiles = original
-				return hash, err
+				return hash, witness, err
 			}
 
 			first, err := cm.HashFiles(dir, []string{".gen/**"}, nil, ProjectConfigScope{})

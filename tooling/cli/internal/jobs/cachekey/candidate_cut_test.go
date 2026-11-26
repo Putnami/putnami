@@ -172,10 +172,13 @@ func TestAWriteReadsTheCutAgainOnlyForTheKeysItReaches(t *testing.T) {
 	writeFileAt(t, filepath.Join(root, ".gitignore"), "dist/\n.putnami\n")
 	ws := treeFactsWorkspace(root)
 	var reads, asks atomic.Int32
-	savedFiles, savedIgnores := candidateFiles, ignoresDirectory
+	savedFiles, savedIgnores := candidateFiles, ignoresDirectories
 	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, error) { reads.Add(1); return savedFiles(dir) }
-	ignoresDirectory = func(root, rel string) bool { asks.Add(1); return savedIgnores(root, rel) }
-	t.Cleanup(func() { candidateFiles, ignoresDirectory = savedFiles, savedIgnores })
+	ignoresDirectories = func(root string, rels []string) (map[string]bool, error) {
+		asks.Add(1)
+		return savedIgnores(root, rels)
+	}
+	t.Cleanup(func() { candidateFiles, ignoresDirectories = savedFiles, savedIgnores })
 	key := extension.TaskCacheKey{Files: []string{"main.go"}, Runtime: []string{extproto.RuntimeInputCandidateFiles}}
 	app, lib := cutJob(ws.ProjectByID("/app"), key), cutJob(ws.ProjectByID("/lib"), key)
 	facts := NewTreeFacts(root)
@@ -282,5 +285,98 @@ func TestReachedPath(t *testing.T) {
 		if got := reachedPath(rel); got != want {
 			t.Errorf("reachedPath(%q) = %q, want %q", rel, got, want)
 		}
+	}
+}
+
+// A write under a declared output directory Git excludes as a whole, below
+// which the cut lists nothing, leaves the workspace's cut as it is, once the
+// question about .putnami was asked: that one question names every output.
+// Before it, such a write reads the cut again, as before. A write under an
+// output where the cut lists a tracked file, or one Git does not exclude,
+// reads the cut again, and so does a write under any output but .putnami once
+// a write of the run named a .gitignore. An output in a nested repository,
+// which Git refuses to answer for, is not asked about and costs .putnami
+// nothing (tooling/cli ADR 0109).
+func TestAWriteUnderAnIgnoredOutputLeavesTheCutAsItIs(t *testing.T) {
+	spectest.Proves(t, treeFactsFeature, "candidate-cut-and-history-follow-the-key", "a-write-of-the-run-reads-the-cut-again")
+	root := treeFactsRepo(t)
+	writeFileAt(t, filepath.Join(root, ".gitignore"), "dist/\n.putnami\ngen\n")
+	writeFileAt(t, filepath.Join(root, "lib", "gen", "pinned.txt"), "tracked\n")
+	treeKeyedGit(t, root, "add", "-f", filepath.Join("lib", "gen", "pinned.txt"))
+	var reads, asks atomic.Int32
+	savedFiles, savedIgnores := candidateFiles, ignoresDirectories
+	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, error) { reads.Add(1); return savedFiles(dir) }
+	ignoresDirectories = func(root string, rels []string) (map[string]bool, error) {
+		asks.Add(1)
+		return savedIgnores(root, rels)
+	}
+	t.Cleanup(func() { candidateFiles, ignoresDirectories = savedFiles, savedIgnores })
+	facts := NewTreeFacts(root)
+	nested := filepath.Join(root, "nested")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	treeKeyedGit(t, nested, "init", "-q")
+	facts.outputs = []string{filepath.Join(root, ".putnami"), filepath.Join(root, "app", "gen"),
+		filepath.Join(root, "lib", "gen"), filepath.Join(root, "other", "build"), filepath.Join(nested, "gen")}
+	facts.currentCut()
+
+	step := func(name string, written string, wantReads, wantAsks int32) {
+		t.Helper()
+		writeFileAt(t, filepath.Join(written, "out.txt"), name+"\n")
+		facts.InvalidateCut([]string{written})
+		facts.currentCut()
+		if reads.Load() != wantReads || asks.Load() != wantAsks {
+			t.Fatalf("%s: %d reads and %d asks, want %d and %d", name, reads.Load(), asks.Load(), wantReads, wantAsks)
+		}
+	}
+	step("an ignored output before .putnami was asked about", filepath.Join(root, "app", "gen"), 2, 0)
+	step("a write under .putnami", filepath.Join(root, ".putnami", "out", "app"), 2, 1)
+	step("an ignored output once Git answered", filepath.Join(root, "app", "gen", "conf"), 2, 1)
+	step("an ignored output where the cut lists a tracked file", filepath.Join(root, "lib", "gen"), 3, 1)
+	step("an output Git does not exclude", filepath.Join(root, "other", "build"), 4, 1)
+	step("a write outside every output", filepath.Join(root, "app", "src"), 5, 1)
+	step("an output Git refuses to answer for", filepath.Join(nested, "gen"), 6, 1)
+	step("another write under .putnami", filepath.Join(root, ".putnami", "out", "lib"), 6, 1)
+	gitignore := filepath.Join(root, ".gitignore")
+	writeFileAt(t, gitignore, "dist/\n.putnami\n")
+	facts.InvalidateCut([]string{gitignore})
+	facts.currentCut()
+	step("an output once a .gitignore was written", filepath.Join(root, "app", "gen", "later"), 8, 1)
+	step(".putnami once a .gitignore was written", filepath.Join(root, ".putnami", "out", "late"), 8, 1)
+
+	// A write that names a directory above an output may have written the
+	// rules that exclude it, here by removing them: a later write under the
+	// output reads the cut again, and the read is the cut a fresh read gives.
+	writeFileAt(t, gitignore, "dist/\n.putnami\ngen\n")
+	again := NewTreeFacts(root)
+	again.outputs = facts.outputs
+	again.currentCut()
+	readsBefore := reads.Load()
+	putnamiWrite := filepath.Join(root, ".putnami", "out", "again")
+	writeFileAt(t, filepath.Join(putnamiWrite, "out.txt"), "again\n")
+	again.InvalidateCut([]string{putnamiWrite})
+	again.currentCut()
+	if err := os.RemoveAll(filepath.Join(root, "app", "gen")); err != nil {
+		t.Fatal(err)
+	}
+	again.InvalidateCut([]string{filepath.Join(root, "app", "gen")})
+	again.currentCut()
+	if reads.Load() != readsBefore {
+		t.Fatalf("writes under excluded outputs read the cut %d times, want none", reads.Load()-readsBefore)
+	}
+	writeFileAt(t, filepath.Join(root, "app", ".gitignore"), "!gen\n")
+	again.InvalidateCut([]string{filepath.Join(root, "app")})
+	again.currentCut()
+	writeFileAt(t, filepath.Join(root, "app", "gen", "after.txt"), "after\n")
+	again.InvalidateCut([]string{filepath.Join(root, "app", "gen")})
+	if kept, fresh := again.currentCut(), NewTreeFacts(root).currentCut(); !slices.Equal(kept.files, fresh.files) {
+		t.Fatal("after a write above an output, the kept read lists other candidates than a fresh read")
+	}
+
+	// A write that names the workspace root may have rewritten the
+	// repository's own exclude rules, which no .gitignore shows.
+	if !again.aboveAnOutput(root) {
+		t.Fatal("a write of the workspace root did not count as a write of Git's rules")
 	}
 }

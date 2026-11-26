@@ -1,6 +1,7 @@
 # ADR 0106 — A write under an excluded .putnami keeps the digests of Git candidates
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0109](0109-a-write-drops-a-memoized-digest-only-when-it-can-move-it.md)
 - **Date**: 2026-11-25
 - **Amends**: [ADR 0041](0041-git-candidate-file-inputs.md) (a `git:` digest
   lives in the run's memo until a write can move it), and extends point 2 of

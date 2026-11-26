@@ -1,6 +1,8 @@
 # ADR 0004 — A write of the run reads the cut again only for the keys it reaches
 
-- **Status**: accepted
+- **Status**: accepted, point 4 amended by `tooling/cli`
+  [ADR 0109](../../../../tooling/cli/doc/adr/0109-a-write-drops-a-memoized-digest-only-when-it-can-move-it.md)
+  (a write under an output Git ignores as a whole)
 - **Scope**: `@putnami/cli` (`internal/jobs/cachekey`, the run's read of the
   candidate cut and of the tracked paths; `internal/jobs/scheduler`, which
   reads the tracked paths through it)

@@ -134,6 +134,9 @@ so does a squash title that adds or drops the breaking marker (`!` or a
 `BREAKING CHANGE:` footer): the verdict reads that marker. A git failure leaves
 the task without a key, so it runs uncached. One run reads each project's
 baseline once, so a tag created during the run is seen by the next run.
+What does not depend on the project, the repository's state, HEAD and its
+tags, is read once per run for every project its work tree holds
+([ADR 0110](adr/0110-a-run-reads-the-release-state-of-its-repository-once.md)).
 Declaring the input requires CLI contract 7. See
 [ADR 0062](adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md).
 
@@ -444,6 +447,16 @@ live, keeps it when Git excludes that directory as a whole and lists nothing
 below it: the write adds no candidate and changes none. Where Git does not
 exclude `.putnami`, a file written there is a candidate, and the digest is
 computed again. See [ADR 0106](adr/0106-a-write-under-an-excluded-putnami-keeps-the-candidate-digests.md).
+
+A write drops a memoized input digest only when it can move it: when a file
+the digest read lies at or under a written path, or when a file the write left
+there could be selected by the digest's patterns, an exclusion and the
+directories a recursive walk skips included. A digest that lists its
+candidates from the run's cut, such as a workspace `git:**`, waits for the next
+read of the cut instead, and stays when that read lists the same candidates.
+A digest whose selection the names alone do not decide, an input selector or a
+file read through a link, is dropped by every write its region reaches. See
+[ADR 0109](adr/0109-a-write-drops-a-memoized-digest-only-when-it-can-move-it.md).
 
 Candidate inputs hash raw file bytes and symlink target text, with separate
 file-type markers, and each regular file's executable bit as a source binding

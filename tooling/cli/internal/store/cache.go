@@ -59,7 +59,24 @@ type inputHashMemo struct {
 type memoizedInputHash struct {
 	hash   string
 	region InputRegion
+	// witness, when set, is what the digest read: a write inside region
+	// drops it only when the write can move it (ADR 0109).
+	witness *selectionWitness
+	// pending marks a digest a write moves only if the cut read after it
+	// lists other candidates than the read the digest listed from: the next
+	// lookup compares the two (CacheManager.confirmPending).
+	pending bool
 }
+
+// writeEffect is what one invalidation does to a memoized digest.
+type writeEffect int
+
+const (
+	effectKeeps writeEffect = iota
+	effectDrops
+	// effectPends keeps the digest until a read of the cut confirms it.
+	effectPends
+)
 
 // invalidatedRegion is what one invalidation of an inputHashMemo named.
 type invalidatedRegion struct {
@@ -68,21 +85,50 @@ type invalidatedRegion struct {
 	// excluded answers whether the written paths lie where Git lists no
 	// candidate, nil when nothing says so.
 	excluded *candidateExclusion
+	// listing is what the write left at the paths it names, read once when
+	// a witnessed digest asks, nil when the invalidation names no paths.
+	listing *writtenListing
 }
 
-// moves reports whether a write this invalidation names can move a digest of
+// effect reports whether a write this invalidation names can move a digest of
 // region: the write reaches the region, and either it reaches the part where
 // the digest reads files that are not Git candidates, or it lies where Git can
 // list a candidate. The second question is asked only when the first leaves
 // it open, so a run whose writes reach no candidate digest never asks it.
-func (i invalidatedRegion) moves(region InputRegion) bool {
+//
+// A digest with a witness is decided by its witness instead when the write
+// lies at or under the directory it was collected in: the write moves it only
+// when a file it read lies at or under a written path, or a file the write
+// left there could be selected by its patterns (ADR 0109).
+//
+// The effect tells a digest the write drops from one it pends: one whose
+// witness answers that the write moves it only if the cut moved.
+func (i invalidatedRegion) effect(region InputRegion, witness *selectionWitness) writeEffect {
+	drops := func(moves bool) writeEffect {
+		if moves {
+			return effectDrops
+		}
+		return effectKeeps
+	}
 	if !i.written.Overlaps(region) {
-		return false
+		return effectKeeps
+	}
+	if witness.decides(i.listing) {
+		switch witness.moves(i.listing) {
+		case writeKeeps:
+			return effectKeeps
+		case writeMovesIfCandidate:
+			return drops(i.excluded == nil || !i.excluded.holds())
+		case writeMovesIfCutMoved:
+			return effectPends
+		default:
+			return effectDrops
+		}
 	}
 	if region.nonCandidates == nil || i.excluded == nil || i.written.Overlaps(*region.nonCandidates) {
-		return true
+		return effectDrops
 	}
-	return !i.excluded.holds()
+	return drops(!i.excluded.holds())
 }
 
 // CandidateExclusion reports whether every one of paths, absolute paths a task
@@ -108,19 +154,54 @@ func (e *candidateExclusion) holds() bool {
 // lookup returns the digest memoized at key, or false with the generation a
 // computation of it starts from (memoize).
 func (m *inputHashMemo) lookup(key string) (string, uint64, bool) {
+	hash, generation, ok, pending := m.lookupPending(key)
+	if pending != nil {
+		return "", generation, false
+	}
+	return hash, generation, ok
+}
+
+// lookupPending is lookup, also returning a digest a write left pending with
+// its witness: the caller confirms it against a read of the cut
+// (CacheManager.confirmPending) before it answers with it.
+func (m *inputHashMemo) lookupPending(key string) (string, uint64, bool, *selectionWitness) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if cached, ok := m.entries[key]; ok {
-		return cached.hash, m.generation, true
+		if cached.pending {
+			return cached.hash, m.generation, true, cached.witness
+		}
+		return cached.hash, m.generation, true, nil
 	}
-	return "", m.generation, false
+	return "", m.generation, false, nil
+}
+
+// settle ends the pending state of the digest at key after a read of the cut
+// was compared with its witness's. A confirmed digest stays, unless an
+// invalidation came after the lookup that read it, which judged it again; a
+// refuted one is dropped.
+func (m *inputHashMemo) settle(key string, generation uint64, witness *selectionWitness, confirmed bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cached, ok := m.entries[key]
+	if !ok || !cached.pending || cached.witness != witness {
+		return
+	}
+	if !confirmed {
+		delete(m.entries, key)
+		return
+	}
+	if m.generation == generation {
+		cached.pending = false
+		m.entries[key] = cached
+	}
 }
 
 // memoize records hash at key unless an invalidation since generation, the one
 // its computation started from, named a path in region: the digest may then
 // hold the bytes from before that write. An invalidation the log no longer
 // holds counts as one that did.
-func (m *inputHashMemo) memoize(key string, generation uint64, hash string, region InputRegion) {
+func (m *inputHashMemo) memoize(key string, generation uint64, hash string, region InputRegion, witness *selectionWitness) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.generation != generation {
@@ -128,7 +209,7 @@ func (m *inputHashMemo) memoize(key string, generation uint64, hash string, regi
 			return
 		}
 		for _, invalidation := range m.log {
-			if invalidation.generation > generation && invalidation.moves(region) {
+			if invalidation.generation > generation && invalidation.effect(region, witness) != effectKeeps {
 				return
 			}
 		}
@@ -136,20 +217,24 @@ func (m *inputHashMemo) memoize(key string, generation uint64, hash string, regi
 	if m.entries == nil {
 		m.entries = make(map[string]memoizedInputHash)
 	}
-	m.entries[key] = memoizedInputHash{hash: hash, region: region}
+	m.entries[key] = memoizedInputHash{hash: hash, region: region, witness: witness}
 }
 
 // invalidate drops every memoized digest the write of written can move, and
 // logs it for the digests being computed meanwhile. excluded, when set, says
 // whether written lies where Git lists no candidate (invalidatedRegion.moves).
-func (m *inputHashMemo) invalidate(written InputRegion, excluded *candidateExclusion) {
+func (m *inputHashMemo) invalidate(written InputRegion, excluded *candidateExclusion, listing *writtenListing) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.generation++
-	invalidation := invalidatedRegion{generation: m.generation, written: written, excluded: excluded}
+	invalidation := invalidatedRegion{generation: m.generation, written: written, excluded: excluded, listing: listing}
 	for key, memo := range m.entries {
-		if invalidation.moves(memo.region) {
+		switch invalidation.effect(memo.region, memo.witness) {
+		case effectDrops:
 			delete(m.entries, key)
+		case effectPends:
+			memo.pending = true
+			m.entries[key] = memo
 		}
 	}
 	m.log = append(m.log, invalidation)
@@ -202,29 +287,46 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 		key += "|expander\x00" + expander.Identity()
 	}
 
-	cached, generation, ok := cm.fileHashes.lookup(key)
-	if ok {
+	cached, generation, ok, pending := cm.fileHashes.lookupPending(key)
+	if ok && pending != nil {
+		confirmed := cm.confirmPending(pending)
+		cm.fileHashes.settle(key, generation, pending, confirmed)
+		if confirmed {
+			return cached, nil
+		}
+		_, generation, _ = cm.fileHashes.lookup(key)
+	} else if ok {
 		return cached, nil
 	}
 
-	var hash string
-	var err error
-	if cut := cm.candidateSource(); cut != nil {
-		hash, err = hashFilesWith(cut, dir, patterns, expander, scope)
-	} else {
-		hash, err = memoizedHashFiles(dir, patterns, expander, scope)
-	}
+	hash, witness, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope)
 	if err != nil {
 		return "", err
 	}
 
-	cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns))
+	if witness != nil && witness.unmemoized {
+		return hash, nil
+	}
+	cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns), witness)
 	return hash, nil
+}
+
+// confirmPending reports whether the cut, read now, lists what the read a
+// pending digest listed its candidates from listed: the writes since then
+// added, removed and changed no candidate it reads (ADR 0109). A run with no
+// read of the cut for the digest's directory confirms nothing.
+func (cm *CacheManager) confirmPending(witness *selectionWitness) bool {
+	source := cm.candidateSource()
+	if source == nil || witness == nil || witness.cut == "" {
+		return false
+	}
+	read, ok := source(witness.dir)
+	return ok && cutFingerprint(read) == witness.cut
 }
 
 // memoizedHashFiles is the digest lookupFileHash memoizes (hashFiles). It is a
 // variable only so a test can land an invalidation while a digest is computed.
-var memoizedHashFiles = hashFiles
+var memoizedHashFiles = witnessedHashFiles
 
 // HashFiles returns the memoized content digest for files selected under dir,
 // reading a project config through the given task's option scope. A zero scope
@@ -274,8 +376,8 @@ func (cm *CacheManager) InvalidateFileHashes() {
 		return
 	}
 	everything := InputRegion{unbounded: true}
-	cm.fileHashes.invalidate(everything, nil)
-	cm.extraFileHashes.invalidate(everything, nil)
+	cm.fileHashes.invalidate(everything, nil, nil)
+	cm.extraFileHashes.invalidate(everything, nil, nil)
 }
 
 // InvalidateFileHashesUnder drops every memoized input digest whose region
@@ -299,8 +401,8 @@ func (cm *CacheManager) InvalidateFileHashesUnder(paths []string) {
 	if exclusion := cm.exclusion.Load(); exclusion != nil && *exclusion != nil {
 		excluded = &candidateExclusion{paths: slices.Clone(paths), exclude: *exclusion}
 	}
-	cm.fileHashes.invalidate(written, excluded)
-	cm.extraFileHashes.invalidate(written, excluded)
+	cm.fileHashes.invalidate(written, excluded, &writtenListing{paths: slices.Clone(paths)})
+	cm.extraFileHashes.invalidate(written, excluded, nil)
 }
 
 // SetCandidateExclusion gives the run the answer of whether written paths lie
@@ -346,7 +448,7 @@ func (cm *CacheManager) lookupExtraFilesHash(workspaceRoot string, paths []strin
 	}
 
 	hash := hashExtraFiles(workspaceRoot, sorted)
-	cm.extraFileHashes.memoize(key, generation, hash, PathsRegion(sorted))
+	cm.extraFileHashes.memoize(key, generation, hash, PathsRegion(sorted), nil)
 	return hash
 }
 

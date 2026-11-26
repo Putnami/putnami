@@ -233,3 +233,48 @@ func TestAWriteUnderAnExcludedPutnamiKeepsTheCandidateDigests(t *testing.T) {
 		})
 	}
 }
+
+// workspaceTarCheck keys on every .tar file of the workspace, less what
+// exclusions name, as a check that verifies archives across projects would.
+func workspaceTarCheck(patterns ...string) *ScheduledJob {
+	job := declaredJob("lint~archives", "archives", &extension.TaskDeclaration{})
+	job.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{NoOutput: true,
+		Key: &extension.TaskCacheKey{WorkspaceFiles: append([]string{"**/*.tar"}, patterns...)}}
+	return job
+}
+
+// A restore that writes a file a workspace pattern selects moves the key of a
+// job that reads it, and the key is the one a fresh read of the tree gives. A
+// restore its exclusions remove keeps the memoized digest, and the key is
+// still the fresh one (tooling/cli ADR 0109).
+func TestARestoreMovesAWorkspaceKeyOnlyWhenItsPatternsSelectTheRestoredFile(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		excludes []string
+		moves    bool
+	}{
+		{name: "a restored file the patterns select", moves: true},
+		{name: "a restored file the exclusions remove", excludes: []string{"!**/.gen/**"}, moves: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			producer, check := layersProducer(), workspaceTarCheck(tc.excludes...)
+			f := newCaptureFixture(t, producer, check)
+			writeFileAt(t, layerPath(f), "layer\n")
+			if !f.sched.storeDeclaredCapture(producer, capturedResult(nil), captureHashA) {
+				t.Fatal("declared capture published no entry")
+			}
+			if err := os.RemoveAll(filepath.Dir(layerPath(f))); err != nil {
+				t.Fatal(err)
+			}
+			stale := keyOf(t, f, check, f.cache)
+			f.hitOrFail(t, producer, captureHashA)
+			got, fresh := keyOf(t, f, check, f.cache), keyOf(t, f, check, store.NewCacheManager(nil))
+			if got != fresh {
+				t.Fatalf("after the restore, the key is %q, a fresh read gives %q", got, fresh)
+			}
+			if moved := got != stale; moved != tc.moves {
+				t.Fatalf("the restore moved the key = %v, want %v", moved, tc.moves)
+			}
+		})
+	}
+}

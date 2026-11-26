@@ -1,15 +1,16 @@
 package store
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
 
 // A write the run's exclusion places where Git lists no candidate keeps every
 // memoized digest that reads only Git candidates where it lies, so a key after
-// it lists no candidate again. A digest that also reads other files the write
-// reaches is dropped, and so is every digest the write reaches when the
-// exclusion answers no (tooling/cli ADR 0106).
+// it lists no candidate again. A digest whose other patterns select the written
+// file is dropped, and so is every digest that can select it when the
+// exclusion answers no (tooling/cli ADR 0106, ADR 0109).
 func TestAWriteWhereGitListsNoCandidateKeepsTheCandidateDigests(t *testing.T) {
 	for _, excluded := range []bool{true, false} {
 		dir := t.TempDir()
@@ -17,10 +18,16 @@ func TestAWriteWhereGitListsNoCandidateKeepsTheCandidateDigests(t *testing.T) {
 		writeRegionFile(t, notes, "v1")
 		writeRegionFile(t, filepath.Join(dir, "src", "main.ts"), "export {}\n")
 		cm := NewCacheManager(nil)
-		cm.SetCandidateSource(func(asked string) (CandidateCut, bool) {
-			return CandidateCut{Paths: []string{"notes.txt"}, Modes: map[string]string{"notes.txt": "100644"}, Unmerged: map[string]bool{}}, asked == dir
-		})
 		written := filepath.Join(dir, ".putnami", "out", "app", "report.txt")
+		// The cut lists the report once it is written where Git does not
+		// exclude it, as `git ls-files --others` would.
+		cm.SetCandidateSource(func(asked string) (CandidateCut, bool) {
+			read := CandidateCut{Paths: []string{"notes.txt"}, Modes: map[string]string{"notes.txt": "100644"}, Unmerged: map[string]bool{}}
+			if _, err := os.Stat(written); err == nil && !excluded {
+				read.Paths = []string{".putnami/out/app/report.txt", "notes.txt"}
+			}
+			return read, asked == dir
+		})
 		var asked [][]string
 		cm.SetCandidateExclusion(func(paths []string) bool {
 			asked = append(asked, paths)
@@ -34,7 +41,8 @@ func TestAWriteWhereGitListsNoCandidateKeepsTheCandidateDigests(t *testing.T) {
 			}
 			return hash
 		}
-		candidates, apart, mixed := digest("git:**"), digest("git:**", "src/**"), digest("git:**", "**/*.json")
+		candidates, apart, skipped, mixed := digest("git:**"), digest("git:**", "src/**"),
+			digest("git:**", "**/*.txt"), digest("git:**", ".putnami/out/app/*.txt")
 
 		// The memo answers a digest from before this edit until an
 		// invalidation drops it.
@@ -42,10 +50,13 @@ func TestAWriteWhereGitListsNoCandidateKeepsTheCandidateDigests(t *testing.T) {
 		if digest("git:**") != candidates {
 			t.Fatal("the memo did not hold the digest before the edit, so this test cannot prove anything")
 		}
+		writeRegionFile(t, written, "report")
 		cm.InvalidateFileHashesUnder([]string{written})
 
-		if len(asked) != 1 || len(asked[0]) != 1 || asked[0][0] != written {
-			t.Fatalf("the exclusion was asked %v, want once for %s", asked, written)
+		// Every digest here listed its candidates from the cut, so the cut
+		// read after the write decides, and the exclusion is not asked.
+		if len(asked) != 0 {
+			t.Fatalf("the exclusion was asked %v, want never", asked)
 		}
 		for _, check := range []struct {
 			name  string
@@ -55,7 +66,8 @@ func TestAWriteWhereGitListsNoCandidateKeepsTheCandidateDigests(t *testing.T) {
 		}{
 			{"a digest of Git candidates only", digest("git:**"), candidates, excluded},
 			{"a digest whose other files lie elsewhere", digest("git:**", "src/**"), apart, excluded},
-			{"a digest whose other files the write reaches", digest("git:**", "**/*.json"), mixed, false},
+			{"a digest whose recursive walk skips .putnami", digest("git:**", "**/*.txt"), skipped, excluded},
+			{"a digest whose other patterns select the written file", digest("git:**", ".putnami/out/app/*.txt"), mixed, false},
 		} {
 			if kept := check.got == check.was; kept != check.keeps {
 				t.Errorf("excluded %v: %s kept its entry = %v, want %v", excluded, check.name, kept, check.keeps)

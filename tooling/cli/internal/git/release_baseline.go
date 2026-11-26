@@ -84,8 +84,57 @@ var lastRelease = linetag.LastRelease
 // breaking change. A git failure is an error, never a state: a state read
 // from a failure would key the check's verdict to a baseline it did not see.
 func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
+	return readReleaseBaseline(dir, tagPattern, dirReleaseReads{})
+}
+
+// releaseReads are the reads of a release baseline that do not depend on the
+// project directory but on its repository: its state, its HEAD, its tags and
+// a line's last release among them.
+type releaseReads interface {
+	// state answers rev-parse's --is-inside-work-tree,
+	// --is-shallow-repository and --show-prefix lines in dir.
+	state(dir string) (string, string, error)
+	// hasCommit answers whether HEAD names a commit; a false answer with a
+	// nil error is a repository without one.
+	hasCommit(dir string) (bool, error)
+	release(dir, tagPattern string) (linetag.Release, bool, error)
+	// hasTags answers whether the repository has a tag of any line.
+	hasTags(dir string) (bool, error)
+}
+
+// dirReleaseReads asks git in the project directory each time.
+type dirReleaseReads struct{}
+
+func (dirReleaseReads) state(dir string) (string, string, error) {
+	return gitread.RunCapture(dir, "rev-parse", "--is-inside-work-tree", "--is-shallow-repository", "--show-prefix")
+}
+
+func (dirReleaseReads) hasCommit(dir string) (bool, error) {
+	if _, _, err := gitread.RunCapture(dir, "rev-parse", "--verify", "--quiet", "HEAD^{commit}"); err != nil {
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) {
+			return false, fmt.Errorf("read HEAD of %s: %w", dir, err)
+		}
+		return false, nil
+	}
+	return true, nil
+}
+
+func (dirReleaseReads) release(dir, tagPattern string) (linetag.Release, bool, error) {
+	return lastRelease(dir, tagPattern)
+}
+
+func (dirReleaseReads) hasTags(dir string) (bool, error) {
+	refs, err := gitread.Run(dir, "for-each-ref", "--count=1", "--format=%(refname)", "refs/tags")
+	if err != nil {
+		return false, fmt.Errorf("read the tags: %w", err)
+	}
+	return strings.TrimSpace(refs) != "", nil
+}
+
+func readReleaseBaseline(dir, tagPattern string, reads releaseReads) (ReleaseBaseline, error) {
 	baseline := ReleaseBaseline{Pattern: tagPattern}
-	output, stderr, err := gitread.RunCapture(dir, "rev-parse", "--is-inside-work-tree", "--is-shallow-repository", "--show-prefix")
+	output, stderr, err := reads.state(dir)
 	if err != nil {
 		// Only a directory outside every repository is unmanaged: a refused
 		// repository, or a git that cannot run, is a failure, never a state.
@@ -107,11 +156,9 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 	}
 	shallow, prefix := lines[1] == "true", strings.TrimSuffix(lines[2], "/")
 
-	if _, _, err := gitread.RunCapture(dir, "rev-parse", "--verify", "--quiet", "HEAD^{commit}"); err != nil {
-		var exit *exec.ExitError
-		if !errors.As(err, &exit) {
-			return ReleaseBaseline{}, fmt.Errorf("read HEAD of %s: %w", dir, err)
-		}
+	if committed, err := reads.hasCommit(dir); err != nil {
+		return ReleaseBaseline{}, err
+	} else if !committed {
 		baseline.State = ReleaseBaselineNoCommit
 		return baseline, nil
 	}
@@ -120,16 +167,16 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 		return baseline, nil
 	}
 
-	last, ok, err := lastRelease(dir, tagPattern)
+	last, ok, err := reads.release(dir, tagPattern)
 	if err != nil {
 		return ReleaseBaseline{}, err
 	}
 	if !ok {
-		refs, err := gitread.Run(dir, "for-each-ref", "--count=1", "--format=%(refname)", "refs/tags")
+		hasTags, err := reads.hasTags(dir)
 		if err != nil {
-			return ReleaseBaseline{}, fmt.Errorf("read the tags: %w", err)
+			return ReleaseBaseline{}, err
 		}
-		baseline.State, baseline.HasTags = ReleaseBaselineUntagged, strings.TrimSpace(refs) != ""
+		baseline.State, baseline.HasTags = ReleaseBaselineUntagged, hasTags
 		return baseline, nil
 	}
 

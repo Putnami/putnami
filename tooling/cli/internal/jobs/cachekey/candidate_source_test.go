@@ -229,10 +229,13 @@ func TestAPutnamiDirectoryIgnoredInPartIsReadAgain(t *testing.T) {
 			writeFileAt(t, filepath.Join(root, ".gitignore"), "dist/\n"+tc.rule)
 			writeFileAt(t, filepath.Join(root, ".putnami", "cache", "x"), "x\n")
 			var reads, asks atomic.Int32
-			savedFiles, savedIgnores := candidateFiles, ignoresDirectory
+			savedFiles, savedIgnores := candidateFiles, ignoresDirectories
 			candidateFiles = func(dir string) ([]protocoljob.CandidateFile, error) { reads.Add(1); return savedFiles(dir) }
-			ignoresDirectory = func(root, rel string) bool { asks.Add(1); return savedIgnores(root, rel) }
-			t.Cleanup(func() { candidateFiles, ignoresDirectory = savedFiles, savedIgnores })
+			ignoresDirectories = func(root string, rels []string) (map[string]bool, error) {
+				asks.Add(1)
+				return savedIgnores(root, rels)
+			}
+			t.Cleanup(func() { candidateFiles, ignoresDirectories = savedFiles, savedIgnores })
 			facts := NewTreeFacts(root)
 			facts.currentCut()
 			for range 2 {

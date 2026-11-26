@@ -43,6 +43,9 @@ type TreeFacts struct {
 
 	baselinesMu sync.Mutex
 	baselines   map[string]*onceBaseline
+	// releases reads the baselines (releaseReader).
+	releaseOnce sync.Once
+	releases    *putnamigit.ReleaseBaselineReader
 	extractMu   sync.Mutex
 	extractions map[string]*onceExtraction
 	// extractRoot is the directory of the run the release baselines are
@@ -59,10 +62,27 @@ type TreeFacts struct {
 	pending []pendingWrite
 	cutSeq  int
 	jobCuts map[string]*cutRead
-	// putnamiOnce asks Git once whether its rules exclude the workspace's
-	// .putnami directory as a whole (putnamigit.IgnoresDirectory).
-	putnamiOnce    sync.Once
-	putnamiIgnored bool
+	// outputs are the directories a write may leave the cut as it is under:
+	// the workspace's .putnami and the declared outputs of the plan
+	// (SetPlanned), absolute and clean. excludedOnce asks Git once whether
+	// its rules exclude each as a whole (putnamigit.IgnoresDirectories);
+	// excluded holds those it does, relative to the root, case folded.
+	outputs      []string
+	excludedOnce sync.Once
+	excluded     map[string]bool
+	// rulesMoved records that a write of the run named a .gitignore, a path
+	// under .git, or a directory above an output: Git's answer about the
+	// outputs then no longer holds for any but .putnami, as tooling/cli
+	// ADR 0106 settles for it.
+	rulesMoved bool
+	// ancestors maps every strict ancestor of an output but .putnami, as
+	// written and with links followed, to those outputs, built again when
+	// the outputs ancestorsOf names change; and gitignores holds the
+	// .gitignore of each, read when Git was asked (aboveAnOutput).
+	rulesMu     sync.Mutex
+	ancestorsOf []string
+	ancestors   map[string][]string
+	gitignores  map[string]string
 
 	historyMu sync.Mutex
 	histories map[string]*onceHistory
@@ -88,19 +108,25 @@ type cutRead struct {
 	listingOnce   sync.Once
 	listing       *protocoljob.CandidateListing
 	listingErr    error
-	// putnamiOnce decides once whether a path the read lists lies at or
-	// below the workspace's .putnami directory (candidateReachesPutnami).
-	putnamiOnce   sync.Once
-	putnamiListed bool
+	// listedOnce derives once where the read lists a candidate
+	// (listedDirectories): every directory on the path of a candidate, and
+	// where each directory link on such a path leads.
+	listedOnce  sync.Once
+	listedDirs  map[string]bool
+	linkTargets []string
 }
 
 // pendingWrite is a write of the run since the current read of the cut: the
 // slash paths, relative to the workspace root and with case folded, it names
 // and lands at once its symbolic links are followed (reachedPath), and whether
-// it lands under the workspace's .putnami directory.
+// the directories of TreeFacts.outputs it lands at or under, relative to the
+// root and case folded (outputsOf).
 type pendingWrite struct {
 	paths   []string
-	putnami bool
+	outputs []string
+	// rules says whether the write names a .gitignore, a path under .git or
+	// a directory above an output (aboveAnOutput).
+	rules bool
 }
 
 type onceHistory struct {
@@ -134,7 +160,7 @@ var (
 	ignoredDirectories = putnamigit.IgnoredDirectories
 	writeFilesAtCommit = putnamigit.WriteFilesAtCommit
 	candidateFiles     = putnamigit.CandidateFiles
-	ignoresDirectory   = putnamigit.IgnoresDirectory
+	ignoresDirectories = putnamigit.IgnoresDirectories
 	readChangeHistory  = putnamigit.ReadChangeHistory
 )
 
@@ -268,31 +294,34 @@ func (t *TreeFacts) currentCutFor(directories []string) *cutRead {
 
 // stale reports whether a write of the run since the current read may have
 // changed the cut at or below one of directories: it lies at, below or above
-// one of them. A write under an excluded .putnami changes nothing
-// (putnamiExcluded), which is asked of Git only when such a write alone
-// reaches the directories. The caller holds cutMu.
+// one of them. A write under an output directory Git excludes as a whole,
+// below which the current read lists nothing, changes nothing (excludedWrite);
+// Git is asked only when such writes alone reach the directories (tooling/cli
+// ADR 0109). The caller holds cutMu.
 func (t *TreeFacts) stale(directories []string) bool {
-	putnami := false
+	excludable := false
 	for _, write := range t.pending {
 		if !write.reaches(directories) {
 			continue
 		}
-		if !write.putnami {
+		if !t.excludable(write) {
 			return true
 		}
-		putnami = true
+		excludable = true
 	}
-	if !putnami {
+	if !excludable {
 		return false
 	}
-	if !t.putnamiExcluded() {
-		return true
+	for _, write := range t.pending {
+		if write.reaches(directories) && !t.excludedWrite(write) {
+			return true
+		}
 	}
-	// The current read stays excluded until the next read, which clears the
-	// writes: those under .putnami change nothing.
+	// The current read stays as it is until the next read, which clears the
+	// writes: the excluded ones change nothing.
 	kept := t.pending[:0]
 	for _, write := range t.pending {
-		if !write.putnami {
+		if !t.excludable(write) || !t.excludedWrite(write) {
 			kept = append(kept, write)
 		}
 	}
@@ -373,13 +402,15 @@ func (t *TreeFacts) InvalidateCut(paths []string) {
 	resolvedRoot := resolvedPath(t.root)
 	writes := make([]pendingWrite, 0, len(paths))
 	for _, path := range paths {
-		write := pendingWrite{putnami: t.inPutnami(path)}
+		write := pendingWrite{outputs: t.outputsOf(path), rules: t.aboveAnOutput(path)}
 		for _, candidate := range [][2]string{{t.root, path}, {resolvedRoot, resolvedPath(path)}} {
 			rel, err := filepath.Rel(candidate[0], candidate[1])
 			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 				continue
 			}
-			write.paths = append(write.paths, reachedPath(filepath.ToSlash(rel)))
+			reached := reachedPath(filepath.ToSlash(rel))
+			write.rules = write.rules || reached != strings.ToLower(filepath.ToSlash(rel))
+			write.paths = append(write.paths, reached)
 		}
 		if len(write.paths) > 0 {
 			writes = append(writes, write)
@@ -387,10 +418,79 @@ func (t *TreeFacts) InvalidateCut(paths []string) {
 	}
 	t.cutMu.Lock()
 	defer t.cutMu.Unlock()
+	for _, write := range writes {
+		t.rulesMoved = t.rulesMoved || write.rules
+	}
 	if t.cut == nil {
 		return
 	}
 	t.pending = append(t.pending, writes...)
+}
+
+// aboveAnOutput reports whether a write to path, as written or with its links
+// followed, lies strictly above an output directory other than .putnami and
+// changed a .gitignore between it and that output: Git excludes an output by
+// the rules of its ancestors alone. Each such .gitignore was read when Git was
+// asked (excludedOutputs); one that differs now, appeared or disappeared,
+// moved the rules. Before Git was asked, nothing it answered can be stale.
+func (t *TreeFacts) aboveAnOutput(path string) bool {
+	outputs := t.outputDirectories()
+	t.rulesMu.Lock()
+	if len(t.ancestorsOf) != len(outputs) || (len(outputs) > 0 && &t.ancestorsOf[0] != &outputs[0]) {
+		t.ancestorsOf = outputs
+		t.ancestors = map[string][]string{}
+		putnami := filepath.Join(t.root, ".putnami")
+		for _, output := range outputs {
+			if output == putnami {
+				continue
+			}
+			for _, form := range []string{output, resolvedPath(output)} {
+				for dir := filepath.Dir(form); ; dir = filepath.Dir(dir) {
+					t.ancestors[dir] = append(t.ancestors[dir], form)
+					if filepath.Dir(dir) == dir {
+						break
+					}
+				}
+			}
+		}
+	}
+	recorded, ancestors := t.gitignores, t.ancestors
+	t.rulesMu.Unlock()
+	if recorded == nil {
+		return false
+	}
+	path = filepath.Clean(path)
+	gitDir := filepath.Join(t.root, ".git")
+	for _, written := range []string{path, resolvedPath(path)} {
+		// A write at or above the repository's .git may have rewritten its
+		// exclude rules (info/exclude, the excludes file its config names).
+		if atOrUnder(gitDir, written) {
+			return true
+		}
+		for _, output := range ancestors[written] {
+			for dir := filepath.Dir(output); ; dir = filepath.Dir(dir) {
+				file := filepath.Join(dir, ".gitignore")
+				before, known := recorded[file]
+				if !known || before != readRules(file) {
+					return true
+				}
+				if dir == written || filepath.Dir(dir) == dir {
+					break
+				}
+			}
+		}
+	}
+	return false
+}
+
+// readRules is the content of a .gitignore, or "\x00absent" when none can be
+// read there.
+func readRules(file string) string {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return "\x00absent"
+	}
+	return string(data)
 }
 
 // reachedPath is the directory a write of rel, a slash path relative to the
@@ -431,44 +531,136 @@ func (t *TreeFacts) atTopLevel() bool {
 	return err == nil
 }
 
-// putnamiExcluded reports whether a write under the workspace's .putnami
-// directory leaves the cut as it is: Git's rules exclude the directory as a
-// whole, and the current read lists nothing below it. The caller holds cutMu.
-func (t *TreeFacts) putnamiExcluded() bool {
-	t.putnamiOnce.Do(func() { t.putnamiIgnored = ignoresDirectory(t.root, ".putnami") })
+// excludable reports whether excludedWrite may answer for a write without
+// asking Git more than the run did before: Git's answer is known, or the write
+// lands under .putnami, the directory tooling/cli ADR 0106 asks about, and the
+// one question asks about every output directory at once. The caller holds
+// cutMu.
+func (t *TreeFacts) excludable(write pendingWrite) bool {
+	if slices.Contains(write.outputs, ".putnami") {
+		return true
+	}
+	return len(write.outputs) > 0 && t.excluded != nil && !t.rulesMoved
+}
+
+// excludedWrite reports whether a write leaves the cut as it is: it lands at
+// or under one of its output directories that Git's rules exclude as a whole
+// and below which the current read lists nothing. The caller holds cutMu.
+func (t *TreeFacts) excludedWrite(write pendingWrite) bool {
 	read := t.cut
-	if read.err != nil {
+	if read == nil || read.err != nil {
 		// A cut that could not be read says nothing of what lies below.
 		return false
 	}
-	read.putnamiOnce.Do(func() { read.putnamiListed = t.candidateReachesPutnami(read.files) })
-	return t.putnamiIgnored && !read.putnamiListed
-}
-
-// candidateReachesPutnami reports whether a candidate of files lies at or
-// below the workspace's .putnami directory: its path names it, with case
-// folded as a case-insensitive file system resolves it, or a directory on its
-// path is a symbolic link that leads there, so the digest of the candidate
-// reads bytes a write under .putnami changes. Each directory of the cut is
-// stated once.
-func (t *TreeFacts) candidateReachesPutnami(files []protocoljob.CandidateFile) bool {
-	resolvedPutnami := filepath.Join(resolvedPath(t.root), ".putnami")
-	checked := map[string]bool{}
-	for _, file := range files {
-		lower := strings.ToLower(file.Path)
-		if lower == ".putnami" || strings.HasPrefix(lower, ".putnami/") {
+	excluded := t.excludedOutputs()
+	for _, output := range write.outputs {
+		if output != ".putnami" && t.rulesMoved {
+			continue
+		}
+		if excluded[output] && !read.lists(t.root, output) {
 			return true
 		}
-		for dir := path.Dir(file.Path); dir != "." && !checked[dir]; dir = path.Dir(dir) {
-			checked[dir] = true
-			full := filepath.Join(t.root, filepath.FromSlash(dir))
-			info, err := os.Lstat(full)
-			if err != nil || info.Mode()&os.ModeSymlink == 0 {
+	}
+	return false
+}
+
+// excludedOutputs asks Git once, in one call, which output directories its
+// rules exclude as a whole. A run whose plan declares no output asks about
+// .putnami alone, as tooling/cli ADR 0106 did.
+func (t *TreeFacts) excludedOutputs() map[string]bool {
+	t.excludedOnce.Do(func() {
+		putnami := filepath.Join(t.root, ".putnami")
+		var rels []string
+		for _, output := range t.outputDirectories() {
+			// Git refuses a path beyond a link or in a nested repository,
+			// and with it the whole question: such an output is not asked.
+			if output != putnami && !t.askable(output) {
 				continue
 			}
-			if atOrUnder(resolvedPath(full), resolvedPutnami) {
-				return true
+			if rel, err := filepath.Rel(t.root, output); err == nil {
+				rels = append(rels, filepath.ToSlash(rel))
 			}
+		}
+		// The rules are read before Git is asked: one that changes in
+		// between differs from what is read here, and moves the answer.
+		gitignores := map[string]string{}
+		for _, output := range t.outputDirectories() {
+			for _, form := range []string{output, resolvedPath(output)} {
+				for dir := filepath.Dir(form); ; dir = filepath.Dir(dir) {
+					file := filepath.Join(dir, ".gitignore")
+					if _, seen := gitignores[file]; seen {
+						break
+					}
+					gitignores[file] = readRules(file)
+					if filepath.Dir(dir) == dir {
+						break
+					}
+				}
+			}
+		}
+		t.rulesMu.Lock()
+		t.gitignores = gitignores
+		t.rulesMu.Unlock()
+		ignored, err := ignoresDirectories(t.root, rels)
+		if err != nil && len(rels) > 1 {
+			// The one question tooling/cli ADR 0106 asks still holds.
+			ignored, err = ignoresDirectories(t.root, []string{".putnami"})
+		}
+		t.excluded = map[string]bool{}
+		if err != nil {
+			return
+		}
+		for rel := range ignored {
+			t.excluded[strings.ToLower(rel)] = true
+		}
+	})
+	return t.excluded
+}
+
+// askable reports whether Git can answer for an output directory: no link
+// leads it elsewhere, and no .git at or above it below the root starts a
+// nested repository or a submodule.
+func (t *TreeFacts) askable(output string) bool {
+	if resolvedPath(output) != filepath.Join(resolvedPath(t.root), strings.TrimPrefix(output, t.root)) {
+		return false
+	}
+	for current := output; current != t.root && atOrUnder(current, t.root); current = filepath.Dir(current) {
+		if _, err := os.Lstat(filepath.Join(current, ".git")); !os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
+}
+
+// lists reports whether the read lists a candidate at or below output, a
+// slash path relative to root with case folded: a candidate's path names it,
+// as a case-insensitive file system resolves it, or a directory on a
+// candidate's path is a symbolic link that leads there, so the digest of the
+// candidate reads bytes a write there changes. Each directory of the cut is
+// stated once per read.
+func (r *cutRead) lists(root, output string) bool {
+	r.listedOnce.Do(func() {
+		r.listedDirs = map[string]bool{}
+		visited := map[string]bool{}
+		for _, file := range r.files {
+			r.listedDirs[strings.ToLower(file.Path)] = true
+			for dir := path.Dir(file.Path); dir != "." && !visited[dir]; dir = path.Dir(dir) {
+				visited[dir] = true
+				r.listedDirs[strings.ToLower(dir)] = true
+				full := filepath.Join(root, filepath.FromSlash(dir))
+				if info, err := os.Lstat(full); err == nil && info.Mode()&os.ModeSymlink != 0 {
+					r.linkTargets = append(r.linkTargets, resolvedPath(full))
+				}
+			}
+		}
+	})
+	if r.listedDirs[output] {
+		return true
+	}
+	resolved := resolvedPath(filepath.Join(root, filepath.FromSlash(output)))
+	for _, target := range r.linkTargets {
+		if atOrUnder(target, resolved) || atOrUnder(resolved, target) {
+			return true
 		}
 	}
 	return false
@@ -494,29 +686,61 @@ func (t *TreeFacts) ExcludesFromCandidates(paths []string) bool {
 	if t == nil || t.root == "" || len(paths) == 0 {
 		return false
 	}
+	writes := make([]pendingWrite, 0, len(paths))
 	for _, path := range paths {
-		if !t.inPutnami(path) {
-			return false
-		}
+		writes = append(writes, pendingWrite{outputs: t.outputsOf(path)})
 	}
 	t.cutMu.Lock()
 	defer t.cutMu.Unlock()
+	for _, write := range writes {
+		if !t.excludable(write) {
+			return false
+		}
+	}
 	if t.cut == nil || t.stale(workspaceDirectories) {
 		t.readCut()
 	}
-	return t.putnamiExcluded()
+	for _, write := range writes {
+		if !t.excludedWrite(write) {
+			return false
+		}
+	}
+	return true
 }
 
-// inPutnami reports whether a write to path lands at or under the workspace's
-// .putnami directory: path names it, and with every symbolic link on it
-// followed, path still lies under the .putnami of the resolved workspace root.
-// A link on .putnami itself, or below it, that leads elsewhere makes the write
-// land elsewhere, maybe among the candidates.
-func (t *TreeFacts) inPutnami(path string) bool {
-	if !atOrUnder(path, filepath.Join(t.root, ".putnami")) {
-		return false
+// outputsOf returns the output directories a write to path lands at or
+// under, relative to the root and case folded: path names one, and with every
+// symbolic link on it followed, path still lies under that directory of the
+// resolved workspace root. A link on the directory itself, or below it, that
+// leads elsewhere makes the write land elsewhere, maybe among the candidates.
+func (t *TreeFacts) outputsOf(path string) []string {
+	var outputs []string
+	resolvedRoot := ""
+	for _, output := range t.outputDirectories() {
+		if !atOrUnder(path, output) {
+			continue
+		}
+		if resolvedRoot == "" {
+			resolvedRoot = resolvedPath(t.root)
+		}
+		rel, err := filepath.Rel(t.root, output)
+		if err != nil || !atOrUnder(resolvedPath(path), filepath.Join(resolvedRoot, rel)) {
+			continue
+		}
+		outputs = append(outputs, strings.ToLower(filepath.ToSlash(rel)))
 	}
-	return atOrUnder(resolvedPath(path), filepath.Join(resolvedPath(t.root), ".putnami"))
+	return outputs
+}
+
+// outputDirectories is outputs, the workspace's .putnami when SetPlanned
+// recorded none.
+func (t *TreeFacts) outputDirectories() []string {
+	t.extractMu.Lock()
+	defer t.extractMu.Unlock()
+	if len(t.outputs) == 0 {
+		t.outputs = []string{filepath.Join(t.root, ".putnami")}
+	}
+	return t.outputs
 }
 
 // atOrUnder reports whether path is directory or lies below it.
@@ -682,8 +906,15 @@ func (t *TreeFacts) ReleaseBaseline(dir, pattern string) (putnamigit.ReleaseBase
 		t.baselines[key] = entry
 	}
 	t.baselinesMu.Unlock()
-	entry.once.Do(func() { entry.baseline, entry.err = putnamigit.ReadReleaseBaseline(dir, pattern) })
+	entry.once.Do(func() { entry.baseline, entry.err = t.releaseReader().Read(dir, pattern) })
 	return entry.baseline, entry.err
+}
+
+// releaseReader is the run's one reader of release baselines, which asks git
+// once for the repository's state, HEAD and tags (tooling/cli ADR 0110).
+func (t *TreeFacts) releaseReader() *putnamigit.ReleaseBaselineReader {
+	t.releaseOnce.Do(func() { t.releases = putnamigit.NewReleaseBaselineReader(t.root) })
+	return t.releases
 }
 
 // SetPlanned records, for each version line, the directories of the planned
@@ -702,8 +933,21 @@ func (t *TreeFacts) SetPlanned(ws *workspace.Workspace, planned []*jobmodel.Sche
 			lines[pattern] = append(lines[pattern], dir)
 		}
 	}
+	outputs := []string{filepath.Join(t.root, ".putnami")}
+	seen := map[string]bool{outputs[0]: true}
+	for _, job := range planned {
+		for _, written := range DeclaredOutputPaths(WorkspaceRoots{Root: t.root}, job, &jobmodel.JobResult{}) {
+			written = filepath.Clean(written)
+			if seen[written] || written == t.root || !atOrUnder(written, t.root) {
+				continue
+			}
+			seen[written] = true
+			outputs = append(outputs, written)
+		}
+	}
 	t.extractMu.Lock()
 	t.lineDirectories = lines
+	t.outputs = outputs
 	t.extractMu.Unlock()
 }
 

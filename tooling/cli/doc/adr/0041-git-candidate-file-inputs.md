@@ -1,8 +1,9 @@
 # ADR 0041 — Repository scanners declare Git candidate inputs
 
 - **Status**: accepted, amended by
-  [ADR 0063](0063-a-git-input-keys-the-executable-bit.md) and
-  [ADR 0106](0106-a-write-under-an-excluded-putnami-keeps-the-candidate-digests.md)
+  [ADR 0063](0063-a-git-input-keys-the-executable-bit.md),
+  [ADR 0106](0106-a-write-under-an-excluded-putnami-keeps-the-candidate-digests.md) and
+  [ADR 0109](0109-a-write-drops-a-memoized-digest-only-when-it-can-move-it.md)
 - **Scope**: CLI cache inputs (`internal/store`, `internal/git`), workspace
   impact, repository document gates
 
