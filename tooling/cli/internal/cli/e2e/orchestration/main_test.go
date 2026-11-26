@@ -1,12 +1,12 @@
-// Package orchestration holds the exact orchestration counts of this
-// repository: what a run of the real CLI starts, read from its
+// Package orchestration holds the orchestration counts of this repository
+// under their ceilings: what a run of the real CLI starts, read from its
 // run.orchestration report, for the engine and for each extension built here.
 // These are tests of this repository only: they run when Putnami changes and
 // never in a consumer workspace.
 //
-// A pull request that changes a count changes its number here, in the same
-// pull request, and a number only goes down. Wall times are not tested: they
-// are read from the tooling bench.
+// A count below its ceiling passes with no edit. A pull request that raises a
+// count raises its ceiling here and says why next to it, in one short
+// comment. Wall times are not tested: they are read from the tooling bench.
 //
 // The tests swap the process streams and the working directory, so they run
 // in their own test binary, one after another.

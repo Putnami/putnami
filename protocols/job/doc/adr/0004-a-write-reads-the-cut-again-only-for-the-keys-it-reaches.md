@@ -3,6 +3,11 @@
 - **Status**: accepted, point 4 amended by `tooling/cli`
   [ADR 0109](../../../../tooling/cli/doc/adr/0109-a-write-drops-a-memoized-digest-only-when-it-can-move-it.md)
   (a write under an output Git ignores as a whole)
+- **Status, 2026-11-26**: the Context's clause that the decision
+  `exact-orchestration-counts-are-tests-of-this-repository` lets an engine
+  count take over a job read by at most the jobs' fall is superseded: the
+  decision now makes a run's orchestration counts ceilings, and a pull request
+  that raises one says why
 - **Scope**: `@putnami/cli` (`internal/jobs/cachekey`, the run's read of the
   candidate cut and of the tracked paths; `internal/jobs/scheduler`, which
   reads the tracked paths through it)
@@ -26,8 +31,9 @@ the extension counts test (`tooling/cli/internal/cli/e2e/orchestration`,
 20 Git calls to 22 while the jobs went from 1 to 0: one more `ls-files`,
 after the writes of the project's own generate steps, and the `check-ignore`
 of `.putnami`, after a store write. The decision
-`exact-orchestration-counts-are-tests-of-this-repository` lets an engine
-count take over a job read by at most the jobs' fall.
+`exact-orchestration-counts-are-tests-of-this-repository` let an engine
+count take over a job read by at most the jobs' fall (superseded on
+2026-11-26: the counts are ceilings, see the status above).
 
 A key's cut is the listing at or below its directories (ADR 0003 point 1).
 A write changes what the cut lists only at, below or above the written path

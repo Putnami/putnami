@@ -190,7 +190,7 @@ the commits, the runs and where each number was read.
 ## Orchestration Counts
 
 The tests in `tooling/cli/internal/cli/e2e/orchestration` hold the orchestration
-counts of this repository exactly. They are tests of this repository: they run
+counts of this repository under ceilings. They are tests of this repository: they run
 when Putnami changes, never in a consumer workspace, and no consumer pull request
 fails because of them. Wall times are not tested; they are read from the tooling
 bench.
@@ -291,14 +291,14 @@ manifest, are inputs of `@putnami/cli`'s test task, so a pull request that chang
 
 | Count | What it is | How it is lowered |
 |---|---|---|
-| Git calls per job | The engine's git calls on runs of 6 and 15 tasks, each on the default store under a home of its own, whose difference is the engine's git calls per job times 9, recorded at 0; the git calls of the SDK jobs, by subcommand. | The engine reads the tree once per run and hands its facts to jobs in the job context; a job reads them there instead of running git. |
+| Git calls per job | The engine's git calls on runs of 6 and 15 tasks, each on the default store under a home of its own, whose difference, what 9 more jobs cost, is held under a ceiling of 0; the git calls of the SDK jobs, by subcommand. | The engine reads the tree once per run and hands its facts to jobs in the job context; a job reads them there instead of running git. |
 | Processes started by planning an unchanged workspace | Every process `--dry-run` starts on the workspace: git, toolchain probes, control processes. A plan reports no `run.orchestration`, so the test reads the process-wide ledger around it (`clitest.PlanCounts`). The engine's fixture also holds a whole run of the unchanged workspace, every task found in the cache. Each extension's plan is its git calls alone: a runtime handshake, a toolchain probe and an input-resolve answer are read from what the runs before recorded, and the workspace snapshot answers for the workspace probe ([ADR 0102](adr/0102-planning-reads-recorded-facts.md)), whether its toolchains are Putnami home releases or system toolchains that name their own executable ([ADR 0105](adr/0105-a-toolchain-that-names-its-own-executable-is-recorded.md)). | A probe or a read that does not depend on the change is answered from what the run already knows, or from state kept between runs. |
 | Tasks a second run executes | The tasks a run of the unchanged workspace executes once a first run, on every worker in the order its tasks take there, filled the cache, read from its task records (`clitest.ExecutedTasks`). The Go, TypeScript, sdd and clientgen cases execute none, but the tasks a case names as never served from the cache, each with its reason: the sdd checks of the proposed squash message, which read an environment variable and Git history no key holds. A library's `build~infra` skip is cached as the manifest's absence. A `--no-cache` run stores nothing, so a run after it is served from what the runs before it stored. | A key reads only what the tree holds: a fixture ignores `.gen` as `putnami init` writes it, which also ignores Python's `__pycache__` and `*.egg-info`, no lint rewrites what another task generated, and a fixture's sources are written as its lint formats them, since a lint that fixes a source changes the tree the next run reads. |
 | CLI starts per job | The `putnami` processes the SDK jobs start, such as a registry credential a job resolves itself. The Go fixture's jobs start none: a task declares `nativeRegistryCredential`, and the engine materializes it once per origin and per 4-minute window, which its own ledger counts. | The engine materializes what jobs ask the CLI for once per run and hands it to them. |
 | Extension processes per run | The job, batch and control processes the engine starts. | Ready tasks share a batch process, or one extension process runs many jobs. |
-| Engine CPU per task | The CLI process's own CPU per task on 300 and on 1,200 trivial batchable tasks run with `--no-cache` on four workers, the least of three runs after a first one. The test fails when it grows 1.5 times from the smaller plan to the larger, and at twice its recorded value on the larger. | Work the engine repeats per task or per pending candidate is done once per run, or once per job. |
+| Engine CPU per task | The CLI process's own CPU per task on 300 and on 1,200 trivial batchable tasks run with `--no-cache` on four workers, the least of three runs after a first one. The test fails when it grows 1.5 times from the smaller plan to the larger, and at twice its recorded baseline on the larger. | Work the engine repeats per task or per pending candidate is done once per run, or once per job. |
 
-Each extension case holds two ledgers, one line each: the run with
+Each extension case holds two ceiling ledgers, one line each: the run with
 `--no-cache`, every task executed, and the plan of the unchanged workspace. A
 case then runs the unchanged workspace once more, from the cache, and holds the
 tasks it executes. A
@@ -306,18 +306,22 @@ ledger names every process kind the engine started, its git calls by
 subcommand, then the CLI starts and git calls of the jobs. The tools jobs run
 (`go`, `bun`, `cargo`) are the jobs' work and are left out.
 
-A pull request that changes a count changes its number in the same pull request.
-A case's total only goes down, and so does every count, except an engine count
-that takes over a read the jobs made: it may rise, once per run, by no more than
-the jobs' count falls. When a test fails, it prints the ledger it got: a lower
-count replaces the recorded one; a higher count is a regression to fix.
+Each count of a ledger is a ceiling: a run passes when every count is at or
+below it, and a count the ceiling does not name has a ceiling of 0. A pull
+request that lowers a count edits no test; a ledger check logs a ledger below
+its ceiling, which a later change may lower. A pull request that raises a count
+raises its ceiling in the same pull request and says why next to it, in one
+short comment. When a test fails, it prints the ledger it got and each count
+above its ceiling.
 The growth of the engine's CPU per task does not depend on the host: an engine
 whose work per task is the same on any plan reads below 1.4 on a 4-core Linux
 container, most often below 1.0, and work repeated for each pending task reads
 1.6 to 2.3. The test runs the engine with `GOMAXPROCS` 4, since a Putnami job
-sets it to its CPU budget and the engine's CPU depends on it. The recorded value is measured with
-coverage on a 4-core Linux container; a change that lowers it lowers the
-recorded value, and a change that raises it past twice that value fails. The race detector multiplies the CPU, so a run with `-race`
+sets it to its CPU budget and the engine's CPU depends on it. The recorded baseline is measured with
+coverage on a 4-core Linux container. The test fails when the engine's CPU per
+task on the larger plan is twice the baseline or more: a slower host costs
+every task alike and stays within that margin, a regression of the engine does
+not. A change that raises the baseline says why next to it. The race detector multiplies the CPU, so a run with `-race`
 skips that test.
 
 ## Cache Economics Benchmark

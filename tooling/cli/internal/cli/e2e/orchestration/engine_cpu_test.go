@@ -20,11 +20,14 @@ const engineCPUGrowth = 1.5
 // engine's CPU and its growth depend on it.
 const engineThreads = 4
 
-// engineCPUPerTask is the engine's CPU per task recorded on the larger plan,
-// with coverage on a 4-core Linux container. The test fails at twice it, a
-// margin that absorbs the hosts' differences; the growth below does not depend
-// on the host.
+// engineCPUPerTask is the baseline: the engine's CPU per task recorded on the
+// larger plan, with coverage on a 4-core Linux container.
 const engineCPUPerTask = 900 * time.Microsecond
+
+// engineCPUMargin is the largest ratio of the engine's CPU per task on the
+// larger plan to its baseline. A margin of 2 absorbs a slower host, which
+// costs every task alike; the growth above does not depend on the host.
+const engineCPUMargin = 2.0
 
 // TestTheEngineCPUPerTask holds the CPU the engine process spends per task
 // when the tasks themselves cost nothing: planning, dispatch, batching and the
@@ -49,15 +52,15 @@ func TestTheEngineCPUPerTask(t *testing.T) {
 	small := leastCPUPerTask(t, 100)
 	large := leastCPUPerTask(t, 400)
 	growth := float64(large) / float64(small)
-	t.Logf("engine CPU per task: %s on 300 tasks, %s on 1,200 tasks, growth %.2f (recorded %s)",
+	t.Logf("engine CPU per task: %s on 300 tasks, %s on 1,200 tasks, growth %.2f (baseline %s)",
 		small, large, growth, engineCPUPerTask)
 	if growth >= engineCPUGrowth {
 		t.Errorf("engine CPU per task grows %.2f times from 300 to 1,200 tasks, at least %.1f: the engine repeats work for each pending task; %s",
 			growth, engineCPUGrowth, countsHint)
 	}
-	if large >= 2*engineCPUPerTask {
-		t.Errorf("engine CPU per task = %s on 1,200 tasks, at least twice the recorded %s; %s",
-			large, engineCPUPerTask, countsHint)
+	if ratio := float64(large) / float64(engineCPUPerTask); ratio >= engineCPUMargin {
+		t.Errorf("engine CPU per task = %s on 1,200 tasks, %.2f times its baseline %s, at least %.1f; %s",
+			large, ratio, engineCPUPerTask, engineCPUMargin, countsHint)
 	}
 }
 

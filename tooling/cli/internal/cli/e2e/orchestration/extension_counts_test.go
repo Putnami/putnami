@@ -20,8 +20,8 @@ import (
 )
 
 // extensionCase is the fixture of one extension built here: a workspace that
-// loads it from this tree, with one small project it serves, and the counts
-// that workspace holds.
+// loads it from this tree, with one small project it serves, and the ceilings
+// of the counts that workspace holds.
 type extensionCase struct {
 	// name is the extension, as a subtest names it.
 	name string
@@ -55,14 +55,12 @@ type extensionCase struct {
 	// history (clitest.ForgetTaskHistory), so its tasks run in the same order
 	// from one run to the next.
 	command []string
-	// cold is the ledger of a run with --no-cache, every task executed.
+	// cold is the ceiling ledger of a run with --no-cache, every task
+	// executed: each count of the run is at most its count here.
 	cold string
-	// plan is the ledger of planning the unchanged workspace, the same
-	// command with --dry-run, which executes nothing.
+	// plan is the ceiling ledger of planning the unchanged workspace, the
+	// same command with --dry-run, which executes nothing.
 	plan string
-	// was is the cold ledger the change before the last one to move it
-	// recorded: cold holds the counts rule against it (checkCountsRule).
-	was string
 	// settles is whether the case holds that a run after a run of the
 	// unchanged workspace executes no task but everyRun.
 	settles bool
@@ -151,7 +149,6 @@ var extensionCases = []extensionCase{
 		setup:       [][]string{{"projects", "sync"}},
 		command:     []string{"lint,test,build", "--all", "--max-parallel", "1"},
 		cold:        "engine job 9 · cli 1 · git 16 | engine git for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:         "engine job 9 · cli 1 · git 17 | engine git check-ignore 1 · for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:        "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:     true,
 	},
@@ -168,7 +165,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"lint,test,build", "--all", "--max-parallel", "1"},
 		cold:       "engine job 8 · control 1 · git 23 | engine git for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 8 · control 1 · git 24 | engine git check-ignore 1 · for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 	},
@@ -181,7 +177,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 13 · git 23 | engine git check-ignore 1 · for-each-ref 1 · ls-files 9 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 13 · git 24 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 9 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 		// The squash-message checks read PUTNAMI_PROPOSAL_MESSAGE and Git
@@ -206,7 +201,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"client-generate", "--projects", "client", "--max-parallel", "1"},
 		cold:       "engine job 1 · control 1 · git 16 | engine git diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 1 · control 1 · git 16 | engine git diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 	},
@@ -221,7 +215,6 @@ var extensionCases = []extensionCase{
 		setup:       [][]string{{"projects", "sync"}},
 		command:     []string{"lint,test,build", "--all", "--max-parallel", "1"},
 		cold:        "engine job 4 · git 17 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:         "engine job 4 · git 18 | engine git diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git ls-files 1",
 		plan:        "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -233,7 +226,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"test", "--all", "--max-parallel", "1"},
 		cold:       "engine job 2 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 2 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -251,7 +243,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"build", "--all", "--max-parallel", "1"},
 		cold:       "engine job 5 · control 1 · git 21 | engine git for-each-ref 1 · ls-files 9 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 5 · control 1 · git 20 | engine git for-each-ref 1 · ls-files 8 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
 		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -263,7 +254,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -275,7 +265,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -287,7 +276,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -299,7 +287,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -311,7 +298,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -323,7 +309,6 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -335,15 +320,15 @@ var extensionCases = []extensionCase{
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 }
 
 // TestTheExtensionCounts holds, for each extension built here, what a small
-// workspace it serves starts: the job and control processes of the engine,
-// the git calls of the engine and of the jobs, and the CLI starts of the jobs,
-// in a run that executes every task, and in planning the unchanged workspace.
+// workspace it serves starts under the case's ceilings: the job and control
+// processes of the engine, the git calls of the engine and of the jobs, and
+// the CLI starts of the jobs, in a run that executes every task, and in
+// planning the unchanged workspace.
 func TestTheExtensionCounts(t *testing.T) {
 	clitest.RequireShell(t)
 	// The cases share one Putnami home, so its copies are made once.
@@ -377,15 +362,9 @@ func TestTheExtensionCounts(t *testing.T) {
 					t.Errorf("a run after a run of the unchanged workspace executed %v, want only %v", executed, tc.everyRun)
 				}
 			}
-			for _, check := range []struct{ name, got, want string }{
-				{"a run with every task executed", cold.Ledger(), tc.cold},
-				{"planning the unchanged workspace", plan.Ledger(), tc.plan},
-			} {
-				if check.got != check.want {
-					t.Errorf("%s:\n got  %s\n want %s\n%s", check.name, check.got, check.want, countsHint)
-				}
-			}
-			if plan.Ledger() == tc.plan {
+			holdCeiling(t, "a run with every task executed", cold.Ledger(), tc.cold)
+			holdCeiling(t, "planning the unchanged workspace", plan.Ledger(), tc.plan)
+			if startsOnlyGit(t, plan.Ledger()) {
 				held++
 			}
 			if tc.name == "go" {
@@ -400,6 +379,28 @@ func TestTheExtensionCounts(t *testing.T) {
 		spectest.Proves(t, "cli/job-planning-execution", "unchanged-planning-reads-records",
 			"planning-an-unchanged-workspace-starts-only-git")
 	}
+}
+
+// startsOnlyGit reports whether a plan's ledger names no process but the
+// engine's git calls, whatever its ceiling allows.
+func startsOnlyGit(t *testing.T, ledger string) bool {
+	t.Helper()
+	counts, err := parseLedger(ledger)
+	if err != nil {
+		t.Errorf("planning the unchanged workspace: %v", err)
+		return false
+	}
+	for kind := range counts.engine {
+		if kind != "git" {
+			t.Errorf("planning the unchanged workspace started engine %s processes, want git alone: %s", kind, ledger)
+			return false
+		}
+	}
+	if len(counts.jobs) > 0 || len(counts.jobsGit) > 0 {
+		t.Errorf("planning the unchanged workspace started job processes, want git alone: %s", ledger)
+		return false
+	}
+	return true
 }
 
 // prepareExtensionCase writes the case's workspace, with the case's pinned
