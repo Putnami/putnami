@@ -6,6 +6,8 @@
   workspace project carries a feature of its own, a spec or a reviewed
   `featureAuthority`, and that `validate-workspace` fails one that carries
   none
+- **Amended**: 2026-11-26, §5 and Consequences: Contributor CI runs the step
+  in its squash commit checks (`validate-workspace`)
 - **Scope**: `@putnami/sdd` (`feature-coverage-validate` and
   `feature-coverage-ratchet-validate`, steps of `validate-workspace`), every
   workspace that sets

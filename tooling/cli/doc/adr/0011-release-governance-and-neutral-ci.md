@@ -1,6 +1,9 @@
 # ADR 0011 — Release governance: an owner bound to the license, exceptions that expire, and a contributor path proved by execution
 
 - **Status**: accepted
+- **Amended**: 2026-11-26, §4 and Consequences: the credential-free gate runs
+  nightly, on demand and before a release; pull requests keep the squash
+  commit checks
 - **Scope**: the workspace-root governance record (`GOVERNANCE.md`, `RELEASING.md`, `SECURITY.md`, `CONTRIBUTING.md`), `@putnami/cli` (`tooling/cli`, `tooling/cli-document-set`, `tooling/repository-checks`) as the home of the gates, `protocols/support`
 
 ## Context
@@ -85,8 +88,8 @@ command, because a contributor cannot tell one apart from the gate.
 no secret, because a fork's pull request cannot reach Putnami Cloud CI. It is
 corroboration, not the definition, and it stays a non-required check. It runs
 every night on `main`, on demand, and as a step of the release checklist, not
-on every pull request: what it proves changes rarely, and it took 13 to 39
-minutes per pull request head, a wait that outlasted Putnami CI on 36 of 79
+on every pull request: what it proves changes rarely, and it took a median of
+about 7 minutes and up to 39 per pull request head, a wait that outlasted Putnami CI on 36 of 79
 heads measured on 2026-11-25 and 26. A failed nightly run opens an issue. A
 pull request keeps only the squash commit checks of `validate-workspace`,
 which need the squash message only a pull request has.

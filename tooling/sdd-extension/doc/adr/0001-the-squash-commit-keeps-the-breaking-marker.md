@@ -1,6 +1,8 @@
 # ADR 0001 — The squash commit keeps the breaking marker of its commits
 
 - **Status**: accepted
+- **Amended**: 2026-11-26, §3 and Consequences: Contributor CI checks the
+  message in its squash commit checks, at each push and each edit
 - **Scope**: `@putnami/sdd` (`breaking-marker-validate`, a step of
   `validate-workspace`), the Contributor CI workflow of this repository, and
   every runner that runs the gate on a pull request
