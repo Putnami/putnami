@@ -52,6 +52,8 @@ def run_env(commit):
     env = dict(os.environ)
     # No session upload: the measurement must not publish anything.
     env.pop("PUTNAMI_SESSION_REPORTER", None)
+    # No remote cache: the provider is never started (documented core switch).
+    env["PUTNAMI_CACHE_TRUST"] = "none"
     env["PUTNAMI_STORE_DIR"] = f"{STATE}/{commit}/store"
     env["PUTNAMI_GO_CACHE_DIR"] = f"{STATE}/{commit}/go"
     return env
@@ -244,6 +246,11 @@ def run(commit, scenario, label):
     with open(f"{out}/acct.json", "w") as f:
         json.dump(recs, f)
     os.remove(f"{out}/pacct")
+    remote_lines = []
+    with open(f"{out}/run.log", errors="replace") as f:
+        for line in f:
+            if "remote cache" in line.lower():
+                remote_lines.append(line.strip()[:300])
     sess_path = latest_session(wt, t0)
     if sess_path:
         shutil.copy(sess_path, f"{out}/session.json")
@@ -257,9 +264,17 @@ def run(commit, scenario, label):
                    "systemS": stat["system_usec"] / 1e6, "v1UsageS": v1_ns / 1e9,
                    "leftInCgroup": left_in_cg},
         "leftover": timing["leftover"],
+        "remoteCacheLines": remote_lines,
         "acct": acct_summary(recs),
         "session": session_summary(f"{out}/session.json") if sess_path else None,
     }
+    a = summary["acct"]
+    # CPU the cgroup saw that no accounting record carries: Linux truncates
+    # each process's CPU to 10 ms ticks, which loses most of a short process.
+    a["unattributedS"] = round(summary["cgroup"]["usageS"] - a["putnamiS"] - a["toolsS"] - a["harnessS"], 2)
+    tot = summary["cgroup"]["usageS"]
+    a["shareOfTotalPct"] = round(100.0 * a["putnamiS"] / tot, 2) if tot else None
+    a["shareUpperPct"] = round(100.0 * (a["putnamiS"] + max(a["unattributedS"], 0)) / tot, 2) if tot else None
     with open(f"{out}/summary.json", "w") as f:
         json.dump(summary, f, indent=1)
     a = summary["acct"]
@@ -286,11 +301,17 @@ def session_summary(path):
         k = t.get("status") or t.get("state") or "?"
         status[k] = status.get(k, 0) + 1
     sched = s.get("scheduler") or dig(s, "run", "scheduler") or {}
+    ready = sched.get("readyWait") or []
+    run = s.get("run") or {}
     return {
         "sessionId": s.get("sessionId") or s.get("id"),
         "taskStatus": status,
+        "counts": run.get("counts"),
+        "reuse": run.get("reuse"),
+        "durationMs": run.get("durationMs"),
+        "maxReadyWaitMs": max((r.get("maxMs", 0) for r in ready), default=None) if ready else None,
         "orchestrationCpu": dig(s, "run", "orchestration", "cpu"),
-        "readyWait": {k: v for k, v in sched.items() if "wait" in k.lower() or "ready" in k.lower()},
+        "readyWait": ready,
         "remoteCache": s.get("remoteCache") or dig(s, "run", "remoteCache") or dig(s, "cache", "remote"),
     }
 
@@ -328,7 +349,7 @@ def report():
     for r in runs:
         if r.get("excluded"):
             continue
-        key = (r["label"].rstrip("0123456789").rsplit("-", 1)[0] if False else r["label"].rstrip("0123456789"), r["commit"])
+        key = (r["label"].rstrip("0123456789"), r["commit"])
         groups.setdefault(key, []).append(r)
     table = []
     for (series, commit), rs in sorted(groups.items()):
@@ -339,6 +360,12 @@ def report():
             "putnamiS": median_range([r["acct"]["putnamiS"] for r in rs]),
             "toolsS": median_range([r["acct"]["toolsS"] for r in rs]),
             "sharePct": median_range([r["acct"]["sharePct"] for r in rs]),
+            "unattributedS": median_range([r["acct"].get("unattributedS") for r in rs]),
+            "shareUpperPct": median_range([r["acct"].get("shareUpperPct") for r in rs]),
+            "executed": median_range([dig(r, "session", "counts", "succeeded") for r in rs]),
+            "localCacheHits": median_range([dig(r, "session", "reuse", "localCache") for r in rs]),
+            "maxReadyWaitS": median_range([(dig(r, "session", "maxReadyWaitMs") or 0) / 1000
+                                           if dig(r, "session", "maxReadyWaitMs") is not None else None for r in rs]),
             "orchestrationTotalS": median_range([
                 (dig(r, "session", "orchestrationCpu", "totalMs") or 0) / 1000
                 if dig(r, "session", "orchestrationCpu") else None for r in rs]),
@@ -351,11 +378,14 @@ def report():
         if not m:
             return "n/a"
         return f"{m['median']:g}{unit} ({m['min']:g}–{m['max']:g})"
-    lines = ["| Scenario | Commit | Wall | Total CPU | Putnami CPU | Tools CPU | Putnami share | Exit codes |",
-             "|---|---|---|---|---|---|---|---|"]
+    lines = ["| Scenario | Commit | Wall | Total CPU (cgroup) | Putnami CPU | Tools CPU | Unattributed | Putnami share | Orchestration (session) | Executed / cache hits | Max ready wait | Exit codes |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for t in table:
+        ex = t["executed"]["median"] if t["executed"] else "n/a"
+        hit = t["localCacheHits"]["median"] if t["localCacheHits"] else "n/a"
         lines.append(f"| {t['series']} | {t['commit']} | {fmt(t['wallS'])} | {fmt(t['cpuS'])} | "
-                     f"{fmt(t['putnamiS'])} | {fmt(t['toolsS'])} | {fmt(t['sharePct'], '%')} | {t['rc']} |")
+                     f"{fmt(t['putnamiS'])} | {fmt(t['toolsS'])} | {fmt(t['unattributedS'])} | {fmt(t['sharePct'], '%')} | "
+                     f"{fmt(t['orchestrationTotalS'])} | {ex} / {hit} | {fmt(t['maxReadyWaitS'])} | {t['rc']} |")
     with open(f"{DATA}/table.md", "w") as f:
         f.write("\n".join(lines) + "\n")
     print("\n".join(lines))
