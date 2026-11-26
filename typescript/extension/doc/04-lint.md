@@ -87,7 +87,13 @@ A lint that only checks leaves out of Biome's targets what Putnami writes at
 the project root: `putnami.json`, `.gen`, `.putnami`, and a `tsconfig.json`
 that only extends the workspace root's, as an import writes it. The
 repository's Biome configuration never formatted those files, and a lint that
-writes nothing cannot bring them to it; the fix path formats them. An import
+writes nothing cannot bring them to it; the fix path formats `putnami.json` and
+that `tsconfig.json`. No lint gives Biome the `.gen` and `.putnami` of a project
+root, and neither the Biome nor the ESLint tasks key them: other tasks write
+them, and a lint that
+rewrote them would move their outputs after they ran, so the next run of the
+unchanged workspace would run again. `lint~docs` keys every file Git lists, so
+the workspace's `.gitignore` lists `.gen`, as `putnami init` writes it. An import
 from Nx, Turborepo, Rush or moon writes `fix: false` in
 `options["@putnami/typescript:lint"]` of each project whose lint script it
 moves and that passes no write flag, so that the moved lint only checks, as

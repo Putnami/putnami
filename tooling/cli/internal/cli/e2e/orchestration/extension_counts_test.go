@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -62,6 +63,13 @@ type extensionCase struct {
 	// was is the cold ledger the change before the last one to move it
 	// recorded: cold holds the counts rule against it (checkCountsRule).
 	was string
+	// settles is whether the case holds that a run after a run of the
+	// unchanged workspace executes no task but everyRun.
+	settles bool
+	// everyRun are the keys of the tasks that execute on every run of the
+	// unchanged workspace, each named with the reason it is never served from
+	// the cache.
+	everyRun []string
 }
 
 // registries are the registries of this repository's workspace, so a job
@@ -70,7 +78,7 @@ const registries = `{"npm": {"scopes": {"@putnami": "https://npm.putnami.dev"}},
 	` "go": {"origin": "https://go.putnami.dev", "proxy": ["https://proxy.golang.org", "direct"]}}`
 
 var goFiles = map[string]string{
-	".gitignore": ".putnami\n",
+	".gitignore": ".putnami\n.gen\n",
 	"putnami.workspace.json": `{"name": "counts", "extensions": ["/.ext/go", "/.ext/dev"], "includes": ["lib"],` +
 		` "registries": ` + registries + `}` + "\n",
 	"lib/putnami.json": `{"name": "lib", "extensions": ["@putnami/go"]}` + "\n",
@@ -81,20 +89,23 @@ var goFiles = map[string]string{
 }
 
 var typescriptFiles = map[string]string{
-	".gitignore":   ".putnami\nnode_modules\ndist\n*.tsbuildinfo\n",
+	".gitignore":   ".putnami\n.gen\nnode_modules\ndist\n*.tsbuildinfo\n",
 	"package.json": `{"name": "counts", "private": true, "packageManager": "bun@1.4.5", "workspaces": ["lib"]}` + "\n",
 	"putnami.workspace.json": `{"name": "counts", "extensions": ["/.ext/typescript", "/.ext/dev"], "includes": ["lib"],` +
 		` "registries": ` + registries + `}` + "\n",
-	"lib/putnami.json": `{"name": "lib", "extensions": ["@putnami/typescript"]}` + "\n",
-	"lib/package.json": `{"name": "lib", "type": "module", "main": "dist/index.js", "types": "dist/index.d.ts",` +
-		` "scripts": {"build": "tsc -b"}}` + "\n",
-	"lib/tsconfig.json": `{"compilerOptions": {"composite": true, "rootDir": "src", "outDir": "dist",` +
-		` "module": "nodenext", "target": "es2022", "strict": true, "types": []}, "include": ["src"]}` + "\n",
+	// The project's files are written as its lint formats them, so the first
+	// run rewrites no source and the next run finds the tree it left.
+	"lib/putnami.json": `{ "name": "lib", "extensions": ["@putnami/typescript"] }` + "\n",
+	"lib/package.json": "{\n\t\"name\": \"lib\",\n\t\"type\": \"module\",\n\t\"main\": \"dist/index.js\",\n" +
+		"\t\"types\": \"dist/index.d.ts\",\n\t\"scripts\": {\n\t\t\"build\": \"tsc -b\"\n\t}\n}\n",
+	"lib/tsconfig.json": "{\n\t\"compilerOptions\": {\n\t\t\"composite\": true,\n\t\t\"rootDir\": \"src\",\n" +
+		"\t\t\"outDir\": \"dist\",\n\t\t\"module\": \"nodenext\",\n\t\t\"target\": \"es2022\",\n" +
+		"\t\t\"strict\": true,\n\t\t\"types\": []\n\t},\n\t\"include\": [\"src\"]\n}\n",
 	"lib/src/index.ts": "export const add = (a: number, b: number): number => a + b;\n",
 }
 
 var sddFiles = map[string]string{
-	".gitignore":             ".putnami\n",
+	".gitignore":             ".putnami\n.gen\n",
 	"putnami.workspace.json": `{"name": "counts", "extensions": ["/.ext/sdd"], "includes": ["lib"]}` + "\n",
 	"lib/putnami.json":       `{"name": "lib", "extensions": ["@putnami/sdd"]}` + "\n",
 	"lib/putnami.features.json": `{"protocolVersion": 2, "namespace": "counts", "features": [{"id": "counts/add",` +
@@ -139,9 +150,14 @@ var extensionCases = []extensionCase{
 		files:       goFiles,
 		setup:       [][]string{{"projects", "sync"}},
 		command:     []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:        "engine job 9 · cli 1 · git 18 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:         "engine job 9 · cli 1 · git 18 | engine git diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git ls-files 1",
-		plan:        "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:        "engine job 9 · cli 1 · git 17 | engine git check-ignore 1 · for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:         "engine job 9 · cli 1 · git 18 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:        "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:     true,
+		// build-infra skips a library, and a skip of a task with a required
+		// output caches nothing, so a hit never leaves a manifest the inputs do
+		// not produce.
+		everyRun: []string{"/lib:build~infra"},
 	},
 	{
 		name:        "typescript",
@@ -155,9 +171,10 @@ var extensionCases = []extensionCase{
 		files:      typescriptFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:       "engine job 8 · control 1 · git 25 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
-		was:        "engine job 8 · control 1 · git 24 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 10 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 6 | jobs git check-ignore 2 · ls-files 3 · rev-parse 1",
-		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 8 · control 1 · git 24 | engine git check-ignore 1 · for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
+		was:        "engine job 8 · control 1 · git 25 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git check-ignore 1",
+		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:    true,
 	},
 	{
 		name:       "sdd",
@@ -167,9 +184,15 @@ var extensionCases = []extensionCase{
 		files:      sddFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 13 · git 24 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 9 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		was:        "engine job 13 · git 23 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 8 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs git 1 | jobs git ls-files 1",
-		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 13 · git 23 | engine git check-ignore 1 · for-each-ref 1 · ls-files 9 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		was:        "engine job 13 · git 24 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 9 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:    true,
+		// The squash-message checks read PUTNAMI_PROPOSAL_MESSAGE and Git
+		// history, which no key holds (sdd ADR 0002 point 7, protocols/job ADR
+		// 0003 point 4), so they are uncached.
+		everyRun: []string{"counts:validate-workspace~agent-attribution", "counts:validate-workspace~breaking-marker",
+			"counts:validate-workspace~feature-coverage-ratchet"},
 	},
 	{
 		name:        "clientgen",
@@ -189,6 +212,7 @@ var extensionCases = []extensionCase{
 		cold:       "engine job 1 · control 1 · git 16 | engine git diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		was:        "engine job 1 · control 1 · git 16 | engine git diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:    true,
 	},
 	{
 		name:        "rust",
@@ -369,8 +393,9 @@ func TestTheExtensionCounts(t *testing.T) {
 			// runtimes the workspace compiles from this tree.
 			clitest.PinToolchains(t, repoRoot, root, tc.toolchains...)
 			// The first run prepares the extension runtimes, so the runs counted
-			// build none.
-			if code, out := clitest.RunGateArgs(t, root, tc.command...); code != 0 {
+			// build none. It runs on every worker, in the order its tasks take
+			// there.
+			if code, out := clitest.RunGateArgs(t, root, everyWorker(tc.command)...); code != 0 {
 				t.Fatalf("putnami %v exit %d:\n%s", tc.command, code, out)
 			}
 			clitest.ForgetTaskHistory(t, root)
@@ -379,6 +404,19 @@ func TestTheExtensionCounts(t *testing.T) {
 			plan := clitest.PlanCounts(t, root, tc.command...)
 			t.Logf("cold %d tasks: %s", cold.Tasks, cold.Ledger())
 			t.Logf("plan: %s", plan.Ledger())
+			// A run of the unchanged workspace after those is served from the
+			// cache the first run filled on every worker: it executes no task
+			// but those that run every time. It comes last, so the ledgers above
+			// count what they counted before it.
+			if tc.settles {
+				executed, ended := clitest.ExecutedTasks(t, root, tc.command...)
+				if ended != cold.Tasks {
+					t.Errorf("a run after a run of the unchanged workspace ended %d tasks, want the %d it selects", ended, cold.Tasks)
+				}
+				if !slices.Equal(sorted(executed), sorted(tc.everyRun)) {
+					t.Errorf("a run after a run of the unchanged workspace executed %v, want only %v", executed, tc.everyRun)
+				}
+			}
 			for _, check := range []struct{ name, got, want string }{
 				{"a run with every task executed", cold.Ledger(), tc.cold},
 				{"planning the unchanged workspace", plan.Ledger(), tc.plan},
@@ -402,6 +440,26 @@ func TestTheExtensionCounts(t *testing.T) {
 		spectest.Proves(t, "cli/job-planning-execution", "unchanged-planning-reads-records",
 			"planning-an-unchanged-workspace-starts-only-git")
 	}
+}
+
+// everyWorker is command without its --max-parallel limit.
+func everyWorker(command []string) []string {
+	out := make([]string, 0, len(command))
+	for i := 0; i < len(command); i++ {
+		if command[i] == "--max-parallel" {
+			i++
+			continue
+		}
+		out = append(out, command[i])
+	}
+	return out
+}
+
+// sorted is a sorted copy of keys.
+func sorted(keys []string) []string {
+	out := slices.Clone(keys)
+	slices.Sort(out)
+	return out
 }
 
 // unchangedRunReadsNoSource holds that a run of the unchanged workspace reads

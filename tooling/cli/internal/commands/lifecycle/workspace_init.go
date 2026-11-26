@@ -278,12 +278,18 @@ func parseInitFlags(args []string) initFlags {
 	return f
 }
 
+// defaultGitignore is the .gitignore a new workspace starts with: what its
+// tools write beside the sources and never commit. An untracked file a run
+// writes is a candidate of every git: input that lists the workspace, so one
+// left out here moves those keys after the first run.
 const defaultGitignore = `node_modules
 dist
 .putnami
 coverage
 .gen
 .generated
+__pycache__
+*.egg-info
 .DS_Store
 .env.local.yaml
 .env.prod.yaml

@@ -26,11 +26,16 @@ import (
 )
 
 // treeKeyedSiteConfig is the site's project config: it declares two generate
-// assets, the workspace's docs directory and the library's README.
+// assets, the workspace's docs directory and the library's README, and its
+// build stamp as an input of its tests, which read it, so a key reads the
+// stamp: no lint keys the .gen it leaves out.
 const treeKeyedSiteConfig = `{
   "name": "site",
   "dependencies": ["library"],
   "options": {
+    "test": {
+      "filePatterns": [".gen/version.json"]
+    },
     "generate": {
       "assets": [
         { "from": "/docs", "to": "public/docs" },
@@ -419,11 +424,10 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 	t.Run("a tree-describing stamp field moves the keys that read the stamp", func(t *testing.T) {
 		lane := openTreeKeyedLane(t, treeKeyedCloneMain(t, origin, parent, "stamp"))
 		_, unmerged := lane.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
-		for _, project := range []string{"library", "site"} {
-			mergeStampField(t, filepath.Join(lane.ws.Root, project), "contentHash", producedContentHash)
-		}
+		mergeStampField(t, filepath.Join(lane.ws.Root, "site"), "contentHash", producedContentHash)
 		_, merged := lane.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
-		for _, key := range []string{"/library:lint~format", "/library:lint~check", "/site:lint~format", "/site:lint~check"} {
+		// The site's tests read its stamp: the site declares it as a test input.
+		for _, key := range []string{"/site:test~test"} {
 			if _, keyed := unmerged[key]; !keyed {
 				t.Fatalf("%s is not keyed in %v; the control reads no stamp", key, sortedKeyNames(unmerged))
 			}

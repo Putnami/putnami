@@ -23,8 +23,8 @@ var eslintCommand = toolchain.ESLintCommand
 const eslintTimeout = 4 * time.Minute
 
 // generatedDirectories are the directories Putnami writes in a project, which
-// ESLint never lints: git ignores them, and the read-only lint task leaves
-// .gen out of its cache key.
+// neither ESLint nor Biome ever lints or fixes: git ignores them, other tasks
+// write them, and the Biome and ESLint tasks leave .gen out of their cache key.
 var generatedDirectories = []string{".gen", ".putnami"}
 
 // ESLint runs eslintBin on node over the files of the project at projectPath,

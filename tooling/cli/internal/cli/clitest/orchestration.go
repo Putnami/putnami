@@ -129,6 +129,35 @@ func RunCounts(t *testing.T, wsRoot string, args ...string) Counts {
 	return ParseCounts(t, out)
 }
 
+// ExecutedTasks drives one invocation of the real CLI in the workspace at
+// wsRoot with --output=jsonl, fails the test unless it exits 0, and returns, in
+// the order they ended, the keys of the tasks it executed: every task record
+// that reused no result, whatever its verdict. ended is the number of task
+// records the run ended, executed or reused.
+func ExecutedTasks(t *testing.T, wsRoot string, args ...string) (executed []string, ended int) {
+	t.Helper()
+	code, out := RunGateArgs(t, wsRoot, append(args, "--output=jsonl")...)
+	if code != 0 {
+		t.Fatalf("putnami %s exit %d:\n%s", strings.Join(args, " "), code, out)
+	}
+	executed = []string{}
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var record protocolcli.SessionStreamRecord
+		if json.Unmarshal([]byte(line), &record) != nil || record.Record != protocolcli.RecordTaskEnd || record.Task == nil {
+			continue
+		}
+		ended++
+		if record.Task.Reuse == protocolcli.TaskReuseNone {
+			executed = append(executed, record.Task.Identity.Key)
+		}
+	}
+	return executed, ended
+}
+
 // ForgetTaskHistory removes the task history of the workspace at wsRoot.
 //
 // A run dispatches its ready tasks longest first by the durations the runs

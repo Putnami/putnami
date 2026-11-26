@@ -192,12 +192,14 @@ func TestBiomeTargets_ACheckOnlyLintLeavesOutWhatPutnamiWrites(t *testing.T) {
 		t.Fatalf("check-only targets = %v, want %v", targets, want)
 	}
 
-	// A lint that fixes formats every file of the project.
+	// A lint that fixes formats every file of the project but the directories
+	// Putnami generates at its root, which other tasks write.
 	_, targets, err = biomeTargets(root, projects, config, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"apps/web", "apps/api", "libs/plain"}; !reflect.DeepEqual(targets, want) {
+	if want := []string{"apps/web/package.json", "apps/web/putnami.json", "apps/web/src", "apps/web/tsconfig.json",
+		"apps/api", "libs/plain"}; !reflect.DeepEqual(targets, want) {
 		t.Fatalf("fixing targets = %v, want %v", targets, want)
 	}
 }

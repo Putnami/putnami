@@ -68,6 +68,8 @@ dist
 coverage
 .gen
 .generated
+__pycache__
+*.egg-info
 .DS_Store
 .env.local.yaml
 .env.prod.yaml

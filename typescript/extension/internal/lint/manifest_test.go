@@ -15,7 +15,7 @@ import (
 // activation and task cache inputs aligned with Biome. This prevents a
 // status-only lint cache entry from describing a clean tree when Biome rewrote
 // a test, config, or other project file outside src/, and avoids
-// invoking Biome in a project with no supported files. The read-only lint task
+// invoking Biome in a project with no supported files. Every lint task
 // excludes generated output from its cache key: .gen is ignored by lint and
 // changes whenever generation runs, so hashing it makes unchanged source miss.
 func TestLintCommandAndTasksCoverEveryBiomeWritableProjectFile(t *testing.T) {
@@ -48,7 +48,7 @@ func TestLintCommandAndTasksCoverEveryBiomeWritableProjectFile(t *testing.T) {
 	components := []string{"**/*.vue", "**/*.svelte", "**/*.astro"}
 	documents := []string{"**/*.md", "**/*.mdx", "**/*.yml", "**/*.yaml"}
 	activation := append(append([]string(nil), biome...), components...)
-	want := append(append([]string(nil), activation...), documents...)
+	want := append(append(append([]string(nil), activation...), documents...), "!.gen/**")
 	if got := manifest.Commands["lint"].ActivationFiles; !reflect.DeepEqual(got, activation) {
 		t.Errorf("lint activation files = %v, want %v", got, activation)
 	}
@@ -66,9 +66,8 @@ func TestLintCommandAndTasksCoverEveryBiomeWritableProjectFile(t *testing.T) {
 	if !ok {
 		t.Fatal("manifest task \"lint-all\" is missing")
 	}
-	wantLintAll := append(append([]string(nil), want...), "!.gen/**")
-	if got := lintAll.Inputs["sources"].Files; !reflect.DeepEqual(got, wantLintAll) {
-		t.Errorf("lint-all sources cache inputs = %v, want %v", got, wantLintAll)
+	if got := lintAll.Inputs["sources"].Files; !reflect.DeepEqual(got, want) {
+		t.Errorf("lint-all sources cache inputs = %v, want %v", got, want)
 	}
 }
 

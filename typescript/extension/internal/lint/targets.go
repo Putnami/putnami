@@ -24,14 +24,18 @@ var errNoSharedRoot = errors.New("selected projects do not share workspace root"
 // project's sources. The scan skips the directories the input hasher skips, so
 // a marker it finds is a keyed input of the lint tasks (`**/*.json`), and
 // adding or removing a nested project changes the task key. The one exception
-// is `.gen`, which the read-only task leaves out of its key: a lint that only
-// checks never gives Biome the `.gen` of a project root, so a marker there
-// changes nothing Biome lints.
+// is `.gen`, which every Biome lint task leaves out of its key: a lint never gives
+// Biome the `.gen` of a project root, so a marker there changes nothing Biome
+// lints.
 //
+// Each project leaves out the directories Putnami generates at its root
+// (generatedDirectories), whether the lint fixes or only checks: other tasks
+// write them, and a lint that rewrote them would change their outputs after
+// they ran, so the next run would find its own sources moved and run again.
 // With checkOnly set, the lint writes nothing, and each project also leaves
-// out what Putnami writes at its root (writtenByPutnami): the repository's
-// Biome configuration never formatted those files, and a lint that only
-// checks cannot bring them to it.
+// out the other files Putnami writes at its root (writtenByPutnami): the
+// repository's Biome configuration never formatted those files, and a lint
+// that only checks cannot bring them to it.
 //
 // An empty list with a nil error means every file of the selected projects
 // belongs to a nested project or is written by Putnami, and there is nothing
@@ -101,8 +105,9 @@ var unscannedDirectories = map[string]bool{
 // rewrite what this process cannot read, and it applies its own ignore rules
 // to it. A symbolic link is passed by name and never followed; a link whose
 // target is missing is left out, because Biome reports it as an error when it
-// is named explicitly. With checkOnly set, the entries of a project root that
-// Putnami writes are left out.
+// is named explicitly. The directories Putnami generates at a project root are
+// left out, and with checkOnly set, every entry of a project root that Putnami
+// writes.
 func coverDirectory(dir, rel string, root, checkOnly bool) (coverage, []string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -119,7 +124,7 @@ func coverDirectory(dir, rel string, root, checkOnly bool) (coverage, []string, 
 	for _, entry := range entries {
 		name := entry.Name()
 		entryRel := path.Join(rel, name)
-		if root && checkOnly && writtenByPutnami(dir, entry) {
+		if root && (generatedDirectory(entry) || checkOnly && writtenByPutnami(dir, entry)) {
 			kind = coverPartial
 			continue
 		}
@@ -166,6 +171,12 @@ func holdsProjectManifest(entries []os.DirEntry) bool {
 // holds none: it extends the workspace root's and sets nothing else.
 var importedTSConfig = regexp.MustCompile(`^\{\n  "extends": "(\.\./)+tsconfig\.json"\n\}\n$`)
 
+// generatedDirectory reports whether an entry of a project root is a directory
+// Putnami generates there.
+func generatedDirectory(entry os.DirEntry) bool {
+	return entry.IsDir() && slices.Contains(generatedDirectories, entry.Name())
+}
+
 // writtenByPutnami reports whether an entry of the project root dir is one
 // Putnami writes: the project manifest, a generated directory, or a
 // tsconfig.json with the bytes an import writes.
@@ -173,7 +184,7 @@ func writtenByPutnami(dir string, entry os.DirEntry) bool {
 	name := entry.Name()
 	switch {
 	case entry.IsDir():
-		return slices.Contains(generatedDirectories, name)
+		return generatedDirectory(entry)
 	case !entry.Type().IsRegular():
 		return false
 	case name == projectManifest:
