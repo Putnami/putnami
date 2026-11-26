@@ -235,6 +235,7 @@
               "a-compatibility-hook-applies-to-runtime-defaults",
               "a-compatibility-hook-applies-to-an-authored-runtime",
               "findings-never-fail-the-task",
+              "a-failed-write-fails-the-task",
               "a-deployment-declaration-is-the-canonical-aggregate",
               "a-deployment-declaration-leaves-the-defaults-sidecar-alone",
               "a-deployment-declaration-is-never-stale"

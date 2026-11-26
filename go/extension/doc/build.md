@@ -454,7 +454,8 @@ those bytes.
      defaults are synthesized and written to `<workload>/.gen/infra/runtime.json`
    - Writes `<workload>/.gen/requirements.json` atomically
    - Findings (a malformed contribution, a merge conflict, an unused override)
-     are reported as task warnings and never fail the build
+     are reported as task warnings and never fail the build. A failed write or
+     removal fails it
    - Skipped for libraries (see [Project classification](#project-classification))
    - Does not depend on compile: it reads no binary and its key does not fold
      the compile key. Write serialization of `.gen` still orders it after the
@@ -467,15 +468,16 @@ those bytes.
      project that joins or leaves the closure, moves the key. The key also
      moves with the project type and with the extension's code, which holds the
      runtime defaults. No commit, ref or checkout path reaches the key
-   - A cache hit restores `.gen/requirements.json` and, without an authored
-     runtime, `.gen/infra/runtime.json`. With an authored runtime, a hit
-     restores nothing at the sidecar's path and removes nothing, so a sidecar
-     an earlier build left stays until the step runs again. The runtime block
-     of `.gen/requirements.json` is the value that applies. Only a run that
-     writes the manifest is
-     stored: a library, a workload that declares nothing and a run whose write
-     failed report a skip and are not cached. A cache hit does not repeat the
-     findings
+   - Both files declare `emptied`
+     ([CLI ADR 0107](../../../tooling/cli/doc/adr/0107-an-emptied-file-output-is-removed-on-execution-and-on-an-empty-restore.md)):
+     the engine removes them before the step executes and on a cache hit of
+     an entry that records them absent. A library and a workload that declares
+     nothing report a skip, which is cached as the manifest's absence, so an
+     unchanged library runs no aggregation on the next build and a hit never
+     leaves a manifest an earlier run wrote. A cache hit restores
+     `.gen/requirements.json` and, without an authored runtime,
+     `.gen/infra/runtime.json`, and removes whichever the entry records
+     absent. A cache hit does not repeat the findings
    - The `package` command's `deployment` step writes the same aggregate as
      the workload's deployment declaration (see
      [Package](package.md#deployment-channel))
@@ -783,9 +785,10 @@ Every declared output has exactly one owning task:
 | `package-docker` | `docker/` | per-command output dir |
 | `config-extract-exec` | `schema/config.json`, `schema/config.jsonschema.json` | project dir |
 
-Every output above except `.gen/` and `.gen/requirements.json` may legitimately
+Every output above except `.gen/` may legitimately
 be absent after a successful run — coverage is not instrumented for a project with `coverage: false`, a dry-run package writes no channel directory,
-a project that contributes no migration operation has no bundle, a project with
+a project that contributes no migration operation has no bundle, a library
+or a workload that declares nothing has no `.gen/requirements.json`, a project with
 nothing to merge writes no merged config file, a workload that authors
 `infra/runtime.json` gets no runtime defaults file,
 and a library's `bin/` is empty because its build evidence is a compile check.
@@ -806,11 +809,11 @@ both tasks from cache used to restore a `.gen` missing all of it; four of those
 `build-describe` declares, at the documented contract path rather than a
 private staging copy. `.gen/deployment.json` is ceded for the same reason: the
 `package` command's `deployment` step writes it after generate's snapshot and
-declares it as its one required output (see
+declares it as its one output, emptied (see
 [Package](package.md#deployment-channel)). `.gen/requirements.json` and
 `.gen/infra/runtime.json` are ceded for the same reason: the `build` command's
-`infra` step writes them after generate's snapshot and declares them, the
-manifest as a required output. `.gen/layers/` is ceded to `cloud-image-layers`
+`infra` step writes them after generate's snapshot and declares them, both
+emptied. `.gen/layers/` is ceded to `cloud-image-layers`
 of `@putnami/cloud`, and `.gen/site-content/` to `cloud-site-content-generate`
 of `@putnami/cloud`, which declare them. The last, `.gen/conf/`, is ceded for
 the opposite ordering: `config-merge` runs BEFORE generate, so generate's snapshot adopted

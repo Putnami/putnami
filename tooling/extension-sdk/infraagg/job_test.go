@@ -108,8 +108,8 @@ func TestJob_FindingsAreWarningsAndNeverFail(t *testing.T) {
 }
 
 // A workload that declares nothing reports SKIP: its run removes an earlier
-// manifest, which a cache entry of the task cannot replay, so the language's
-// required manifest output keeps the run uncached.
+// manifest, and the engine removes it on a hit of the cached skip, because the
+// language declares the manifest emptied.
 func TestJob_AWorkloadThatDeclaresNothingIsASkip(t *testing.T) {
 	root := t.TempDir()
 	ctx := closureContext(root, "app", "app", "application")
@@ -134,11 +134,11 @@ func TestJob_AWorkloadThatDeclaresNothingIsASkip(t *testing.T) {
 	}
 }
 
-// A failed write reports SKIP and never fails: the files on disk can be an
-// earlier run's, so the run must not be cached, and a deployability manifest
-// never fails a build. The failure reaches the reader as a warning.
-func TestJob_AFailedWriteIsASkipThatNeverFails(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "infra-aggregation-neutrality", "findings-never-fail-the-task")
+// A failed write fails the task with the error: the files on disk can be an
+// earlier run's, and a SKIP would be cached as the manifest's absence. The
+// failure also reaches the reader as a warning.
+func TestJob_AFailedWriteFailsTheTask(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "infra-aggregation-neutrality", "a-failed-write-fails-the-task")
 	root := t.TempDir()
 	ctx := closureContext(root, "app", "app", "application", "lib")
 	writeProjectFile(t, root, "lib", "infra/requirements.json", dbManifest)
@@ -151,8 +151,8 @@ func TestJob_AFailedWriteIsASkipThatNeverFails(t *testing.T) {
 		status, data, err = Job(Options{})(ctx, jsonl.NewForVersion(1), nil)
 	})
 
-	if err != nil || status != "SKIP" {
-		t.Fatalf("job = %q %v, want a SKIP that does not fail", status, err)
+	if err == nil || status != "FAILED" || !strings.Contains(err.Error(), "write aggregated infra manifest") {
+		t.Fatalf("job = %q %v, want FAILED with the write error", status, err)
 	}
 	if data["outcome"] != string(OutcomeEmitted) {
 		t.Errorf("data[outcome] = %v, want %q", data["outcome"], OutcomeEmitted)

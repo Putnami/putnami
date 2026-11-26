@@ -14,6 +14,7 @@ import (
 	cache "go.putnami.dev/protocol/cache"
 	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/robustio"
 )
 
 // The one atomic materialize primitive for task-owned entries.
@@ -784,4 +785,15 @@ func copyFileTo(src, staging string, modes recordedModes, path string) error {
 // reuses the lease owner nonce rather than adding a second source of randomness.
 func randomSuffix() string {
 	return newLeaseOwner()
+}
+
+// RemoveTaskOutputFile removes the file or symlink at dest without following
+// a link, as the emptying of a file output that declares emptied does (CLI ADR
+// 0107). On Windows it waits out a handle another process briefly holds. An
+// absent dest is not an error.
+func RemoveTaskOutputFile(dest string) error {
+	if err := robustio.Remove(dest); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
 }

@@ -239,7 +239,7 @@
     },
     {
       "id": "executed-directory-output-starts-empty",
-      "text": "Before a task executes, the engine empties each literal-path directory output that is required, under the command-output root, or declares emptied, keeping ceded and preserved subpaths and the build stamp. A hit whose entry records such an output empty empties it too, or executes the task when it cannot. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. Other outputs are not emptied. A key marker keeps entries stored without emptying from being served."
+      "text": "Before a task executes, the engine empties each literal-path directory output that is required, under the command-output root, or declares emptied, keeping ceded and preserved subpaths and the build stamp, and removes each emptied file. A hit recording such an output empty or absent empties it, or else executes the task. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. A key marker keeps entries stored without emptying from being served."
     },
     {
       "id": "emptied-output-keeps-tracked-files",
@@ -432,6 +432,7 @@
     "tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md",
     "tooling/cli/doc/adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md",
     "tooling/cli/doc/adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md",
+    "tooling/cli/doc/adr/0107-an-emptied-file-output-is-removed-on-execution-and-on-an-empty-restore.md",
     "tooling/cli/doc/adr/0094-a-main-publication-releases-what-its-pull-request-published.md",
     "tooling/cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md",
     "tooling/cli/doc/adr/0073-the-core-declares-no-development-verb.md",

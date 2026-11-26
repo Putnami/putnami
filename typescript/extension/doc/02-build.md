@@ -690,8 +690,8 @@ Emits the workload's deployability manifest at `<project>/.gen/requirements.json
 5. Writes the manifest atomically.
 
 Findings (a malformed contribution, a merge conflict, an unused override) are
-reported as task warnings and never fail the build. The phase is skipped for
-libraries.
+reported as task warnings and never fail the build. A failed write or removal
+fails it. The phase is skipped for libraries.
 
 The phase is cached. Its key holds every file it reads: the committed
 `infra/requirements.json` of every project in the closure, with that project's
@@ -699,15 +699,15 @@ path, and the workload's `infra/runtime.json` and `infra/overrides.json`. A
 change to a dependency's requirements, or a project that joins or leaves the
 closure, moves the key. The key also moves with the project type and with the
 extension's code, which holds the runtime defaults and the HTTP/2 rule. No
-commit, ref or checkout path reaches the key. A cache hit restores
-`.gen/requirements.json` and, without an authored runtime,
-`.gen/infra/runtime.json`. With an authored runtime, a hit restores nothing at
-the sidecar's path and removes nothing, so a sidecar an earlier build left
-stays until the phase runs again. The runtime block of
-`.gen/requirements.json` is the value that applies. Only a run that writes the
-manifest is stored: a
-library, a workload that declares nothing and a run whose write failed report a
-skip and are not cached. A cache hit does not repeat the findings.
+commit, ref or checkout path reaches the key. Both files declare `emptied`
+([CLI ADR 0107](../../../tooling/cli/doc/adr/0107-an-emptied-file-output-is-removed-on-execution-and-on-an-empty-restore.md)):
+the engine removes them before the phase executes and on a cache hit of an
+entry that records them absent. A library and a workload that declares nothing
+report a skip, which is cached as the manifest's absence, so an unchanged
+library runs no aggregation on the next build and a hit never leaves a
+manifest an earlier run wrote. A cache hit restores `.gen/requirements.json`
+and, without an authored runtime, `.gen/infra/runtime.json`, and removes
+whichever the entry records absent. A cache hit does not repeat the findings.
 
 The `package` command's `deployment` step writes the same aggregate, under the
 same HTTP/2 hook, as the workload's deployment declaration (see
@@ -811,13 +811,11 @@ Every output has exactly one owning task:
 | `test-run` | `lcov.info`, `results.junit.xml` | per-command output dir |
 | `package-npm` | `npm/` | per-command output dir |
 | `package-docker` | `docker/` | per-command output dir |
-| `build-infra` | `.gen/requirements.json` (required: a run that writes none caches nothing), `.gen/infra/runtime.json` | project dir |
-| `package-deployment` | `.gen/deployment.json` (required: a run that writes none caches nothing) | project dir |
+| `build-infra` | `.gen/requirements.json`, `.gen/infra/runtime.json` (both emptied: a run that writes none is cached as their absence) | project dir |
+| `package-deployment` | `.gen/deployment.json` (emptied: a run that writes none is cached as its absence) | project dir |
 | `config-extract-exec` | `schema/config.json`, `schema/config.jsonschema.json` | project dir |
 
-Except the required `.gen/requirements.json` of `build-infra` and
-`.gen/deployment.json` of `package-deployment`, each declared output above may
-legitimately be absent after a successful run — a project with no entrypoint
+Each declared output above may legitimately be absent after a successful run — a project with no entrypoint
 transpiles to nothing, coverage is only instrumented under `--enforce-coverage`,
 a project with no config blocks emits no schema, a project whose hooks complete
 without a route fragment commits no route inventory, and a workload that authors

@@ -384,10 +384,11 @@ var v3InvalidFixtureCodes = map[string][]string{
 	// PRESERVES — a file has no subpath, an entry never escapes the output,
 	// and one path is preserved once, however it is spelled.
 	"declared-output-preserve-invalid.json": {"invalid-output-path", "duplicate-output-preserve", "invalid-output-preserve"},
-	// EMPTIED — the flag names an optional project or workspace directory the
-	// engine can empty before the run: not an optional command-output
-	// directory or a required one, which it empties already, and not a file, a
-	// pathFrom output or an invocation-scoped output.
+	// EMPTIED — the flag names an optional project or workspace directory or
+	// file the engine can empty before the run: not an optional command-output
+	// directory or a required one, which it empties already, not a required
+	// file, which every stored entry holds, and not a pathFrom output or an
+	// invocation-scoped output.
 	"declared-output-emptied-invalid.json": {
 		"invalid-output-emptied", "invalid-output-emptied", "invalid-output-emptied", "invalid-output-emptied",
 		"invalid-output-emptied",

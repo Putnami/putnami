@@ -1054,13 +1054,22 @@ func emptyingShapesJob() *ScheduledJob {
 				Kind: extension.OutputKindDirectory, Root: extension.OutputRootWorkspace, Path: "dist/contracts",
 				OptionalEmpty: true, Emptied: true,
 			},
-			"tool":    fileDeclaration(extension.OutputRootCommandOutput, "bin/tool", true),
-			"client":  {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
-			"scratch": {Kind: extension.OutputKindDirectory, Scope: extensionproto.OutputScopeInvocation, Path: "scratch", OptionalEmpty: true},
-			"socket":  {Kind: extensionproto.OutputKindRuntimeFile, Scope: extensionproto.OutputScopeInvocation, Path: "socket", OptionalEmpty: true},
-			"escape":  {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: "../outside", OptionalEmpty: true},
-			"root":    {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".", OptionalEmpty: true},
-			"unknown": {Kind: extension.OutputKindDirectory, Root: "elsewhere", Path: "out", OptionalEmpty: true},
+			"emptiedFile": {
+				Kind: extension.OutputKindFile, Root: extension.OutputRootProject, Path: "manifest/requirements.json",
+				OptionalEmpty: true, Emptied: true,
+			},
+			// Files the protocol refuses the flag on are never removed, should
+			// a declaration skip validation: a required one, and one under the
+			// command-output root.
+			"requiredFile": {Kind: extension.OutputKindFile, Root: extension.OutputRootProject, Path: "dist/app.js", Emptied: true},
+			"commandFile":  {Kind: extension.OutputKindFile, Root: extension.OutputRootCommandOutput, Path: "bin/flagged", OptionalEmpty: true, Emptied: true},
+			"tool":         fileDeclaration(extension.OutputRootCommandOutput, "bin/tool", true),
+			"client":       {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
+			"scratch":      {Kind: extension.OutputKindDirectory, Scope: extensionproto.OutputScopeInvocation, Path: "scratch", OptionalEmpty: true},
+			"socket":       {Kind: extensionproto.OutputKindRuntimeFile, Scope: extensionproto.OutputScopeInvocation, Path: "socket", OptionalEmpty: true},
+			"escape":       {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: "../outside", OptionalEmpty: true},
+			"root":         {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".", OptionalEmpty: true},
+			"unknown":      {Kind: extension.OutputKindDirectory, Root: "elsewhere", Path: "out", OptionalEmpty: true},
 		},
 	})
 }
@@ -1120,6 +1129,7 @@ func TestEmptyOwnedOutputsPerRoot(t *testing.T) {
 		filepath.Join(project, "contract", "openapi.json"),
 		filepath.Join(project, "contract", "nested", "config.json"),
 		filepath.Join(f.ws.Root, "dist", "contracts", "stale.json"),
+		filepath.Join(project, "manifest", "requirements.json"),
 	}
 	kept := []string{
 		// Ceded, preserved, and the scheduler's stamp.
@@ -1143,6 +1153,8 @@ func TestEmptyOwnedOutputsPerRoot(t *testing.T) {
 		filepath.Join(project, "described", "config.json"),
 		filepath.Join(f.ws.Root, "dist", "optional", "config.json"),
 		filepath.Join(command, "bin", "tool"),
+		filepath.Join(project, "dist", "app.js"),
+		filepath.Join(command, "bin", "flagged"),
 		filepath.Join(project, "src", "clients", "removed-endpoint.ts"),
 		filepath.Join(project, "scratch", "kept.txt"),
 		filepath.Join(project, "out", "kept.txt"),

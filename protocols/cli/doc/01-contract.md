@@ -350,6 +350,14 @@ drops the member and probes the binary once per run, with the same answer, so
 the member raises no floor: a manifest that declares it keeps the stamp its
 other vocabulary requires. An older reader's strict validation (`putnami extensions
 validate`, an extension's packaging) refuses the member it does not know.
+Contract `27` (`EmptiedFileOutputContract`) is additive for a task's file
+output that declares `emptied`. From 27 on, the CLI removes the file before
+the task executes and on a restore of an entry that records it absent, so a
+cached run that wrote no file restores its absence. A reader below 27 refuses
+`emptied` on a file, or would keep a file an earlier run left where the
+entry's run left none, so it refuses the stamp instead. The floor binds a
+manifest wherever it loads from. Only a manifest with such an output is
+stamped 27.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

@@ -45,6 +45,11 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	27: ADDITIVE — a task's file output that declares `emptied`. From 27 on,
+//	   the CLI removes the file before the task executes and on a restore of
+//	   an entry that records it absent, so a cached run that wrote no file
+//	   restores its absence. A reader below 27 refuses the flag on a file, so
+//	   a manifest that declares one is stamped 27 from every origin.
 //	26: ADDITIVE, NO FLOOR — how a runtime toolchain's binary names its own
 //	   executable (`probe.self`). From 26 on, the CLI runs the declared probe
 //	   once, when it records a toolchain outside the Putnami home's
@@ -369,7 +374,15 @@ const PromptHostHooksContract = 25
 // vocabulary requires.
 const ToolchainProbeSelfContract = 26
 
+// EmptiedFileOutputContract is required by a manifest whose task declares a
+// file output emptied. A reader at this contract removes the file before the
+// task executes and on a restore of an entry that records it absent, so a
+// cached run that wrote no file restores the file's absence. An older reader
+// refuses emptied on a file, or would leave a file an earlier run wrote where
+// the run that produced the entry left none, so it refuses the stamp instead.
+const EmptiedFileOutputContract = 27
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = ToolchainProbeSelfContract
+const LatestContract = EmptiedFileOutputContract

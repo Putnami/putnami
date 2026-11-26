@@ -154,10 +154,6 @@ var extensionCases = []extensionCase{
 		was:         "engine job 9 · cli 1 · git 18 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:        "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:     true,
-		// build-infra skips a library, and a skip of a task with a required
-		// output caches nothing, so a hit never leaves a manifest the inputs do
-		// not produce.
-		everyRun: []string{"/lib:build~infra"},
 	},
 	{
 		name:        "typescript",

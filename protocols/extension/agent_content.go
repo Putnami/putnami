@@ -99,7 +99,8 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: PromptHostHooksContract for a host hook at UserPromptSubmit or
+// the manifest: EmptiedFileOutputContract for a file output that declares
+// emptied, PromptHostHooksContract for a host hook at UserPromptSubmit or
 // one that declares async, ProviderMembersContract for a provider operation
 // that declares members, DependencyClosureContract for a command that depends on a
 // command across its project's dependency closure, BuildGraphEdgesContract for
@@ -240,7 +241,31 @@ func RequiredLoadContract(m *Manifest) int {
 	if DeclaresPromptHostHooks(m) {
 		required = max(required, protocolcli.PromptHostHooksContract)
 	}
+	// A file output is emptied only by a reader that removes it, whatever
+	// origin the manifest loads from.
+	if DeclaresEmptiedFileOutput(m) {
+		required = max(required, protocolcli.EmptiedFileOutputContract)
+	}
 	return required
+}
+
+// DeclaresEmptiedFileOutput reports whether a task of the manifest declares a
+// file output emptied: the vocabulary of protocolcli.EmptiedFileOutputContract.
+func DeclaresEmptiedFileOutput(m *Manifest) bool {
+	if m == nil {
+		return false
+	}
+	for _, task := range m.Tasks {
+		if task.Declares == nil {
+			continue
+		}
+		for _, output := range task.Declares.Outputs {
+			if output.Emptied && output.Kind == OutputKindFile {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // DeclaresCommandLayerInputs reports whether a pipeline step of the manifest

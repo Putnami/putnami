@@ -22,11 +22,11 @@
 //
 // Nothing in Aggregate is fatal. A malformed contribution, a merge conflict, a
 // validation finding and a failed write all come back as diagnostics: a build
-// that produced binaries must not be failed by a deployability manifest, and a
+// that produced binaries must not be failed by a deployability finding, and a
 // finding nobody sees is worse than one attributed to its project. A failed
 // write or removal also sets Result.Err, because the files it leaves on disk
 // need not describe the inputs, and a caller that caches the outcome must not
-// keep them.
+// keep them: Job fails the task with it.
 //
 // Deployment derives the same manifest from the same committed files and
 // writes it as the workload's deployment declaration, the canonical bytes a

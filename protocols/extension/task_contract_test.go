@@ -1248,12 +1248,12 @@ func TestValidateOutputDrift(t *testing.T) {
 	}
 }
 
-// An emptied output is an optional directory with a literal path under the
-// project or workspace root. Each other shape is refused at its own field: one
-// the engine cannot empty before the run (a file, a pathFrom output, an
-// invocation-scoped output) and one it empties already (a required directory,
-// an optional command-output directory). An unset or false flag states
-// nothing.
+// An emptied output is an optional directory or file with a literal path
+// under the project or workspace root. Each other shape is refused at its own
+// field: one the engine cannot empty before the run (a runtime file, a
+// pathFrom output, an invocation-scoped output), one it empties already (a
+// required directory, an optional command-output directory), and a required
+// file, which every stored entry holds. An unset or false flag states nothing.
 func TestValidateOutputEmptied(t *testing.T) {
 	task := TaskDefinition{Outputs: map[string]TaskOutputPort{"clientOutput": {}}}
 	cases := []struct {
@@ -1266,12 +1266,16 @@ func TestValidateOutputEmptied(t *testing.T) {
 		{name: "optional directory under the default root", output: DeclaredOutput{Kind: OutputKindDirectory, Path: ".gen/clientgen", OptionalEmpty: true, Emptied: true}},
 		{name: "optional workspace directory", output: DeclaredOutput{Kind: OutputKindDirectory, Root: OutputRootWorkspace, Path: "dist/contracts", OptionalEmpty: true, Emptied: true}},
 		{name: "with ceded and preserved subpaths", output: DeclaredOutput{Kind: OutputKindDirectory, Path: ".gen/schema", OptionalEmpty: true, Emptied: true, Excludes: []string{".gen/schema/ceded"}, Preserves: []string{"kept"}}},
-		{name: "a file", output: DeclaredOutput{Kind: OutputKindFile, Path: "dist/app.js", OptionalEmpty: true, Emptied: true}, codes: 1},
+		{name: "an optional project file", output: DeclaredOutput{Kind: OutputKindFile, Root: OutputRootProject, Path: ".gen/requirements.json", OptionalEmpty: true, Emptied: true}},
+		{name: "an optional workspace file", output: DeclaredOutput{Kind: OutputKindFile, Root: OutputRootWorkspace, Path: "dist/manifest.json", OptionalEmpty: true, Emptied: true}},
+		{name: "a required file", output: DeclaredOutput{Kind: OutputKindFile, Path: "dist/app.js", Emptied: true}, codes: 1},
+		{name: "an optional command-output file", output: DeclaredOutput{Kind: OutputKindFile, Root: OutputRootCommandOutput, Path: "bin/tool", OptionalEmpty: true, Emptied: true}, codes: 1},
+		{name: "a runtime file", output: DeclaredOutput{Kind: OutputKindRuntimeFile, Path: "lease.json", OptionalEmpty: true, Emptied: true}, codes: 1},
 		{name: "a pathFrom directory", output: DeclaredOutput{Kind: OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true, Emptied: true}, codes: 1},
 		{name: "an invocation-scoped directory", output: DeclaredOutput{Kind: OutputKindDirectory, Scope: OutputScopeInvocation, Path: "scratch", OptionalEmpty: true, Emptied: true}, codes: 1},
 		{name: "an optional command-output directory", output: DeclaredOutput{Kind: OutputKindDirectory, Root: OutputRootCommandOutput, Path: "bin", OptionalEmpty: true, Emptied: true}, codes: 1},
 		{name: "a required directory", output: DeclaredOutput{Kind: OutputKindDirectory, Path: ".gen", Emptied: true}, codes: 1},
-		{name: "a required command-output file", output: DeclaredOutput{Kind: OutputKindFile, Root: OutputRootCommandOutput, Path: "bin/tool", Emptied: true}, codes: 3},
+		{name: "a required command-output file", output: DeclaredOutput{Kind: OutputKindFile, Root: OutputRootCommandOutput, Path: "bin/tool", Emptied: true}, codes: 2},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

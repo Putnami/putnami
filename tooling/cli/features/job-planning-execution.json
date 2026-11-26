@@ -943,6 +943,7 @@
             "an-optional-project-or-workspace-output-is-left-as-it-stands",
             "an-optional-command-output-directory-is-emptied",
             "an-emptied-optional-project-or-workspace-output-is-emptied",
+            "an-emptied-file-output-is-removed-on-execution-and-on-an-absent-restore",
             "a-restore-of-an-empty-command-output-record-empties-it",
             "a-failure-to-empty-on-restore-executes-the-task",
             "an-entry-stored-without-emptying-is-never-served"

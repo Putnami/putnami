@@ -335,7 +335,9 @@
               "host-hooks-below-contract-17-do-not-load",
               "a-closure-command-dependency-requires-contract-22",
               "prompt-host-hooks-require-contract-25",
-              "prompt-host-hooks-below-contract-25-do-not-load"
+              "prompt-host-hooks-below-contract-25-do-not-load",
+              "emptied-file-outputs-require-contract-27",
+              "emptied-file-outputs-below-contract-27-do-not-load"
             ]
           }
         },

@@ -492,7 +492,7 @@ wiring — though a declared output may take its path from such a port (see
 | `pathFrom` | one of | Name of a port in the task's `outputs` map whose runtime value is the path |
 | `within` | no | Root-relative subtree a `pathFrom` output's reported path must equal or lie under. A path outside it leaves the run uncached, and the planner takes the output's write to be this subtree instead of the whole root. Requires `pathFrom` |
 | `optionalEmpty` | no | The output may legitimately be absent, or empty, after a successful run |
-| `emptied` | no | The engine empties this `optionalEmpty` **directory** output before the task executes and on a restore of an entry that records it empty. Requires a durable scope, a literal `path`, and the `project` or `workspace` root |
+| `emptied` | no | The engine empties this `optionalEmpty` **directory** or removes this `optionalEmpty` **file** before the task executes and on a restore of an entry that records it empty. Requires a durable scope, a literal `path`, and the `project` or `workspace` root. On a file it requires CLI contract 27 |
 | `readByDependents` | no | The projects that depend on the owning project read this output as part of that project, such as a generated client they compile. The planner orders their jobs after the task. Requires a durable scope and the `project` root |
 | `excludes` | no | Root-relative subpaths this **directory** output cedes: neither captured nor restored with it, and ownable by another task |
 | `preserves` | no | Output-relative subpaths of this **directory** output the workspace owns (a `putnami.json`, a `go.mod`): never captured, never replaced or deleted by a restore, never judged for drift. Allowed on a `pathFrom` output |
@@ -567,6 +567,15 @@ task's key instead of hashing its bytes
 ([ADR 0009](adr/0009-an-optional-project-output-may-ask-to-be-emptied.md)). An
 `optionalEmpty` `command-output` directory and a required directory are emptied
 without the flag, and declaring it there is an error.
+
+On a file, `emptied` makes a run that writes no file cacheable as the file's
+absence: the engine removes the file before the task executes and on a restore
+of an entry that records it absent, so a hit never leaves a file an earlier run
+wrote. A task whose skip writes no manifest declares the manifest this way
+instead of as a required output, which would cache nothing for the skip. The
+flag on a file raises the manifest's contract to 27
+([ADR 0021](adr/0021-an-emptied-file-output-is-removed.md)). A required file is
+present in every stored entry, and declaring the flag on one is an error.
 
 #### Ceding a Subpath (`excludes`)
 

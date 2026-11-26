@@ -82,7 +82,7 @@ v9                          ← format version (for compatibility)
 + runtime identity          ← declared runtime inputs such as hostPlatform or releaseBaseline, absent when none
 + OS class                  ← "windows" on Windows, absent elsewhere
 + source state              ← "unmanaged" where Git does not manage the workspace root, absent inside a repository
-+ emptied outputs           ← ids of the directory outputs emptied before the task executes (required, or optional under the command-output directory), absent when none
++ emptied outputs           ← ids of the outputs emptied before the task executes (a required directory, an optional one under the command-output directory, or an optional project or workspace directory or file that declares emptied), absent when none
 + task name                 ← e.g., "build~transpile"
 + task contract digest      ← the task's declaration in the manifest
 + project name              ← e.g., "my-app"
@@ -850,7 +850,7 @@ Four outputs are not emptied:
 | Output | Why |
 | --- | --- |
 | An `optionalEmpty` project or workspace directory that does not declare `emptied` | The path can hold a file no task writes, which a run that writes nothing there reads |
-| A file | The task replaces it whole |
+| A file that does not declare `emptied` | The task replaces it whole |
 | An invocation-scoped output | It lives in a private tree created for the run |
 | A `pathFrom` output | Its path is known only after the task ran |
 
@@ -867,6 +867,19 @@ output declares `emptied`. That flag states that only the task writes the path,
 and the engine then treats the output as it treats an optional command-output
 directory. The Go `build-describe` declares its `.gen/schema` output emptied,
 and a provider commits its contract as `schema/openapi.json` outside it.
+
+An `optionalEmpty` project or workspace file that declares `emptied` is
+removed before its task executes and on a restore of an entry that records it
+absent
+([ADR 0107](adr/0107-an-emptied-file-output-is-removed-on-execution-and-on-an-empty-restore.md)).
+A run that writes no file, a deterministic skip included, is then cached as the
+file's absence, and a hit never leaves a file an earlier run wrote. A
+directory at the path is refused, not removed: the execution fails, and a
+restore executes the task instead. A file the Git index tracks at the path is
+refused as in an emptied directory; the index is read only while a file is
+there. The Go and TypeScript `build-infra` and
+`package-deployment` declare their manifests this way, so a library's skip is
+cached.
 
 A file that a task stops writing therefore stays in an optional project or
 workspace directory that does not declare `emptied`, or in a `pathFrom`

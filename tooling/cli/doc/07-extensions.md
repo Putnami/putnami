@@ -1620,7 +1620,7 @@ An executing task starts from an empty owned directory (see
 hook writes inside a task's required directory output, or inside an
 `optionalEmpty` directory output under the command-output directory or that
 declares `emptied`, is gone once that task executes or is restored from the
-cache. Any other `optionalEmpty` project or workspace directory output is not
+cache, and so is a file at the path of a file output that declares `emptied`. Any other `optionalEmpty` project or workspace directory output is not
 emptied. Write
 hook files outside every declared directory output, or under a subpath the
 owning task cedes (`excludes`) or preserves (`preserves`).

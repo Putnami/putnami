@@ -42,7 +42,8 @@ type EmptiedOutputDeclaration struct {
 // EmptiedOutputDeclarations returns, in id order, the declared outputs of job
 // that the scheduler empties before the job executes: every durable directory
 // output whose path the declaration states, when it is required, lives under
-// the command-output root, or declares emptied.
+// the command-output root, or declares emptied, and every durable file output
+// whose path the declaration states and that declares emptied (ADR 0107).
 //
 // A required output is recorded present in every entry, so a restore prunes
 // exactly what the emptying removes. An optionalEmpty output under the
@@ -59,6 +60,13 @@ type EmptiedOutputDeclaration struct {
 // writes, such as a committed configuration the task reads when it writes
 // nothing there, and a restore of an entry that records it empty leaves it as
 // it stands (store.TaskOutputEmpty).
+//
+// A file is removed instead of emptied, and only when it declares emptied:
+// the protocol admits the flag on an optionalEmpty file under the project or
+// workspace root, so a run that writes no file is cached as its absence, and
+// a restore of that record removes a file an earlier run left (ADR 0107). A
+// required file is replaced whole by every execution and restore, and is
+// left out, as is a file without the flag.
 //
 // A pathFrom output is left out because its path is known only after the run,
 // and an invocation-scoped one because it lives in a tree created for the run.
@@ -84,13 +92,30 @@ func EmptiedOutputDeclarations(job *jobmodel.ScheduledJob) []EmptiedOutputDeclar
 	var emptied []EmptiedOutputDeclaration
 	for _, id := range ids {
 		output := declaration.Outputs[id]
-		if output.Kind != extension.OutputKindDirectory || output.PathFrom != "" || output.IsInvocationScoped() {
+		if output.PathFrom != "" || output.IsInvocationScoped() {
 			continue
 		}
-		switch output.EffectiveRoot() {
-		case extension.OutputRootCommandOutput:
-		case extension.OutputRootProject, extension.OutputRootWorkspace:
-			if output.OptionalEmpty && !output.Emptied {
+		switch output.Kind {
+		case extension.OutputKindDirectory:
+			switch output.EffectiveRoot() {
+			case extension.OutputRootCommandOutput:
+			case extension.OutputRootProject, extension.OutputRootWorkspace:
+				if output.OptionalEmpty && !output.Emptied {
+					continue
+				}
+			default:
+				continue
+			}
+		case extension.OutputKindFile:
+			// The shape the protocol admits the flag on, checked again so a
+			// declaration that skipped validation never removes a required
+			// file or one under the command-output root.
+			if !output.Emptied || !output.OptionalEmpty {
+				continue
+			}
+			switch output.EffectiveRoot() {
+			case extension.OutputRootProject, extension.OutputRootWorkspace:
+			default:
 				continue
 			}
 		default:

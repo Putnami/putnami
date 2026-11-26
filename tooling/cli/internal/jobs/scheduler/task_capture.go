@@ -65,7 +65,9 @@
 // Any other optionalEmpty output under the project or the workspace root is
 // not emptied: it can hold a committed file no task writes, a run that writes
 // nothing there is recorded empty, and a restore of that record leaves the
-// path as it stands. A file is not emptied because the task replaces it whole;
+// path as it stands. A file is removed when it declares emptied (ADR 0107), so
+// a run that writes none and a restore of its absent record leave no file;
+// any other file is not emptied because the task replaces it whole;
 // an invocation-scoped output because it lives in a private tree created for
 // the run; a pathFrom output because its path is known only after the task
 // ran. A file a generator stops emitting therefore stays in an output of those
@@ -108,6 +110,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path"
@@ -234,11 +237,44 @@ func (s *Scheduler) emptyDeclaredOutput(job *ScheduledJob, declared cachekey.Emp
 		return fmt.Errorf("declared output %q has unknown root %q", declared.ID, root)
 	}
 	dest := filepath.Join(base, filepath.FromSlash(declared.Rel))
+	if declared.Output.Kind == extension.OutputKindFile {
+		if err := removeFileOutput(dest); err != nil {
+			return fmt.Errorf("declared output %q: %w", declared.ID, err)
+		}
+		return nil
+	}
 	if err := emptyTaskOutput(dest, store.ResolveScratchRoot(roots.Root), emptyingKeep(declared)...); err != nil {
 		return fmt.Errorf("declared output %q: %w", declared.ID, err)
 	}
 	return nil
 }
+
+// removeFileOutput removes the emptied file output at dest (ADR 0107). An
+// absent path is already empty. A symlink is removed without following it. A
+// directory is no file the task wrote, so it is refused rather than removed
+// with whatever it holds: the caller fails the execution, or the restore,
+// which then executes the task.
+func removeFileOutput(dest string) error {
+	info, err := os.Lstat(dest)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("remove output file: %w", err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("remove output file: %s is a directory, and an emptied file output removes only a file", dest)
+	}
+	if err := removeOutputFile(dest); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("remove output file: %w", err)
+	}
+	return nil
+}
+
+// removeOutputFile is store.RemoveTaskOutputFile, which waits out a handle
+// another process briefly holds on Windows. It is a variable only so a test
+// can make a removal fail.
+var removeOutputFile = store.RemoveTaskOutputFile
 
 // emptyingKeep returns the output-relative slash subpaths an emptying of
 // declared leaves in place: the ceded and preserved subpaths, and the build
@@ -255,9 +291,10 @@ func emptyingKeep(declared cachekey.EmptiedOutputDeclaration) []string {
 // each output of cachekey.EmptiedOutputDeclarations that entry records empty. A
 // required output is never recorded empty, so in practice this is an
 // optionalEmpty output under the command-output root, or an optionalEmpty
-// project or workspace directory that declares emptied. A restore of such an
-// entry leaves the directory the execution that produced the entry left: the
-// kept subpaths and nothing else.
+// project or workspace directory or file that declares emptied. A restore of
+// such an entry leaves the directory the execution that produced the entry
+// left, the kept subpaths and nothing else, and removes such a file, which
+// that execution did not write.
 func emptiedByRestore(job *ScheduledJob, entry *store.TaskEntry) map[string]cachekey.EmptiedOutputDeclaration {
 	emptied := map[string]cachekey.EmptiedOutputDeclaration{}
 	for _, declared := range cachekey.EmptiedOutputDeclarations(job) {

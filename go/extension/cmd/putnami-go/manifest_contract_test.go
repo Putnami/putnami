@@ -447,10 +447,10 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		{task: "build-generate", id: "gen", kind: "directory", root: "project", path: ".gen", excludes: strings.Join(cededGenSubpaths, ",")},
 		// The aggregated deployability manifest and its runtime defaults
 		// sidecar, at the ceded .gen/requirements.json and
-		// .gen/infra/runtime.json. The manifest is required, so a run that
-		// writes none caches nothing.
-		{task: "build-infra", id: "requirements", kind: "file", root: "project", path: ".gen/requirements.json"},
-		{task: "build-infra", id: "runtimeDefaults", kind: "file", root: "project", path: ".gen/infra/runtime.json", optionalEmpty: true},
+		// .gen/infra/runtime.json. Both are emptied, so a run that writes none
+		// caches their absence and a hit removes an earlier run's (ADR 0107).
+		{task: "build-infra", id: "requirements", kind: "file", root: "project", path: ".gen/requirements.json", optionalEmpty: true, emptied: true},
+		{task: "build-infra", id: "runtimeDefaults", kind: "file", root: "project", path: ".gen/infra/runtime.json", optionalEmpty: true, emptied: true},
 		{task: "config-extract-exec", id: "jsonSchema", kind: "file", root: "project", path: "schema/config.jsonschema.json", optionalEmpty: true},
 		{task: "config-extract-exec", id: "schema", kind: "file", root: "project", path: "schema/config.json", optionalEmpty: true},
 		// The merged config file, inside the ceded .gen/conf. The build
@@ -462,8 +462,8 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		// it is declared and restored with the archives it describes.
 		{task: "package-archives", id: "publication-manifest", kind: "file", root: "command-output", path: "metadata.json", optionalEmpty: true},
 		// The deployment declaration, inside the ceded .gen/deployment.json.
-		// Required, so a run that writes none caches nothing.
-		{task: "package-deployment", id: "deployment", kind: "file", root: "project", path: ".gen/deployment.json"},
+		// Emptied, so a run that writes none caches its absence.
+		{task: "package-deployment", id: "deployment", kind: "file", root: "project", path: ".gen/deployment.json", optionalEmpty: true, emptied: true},
 		{task: "package-docker", id: "docker", kind: "directory", root: "command-output", path: "docker", optionalEmpty: true},
 		{task: "package-go", id: "go", kind: "directory", root: "command-output", path: "go", optionalEmpty: true},
 		{task: "publish-docker", id: "published-image", kind: "file", root: "command-output", path: "docker/published-image.json", optionalEmpty: true},
@@ -597,17 +597,18 @@ var cededGenOwner = map[string][]cededClaim{
 	// describe job folds into schema/config.json before it finishes.
 	".gen/config-deps.json": nil,
 	// The workload's deployment declaration, written by a package step that
-	// runs after generate. It is REQUIRED rather than optionalEmpty: the task
-	// removes the file when it writes none (a library, an aggregate with an
-	// error finding), and an empty optional capture would restore nothing over
-	// an earlier declaration, leaving it in place.
-	".gen/deployment.json": {{task: "package-deployment", output: "deployment", required: true}},
+	// runs after generate. It is optionalEmpty and emptied (CLI ADR 0107): a
+	// library and an aggregate with an error finding write none, and the
+	// engine removes an earlier declaration before the task executes and on a
+	// hit of their absent record, so the skip caches without leaving one.
+	".gen/deployment.json": {{task: "package-deployment", output: "deployment"}},
 	".gen/design":          {{task: "build-describe", output: "design"}},
 	// The workload's runtime defaults sidecar, written by build-infra after
 	// generate when the workload authors no infra/runtime.json and removed when
 	// it does. Generate's run still deletes it with the rest of .gen/infra, and
-	// build-infra runs after generate under `build`. It is optionalEmpty: a
-	// workload that authors its runtime has none.
+	// build-infra runs after generate under `build`. It is optionalEmpty and
+	// emptied: a workload that authors its runtime has none, and a hit of that
+	// record removes one an earlier run left.
 	".gen/infra/runtime.json": {{task: "build-infra", output: "runtimeDefaults"}},
 	// The image layers, which cloud-image-layers of @putnami/cloud declares as
 	// its project directory output.
@@ -615,11 +616,11 @@ var cededGenOwner = map[string][]cededClaim{
 	".gen/migration-bundle": {{task: "build-describe", output: "migrationBundle"}},
 	".gen/migrations.json":  {{task: "build-describe", output: "migrations"}},
 	// The workload's aggregated deployability manifest, written by build-infra
-	// after generate. It is REQUIRED rather than optionalEmpty for the reason
-	// the deployment declaration is: the task removes the file when the
-	// workload declares nothing, and an empty optional capture would restore
-	// nothing over an earlier manifest, leaving it in place.
-	".gen/requirements.json": {{task: "build-infra", output: "requirements", required: true}},
+	// after generate. It is optionalEmpty and emptied for the reason the
+	// deployment declaration is: a library and a workload that declares
+	// nothing write none, and the engine removes an earlier manifest on their
+	// execution and on a hit of their absent record.
+	".gen/requirements.json": {{task: "build-infra", output: "requirements"}},
 	".gen/schema":            {{task: "build-describe", output: "schema"}},
 	// The generated sections of a site project, which
 	// cloud-site-content-generate of @putnami/cloud declares as its project
@@ -1698,11 +1699,13 @@ func TestOnlyTheGolangciFixTaskMutatesSources(t *testing.T) {
 //     and the language's compatibility hook are code, in the extension
 //     implementation digest.
 //   - DECLARED. It declares every file it writes, inside the paths
-//     build-generate cedes (cededGenOwner): the manifest, required, so a run
-//     that writes none caches nothing (infraagg.Job reports SKIP for a
-//     library, a workload that declares nothing and a failed write), and the
-//     runtime defaults sidecar, optionalEmpty, because a workload that authors
-//     infra/runtime.json gets none. The paths are the SDK's, so a hit restores
+//     build-generate cedes (cededGenOwner): the manifest, absent for a library
+//     and a workload that declares nothing (infraagg.Job reports SKIP), and
+//     the runtime defaults sidecar, absent for a workload that authors
+//     infra/runtime.json. Both are optionalEmpty and emptied (CLI ADR 0107),
+//     so a skip is cached as the files' absence and a hit removes files an
+//     earlier run left; a failed write fails the task and caches nothing.
+//     The paths are the SDK's, so a hit restores
 //     exactly what infraagg.Aggregate writes
 //     (infraagg.TestAggregate_WritesOnlyTheDeclaredFiles). Both files lie in
 //     the project's .gen, which the compile and the test step read, so it
@@ -1739,17 +1742,14 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 	if len(task.Declares.Outputs) != 2 {
 		t.Errorf("build-infra outputs = %+v, want the manifest and the runtime defaults sidecar", task.Declares.Outputs)
 	}
-	for id, want := range map[string]struct {
-		path     string
-		required bool
-	}{
-		"requirements":    {path: infraagg.AggregatedManifestFile, required: true},
-		"runtimeDefaults": {path: infraagg.RuntimeDefaultsFile},
+	for id, path := range map[string]string{
+		"requirements":    infraagg.AggregatedManifestFile,
+		"runtimeDefaults": infraagg.RuntimeDefaultsFile,
 	} {
 		output, ok := task.Declares.Outputs[id]
 		if !ok || output.Kind != proto.OutputKindFile || output.EffectiveRoot() != proto.OutputRootProject ||
-			output.Path != want.path || output.OptionalEmpty == want.required {
-			t.Errorf("build-infra %s output = %+v, want the project-rooted file %s (required %t)", id, output, want.path, want.required)
+			output.Path != path || !output.OptionalEmpty || !output.Emptied {
+			t.Errorf("build-infra %s output = %+v, want the project-rooted file %s, optionalEmpty and emptied", id, output, path)
 		}
 	}
 	writesGen := slices.ContainsFunc(task.Writes, func(ref proto.ResourceRef) bool {
@@ -1829,8 +1829,8 @@ func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
 	}
 	output, ok := task.Declares.Outputs["deployment"]
 	if !ok || output.Kind != proto.OutputKindFile || output.EffectiveRoot() != proto.OutputRootProject ||
-		output.Path != infraagg.DeploymentFile || output.OptionalEmpty {
-		t.Errorf("package-deployment deployment output = %+v, want the required project-rooted file %s", output, infraagg.DeploymentFile)
+		output.Path != infraagg.DeploymentFile || !output.OptionalEmpty || !output.Emptied {
+		t.Errorf("package-deployment deployment output = %+v, want the project-rooted file %s, optionalEmpty and emptied", output, infraagg.DeploymentFile)
 	}
 
 	if cmds := commandsByTask(m)["package-deployment"]; !slices.Equal(cmds, []string{"package"}) {

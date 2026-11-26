@@ -31,17 +31,17 @@ const PhaseName = "infra"
 //
 // It reports OK only when the run wrote the manifest and kept the runtime
 // defaults sidecar in step with it, so the files on disk are the ones the
-// inputs determine. Every other run reports SKIP and never fails:
+// inputs determine. It reports SKIP when the inputs produce no manifest:
 //
 //   - a project that is not a workload, which writes nothing;
-//   - a workload that declares nothing, whose run removes an earlier manifest;
-//   - a failed write or removal (Result.Err), which can leave an earlier
-//     manifest or sidecar in place.
+//   - a workload that declares nothing, whose run removes an earlier manifest.
 //
-// A language that caches the task declares the manifest as a required output,
-// so a SKIP is never cached and the next run executes again: it removes or
-// rewrites the files itself. A failed write does not fail the task, for the
-// same reason a finding does not.
+// A failed write or removal (Result.Err) fails the task with that error,
+// because the files it leaves on disk need not describe the inputs. A SKIP
+// then always stands for the manifest's absence, so a language that caches
+// the task declares the manifest an optionalEmpty output that the engine
+// empties (CLI ADR 0107): the skip is cached, and a hit removes a manifest an
+// earlier run left.
 func Job(opts Options) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 		emit.PhaseStart(PhaseName)
@@ -51,7 +51,7 @@ func Job(opts Options) cli.JobFunc {
 		switch {
 		case result.Err != nil:
 			emit.PhaseEnd(PhaseName, "failed")
-			return "SKIP", result.Data(), nil
+			return "FAILED", result.Data(), result.Err
 		case result.Outcome != OutcomeEmitted:
 			emit.PhaseEnd(PhaseName, "skipped")
 			return "SKIP", result.Data(), nil

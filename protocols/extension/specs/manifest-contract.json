@@ -166,7 +166,7 @@
     {
       "id": "later-rungs-raise-the-contract-floor",
       "text": [
-        "A step that gates on or binds the run's changed files requires contract 16, a hostHooks member contract 17, a dependency on a command across the dependency closure, ^command, contract 22, and a host hook at UserPromptSubmit or one that declares async contract 25, each only when used.",
+        "A step that gates on or binds the run's changed files requires contract 16, a hostHooks member contract 17, a dependency on a command across the dependency closure, ^command, contract 22, a host hook at UserPromptSubmit or one that declares async contract 25, and a task file output that declares emptied contract 27, each only when used.",
         "A manifest stamped below the rung its vocabulary requires does not load."
       ]
     },
@@ -224,6 +224,7 @@
     "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md",
     "protocols/extension/doc/adr/0008-workspace-requirement-and-group-default-need-no-contract.md",
     "protocols/extension/doc/adr/0009-an-optional-project-output-may-ask-to-be-emptied.md",
+    "protocols/extension/doc/adr/0021-an-emptied-file-output-is-removed.md",
     "protocols/extension/doc/adr/0010-a-path-from-output-may-bound-its-path.md",
     "protocols/extension/doc/adr/0011-a-publish-task-declares-the-channels-it-serves.md",
     "protocols/extension/doc/adr/0012-a-provisioned-candidate-names-the-pinned-archive-executable.md",

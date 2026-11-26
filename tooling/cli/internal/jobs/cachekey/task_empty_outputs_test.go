@@ -48,21 +48,32 @@ func emptyingShapesJob() *jobmodel.ScheduledJob {
 				Kind: extension.OutputKindDirectory, Root: extension.OutputRootWorkspace, Path: "dist/contracts",
 				OptionalEmpty: true, Emptied: true,
 			},
-			"tool":    fileDeclaration(extension.OutputRootCommandOutput, "bin/tool", true),
-			"client":  {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
-			"scratch": {Kind: extension.OutputKindDirectory, Scope: extensionproto.OutputScopeInvocation, Path: "scratch", OptionalEmpty: true},
-			"socket":  {Kind: extensionproto.OutputKindRuntimeFile, Scope: extensionproto.OutputScopeInvocation, Path: "socket", OptionalEmpty: true},
-			"escape":  {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: "../outside", OptionalEmpty: true},
-			"root":    {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".", OptionalEmpty: true},
-			"unknown": {Kind: extension.OutputKindDirectory, Root: "elsewhere", Path: "out", OptionalEmpty: true},
+			"emptiedFile": {
+				Kind: extension.OutputKindFile, Root: extension.OutputRootProject, Path: ".gen/requirements.json",
+				OptionalEmpty: true, Emptied: true,
+			},
+			// A file the protocol refuses the flag on is never removed, should
+			// a declaration skip validation: a required one, and one under the
+			// command-output root.
+			"requiredFile": {Kind: extension.OutputKindFile, Root: extension.OutputRootProject, Path: "dist/app.js", Emptied: true},
+			"commandFile":  {Kind: extension.OutputKindFile, Root: extension.OutputRootCommandOutput, Path: "bin/flagged", OptionalEmpty: true, Emptied: true},
+			"tool":         fileDeclaration(extension.OutputRootCommandOutput, "bin/tool", true),
+			"client":       {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
+			"scratch":      {Kind: extension.OutputKindDirectory, Scope: extensionproto.OutputScopeInvocation, Path: "scratch", OptionalEmpty: true},
+			"socket":       {Kind: extensionproto.OutputKindRuntimeFile, Scope: extensionproto.OutputScopeInvocation, Path: "socket", OptionalEmpty: true},
+			"escape":       {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: "../outside", OptionalEmpty: true},
+			"root":         {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".", OptionalEmpty: true},
+			"unknown":      {Kind: extension.OutputKindDirectory, Root: "elsewhere", Path: "out", OptionalEmpty: true},
 		},
 	})
 }
 
 // The emptied set is every durable directory output whose path the
 // declaration states and that is required, lives under the command-output
-// root, or declares emptied, in id order. An optionalEmpty directory under the
-// project or the workspace root that does not declare emptied, a file, a
+// root, or declares emptied, and every optionalEmpty project or workspace file
+// that declares emptied (ADR 0107), in id order. An optionalEmpty directory
+// under the project or the workspace root that does not declare emptied, any
+// other file, a
 // pathFrom output, an invocation-scoped output, a path that escapes or names
 // its root, and an unknown root are left out. The key carries the ids of
 // exactly that set.
@@ -71,9 +82,10 @@ func TestEmptiedOutputsAreRequiredCommandOutputOrFlaggedDirectoriesWithAStatedPa
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-project-or-workspace-output-is-left-as-it-stands")
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-command-output-directory-is-emptied")
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-emptied-optional-project-or-workspace-output-is-emptied")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-emptied-file-output-is-removed-on-execution-and-on-an-absent-restore")
 	job := emptyingShapesJob()
 
-	want := []string{"archives", "default", "emptiedOptional", "emptiedShared", "gen", "lib", "shared"}
+	want := []string{"archives", "default", "emptiedFile", "emptiedOptional", "emptiedShared", "gen", "lib", "shared"}
 	if got := EmptiedOutputIDs(job); !reflect.DeepEqual(got, want) {
 		t.Fatalf("EmptiedOutputIDs = %v, want %v", got, want)
 	}
@@ -82,7 +94,8 @@ func TestEmptiedOutputsAreRequiredCommandOutputOrFlaggedDirectoriesWithAStatedPa
 		rels[declared.ID] = declared.Rel
 	}
 	if want := map[string]string{
-		"archives": "archives", "default": "generated", "emptiedOptional": "contract", "emptiedShared": "dist/contracts",
+		"archives": "archives", "default": "generated", "emptiedFile": ".gen/requirements.json",
+		"emptiedOptional": "contract", "emptiedShared": "dist/contracts",
 		"gen": ".gen", "lib": "lib", "shared": "dist/shared",
 	}; !reflect.DeepEqual(rels, want) {
 		t.Fatalf("emptied paths = %v, want %v", rels, want)

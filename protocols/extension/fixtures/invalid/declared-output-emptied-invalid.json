@@ -29,9 +29,8 @@
           "file": {
             "kind": "file",
             "path": "dist/app.js",
-            "optionalEmpty": true,
             "emptied": true,
-            "description": "A file is replaced whole."
+            "description": "A required file is present in every entry the engine stores."
           },
           "port": {
             "kind": "directory",

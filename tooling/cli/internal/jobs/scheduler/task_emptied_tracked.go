@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
@@ -69,6 +70,11 @@ func (s *Scheduler) trackedUnder(root, rel string) ([]string, error) {
 // of the output: git mv for a file in the worktree, and git rm --cached for one
 // the index still tracks after it left the worktree.
 //
+// An emptied file output is asked about only while a file is at its path
+// (ADR 0107): removing an absent file removes nothing, and a restore that
+// writes one overwrites nothing. A tracked file already deleted from the
+// worktree there is therefore not reported, as it is in an emptied directory.
+//
 // A required or command-output directory is emptied without the flag (ADR
 // 0064, ADR 0065), and the scheduler asks nothing about it. Outside a Git work
 // tree there is no index, and the outputs are emptied as before. A workspace
@@ -94,6 +100,15 @@ func (s *Scheduler) refuseTrackedEmptiedOutputs(job *ScheduledJob) error {
 			return fmt.Errorf("declared output %q: %w", declared.ID, err)
 		}
 		rel = filepath.ToSlash(rel)
+		// An emptied file absent from the worktree leaves nothing to remove,
+		// and a restore that writes it overwrites nothing, so the index is not
+		// read for it (ADR 0107): a library whose skip writes no manifest
+		// starts no git.
+		if declared.Output.Kind == extension.OutputKindFile {
+			if _, statErr := os.Lstat(filepath.Join(roots.Root, filepath.FromSlash(rel))); errors.Is(statErr, fs.ErrNotExist) {
+				continue
+			}
+		}
 		tracked, err := s.trackedUnder(roots.Root, rel)
 		var unmanaged *gitread.UnmanagedError
 		if errors.As(err, &unmanaged) {

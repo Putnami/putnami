@@ -196,6 +196,9 @@ type ownerRow struct {
 	root          string
 	path          string
 	optionalEmpty bool
+	// emptied is whether the engine empties the output before the task
+	// executes and on a restore of an entry that records it empty.
+	emptied bool
 	// drift is the declaration's drift policy (protocols/extension ADR 0004).
 	// The committed outputs build-generate writes carry it — the generated
 	// client and the OpenAPI contract: this task is the first writer of both
@@ -205,7 +208,7 @@ type ownerRow struct {
 }
 
 func (r ownerRow) String() string {
-	return fmt.Sprintf("%s.%s = %s %s:%s optionalEmpty=%t drift=%q", r.task, r.id, r.kind, r.root, r.path, r.optionalEmpty, r.drift)
+	return fmt.Sprintf("%s.%s = %s %s:%s optionalEmpty=%t emptied=%t drift=%q", r.task, r.id, r.kind, r.root, r.path, r.optionalEmpty, r.emptied, r.drift)
 }
 
 // TestDeclaredOutputOwnerTable pins the declared output ownership as a
@@ -255,10 +258,11 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		{task: "build-generate", id: "openapi", kind: "file", root: "project", path: "schema/openapi.json", optionalEmpty: true, drift: "fail"},
 		// The aggregated deployability manifest and its runtime defaults
 		// sidecar, at the .gen/requirements.json and .gen/infra/runtime.json
-		// build-generate cedes. The manifest is required, so a run that writes
-		// none caches nothing.
-		{task: "build-infra", id: "requirements", kind: "file", root: "project", path: ".gen/requirements.json"},
-		{task: "build-infra", id: "runtimeDefaults", kind: "file", root: "project", path: ".gen/infra/runtime.json", optionalEmpty: true},
+		// build-generate cedes. Both are emptied, so a run that writes none
+		// caches their absence and a hit removes an earlier run's (CLI ADR
+		// 0107).
+		{task: "build-infra", id: "requirements", kind: "file", root: "project", path: ".gen/requirements.json", optionalEmpty: true, emptied: true},
+		{task: "build-infra", id: "runtimeDefaults", kind: "file", root: "project", path: ".gen/infra/runtime.json", optionalEmpty: true, emptied: true},
 		{task: "build-transpile", id: "lib", kind: "directory", root: "command-output", path: "lib", optionalEmpty: true},
 		// The tsc build's outputs, at the paths its tsconfig names, which the
 		// task reports on its data ports (ADR 0010).
@@ -273,9 +277,9 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		{task: "package-archives", id: "archives", kind: "directory", root: "command-output", path: "archives", optionalEmpty: true},
 		{task: "package-archives", id: "publication-manifest", kind: "file", root: "command-output", path: "metadata.json", optionalEmpty: true},
 		// The deployment declaration, inside the .gen/deployment.json
-		// build-generate cedes. Required, so a run that writes none caches
-		// nothing.
-		{task: "package-deployment", id: "deployment", kind: "file", root: "project", path: ".gen/deployment.json"},
+		// build-generate cedes. Emptied, so a run that writes none caches its
+		// absence.
+		{task: "package-deployment", id: "deployment", kind: "file", root: "project", path: ".gen/deployment.json", optionalEmpty: true, emptied: true},
 		{task: "package-docker", id: "docker", kind: "directory", root: "command-output", path: "docker", optionalEmpty: true},
 		{task: "package-npm", id: "npm", kind: "directory", root: "command-output", path: "npm", optionalEmpty: true},
 		{task: "publish-docker", id: "published-image", kind: "file", root: "command-output", path: "docker/published-image.json", optionalEmpty: true},
@@ -318,6 +322,7 @@ func declaredOwnerRows(m *proto.Manifest) []ownerRow {
 				root:          output.EffectiveRoot(),
 				path:          output.Path + output.PathFrom,
 				optionalEmpty: output.OptionalEmpty,
+				emptied:       output.Emptied,
 				drift:         output.Drift,
 			})
 		}
@@ -736,11 +741,12 @@ const siteContentDir = ".gen/site-content"
 //     and the HTTP/2 compatibility hook are code, in the extension
 //     implementation digest.
 //   - DECLARED. It declares every file it writes, at paths build-generate
-//     cedes: the manifest, required, so a run that writes none caches nothing
-//     (infraagg.Job reports SKIP for a library, a workload that declares
-//     nothing and a failed write), and the runtime defaults sidecar,
-//     optionalEmpty, because a workload that authors infra/runtime.json gets
-//     none. The paths are the SDK's, so a hit restores exactly what
+//     cedes: the manifest, absent for a library and a workload that declares
+//     nothing (infraagg.Job reports SKIP), and the runtime defaults sidecar,
+//     absent for a workload that authors infra/runtime.json. Both are
+//     optionalEmpty and emptied (CLI ADR 0107), so a skip is cached as the
+//     files' absence and a hit removes files an earlier run left; a failed
+//     write fails the task and caches nothing. The paths are the SDK's, so a hit restores exactly what
 //     infraagg.Aggregate writes (infraagg.TestAggregate_WritesOnlyTheDeclaredFiles).
 //     Both files lie in the project's .gen, which the compile and the test
 //     step read, so it also declares the gen write resource: the planner
@@ -776,17 +782,14 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 	if len(task.Declares.Outputs) != 2 {
 		t.Errorf("build-infra outputs = %+v, want the manifest and the runtime defaults sidecar", task.Declares.Outputs)
 	}
-	for id, want := range map[string]struct {
-		path     string
-		required bool
-	}{
-		"requirements":    {path: infraagg.AggregatedManifestFile, required: true},
-		"runtimeDefaults": {path: infraagg.RuntimeDefaultsFile},
+	for id, path := range map[string]string{
+		"requirements":    infraagg.AggregatedManifestFile,
+		"runtimeDefaults": infraagg.RuntimeDefaultsFile,
 	} {
 		output, ok := task.Declares.Outputs[id]
 		if !ok || output.Kind != proto.OutputKindFile || output.EffectiveRoot() != proto.OutputRootProject ||
-			output.Path != want.path || output.OptionalEmpty == want.required {
-			t.Errorf("build-infra %s output = %+v, want the project-rooted file %s (required %t)", id, output, want.path, want.required)
+			output.Path != path || !output.OptionalEmpty || !output.Emptied {
+			t.Errorf("build-infra %s output = %+v, want the project-rooted file %s, optionalEmpty and emptied", id, output, path)
 		}
 	}
 	writesGen := slices.ContainsFunc(task.Writes, func(ref proto.ResourceRef) bool {
@@ -882,8 +885,8 @@ func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
 	}
 	output, ok := task.Declares.Outputs["deployment"]
 	if !ok || output.Kind != proto.OutputKindFile || output.EffectiveRoot() != proto.OutputRootProject ||
-		output.Path != infraagg.DeploymentFile || output.OptionalEmpty {
-		t.Errorf("package-deployment deployment output = %+v, want the required project-rooted file %s", output, infraagg.DeploymentFile)
+		output.Path != infraagg.DeploymentFile || !output.OptionalEmpty || !output.Emptied {
+		t.Errorf("package-deployment deployment output = %+v, want the project-rooted file %s, optionalEmpty and emptied", output, infraagg.DeploymentFile)
 	}
 	gen := m.Tasks["build-generate"].Declares.Outputs["gen"]
 	if !slices.Contains(gen.Excludes, infraagg.DeploymentFile) {

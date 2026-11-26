@@ -506,10 +506,13 @@ member with package publisher `@putnami/typescript` and package step
    same aggregate always gives the same bytes, so the member's digest moves
    only when the declaration does.
 4. Writes nothing for a library. Writes nothing for a workload whose aggregate
-   has errors either, and reports the findings as warnings. In both cases it
-   removes a declaration an earlier run left and caches nothing, because the
-   file is the step's required output. A publication that needs the file finds
-   none, never an old one.
+   has errors either, and reports the findings as warnings. In both cases the
+   engine removes a declaration an earlier run left, and the skip is cached as
+   the file's absence: the output declares `emptied`, so a cache hit of that
+   skip removes the file too
+   ([CLI ADR 0107](../../../tooling/cli/doc/adr/0107-an-emptied-file-output-is-removed-on-execution-and-on-an-empty-restore.md)).
+   A publication that needs the file finds none, never an old one. A failed
+   write or removal fails the step.
 
 The step never writes the runtime defaults file `.gen/infra/runtime.json` or
 `.gen/requirements.json`; both stay the build's. `build-generate` cedes

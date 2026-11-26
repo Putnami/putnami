@@ -330,15 +330,17 @@ type DeclaredOutput struct {
 	// an error. Without this flag, a missing declared output means the
 	// declaration and the task disagree.
 	OptionalEmpty bool `json:"optionalEmpty,omitempty"`
-	// Emptied asks the engine to empty an optionalEmpty directory output under
-	// the project or workspace root before its task executes, and on a restore
-	// of an entry that records the output empty (ADR 0009). The engine already
-	// does both for a required directory output and for an optionalEmpty one
-	// under the command-output root, so the flag is valid only on a durable
-	// directory output with a literal path under the project or workspace root
+	// Emptied asks the engine to empty an optionalEmpty output under the
+	// project or workspace root before its task executes, and on a restore of
+	// an entry that records the output empty (ADR 0009, ADR 0021): a directory
+	// loses what the task owns in it, and a file is removed. The engine already
+	// empties a required directory output and an optionalEmpty directory under
+	// the command-output root, so the flag is valid only on a durable directory
+	// or file output with a literal path under the project or workspace root
 	// that is optionalEmpty. A task sets it when only the task writes the path:
 	// no committed file and no other task's bytes live there. The output then
-	// holds what the task's last execution or restore wrote, and nothing else.
+	// holds what the task's last execution or restore wrote, and nothing else,
+	// so a run that writes no file is cached as the file's absence.
 	Emptied bool `json:"emptied,omitempty"`
 	// ReadByDependents states that the projects which depend on the owning
 	// project read this output as part of that project: a generated client
@@ -837,10 +839,11 @@ func validateOutputEmptied(field string, output DeclaredOutput) []diag.Diagnosti
 	}
 	var diags []diag.Diagnostic
 	emptiedField := field + ".emptied"
-	// A file is replaced whole, and a runtime file is never captured.
-	if output.Kind != OutputKindDirectory {
+	// A directory loses what its task owns in it, and a file is removed (ADR
+	// 0021). A runtime file is never captured.
+	if output.Kind != OutputKindDirectory && output.Kind != OutputKindFile {
 		diags = append(diags, diag.Errorf("invalid-output-emptied", emptiedField,
-			"only a %q output is emptied; this output declares kind %q", OutputKindDirectory, output.Kind))
+			"only a %q or %q output is emptied; this output declares kind %q", OutputKindDirectory, OutputKindFile, output.Kind))
 	}
 	// An invocation-scoped output lives in a tree created for the run.
 	if output.EffectiveScope() != OutputScopeDurable {
@@ -854,17 +857,19 @@ func validateOutputEmptied(field string, output DeclaredOutput) []diag.Diagnosti
 			"an emptied output must declare a literal path: a pathFrom value is unknown until the task runs"))
 	}
 	// The engine empties every optionalEmpty directory under the command-output
-	// root already, and the flag would state nothing.
+	// root already, and the flag would state nothing there. The flag stays on
+	// the roots a committed file can live under, for a file too.
 	if output.Root == OutputRootCommandOutput {
 		diags = append(diags, diag.Errorf("invalid-output-emptied", emptiedField,
 			"the engine already empties an optional directory under the %q root; the flag applies to the %q and %q roots",
 			OutputRootCommandOutput, OutputRootProject, OutputRootWorkspace))
 	}
-	// The engine empties every required directory output already, and the flag
-	// would state nothing.
+	// The engine empties every required directory output already, and a
+	// required file is present in every entry it stores, so the flag would
+	// state nothing.
 	if !output.OptionalEmpty {
 		diags = append(diags, diag.Errorf("invalid-output-emptied", emptiedField,
-			"the engine already empties a required directory output; the flag applies to an optionalEmpty output"))
+			"a required output is present after every run that caches, so the engine has nothing to empty; the flag applies to an optionalEmpty output"))
 	}
 	return diags
 }
