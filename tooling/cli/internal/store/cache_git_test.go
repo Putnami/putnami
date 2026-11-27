@@ -429,7 +429,7 @@ func TestGitInputsListOnlyBelowTheBoundOfTheirPatterns(t *testing.T) {
 	project := filepath.Join(root, "tools", "gate")
 	var listed [][]string
 	saved := candidatePaths
-	candidatePaths = func(root string, prefixes ...string) ([]string, error) {
+	candidatePaths = func(root string, prefixes ...string) ([]string, []string, error) {
 		listed = append(listed, prefixes)
 		return saved(root, prefixes...)
 	}

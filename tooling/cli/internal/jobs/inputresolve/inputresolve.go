@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -496,4 +497,21 @@ func (m matcher) PrimeInputs(queries []workspace.InputSelectorQuery) {
 		converted[i] = store.InputQuery(query)
 	}
 	m.r.PrimeInputs(converted)
+}
+
+// AnswerIdentity names what an answer of extensionName depends on beside its
+// basis: the protocol version, the implementation identity of the extension
+// and the workspace's probe digest, the identity its kept answers are
+// recorded under (records). It is "" when answers are not kept: no records,
+// or an extension with no implementation identity. The input record keys a
+// selector's digest with it (tooling/cli ADR 0113 §1).
+func (r *Resolver) AnswerIdentity(extensionName string) string {
+	if r == nil || r.records == nil {
+		return ""
+	}
+	identity := r.records.identity(extensionName)
+	if identity == "" {
+		return ""
+	}
+	return strconv.Itoa(wsproto.InputResolveProtocolVersion) + "\x00" + identity + "\x00" + r.records.probeDigest()
 }

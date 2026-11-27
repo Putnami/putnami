@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
 
 // CacheManager integrates the LocalStore with job execution to provide
@@ -326,13 +327,63 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 		return cached, nil
 	}
 
+	// A digest the input record holds is answered when its witness holds,
+	// without collecting it (ADR 0113).
+	record := fileindex.CurrentRecord()
+	recorded, recordable := "", false
+	if record != nil {
+		recorded, recordable = recordKey(key, patterns, expander)
+	}
+	if recordable {
+		forgets := record.Forgets()
+		if hash, witness, memoize, ok := recordedInputDigest(record, recorded, dir, patterns); ok {
+			// A sample of the answers is collected again (ADR 0113 §1): one
+			// that differs, or that no longer collects, shows a witness the
+			// record should not have trusted, unless a write of the run came
+			// between the two. The record is then discarded for good, with
+			// every digest this run memoized: the run collects them again.
+			if record.Sample() {
+				collected, _, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope)
+				if (err != nil || collected != hash) && record.Forgets() == forgets {
+					reason := fmt.Sprintf("the input record answered %s for %s %s, which a collection gives as %s", hash, dir, strings.Join(patterns, ","), collected)
+					if err != nil {
+						reason = fmt.Sprintf("the input record answered %s for %s %s, which no longer collects (%v)", hash, dir, strings.Join(patterns, ","), err)
+					}
+					record.Discard(reason)
+					cm.InvalidateFileHashes()
+				}
+				if err != nil {
+					return "", err
+				}
+				if collected != hash {
+					// A write of the run came between: the answer may be
+					// sound, but nothing tells, so its entry is dropped.
+					record.Drop(InputDigestTable, recorded)
+					hash, memoize = collected, false
+				}
+			}
+			if record.Discarded() == "" {
+				if memoize {
+					cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns), witness)
+				}
+				return hash, nil
+			}
+			recordable = false
+		}
+	}
 	hash, witness, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope)
 	if err != nil {
 		return "", err
 	}
+	if recordable {
+		recordInputDigest(record, recorded, hash, witness)
+	}
 
 	if witness != nil && witness.unmemoized {
 		return hash, nil
+	}
+	if witness != nil && witness.recordOnly {
+		witness = nil
 	}
 	cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns), witness)
 	return hash, nil
@@ -403,6 +454,7 @@ func (cm *CacheManager) InvalidateFileHashes() {
 		return
 	}
 	everything := InputRegion{unbounded: true}
+	fileindex.CurrentRecord().ForgetAll()
 	cm.fileHashes.invalidate(everything, nil, nil)
 	cm.extraFileHashes.invalidate(everything, nil, nil)
 }
@@ -424,6 +476,15 @@ func (cm *CacheManager) InvalidateFileHashesUnder(paths []string) {
 		return
 	}
 	written := PathsRegion(paths)
+	if record := fileindex.CurrentRecord(); record != nil {
+		forgotten := slices.Clone(paths)
+		for _, p := range paths {
+			if absolute, err := filepath.Abs(p); err == nil {
+				forgotten = append(forgotten, linkTarget(absolute))
+			}
+		}
+		record.Forget(forgotten)
+	}
 	var excluded *candidateExclusion
 	if exclusion := cm.exclusion.Load(); exclusion != nil && *exclusion != nil {
 		excluded = &candidateExclusion{paths: slices.Clone(paths), exclude: *exclusion}

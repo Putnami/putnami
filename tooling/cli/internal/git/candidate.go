@@ -27,6 +27,24 @@ func CandidatePaths(root string, prefixes ...string) ([]string, error) {
 	return CandidatePathsFromGit(root, prefixes...)
 }
 
+// CandidatePathsWitnessed is CandidatePaths with the paths whose stats
+// witness the listing when the reader read it in-process, nil when Git listed
+// it (CandidateFilesWitnessed, tooling/cli ADR 0113 §3).
+func CandidatePathsWitnessed(root string, prefixes ...string) ([]string, []string, error) {
+	repo, err := openLocal(root)
+	if err == nil {
+		var cut *localCut
+		if cut, err = repo.readCut(prefixes...); err == nil {
+			return cutPaths(cut), repo.cutWitness(cut), nil
+		}
+	}
+	if !inProcessUnsupported(err) {
+		return nil, nil, err
+	}
+	paths, err := CandidatePathsFromGit(root, prefixes...)
+	return paths, nil, err
+}
+
 // candidatePathsInProcess is CandidatePaths read in-process: the index's
 // paths and the untracked ones, a nested repository as its directory with a
 // trailing slash, as ls-files lists it.
@@ -39,6 +57,11 @@ func candidatePathsInProcess(root string, prefixes []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return cutPaths(cut), nil
+}
+
+// cutPaths lists a cut's paths as CandidatePaths does.
+func cutPaths(cut *localCut) []string {
 	paths := make([]string, 0, len(cut.Index.Entries)+len(cut.Untracked))
 	for _, entry := range cut.Index.Entries {
 		paths = append(paths, entry.Path)
@@ -47,10 +70,10 @@ func candidatePathsInProcess(root string, prefixes []string) ([]string, error) {
 		paths = append(paths, untracked.Listed())
 	}
 	if len(paths) == 0 {
-		return nil, nil
+		return nil
 	}
 	sort.Strings(paths)
-	return slices.Compact(paths), nil
+	return slices.Compact(paths)
 }
 
 // CandidatePathsFromGit is CandidatePaths read from Git alone, with the
