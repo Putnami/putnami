@@ -25,8 +25,10 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 
+	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/features/spectest"
 	grpcservices "go.putnami.dev/protocol/grpc-services"
+	httproutes "go.putnami.dev/protocol/http-routes"
 )
 
 func TestSnapshotSchemaDirEmptyDir(t *testing.T) {
@@ -638,27 +640,28 @@ func TestCollectArtifactsTakesFreshHTTPRoutesOverCachedStaleGen(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(schemaDir, "http-routes.json")
-	if err := os.WriteFile(path, []byte(`{"protocolVersion":1,"digest":"old","routes":[]}`+"\n"), 0o644); err != nil {
+	old, _ := routeInventory(t)
+	if err := os.WriteFile(path, old, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	// Snapshot after the generate cache hit restored the prior describe output.
 	snap := snapshotSchemaDir(schemaDir)
-	fresh := `{"protocolVersion":1,"digest":"new","routes":[{"method":"GET","path":"/healthz"}]}` + "\n"
-	if err := os.WriteFile(path, []byte(fresh), 0o644); err != nil {
+	fresh, committedFresh := routeInventory(t, "/healthz")
+	if err := os.WriteFile(path, fresh, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	if _, err := collectArtifacts(projectPath, genDir, true, snap, nil); err != nil {
 		t.Fatalf("fresh route inventory after a generate cache restore must not conflict: %v", err)
 	}
-	for _, wantPath := range []string{path, filepath.Join(projectPath, "schema", "http-routes.json")} {
+	for wantPath, want := range map[string][]byte{path: fresh, filepath.Join(projectPath, "schema", "http-routes.json"): committedFresh} {
 		got, err := os.ReadFile(wantPath)
 		if err != nil {
 			t.Fatalf("read %s: %v", wantPath, err)
 		}
-		if string(got) != fresh {
-			t.Fatalf("%s = %s, want fresh describe output %s", wantPath, got, fresh)
+		if !bytes.Equal(got, want) {
+			t.Fatalf("%s = %s, want fresh describe output %s", wantPath, got, want)
 		}
 	}
 }
@@ -1949,39 +1952,27 @@ func TestCollectArtifactsRemovesCommittedGRPCInventoryItDidNotWrite(t *testing.T
 func TestCollectArtifactsRemovesAnUncommittedRouteInventory(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "committed-route-inventory-drift", "an-uncommitted-route-inventory-is-removed")
 	const stale = `{"protocol":"putnami.http-routes.v1","routes":[{"method":"GET","path":"/gone"}]}` + "\n"
-	const fresh = `{"protocol":"putnami.http-routes.v1","routes":[]}` + "\n"
+	fresh, committedFresh := routeInventory(t, "/health")
 	for _, test := range []struct {
 		name        string
 		writeRoutes bool
 		commit      bool
 		want        string // "" means the committed copy is absent
 	}{
-		{name: "fresh inventory is committed verbatim", writeRoutes: true, commit: true, want: fresh},
+		{name: "fresh inventory is committed", writeRoutes: true, commit: true, want: string(committedFresh)},
 		{name: "no HTTP surface this run", writeRoutes: false, commit: true},
 		{name: "schemas not committed", writeRoutes: true, commit: false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			projectPath := t.TempDir()
-			genDir := filepath.Join(projectPath, ".gen")
-			genSchemaDir := filepath.Join(genDir, "schema")
-			committedDir := filepath.Join(projectPath, "schema")
-			for _, dir := range []string{genSchemaDir, committedDir} {
-				if err := os.MkdirAll(dir, 0o755); err != nil {
-					t.Fatal(err)
-				}
-			}
-			committed := filepath.Join(committedDir, "http-routes.json")
-			if err := os.WriteFile(committed, []byte(stale), 0o644); err != nil {
-				t.Fatal(err)
-			}
+			projectPath, genSchemaDir, committed := routeInventoryProject(t, stale)
 			snap := snapshotSchemaDir(genSchemaDir)
 			if test.writeRoutes {
-				if err := os.WriteFile(filepath.Join(genSchemaDir, "http-routes.json"), []byte(fresh), 0o644); err != nil {
+				if err := os.WriteFile(filepath.Join(genSchemaDir, "http-routes.json"), fresh, 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			if _, err := collectArtifacts(projectPath, genDir, test.commit, snap, nil); err != nil {
+			if _, err := collectArtifacts(projectPath, filepath.Dir(genSchemaDir), test.commit, snap, nil); err != nil {
 				t.Fatalf("collectArtifacts: %v", err)
 			}
 			got, err := os.ReadFile(committed)
@@ -1993,6 +1984,101 @@ func TestCollectArtifactsRemovesAnUncommittedRouteInventory(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Describe commits the route inventory without its digest: the .gen artifact
+// keeps the producer's canonical bytes and digest, the committed copy is its
+// committed form, from which the strict parser derives the same digest, and an
+// inventory the parser refuses fails the run without touching the committed
+// copy.
+func TestCollectArtifactsCommitsTheRouteInventoryWithoutItsDigest(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "committed-route-inventory-drift", "describe-commits-the-inventory-without-its-digest")
+	artifact, want := routeInventory(t, "/health", "/items/{id}")
+	const prior = `{"routes":[]}` + "\n"
+
+	projectPath, genSchemaDir, committed := routeInventoryProject(t, prior)
+	snap := snapshotSchemaDir(genSchemaDir)
+	emitted := filepath.Join(genSchemaDir, "http-routes.json")
+	if err := os.WriteFile(emitted, artifact, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := collectArtifacts(projectPath, filepath.Dir(genSchemaDir), true, snap, nil); err != nil {
+		t.Fatalf("collectArtifacts: %v", err)
+	}
+	if got, err := os.ReadFile(committed); err != nil || !bytes.Equal(got, want) {
+		t.Fatalf("committed inventory = %q (err %v), want the committed form %q", got, err, want)
+	}
+	if got, err := os.ReadFile(emitted); err != nil || !bytes.Equal(got, artifact) {
+		t.Fatalf(".gen inventory = %q (err %v), want the producer's bytes", got, err)
+	}
+	artifactManifest, _ := httproutes.ParseAndValidateManifest(artifact)
+	committedManifest, diags := httproutes.ParseAndValidateManifest(want)
+	if committedManifest == nil || committedManifest.Digest != artifactManifest.Digest {
+		t.Fatalf("derived digest = %v (diagnostics %v), want the artifact's %q", committedManifest, diags, artifactManifest.Digest)
+	}
+
+	projectPath, genSchemaDir, committed = routeInventoryProject(t, prior)
+	snap = snapshotSchemaDir(genSchemaDir)
+	wrong := bytes.Replace(artifact, []byte(artifactManifest.Digest), []byte("sha256:"+strings.Repeat("0", 64)), 1)
+	if err := os.WriteFile(filepath.Join(genSchemaDir, "http-routes.json"), wrong, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := collectArtifacts(projectPath, filepath.Dir(genSchemaDir), true, snap, nil); err == nil || !strings.Contains(err.Error(), httproutes.ErrorCodeDigestMismatch) {
+		t.Fatalf("collectArtifacts with a wrong digest: err = %v, want %s", err, httproutes.ErrorCodeDigestMismatch)
+	}
+	if got, err := os.ReadFile(committed); err != nil || string(got) != prior {
+		t.Fatalf("committed inventory = %q (err %v), want it left as it was", got, err)
+	}
+}
+
+// routeInventoryProject makes a project directory whose committed
+// schema/http-routes.json holds prior, and answers the project, its .gen/schema
+// directory and the committed inventory path.
+func routeInventoryProject(t *testing.T, prior string) (string, string, string) {
+	t.Helper()
+	projectPath := t.TempDir()
+	genSchemaDir := filepath.Join(projectPath, ".gen", "schema")
+	committedDir := filepath.Join(projectPath, "schema")
+	for _, dir := range []string{genSchemaDir, committedDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	committed := filepath.Join(committedDir, "http-routes.json")
+	if err := os.WriteFile(committed, []byte(prior), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return projectPath, genSchemaDir, committed
+}
+
+// routeInventory answers the canonical artifact and the committed form of an
+// inventory that serves GET on each path, through the protocol module.
+func routeInventory(t *testing.T, paths ...string) ([]byte, []byte) {
+	t.Helper()
+	routes := make([]httproutes.Route, 0, len(paths))
+	for _, path := range paths {
+		match := httproutes.MatchExact
+		if strings.Contains(path, "{") {
+			match = httproutes.MatchTemplate
+		}
+		routes = append(routes, httproutes.Route{
+			Match: match, Path: path, Methods: []string{"GET"}, PublicEdge: true,
+			Provenance: httproutes.Provenance{Project: "api", SourceKind: httproutes.SourceManual},
+		})
+	}
+	manifest, diags := httproutes.Canonicalize(routes)
+	if diag.HasErrors(diags) {
+		t.Fatalf("canonicalize: %v", diags)
+	}
+	artifact, diags := httproutes.CanonicalJSON(manifest)
+	if diag.HasErrors(diags) {
+		t.Fatalf("canonical JSON: %v", diags)
+	}
+	committed, diags := httproutes.CommittedJSON(manifest)
+	if diag.HasErrors(diags) {
+		t.Fatalf("committed JSON: %v", diags)
+	}
+	return artifact, committed
 }
 
 // grpcInventory returns the protocol's canonical bytes for an inventory that

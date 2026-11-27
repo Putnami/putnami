@@ -29,6 +29,7 @@ import (
 	protocfg "go.putnami.dev/protocol/config"
 	diag "go.putnami.dev/protocol/diagnostic"
 	grpcservices "go.putnami.dev/protocol/grpc-services"
+	httproutes "go.putnami.dev/protocol/http-routes"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/genresult"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -988,7 +989,12 @@ func (s schemaSnapshot) content(path string) ([]byte, bool) {
 func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnapshot, staged map[string]bool) ([]string, error) {
 	var artifacts []string
 
-	err := filepath.WalkDir(genDir, func(path string, d fs.DirEntry, err error) error {
+	committedRoutes, err := committedRouteInventory(genDir, commit, before, staged)
+	if err != nil {
+		return nil, err
+	}
+
+	err = filepath.WalkDir(genDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
@@ -1046,8 +1052,10 @@ func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnap
 					// authoritative rather than failing with a false multi-producer
 					// conflict. body already holds it.
 					//
-					// Promotion is deliberately VERBATIM, here as for every artifact:
-					// the committed copy is byte-identical to the .gen one. The
+					// Promotion is deliberately VERBATIM, here as for every artifact
+					// but the route inventory, whose committed form is the .gen
+					// artifact without its digest (protocols/http-routes ADR 0003):
+					// the committed copy is otherwise byte-identical to the .gen one. The
 					// single-project stability contract is enforced where the
 					// manifest is produced (the emitter scopes packages[] to the
 					// project's capability surface, and canonical emission drops
@@ -1077,6 +1085,9 @@ func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnap
 		if !commit {
 			return nil
 		}
+		if isHTTPRoutesSchemaPath(relSlash) {
+			body = committedRoutes
+		}
 		dst := filepath.Join(projectPath, rel)
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return err
@@ -1094,6 +1105,34 @@ func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnap
 		return nil, err
 	}
 	return artifacts, nil
+}
+
+// committedRouteInventory answers the committed form of the route inventory
+// collectArtifacts would promote, the .gen artifact without its digest
+// (protocols/http-routes ADR 0003), or nil when it promotes none. It reads the
+// artifact with the protocol's strict parser before any schema is promoted, so
+// an inventory the parser refuses fails the run and leaves every committed
+// file as it was.
+func committedRouteInventory(genDir string, commit bool, before schemaSnapshot, staged map[string]bool) ([]byte, error) {
+	if !commit {
+		return nil, nil
+	}
+	path := filepath.Join(genDir, filepath.FromSlash(httpRoutesSchemaRelPath))
+	if !before.changedSince(path) && !staged[httpRoutesSchemaRelPath] {
+		return nil, nil
+	}
+	body, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	committed, diags := httproutes.CommittedForm(body)
+	if diag.HasErrors(diags) {
+		return nil, fmt.Errorf("committed form of %s: %v", httpRoutesSchemaRelPath, diags)
+	}
+	return committed, nil
 }
 
 // committedFeatureEvidenceRelPath is the Go framework's committed feature

@@ -40,7 +40,7 @@ func TestPromoteSchemaArtifactIsAtomicUnderConcurrentWriters(t *testing.T) {
 		go func(source string) {
 			defer wg.Done()
 			<-start
-			if _, err := promoteSchemaArtifact(projectPath, source, HTTPRoutesRelPath); err != nil {
+			if _, err := promoteSchemaArtifact(projectPath, source, HTTPRoutesRelPath, nil); err != nil {
 				failures <- err
 			}
 		}(emitted[i%len(emitted)])

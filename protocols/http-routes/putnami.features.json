@@ -7,7 +7,7 @@
       "id": "http-routes/route-inventory-contract",
       "type": "feature",
       "name": "Route inventory contract",
-      "outcome": "A framework describes every route an application serves as one canonical, digest-pinned inventory, so a deployment edge builds a default-deny allowlist from it and no public route can admit a private one",
+      "outcome": "A framework describes every route an application serves as one canonical inventory whose digest its routes determine, so a deployment edge builds a default-deny allowlist from it and no public route can admit a private one",
       "owner": "framework",
       "target": "coded",
       "requirements": [
@@ -67,6 +67,21 @@
               "the-golden-pins-the-bytes-and-the-digest",
               "input-order-and-method-case-do-not-matter",
               "the-typescript-serializer-reproduces-the-golden"
+            ]
+          }
+        },
+        {
+          "id": "the-committed-form-derives-its-digest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-committed-form-is-the-artifact-without-its-digest",
+              "a-parser-derives-a-missing-digest",
+              "the-typescript-validator-derives-the-same-digest"
             ]
           }
         },

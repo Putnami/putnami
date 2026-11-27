@@ -59,6 +59,12 @@ export interface HttpRoutesDiagnostic {
   field?: string;
 }
 
+/**
+ * A manifest in either form: the artifact form carries its digest, the
+ * committed form omits it and a reader derives it from the routes.
+ */
+export type HttpRoutesManifestInput = Omit<HttpRoutesManifest, 'digest'> & { digest?: string };
+
 export interface ParseHttpRoutesResult {
   manifest?: HttpRoutesManifest;
   diagnostics: HttpRoutesDiagnostic[];
@@ -102,8 +108,11 @@ const FEATURE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)+$/;
 const REQUIREMENT_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
- * Strictly parse and validate a v1 inventory. Unknown fields, unsafe route
- * patterns, visibility overlaps, and digest drift all fail closed.
+ * Strictly parse and validate a v1 inventory in either form. Unknown fields,
+ * unsafe route patterns, visibility overlaps, and digest drift all fail
+ * closed. The returned manifest carries the inventory's digest: the one the
+ * artifact form states, or the one derived from the routes of the committed
+ * form.
  */
 export function parseAndValidateHttpRoutes(text: string): ParseHttpRoutesResult {
   let value: unknown;
@@ -120,7 +129,7 @@ export function parseAndValidateHttpRoutes(text: string): ParseHttpRoutesResult 
   validateObjectShape(
     value,
     ['$schema', 'protocol', 'routes', 'digest'],
-    ['$schema', 'protocol', 'routes', 'digest'],
+    ['$schema', 'protocol', 'routes'],
     '',
     shapeDiagnostics,
   );
@@ -130,7 +139,7 @@ export function parseAndValidateHttpRoutes(text: string): ParseHttpRoutesResult 
     shapeDiagnostics.push(error(HTTP_ROUTES_ERROR_CODES.parseError, 'protocol', 'protocol must be a string'));
   if (!Array.isArray(value['routes']))
     shapeDiagnostics.push(error(HTTP_ROUTES_ERROR_CODES.parseError, 'routes', 'routes must be an array'));
-  if (typeof value['digest'] !== 'string')
+  if ('digest' in value && typeof value['digest'] !== 'string')
     shapeDiagnostics.push(error(HTTP_ROUTES_ERROR_CODES.parseError, 'digest', 'digest must be a string'));
 
   const routesValue = value['routes'];
@@ -141,14 +150,18 @@ export function parseAndValidateHttpRoutes(text: string): ParseHttpRoutesResult 
   }
   if (shapeDiagnostics.length > 0) return { diagnostics: shapeDiagnostics };
 
-  const manifest = value as unknown as HttpRoutesManifest;
+  const manifest = value as unknown as HttpRoutesManifestInput;
   const diagnostics = validateHttpRoutesManifest(manifest);
   if (diagnostics.length > 0) return { diagnostics };
-  return { manifest, diagnostics: [] };
+  const digest = manifest.digest ?? canonicalizeHttpRoutes(manifest.routes).manifest?.digest ?? '';
+  return { manifest: { ...manifest, digest }, diagnostics: [] };
 }
 
-/** Validate an already-decoded manifest and verify its canonical digest. */
-export function validateHttpRoutesManifest(manifest: HttpRoutesManifest): HttpRoutesDiagnostic[] {
+/**
+ * Validate an already-decoded manifest and verify a present digest against
+ * the canonical inventory. A manifest without a digest is the committed form.
+ */
+export function validateHttpRoutesManifest(manifest: HttpRoutesManifestInput): HttpRoutesDiagnostic[] {
   const diagnostics: HttpRoutesDiagnostic[] = [];
   if (manifest.$schema !== HTTP_ROUTES_SCHEMA_URL) {
     diagnostics.push(
@@ -169,7 +182,7 @@ export function validateHttpRoutesManifest(manifest: HttpRoutesManifest): HttpRo
     );
   }
   diagnostics.push(...validateHttpRoutes(manifest.routes));
-  if (!DIGEST.test(manifest.digest)) {
+  if (manifest.digest !== undefined && !DIGEST.test(manifest.digest)) {
     diagnostics.push(
       error(
         HTTP_ROUTES_ERROR_CODES.invalidDigest,
@@ -180,7 +193,7 @@ export function validateHttpRoutesManifest(manifest: HttpRoutesManifest): HttpRo
   } else if (diagnostics.length === 0) {
     const canonical = canonicalizeHttpRoutes(manifest.routes);
     if (canonical.diagnostics.length > 0) diagnostics.push(...canonical.diagnostics);
-    else if (canonical.manifest?.digest !== manifest.digest) {
+    else if (manifest.digest !== undefined && canonical.manifest?.digest !== manifest.digest) {
       diagnostics.push(
         error(
           HTTP_ROUTES_ERROR_CODES.digestMismatch,
@@ -230,6 +243,19 @@ export function serializeCanonicalHttpRoutes(
   const result = canonicalizeHttpRoutes(manifest.routes);
   if (!result.manifest) return result;
   return { ...result, text: `${escapeLikeGo(JSON.stringify(result.manifest, null, 2))}\n` };
+}
+
+/**
+ * Render the committed form: the canonical bytes without the digest member,
+ * which a reader derives from the routes.
+ */
+export function serializeCommittedHttpRoutes(
+  manifest: Pick<HttpRoutesManifest, 'routes'>,
+): ParseHttpRoutesResult & { text?: string } {
+  const result = canonicalizeHttpRoutes(manifest.routes);
+  if (!result.manifest) return result;
+  const { digest: _digest, ...committed } = result.manifest;
+  return { ...result, text: `${escapeLikeGo(JSON.stringify(committed, null, 2))}\n` };
 }
 
 /** Validate route-level and cross-route invariants in stable input order. */

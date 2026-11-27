@@ -45,6 +45,5 @@
         "evidencePath": "src/api/orders/post.ts"
       }
     }
-  ],
-  "digest": "sha256:969ebfed14209a31db8fbcedfd720ba0494ac1b5274f7d60ba1099f9676d5555"
+  ]
 }

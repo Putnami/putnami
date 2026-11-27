@@ -255,7 +255,10 @@
     },
     {
       "id": "committed-route-inventory",
-      "text": "Once every preBuild hook reports data.httpRoutes {v:1,state:complete}, build-generate commits canonical HTTP routes atomically, skips identical bytes, commits routes [] for an empty fragment and removes the file with no fragment. An absent, malformed or unavailable evaluation, failed hook, invalid aggregate, unreadable manifest or missing Bun fails generate, naming the cause, and keeps committed routes and infra facts. Solo and batch commit identical bytes. Drift fails the task. No option controls it."
+      "text": [
+        "Once every preBuild hook reports data.httpRoutes {v:1,state:complete}, build-generate commits the digest-less aggregate atomically, skips identical bytes, commits routes [] for an empty fragment, removes the file with no fragment.",
+        "An absent, malformed or unavailable evaluation, failed hook, invalid aggregate, unreadable manifest or missing Bun fails generate, naming the cause, keeping committed routes and infra facts. Solo and batch write identical bytes. Drift fails the task. No option controls it."
+      ]
     },
     {
       "id": "compiled-service-config",

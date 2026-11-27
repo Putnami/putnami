@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -1190,9 +1192,9 @@ func (s *Scheduler) refreshVersionFile(job *ScheduledJob) {
 // — the restored file is left byte-for-byte alone, so buildTime does not churn.
 // When it differs, the rewrite lands on exactly the identity
 // preserveMatchingVersionFiles seeded before ANY key was computed. Either way the
-// run ends holding the same tree-only digest (store.versionStampDigest) that
-// every key computed in this run hashed, so this write cannot invalidate a key it
-// was itself an input to.
+// run ends holding the identity every key computed in this run hashed. A
+// digest memoized from the stamp the restore put back can still be stale, so
+// the caller drops the digests of the stamp whenever this call rewrote it.
 //
 // It deliberately does NOT claim the versionFiles slot refreshVersionFile owns:
 // this is a preserve-style write for a project that reused an artifact, not the
@@ -1208,17 +1210,33 @@ func (s *Scheduler) refreshVersionFile(job *ScheduledJob) {
 // of the stale stamp outlives the restore. Widening the window would mean
 // giving the stamp a lock every key computation has to take, which is a cost
 // paid on every task to close a window nothing reaches.
-func (s *Scheduler) restampRestoredVersionStamp(job *ScheduledJob, entry *store.TaskEntry) {
+//
+// It returns the stamp's path when it rewrote the stamp, so the restore drops
+// the digests of the stamp it replaced even when the restore wrote no output
+// (ADR 0119).
+func (s *Scheduler) restampRestoredVersionStamp(job *ScheduledJob, entry *store.TaskEntry) string {
 	if job == nil || job.Project == nil || !restoreReplacesVersionStamp(entry) {
-		return
+		return ""
 	}
 	s.versionFilesMu.Lock()
 	defer s.versionFilesMu.Unlock()
+	stamp := ""
+	if s.ws != nil {
+		stamp = filepath.Join(s.ws.Root, job.Project.Path, filepath.FromSlash(versionStampRelPath))
+	}
+	before, beforeErr := os.Lstat(stamp)
 	started := time.Now()
 	spawned := generateVersionFilesAtWithSourceBindings(
 		s.ws, []*ScheduledJob{job}, s.cfg.VersionInfo, s.versionBuildTime, true, s.capabilitySourceBindings,
 	)
 	s.cacheStats.RecordLocalBindings(started, time.Now(), spawned)
+	after, afterErr := os.Lstat(stamp)
+	if stamp == "" || (beforeErr == nil && afterErr == nil && os.SameFile(before, after) &&
+		before.ModTime().Equal(after.ModTime()) && before.Size() == after.Size()) ||
+		(beforeErr != nil && afterErr != nil) {
+		return ""
+	}
+	return stamp
 }
 
 // emitSessionJobEnd emits a session event for job completion.

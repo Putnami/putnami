@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // ingestTree publishes a one-directory-output entry whose payload is files.
@@ -858,4 +859,39 @@ func alwaysSwap(t *testing.T) {
 	saved := keepHeldDestinations
 	keepHeldDestinations = false
 	t.Cleanup(func() { keepHeldDestinations = saved })
+}
+
+// A restore over a destination that already holds the output reports no
+// write, unless something there changed at or after the instant the caller
+// names: the restore then counts as a write (ADR 0119).
+func TestMaterializeTaskOutput_HeldDestinationReportsNoWrite(t *testing.T) {
+	s := NewLocalStore(t.TempDir())
+	entry := ingestTree(t, s, "held-key", map[string]string{"main.js": "built", "nested/chunk.js": "chunk"})
+	dest := filepath.Join(t.TempDir(), "dist")
+
+	wrote, err := s.MaterializeTaskOutput(entry, "dist", dest, "")
+	if err != nil || !wrote {
+		t.Fatalf("first restore: wrote=%v err=%v, want a write", wrote, err)
+	}
+	wrote, err = s.MaterializeTaskOutput(entry, "dist", dest, "")
+	if err != nil || wrote {
+		t.Fatalf("restore over a held destination: wrote=%v err=%v, want none", wrote, err)
+	}
+
+	info, err := os.Lstat(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, _, ok := fileChangeTime(info); !ok {
+		t.Skip("no change time on this platform: every held destination counts as written")
+	}
+	future := time.Now().Add(time.Hour).UnixNano()
+	if wrote, err := s.materializeTaskOutput(entry, "dist", dest, "", future, nil); err != nil || wrote {
+		t.Fatalf("held destination unchanged since the reads began: wrote=%v err=%v, want none", wrote, err)
+	}
+	past := time.Now().Add(-time.Hour).UnixNano()
+	if wrote, err := s.materializeTaskOutput(entry, "dist", dest, "", past, nil); err != nil || !wrote {
+		t.Fatalf("held destination changed after the reads began: wrote=%v err=%v, want a write", wrote, err)
+	}
+	assertTree(t, dest, map[string]string{"main.js": "built", "nested/chunk.js": "chunk"})
 }

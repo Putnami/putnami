@@ -17,6 +17,5 @@
         "evidencePath": "src/api/get.ts"
       }
     }
-  ],
-  "digest": "sha256:cdc0e80a64b507907ad672a9eea8bcd2648df354e61f75c69b7f9b951d0e6b66"
+  ]
 }

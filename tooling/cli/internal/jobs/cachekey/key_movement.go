@@ -181,11 +181,27 @@ func declaredOutputWrites(roots WorkspaceRoots, job *jobmodel.ScheduledJob, resu
 // entry records, present or recorded empty: every path its restore rewrites or
 // clears.
 func RestoredOutputPaths(roots WorkspaceRoots, job *jobmodel.ScheduledJob, entry *store.TaskEntry) []string {
+	return outputPaths(roots, job, entry, nil)
+}
+
+// WrittenOutputPaths is RestoredOutputPaths for the outputs written names, the
+// ones a completed restore wrote: none when written is empty.
+func WrittenOutputPaths(roots WorkspaceRoots, job *jobmodel.ScheduledJob, entry *store.TaskEntry, written map[string]bool) []string {
+	if len(written) == 0 {
+		return nil
+	}
+	return outputPaths(roots, job, entry, written)
+}
+
+func outputPaths(roots WorkspaceRoots, job *jobmodel.ScheduledJob, entry *store.TaskEntry, only map[string]bool) []string {
 	if entry == nil {
 		return nil
 	}
 	paths := make([]string, 0, len(entry.Outputs))
 	for _, output := range entry.Outputs {
+		if only != nil && !only[output.ID] {
+			continue
+		}
 		base, ok := roots.OutputRoot(job, output.Root)
 		if !ok {
 			base = roots.Root

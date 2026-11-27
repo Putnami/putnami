@@ -338,6 +338,5 @@
         "evidencePath": "src/tasks/web/action.ts"
       }
     }
-  ],
-  "digest": "sha256:1cfe7f8ec79bca6885a11617e2c0adb43896f4985196bfe51c1e995d28b24173"
+  ]
 }

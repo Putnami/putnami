@@ -5,7 +5,7 @@
   "description": "Provider-neutral application reachability inventory used to construct a public HTTP edge allowlist.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["$schema", "protocol", "routes", "digest"],
+  "required": ["$schema", "protocol", "routes"],
   "properties": {
     "$schema": {
       "const": "https://putnami.dev/schemas/putnami-http-routes-v1.json"
@@ -20,7 +20,7 @@
     "digest": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$",
-      "description": "SHA-256 of the canonical protocol/routes projection."
+      "description": "SHA-256 of the canonical protocol/routes projection. The artifact form under .gen carries it; the committed form omits it, and a reader derives it from the routes."
     }
   },
   "$defs": {

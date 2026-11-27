@@ -573,23 +573,35 @@ func (s *Scheduler) invalidateCapabilitySourceBindingsForProject(job *ScheduledJ
 	s.versionFilesMu.Unlock()
 }
 
-// invalidateCapabilitySourceBindingsForRestore brackets materialization of a
-// cached entry. A project-rooted output can change the project's source-v1
+// invalidateCapabilitySourceBindingsForRestore follows the materialization of
+// a cached entry, whether it completed or failed. A project-rooted output can change the project's source-v1
 // binding unless source-v1 excludes its path (putnamigit.SourceBindingExcludes),
 // as it excludes .gen and the committed feature evidence a describe hit
 // restores: such a restore keeps the project's memoized binding. Workspace-rooted
 // outputs may intersect any project (including a root project), so they
 // conservatively invalidate the whole memo. Command and invocation outputs live
-// outside project source roots. Calling this both before and after
-// materialization also clears a value computed concurrently with the write.
+// outside project source roots. A binding is computed and memoized under
+// versionFilesMu, so one computed before or during the write is memoized
+// before this call takes the lock, and this call clears it.
+//
+// written, when not nil, names the outputs a completed restore wrote: one
+// whose destination already held it changed no byte a binding reads, so it
+// keeps the memo (ADR 0119). A failed restore passes nil: it may have written
+// any of them.
 func (s *Scheduler) invalidateCapabilitySourceBindingsForRestore(job *ScheduledJob, entry *store.TaskEntry) {
+	s.invalidateCapabilitySourceBindingsForWritten(job, entry, nil)
+}
+
+// invalidateCapabilitySourceBindingsForWritten is
+// invalidateCapabilitySourceBindingsForRestore for the outputs written names.
+func (s *Scheduler) invalidateCapabilitySourceBindingsForWritten(job *ScheduledJob, entry *store.TaskEntry, written map[string]bool) {
 	if job == nil || job.Project == nil || entry == nil {
 		return
 	}
 	invalidateProject := false
 	invalidateAll := false
 	for _, output := range entry.Outputs {
-		if !output.Present() {
+		if !output.Present() || (written != nil && !written[output.ID]) {
 			continue
 		}
 		switch output.Root {

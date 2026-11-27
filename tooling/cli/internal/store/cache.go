@@ -37,6 +37,9 @@ type CacheManager struct {
 	valuesMu        sync.Mutex
 	inputResolver   InputResolver // expands the input selectors a key reads
 	inputResolverMu sync.Mutex
+	// readsSince is SetTreeReadsSince's instant in Unix nanoseconds, zero
+	// for the start of the process.
+	readsSince atomic.Int64
 }
 
 // invalidationLogSize is how many invalidations an inputHashMemo remembers
@@ -54,6 +57,9 @@ type inputHashMemo struct {
 	// invalidationLogSize of them named, oldest first.
 	generation uint64
 	log        []invalidatedRegion
+	// index names the entries whose region can overlap a written region, so
+	// an invalidation judges those and no others (ADR 0119).
+	index memoRegionIndex
 }
 
 // memoizedInputHash is one memoized input digest and the region of its files.
@@ -189,6 +195,7 @@ func (m *inputHashMemo) settle(key string, generation uint64, witness *selection
 		return
 	}
 	if !confirmed {
+		m.index.remove(key, cached.region)
 		delete(m.entries, key)
 		return
 	}
@@ -218,7 +225,11 @@ func (m *inputHashMemo) memoize(key string, generation uint64, hash string, regi
 	if m.entries == nil {
 		m.entries = make(map[string]memoizedInputHash)
 	}
+	if previous, ok := m.entries[key]; ok {
+		m.index.remove(key, previous.region)
+	}
 	m.entries[key] = memoizedInputHash{hash: hash, region: region, witness: witness}
+	m.index.add(key, region)
 }
 
 // invalidate drops every memoized digest the write of written can move, and
@@ -229,13 +240,29 @@ func (m *inputHashMemo) invalidate(written InputRegion, excluded *candidateExclu
 	defer m.mu.Unlock()
 	m.generation++
 	invalidation := invalidatedRegion{generation: m.generation, written: written, excluded: excluded, listing: listing}
-	for key, memo := range m.entries {
+	judge := func(key string) {
+		memo, ok := m.entries[key]
+		if !ok {
+			return
+		}
 		switch invalidation.effect(memo.region, memo.witness) {
 		case effectDrops:
+			m.index.remove(key, memo.region)
 			delete(m.entries, key)
 		case effectPends:
 			memo.pending = true
 			m.entries[key] = memo
+		}
+	}
+	if written.unbounded {
+		for key := range m.entries {
+			judge(key)
+		}
+	} else {
+		// An entry outside the index's answer has a region the write does not
+		// overlap, which effect keeps whatever else it holds.
+		for _, key := range m.index.overlapping(written) {
+			judge(key)
 		}
 	}
 	m.log = append(m.log, invalidation)
@@ -1003,4 +1030,98 @@ type CacheKeyPolicy struct {
 	ConfigScope ProjectConfigScope
 	// InputExpander expands the input selectors Files and WorkspaceFiles name.
 	InputExpander InputExpander
+}
+
+// memoRegionIndex names, among the entries of an inputHashMemo, every one
+// whose region can overlap a written region, without comparing the write with
+// each entry: an entry is found by the roots of its region, an ancestor of a
+// written root by name and a descendant by a range of the sorted roots
+// (RegionIndex answers the same question for a fixed set of owners). An
+// unbounded region overlaps every write that names a path. The zero value is
+// an empty index; its memo's mutex guards it.
+type memoRegionIndex struct {
+	byRoot    map[string]map[string]struct{}
+	roots     []string // sorted, each root of byRoot once
+	unbounded map[string]struct{}
+}
+
+func (x *memoRegionIndex) add(key string, region InputRegion) {
+	if region.unbounded {
+		if x.unbounded == nil {
+			x.unbounded = make(map[string]struct{})
+		}
+		x.unbounded[key] = struct{}{}
+		return
+	}
+	if x.byRoot == nil {
+		x.byRoot = make(map[string]map[string]struct{})
+	}
+	for _, root := range region.roots {
+		keys, ok := x.byRoot[root]
+		if !ok {
+			keys = make(map[string]struct{})
+			x.byRoot[root] = keys
+			at, _ := slices.BinarySearch(x.roots, root)
+			x.roots = slices.Insert(x.roots, at, root)
+		}
+		keys[key] = struct{}{}
+	}
+}
+
+func (x *memoRegionIndex) remove(key string, region InputRegion) {
+	if region.unbounded {
+		delete(x.unbounded, key)
+		return
+	}
+	for _, root := range region.roots {
+		keys, ok := x.byRoot[root]
+		if !ok {
+			continue
+		}
+		delete(keys, key)
+		if len(keys) == 0 {
+			delete(x.byRoot, root)
+			if at, found := slices.BinarySearch(x.roots, root); found {
+				x.roots = slices.Delete(x.roots, at, at+1)
+			}
+		}
+	}
+}
+
+// overlapping returns, once each, the keys whose region overlaps written, a
+// bounded region, and possibly more: the caller judges each one exactly.
+func (x *memoRegionIndex) overlapping(written InputRegion) []string {
+	if len(written.roots) == 0 {
+		return nil
+	}
+	found := make(map[string]struct{}, len(x.unbounded))
+	add := func(keys map[string]struct{}) {
+		for key := range keys {
+			found[key] = struct{}{}
+		}
+	}
+	add(x.unbounded)
+	for _, root := range written.roots {
+		// The root and every path it lies under. Each separator boundary is
+		// named without and with its separator, so a filesystem or drive root
+		// ("/", "c:/") is named too.
+		add(x.byRoot[root])
+		for i := len(root) - 1; i >= 0; i-- {
+			if root[i] == '/' {
+				add(x.byRoot[root[:i]])
+				add(x.byRoot[root[:i+1]])
+			}
+		}
+		// Every root strictly beneath it.
+		prefix := strings.TrimSuffix(root, "/") + "/"
+		at, _ := slices.BinarySearch(x.roots, prefix)
+		for ; at < len(x.roots) && strings.HasPrefix(x.roots[at], prefix); at++ {
+			add(x.byRoot[x.roots[at]])
+		}
+	}
+	keys := make([]string, 0, len(found))
+	for key := range found {
+		keys = append(keys, key)
+	}
+	return keys
 }

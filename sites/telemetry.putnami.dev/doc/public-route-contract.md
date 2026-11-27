@@ -105,9 +105,9 @@ for an enforcement rollout:
 
 | Test | Claim |
 |---|---|
-| `TestCommittedRouteArtifactMatchesServedRoutes` | the committed artifact is byte-identical to what the server describes — completeness |
+| `TestCommittedRouteArtifactMatchesServedRoutes` | the committed artifact is byte-identical to the committed form of what the server describes — completeness |
 | `TestRouteArtifactIsIndependentOfDeployTimeConfig` | limits, collector endpoint, and aggregate-auth configuration cannot change the described contract |
-| `TestCommittedRouteArtifactIsCanonical` | canonical ordering, digest, and round-trip idempotence — determinism |
+| `TestCommittedRouteArtifactIsCanonical` | canonical ordering, no committed digest, and round-trip idempotence — determinism |
 | `TestCommittedRouteArtifactIsWorkloadOwned` | exact-match only, public-edge, workload provenance, rule budget |
 | `TestDeclaredRoutesCarryRealTraffic` | every declared `(path, method)` carries real traffic — the golden CLI-usage payload and a signed caller token — through an edge that admits only the artifact |
 | `TestUndeclaredRequestsNeverReachTheWorkload` | eleven undeclared probes return `404` and reach the workload zero times |

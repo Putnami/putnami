@@ -82,6 +82,17 @@ func AggregateHTTPRoutes(projectPath string) (string, error) {
 	return out, nil
 }
 
+// CommittedHTTPRoutes returns the committed form of an inventory: its
+// canonical bytes without the digest, which a reader derives from the routes
+// (protocols/http-routes ADR 0003).
+func CommittedHTTPRoutes(artifact []byte) ([]byte, error) {
+	body, diags := httproutes.CommittedForm(artifact)
+	if diag.HasErrors(diags) {
+		return nil, httpRoutesDiagnosticError(diags)
+	}
+	return body, nil
+}
+
 func httpRoutesDiagnosticError(diags []diag.Diagnostic) error {
 	parts := make([]string, 0, len(diags))
 	for _, d := range diags {

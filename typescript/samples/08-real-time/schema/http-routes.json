@@ -77,6 +77,5 @@
         "evidencePath": "src/api/notifications/get.ts"
       }
     }
-  ],
-  "digest": "sha256:251e0b73f960ead9fbb35dfb46926abae152976a11edfd3eba681a9adc0befcf"
+  ]
 }

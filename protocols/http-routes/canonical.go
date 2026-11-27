@@ -66,6 +66,45 @@ func CanonicalJSON(m *Manifest) ([]byte, []diag.Diagnostic) {
 	return append(data, '\n'), nil
 }
 
+// committedManifest is the committed form of a manifest: the artifact members
+// in the same order, without the digest a reader derives from the routes.
+type committedManifest struct {
+	Schema   string  `json:"$schema"`
+	Protocol string  `json:"protocol"`
+	Routes   []Route `json:"routes"`
+}
+
+// CommittedJSON returns the committed form of m after canonicalization: the
+// bytes CanonicalJSON returns without the digest member. A project commits
+// this form, so two inventories that differ in some routes differ only in
+// those routes' lines.
+func CommittedJSON(m *Manifest) ([]byte, []diag.Diagnostic) {
+	canonical, diags := CanonicalizeManifest(m)
+	if diag.HasErrors(diags) {
+		return nil, diags
+	}
+	data, err := json.MarshalIndent(committedManifest{
+		Schema:   canonical.Schema,
+		Protocol: canonical.Protocol,
+		Routes:   canonical.Routes,
+	}, "", "  ")
+	if err != nil {
+		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeSerialization, "", "serialize committed manifest: %v", err)}
+	}
+	return append(data, '\n'), nil
+}
+
+// CommittedForm strictly parses and validates an inventory in either form and
+// returns its committed form. A producer promotes the artifact it wrote under
+// .gen with it.
+func CommittedForm(data []byte) ([]byte, []diag.Diagnostic) {
+	manifest, diags := ParseAndValidateManifest(data)
+	if diag.HasErrors(diags) {
+		return nil, diags
+	}
+	return CommittedJSON(manifest)
+}
+
 func cloneRoutes(routes []Route) []Route {
 	if len(routes) == 0 {
 		return []Route{}

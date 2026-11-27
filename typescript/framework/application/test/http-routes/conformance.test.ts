@@ -7,6 +7,7 @@ import {
   HTTP_ROUTES_ERROR_CODES,
   parseAndValidateHttpRoutes,
   serializeCanonicalHttpRoutes,
+  serializeCommittedHttpRoutes,
   type HttpRouteInput,
 } from '../../src/http-routes';
 
@@ -108,6 +109,35 @@ describe('putnami.http-routes.v1 shared conformance', () => {
         'sha256:b9b1df83b351439e30d8aff5c6d2ec7de61de8a9bab1444738c4c27984c1f77e',
       );
       expect(JSON.stringify(input)).toBe(before);
+    },
+  );
+
+  specTest(
+    'derives the digest of the committed form and renders the committed golden',
+    {
+      feature: 'http-routes/route-inventory-contract',
+      requirement: 'the-committed-form-derives-its-digest',
+      check: 'the-typescript-validator-derives-the-same-digest',
+    },
+    () => {
+      const committedText = readFileSync(join(FIXTURES, 'equivalence', 'http-routes.committed.golden.json'), 'utf8');
+      const parsed = parseAndValidateHttpRoutes(committedText);
+      expect(parsed.diagnostics).toEqual([]);
+      expect(parsed.manifest?.digest).toBe('sha256:b9b1df83b351439e30d8aff5c6d2ec7de61de8a9bab1444738c4c27984c1f77e');
+      if (!parsed.manifest) throw new Error('the committed golden failed to parse');
+      expect(serializeCommittedHttpRoutes(parsed.manifest).text).toBe(committedText);
+      expect(serializeCanonicalHttpRoutes(parsed.manifest).text).toBe(
+        readFileSync(join(FIXTURES, 'equivalence', 'http-routes.golden.json'), 'utf8'),
+      );
+      for (const name of expectations.valid) {
+        const artifact = parseAndValidateHttpRoutes(readFileSync(join(FIXTURES, 'valid', name), 'utf8'));
+        if (!artifact.manifest) throw new Error(`${name} failed to parse`);
+        const committed = serializeCommittedHttpRoutes(artifact.manifest);
+        expect(committed.text, name).not.toContain('"digest"');
+        const reparsed = parseAndValidateHttpRoutes(committed.text ?? '');
+        expect(reparsed.diagnostics, name).toEqual([]);
+        expect(reparsed.manifest?.digest, name).toBe(artifact.manifest.digest);
+      }
     },
   );
 });

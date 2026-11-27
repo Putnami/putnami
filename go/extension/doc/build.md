@@ -642,12 +642,15 @@ Catch-alls, wildcards, and other patterns that cannot be represented safely by
 v1 fail the build with an `http_routes.unsupported_pattern` diagnostic instead
 of widening the public edge route.
 
-`build-describe` is the one writer of the committed inventory, and it fails on
-drift: when the inventory a build writes, or a cache hit restores, differs from
+`build-describe` is the one writer of the committed inventory. It commits the
+inventory without its `digest`, which stays in `.gen/schema/http-routes.json`
+for package and deploy; a reader derives it from the routes
+(protocols/http-routes ADR 0003). Two pull requests that change different
+routes therefore do not conflict on the file. The task fails on drift: when the inventory a build writes, or a cache hit restores, differs from
 the committed `schema/http-routes.json`, the build fails with
 `generated-output-drift`. The worktree then holds the regenerated inventory:
 commit it. A stale inventory never lands silently. When two pull requests that
-each change a route conflict on the file, rebuild the project rather than
+change the same route conflict on the file, rebuild the project rather than
 merging the file by hand.
 
 ## gRPC service inventory
@@ -674,7 +677,7 @@ bytes. An inventory describe cannot read also fails the build. In each case
 the run commits no schema file and removes none, so the committed inventory
 and the other committed sidecars keep the last successful run's bytes.
 
-A valid inventory is committed verbatim, like the route inventory. Its one
+A valid inventory is committed verbatim. Its one
 producer is the app's describe binary, so a differing copy an earlier run left
 in `.gen` is replaced, not reported as a second producer. The check never
 reads the committed copy, and a `.gen` leftover that this run neither wrote nor
