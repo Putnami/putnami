@@ -137,6 +137,26 @@ baseline once, so a tag created during the run is seen by the next run.
 What does not depend on the project, the repository's state, HEAD and its
 tags, is read once per run for every project its work tree holds
 ([ADR 0110](adr/0110-a-run-reads-the-release-state-of-its-repository-once.md)).
+
+A run records each tagged or untagged baseline it reads in
+`.putnami/release-record`, keyed by the project directory, the tag pattern and
+the witness of the commits the baseline names: HEAD's commit, every tag with
+the object it peels to, the tags HEAD reaches, the repository state (a full clone, the work tree's
+prefix), the absence of replace refs, grafts and reftables, Git's whole
+configuration reading and the `GIT_` variables, `HOME` and `XDG_CONFIG_HOME`.
+Git names its objects by their content, so the tree a tag's commit holds and
+the commits since it never change: the next run whose witness is the same
+answers each baseline from the record, with no `rev-parse`, `ls-tree` or `log`
+of its own. Any other witness reads the baselines again, as above, and a
+baseline read is written only when the witness, taken again when the run
+saves the record, has not moved. A shallow
+clone, a repository without a commit and a directory outside every work tree
+record nothing, and neither does a history that `GIT_REPLACE_REF_BASE`,
+`GIT_NO_REPLACE_OBJECTS` or `GIT_GRAFT_FILE` may rewrite. The record has the
+file index's envelope: another CLI executable, or a damaged file, starts with
+an empty record, concurrent runs merge into it under a lock, and an entry no
+run used in its last 32 saves is dropped (ADR 0113, section 4).
+
 Declaring the input requires CLI contract 7. See
 [ADR 0062](adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md).
 
