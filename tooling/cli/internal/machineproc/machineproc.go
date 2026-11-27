@@ -36,6 +36,7 @@ const (
 	CodeBusy     = "machine.busy"
 	CodeStopping = "machine.stopping"
 	CodeContext  = "machine.context"
+	CodeTerminal = "machine.terminal"
 )
 
 // request is what a client sends the supervisor, and the supervisor the
@@ -57,6 +58,11 @@ type request struct {
 	// Fingerprint is processFingerprint of the client: a worker whose own
 	// differs refuses the run.
 	Fingerprint string `json:"fingerprint,omitempty"`
+	// Terminal says the client's stdin and stdout are a terminal: the worker
+	// gives the run a pseudo-terminal whose master the client relays.
+	Terminal bool `json:"terminal,omitempty"`
+	// StderrTerminal says the client's stderr is that terminal too.
+	StderrTerminal bool `json:"stderrTerminal,omitempty"`
 }
 
 // Reply answers a request.
@@ -75,6 +81,8 @@ type event struct {
 	// a client that waited too long runs the command itself and never sends
 	// it, so a command never runs twice.
 	Ready bool `json:"ready,omitempty"`
+	// Terminal says Ready carries the master of the run's pseudo-terminal.
+	Terminal bool `json:"terminal,omitempty"`
 	// Started says the run has begun.
 	Started bool `json:"started,omitempty"`
 	// Exit is the run's exit code, its last event.
@@ -86,9 +94,9 @@ type event struct {
 	Lost bool `json:"lost,omitempty"`
 }
 
-// signal is what a client sends the worker that serves it: "go" once it
+// clientSignal is what a client sends the worker that serves it: "go" once it
 // read Ready, then "interrupt" or "terminate" as it receives them.
-type signal struct {
+type clientSignal struct {
 	Signal string `json:"signal"`
 }
 

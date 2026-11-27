@@ -78,8 +78,11 @@ func Serve(ctx context.Context, args []string) (code int, served bool) {
 		startWanted = true
 		return 0, false
 	}
-	if hasTerminal() {
-		recordLocal(dir, "the command has a terminal, which a worker cannot give its jobs")
+	terminal := isTerminal(os.Stdin) && isTerminal(os.Stdout)
+	if !terminal && hasTerminal() {
+		// A terminal that is not the command's input and output (a
+		// redirected run) would reach the run's jobs through /dev/tty only.
+		recordLocal(dir, "the command has a terminal but its input or output is redirected")
 		return 0, false
 	}
 	c, err := dial(dir)
@@ -102,6 +105,7 @@ func Serve(ctx context.Context, args []string) (code int, served bool) {
 	req := request{
 		Protocol: ProtocolVersion, Op: "run", Build: build, Executable: exe,
 		Args: args, Env: env, Dir: wd, Umask: umask, Fingerprint: processFingerprint(),
+		Terminal: terminal, StderrTerminal: terminal && isTerminal(os.Stderr),
 	}
 	if err := c.send(req, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		recordLocal(dir, "the request could not be sent")
@@ -126,16 +130,27 @@ const clientReadyTimeout = 15 * time.Second
 // whose worker ended before its exit, is not served: the caller runs it
 // itself, unless the user interrupted it.
 func await(ctx context.Context, c *conn) (code int, served bool, reason string) {
-	events := make(chan event)
+	type received struct {
+		ev    event
+		files []*os.File
+	}
+	events := make(chan received)
 	failed := make(chan error, 1)
 	go func() {
 		for {
 			var ev event
-			if _, err := c.receive(&ev); err != nil {
+			files, err := c.receive(&ev)
+			if err != nil {
 				failed <- err
 				return
 			}
-			events <- ev
+			events <- received{ev, files}
+		}
+	}()
+	var relay *terminalRelay
+	defer func() {
+		if relay != nil {
+			relay.close()
 		}
 	}()
 	ready := time.NewTimer(clientReadyTimeout)
@@ -152,10 +167,10 @@ func await(ctx context.Context, c *conn) (code int, served bool, reason string) 
 		if abort.Source() == abort.SourceUser {
 			kind = "interrupt"
 		}
-		_ = c.send(signal{Signal: kind})
+		_ = c.send(clientSignal{Signal: kind})
 	}
 	lost := func(why string) (int, bool, string) {
-		if interrupted {
+		if interrupted || (relay != nil && relay.interrupted.Load()) {
 			return lostRunExit, true, why
 		}
 		if started {
@@ -173,13 +188,28 @@ func await(ctx context.Context, c *conn) (code int, served bool, reason string) 
 				return 0, false, "interrupted before the worker took the command"
 			}
 			forward()
-		case ev := <-events:
+		case got := <-events:
+			ev := got.ev
+			if ev.Ready && ev.Terminal && !gone {
+				if len(got.files) != 1 {
+					closeAll(got.files)
+					return 0, false, "the worker sent no terminal"
+				}
+				var err error
+				if relay, err = startRelay(got.files[0]); err != nil {
+					_ = got.files[0].Close()
+					relay = nil
+					return 0, false, "the terminal could not be relayed: " + err.Error()
+				}
+			} else {
+				closeAll(got.files)
+			}
 			switch {
 			case ev.Refused != "":
 				return 0, false, "refused: " + ev.Refused
 			case ev.Ready && !gone:
 				readyC = nil
-				if err := c.send(signal{Signal: "go"}); err != nil {
+				if err := c.send(clientSignal{Signal: "go"}); err != nil {
 					return 0, false, "the go could not be sent"
 				}
 				gone = true
@@ -189,6 +219,9 @@ func await(ctx context.Context, c *conn) (code int, served bool, reason string) 
 			case ev.Lost:
 				return lost("the worker ended during the run")
 			case ev.Exit != nil:
+				if relay != nil {
+					relay.drain()
+				}
 				return *ev.Exit, true, ""
 			case ev.Started:
 				started = true

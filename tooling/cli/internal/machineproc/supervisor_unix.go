@@ -308,6 +308,9 @@ func (s *supervisor) startWorker(key, build, exe string) (*worker, error) {
 	cmd.Env = supervisorEnv(os.Environ())
 	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
 	cmd.ExtraFiles = []*os.File{theirs}
+	// A session of its own, with no controlling terminal: a run at a
+	// terminal makes its pseudo-terminal the worker's.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	s.mu.Lock()
 	err = cmd.Start()
 	if err == nil {

@@ -1391,11 +1391,14 @@ next run goes through the worker of its executable. A run always runs in its
 own process in CI (`CI`, or a CI service's own variable), in a hosted run
 (`--credential-fd`), when a job of a run starts it, in watch mode (`--watch`,
 `-w`, or a serve workload), for `publish`, `deploy` and `release`, from a
-terminal (a worker has none to give its jobs, so commands that agents,
-scripts and editors start go through it), when the worker's limits, groups,
+terminal whose input or output is redirected, when the worker's limits, groups,
 priority or control group differ from the command's, and whenever the
 supervisor or the worker refuses or fails before the run starts. A worker
 that ends during a run makes the command run again in its own process.
+At a terminal, the worker gives the run a pseudo-terminal that the command
+relays: the output, prompts, Ctrl-C and the window size behave as in a run
+in its own process. Ctrl-Z suspends the command; the run goes on and its
+output waits until the command resumes.
 `putnami machine status` shows why the last command ran in its own process.
 `PUTNAMI_MACHINE=off` turns it off for one command and `PUTNAMI_MACHINE=on` on;
 `machine on|off` records the user's choice in `machine.json` under the
