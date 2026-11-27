@@ -31,24 +31,6 @@ func useRecordAt(t *testing.T, root string) *fileindex.Record {
 	return record
 }
 
-// useRoundRecord makes the record of a round of a randomized test current:
-// on an even round with a clock an hour ahead, so every part is recordable,
-// and on an odd round with the filesystem's own clock, so the writes of the
-// previous round lie inside the racy margin (ADR 0113 §2).
-func useRoundRecord(t *testing.T, root string, round int) *fileindex.Record {
-	t.Helper()
-	if round%2 == 0 {
-		return useRecordAt(t, root)
-	}
-	record := fileindex.OpenRecord(fileindex.RecordPath(root), "test")
-	restore := fileindex.UseRecord(record)
-	t.Cleanup(restore)
-	if fileindex.CurrentRecord() == nil {
-		t.Skip("this platform or filesystem keeps no input record")
-	}
-	return record
-}
-
 func writeRecordTree(t *testing.T, root string, files map[string]string) {
 	t.Helper()
 	for rel, content := range files {
@@ -192,7 +174,7 @@ func TestTheInputRecordServesNoFalseHit(t *testing.T) {
 			})
 			writeRecordTree(t, root, map[string]string{"shared/a/s.txt": "s"})
 			for round := range 25 {
-				record := useRoundRecord(t, root, round)
+				record := useRecordAt(t, root)
 				cm := NewCacheManager(nil)
 				expander := basisExpander{identity: "ext"}
 				for _, patterns := range recordPatternSets {
@@ -440,7 +422,7 @@ func TestTheInputRecordServesNoFalseHitOfGitCandidates(t *testing.T) {
 			// its files were written, and only a kept one gives a witness.
 			time.Sleep(1100 * time.Millisecond)
 			for round := range 20 {
-				record := useRoundRecord(t, root, round)
+				record := useRecordAt(t, root)
 				cm := NewCacheManager(nil)
 				source := inProcessCut(t, root)
 				cm.SetCandidateSource(source)
@@ -586,5 +568,51 @@ func TestASampledAnswerThatDiffersDiscardsTheRecord(t *testing.T) {
 	after := useRecordAt(t, root)
 	if _, _, ok := after.Answer(InputDigestTable, key, after.Hold); ok {
 		t.Fatal("a discarded record kept an entry")
+	}
+}
+
+// TestAWriteInsideTheMarginIsNotAnsweredLater runs the racy rule end to end
+// with the filesystem's clock (ADR 0113 §2): a digest of files written just
+// now is collected but not recorded, so a rewrite in the same tick of the
+// clock, which can keep the file's stat, is read by the next run.
+func TestAWriteInsideTheMarginIsNotAnsweredLater(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "p")
+	writeRecordTree(t, project, map[string]string{"src/a.go": "a"})
+	patterns := []string{"src/**/*.go"}
+	record := fileindex.OpenRecord(fileindex.RecordPath(root), "test")
+	restore := fileindex.UseRecord(record)
+	defer restore()
+	if fileindex.CurrentRecord() == nil {
+		t.Skip("this platform or filesystem keeps no input record")
+	}
+	if _, err := NewCacheManager(nil).HashFiles(project, patterns, nil, ProjectConfigScope{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := record.Save(); err != nil {
+		t.Fatal(err)
+	}
+	key, _ := recordKey(project+"|"+strings.Join(patterns, ",")+"||", patterns, nil)
+	saved := fileindex.OpenRecord(fileindex.RecordPath(root), "test")
+	if _, _, ok := saved.Answer(InputDigestTable, key, func([]fileindex.RecordPart) bool { return true }); ok || record.Computed() == 0 {
+		t.Fatalf("a digest of files written inside the margin was recorded (offered %d)", record.Computed())
+	}
+	info, err := os.Stat(filepath.Join(project, "src", "a.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeRecordTree(t, project, map[string]string{"src/a.go": "b"})
+	must(t, os.Chtimes(filepath.Join(project, "src", "a.go"), info.ModTime(), info.ModTime()))
+
+	next := fileindex.OpenRecord(fileindex.RecordPath(root), "test")
+	restoreNext := fileindex.UseRecord(next)
+	defer restoreNext()
+	got, err := NewCacheManager(nil).HashFiles(project, patterns, nil, ProjectConfigScope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := hashFiles(project, patterns, nil, ProjectConfigScope{})
+	if got != want || next.Answered() != 0 {
+		t.Fatalf("a digest of files written inside the margin was answered (%d): %s, want %s", next.Answered(), got, want)
 	}
 }

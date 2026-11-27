@@ -85,6 +85,9 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 	must(t, os.MkdirAll(filepath.Join(project, "d"), 0o755))
 	must(t, os.Symlink("missing.md", filepath.Join(project, "d", "dangling.md")))
 	runGit(t, project, "init", "-q")
+	// The reader keeps the configuration a second after it was written, so
+	// only the fallback case below leaves a Git digest without a witness.
+	time.Sleep(1100 * time.Millisecond)
 	cases := []struct {
 		name     string
 		patterns []string
@@ -98,7 +101,7 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 		{"an exclusion", []string{"**/*.go", "*.md", "!README.md"}, nil, true, nil},
 		{"a missing prefix", []string{"missing/**"}, nil, true, nil},
 		{"the empty pattern set (the default walk)", nil, nil, false, nil},
-		{"Git candidates of a configuration the reader reads again (no witness)", []string{"git:**"}, nil, false, nil},
+		{"Git candidates the in-process reader lists", []string{"git:**"}, nil, true, nil},
 		{"an input selector whose answers name their identity", []string{"go:sources"}, basisExpander{identity: "ext"}, true, nil},
 		{"an input selector whose answers name none", []string{"go:sources"}, basisExpander{}, false, nil},
 		{"a glob before the last segment (it may read through a link)", []string{"s*/a.go"}, nil, false, nil},

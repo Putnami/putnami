@@ -1407,9 +1407,11 @@ func witnessedHashFiles(cut CandidateSource, dir string, patterns []string, expa
 		dir: collected.dir, listed: collected.facts.listed, unlisted: collected.facts.unlisted,
 		absent: collected.facts.absent,
 	}
-	if absolute, err := filepath.Abs(dir); err != nil || filepath.Clean(absolute) != collected.dir {
-		// The collection read another directory than the one the digest is
-		// keyed by, through a link: no stat of it witnesses the link.
+	// The collection may read the directory the digest is keyed by through
+	// a link; the links of both are witnessed (recordInputDigest).
+	if absolute, err := filepath.Abs(dir); err == nil {
+		record.keyDir = filepath.Clean(absolute)
+	} else {
 		record = nil
 	}
 	if record != nil {
@@ -1442,7 +1444,10 @@ func witnessedHashFiles(cut CandidateSource, dir string, patterns []string, expa
 // recordWitness is what the input record keeps beside a collected digest:
 // the files it selected and the paths it read to select them (ADR 0113 §1).
 type recordWitness struct {
+	// dir is the directory the collection read; keyDir the one the digest
+	// is keyed by, the same but where a link leads elsewhere.
 	dir      string
+	keyDir   string
 	selected []string
 	// listed holds each directory the collection listed and each path it
 	// looked up; unlisted says the collection could not name them.

@@ -135,9 +135,10 @@ The witness of a digest is:
   that is absent from the work tree, a pattern's static prefix or a literal
   path that does not exist. The collection found it absent and the record
   finds it absent again; it is witnessed by staying absent, and holds while
-  nothing exists at the path. A path the cut's witness names that does not
-  exist, such as a configuration file, is witnessed by the stat of the
-  nearest existing directory above it.
+  nothing exists at the path. Any other path a witness names that does not
+  exist when the record takes its stat, such as a configuration file of the
+  cut's witness or a directory a walk listed and that is gone since, is
+  witnessed by the stat of the nearest existing directory above it.
 - **For a `git:` pattern, the cut's witness** (section 3).
 - **For an input selector, the answer's witness**: the answer of the extension
   is already kept across runs, keyed by its extension's implementation
@@ -150,15 +151,20 @@ The witness of a digest is:
   answers through another entry.
 
 A digest gets no record, and is collected every run as today, when any part
-of it has no witness: a pattern, a directory or a basis set that reaches a
-file or a directory through a symbolic link, whether the link is selected,
-listed, dangling or on the way to one of them, and a collection directory
-that resolves elsewhere through a link (a link's target can change outside
-every witnessed directory); a pattern with a glob before its last segment,
-which `filepath.Glob` follows through links; the empty pattern set; an
-expander with no identity, or an answer whose basis the extension did not
-declare. A Git candidate is read as Git lists it, a link by its text, so a
-candidate that is a link is witnessed by its own stat. The record never widens the class of
+of it has no witness: a selected file or a listed path that is itself a
+symbolic link, dangling or not (its target can change outside every
+witnessed directory); a pattern with a glob before its last segment, which
+`filepath.Glob` follows through links; the empty pattern set; an expander
+with no identity, or an answer whose basis the extension did not declare. A
+link on the way to a witnessed path, a system one above the workspace or a
+linked project directory included, does not prevent the record: each link
+the resolution of a witnessed directory meets is witnessed by its own lstat,
+which pointing it elsewhere moves, and every path below it is stated through
+it. Three paths are read by a link's text rather than through it, and a link
+there is its own witness: a Git candidate of a digest of Git candidates
+alone, as Git lists it; a path an answer's basis content set selects, as the
+basis digest reads it; and a link the nearest existing directory above a
+missing path is reached through, with the directory it leads to. The record never widens the class of
 digests on the extension's word: an answer with no basis is recollected.
 
 A run answers a recorded digest at its first lookup only after checking the

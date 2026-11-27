@@ -273,16 +273,14 @@ func TestTheInputRecordRegressionSelectorLinkedFileRecorded(t *testing.T) {
 	record := useRecordAt(t, root)
 	_, err := NewCacheManager(nil).HashFiles(project, patterns, linkExpander{}, ProjectConfigScope{})
 	must(t, err)
-	key, ok := recordKey("x", patterns, linkExpander{})
-	t.Logf("recordKey ok=%v %q", ok, key)
-	_, witness, err := witnessedHashFiles(nil, project, patterns, linkExpander{}, ProjectConfigScope{})
-	must(t, err)
-	t.Logf("witness=%+v record=%+v", witness != nil, witness.record)
 	must(t, record.Save())
 	next := useRecordAt(t, root)
 	_, err = NewCacheManager(nil).HashFiles(project, patterns, linkExpander{}, ProjectConfigScope{})
 	must(t, err)
-	t.Logf("answered unchanged=%d", next.Answered())
+	// A selector file that is a link is read through it: not recorded.
+	if next.Answered() != 0 {
+		t.Fatalf("a selector digest that reads a link was answered %d times", next.Answered())
+	}
 }
 
 func TestTheInputRecordRegressionFallbackCase(t *testing.T) {
@@ -290,13 +288,19 @@ func TestTheInputRecordRegressionFallbackCase(t *testing.T) {
 	project := filepath.Join(root, "p")
 	writeRecordTree(t, project, map[string]string{"src/a.go": "a", "README.md": "r", "x.json": "{}"})
 	runGit(t, project, "init", "-q")
-	paths, witness, err := gitutil.CandidatePathsWitnessed(project)
-	t.Logf("immediately: paths=%d witness=%d err=%v", len(paths), len(witness), err)
+	// A configuration written less than a second ago is not kept: no witness.
+	if _, witness, err := gitutil.CandidatePathsWitnessed(project); err != nil || witness != nil {
+		t.Fatalf("a fresh configuration gave a witness (%d paths, %v)", len(witness), err)
+	}
 	time.Sleep(1100 * time.Millisecond)
-	paths, witness, err = gitutil.CandidatePathsWitnessed(project)
-	t.Logf("after 1.1s: paths=%d witness=%d err=%v", len(paths), len(witness), err)
-	paths, witness, err = gitutil.CandidatePathsWitnessed(project)
-	t.Logf("again: paths=%d witness=%d err=%v", len(paths), len(witness), err)
+	if _, witness, err := gitutil.CandidatePathsWitnessed(project); err != nil || len(witness) == 0 {
+		t.Fatalf("a kept configuration gave no witness (%v)", err)
+	}
+	// GIT_INDEX_FILE makes the reader fall back to Git, which names nothing.
+	t.Setenv("GIT_INDEX_FILE", filepath.Join(project, ".git", "index"))
+	if _, witness, err := gitutil.CandidatePathsWitnessed(project); err != nil || witness != nil {
+		t.Fatalf("the Git fallback gave a witness (%d paths, %v)", len(witness), err)
+	}
 }
 
 func probeGitPrefix(t *testing.T, patterns []string, setup map[string]string, change func(root string)) {

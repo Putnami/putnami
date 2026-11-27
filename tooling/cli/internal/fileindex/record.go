@@ -896,3 +896,42 @@ func OpenRecordAt(path, identity string, clock int64) *Record {
 	r.load()
 	return r
 }
+
+// LinkHops returns each symbolic link the resolution of the directory dir
+// meets, as the path where it met it, and false when dir does not resolve: a
+// missing element, or more than 255 links.
+func LinkHops(dir string) ([]string, bool) {
+	var hops []string
+	current := string(filepath.Separator)
+	pending := strings.FieldsFunc(dir, func(r rune) bool { return r < 0x80 && os.IsPathSeparator(uint8(r)) })
+	for len(pending) > 0 {
+		segment := pending[0]
+		pending = pending[1:]
+		switch segment {
+		case ".":
+			continue
+		case "..":
+			current = filepath.Dir(current)
+			continue
+		}
+		next := filepath.Join(current, segment)
+		info, err := os.Lstat(next)
+		if err != nil {
+			return nil, false
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			current = next
+			continue
+		}
+		hops = append(hops, next)
+		link, err := os.Readlink(next)
+		if err != nil || len(hops) > 255 {
+			return nil, false
+		}
+		if filepath.IsAbs(link) {
+			current = string(filepath.Separator)
+		}
+		pending = append(strings.FieldsFunc(link, func(r rune) bool { return r < 0x80 && os.IsPathSeparator(uint8(r)) }), pending...)
+	}
+	return hops, true
+}

@@ -523,19 +523,43 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 	if w.unlisted || w.candidates && w.cutWitness == nil {
 		return
 	}
-	// directLink reports whether every directory from the root to dir is
-	// itself, not a link, once per directory.
+	// The selected files come first, each once, as the collection
+	// selected them; then every other path, once.
+	parts := make([]fileindex.RecordPart, 0, len(w.selected)+len(w.listed))
+	var others []fileindex.RecordPart
+	seen := make(map[string]bool, cap(parts))
+	for _, path := range w.selected {
+		seen[path] = true
+	}
+	add := func(path string, st fileindex.Stat) {
+		if !seen[path] {
+			seen[path] = true
+			others = append(others, fileindex.RecordPart{Path: path, Stat: st})
+		}
+	}
+	// direct reports whether the directory dir resolves, and witnesses each
+	// symbolic link its resolution meets, a system one above the workspace
+	// included, by the link's own lstat: pointing it elsewhere moves that
+	// stat, and every path read below it is stated through it. Once per
+	// directory.
 	resolved := map[string]bool{}
 	direct := func(dir string) bool {
-		known, ok := resolved[dir]
-		if !ok {
-			target, err := filepath.EvalSymlinks(dir)
-			known = err == nil && target == dir
-			resolved[dir] = known
+		if known, ok := resolved[dir]; ok {
+			return known
 		}
-		return known
+		hops, ok := fileindex.LinkHops(dir)
+		for _, hop := range hops {
+			st, there := fileindex.LstatAny(hop)
+			if !there {
+				ok = false
+				break
+			}
+			add(hop, st)
+		}
+		resolved[dir] = ok
+		return ok
 	}
-	if !direct(w.dir) {
+	if !direct(w.dir) || w.keyDir != w.dir && !direct(w.keyDir) {
 		return
 	}
 	// An answer's files hold while what the extension read holds: the
@@ -550,14 +574,7 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 		basisDirectories = append(basisDirectories, directories...)
 		contents = append(contents, content...)
 	}
-	// The selected files come first, each once, as the collection
-	// selected them; then every other path, once.
-	parts := make([]fileindex.RecordPart, 0, len(w.selected)+len(w.listed))
-	var others []fileindex.RecordPart
-	seen := make(map[string]bool, cap(parts))
-	for _, path := range w.selected {
-		seen[path] = true
-	}
+
 	// stat takes a path's lstat for the witness: no link on its way, and
 	// not a link itself unless linkRead (read by its text).
 	stat := func(path string, linkRead bool) (fileindex.Stat, bool) {
@@ -566,12 +583,6 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 			return fileindex.Stat{}, false
 		}
 		return st, linkRead || st.Mode&modeTypeMask != modeSymlink
-	}
-	add := func(path string, st fileindex.Stat) {
-		if !seen[path] {
-			seen[path] = true
-			others = append(others, fileindex.RecordPart{Path: path, Stat: st})
-		}
 	}
 	gitOnly := w.candidates && !w.ordinary && len(w.bases) == 0
 	for _, path := range w.selected {
@@ -641,10 +652,24 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 		// A missing path is witnessed by the nearest directory above it
 		// that exists: its listing shows the path stays missing.
 		existing := filepath.Clean(path)
-		_, there := fileindex.LstatAny(existing)
+		found, there := fileindex.LstatAny(existing)
 		for !there && filepath.Dir(existing) != existing {
 			existing = filepath.Dir(existing)
-			_, there = fileindex.LstatAny(existing)
+			found, there = fileindex.LstatAny(existing)
+		}
+		if there && existing != filepath.Clean(path) && found.Mode&modeTypeMask == modeSymlink {
+			// The nearest existing directory is reached through a link, such
+			// as a linked home: the link is a hop of its resolution, and the
+			// directory it leads to lists the missing path.
+			target, err := filepath.EvalSymlinks(existing)
+			if err != nil || !direct(existing) {
+				return false
+			}
+			st, ok := stat(target, false)
+			if ok {
+				add(target, st)
+			}
+			return ok
 		}
 		st, ok := stat(existing, false)
 		if ok {
