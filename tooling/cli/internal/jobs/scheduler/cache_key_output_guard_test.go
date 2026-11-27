@@ -128,6 +128,7 @@ var keyOutputAllowlist = map[keyOutputConflict]string{
 	{"@putnami/sdd recipes-validate", "git:**", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                   generatedClientGitReason,
 	{"@putnami/typescript build-compile", "src/**/*.ts", "@putnami/clientgen client-generate-ts", "src"}:                                    generatedClientSourceReason,
 	{"@putnami/typescript build-compile", "src/**/*.tsx", "@putnami/clientgen client-generate-ts", "src"}:                                   generatedClientSourceReason,
+	{"@putnami/typescript build-emit", "git:**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                generatedClientGitReason,
 	{"@putnami/typescript build-generate", "src/**/*.ts", "@putnami/clientgen client-generate-ts", "src"}:                                   generatedClientSourceReason,
 	{"@putnami/typescript build-generate", "src/**/*.tsx", "@putnami/clientgen client-generate-ts", "src"}:                                  generatedClientSourceReason,
 	{"@putnami/typescript build-transpile", "src/**/*.ts", "@putnami/clientgen client-generate-ts", "src"}:                                  generatedClientSourceReason,

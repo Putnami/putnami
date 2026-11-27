@@ -22,7 +22,7 @@ func TestRealTestPipelinesLeaveTheCommandLayerOutOfTheirBuildSteps(t *testing.T)
 		dir     string
 		leaving []string
 	}{
-		{dir: "typescript/extension", leaving: []string{"generate", "tsc", "tsc-auto"}},
+		{dir: "typescript/extension", leaving: []string{"emit", "generate", "tsc", "tsc-auto"}},
 		{dir: "go/extension", leaving: []string{"config-merge", "describe", "generate"}},
 	}
 	for _, tc := range cases {

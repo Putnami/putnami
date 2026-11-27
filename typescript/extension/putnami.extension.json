@@ -512,6 +512,14 @@
           "if": "params.compiler == 'tsc'"
         },
         {
+          "id": "emit",
+          "task": "build-emit",
+          "commandLayerInputs": false,
+          "dependsOn": [
+            "generate"
+          ]
+        },
+        {
           "id": "test-env",
           "task": "test-env-up",
           "dependsOn": [
@@ -1456,6 +1464,71 @@
             "description": "The project's committed putnami.http-routes.v1 inventory: the committed form, without its digest, of the canonical .gen/schema/http-routes.json this task aggregates from the framework pre-build hooks' route fragments (protocols/http-routes ADR 0003), written after every pre-build hook reported a complete data.httpRoutes evaluation, {\"v\":1,\"state\":\"complete\"}, and the aggregate validated. The framework hooks are its sole authors; this task only drops the digest of the aggregate, and reads no project option to decide it. Fragments that hold no route commit an inventory with routes []. A run whose hooks all reported complete and wrote no fragment removes the file, including for a project that declares no pre-build hook. The task fails and leaves the file and infra/requirements.json as they stand when a hook fails, when the aggregate is invalid, and, before it aggregates anything, when it cannot evaluate every route producer: discovery could not read package.json or a dependency's putnami.extension.json, a hook reported its routes unavailable or returned no or a malformed data.httpRoutes, or Bun is missing for a project with a pre-build hook. It is committed, and this task is its first writer in a session, so the engine compares what it writes, removes, or a cache hit restores with the bytes present before and fails the task with generated-output-drift on a difference — the worktree then holds the regenerated inventory to commit (protocols/extension ADR 0004). Absent for a project whose hooks complete without a route fragment."
           }
         },
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-emit": {
+      "description": "Write the emit manifest of the project's dependency closure, the project included: each TypeScript module keyed on the SHA-256 of the JavaScript Bun's transpiler emits for it, under the compiler options of the tsconfig that governs it, and every other file Git does not ignore, the closure's .gen trees included, on the SHA-256 of its bytes. A declaration file is left out: Bun never runs one. Every narrowing falls back to bytes: a module that does not transpile, or whose tsconfig chain reaches a package or a config outside this key, keys on its bytes, and a closure in which a bunfig.toml preload or a Bun plugin can transform modules before Bun runs them keys every module on its bytes. test-run folds the manifest's digest instead of its dependencies' sources, so a type-only or comment-only change in a dependency reruns no dependent test (ADR 0016).",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build-emit"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "closure": {
+          "from": "closure",
+          "files": [
+            "git:**/*",
+            "!node_modules/**",
+            "!**/node_modules/**"
+          ]
+        },
+        "sources": {
+          "from": "project",
+          "files": [
+            "git:**/*",
+            "!../**",
+            "!node_modules/**",
+            "!**/node_modules/**"
+          ]
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "bunfig.toml",
+            "tsconfig*.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        },
+        "candidateFiles": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The manifest's mode and file count"
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "manifest": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "emit-manifest.json",
+            "description": "The emit manifest: version, mode (emit, or bytes with the reason), and one entry per closure file with its project, path, kind (js, bytes or absent) and SHA-256."
+          }
+        }
+      ,
         "effects": [
           "toolchain-cache"
         ]

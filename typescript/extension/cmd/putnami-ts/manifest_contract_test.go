@@ -252,6 +252,8 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 
 	want := []ownerRow{
 		{task: "build-compile", id: "compile", kind: "directory", root: "command-output", path: "compile", optionalEmpty: true},
+		// The emit manifest test-run folds (ADR 0016).
+		{task: "build-emit", id: "manifest", kind: "file", root: "command-output", path: "emit-manifest.json"},
 		{task: "build-generate", id: "capabilities", kind: "file", root: "project", path: "schema/capabilities.json", optionalEmpty: true},
 		{task: "build-generate", id: "gen", kind: "directory", root: "project", path: ".gen"},
 		{task: "build-generate", id: "httpRoutes", kind: "file", root: "project", path: "schema/http-routes.json", optionalEmpty: true, drift: "fail"},
@@ -418,6 +420,7 @@ func TestTaskEffectTable(t *testing.T) {
 		"cache-clean-exec":    {"toolchain-cache"},
 		"cache-gc-exec":       {"toolchain-cache"},
 		"build-compile":       {"toolchain-cache"},
+		"build-emit":          {"toolchain-cache"},
 		"build-transpile":     {"toolchain-cache"},
 		"build-types":         {"toolchain-cache"},
 		"config-extract-exec": {"toolchain-cache"},

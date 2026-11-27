@@ -101,11 +101,12 @@ The summary, the test cases and `--enforce-coverage` read the reports the same w
 ## Execution Flow
 
 ```text
-generate ──→ discover ──→ run ──→ parse
+generate ──→ emit ──→ discover ──→ run ──→ parse
          └──→ types
 ```
 
 1. **Generate** — runs the build generate phase to ensure `.gen/` is current. It writes the same `.gen/` tree as the `generate` step of `build`, so in a run such as `putnami lint,test,build` the planner orders the two: one never starts while the other, or a step that reads its output, still runs
+   - **Emit** — writes the emit manifest of the project's dependency closure (`emit-manifest.json`): each TypeScript module keyed on the JavaScript Bun emits for it, every other file on its bytes. The test run's key folds this manifest, not its dependencies' sources, so a type-only or comment-only change in a dependency reruns no dependent test; a change to the emitted JavaScript, to a file read at run time or to a config still does. A closure in which a `bunfig.toml` `preload` or a Bun plugin can transform modules keys every module on its bytes ([ADR 0016](adr/0016-a-test-run-keys-on-the-javascript-its-dependencies-emit.md))
 2. **Discover** — scans the project for test files matching `**/*.{test,spec}.{ts,tsx,js,jsx}` (excludes `node_modules`, `.gen`, and `dist` directories)
 3. **Run** — executes the project's [test runner](#test-runner) with the configured options
 4. **Parse** — reads JUnit XML and optional LCOV output, extracts failures and metrics
