@@ -562,7 +562,8 @@ A task may be cacheable only when its declared inputs cover what it reads.
   "manifest": { "from": "project",   "files": ["putnami.features.json", "features/*.json"] },
   "specs":    { "from": "project",   "files": ["specs/*.json"] },
   "identity": { "from": "workspace", "files": ["**/putnami.features.json", "**/features/*.json", "**/specs/*.json", "**/putnami.json", "putnami.workspace.json", "!**/.gen/**"] },
-  "externalSpecs": { "from": "workspace", "files": ["git:**/*.md", "git:**/*.feature"] }
+  "externalSpecs": { "from": "workspace", "files": ["git:**/*.md", "git:**/*.feature"] },
+  "support-catalog": { "from": "workspace", "files": ["putnami.support.json"] }
 }
 ```
 
@@ -583,6 +584,9 @@ workspace.
 
 `specs-validate` also keys on `**/putnami.json` and `putnami.workspace.json`,
 because `options.sdd.specFormats` and the verification mode decide its verdict.
+It keys on the workspace support catalog, `putnami.support.json`, because its
+completeness assessment reports a publishable project with no catalog entry:
+editing the catalog moves the key of every project's `specs-validate`.
 See [ADR 0006 of `protocols/features`](../../../protocols/features/doc/adr/0006-the-spec-source-contract.md).
 
 ### `architecture-validate` — cached, and it never reads git

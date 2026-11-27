@@ -14,6 +14,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
 	featureproto "go.putnami.dev/protocol/features"
+	supportproto "go.putnami.dev/protocol/support"
 	sdkmanifest "go.putnami.dev/sdk/extension/manifest"
 )
 
@@ -149,7 +150,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Description: "Validate one project's specs against the features they detail, resolve their decision links in this worktree, and report the completeness gaps around them. " +
 				"It OWNS one project's rows and READS the workspace's authored identities: a spec is keyed by feature id, one spec per feature is a workspace-wide guarantee, " +
 				"and a subset cannot prove either. The key follows the read set rather than the ownership — the two project ports name what this task reports on, " +
-				"the workspace port names the identity tier it resolves against — because a key that stopped at the project would let a sibling's manifest change this verdict silently. " +
+				"the workspace ports name the identity tier it resolves against, the external specs it reads and the support catalog — because a key that stopped at the project would let a sibling's manifest change this verdict silently. " +
 				"On a valid repository it additionally emits the executable-criteria projection (D9): the bounded (feature, requirement) → criterion join derived only from " +
 				"manifests and specs, which core joins with run observations. The projection is a declared output so a cache hit restores it byte-identically.",
 			Kind:      "command",
@@ -180,6 +181,10 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 					"git:**/*.md",
 					"git:**/*.feature",
 				}},
+				// The reviewed support catalog the completeness assessment reads:
+				// a publishable project with no catalog entry is a reported gap,
+				// so editing the catalog changes this verdict.
+				"support-catalog": {From: "workspace", Files: []string{supportproto.CatalogFilename}},
 			},
 			// Serialized after the project's source writers for the same reason
 			// as features-validate — and here it also protects the KEY: a
@@ -942,6 +947,8 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 			"identity": "workspace",
 			// An external spec may live anywhere in the workspace.
 			"externalSpecs": "workspace",
+			// The support catalog sits at the workspace root.
+			"support-catalog": "workspace",
 		},
 		// Project-rooted patterns here would key a workspace verdict on one
 		// project's files. The policy port covers the committed mode that changes

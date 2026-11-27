@@ -285,7 +285,9 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   ownership: two project ports name what the task reports on, and a workspace
   port (`**/putnami.features.json`, `**/features/*.json`, `**/specs/*.json`) names the identity tier
   it resolves against. A key that stopped at the project would let a sibling's
-  manifest change this verdict silently.
+  manifest change this verdict silently. Two more workspace ports name the
+  external specs it reads and the support catalog, `putnami.support.json`, its
+  completeness assessment reads.
 - `architecture-validate` reads the workspace's ARC declarations, capability
   evidence, debt artifacts, and `putnami.workspace.json` for its adoption
   policy. The workspace file is a declared cache input, so a mode change cannot

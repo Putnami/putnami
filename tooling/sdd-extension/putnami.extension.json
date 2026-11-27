@@ -1480,7 +1480,7 @@
       "declares": {}
     },
     "specs-validate": {
-      "description": "Validate one project's specs against the features they detail, resolve their decision links in this worktree, and report the completeness gaps around them. It OWNS one project's rows and READS the workspace's authored identities: a spec is keyed by feature id, one spec per feature is a workspace-wide guarantee, and a subset cannot prove either. The key follows the read set rather than the ownership \u2014 the two project ports name what this task reports on, the workspace port names the identity tier it resolves against \u2014 because a key that stopped at the project would let a sibling's manifest change this verdict silently. On a valid repository it additionally emits the executable-criteria projection (D9): the bounded (feature, requirement) \u2192 criterion join derived only from manifests and specs, which core joins with run observations. The projection is a declared output so a cache hit restores it byte-identically.",
+      "description": "Validate one project's specs against the features they detail, resolve their decision links in this worktree, and report the completeness gaps around them. It OWNS one project's rows and READS the workspace's authored identities: a spec is keyed by feature id, one spec per feature is a workspace-wide guarantee, and a subset cannot prove either. The key follows the read set rather than the ownership \u2014 the two project ports name what this task reports on, the workspace ports name the identity tier it resolves against, the external specs it reads and the support catalog \u2014 because a key that stopped at the project would let a sibling's manifest change this verdict silently. On a valid repository it additionally emits the executable-criteria projection (D9): the bounded (feature, requirement) \u2192 criterion join derived only from manifests and specs, which core joins with run observations. The projection is a declared output so a cache hit restores it byte-identically.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1518,6 +1518,12 @@
           "from": "project",
           "files": [
             "specs/*.json"
+          ]
+        },
+        "support-catalog": {
+          "from": "workspace",
+          "files": [
+            "putnami.support.json"
           ]
         }
       },

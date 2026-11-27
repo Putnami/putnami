@@ -60,8 +60,10 @@ func runFeaturesValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (st
 //
 // Its declared inputs are the project's own authored features, in
 // putnami.features.json or features/*.json, and its direct specs/*.json
-// children — exactly the documents this evaluation reads, which is what makes
-// it cacheable at all. The narrowing that follows is stated
+// children, beside three workspace ports: the identity tier it resolves
+// against, the external specs and decision records it reads, and the support
+// catalog its completeness assessment reads. Together they are exactly the
+// documents this evaluation reads, which is what makes it cacheable at all. The narrowing that follows is stated
 // rather than hidden: a workspace-wide question ("is this feature id declared
 // twice ANYWHERE?") is not this task's to answer, because answering it would
 // mean reading every project's manifest under a key that names one project's
