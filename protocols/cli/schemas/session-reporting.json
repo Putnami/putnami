@@ -218,6 +218,10 @@
           "type": "integer",
           "minimum": 65536,
           "maximum": 4194304
+        },
+        "packages": {
+          "description": "The reporter's destination accepts packages (ADR 0135). Only a reporter whose engine named framing version 4 sends it, and only true.",
+          "const": true
         }
       },
       "allOf": [

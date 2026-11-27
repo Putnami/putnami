@@ -109,12 +109,17 @@ func (c Capability) providerEnv(ctx context.Context, env []string) []string {
 
 // launchEnv is the environment a capability's provider starts with: its
 // providerEnv, which removes any inherited framing variable, and, for a
-// LargeFrames capability, the framing version this engine speaks. It is not a
-// credential: it says that this engine reads chunkBytes in acknowledgements
-// and sends version 3 frames (ADR 0131).
+// LargeFrames or Packages capability, the framing version this engine speaks.
+// It is not a credential: version 3 says that this engine reads chunkBytes in
+// acknowledgements and sends version 3 frames (ADR 0131); version 4 says that
+// as well, and that it reads packages in acknowledgements and then sends
+// packages (ADR 0135).
 func (c Capability) launchEnv(ctx context.Context, env []string) []string {
 	clean := c.providerEnv(ctx, env)
-	if c.LargeFrames {
+	switch {
+	case c.Packages:
+		clean = append(clean, protocolcli.SessionReportingFramingEnv+"="+strconv.Itoa(protocolcli.SessionReportingPackagesVersion))
+	case c.LargeFrames:
 		clean = append(clean, protocolcli.SessionReportingFramingEnv+"="+strconv.Itoa(protocolcli.SessionReportingLargeFrameVersion))
 	}
 	return clean

@@ -160,6 +160,22 @@
             "only-the-session-reporter-reads-the-framing-variable"
           ]
         }
+      },
+      {
+        "id": "task-packages-in-parallel",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-task-package-holds-its-records-byte-for-byte",
+            "packages-travel-in-parallel-and-a-manifest-closes-the-session",
+            "a-replay-sends-only-unacknowledged-packages",
+            "a-session-without-a-packages-offer-stays-on-frames"
+          ]
+        }
       }
     ]
   }

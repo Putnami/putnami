@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
@@ -134,6 +135,7 @@ func serveSessionReporter(env map[string]string, local localSessionResolver, in 
 		cfg.local = local
 	}
 	cfg.framing = framingRequested(env)
+	cfg.packages = packagesRequested(env)
 	return runSessionReporter(context.Background(), in, out, logw, cfg, &http.Client{Timeout: sessionReporterRequestTimeout})
 }
 
@@ -156,6 +158,10 @@ type sessionReporterConfig struct {
 	// acknowledgement carries chunkBytes (ADR 0131). Only the session
 	// reporter reads it.
 	framing bool
+	// packages records that the engine named framing version 4: an
+	// acknowledgement says packages: true once the destination advertised
+	// them (ADR 0135). Only the session reporter reads it.
+	packages bool
 }
 
 // hosted reports whether the engine runs this reporter for a hosted run: it
@@ -247,7 +253,7 @@ func newReporterConfig(env map[string]string, command, tokenEnv string, logw io.
 // echo); every receiver outcome is an ACK.
 func runSessionReporter(ctx context.Context, in io.Reader, out, logw io.Writer, cfg sessionReporterConfig, client *http.Client) error {
 	sender := &sessionReporterSender{cfg: &cfg, client: client, logw: logw}
-	return serveReportingFrames(ctx, in, out, logw, protocolcli.SessionReporterCommand, &cfg, sender.deliver)
+	return serveReportingFrames(ctx, in, out, logw, protocolcli.SessionReporterCommand, &cfg, sender.deliver, sender)
 }
 
 // reportingDeliverer answers one frame of the session-reporting wire. Every
@@ -261,16 +267,34 @@ type reportingDeliverer func(ctx context.Context, chunk *protocolcli.SessionRepo
 // Before the first chunk it also answers the protocol 2 handshake
 // (reportingHandshake), one answer per line, which sets cfg's bearer. From the
 // first chunk on, every line is a chunk, as in protocol 1.
-func serveReportingFrames(ctx context.Context, in io.Reader, out, logw io.Writer, command string, cfg *sessionReporterConfig, deliver reportingDeliverer) error {
+//
+// A put or a manifest line (ADR 0135) goes to the package lane
+// (packageLane): packages answers it, or the lane refuses it when packages is
+// nil, as for the log reporter. Puts run concurrently and their results are
+// written as each completes; a frame or a manifest waits for every put in
+// flight first, so a frame is delivered alone, as without packages.
+func serveReportingFrames(ctx context.Context, in io.Reader, out, logw io.Writer, command string, cfg *sessionReporterConfig, deliver reportingDeliverer, packages packageSender) error {
 	sc := bufio.NewScanner(in)
-	sc.Buffer(make([]byte, 0, 64*1024), sessionReporterLineBytes)
-	w := bufio.NewWriter(out)
+	sc.Buffer(make([]byte, 0, 64*1024), reportingLineBytes)
+	output := &reportingOutput{w: bufio.NewWriter(out)}
+	lane := newPackageLane(packages, output, logw, command)
+	defer lane.drain()
 	handshake := &reportingHandshake{cfg: cfg}
 	streaming := false
 	for sc.Scan() {
 		line := sc.Bytes()
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
+		}
+		if op := protocolcli.SessionReportingPackageOp(line); op == protocolcli.SessionReportingOpPut || op == protocolcli.SessionReportingOpManifest {
+			streaming = true
+			if err := lane.serve(ctx, op, line); err != nil {
+				return err
+			}
+			continue
+		}
+		if len(line) > sessionReporterLineBytes {
+			return fmt.Errorf("session reporting frame exceeds %d bytes", sessionReporterLineBytes)
 		}
 		if !streaming {
 			if op, ok := handshakeOp(line); ok {
@@ -280,33 +304,36 @@ func serveReportingFrames(ctx context.Context, in io.Reader, out, logw io.Writer
 					// the code are protocol constants (handshakeOp, answer).
 					fmt.Fprintf(logw, "%s %s: refused %s: %s\n", reporterBinary, command, op, result.Code)
 				}
-				if err := writeReportingLine(w, result); err != nil {
+				if err := output.write(result); err != nil {
 					return err
 				}
 				continue
 			}
 		}
+		lane.drain()
 		chunk, err := protocolcli.ParseSessionReportingChunk(line)
 		if err != nil {
 			fmt.Fprintf(logw, "%s %s: malformed frame: %v\n", reporterBinary, command, err)
 			return fmt.Errorf("malformed session reporting frame")
 		}
 		streaming = true
-		if err := writeReportingLine(w, deliver(ctx, chunk)); err != nil {
+		if err := output.write(deliver(ctx, chunk)); err != nil {
 			return err
 		}
 	}
 	if err := sc.Err(); err != nil {
 		if errors.Is(err, bufio.ErrTooLong) {
-			return fmt.Errorf("session reporting frame exceeds %d bytes", sessionReporterLineBytes)
+			return fmt.Errorf("session reporting line exceeds %d bytes", reportingLineBytes)
 		}
 		return err
 	}
-	return nil
+	lane.drain()
+	return output.failure()
 }
 
 // writeReportingLine writes one JSON line on the protocol's stdout and flushes
-// it: the engine waits for each answer before it sends the next line.
+// it: the engine waits for each frame's answer before it sends the next line,
+// and reads each put's result as it arrives.
 func writeReportingLine(w *bufio.Writer, v any) error {
 	encoded, err := json.Marshal(v)
 	if err != nil {
@@ -346,6 +373,10 @@ type sessionReporterSender struct {
 	// unsure holds the version 3 frames an attempt at which ended without a
 	// decisive answer: the receiver may hold them (admitLarge).
 	unsure map[string]bool
+	// packageMu guards what concurrent puts share: the local session, its
+	// bearer, encoder and frameCap. A frame runs only once no put is in
+	// flight (serveReportingFrames), so the frame path takes no lock.
+	packageMu sync.Mutex
 }
 
 // sessionDestination is where one frame goes and the bearer it carries. local
@@ -357,11 +388,12 @@ type sessionDestination struct {
 	local  *clicore.WorkspaceContext
 }
 
-// destination returns where chunk goes, or false when the reporter has none.
-// A hosted reporter (sessionReporterConfig.hosted) posts to the ingest base
-// under its run credential and needs both. Otherwise the local mode posts to
-// the local-sessions route under the stored login.
-func (s *sessionReporterSender) destination(chunk *protocolcli.SessionReportingChunk) (sessionDestination, bool) {
+// destination returns where a frame or a package of sessionID goes, or false
+// when the reporter has none. A hosted reporter
+// (sessionReporterConfig.hosted) posts to the ingest base under its run
+// credential and needs both. Otherwise the local mode posts to the
+// local-sessions route under the stored login.
+func (s *sessionReporterSender) destination(sessionID string) (sessionDestination, bool) {
 	if s.cfg.hosted() {
 		if s.cfg.ingestURL == "" || s.cfg.token == "" {
 			return sessionDestination{}, false
@@ -375,7 +407,7 @@ func (s *sessionReporterSender) destination(chunk *protocolcli.SessionReportingC
 	if session == nil {
 		return sessionDestination{}, false
 	}
-	return sessionDestination{url: localSessionURL(session, chunk.SessionID), bearer: session.AuthToken, local: session}, true
+	return sessionDestination{url: localSessionURL(session, sessionID), bearer: session.AuthToken, local: session}, true
 }
 
 // localSession resolves the local mode's session on the first frame that needs
@@ -436,11 +468,17 @@ func nack(chunk *protocolcli.SessionReportingChunk, code string, retryable bool)
 }
 
 // deliver answers one frame (post), and answers the plan's
-// sessionReporterPlanRetryableNacks-th retryable NACK without retry.
+// sessionReporterPlanRetryableNacks-th retryable NACK without retry. When
+// the engine named framing version 4 and the destination's latest decisive
+// answer advertised packages, the acknowledgement offers them, whatever its
+// outcome.
 func (s *sessionReporterSender) deliver(ctx context.Context, chunk *protocolcli.SessionReportingChunk) protocolcli.SessionReportingAck {
 	ack := s.post(ctx, chunk)
 	if s.cfg.framing {
 		ack.ChunkBytes = s.frameCap.ackBytes(s.lastURL)
+	}
+	if s.cfg.packages && s.frameCap.offersPackages(s.lastURL) {
+		ack.Packages = true
 	}
 	if chunk.Artifact == planArtifact && !ack.OK && ack.Retryable {
 		s.planRetryableNacks++
@@ -461,7 +499,7 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 	if s.cfg.inspectionGuardFailed {
 		return nack(chunk, ackCodeInspectionGuard, false)
 	}
-	dest, ok := s.destination(chunk)
+	dest, ok := s.destination(chunk.SessionID)
 	if !ok {
 		return nack(chunk, ackCodeNotConfigured, false)
 	}
@@ -583,7 +621,8 @@ func (s *sessionReporterSender) send(ctx context.Context, dest sessionDestinatio
 }
 
 // sessionRequest is one request of method to dest under its bearer: a frame's
-// POST, or the OPTIONS probe of a destination's advertisement (ADR 0131).
+// POST, the OPTIONS probe of a destination's advertisement (ADR 0131), or a
+// put's bundle or the manifest (packageRequest, ADR 0135).
 func sessionRequest(ctx context.Context, method string, dest sessionDestination, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, method, dest.url, body)
 	if err != nil {

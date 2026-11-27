@@ -25,10 +25,18 @@
     {
       "id": "unadvertised-large-acceptance-fails-closed",
       "text": "A 200 answer to a version 3 frame that does not advertise a cap at least the frame's size is not acknowledged: the reporter answers receiver_mismatch without retry."
+    },
+    {
+      "id": "packages-go-in-parallel",
+      "text": [
+        "When the engine names framing version 4 and the destination's latest decisive answer carried X-Putnami-Session-Packages: 1, every acknowledgement says packages: true; otherwise none does.",
+        "The reporter posts each put's packages as one bundle to <route>/packages as it arrives, several at once, and answers each put by its address; it posts the final manifest to <route>/manifest."
+      ]
     }
   ],
   "decisions": [
     "tooling/cli/doc/adr/0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md",
-    "cloud/extension/doc/adr/0001-a-reporter-compresses-a-chunk-once-the-receiver-advertises-gzip.md"
+    "cloud/extension/doc/adr/0001-a-reporter-compresses-a-chunk-once-the-receiver-advertises-gzip.md",
+    "tooling/cli/doc/adr/0135-a-run-delivers-its-report-as-task-packages-sent-in-parallel.md"
   ]
 }

@@ -74,6 +74,15 @@ sequence again within 65536 bytes, for a chunk it cut on its first attempt
 only; otherwise the code is a plain refusal. Core verifies every identity field and
 never treats a different offset/sequence as progress.
 
+A session reporter started with `PUTNAMI_SESSION_REPORTING_FRAMING=4` may
+also add `packages: true` to an ACK, saying that its receiver takes
+packages (ADR 0135 of the CLI). The engine may then send version 4 lines:
+`put`, a batch of packages, each `{kind, address, data}` addressed by the
+SHA-256 of its bytes, the put addressed by the SHA-256 of its packages'
+addresses; and a final `manifest` listing every package's address. The
+reporter answers each with a result of the same `op` and `address`, in any
+order, several puts being in flight at once.
+
 Receivers must accept identical duplicates, reject conflicting content/order,
 and bind the destination to the admitted execution. ACK cursors belong to the
 original binding. A new credential may renew it, but not retarget it. Core saves

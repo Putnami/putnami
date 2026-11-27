@@ -30,14 +30,17 @@ func framingRequested(env map[string]string) bool {
 }
 
 // frameCap tracks the decoded cap the latest answer of one destination
-// advertised. Like chunkEncoder, the latest exchange decides: an answer
-// without the headers, or a request without an answer, advertises nothing.
-// One frameCap serves one reporter, whose frames arrive one at a time.
+// advertised, and whether it advertised packages. Like chunkEncoder, the
+// latest exchange decides: an answer without the headers, or a request without
+// an answer, advertises nothing. One frameCap serves one reporter; it is not
+// safe for concurrent use.
 type frameCap struct {
 	// url is the destination whose latest exchange got an answer, or "".
 	url string
 	// bytes is the cap that answer advertised, or 0 when it advertised none.
 	bytes int
+	// packages records that answer advertised packages (advertisesPackages).
+	packages bool
 }
 
 // observe records the answer url gave with status, or no answer when header
@@ -52,7 +55,7 @@ func (c *frameCap) observe(url string, status int, header http.Header) {
 	if !decisiveAnswer(status) {
 		return
 	}
-	*c = frameCap{url: url, bytes: advertisedChunkBytes(header)}
+	*c = frameCap{url: url, bytes: advertisedChunkBytes(header), packages: advertisesPackages(header)}
 }
 
 // decisiveAnswer reports whether an answer of status comes from the receiver

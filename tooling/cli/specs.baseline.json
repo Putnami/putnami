@@ -293,6 +293,7 @@
     "cli/native-session-reporting#engine-lifecycle",
     "cli/native-session-reporting#negotiated-frame-size",
     "cli/native-session-reporting#spec-verification-record",
+    "cli/native-session-reporting#task-packages-in-parallel",
     "cli/native-session-reporting#trimmed-upload",
     "cli/native-session-reporting#unavailable-provider",
     "cli/portable-runner#commit-request",

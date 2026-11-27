@@ -163,7 +163,11 @@ type cursor struct {
 // At version 2 (viewCheckpointVersion), Events is the cursor of the view the
 // events.jsonl frames are cut from, and EventsRaw the raw offset of
 // events.jsonl the subscription acknowledged. At version 1, Events is a raw
-// cursor and EventsRaw is zero, absent from the checkpoint.
+// cursor and EventsRaw is zero, absent from the checkpoint. At version 3
+// (packagesCheckpointVersion), the session switched to packages: Packages
+// records what the reporter acknowledged, EventsRaw the raw offset the
+// subscription acknowledged, and only plan.json frames, so its cursor alone
+// may move and only one of its frames may be pending.
 type state struct {
 	Version                 int                                `json:"version"`
 	Provider                string                             `json:"provider"`
@@ -176,6 +180,7 @@ type state struct {
 	SpecVerification        cursor                             `json:"specVerification"`
 	SpecVerificationOmitted string                             `json:"specVerificationOmitted,omitempty"`
 	Pending                 *protocolcli.SessionReportingChunk `json:"pending,omitempty"`
+	Packages                *packagesState                     `json:"packages,omitempty"`
 	Complete                bool                               `json:"complete"`
 	Error                   string                             `json:"error,omitempty"`
 }
@@ -242,6 +247,9 @@ type Run struct {
 	// reporter accepted, which drain reads to apply the progress deadline.
 	progressMu sync.Mutex
 	lastAck    time.Time
+	// pipe is the reporter process once the session sends packages
+	// (ADR 0135): several lines outstanding at once.
+	pipe *pipeline
 }
 
 // Start declares the capability as a subscriber of events, resuming at its
@@ -330,7 +338,7 @@ func openRun(ctx context.Context, capability Capability, dir, sessionID, provide
 }
 
 func knownCheckpointVersion(version int) bool {
-	return version == rawCheckpointVersion || version == viewCheckpointVersion
+	return version == rawCheckpointVersion || version == viewCheckpointVersion || version == packagesCheckpointVersion
 }
 
 // moveToView moves a version 1 checkpoint of a View capability to version 2
@@ -364,14 +372,14 @@ func (r *Run) eventsView() *view {
 // the checkpoint already finalized acknowledges the final marker too.
 func (r *Run) subscribe(events *sessionstream.Log) error {
 	from := r.state.Events.Offset
-	if r.viewFraming() {
+	if r.viewFraming() || r.packaged() {
 		from = r.state.EventsRaw
 	}
 	sub, err := events.Subscribe(r.capability.Name, from)
 	if err != nil {
 		return fmt.Errorf("reporting artifact changed: %s", sessionstream.EventsFile)
 	}
-	if r.state.Events.Final {
+	if r.state.Events.Final || r.packaged() && r.state.Packages.Manifest {
 		_ = sub.Ack(from, true)
 	}
 	r.events = sub
@@ -392,7 +400,7 @@ func (r *Run) omitLatePlan() {
 // framed a chunk.
 func (r *Run) otherArtifactProgressed() bool {
 	s := r.state
-	return s.Events.Sequence > 0 || s.Session.Sequence > 0 || s.SpecVerification.Sequence > 0 || s.Pending != nil && s.Pending.Artifact != planFile
+	return s.Events.Sequence > 0 || s.Session.Sequence > 0 || s.SpecVerification.Sequence > 0 || s.Pending != nil && s.Pending.Artifact != planFile || s.Packages != nil && s.Packages.progressed()
 }
 
 // planClosed reports whether plan.json acknowledged its final marker or was
@@ -406,7 +414,7 @@ func (r *Run) planClosed() bool {
 // wrote it, and the evidence of its delivery already reads delivered, so no
 // replay would send the record.
 func (r *Run) omitLateSpecVerification() {
-	if r.state.Complete && r.specVerificationOpen() {
+	if r.state.Complete && !r.packaged() && r.specVerificationOpen() {
 		r.state.SpecVerificationOmitted = specVerificationLate
 	}
 }
@@ -429,6 +437,13 @@ func (r *Run) validate() error {
 	if !r.validCursors() {
 		return fmt.Errorf("invalid reporting cursor")
 	}
+	if r.packaged() {
+		// A session on packages frames plan.json only, and validatePackages
+		// checks what it recorded of its packages.
+		if err := r.validatePackages(); err != nil {
+			return err
+		}
+	}
 	if !r.capability.sends(sessionFile) && r.state.Session != (cursor{}) {
 		return fmt.Errorf("invalid reporting cursor")
 	}
@@ -442,8 +457,9 @@ func (r *Run) validate() error {
 		return fmt.Errorf("invalid reporting cursor")
 	}
 	// spec-verification.json frames only once the events final marker is
-	// acknowledged.
-	if r.specVerificationStarted() && (!r.capability.sends(specVerificationFile) || !r.state.Events.Final) {
+	// acknowledged. A session on packages omits it, at most, before its
+	// manifest (validatePackages).
+	if !r.packaged() && r.specVerificationStarted() && (!r.capability.sends(specVerificationFile) || !r.state.Events.Final) {
 		return fmt.Errorf("invalid reporting cursor")
 	}
 	if r.state.SpecVerificationOmitted != "" && (r.state.SpecVerification.Final || !specVerificationOmissions[r.state.SpecVerificationOmitted]) {
@@ -473,10 +489,13 @@ func (r *Run) validCursors() bool {
 			return false
 		}
 	}
-	if r.state.Version == viewCheckpointVersion {
-		return r.capability.View && r.state.EventsRaw >= 0
+	switch r.state.Version {
+	case viewCheckpointVersion:
+		return r.capability.View && r.state.EventsRaw >= 0 && r.state.Packages == nil
+	case packagesCheckpointVersion:
+		return r.capability.Packages && r.state.EventsRaw >= 0 && r.state.Packages != nil
 	}
-	return r.state.EventsRaw == 0
+	return r.state.EventsRaw == 0 && r.state.Packages == nil
 }
 
 func (r *Run) cursor(artifact string) *cursor {
@@ -495,6 +514,9 @@ func (r *Run) cursor(artifact string) *cursor {
 // it acknowledged each final marker, or omitted plan.json or
 // spec-verification.json.
 func (r *Run) complete() bool {
+	if r.packaged() {
+		return r.state.Packages.Manifest && (r.planClosed() || !r.capability.sends(planFile))
+	}
 	return r.state.Events.Final && (r.state.Session.Final || !r.capability.sends(sessionFile)) && (r.planClosed() || !r.capability.sends(planFile)) && !r.specVerificationOpen()
 }
 
@@ -505,6 +527,10 @@ func (r *Run) save() error {
 	data, err := json.Marshal(r.state)
 	if err != nil {
 		return fmt.Errorf("encode reporting checkpoint")
+	}
+	if len(data) > checkpointBytes {
+		// A checkpoint past the bound openRun reads would refuse every replay.
+		return fmt.Errorf("reporting checkpoint exceeds its bound")
 	}
 	f, err := os.CreateTemp(r.dir, ".reporting-*")
 	if err != nil {
@@ -532,6 +558,10 @@ func (r *Run) save() error {
 
 func (r *Run) release() {
 	r.cancel()
+	if r.pipe != nil {
+		r.pipe.close()
+		r.pipe, r.process = nil, nil
+	}
 	if r.process != nil {
 		r.process.close()
 	}
@@ -562,6 +592,10 @@ func (r *Run) deliver() error {
 	// chunk waits one interval like every later one.
 	lastEventsSend := r.clock.Now()
 	for !r.state.Complete {
+		if r.packaged() && r.planClosed() {
+			// plan.json closed: packages carry the rest of the session.
+			return r.deliverPackages(terminal)
+		}
 		if r.ctx.Err() != nil {
 			// A spec-verification.json that alone remains when the limits end
 			// is omitted, and the delivery it would have ended is complete.
@@ -1016,6 +1050,7 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 			}
 			r.observeCap(ack)
 			if ack.OK {
+				r.observePackages(ack)
 				return nil
 			}
 			if recut && !ack.Retryable && ack.Code == protocolcli.SessionReportingCodeFrameUnsupported && chunk.ProtocolVersion == protocolcli.SessionReportingLargeFrameVersion {
@@ -1070,6 +1105,28 @@ func (r *Run) observeCap(ack *protocolcli.SessionReportingAck) {
 	if ack.ChunkBytes > protocolcli.SessionReportingChunkBytes {
 		r.chunkBytes = min(ack.ChunkBytes, protocolcli.SessionReportingMaxChunkBytes)
 	}
+}
+
+// observePackages switches the session to packages (ADR 0135) when an
+// acknowledgement of a Packages capability offers them while no events.jsonl,
+// session.json or spec-verification.json frame was framed: only a plan.json
+// frame, the one acknowledged, may be pending. The switch holds for the rest
+// of the session; the checkpoint the worker saves next records it. Otherwise
+// the session stays on frames.
+func (r *Run) observePackages(ack *protocolcli.SessionReportingAck) {
+	s := &r.state
+	if !ack.Packages || !r.capability.Packages || s.Packages != nil || s.Version != viewCheckpointVersion {
+		return
+	}
+	if s.Events != (cursor{}) || s.EventsRaw != 0 || s.Session != (cursor{}) || s.SpecVerification != (cursor{}) || s.SpecVerificationOmitted != "" || s.Pending == nil || s.Pending.Artifact != planFile {
+		return
+	}
+	s.Version, s.Packages = packagesCheckpointVersion, &packagesState{}
+}
+
+// packaged reports whether the session switched to packages.
+func (r *Run) packaged() bool {
+	return r.state.Packages != nil
 }
 
 // frameBytes is the size the next frame is cut at: chunkBytes, or 64 KiB

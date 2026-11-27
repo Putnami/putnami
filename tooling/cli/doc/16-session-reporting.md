@@ -333,3 +333,17 @@ again at 64 KiB at the same offset and sequence; a frame an earlier attempt
 may have delivered is retried as it is. The log reporter keeps 64 KiB frames. The decision and
 what the receiver changes are in
 [ADR 0131](adr/0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md).
+
+## Task packages
+
+With a receiver that also advertises `X-Putnami-Session-Packages: 1`, the
+engine names framing version 4 to the session reporter and, once `plan.json`
+has gone as frames, delivers the rest of the session as task packages: every
+record of `events.jsonl`, byte for byte and with its offset, in one package
+per task, sealed at the task's end. Whenever one of eight slots is free, the
+packages sealed since leave in one put; `session.json` and
+`spec-verification.json` follow in parts, then a final manifest. Nothing is
+trimmed, and a replay sends only the packages not yet acknowledged. A
+receiver that advertises no packages keeps the session on frames. The
+decision and the receiver's contract are in
+[ADR 0135](adr/0135-a-run-delivers-its-report-as-task-packages-sent-in-parallel.md).

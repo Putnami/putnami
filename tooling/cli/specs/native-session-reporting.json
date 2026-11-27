@@ -94,12 +94,21 @@
         "A frame_unsupported refusal of a version 3 frame it cut, on its first attempt, drops it durably and cuts its offset and sequence again at 64 KiB; on a later attempt, or for a frame read from a checkpoint, it is a plain refusal.",
         "A pending version 3 frame survives the checkpoint and replays with the same identity and bytes."
       ]
+    },
+    {
+      "id": "task-packages-in-parallel",
+      "text": [
+        "Once the session reporter's acknowledgement offers packages before any events.jsonl or session.json frame, every record of events.jsonl leaves, byte for byte, in the package of its task, sealed at the task's end, at 4 MiB or at the stream's end, with its raw offsets.",
+        "Whenever one of 8 slots is free, the packages sealed since leave as one put; a final manifest follows the last acknowledgement, and a replay sends only the packages not acknowledged.",
+        "Without the offer the session stays on frames."
+      ]
     }
   ],
   "decisions": [
     "tooling/cli/doc/adr/0033-native-session-reporting.md",
     "tooling/cli/doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md",
     "tooling/cli/doc/adr/0115-a-local-run-hands-its-report-upload-to-a-detached-replay.md",
-    "tooling/cli/doc/adr/0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md"
+    "tooling/cli/doc/adr/0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md",
+    "tooling/cli/doc/adr/0135-a-run-delivers-its-report-as-task-packages-sent-in-parallel.md"
   ]
 }
