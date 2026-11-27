@@ -224,7 +224,10 @@ route.
 `build-generate` commits the route inventory to `<project>/schema/http-routes.json`,
 the path the Go extension commits, so a consumer reads what a TypeScript
 application serves from the repository without running a build. The hooks are
-its only authors: the task copies the aggregate and composes nothing. It runs
+its only authors: the task commits the aggregate without its `digest`, which
+stays in `.gen/schema/http-routes.json` for package and deploy and which a
+reader derives from the routes (protocols/http-routes ADR 0003), so two pull
+requests that change different routes do not conflict on the file. It runs
 after bundled serve, so a generate that fails changes no committed inventory.
 
 Every pre-build hook reports its route evaluation as `data.httpRoutes` in its
@@ -242,7 +245,7 @@ do not report it. See
 
 | The run | The committed `schema/http-routes.json` |
 |---------|-----------------------------------------|
-| Every hook reported a complete evaluation and the aggregate validated | Becomes a byte-for-byte copy of `.gen/schema/http-routes.json`. The copy is staged in a temporary file and renamed into place, and it is skipped when the bytes already match, so a warm build leaves the file and its mtime alone. |
+| Every hook reported a complete evaluation and the aggregate validated | Becomes the committed form of `.gen/schema/http-routes.json`: the same bytes without the `digest` member. The copy is staged in a temporary file and renamed into place, and it is skipped when the bytes already match, so a warm build leaves the file and its mtime alone. |
 | Every hook reported a complete evaluation and the fragments hold no route, such as one fragment with `routes: []` | Becomes the known-empty canonical inventory, with `routes: []`. |
 | Every hook reported a complete evaluation and none wrote a fragment, including a project that declares no pre-build hook, with or without Bun, and one whose dependencies are plain packages without `putnami.extension.json` | Is removed: nothing produces it any more. |
 | A hook failed, including the `@putnami/application` hook when the `app()` factory throws | Stays as it stands; the generate fails with `GENERATE_FAILED` and the hook's error. |

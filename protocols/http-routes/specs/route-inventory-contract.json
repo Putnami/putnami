@@ -6,6 +6,7 @@
     "A deployment edge admits exactly the declared routes and methods of a workload",
     "An inventory in which a public route could reach a private one is refused before it is deployed",
     "Go and TypeScript producers emit byte-identical inventories with the same digest for the same routes",
+    "Two pull requests that change different routes do not conflict on the committed inventory",
     "A tool finds the pages that prove a feature requirement, and the path that renders each, with one read of the inventory"
   ],
   "nonGoals": [
@@ -24,7 +25,7 @@
     {
       "id": "an-inventory-fails-closed",
       "text": [
-        "An inventory parses strictly and fails as a whole: an unknown member or protocol, an unsupported pattern, an unsafe escape, a duplicate method or route, a missing provenance or publicEdge, and a digest mismatch are errors with stable codes.",
+        "An inventory parses strictly and fails as a whole: an unknown member or protocol, an unsupported pattern, an unsafe escape, a duplicate method or route, a missing provenance or publicEdge, and a malformed or mismatched digest are errors with stable codes.",
         "Every valid fixture validates, every invalid one fails with its expected code, and every expected code is registered.",
         "The TypeScript validator of @putnami/application gives every fixture the same verdict and code."
       ]
@@ -43,6 +44,14 @@
         "Canonicalization sorts methods and routes, serializes the protocol and the routes with two-space indentation and one trailing newline, and sets the digest to sha256: and the SHA-256 hex of those bytes.",
         "The full fixture yields the committed cross-language golden and its pinned digest, whatever the route order and method case of the input, on every run.",
         "The TypeScript serializer reproduces the golden bytes and digest without mutating its input."
+      ]
+    },
+    {
+      "id": "the-committed-form-derives-its-digest",
+      "text": [
+        "The artifact form carries the digest; the committed form is the canonical artifact bytes without the digest member.",
+        "A strict parser accepts an inventory without a digest and returns it with the digest it computes, the one the artifact form carries; a present digest is checked as before.",
+        "The TypeScript validator of @putnami/application accepts the committed form of every valid fixture and derives the same digest."
       ]
     },
     {
@@ -65,6 +74,7 @@
   ],
   "decisions": [
     "protocols/http-routes/doc/adr/0001-route-inventory-is-not-openapi.md",
-    "protocols/http-routes/doc/adr/0002-optional-members-fail-closed-on-old-consumers.md"
+    "protocols/http-routes/doc/adr/0002-optional-members-fail-closed-on-old-consumers.md",
+    "protocols/http-routes/doc/adr/0003-the-committed-inventory-derives-its-digest.md"
   ]
 }

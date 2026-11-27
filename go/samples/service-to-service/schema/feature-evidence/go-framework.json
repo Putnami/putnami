@@ -15,7 +15,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -45,7 +45,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -75,7 +75,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -105,7 +105,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -135,7 +135,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -165,7 +165,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -195,7 +195,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -225,7 +225,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -255,7 +255,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -285,7 +285,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -315,7 +315,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -345,7 +345,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -375,7 +375,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -405,7 +405,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -435,7 +435,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -465,7 +465,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -495,7 +495,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -525,7 +525,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -555,7 +555,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -585,7 +585,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -615,7 +615,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -645,7 +645,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -675,7 +675,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -705,7 +705,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -735,7 +735,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -765,7 +765,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -795,7 +795,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -825,7 +825,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -855,7 +855,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -885,7 +885,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -915,7 +915,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -945,7 +945,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",
@@ -975,7 +975,7 @@
       "source": {
         "root": "project",
         "ownerProject": "go.putnami.dev/examples/service-to-service",
-        "binding": "source-v1:sha256:94f2c14d87909724d1bc843b6ca9ebc108ac8a284f868d80031426fc0d5cc8ef"
+        "binding": "source-v1:sha256:dcf32a3deda1db4cc7e4cc8aa763c7690b435399d4596c981d27c157137b11a4"
       },
       "subject": {
         "kind": "capability",

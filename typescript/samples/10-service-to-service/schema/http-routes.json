@@ -254,6 +254,5 @@
         "evidencePath": "src/api/whoami/get.ts"
       }
     }
-  ],
-  "digest": "sha256:4076d63211681173e71669bb034748a7ae6444e74efdb27e4da79082e0899754"
+  ]
 }

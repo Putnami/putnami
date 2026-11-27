@@ -105,6 +105,5 @@
         "evidencePath": "src/api/products/[id]/get.ts"
       }
     }
-  ],
-  "digest": "sha256:6378743e0c4382f7f45b1bbf79dd87b10dd06fa19a107635daf1bc6470addd02"
+  ]
 }

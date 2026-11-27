@@ -88,10 +88,10 @@ func ParseManifest(data []byte) (*Manifest, []diag.Diagnostic) {
 		Proves     json.RawMessage `json:"proves"`
 	}
 	type manifestWire struct {
-		Schema   string      `json:"$schema"`
-		Protocol string      `json:"protocol"`
-		Routes   []routeWire `json:"routes"`
-		Digest   string      `json:"digest"`
+		Schema   string          `json:"$schema"`
+		Protocol string          `json:"protocol"`
+		Routes   []routeWire     `json:"routes"`
+		Digest   json.RawMessage `json:"digest"`
 	}
 
 	dec := json.NewDecoder(bytes.NewReader(data))
@@ -104,12 +104,22 @@ func ParseManifest(data []byte) (*Manifest, []diag.Diagnostic) {
 		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "%v", err)}
 	}
 
+	var digest string
+	if wire.Digest != nil {
+		if err := json.Unmarshal(wire.Digest, &digest); err != nil || bytes.Equal(bytes.TrimSpace(wire.Digest), []byte("null")) {
+			return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "digest", "digest must be a string, or absent")}
+		}
+		if digest == "" {
+			return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidDigest, "digest",
+				"digest must be sha256 followed by 64 lowercase hexadecimal characters, or absent")}
+		}
+	}
 	manifest := Manifest{
 		Schema:   wire.Schema,
 		Protocol: wire.Protocol,
 		Routes:   make([]Route, len(wire.Routes)),
-		Digest:   wire.Digest,
 	}
+	manifest.Digest = digest
 	for i, route := range wire.Routes {
 		if route.PublicEdge == nil {
 			field := fmt.Sprintf("routes[%d].publicEdge", i)
@@ -177,25 +187,37 @@ func parseProves(field string, raw json.RawMessage) ([]Proof, *diag.Diagnostic) 
 	return proves, nil
 }
 
-// ParseAndValidateManifest strictly parses and validates a manifest, including
-// recomputing its digest from the canonical route inventory.
+// ParseAndValidateManifest strictly parses and validates a manifest in either
+// form. The artifact form carries a digest, which must match the canonical
+// route inventory; the committed form carries none, and the returned manifest
+// holds the digest computed from its routes. Either way the returned Digest is
+// the inventory's digest.
 func ParseAndValidateManifest(data []byte) (*Manifest, []diag.Diagnostic) {
 	manifest, diags := ParseManifest(data)
 	if diag.HasErrors(diags) {
 		return nil, diags
 	}
-	diags = ValidateManifest(manifest)
+	digest, diags := validateManifest(manifest)
 	if diag.HasErrors(diags) {
 		return nil, diags
 	}
+	manifest.Digest = digest
 	return manifest, nil
 }
 
-// ValidateManifest validates the envelope and every route, then verifies the
-// digest against the canonicalized inventory.
+// ValidateManifest validates the envelope and every route, then verifies a
+// present digest against the canonicalized inventory. An empty Digest is the
+// committed form, which carries no digest.
 func ValidateManifest(manifest *Manifest) []diag.Diagnostic {
+	_, diags := validateManifest(manifest)
+	return diags
+}
+
+// validateManifest is ValidateManifest that also answers the canonical digest
+// of a valid manifest.
+func validateManifest(manifest *Manifest) (string, []diag.Diagnostic) {
 	if manifest == nil {
-		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "manifest is nil")}
+		return "", []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "manifest is nil")}
 	}
 	var diags []diag.Diagnostic
 	if manifest.Schema != SchemaURL {
@@ -207,19 +229,22 @@ func ValidateManifest(manifest *Manifest) []diag.Diagnostic {
 			"protocol %q is not supported (want %q)", manifest.Protocol, Protocol))
 	}
 	diags = append(diags, ValidateRoutes(manifest.Routes)...)
-	if !digestPattern.MatchString(manifest.Digest) {
+	if manifest.Digest != "" && !digestPattern.MatchString(manifest.Digest) {
 		diags = append(diags, diag.Errorf(ErrorCodeInvalidDigest, "digest",
 			"digest must be sha256 followed by 64 lowercase hexadecimal characters"))
-	} else if !diag.HasErrors(diags) {
-		canonical, canonicalDiags := Canonicalize(manifest.Routes)
-		if diag.HasErrors(canonicalDiags) {
-			diags = append(diags, canonicalDiags...)
-		} else if manifest.Digest != canonical.Digest {
-			diags = append(diags, diag.Errorf(ErrorCodeDigestMismatch, "digest",
-				"digest %q does not match canonical inventory digest %q", manifest.Digest, canonical.Digest))
-		}
 	}
-	return diags
+	if diag.HasErrors(diags) {
+		return "", diags
+	}
+	canonical, canonicalDiags := Canonicalize(manifest.Routes)
+	if diag.HasErrors(canonicalDiags) {
+		return "", append(diags, canonicalDiags...)
+	}
+	if manifest.Digest != "" && manifest.Digest != canonical.Digest {
+		return "", append(diags, diag.Errorf(ErrorCodeDigestMismatch, "digest",
+			"digest %q does not match canonical inventory digest %q", manifest.Digest, canonical.Digest))
+	}
+	return canonical.Digest, diags
 }
 
 // ValidateRoutes validates individual route shapes followed by cross-route

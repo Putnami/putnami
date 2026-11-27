@@ -88,6 +88,5 @@
         "evidencePath": "src/api/users/[id]/put.ts"
       }
     }
-  ],
-  "digest": "sha256:7d508527bc5ab862c964f50c11f088ad7f4c450e469e7020638b83379c4ef6fc"
+  ]
 }

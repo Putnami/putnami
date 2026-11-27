@@ -29,7 +29,8 @@ func route(match httproutes.MatchKind, path string, public bool, methods ...stri
 }
 
 // fixtureProject writes a canonical route inventory under dir/app at location
-// ("schema" or ".gen/schema") and returns the workspace and project.
+// and returns the workspace and project: the committed form, without its
+// digest, under "schema", and the artifact form under ".gen/schema".
 func fixtureProject(t *testing.T, location string, routes []httproutes.Route) (*compose.Workspace, *compose.Project) {
 	t.Helper()
 	root := t.TempDir()
@@ -42,15 +43,18 @@ func fixtureProject(t *testing.T, location string, routes []httproutes.Route) (*
 	if diag.HasErrors(diags) {
 		t.Fatalf("canonicalize fixture routes: %v", diags)
 	}
-	data, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		t.Fatal(err)
+	data, diags := httproutes.CanonicalJSON(manifest)
+	if location == "schema" {
+		data, diags = httproutes.CommittedJSON(manifest)
+	}
+	if diag.HasErrors(diags) {
+		t.Fatalf("serialize fixture routes: %v", diags)
 	}
 	dir := filepath.Join(root, "app", filepath.FromSlash(location))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "http-routes.json"), append(data, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "http-routes.json"), data, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return ws, project
@@ -251,6 +255,10 @@ func TestDerive_ReadsTheCommittedInventoryFirst(t *testing.T) {
 	}
 	if len(contract.DerivedFrom) != 1 || contract.DerivedFrom[0].Path != "app/schema/http-routes.json" {
 		t.Errorf("derivedFrom = %+v, want app/schema/http-routes.json", contract.DerivedFrom)
+	}
+	manifest, _ := httproutes.Canonicalize([]httproutes.Route{route(httproutes.MatchExact, "/committed", true, "GET")})
+	if strings.Contains(string(data), `"digest"`) || contract.DerivedFrom[0].Digest != manifest.Digest {
+		t.Errorf("derivedFrom digest = %q, want %q derived from the committed form", contract.DerivedFrom[0].Digest, manifest.Digest)
 	}
 }
 
