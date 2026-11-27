@@ -185,3 +185,37 @@ func TestTaskResultOf_BoundsHoldAfterSanitization(t *testing.T) {
 		t.Fatal("a secret in a failure output survived the decode")
 	}
 }
+
+// TestTaskArtifactsOf_IsTheProjectionsArtifacts pins that the artifacts-only
+// read the spec gate uses names every artifact TaskResultOf projects, in its
+// order and with its id, kind and path, from the event stream and from a
+// canonical result alike.
+func TestTaskArtifactsOf_IsTheProjectionsArtifacts(t *testing.T) {
+	job := canonicalTestJob("a", "test", "test-exec")
+	result := testCasesResult(t, "OK", `{"testCases": [{"name": "TestA", "suite": "example.com/a", "status": "passed"}]}`)
+	result.Events = append(result.Events,
+		parseTestEvent(t, `{"v":2,"type":"artifact","data":{"id":"putnami-feature-verification","kind":"report","path":".putnami/out/a/~test/v.json"}}`),
+		parseTestEvent(t, `{"v":2,"type":"artifact","data":{"id":"criteria","name":"c","kind":"report","path":".putnami/out/a/~test/c.json"}}`))
+
+	sameArtifacts := func(t *testing.T, result *JobResult) {
+		t.Helper()
+		got, projected := TaskArtifactsOf(result), TaskResultOf(job, result).Artifacts
+		if len(got) != len(projected) || len(got) == 0 {
+			t.Fatalf("artifacts = %+v, want the projection's %+v", got, projected)
+		}
+		for i := range got {
+			if got[i].ID != projected[i].ID || got[i].Name != projected[i].Name ||
+				got[i].Kind != projected[i].Kind || got[i].Path != projected[i].Path {
+				t.Errorf("artifact %d = %+v, want %+v", i, got[i], projected[i])
+			}
+		}
+	}
+	sameArtifacts(t, result)
+
+	result.Canonical = &TaskResult{Artifacts: []TaskArtifact{{ID: "canonical", Kind: "report", Path: "out/c.json"}}}
+	sameArtifacts(t, result)
+
+	if TaskArtifactsOf(nil) != nil {
+		t.Error("a missing result has artifacts")
+	}
+}

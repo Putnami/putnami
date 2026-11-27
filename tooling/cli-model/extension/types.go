@@ -243,6 +243,10 @@ var ManifestProtocolVersion = proto.ManifestProtocolVersion
 // resolved each root to an absolute directory get the exact cross-root answer.
 var OutputsOverlap = proto.OutputsOverlap
 
+// OverlapCandidates returns the pairs of refs OutputsOverlap may report, in
+// the order a pairwise scan visits them, at a cost proportional to the refs.
+var OverlapCandidates = proto.OverlapCandidates
+
 // DecidableExcludes returns the subpaths a directory output cedes that an
 // ownership comparison may honor: normalized, strictly inside the output's own
 // path, and sorted. Undecidable entries are dropped, so a defective declaration

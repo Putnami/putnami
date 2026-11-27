@@ -729,7 +729,7 @@ func TestRunObservationRecoveryAsksTheRemoteTheSessionRecords(t *testing.T) {
 	t.Parallel()
 	fixture := newRecoveryPlanFixture(t, false)
 	req := &Request{Commands: []string{"test"}}
-	source := runObservationRecovery(t.Context(), req, fixture.ws, fixture.source.extensions, fixture.cache)
+	source := runObservationRecovery(t.Context(), req, fixture.ws, fixture.source.extensions, fixture.cache, nil, nil)
 	if source == nil || source.remote == nil {
 		t.Fatal("the run's recovery source reads no remote cache")
 	}

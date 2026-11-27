@@ -416,6 +416,23 @@ func TaskResultOf(job *ScheduledJob, result *JobResult) TaskResult {
 	return task
 }
 
+// TaskArtifactsOf returns the artifacts TaskResultOf projects for result,
+// without the identity it stamps on each and without decoding the result's
+// test summaries and cases, which a reader that looks an artifact up by id and
+// path does not need: on a run of thousands of tasks, the decoding is most of
+// the projection's cost.
+func TaskArtifactsOf(result *JobResult) []TaskArtifact {
+	switch {
+	case result == nil:
+		return nil
+	case result.Canonical != nil:
+		return result.Canonical.Artifacts
+	default:
+		_, artifacts, _, _ := RecordsFromEvents(result.Events)
+		return artifacts
+	}
+}
+
 // testCasesOf decodes the per-case results a result payload carries and
 // applies protocols/cli's test-case contract to them.
 //

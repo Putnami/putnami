@@ -67,6 +67,15 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 	ordered := orderedJobs(planned, results)
 	observations, reportsByFeature, reportDiagnostics := collectObservations(ws.Root, ordered, results)
 	record.Diagnostics = append(record.Diagnostics, reportDiagnostics...)
+	// A group is evaluated against the observations of its own feature, and
+	// every reader below them (the evaluator, the duplicate trace, the scope
+	// check) ignores any other feature's. Grouping them once keeps the gate
+	// proportional to the observations instead of to groups times observations.
+	observationsByFeature := make(map[string][]sessionObservation)
+	for _, entry := range observations {
+		feature := entry.observation.Feature
+		observationsByFeature[feature] = append(observationsByFeature[feature], entry)
+	}
 	// The candidate set is derived from the FULL plan, not from the jobs that
 	// produced results: a project whose test was planned owns its own silence,
 	// whether or not the task got as far as reporting.
@@ -115,7 +124,7 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 		scope := &scopeOf{ws: ws, projectID: projectID, owned: owned}
 		for _, criteria := range projection.Groups {
 			record.Groups = append(record.Groups, evaluateGroup(projectID, criteria, mode, source,
-				observations, reportsByFeature, at, evidence, owned, scope))
+				observationsByFeature[criteria.Feature], reportsByFeature, at, evidence, owned, scope))
 		}
 	}
 	// Nothing was projected and nothing was diagnosed. The record is empty when
@@ -137,6 +146,8 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 // name one of them as their feature authority. scope admits the session's
 // observations of the group's feature: one a project outside the owner's
 // evidence scope reports grants no support and is an error of the group.
+// session needs to hold only the observations of the group's feature, which
+// is all Collect passes; any other feature's are read by nothing here.
 func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode features.VerificationMode,
 	source features.VerificationModeSource, session []sessionObservation,
 	reportsByFeature map[string][]features.VerificationReportRef, at time.Time,
@@ -430,7 +441,7 @@ func collectObservations(wsRoot string, ordered []*jobs.ScheduledJob, results ma
 			continue
 		}
 		result := results[job.Key()]
-		for _, artifact := range jobs.TaskResultOf(job, result).Artifacts {
+		for _, artifact := range jobs.TaskArtifactsOf(result) {
 			if artifact.ID != features.VerificationReportArtifactID {
 				continue
 			}
@@ -484,7 +495,7 @@ func collectObservations(wsRoot string, ordered []*jobs.ScheduledJob, results ma
 func readProjection(wsRoot string, job *jobs.ScheduledJob, result *jobs.JobResult) (
 	*features.SpecCriteriaProjection, bool, []diag.Diagnostic) {
 	var diagnostics []diag.Diagnostic
-	for _, artifact := range jobs.TaskResultOf(job, result).Artifacts {
+	for _, artifact := range jobs.TaskArtifactsOf(result) {
 		if artifact.ID != features.SpecCriteriaProjectionArtifactID {
 			continue
 		}

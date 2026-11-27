@@ -387,8 +387,10 @@ func sessionTasks(
 }
 
 // ReduceSchedulerSession builds the canonical session result for a completed
-// scheduler run, records included. Scheduler.Run calls it exactly once and
-// publishes the reduction as SchedulerResult.Session.
+// scheduler run, records included: ReduceSchedulerTasks over RunTasks. The
+// scheduler projects the tasks once and reduces that projection with
+// ReduceSchedulerTasks; this spelling serves a caller that holds only the
+// plan and the results.
 func ReduceSchedulerSession(
 	planned []*ScheduledJob,
 	results map[string]*JobResult,
@@ -396,7 +398,20 @@ func ReduceSchedulerSession(
 	duration time.Duration,
 	cache *CacheStatsSnapshot,
 ) *SessionResult {
-	return reduceSession(sessionTasks(planned, results, TaskResultOf), outcome, duration, cache)
+	return ReduceSchedulerTasks(RunTasks(planned, results), outcome, duration, cache)
+}
+
+// ReduceSchedulerTasks is ReduceSchedulerSession over the run's tasks already
+// projected by RunTasks. Scheduler.Run calls it exactly once, on the
+// projection it also hands its renderers and the session writer, and
+// publishes the reduction as SchedulerResult.Session.
+func ReduceSchedulerTasks(
+	tasks []ScheduledTask,
+	outcome SessionOutcome,
+	duration time.Duration,
+	cache *CacheStatsSnapshot,
+) *SessionResult {
+	return reduceSession(tasks, outcome, duration, cache)
 }
 
 // ReduceRun folds a completed run into the canonical SessionResult for the

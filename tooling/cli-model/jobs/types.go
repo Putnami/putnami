@@ -226,6 +226,12 @@ type SessionOutcome struct {
 	// Orchestration is the run's orchestration report, settled like Cache and
 	// supplied to terminal renderers the same way.
 	Orchestration *OrchestrationSnapshot
+	// Tasks is every task of the run projected with its records (RunTasks),
+	// settled like Cache once the finalizers have amended the results, and
+	// supplied to terminal renderers the same way, so a renderer reads the
+	// run's one projection instead of decoding every task's results again. Nil
+	// where the caller has none, and the renderer then projects the results.
+	Tasks []ScheduledTask
 }
 
 // Renderer is the interface for rendering job execution output.

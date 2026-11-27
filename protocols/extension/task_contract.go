@@ -578,6 +578,69 @@ func OutputsOverlap(a, b OutputRef) bool {
 	return !cedesRegion(a, bPath) && !cedesRegion(b, aPath)
 }
 
+// OverlapCandidates returns the pairs of refs that OutputsOverlap may answer
+// true for, each as {later, earlier} indexes into refs, in the order a
+// pairwise scan visits them: later ascending, then earlier ascending. Every
+// pair OutputsOverlap reports is among them; the predicate still decides each.
+//
+// Two refs can overlap only when they wait on the same port, or when their
+// paths, lowercased as OutputsOverlap compares them, are equal or one contains
+// the other. Roots are left to the predicate, and a carve-out only ever turns
+// an overlap into none. Each path is looked up with each of its ancestors, so
+// the cost is the sum of the paths' depths plus the pairs found, where a scan
+// of every pair grows with the square of the refs.
+func OverlapCandidates(refs []OutputRef) [][2]int {
+	byPort := make(map[string][]int)
+	byPath := make(map[string][]int, len(refs))
+	paths := make([]string, len(refs))
+	for index, ref := range refs {
+		switch {
+		case ref.FromPort != "":
+			byPort[ref.FromPort] = append(byPort[ref.FromPort], index)
+		case ref.Path != "":
+			paths[index] = strings.ToLower(ref.Path)
+			byPath[paths[index]] = append(byPath[paths[index]], index)
+		}
+	}
+
+	var pairs [][2]int
+	for _, indexes := range byPort {
+		for i := 1; i < len(indexes); i++ {
+			for _, earlier := range indexes[:i] {
+				pairs = append(pairs, [2]int{indexes[i], earlier})
+			}
+		}
+	}
+	for index, path := range paths {
+		if path == "" {
+			continue
+		}
+		// Equal paths: each pair once, from its later side.
+		for _, other := range byPath[path] {
+			if other < index {
+				pairs = append(pairs, [2]int{index, other})
+			}
+		}
+		// A parent contains path exactly when path has the prefix parent + "/",
+		// which is path cut at one of its own separators.
+		for cut := 0; cut < len(path); cut++ {
+			if path[cut] != '/' {
+				continue
+			}
+			for _, other := range byPath[path[:cut]] {
+				pairs = append(pairs, [2]int{max(index, other), min(index, other)})
+			}
+		}
+	}
+	sort.Slice(pairs, func(a, b int) bool {
+		if pairs[a][0] != pairs[b][0] {
+			return pairs[a][0] < pairs[b][0]
+		}
+		return pairs[a][1] < pairs[b][1]
+	})
+	return pairs
+}
+
 // cedesRegion reports whether ref's declaration cedes the region other
 // occupies: other is one of ref's excluded subpaths, or sits inside one.
 //
