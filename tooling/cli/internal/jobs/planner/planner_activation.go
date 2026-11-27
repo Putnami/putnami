@@ -158,8 +158,9 @@ func stepIsActive(act *extension.StepActivation, scope activationScope) bool {
 // activationKey names a gate's tree question for a project: its project, the
 // gate without its change condition, and the facts outside the tree it
 // depends on (the project's type, its closure, the workspace's project
-// roots). witnessed is false when the gate also reads the diff below its top
-// level, which no witness answers for.
+// roots). witnessed is false when the plan named no project roots or no
+// workspace root, or when the gate reads the diff below its top level, which
+// no witness answers for.
 func activationKey(act *extension.StepActivation, scope activationScope) (string, bool) {
 	gate := *act
 	gate.ChangedFiles = nil
@@ -175,11 +176,12 @@ func activationKey(act *extension.StepActivation, scope activationScope) (string
 	b.WriteString(filepath.ToSlash(rel))
 	b.WriteByte(0)
 	b.Write(encoded)
-	// reads reports whether the gate, or with nested only one of its
-	// alternatives at any depth, has the condition has selects.
-	var reads func(g *extension.StepActivation, nested bool, has func(*extension.StepActivation) bool) bool
-	reads = func(g *extension.StepActivation, nested bool, has func(*extension.StepActivation) bool) bool {
-		if !nested && has(g) {
+	// reads reports whether g or one of its alternatives, at any depth, has
+	// the condition that has selects. With alternativesOnly, g's own
+	// conditions do not count.
+	var reads func(g *extension.StepActivation, alternativesOnly bool, has func(*extension.StepActivation) bool) bool
+	reads = func(g *extension.StepActivation, alternativesOnly bool, has func(*extension.StepActivation) bool) bool {
+		if !alternativesOnly && has(g) {
 			return true
 		}
 		for i := range g.AnyOf {
@@ -207,7 +209,13 @@ func activationKey(act *extension.StepActivation, scope activationScope) (string
 		b.WriteString("\x00projects=")
 		b.WriteString(scope.cache.rootsDigest)
 	}
-	witnessed := scope.wsRoot != "" && !reads(act, true, func(g *extension.StepActivation) bool { return len(g.ChangedFiles) > 0 })
+	// An answer is kept only under the workspace's project roots, which Plan
+	// names in rootsDigest: a cache without them keeps none. A change
+	// condition below the top level reads the diff, which no witness answers
+	// for; the manifest loader refuses one, and this keeps a synthesized gate
+	// from being kept.
+	witnessed := scope.wsRoot != "" && scope.cache != nil && scope.cache.rootsDigest != "" &&
+		!reads(act, true, func(g *extension.StepActivation) bool { return len(g.ChangedFiles) > 0 })
 	return b.String(), witnessed
 }
 

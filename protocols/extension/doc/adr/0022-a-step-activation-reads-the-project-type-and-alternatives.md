@@ -22,7 +22,10 @@ could be written, so the step was planned for every project (CLI ADR 0132).
    declared type is listed; `""` names a project that declares none.
 2. **`anyOf`** lists alternative gates. The gate holds when at least one of
    them holds, besides every other condition of the gate. An alternative is a
-   gate of the same vocabulary, nested alternatives included.
+   gate of the same vocabulary, nested alternatives included, but for
+   `changedFiles`: a step binds the changed files its top-level gate selects,
+   so a change gate inside an alternative would select files no binding reads.
+   Strict validation and loading refuse it (`nested-changed-files`).
 3. **The members enter as additive contract 28** (`ContextActivationContract`).
    `DeclaresContextActivation` is the predicate; `RequiredLoadContract`
    includes the rung. A reader below 28 decodes manifests strictly and would

@@ -74,6 +74,10 @@
       "text": "Within a project's tree, recursive activation-file patterns use the loaded workspace project roots to exclude files owned by nested projects. Neither a static prefix starting below a nested project nor the directory walk can source a match from that project. Ordinary source subdirectories remain searchable, and a selected child or genuinely multi-language parent activates from its own matching files without requiring an explicit language-extension dependency for config-extract."
     },
     {
+      "id": "a-plan-holds-only-the-steps-a-project-context-gives-work-to",
+      "text": "A pipeline step whose activation gate the project's files, type and closure do not satisfy is not planned. Each answer is decided once per plan and, when its reads can be witnessed, kept under the stats of what it read, so a project that gains a file giving the step work plans it on the next run. The Go generate step declares no gate, so an idle library still plans it and its dependents' keys still read the library's sources through ^generate."
+    },
+    {
       "id": "dependency-plan",
       "text": "Planning builds a deterministic DAG that keeps functional dependencies apart from write-serialization edges, resolves same-session prerequisites across providers, and rejects missing selected commands. A command~step dependency plans the whole command, reads that step and runs after its other leaves. A ^command dependency runs that command across the dependency closure. A captured runner AFTER contract makes every protected write depend on every required gate leaf; missing gates and cycles fail closed."
     },

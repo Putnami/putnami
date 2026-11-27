@@ -50,7 +50,9 @@ func validateManifestBindingSources(m *Manifest) []diag.Diagnostic {
 // a `from` other than InputBindingFromContext, a context path other than
 // ContextPathChangedFiles, or a path with no source. The CLI resolves exactly
 // that one fact, so any other spelling would reach the task as no value and
-// key the step without the input its author meant to bind.
+// key the step without the input its author meant to bind. It also refuses a
+// change gate inside an activation's alternatives, whose files no binding
+// reads.
 func validateBindingSources(field string, step PipelineStep) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for _, name := range sortedKeys(step.With) {
@@ -71,6 +73,23 @@ func validateBindingSources(field string, step PipelineStep) []diag.Diagnostic {
 				"binding %q reads context path %q, which the planner does not resolve; the only context path is %q",
 				name, binding.Path, ContextPathChangedFiles))
 		}
+	}
+	// A change gate sits at the top of the activation: the step binds the
+	// changed files its top-level gate selects, and a gate inside an
+	// alternative would select a set no binding reads.
+	if step.Activation != nil {
+		var nested func(field string, alternatives []StepActivation)
+		nested = func(field string, alternatives []StepActivation) {
+			for i, alternative := range alternatives {
+				altField := fmt.Sprintf("%s.anyOf[%d]", field, i)
+				if len(alternative.ChangedFiles) > 0 {
+					diags = append(diags, diag.Errorf("nested-changed-files", altField+".changedFiles",
+						"a changedFiles gate inside anyOf selects files no binding reads; declare it at the top of the activation"))
+				}
+				nested(altField, alternative.AnyOf)
+			}
+		}
+		nested(field+".activation", step.Activation.AnyOf)
 	}
 	return diags
 }

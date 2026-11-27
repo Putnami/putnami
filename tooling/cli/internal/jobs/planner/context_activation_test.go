@@ -7,6 +7,7 @@ import (
 	"time"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/repotest"
@@ -103,6 +104,7 @@ func planContext(t *testing.T, root string, projects []*workspace.Project) map[s
 
 func TestAPlanHoldsOnlyTheStepsTheProjectContextGivesWork(t *testing.T) {
 	repotest.Require(t)
+	spectest.Proves(t, "cli/job-planning-execution", "a-plan-holds-only-the-steps-a-project-context-gives-work-to", "an-idle-step-is-not-planned")
 	t.Parallel()
 	root, projects := contextWorkspace(t)
 	keys := planContext(t, root, projects)
@@ -147,6 +149,7 @@ func TestAPlanHoldsOnlyTheStepsTheProjectContextGivesWork(t *testing.T) {
 // library that plans nothing else still moves every dependent key.
 func TestAnIdleLibraryStillCarriesItsSourcesToItsDependents(t *testing.T) {
 	repotest.Require(t)
+	spectest.Proves(t, "cli/job-planning-execution", "a-plan-holds-only-the-steps-a-project-context-gives-work-to", "an-idle-library-still-carries-its-sources-to-its-dependents")
 	t.Parallel()
 	root, projects := contextWorkspace(t)
 	ws := workspace.NewWorkspace(root, nil, projects)
@@ -176,6 +179,7 @@ func settle() { time.Sleep(fileindex.Margin + 100*time.Millisecond) }
 // answer kept with its witnesses never outlives the file that changes it.
 func TestAStepThatGainsWorkIsPlannedInTheNextRun(t *testing.T) {
 	repotest.Require(t)
+	spectest.Proves(t, "cli/job-planning-execution", "a-plan-holds-only-the-steps-a-project-context-gives-work-to", "a-step-that-gains-work-is-planned-in-the-next-run")
 	t.Parallel()
 	cases := []struct {
 		name string

@@ -220,6 +220,21 @@
         }
       },
       {
+        "id": "a-plan-holds-only-the-steps-a-project-context-gives-work-to",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-idle-step-is-not-planned",
+            "a-step-that-gains-work-is-planned-in-the-next-run",
+            "an-idle-library-still-carries-its-sources-to-its-dependents"
+          ]
+        }
+      },
+      {
         "id": "dependency-plan",
         "stage": "coded",
         "evidenceKinds": [

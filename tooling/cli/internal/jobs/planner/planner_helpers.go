@@ -52,7 +52,8 @@ type planCache struct {
 	activation map[string]bool
 	// rootsDigest names the workspace's project roots, relative to its root:
 	// a recursive gate enters no other project's root, so its kept answer
-	// depends on them.
+	// depends on them. Plan sets it with projectRoots; a cache it leaves empty
+	// keeps no activation answer between runs.
 	rootsDigest string
 }
 

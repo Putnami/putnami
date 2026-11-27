@@ -443,7 +443,9 @@ type StepActivation struct {
 	// AnyOf lists alternative gates; the step is active only if at least one
 	// of them holds, in addition to every other condition of this gate. A
 	// step whose work has several independent sources (an import, a committed
-	// file it reconciles, an output it clears) names each one here. Empty
+	// file it reconciles, an output it clears) names each one here. An
+	// alternative declares no ChangedFiles: the step binds the files its
+	// top-level gate selects, so validation refuses one inside anyOf. Empty
 	// means no alternative is required.
 	AnyOf []StepActivation `json:"anyOf,omitempty"`
 }

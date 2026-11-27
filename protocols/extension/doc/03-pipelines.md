@@ -194,7 +194,7 @@ of projects:
 | `changedFiles` | Active only if at least one of the run's changed files that the project owns, project-relative, matches one of these globs |
 | `closureFiles` | Active only if a member of the project's dependency closure, the project included, has a file matching one of these globs |
 | `projectTypes` | Active only if the project's declared type is listed; `""` stands for a project that declares no type |
-| `anyOf` | Alternative gates; active only if at least one of them holds, in addition to every other condition |
+| `anyOf` | Alternative gates; active only if at least one of them holds, in addition to every other condition. An alternative may not declare `changedFiles`, which belongs at the top of the gate |
 
 A step is active only when **every** declared condition holds, and conditions fail closed — a missing or unreadable file makes the step inactive, mirroring the runtime skip checks so pruning never removes a step that would have done real work.
 
