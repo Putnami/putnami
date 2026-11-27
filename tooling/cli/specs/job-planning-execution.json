@@ -151,7 +151,7 @@
     },
     {
       "id": "a-run-fails-on-its-selected-projects-findings",
-      "text": "After the session, the CLI reads the putnami-evidence artifact of every planned task, run or served from the cache, stamps each finding with the project that owns its path, and fails the run on each error finding of a selected project, as <project>:evidence~verdict. A finding no project owns counts under every selection. Warnings print on stderr. The selection enters no key, so one cache entry serves every selection."
+      "text": "After the session, the CLI reads the putnami-evidence artifact of every planned task, run or cached, stamps each finding with the project that owns its path, and fails the run on each error finding of a selected project, as <project>:evidence~verdict. A finding no project owns counts under every selection. Warnings print one line per project and rule with a count; each reaches the session record. A task declaring selection none gets no selection and keys none, so one entry serves every selection."
     },
     {
       "id": "declared-verification-producers",

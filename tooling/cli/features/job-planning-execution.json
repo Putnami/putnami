@@ -561,7 +561,9 @@
             "an-error-finding-of-a-selected-project-fails-the-run",
             "a-finding-of-an-unselected-project-does-not-fail-the-run",
             "a-cached-task-contributes-its-findings",
-            "a-finding-no-project-owns-fails-every-selection"
+            "a-finding-no-project-owns-fails-every-selection",
+            "warnings-print-one-line-per-project-and-rule",
+            "a-task-that-reads-no-selection-keys-once-for-every-selection"
           ]
         }
       },
