@@ -351,6 +351,17 @@
           "default": false,
           "description": "Fail a suite whose test database does not answer instead of skipping it: the test binding carries the require mode, and a run without any binding hands an empty one in that mode. A binding provisioned on CI carries it already. The run still starts the local test database it may start."
         },
+        "infra": {
+          "type": "string",
+          "choices": ["auto", "require", "skip"],
+          "description": "How the test database is provisioned for a project that declares one in infra/requirements.json: auto starts a local server (a Docker container, else the PostgreSQL installed on the machine), require consumes the binding the environment supplies and fails without one, skip provisions nothing. Default: require when CI is set, auto otherwise; the test.infra option sets it too."
+        },
+        "infra-down": {
+          "type": "boolean",
+          "default": false,
+          "ciDefault": false,
+          "description": "Stop every test database server this workspace started, and provision none for this run. It acts in the auto mode off CI, through a selected project whose closure declares a database; that project's tests run under keys of their own, and every other task keeps its cache entry."
+        },
         "runner": {
           "type": "string",
           "description": "Test runner: bun, vitest or jest. Default: the runner the project's package.json test script runs, else bun"

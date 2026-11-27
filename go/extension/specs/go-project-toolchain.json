@@ -466,6 +466,10 @@
         "A -buildvcs from GOFLAGS, Go's env file or the buildvcs parameter wins; the env file's other flags stay.",
         "A clone keeps Go's default stamping; test processes get no -buildvcs."
       ]
+    },
+    {
+      "id": "test-infra-flags",
+      "text": "`putnami test` declares --infra-down, a boolean that defaults to false on every run, and --infra, one of auto, require or skip with no default, so test-env-up keeps choosing require on CI and auto elsewhere; test-env-up reads both from the command params, --infra-down enters the key of no task that does not read it apart from the tests that consume the test environment, whose keys fold the inputs of its producer, and the test environment's teardown is never pruned under it."
     }
   ],
   "decisions": [

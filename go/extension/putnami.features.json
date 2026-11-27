@@ -1115,6 +1115,15 @@
           }
         },
         {
+          "id": "test-infra-flags",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["test-declares-the-infra-flags", "infra-down-reaches-test-env-up-and-its-teardown"]
+          }
+        },
+        {
           "id": "worktree-vcs-stamp",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

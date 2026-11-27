@@ -320,6 +320,8 @@ Unhandled errors between tests (module-level crashes) are extracted and reported
 | `--type-checker` | `string` | `tsc` | Checker of the `types` step: `tsc`, or `bun` for `bun check` (see [Checking with `bun check`](#checking-with-bun-check)) |
 | `--test-verbose` | `boolean` | `false` | Show the complete Bun transcript at info level; changes visibility only, never the invocation or verdict |
 | `--require-test-db` | `boolean` | `false` | Put the `require` mode on the database test binding `test-env-up` provisions, so a suite whose test database does not answer fails instead of skipping. A binding provisioned on CI carries it already. The run still starts the local test database it may start: a Docker container, or the PostgreSQL installed on the machine when no Docker daemon answers |
+| `--infra` | `string` | `require` on CI, `auto` otherwise | How `test-env-up` provisions the test database of a project that declares one in `infra/requirements.json`: `auto` starts a local server, `require` consumes the binding the environment supplies and fails without one, `skip` provisions nothing. The `test.infra` option sets it too |
+| `--infra-down` | `boolean` | `false` | Stop every test database server this workspace started, and provision none for this run. It acts in the `auto` mode off CI, through a selected project whose closure declares a database in `infra/requirements.json`; elsewhere it does nothing. That project's tests run under keys of their own, since their keys fold the test environment's inputs; every other task keeps its cache entry |
 
 ### Activation
 

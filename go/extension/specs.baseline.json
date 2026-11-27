@@ -73,6 +73,7 @@
     "go/go-project-toolchain#test-database-binding",
     "go/go-project-toolchain#test-failure-attribution",
     "go/go-project-toolchain#test-host-identity-scrub",
+    "go/go-project-toolchain#test-infra-flags",
     "go/go-project-toolchain#testdata-is-a-test-input",
     "go/go-project-toolchain#the-packager-refuses-a-nameless-manifest",
     "go/go-project-toolchain#the-packager-stamps-a-dependent",

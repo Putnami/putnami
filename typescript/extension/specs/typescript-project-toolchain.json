@@ -339,6 +339,10 @@
     {
       "id": "tools-take-the-cpu-budget",
       "text": "Every bun process a build or test task starts, tsc included, runs as many garbage-collector markers as the job's CPU budget (BUN_JSC_numberOfGCMarkers), a bun suite that opts into workers runs as many as the budget, and a Vitest or Jest suite takes it as --maxWorkers unless its configuration sets a worker count; a value the operator set wins, and an application a serve job starts receives none of them."
+    },
+    {
+      "id": "test-infra-flags",
+      "text": "`putnami test` declares --infra-down, a boolean that defaults to false on every run, and --infra, one of auto, require or skip with no default, so test-env-up keeps choosing require on CI and auto elsewhere; test-env-up reads both from the command params, --infra-down enters the key of no task that does not read it apart from the tests that consume the test environment, whose keys fold the inputs of its producer, and the test environment's teardown is never pruned under it."
     }
   ],
   "decisions": [

@@ -57,6 +57,7 @@
     "typescript/typescript-project-toolchain#source-bound-generate",
     "typescript/typescript-project-toolchain#structured-reports",
     "typescript/typescript-project-toolchain#test-files-are-type-checked",
+    "typescript/typescript-project-toolchain#test-infra-flags",
     "typescript/typescript-project-toolchain#test-rerun-each",
     "typescript/typescript-project-toolchain#test-runner-choice",
     "typescript/typescript-project-toolchain#test-runner-reports",

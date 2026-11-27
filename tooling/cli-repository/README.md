@@ -93,6 +93,7 @@ tests.
 - `internal/cli.TestSDDExtensionSpeaksOnlyTheWire`
 - `internal/cli.TestSDDHumanOutputMatchesTheRecordedBuiltIn`
 - `internal/cli.TestSDDSubcommandsMatchTheRecordedBuiltIn`
+- `internal/cli.TestTestAcceptsTheInfraFlagsAndInfraDownReachesTheTeardown`
 - `internal/cli.TestTheLocalProviderAnswersBothEntryPaths`
 - `internal/cli.TestTheLocalProviderReadsASessionWithMissionsStatus`
 - `internal/cli/e2e/bazeldelegation.TestAChangeToOneBazelPackageRunsItAndItsDependentsThroughBazel`

@@ -1252,6 +1252,20 @@
               "bun-and-the-node-runners-take-a-budget-of-2"
             ]
           }
+        },
+        {
+          "id": "test-infra-flags",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "test-declares-the-infra-flags",
+              "infra-down-reaches-test-env-up-and-its-teardown"
+            ]
+          }
         }
       ]
     }

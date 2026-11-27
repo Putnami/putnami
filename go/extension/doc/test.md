@@ -484,6 +484,8 @@ from config.
 | `--race-changed` | `true` | Run the race detector on the packages a change touched, in a step after the test run. Planned only when the run measured a diff and the project owns a changed Go or testdata file outside `.gen`; `--race` replaces it. `--no-race-changed` turns it off. See [Race detector on changed packages](#race-detector-on-changed-packages) |
 | `--timeout <duration>` | — | Test timeout (e.g. `30s`, `5m`) |
 | `--require-test-db` | `false` | Fail a suite whose test database does not answer instead of skipping it: the test binding carries the `require` mode. On CI the binding already carries it, and `testprovider.ForTest` fails a suite on CI that has no binding. See [Test database bindings](#test-database-bindings) |
+| `--infra <mode>` | `require` on CI, `auto` otherwise | How the test database of a project that declares one in `infra/requirements.json` is provisioned: `auto`, `require` or `skip`. The `test.infra` option sets it too. See [Test database bindings](#test-database-bindings) |
+| `--infra-down` | `false` | Stop every test database server this workspace started, and provision none for this run. It acts in the `auto` mode off CI, through a selected project whose closure declares a database in `infra/requirements.json`; elsewhere it does nothing. That project's tests run under keys of their own, since their keys fold the test environment's inputs; every other task keeps its cache entry |
 | `--short` | `false` | Run only tests that check `testing.Short()` |
 | `--run <pattern>` | — | Run only tests matching this regex pattern |
 | `--count <n>` | — | Run each test `n` times |
