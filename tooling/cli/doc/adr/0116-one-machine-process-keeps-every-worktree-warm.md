@@ -200,14 +200,21 @@ bring its workers under its memory budget. A stopping process finishes its
 runs, refuses new ones (their clients run in their own process), removes its
 socket and description, and exits.
 
-**Crash.** A panic or a kill ends a process like any other. A worker's crash
-ends its runs as a lost connection (their clients exit as an interrupted run
-does today) and its next request starts another. A supervisor's crash
-releases its lock and closes its workers' channels, and its workers exit; the
-next run runs in its own process and starts a new supervisor when it ends.
-A process that ended without stopping is recorded in `supervisor.json`; after
-three such ends of one build within an hour, that build gets no worker for
-the hour, and `putnami machine status` says why.
+**Crash: a run never fails because of the machine process.** A worker that
+ends during a run (a panic, a kill) does not end the command. The supervisor
+holds a copy of the client's connection while the worker serves it; on Linux
+it is the processes' subreaper, so what the run had started becomes its
+child when the worker ends, and it kills those processes and their groups.
+It then tells the client, which runs the command again in its own process
+and says so. Only a run the user had already interrupted keeps the
+interrupted exit code. Because a command can run twice this way, `publish`,
+`deploy` and `release` never go through the machine process. On macOS, which
+has no subreaper, what the run had started outlives its worker, as it
+outlives a CLI that ends during a run. A supervisor's crash closes its
+workers' channels, and its workers exit; their clients run their commands
+again in their own process, and the next run starts a new supervisor when it
+ends. Whenever a command meant for the machine process runs in its own
+process, the client records why, and `putnami machine status` shows it.
 
 ### 3. Two protocols, versioned and stable across builds
 
@@ -278,7 +285,8 @@ none other. A client runs in its own process when:
   through the machine process could wait on the run that started it;
 - the command is not a run of the engine (`config`, `machine`, `cache gc`,
   `install`, `--version`…), or it is `watch` or `serve`, which keep their own
-  process;
+  process, or `publish`, `deploy` or `release`, which a rerun after a crash
+  could repeat;
 - a run is active in the worker of its build (the second runs in its own
   process, with today's locks);
 - the supervisor or the worker refuses it: stopping, outdated (section 3),
