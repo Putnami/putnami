@@ -55,7 +55,7 @@ func servedResult(planned []*ScheduledJob) *SchedulerResult {
 		}
 	}
 	outcome := SessionOutcome{Duration: 3 * time.Second}
-	session := reduceSchedulerSession(planned, results, outcome, outcome.Duration, nil)
+	session := reduceSchedulerTasks(RunTasks(planned, results), outcome, outcome.Duration, nil)
 	return &SchedulerResult{
 		Results:  results,
 		Success:  session.Success(),

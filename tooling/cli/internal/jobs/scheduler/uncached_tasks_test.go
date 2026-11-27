@@ -18,7 +18,6 @@ import (
 var uncachedByVerdict = map[string]string{
 	"tooling/sdd-extension/putnami.extension.json:sdd-selfcheck-exec":                "its verdict is the environment of this invocation",
 	"tooling/sdd-extension/putnami.extension.json:breaking-marker-validate":          "its verdict reads the proposed squash message of this invocation and the commits since its baseline",
-	"tooling/sdd-extension/putnami.extension.json:agent-attribution-validate":        "its verdict reads the proposed squash message of this invocation",
 	"tooling/sdd-extension/putnami.extension.json:feature-coverage-ratchet-validate": "its verdict reads the debt list at the merge base of this invocation's baseline",
 	"cloud/extension/putnami.extension.json:cloud-package-config-member":             "its member embeds the HEAD commit, the origin repository and the linked workspace",
 	"cloud/extension/putnami.extension.json:cloud-package-site-content":              "its bundle embeds the HEAD commit",

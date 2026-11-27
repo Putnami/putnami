@@ -206,6 +206,9 @@ func answerHeld(ctx context.Context, req RunRequest, offered any) (*SchedulerRes
 	outcome.Orchestration = s.cfg.Orchestration.Snapshot()
 	cut := resolveSessionOutcome(ctx)
 	outcome.Aborted, outcome.AbortedBy = cut.Aborted, cut.AbortedBy
+	// Every task is projected once, after the finalizers, as finalizeRun does.
+	tasks := RunTasks(s.planned, results)
+	outcome.Tasks = tasks
 	s.renderer.Finish(results, outcome)
 
 	session := *held.result.Session
@@ -214,7 +217,7 @@ func answerHeld(ctx context.Context, req RunRequest, offered any) (*SchedulerRes
 	// makes this run's verdict differ from the held one: it is reduced from
 	// what it holds now, as a run that computed would be, and holds nothing.
 	if cut.Aborted || !maps.Equal(answered, results) {
-		reduced := reduceSchedulerSession(s.planned, results, outcome, outcome.Duration, held.result.Cache)
+		reduced := reduceSchedulerTasks(tasks, outcome, outcome.Duration, held.result.Cache)
 		reduced.Executions, reduced.Environment = session.Executions, session.Environment
 		session = *reduced
 		record = nil
@@ -230,5 +233,6 @@ func answerHeld(ctx context.Context, req RunRequest, offered any) (*SchedulerRes
 		Tuning:   held.result.Tuning,
 		Cache:    held.result.Cache,
 		Session:  &session,
+		Tasks:    tasks,
 	}, record
 }

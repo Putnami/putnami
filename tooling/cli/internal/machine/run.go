@@ -49,14 +49,20 @@ type publishConcurrency struct {
 
 // RunOf folds a completed run for a consumer that holds the plan and the raw
 // results but no reduction yet — the renderers, whose Finish is handed both.
+// Its tasks are the scheduler's projection when the outcome carries it
+// (SessionOutcome.Tasks), and a projection of results otherwise.
 func RunOf(
 	planned []*jobs.ScheduledJob,
 	results map[string]*jobs.JobResult,
 	outcome jobs.SessionOutcome,
 ) Run {
+	scheduled := outcome.Tasks
+	if scheduled == nil {
+		scheduled = jobs.RunTasks(planned, results)
+	}
 	return Run{
 		Session: jobs.ReduceRun(planned, results, outcome),
-		Tasks:   tasksOf(planned, results),
+		Tasks:   tasksOf(scheduled),
 	}
 }
 
@@ -68,7 +74,14 @@ func RunFrom(
 	planned []*jobs.ScheduledJob,
 	results map[string]*jobs.JobResult,
 ) Run {
-	return Run{Session: session, Tasks: tasksOf(planned, results)}
+	return RunOfTasks(session, jobs.RunTasks(planned, results))
+}
+
+// RunOfTasks is RunFrom over the run's tasks already projected by
+// jobs.RunTasks (SchedulerResult.Tasks), so the session writer reads the
+// projection the scheduler made once instead of decoding every task again.
+func RunOfTasks(session *jobs.SessionResult, scheduled []jobs.ScheduledTask) Run {
+	return Run{Session: session, Tasks: tasksOf(scheduled)}
 }
 
 // WithPublishConcurrency attaches scheduler-measured Docker registry
@@ -82,8 +95,7 @@ func (r Run) WithPublishConcurrency(configuredCap, effective int) Run {
 	return r
 }
 
-func tasksOf(planned []*jobs.ScheduledJob, results map[string]*jobs.JobResult) []Task {
-	scheduled := jobs.RunTasks(planned, results)
+func tasksOf(scheduled []jobs.ScheduledTask) []Task {
 	tasks := make([]Task, 0, len(scheduled))
 	for i := range scheduled {
 		identity := Identity(scheduled[i].Job)

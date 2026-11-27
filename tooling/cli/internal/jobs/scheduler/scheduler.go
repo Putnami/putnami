@@ -133,6 +133,11 @@ type SchedulerResult struct {
 	// pointed the session stats writer and the exit-code derivation here too, so
 	// no consumer tallies Results itself any more.
 	Session *SessionResult
+	// Tasks is every task of the run projected with its records, once, after
+	// the finalizers (RunTasks): the projection Session reduces and the
+	// renderers' Finish reads (SessionOutcome.Tasks), for the session writer
+	// to read too instead of decoding every task's results again.
+	Tasks []ScheduledTask
 }
 
 // Scheduler executes a DAG of scheduled jobs with parallel goroutines.
@@ -1129,12 +1134,13 @@ func (s *Scheduler) drainRemote() {
 //     closeInvocations precisely so the finalizer rows recorded there are
 //     already present and are NOT overwritten with a bare "canceled".
 //  2. cfg.FinalizeResults — the caller's last chance to amend rows.
-//  3. resolveSessionOutcome then renderer.Finish, so human and machine output
-//     report the amended rows and the abort verdict together.
+//  3. resolveSessionOutcome, the one projection of every task (RunTasks), then
+//     renderer.Finish, so human and machine output report the amended rows and
+//     the abort verdict together.
 //  4. taskStats.save, best-effort, once the results it learned from are final.
-//  5. the reduction, which is the run's verdict: Session.Success() rather than
-//     a second walk of the map. Its cache summary is read after
-//     drainRemote, so upload counters are in it.
+//  5. the reduction of that projection, which is the run's verdict:
+//     Session.Success() rather than a second walk of the map. Its cache
+//     summary is read after drainRemote, so upload counters are in it.
 //
 // mu is uncontended by the time this runs — no worker exists any more — but it
 // is still taken, because synthesizeCanceledResults is the shared helper the
@@ -1169,7 +1175,14 @@ func (s *Scheduler) finalizeRun(
 	if capacity := s.capacity.finish(); outcome.Orchestration != nil {
 		outcome.Orchestration.Capacity = capacity
 	}
-	s.renderer.Finish(results, outcome)
+	// Every task is projected ONCE, now that the finalizers have amended the
+	// rows: decoding each task's records and test cases is the larger part of
+	// the end of an unchanged run, and the renderers, the reduction and the
+	// session writer each read the same projection.
+	tasks := RunTasks(s.planned, results)
+	finished := outcome
+	finished.Tasks = tasks
+	s.renderer.Finish(results, finished)
 
 	// Persist the run's execution history so the next run's learned weights
 	// and dispatch order see it. Best-effort by design.
@@ -1178,7 +1191,7 @@ func (s *Scheduler) finalizeRun(
 	// The run's verdict is the canonical reduction's, not a second walk of the
 	// result map: a later change deleted runSucceeded in favor of Session.Success,
 	// which applies the same strict rule (a reused failure still fails the run).
-	session := reduceSchedulerSession(s.planned, results, outcome, duration, cacheStats)
+	session := reduceSchedulerTasks(tasks, outcome, duration, cacheStats)
 	// The physical ledger is ATTACHED, not reduced: it is the one quantity in
 	// the session that cannot be recovered from the surviving task results.
 	session.Executions = s.executions.snapshot()
@@ -1201,6 +1214,7 @@ func (s *Scheduler) finalizeRun(
 		Tuning:   tuning,
 		Cache:    cacheStats,
 		Session:  session,
+		Tasks:    tasks,
 	}
 }
 

@@ -186,10 +186,12 @@ var extensionCases = []extensionCase{
 		cold:       "engine job 13 · git 14 | engine git check-ignore 1 · config 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
-		// The squash-message checks read PUTNAMI_PROPOSAL_MESSAGE and Git
-		// history, which no key holds (sdd ADR 0002 point 7, protocols/job ADR
-		// 0003 point 4), so they are uncached.
-		everyRun: []string{"counts:validate-workspace~agent-attribution", "counts:validate-workspace~breaking-marker",
+		// The breaking-marker and coverage-ratchet checks read Git history,
+		// which no key holds (sdd ADR 0001, protocols/job ADR 0003 point 4), so
+		// they are uncached. The agent-attribution check reads the squash
+		// message and one workspace option, which its key holds (sdd ADR 0002
+		// point 7), so it is served from the cache.
+		everyRun: []string{"counts:validate-workspace~breaking-marker",
 			"counts:validate-workspace~feature-coverage-ratchet"},
 	},
 	{

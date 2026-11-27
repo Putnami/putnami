@@ -525,7 +525,7 @@ func (e *Engine) executeSession(
 		// cacheSummary keeps the local-only run's typed-nil snapshot out of the
 		// any-typed member, which would otherwise defeat omitempty and write
 		// "cache": null instead of omitting it.
-		run := machine.RunFrom(result.Session, planned, result.Results)
+		run := machine.RunOfTasks(result.Session, result.Tasks)
 		finalizeErr := session.FinalizeV2WithCoverage(
 			recordedSessionDocument(run, req, session.ID, result.Tuning, cacheSummary(result.Cache)),
 			wsRoot, req.Global.Baseline, req.CommandParams,

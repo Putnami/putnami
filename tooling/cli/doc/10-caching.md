@@ -615,6 +615,10 @@ is never looked up or stored under it. A resource pruned on such a consumer key
 is confirmed when its producer starts, from the key the consumer computes then,
 and is provisioned when a task that can move that key may finish after the
 producer starts.
+When no relation of the plan may be pruned under the command's params (each
+names a `pruneIf` that is false, or invalid because a param it reads is
+missing), the pruning keys nothing, and only the remote negotiation keys the
+plan, when the CLI is signed in.
 
 ## Cache Lifecycle
 

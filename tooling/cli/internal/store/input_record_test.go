@@ -73,6 +73,10 @@ func TestARecordedInputDigestIsAnsweredWithoutCollecting(t *testing.T) {
 	}
 
 	// A file created where the walk listed moves its directory: collected.
+	// Past the coarsest status-change tick, so the creation lands at a later
+	// time than the stats the record took; outside this test's clock the
+	// margin of ADR 0009 covers a creation within one tick.
+	time.Sleep(20 * time.Millisecond)
 	writeRecordTree(t, project, map[string]string{"src/b/d.go": "d"})
 	third := useRecordAt(t, root)
 	moved, err := NewCacheManager(nil).HashFiles(project, patterns, nil, ProjectConfigScope{})

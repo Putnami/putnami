@@ -49,8 +49,9 @@ func validatePlanContract(planned []*jobmodel.ScheduledJob, ws *workspace.Worksp
 
 // overlappingOutputLines reports every pair of plan nodes whose declared
 // outputs claim the same filesystem region, naming BOTH owners. Only refs that
-// share a resolved root are compared, so the pairwise scan stays proportional
-// to the collisions that are actually possible.
+// share a resolved root are compared, and within a root only the pairs that
+// can overlap at all (extension.OverlapCandidates), so the scan is
+// proportional to the outputs and their collisions, not to every pair of them.
 func overlappingOutputLines(planned []*jobmodel.ScheduledJob, ws *workspace.Workspace, limit int) []string {
 	owners := cachekey.DeclaredOutputOwners(planned, ws)
 	if len(owners) < 2 {
@@ -70,40 +71,42 @@ func overlappingOutputLines(planned []*jobmodel.ScheduledJob, ws *workspace.Work
 	total := 0
 	for _, root := range order {
 		group := byRoot[root]
-		for i := 1; i < len(group); i++ {
-			for j := 0; j < i; j++ {
-				later, earlier := group[i], group[j]
-				if later.Job == earlier.Job && later.ID == earlier.ID {
-					continue
-				}
-				// ONE manifest task scheduled under several commands is one
-				// OWNER, not several: `build~generate` and `test~generate` are
-				// the same declaration executing for the same project, and the
-				// planner already serializes them via serializeWriteResources.
-				// Without this exemption every multi-command plan over a
-				// declared task rejects itself. Two
-				// DIFFERENT manifest tasks claiming one path remain an error.
-				if later.ID == earlier.ID && sameManifestTask(later.Job, earlier.Job) {
-					continue
-				}
-				// A carve-out cedes a subpath to ANOTHER task, which works
-				// because the pipeline orders the two. Inside ONE task nothing
-				// orders its outputs against each other on restore, so its own
-				// cede does not divide its own declaration — the same rule the
-				// manifest-local check applies (ValidateOutputOwnership).
-				laterRef, earlierRef := later.Ref, earlier.Ref
-				if sameManifestTask(later.Job, earlier.Job) {
-					laterRef, earlierRef = laterRef.WithoutCarveOuts(), earlierRef.WithoutCarveOuts()
-				}
-				if !extension.OutputsOverlap(laterRef, earlierRef) {
-					continue
-				}
-				total++
-				if len(lines) < limit {
-					lines = append(lines, fmt.Sprintf("  %s output %q (%s) overlaps %s output %q (%s)",
-						later.Job.Key(), later.ID, describeOutputRef(later.Ref),
-						earlier.Job.Key(), earlier.ID, describeOutputRef(earlier.Ref)))
-				}
+		refs := make([]extension.OutputRef, len(group))
+		for index, owner := range group {
+			refs[index] = owner.Ref
+		}
+		for _, pair := range extension.OverlapCandidates(refs) {
+			later, earlier := group[pair[0]], group[pair[1]]
+			if later.Job == earlier.Job && later.ID == earlier.ID {
+				continue
+			}
+			// ONE manifest task scheduled under several commands is one
+			// OWNER, not several: `build~generate` and `test~generate` are
+			// the same declaration executing for the same project, and the
+			// planner already serializes them via serializeWriteResources.
+			// Without this exemption every multi-command plan over a
+			// declared task rejects itself. Two
+			// DIFFERENT manifest tasks claiming one path remain an error.
+			if later.ID == earlier.ID && sameManifestTask(later.Job, earlier.Job) {
+				continue
+			}
+			// A carve-out cedes a subpath to ANOTHER task, which works
+			// because the pipeline orders the two. Inside ONE task nothing
+			// orders its outputs against each other on restore, so its own
+			// cede does not divide its own declaration — the same rule the
+			// manifest-local check applies (ValidateOutputOwnership).
+			laterRef, earlierRef := later.Ref, earlier.Ref
+			if sameManifestTask(later.Job, earlier.Job) {
+				laterRef, earlierRef = laterRef.WithoutCarveOuts(), earlierRef.WithoutCarveOuts()
+			}
+			if !extension.OutputsOverlap(laterRef, earlierRef) {
+				continue
+			}
+			total++
+			if len(lines) < limit {
+				lines = append(lines, fmt.Sprintf("  %s output %q (%s) overlaps %s output %q (%s)",
+					later.Job.Key(), later.ID, describeOutputRef(later.Ref),
+					earlier.Job.Key(), earlier.ID, describeOutputRef(earlier.Ref)))
 			}
 		}
 	}

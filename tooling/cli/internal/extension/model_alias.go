@@ -146,6 +146,10 @@ var ManifestProtocolVersion = model.ManifestProtocolVersion
 // filesystem region — the "one owner per output" predicate.
 var OutputsOverlap = model.OutputsOverlap
 
+// OverlapCandidates returns the pairs of refs OutputsOverlap may report, in
+// the order a pairwise scan visits them, at a cost proportional to the refs.
+var OverlapCandidates = model.OverlapCandidates
+
 // DecidableExcludes returns the subpaths a directory output cedes that an
 // ownership comparison may honor: normalized, strictly inside the output's own
 // path, and sorted.

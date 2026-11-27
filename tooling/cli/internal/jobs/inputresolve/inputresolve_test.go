@@ -365,6 +365,90 @@ func TestMatcherSelectsTheAnswerAndItsBasis(t *testing.T) {
 	}
 }
 
+// A matcher resolves each query once and answers every later path from that
+// expansion, since a selection writes nothing; the resolver itself, which
+// keys read, still checks the basis, and so does the next matcher. A file the
+// basis selects is added after the first path: the matcher keeps its first
+// expansion, the resolver asks again.
+func TestMatcherResolvesEachQueryOnce(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "selection-resolves-each-selector-once",
+		"a-selection-resolves-each-input-selector-query-once")
+	root, app := selectorWorkspace(t)
+	resolver, log := helperResolver(t, root, "list", 30*time.Second)
+	matcher := resolver.Matcher()
+	q := workspace.InputSelectorQuery{Extension: "@test/selectors", Dir: app, Selector: "sel:build", Patterns: []string{"src/**"}}
+	if !matcher.SelectsInput(q, "a.txt") {
+		t.Fatal("the matcher leaves out a listed file")
+	}
+	writeFile(t, filepath.Join(app, "c.txt"), "C")
+	for rel, want := range map[string]bool{"sub/b.txt": true, "c.txt": true, "README.md": false} {
+		if got := matcher.SelectsInput(q, rel); got != want {
+			t.Errorf("SelectsInput(%s) = %v, want %v", rel, got, want)
+		}
+	}
+	if got := requests(t, log); len(got) != 1 {
+		t.Fatalf("requests = %v, want one: the matcher resolves its query once", got)
+	}
+	expansion, err := resolver.ResolveInput(store.InputQuery(q))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(expansion.Files, "c.txt") {
+		t.Errorf("the resolver answers %v, want the added file listed", expansion.Files)
+	}
+	if got := requests(t, log); len(got) != 2 {
+		t.Fatalf("requests = %v, want the resolver to ask again once the basis moved", got)
+	}
+	writeFile(t, filepath.Join(app, "d.txt"), "D")
+	if !resolver.Matcher().SelectsInput(q, "d.txt") {
+		t.Error("a new matcher leaves out a file added before it resolved")
+	}
+	if got := requests(t, log); len(got) != 3 {
+		t.Fatalf("requests = %v, want a new matcher to check the basis again", got)
+	}
+}
+
+// A resolution that fails is not kept: the matcher asks again for the next
+// path, as the resolver does.
+func TestMatcherAsksAgainAfterAFailedResolution(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "selection-resolves-each-selector-once",
+		"a-selection-resolves-each-input-selector-query-once")
+	root, app := selectorWorkspace(t)
+	failing, log := helperResolver(t, root, "error", 30*time.Second)
+	matcher := failing.Matcher()
+	q := workspace.InputSelectorQuery{Extension: "@test/selectors", Dir: app, Selector: "sel:build"}
+	for _, rel := range []string{"a.txt", "README.md"} {
+		if !matcher.SelectsInput(q, rel) {
+			t.Errorf("a failed resolution leaves out %s", rel)
+		}
+	}
+	if got := requests(t, log); len(got) != 2 {
+		t.Fatalf("requests = %v, want one per path", got)
+	}
+}
+
+// A query the resolver refuses, an unlisted selector or a directory outside
+// the workspace, is never resolved: the matcher selects every path but a
+// named-only input, as the resolver does, and asks no extension.
+func TestMatcherLeavesARefusedQueryToTheResolver(t *testing.T) {
+	root, app := selectorWorkspace(t)
+	resolver, log := helperResolver(t, root, "list", 30*time.Second)
+	matcher := resolver.Matcher()
+	for name, q := range map[string]workspace.InputSelectorQuery{
+		"an unlisted selector": {Extension: "@test/selectors", Dir: app, Selector: "sel:unlisted"},
+		"another directory":    {Extension: "@test/selectors", Dir: filepath.Dir(root), Selector: "sel:build"},
+	} {
+		for rel, want := range map[string]bool{"a.txt": true, "putnami.verdict-policy.json": false} {
+			if got := matcher.SelectsInput(q, rel); got != want {
+				t.Errorf("%s: SelectsInput(%s) = %v, want %v", name, rel, got, want)
+			}
+		}
+	}
+	if got := requests(t, log); len(got) != 0 {
+		t.Fatalf("requests = %v, want none", got)
+	}
+}
+
 // An input that does not expand selects every path but a verdict policy, as a
 // nil resolver does: the extension reads such a file only when its answer
 // lists it. The task index merges the selectors of every extension per task,

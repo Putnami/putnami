@@ -234,7 +234,7 @@
               "an-allowing-workspace-passes-with-a-note",
               "an-unset-message-passes-with-a-note",
               "an-invalid-option-fails",
-              "the-step-is-never-served-from-cache"
+              "a-changed-message-or-option-runs-the-step-again"
             ]
           }
         },

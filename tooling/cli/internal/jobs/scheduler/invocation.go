@@ -319,6 +319,11 @@ func (rt *invocationRuntime) isPruned(job *ScheduledJob, present func(consumer *
 // that moment (isPruned). Otherwise it is not pruned: a consumer that
 // missed its entry would run against a resource nobody provisioned.
 //
+// A plan none of whose relations may prune under the command params (each
+// with a pruneIf that is false or invalid) precomputes no key: no consumer
+// lookup could change the outcome, and the remote negotiation computes the
+// keys it needs itself (tooling/cli ADR 0113 §8).
+//
 // It returns the keys it precomputed, nil when it computed none.
 func (rt *invocationRuntime) prune(
 	ws *workspace.Workspace,
@@ -332,6 +337,20 @@ func (rt *invocationRuntime) prune(
 	if rt == nil || cache == nil || bypass.All {
 		return nil
 	}
+	prunable := make(map[*invocationRelation]bool, len(rt.relations))
+	for _, rel := range rt.relations {
+		expression := strings.TrimSpace(rel.Finalizer.Step.Finalizes.PruneIf)
+		prune, valid := expression == "", true
+		if !prune {
+			prune, valid = extension.EvaluateExpressionChecked(expression, &extension.WhenContext{Params: commandParams})
+		}
+		if valid && prune {
+			prunable[rel] = true
+		}
+	}
+	if len(prunable) == 0 {
+		return nil
+	}
 	keys, err := cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cache, bypass, stats)
 	if err != nil {
 		return nil
@@ -339,6 +358,9 @@ func (rt *invocationRuntime) prune(
 	var movement *cachekey.KeyMovement
 	var byKey map[string]*ScheduledJob
 	for _, rel := range rt.relations {
+		if !prunable[rel] {
+			continue
+		}
 		allHit := len(rel.Consumers) > 0
 		for _, consumer := range rel.Consumers {
 			hash, ok := keys[consumer.Key()]
@@ -349,13 +371,6 @@ func (rt *invocationRuntime) prune(
 		}
 		if !allHit {
 			continue
-		}
-		if expression := strings.TrimSpace(rel.Finalizer.Step.Finalizes.PruneIf); expression != "" {
-			prune, valid := extension.EvaluateExpressionChecked(
-				expression, &extension.WhenContext{Params: commandParams})
-			if !valid || !prune {
-				continue
-			}
 		}
 		if movement == nil {
 			decided := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams, Resolver: cache.InputResolver()}, planned)
