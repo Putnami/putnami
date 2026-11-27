@@ -13,6 +13,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // localHits reads the local cache hits a run's summary reports.
@@ -27,6 +28,7 @@ func localHits(t *testing.T, out string) int {
 }
 
 func TestADelegatedNxWorkspaceImportsPricingAndPassesLintTestBuild(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "delegate-import-runs-one-project-on-putnami", "a-delegated-nx-workspace-imports-pricing-and-passes-lint-test-build")
 	clitest.RequireShell(t)
 	if _, err := exec.LookPath("bun"); err != nil {
@@ -160,6 +162,7 @@ func TestADelegatedNxWorkspaceImportsPricingAndPassesLintTestBuild(t *testing.T)
 // package.json loads in import mode: the TypeScript extension's name wins, so
 // the probe merges without a conflict.
 func TestAnImportedNxProjectTakesItsPackageName(t *testing.T) {
+	repotest.Require(t)
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))

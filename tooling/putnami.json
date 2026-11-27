@@ -5,6 +5,7 @@
     "cli-document-set",
     "cli-documents",
     "cli-model",
+    "cli-repository",
     "clientgen-extension",
     "contributor",
     "dev",

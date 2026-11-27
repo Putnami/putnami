@@ -57,6 +57,7 @@ import (
 
 	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // devWorkloadCase is one invocation, compared against its recorded answer.
@@ -176,6 +177,7 @@ func devWorkloadCases() []devWorkloadCase {
 // fixture, same arguments, the same exit code, stdout and stderr the core's
 // built-in commands produced.
 func TestDevWorkloadCommandsMatchTheRecordedCore(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	requireFixtureTools(t)
 	cli := fixtureproc.CLI(t)

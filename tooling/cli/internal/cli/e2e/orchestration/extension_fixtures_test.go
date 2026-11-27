@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The fixtures of the extensions whose cases follow the language cases: each
@@ -159,6 +161,7 @@ var skippedExtensions = map[string]string{
 // reason it holds no count, and when a case or a reason names an extension
 // this repository no longer builds.
 func TestEveryExtensionBuiltHereIsCounted(t *testing.T) {
+	repotest.Require(t)
 	built := map[string]bool{}
 	err := filepath.WalkDir(repoRoot, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // failingInstallExtension writes at dir a stand-in for a language extension
@@ -37,6 +38,7 @@ func failingInstallExtension(t *testing.T, root, dir, name string) {
 // The install the import's projects sync runs fails init: the import is not
 // done, and a script that runs init must not go on.
 func TestAnImportWhoseInstallFailsFailsInit(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "init-rerun-shows-a-diff", "init-from-apply-fails-when-the-workspace-install-fails")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")

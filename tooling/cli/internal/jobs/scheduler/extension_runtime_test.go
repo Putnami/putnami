@@ -23,6 +23,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/procdeadline"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -801,6 +802,7 @@ func TestSynchronizeExtensionRuntimesScansCacheCommands(t *testing.T) {
 }
 
 func TestSynchronizeFirstPartyRuntimesFromCleanArtifactStore(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("first-party prepare scripts require bash")

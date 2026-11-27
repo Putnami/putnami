@@ -34,6 +34,11 @@ import (
 // go.putnami.dev/sdk/extension/gittest is a test-only allowance of the packages
 // whose tests build a git repository: it runs the fixture's git without the
 // caller's git environment, and imports no CLI package.
+//
+// go.putnami.dev/tooling/cli/internal/repotest is a test-only allowance of
+// every package: it marks a test that reads this repository's own files so the
+// CLI's suite skips it and @putnami/cli-repository runs it, and imports only
+// the standard library.
 
 // jobsSplitPackage is one package split out of internal/jobs.
 type jobsSplitPackage struct {
@@ -433,8 +438,12 @@ func jobsSplitFileImportAllowed(pkg jobsSplitPackage, name, path string) bool {
 	if path == jobsSplitModulePath+"/"+pkg.dir || jobsSplitImportAllowed(path, pkg.allowed) {
 		return true
 	}
-	return strings.HasSuffix(name, "_test.go") && jobsSplitImportAllowed(path, pkg.testOnly)
+	return strings.HasSuffix(name, "_test.go") && (path == jobsSplitRepositoryTestMarker || jobsSplitImportAllowed(path, pkg.testOnly))
 }
+
+// jobsSplitRepositoryTestMarker is the test-only import every package's tests
+// may use to mark a test that reads this repository.
+const jobsSplitRepositoryTestMarker = jobsSplitModulePath + "/internal/repotest"
 
 // jobsSplitImportAllowed reports whether path is the standard library or
 // starts with one of the allowed prefixes. A standard-library path has no dot

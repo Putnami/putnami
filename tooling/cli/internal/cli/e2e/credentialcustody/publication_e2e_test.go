@@ -40,6 +40,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/layout"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The workspace a publication e2e fixture publishes from, and the members it
@@ -986,9 +987,9 @@ func failureLines(output string) string {
 // ancestor of the commit is refused at open and nothing is uploaded; a release
 // whose members the registries do not store is refused, and no channel moves.
 func TestReleaseSetE2EPublicationV1UploadsThroughTheProviderAndReleasesForwardOnly(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "real-extension-jobs-pack-and-the-session-uploads")
-	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "the-engine-asks-no-publish-credential")
 	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "real-extensions-open-once-and-release-forward-only")
 	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "a-local-and-a-hosted-run-open-the-same-plan")
 	fx := writePublicationE2EFixture(t)

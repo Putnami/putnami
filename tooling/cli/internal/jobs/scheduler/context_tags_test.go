@@ -11,6 +11,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -67,6 +68,7 @@ func apiCheckTagged(
 // order of the list, a repeated tag and surrounding white space reach neither,
 // and a tag added or removed reaches both.
 func TestTheJobContextCarriesTheTagsTheCacheKeyHolds(t *testing.T) {
+	repotest.Require(t)
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}

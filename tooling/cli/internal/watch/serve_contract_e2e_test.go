@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -95,6 +96,7 @@ func serveFixture(streamPath, pidPath string) int {
 // conformance fixtures can be used as the workload's output.
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
@@ -277,6 +279,7 @@ func (r *readinessRecorder) snapshot() (iterations, ready, v1Ready int) {
 // evidence rather than coincidence: if the ready event never arrived, the loop
 // would never snapshot, never see the file change, and never restart.
 func TestServeLoop_TypedReadinessFromARealJobArmsAndReArms(t *testing.T) {
+	repotest.Require(t)
 	stream := readyStreamFixture(t)
 
 	root := t.TempDir()
@@ -425,6 +428,7 @@ func TestServeLoop_TypedReadinessFromARealJobArmsAndReArms(t *testing.T) {
 // would fail with a timeout that says nothing about why. This runs the same job
 // once, without a watch loop, and names the cause directly.
 func TestServeFixtureAnswersTheAdvertisedProtocolVersion(t *testing.T) {
+	repotest.Require(t)
 	root := t.TempDir()
 	streamPath := filepath.Join(root, "ready.jsonl")
 	if err := os.WriteFile(streamPath, []byte(readyStreamFixture(t)), 0o644); err != nil {

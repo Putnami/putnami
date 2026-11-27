@@ -9,6 +9,7 @@ import (
 
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // contributorUserScope are the skills @putnami/contributor installs in the
@@ -23,6 +24,7 @@ func flat(document string) string {
 }
 
 func TestContributorNamesTheWorkspaceFreeSkills(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "user-scope-skills", "the-user-scope-list-names-the-workspace-free-skills")
 	m, err := extproto.LoadManifest(filepath.Join(contributorRoot(t), extproto.ManifestFilename))
@@ -43,6 +45,7 @@ func TestContributorNamesTheWorkspaceFreeSkills(t *testing.T) {
 }
 
 func TestContributorUserScopeSkillsDeferToTheWorkspaceCopy(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "user-scope-skills", "each-user-scope-skill-defers-to-the-workspace-copy")
 	result := buildContributorContent(t)
@@ -69,6 +72,7 @@ func TestContributorUserScopeSkillsDeferToTheWorkspaceCopy(t *testing.T) {
 }
 
 func TestContributorBuildCheckAndDesignStopWithoutAWorkspace(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "user-scope-skills", "build-check-and-design-stop-without-a-workspace")
 	result := buildContributorContent(t)
@@ -91,6 +95,7 @@ func TestContributorBuildCheckAndDesignStopWithoutAWorkspace(t *testing.T) {
 }
 
 func TestContributorContextSkillReadsObserveWithoutAWorkspace(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "context-without-a-workspace", "the-context-skill-reads-observe-without-a-workspace")
 	document := string(buildContributorContent(t).Files[".agents/skills/context/SKILL.md"])
@@ -115,6 +120,7 @@ func TestContributorContextSkillReadsObserveWithoutAWorkspace(t *testing.T) {
 }
 
 func TestContributorContextSkillReadsTheCIOfAChange(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "context-why-ci-failed", "the-context-skill-reads-the-ci-of-a-change")
 	files := buildContributorContent(t).Files
@@ -156,6 +162,7 @@ func TestContributorContextSkillReadsTheCIOfAChange(t *testing.T) {
 }
 
 func TestContributorSpecSkillWritesTheRepositoryFormatWithoutAWorkspace(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "spec-without-a-workspace", "the-spec-skill-writes-the-repository-format-without-a-workspace")
 	document := string(buildContributorContent(t).Files[".agents/skills/spec/SKILL.md"])

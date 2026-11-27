@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // firstPartyUVTasks are the tasks of the shipped Python extension that run uv.
@@ -37,6 +38,7 @@ var firstPartyUVTasks = []string{
 // it. Every task that runs uv requires the toolchain, so its
 // cache key changes with the pinned release.
 func TestFirstPartyUVRuntimeResolvesTheInstallUnderThePutnamiHome(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/runtime-toolchain-pinning", "exact-lock-resolution",
 		"a-first-party-uv-runtime-resolves-the-install-under-the-putnami-home")
 	const pinned, next, ambient = "0.11.32", "0.12.0", "0.5.18"

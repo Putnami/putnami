@@ -17,6 +17,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func TestMain(m *testing.M) {
@@ -217,6 +218,7 @@ func commit(t *testing.T, root, message string) string {
 }
 
 func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "pants-impact-runs-through-pants", "a-change-to-one-pants-package-runs-it-and-its-dependents-through-pants-uncached")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
@@ -325,6 +327,7 @@ func rootRequirementsDemo(junit, coverage string) map[string]map[string]string {
 }
 
 func TestARootRequirementOrAStrayLockfileRunsThePackagesThatUseIt(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "pants-impact-runs-through-pants", "a-change-to-one-pants-package-runs-it-and-its-dependents-through-pants-uncached")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
@@ -421,6 +424,7 @@ func nestedDemo(junit, coverage string) map[string]map[string]string {
 // is a build-graph edge, which visibility does not judge: the graph loads and
 // the run warns nothing.
 func TestANestedPantsPackageRunsWithItsEdgesAcrossScopes(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "pants-impact-runs-through-pants", "a-change-to-one-pants-package-runs-it-and-its-dependents-through-pants-uncached")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
@@ -481,6 +485,7 @@ func symlinkDemo() map[string]map[string]string {
 // the step init --from pants ends with, writes each package once, so validate
 // passes right after it.
 func TestASymlinkedPantsDirectoryPassesValidateRightAfterTheSync(t *testing.T) {
+	repotest.Require(t)
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))

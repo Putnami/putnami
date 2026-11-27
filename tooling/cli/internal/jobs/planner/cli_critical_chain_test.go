@@ -8,6 +8,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -21,6 +22,7 @@ import (
 // the project default is a cadence choice, not removal of the supported source
 // mutation path.
 func TestCLIValidationLintStaysOffTheTestCriticalChain(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	defaultPlan := planCLIValidationCadence(t, nil)
 	testJob := requireCLIPlanJob(t, defaultPlan, "test~test")
@@ -82,10 +84,19 @@ func planCLIValidationCadence(t *testing.T, commandParams extension.ParamMap) []
 	if projectConfig == nil {
 		t.Fatal("tooling/cli/putnami.json did not load")
 	}
-	// The suite reads every first-party extension manifest, the Go one included.
+	// The tests that read every first-party extension manifest, the Go one
+	// included, run in @putnami/cli-repository, so its key holds the manifests
+	// and the CLI's own suite key does not.
 	const manifestPattern = "../../**/putnami.extension.json"
-	if !containsStr(cachekey.ParamStrings(projectConfig.Options["test"], "filePatterns"), manifestPattern) {
-		t.Fatalf("CLI test cache key does not include %q", manifestPattern)
+	if containsStr(cachekey.ParamStrings(projectConfig.Options["test"], "filePatterns"), manifestPattern) {
+		t.Fatalf("CLI test cache key includes %q again; the tests that read the manifests run in tooling/cli-repository", manifestPattern)
+	}
+	repositoryConfig := wsproto.LoadProjectConfig(filepath.Join(repoRoot, "tooling", "cli-repository"))
+	if repositoryConfig == nil {
+		t.Fatal("tooling/cli-repository/putnami.json did not load")
+	}
+	if !containsStr(cachekey.ParamStrings(repositoryConfig.Options["test"], "filePatterns"), manifestPattern) {
+		t.Fatalf("@putnami/cli-repository test cache key does not include %q", manifestPattern)
 	}
 
 	goExtension := extension.LoadExtensionFromDir(filepath.Join(repoRoot, "go", "extension"), "/go/extension")

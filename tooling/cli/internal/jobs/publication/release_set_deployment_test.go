@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -241,6 +242,7 @@ func TestABaselineHeadCarryingADeploymentMemberIsAValidBaseline(t *testing.T) {
 // channel the step is not planned and the member cannot be keyed, which is
 // the loud failure a publisher that forgot to enable it gets.
 func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing.T) {
+	repotest.Require(t)
 	repoRoot := findJobsRepoRoot(t)
 	goExtension := extension.LoadExtensionFromDir(filepath.Join(repoRoot, "go", "extension"), "/go/extension")
 	if goExtension == nil {
@@ -362,6 +364,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 // both steps without an output conflict, so both members get a selection
 // fingerprint.
 func TestARoutedImageKeepsTheDeploymentMemberKeyable(t *testing.T) {
+	repotest.Require(t)
 	repoRoot := findJobsRepoRoot(t)
 	goExtension := extension.LoadExtensionFromDir(filepath.Join(repoRoot, "go", "extension"), "/go/extension")
 	if goExtension == nil {

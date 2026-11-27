@@ -24,6 +24,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func TestMain(m *testing.M) {
@@ -427,6 +428,7 @@ func envValues(env []string, key string) []string {
 // packaged-source test run stays green.
 func findJobsRepoRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)

@@ -7,12 +7,14 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The TypeScript and Go `test` commands leave their command layers out of the
 // steps that run build tasks, and only those: the steps that run and finalize
 // the tests keep reading `options.test`.
 func TestRealTestPipelinesLeaveTheCommandLayerOutOfTheirBuildSteps(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "a-step-may-read-no-command-option-layer",
 		"the-typescript-and-go-test-steps-shared-with-build-read-no-command-layer")
 	repoRoot := findJobsRepoRoot(t)

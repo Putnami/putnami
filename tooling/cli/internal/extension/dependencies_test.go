@@ -19,6 +19,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -580,6 +581,7 @@ func copyFirstPartyProject(t *testing.T, repoRoot, ws, rel string) {
 // order, with their aliases, related commands and default traits. The core
 // declares none of them, so the table below is the whole expectation.
 func TestTheShippedDevExtensionSatisfiesALanguageDependencyByPath(t *testing.T) {
+	repotest.Require(t)
 	f := newGraphFixture(t)
 	repoRoot := findRepoRoot(t)
 	goExtension, dev := filepath.Join("go", "extension"), filepath.Join("tooling", "dev")

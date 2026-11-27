@@ -21,6 +21,7 @@ import (
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -298,6 +299,7 @@ func treeKeyedBaseline(t *testing.T, lane *treeKeyedLane, job *ScheduledJob) str
 // extension one fixed runtime digest, and resolves no runtime toolchain: one
 // installation on one machine gives both lanes the same value for each.
 func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "tree-keyed-task-cache",
 		"one-tree-in-two-checkouts-at-two-commits-shares-its-keys")
 	spectest.Proves(t, "cli/job-planning-execution", "tree-keyed-task-cache",

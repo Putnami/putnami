@@ -13,6 +13,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	sdkagentartifact "go.putnami.dev/sdk/extension/agentartifact"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The contributor extension (tooling/contributor) is the one maintained
@@ -57,6 +58,7 @@ func buildContributorContent(t *testing.T) *sdkagentartifact.Result {
 }
 
 func TestContributorContentRendersEveryEntryPointOnBothHosts(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "one-contributor-extension", "every-skill-and-worker-renders-on-both-hosts")
 	result := buildContributorContent(t)
@@ -129,6 +131,7 @@ func stageContributorPackage(t *testing.T, version string) (string, *sdkagentart
 }
 
 func TestContributorPackagedAndSourceConsumerMigration(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/contributor-workflows", "canonical-consumer-migration", "packaged-canonical-consumer-content")
 	stage, content := stageContributorPackage(t, "0.1.0")
 	for _, packaged := range []bool{false, true} {
@@ -228,6 +231,7 @@ func TestManagedUpgradeRemovesUnchangedLegacySkillAndProtectsEditedCopy(t *testi
 }
 
 func TestContributorExplicitOnlySkillsDeclareItOnBothHosts(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "explicit-only-invocation", "explicit-only-skills-declare-it-on-both-hosts")
 	result := buildContributorContent(t)
@@ -255,6 +259,7 @@ func TestContributorExplicitOnlySkillsDeclareItOnBothHosts(t *testing.T) {
 }
 
 func TestContributorReviewMetadataKeepsTheReviewQualityFloor(t *testing.T) {
+	repotest.Require(t)
 	profile, err := os.ReadFile(filepath.Join(contributorRoot(t), "src", "agents", "reviewer", "claude.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -279,6 +284,7 @@ func TestContributorReviewMetadataKeepsTheReviewQualityFloor(t *testing.T) {
 }
 
 func TestContributorShipsOnlyCanonicalEntriesAndActiveUtilities(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "canonical-entry-points", "only-canonical-entry-points-and-active-utilities")
 	result := buildContributorContent(t)
@@ -319,6 +325,7 @@ var neutralityRules = []struct {
 }
 
 func TestContributorContentIsProviderNeutral(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-content", "no-backend-client-label-or-memory-identity")
 	result := buildContributorContent(t)
@@ -341,6 +348,7 @@ func TestContributorContentIsProviderNeutral(t *testing.T) {
 var modelIdentity = regexp.MustCompile(`(?i)\b(gpt-[0-9]|claude-[a-z]|opus|sonnet|haiku|fable|astra|luna)\b|\bsol\b`)
 
 func TestContributorInstructionsNameProfilesNotModels(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "repository-policy", "instructions-name-worker-profiles-not-models")
 	root := filepath.Join(contributorRoot(t), "src")
@@ -384,6 +392,7 @@ func sameSet(a, b string) bool {
 }
 
 func TestContributorContentPolicyRefusesProviderSpecificContent(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-content", "the-declared-policy-refuses-provider-specific-content")
 	source := contributorRoot(t)
@@ -443,6 +452,7 @@ func copyTree(t *testing.T, src, dst string, names ...string) {
 // order of build: the declarations go first and alone, the code goes on
 // without waiting, and the comments are read and answered at each checkpoint.
 func TestContributorBuildLoopPushesDeclarationsBeforeCode(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "intent-first-publication", "the-build-loop-pushes-declarations-before-code")
 	build := filepath.Join(contributorRoot(t), "src", "skills", "build")
@@ -483,6 +493,7 @@ func TestContributorBuildLoopPushesDeclarationsBeforeCode(t *testing.T) {
 // run before each declarations push, and only an error the code resolves lets
 // the push go on.
 func TestContributorBuildLoopChecksDeclarationsBeforeThePush(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "intent-first-validation", "the-build-loop-checks-declarations-before-it-pushes-them")
 	result := buildContributorContent(t)
@@ -514,6 +525,7 @@ func TestContributorBuildLoopChecksDeclarationsBeforeThePush(t *testing.T) {
 // parent, follows the children with epic status, and never codes. Build
 // takes a child of an approved epic as approved, under the same stop rules.
 func TestContributorEpicLaunchesChildrenAndNeverCodes(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "epic-orchestration", "the-epic-skill-launches-children-and-never-codes")
 	result := buildContributorContent(t)
@@ -579,6 +591,7 @@ const buildCoreMaxBytes = 7000
 // sends each loop stage to its own reference, and the commands that report
 // the stage and size the plan.
 func TestContributorBuildIsAShortCoreAndOneReferencePerStage(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "one-contribution-loop", "build-is-a-short-core-and-one-reference-per-stage")
 	result := buildContributorContent(t)
@@ -635,6 +648,7 @@ func TestContributorBuildIsAShortCoreAndOneReferencePerStage(t *testing.T) {
 // and drops the tier members; this repository's policy runs only review in a
 // separate agent by default.
 func TestContributorWorkflowProfilesReplaceTiersAndWorkers(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "workflow-profiles", "workflow-profiles-replace-tiers-and-workers")
 	result := buildContributorContent(t)
@@ -696,6 +710,7 @@ func TestContributorWorkflowProfilesReplaceTiersAndWorkers(t *testing.T) {
 // TestContributorReviewCycleBlocksOnP1AndP2 pins the review cycle of the
 // check stage and the severity scale of the review skill.
 func TestContributorReviewCycleBlocksOnP1AndP2(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "review-cycle", "the-review-cycle-blocks-on-p1-and-p2")
 	result := buildContributorContent(t)
@@ -724,6 +739,7 @@ func TestContributorReviewCycleBlocksOnP1AndP2(t *testing.T) {
 // anchors the requirements it creates or renumbers, keeps checks in the
 // manifest, and proposes the native rewrite only on the owner's request.
 func TestContributorSpecSkillEditsTheExternalSpec(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "external-spec-authoring", "the-spec-skill-edits-the-external-spec-it-resolves")
 	result := buildContributorContent(t)

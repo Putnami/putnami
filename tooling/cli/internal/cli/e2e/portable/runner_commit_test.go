@@ -11,6 +11,7 @@ import (
 	runner "go.putnami.dev/protocol/runner"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/runnerprovider"
 )
 
@@ -176,6 +177,7 @@ func TestPortableExecutingEngineRefusesACommitRequestOnAnotherCheckout(t *testin
 // shippedDevManifest reads the @putnami/dev manifest this repository ships.
 func shippedDevManifest(t *testing.T) []byte {
 	t.Helper()
+	repotest.Reads(t)
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -202,7 +204,7 @@ func shippedDevManifest(t *testing.T) []byte {
 // or without a change, as under all, before any selection is measured. No
 // refused request runs a task or records a session.
 func TestPortableExecutingEngineRefusesTheShippedDevWorkloads(t *testing.T) {
-	spectest.Proves(t, "cli/portable-runner", "commit-request", "the-executing-engine-refuses-a-workload-or-rewriting-command")
+	repotest.Require(t)
 	root, _ := clitest.PortableFixture(t, false, false)
 	clitest.WriteFile(t, filepath.Join(root, "dev", "putnami.json"), `{"name":"@putnami/dev"}`)
 	clitest.WriteFile(t, filepath.Join(root, "dev", "putnami.extension.json"), string(shippedDevManifest(t)))

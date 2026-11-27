@@ -13,6 +13,7 @@ import (
 	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // firstPartyVocabularyProjects are the first-party extensions whose jobs a
@@ -158,6 +159,7 @@ func kindTraits(traits CommandTraits) CommandTraits {
 // the traits the core reads; the kinds it adds are pinned by
 // TestTheDevVocabularyDeclaresEveryFirstPartyKind.
 func TestFirstPartyJobsKeepTheirTraitsUnderADevelopmentVocabulary(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "first-party-jobs-keep-their-traits")
 	repoRoot := findRepoRoot(t)
@@ -278,6 +280,7 @@ var verbKinds = map[string]CommandTraits{
 // its own declaration otherwise. Without the vocabulary, a job keeps only what
 // its command declares.
 func TestTheDevVocabularyDeclaresEveryFirstPartyKind(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "command-kinds-and-traits", "the-dev-vocabulary-declares-every-first-party-kind")
 	repoRoot := findRepoRoot(t)

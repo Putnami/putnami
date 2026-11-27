@@ -6,6 +6,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // TestFirstPartyLongLivedServeTasksAreUncacheableProcesses is the positive
@@ -13,6 +14,7 @@ import (
 // bind a port, so replaying a cache entry can never satisfy the command. The
 // expanded job is what the engine renders as NO-CACHE in a plan.
 func TestFirstPartyLongLivedServeTasksAreUncacheableProcesses(t *testing.T) {
+	repotest.Require(t)
 	repoRoot := findRepoRoot(t)
 	fixtures := []struct {
 		name string

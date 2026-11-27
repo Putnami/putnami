@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // TestATscOutputGitDoesNotIgnoreIsRefusedOnceItKeysTheBuild runs the
@@ -15,6 +16,7 @@ import (
 // first gate passes; the next one finds the emitted files in the cut, which
 // move the build's key, and refuses the build before tsc runs.
 func TestATscOutputGitDoesNotIgnoreIsRefusedOnceItKeysTheBuild(t *testing.T) {
+	repotest.Require(t)
 	clitest.RequireShell(t)
 	var tc extensionCase
 	for _, c := range extensionCases {

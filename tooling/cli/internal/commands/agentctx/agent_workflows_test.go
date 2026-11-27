@@ -6,12 +6,15 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // Shared references in shipped contributor entries must resolve on both
 // hosts. The native finalizer, language, machine admission and tree commands
 // have behavioral tests at their Go API boundaries.
 func TestContributorResourceLinks(t *testing.T) {
+	repotest.Require(t)
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)

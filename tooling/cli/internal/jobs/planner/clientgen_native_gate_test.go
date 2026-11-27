@@ -12,6 +12,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -109,6 +110,7 @@ func clientgenNodes(planned []*jobmodel.ScheduledJob) []*jobmodel.ScheduledJob {
 // invariant: one guard, whatever the selection contains, and even when no
 // selected project lists the extension.
 func TestNativeValidatePlansOneClientgenGuardForAnySelection(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "a-workspace-once-command-plans-one-job", "a-workspace-once-command-plans-one-job-for-any-selection")
 	command := loadClientgenExtension(t).Jobs["validate"]
 	if command == nil {
@@ -139,6 +141,7 @@ func TestNativeValidatePlansOneClientgenGuardForAnySelection(t *testing.T) {
 // that holds a provider with an in-module target and a client project that
 // names its provider in generatedFrom.
 func TestNativeValidatePlansNoGeneration(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "a-workspace-once-command-plans-one-job", "a-workspace-once-command-that-depends-on-nothing-plans-nothing-else")
 	description := loadClientgenExtension(t)
 	command := description.Jobs["validate"]
@@ -203,6 +206,7 @@ func TestNativeValidatePlansNoGeneration(t *testing.T) {
 // scoped: `build` and `lint` must not drag a whole-workspace verification
 // behind them.
 func TestNativeValidateGuardIsNotPlannedForAnotherCommand(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "a-workspace-once-command-plans-one-job", "another-command-plans-no-workspace-once-job")
 	description := loadClientgenExtension(t)
 	ws, selected := clientgenConsumerWorkspace(t, 3)
@@ -222,6 +226,7 @@ func TestNativeValidateGuardIsNotPlannedForAnotherCommand(t *testing.T) {
 // one — a workspace that disables the extension or the job — rather than an
 // undocumented environment variable.
 func TestNativeValidateGuardIsDisableable(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "a-workspace-once-command-plans-one-job", "a-disabled-extension-plans-no-workspace-once-job")
 	description := loadClientgenExtension(t)
 	ws, selected := clientgenConsumerWorkspace(t, 3)
@@ -244,6 +249,7 @@ func TestNativeValidateGuardIsDisableable(t *testing.T) {
 // adopts its build generate, and the build's infra step, which declares the
 // project's gen write, waits for the provider's test steps that read .gen.
 func TestProviderGenerationNeverOverlapsATestOfItsClient(t *testing.T) {
+	repotest.Require(t)
 	root := t.TempDir()
 	writeProjectFile(t, root, "provider", "go.mod",
 		"module example.com/provider\n\ngo 1.25\n\nrequire go.putnami.dev/app v0.0.0\n")

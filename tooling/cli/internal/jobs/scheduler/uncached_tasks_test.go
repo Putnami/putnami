@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // uncachedByVerdict names, by repository-relative manifest path and task name,
@@ -157,6 +158,7 @@ func TestUncachedTaskExemptionsRestOnStructuredFacts(t *testing.T) {
 // invocation itself. A task that turns its cache off for any other reason
 // re-executes on every lane and every run, whatever its inputs.
 func TestEveryUncachedTaskHasAnEffectACacheEntryCannotReplay(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	root := findJobsRepoRoot(t)
 

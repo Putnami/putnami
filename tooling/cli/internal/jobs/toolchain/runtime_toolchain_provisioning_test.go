@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // provisioningToolchainExtension declares one required toolchain every task of
@@ -309,6 +310,7 @@ func TestEnsureJobRuntimeToolchainsKeepsAProvisioningResolutionFromOtherCommands
 // written a lock and nothing has pinned a toolchain yet. workspace-install must
 // resolve, and the commands the lock pin protects must still fail closed.
 func TestFirstPartyWorkspaceInstallRunsBeforeTheLockPinsItsToolchain(t *testing.T) {
+	repotest.Require(t)
 	repoRoot := findJobsRepoRoot(t)
 	cases := []struct {
 		dir, name, lock string

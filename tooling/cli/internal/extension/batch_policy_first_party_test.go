@@ -10,6 +10,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // firstPartyBatchPolicies is the batch kind and phase each first-party
@@ -59,6 +60,7 @@ var firstPartyStepPhases = map[string]string{
 // declare, and the step id that names the phase of a task that declares
 // none, so a batch member keeps the tally and the phase its solo run reports.
 func TestTheFirstPartyBatchableTasksKeepTheirTallyAndPhase(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "batch-parity-and-live-cells-follow-declared-kinds",
 		"the-first-party-batchable-tasks-keep-their-tally-and-phase")

@@ -10,6 +10,7 @@ import (
 	model "go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome resolves the
@@ -20,6 +21,7 @@ import (
 // the runtime resolves it and BUN_INSTALL names its install directory, so the
 // bun keeps its own files there.
 func TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/runtime-toolchain-pinning", "exact-lock-resolution",
 		"a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home")
 	const pinned, ambient = "1.9.9", "1.4.0"
@@ -98,6 +100,7 @@ func TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome(t *testing.T)
 // baked bun is another release. The bun on PATH is never substituted, and
 // BUN_INSTALL names the install directory.
 func TestTheClientgenEmitterResolvesAnInstallThatHoldsBinBun(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/runtime-toolchain-pinning", "exact-lock-resolution",
 		"a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home")
 	const pinned, ambient = "1.9.9", "1.4.0"

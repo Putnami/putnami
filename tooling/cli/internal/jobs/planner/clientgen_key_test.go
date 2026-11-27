@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -154,6 +155,7 @@ func (f *clientgenKeyFixture) key(t *testing.T, clientgen *extension.ExtensionDe
 // and the committed sidecar schema/openapi.json instead: files no task writes,
 // whose edits move the key.
 func TestClientgenKeyIgnoresTheDescribeOwnedTrees(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "clientgen-key-reads-no-run-written-tree", "clientgen-key-ignores-the-describe-owned-trees")
 	clientgen := loadShippedExtension(t, "tooling/clientgen-extension", "@putnami/clientgen")
 
@@ -294,6 +296,7 @@ func (p *clientgenPlan) precomputedKeys(t *testing.T) map[string]string {
 // it. The trees are written before any job is keyed, so the claim holds
 // whichever of the two jobs the plan runs first.
 func TestClientgenStartKeyEqualsThePrecomputedKeyWhenDescribeWrites(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "clientgen-key-reads-no-run-written-tree", "clientgen-start-key-equals-the-precomputed-key-when-describe-writes")
 	plan := planClientgenOnAGoProvider(t)
 	plan.job(t, "build~describe")

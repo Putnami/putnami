@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/fileindex"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -330,6 +331,7 @@ var extensionCases = []extensionCase{
 // the CLI starts of the jobs, in a run that executes every task, and in
 // planning the unchanged workspace.
 func TestTheExtensionCounts(t *testing.T) {
+	repotest.Require(t)
 	clitest.RequireShell(t)
 	// The cases share one Putnami home, so its copies are made once.
 	home := t.TempDir()

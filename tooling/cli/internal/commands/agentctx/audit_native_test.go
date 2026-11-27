@@ -12,6 +12,7 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/sdk/extension/gittest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 type auditNativeWorkspace struct {
@@ -62,6 +63,7 @@ func TestAuditFixtureIsTheSameOnAForeignMachine(t *testing.T) {
 // provider binding. The fixture has a remote-tracking head, as the audit helper
 // expects.
 func TestManagedAuditProposalScanUsesNativeLanguage(t *testing.T) {
+	repotest.Require(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("the managed audit helper requires bash")
 	}

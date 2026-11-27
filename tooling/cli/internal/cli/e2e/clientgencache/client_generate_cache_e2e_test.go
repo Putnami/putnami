@@ -23,6 +23,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func TestMain(m *testing.M) {
@@ -194,6 +195,7 @@ func tree(t *testing.T, dir string) map[string]string {
 // emitter, and each later one hits the cache and leaves src exactly as the
 // execution wrote it, from a deleted src and over the restored one.
 func TestACachedTypeScriptClientGenerationRestoresTheTreeItsExecutionWrote(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "executed-directory-output-starts-empty",
 		"a-hit-of-a-generated-typescript-client-restores-what-its-execution-wrote")
 	clitest.RequireShell(t)

@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The extraction acceptance: for every one of the
@@ -92,6 +93,7 @@ type parityCase struct {
 // workspace, same arguments, the same stdout, stderr and exit code the built-in
 // produced.
 func TestSDDSubcommandsMatchTheRecordedBuiltIn(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/sdd-extraction", "recorded-parity-with-the-replaced-surface", "every-subcommand-matches-the-recorded-builtin-byte-for-byte")
 	runtimePath := parityExtensionRuntime(t)
@@ -285,6 +287,7 @@ func parityCases() []parityCase {
 // separate test so a failure names which half broke: a payload difference and a
 // rendering difference are fixed in different files.
 func TestSDDHumanOutputMatchesTheRecordedBuiltIn(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/sdd-extraction", "recorded-parity-with-the-replaced-surface", "the-human-output-matches-the-recorded-builtin")
 	runtimePath := parityExtensionRuntime(t)

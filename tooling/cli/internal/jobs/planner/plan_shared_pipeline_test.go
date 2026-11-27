@@ -12,6 +12,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -520,6 +521,7 @@ func cutPlanKey(key string) (project, step string, ok bool) {
 // Without that flag the same shared plan leaves a consumer job unordered with
 // the generator.
 func TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	goExtension := goWithoutClosureDependencies(loadGoPlannerExtension(t))
 	for _, commands := range [][]string{{"client-generate", "lint", "test", "build"}, {"lint", "test", "build", "validate"}} {
@@ -682,6 +684,7 @@ func planRealGoProjects(t *testing.T, commands []string, params ...extension.Par
 // pipeline nothing that tells them apart, and that the shared plan schedules
 // without falling back.
 func TestSharedExecutions_RealGoManifest(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	for _, params := range []extension.ParamMap{nil, {"skip-deps": true}} {
 		byKey := JobsByPlanKey(planRealGoProjects(t, []string{"lint", "test", "build"}, params))
@@ -726,6 +729,7 @@ func TestSharedExecutions_RealGoManifest(t *testing.T) {
 // deployment step declares its gen write, so it is ordered against every step
 // of the run that reads or writes the project's gen.
 func TestSharedExecutions_RealGoManifestWithPackage(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	planned := planRealGoApplication(t, []string{"test", "build", "package"}, extension.ParamMap{"deployment": true})
 	byKey := JobsByPlanKey(planned)
@@ -779,6 +783,7 @@ func planRealGoApplication(t *testing.T, commands []string, params extension.Par
 // group are ordered, and so are every two steps of the plan that access one
 // resource when either of them writes it.
 func TestSharedExecutions_RealGoManifestLeavesNoConflictUnordered(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	for _, params := range []extension.ParamMap{{"archives": true}, {"deployment": true}} {
 		planned := planRealGoApplication(t, []string{"build", "test", "package"}, params)
@@ -850,6 +855,7 @@ func TestSharedExecutions_RealGoManifestLeavesNoConflictUnordered(t *testing.T) 
 // directly, while its test generate waits for it through test config-merge, an
 // ordering producer. Both name the same producer, so they stay one execution.
 func TestSharedExecutions_AnOrderingStepPassesItsProducersThrough(t *testing.T) {
+	repotest.Require(t)
 	t.Setenv("CI", "true")
 	ws, selected := dependentsWorkspace(t)
 	planned, err := Plan(ws, []string{"lint", "test", "build"}, selected,

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // orphanTeardownBound is how long the composition of a killed putnami may take
@@ -28,6 +29,7 @@ const orphanTeardownBound = 90 * time.Second
 // stops, the lease is removed, the executable exits, and its exit document,
 // written on the stdout it shared with the CLI, reports a clean cleanup.
 func TestComposeTearsDownOnceTheCLIIsKilled(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	requireFixtureTools(t)
 	cli := fixtureproc.CLI(t)

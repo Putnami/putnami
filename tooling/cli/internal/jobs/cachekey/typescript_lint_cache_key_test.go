@@ -8,6 +8,7 @@ import (
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -17,6 +18,7 @@ import (
 // between otherwise identical lint runs, so including it makes the stored
 // lint~check-only entry unreachable on the next run.
 func TestTypeScriptLintCheckOnlyCacheKeyIgnoresGeneratedFiles(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	repoRoot := findJobsRepoRoot(t)
 	manifestPath := filepath.Join(repoRoot, "typescript", "extension", "putnami.extension.json")

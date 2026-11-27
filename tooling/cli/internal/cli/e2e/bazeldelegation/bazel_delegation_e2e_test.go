@@ -17,6 +17,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func TestMain(m *testing.M) {
@@ -258,6 +259,7 @@ func commit(t *testing.T, root, message string) string {
 }
 
 func TestAChangeToOneBazelPackageRunsItAndItsDependentsThroughBazel(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "bazel-impact-runs-through-bazel", "a-change-to-one-bazel-package-runs-it-and-its-dependents-through-bazel-uncached")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
@@ -360,6 +362,7 @@ func TestAChangeToOneBazelPackageRunsItAndItsDependentsThroughBazel(t *testing.T
 // not list, such as a test fixture, becomes no project: neither init --from
 // bazel nor projects sync adds it.
 func TestTheWorkspaceAdoptsOnlyThePackagesBazelLoads(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "only-listed-members-become-projects", "a-directory-the-tool-does-not-list-becomes-no-project")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")

@@ -420,7 +420,12 @@ the governance record in
 contributor recipe in
 [`tooling/cli-document-set`](../../cli-document-set/README.md) — live outside
 `@putnami/cli`: editing `CONTRIBUTING.md` now re-runs small suites instead of
-the CLI's whole test task.
+the CLI's whole test task. The CLI's own tests that read this repository's
+manifests, decisions, templates, agent content and extension sources mark
+themselves with `repotest.Require`: they skip in the CLI's suite, and
+[`tooling/cli-repository`](../../cli-repository/README.md) runs them, keyed on
+those files, so a one-line `putnami.json` change re-runs them and not the
+CLI's whole suite.
 
 A pattern that reaches outside the project must be spelled the way
 `filepath.Rel` produces it, because `collectFiles` matches the cleaned relative

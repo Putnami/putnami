@@ -11,6 +11,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	supportproto "go.putnami.dev/protocol/support"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // Two gates this REPOSITORY holds itself to, keyed on its own checked-in
@@ -49,6 +50,7 @@ import (
 // protocol project that lost its tag would silently start requesting a package
 // entry, and satisfy it with the wrong one.
 func TestCheckedInProtocolProjectsCarryProtocolTag(t *testing.T) {
+	repotest.Require(t)
 	ws := loadCheckedInWorkspace(t)
 
 	seen := 0
@@ -70,6 +72,7 @@ func TestCheckedInProtocolProjectsCarryProtocolTag(t *testing.T) {
 // the completeness the SDD spec surface only reports. Promotion criteria live
 // in protocols/support ADR 0002.
 func TestCheckedInWorkspaceClassifiesEveryPublicSubject(t *testing.T) {
+	repotest.Require(t)
 	ws := loadCheckedInWorkspace(t)
 
 	catalog := readCheckedInSupportCatalog(t, ws.Root)
@@ -122,6 +125,7 @@ func TestCheckedInWorkspaceClassifiesEveryPublicSubject(t *testing.T) {
 // package present only in that projection is invisible to the dependency graph
 // and therefore cannot join a complete release set even though Bun installs it.
 func TestCheckedInNPMWorkspaceProjectionMatchesMembership(t *testing.T) {
+	repotest.Require(t)
 	ws := loadCheckedInWorkspace(t)
 	data, err := os.ReadFile(filepath.Join(ws.Root, "package.json"))
 	if err != nil {
@@ -157,6 +161,7 @@ func TestCheckedInNPMWorkspaceProjectionMatchesMembership(t *testing.T) {
 // list (TS5112), so a package can pass ordinary source tests yet fail its first
 // real release.
 func TestCheckedInNPMPublishProjectsCarryLocalTypeScriptConfig(t *testing.T) {
+	repotest.Require(t)
 	ws := loadCheckedInWorkspace(t)
 	seen := 0
 	for _, project := range ws.Projects {
@@ -186,6 +191,7 @@ func checkedInRoot() string {
 
 func loadCheckedInWorkspace(t *testing.T) *Workspace {
 	t.Helper()
+	repotest.Reads(t)
 	root := checkedInRoot()
 	if _, err := os.Stat(filepath.Join(root, "putnami.workspace.json")); err != nil {
 		if os.IsNotExist(err) {

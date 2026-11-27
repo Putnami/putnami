@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -69,8 +70,8 @@ func localProviderWorkspace(t *testing.T) string {
 }
 
 func TestTheLocalProviderAnswersBothEntryPaths(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "one-route-two-entry-paths", "the-cli-and-the-host-channel-return-the-same-envelope")
 	root := localProviderWorkspace(t)
 
 	// The CLI records a task and a proposal.
@@ -154,6 +155,7 @@ func TestTheLocalProviderAnswersBothEntryPaths(t *testing.T) {
 // through the CLI, `putnami missions status` reads back from the local store,
 // with the session's stage and token usage.
 func TestTheLocalProviderReadsASessionWithMissionsStatus(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-cli-reads-a-session-stage-and-usage-with-missions-status")
 	root := localProviderWorkspace(t)

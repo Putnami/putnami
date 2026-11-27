@@ -22,12 +22,14 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gittest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // findPutnamiw walks up from the test's working directory to the repo root that
 // holds the putnamiw script.
 func findPutnamiw(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -176,6 +178,7 @@ func soleBlob(t *testing.T, home string) string {
 }
 
 func TestPutnamiwDownload_PublishesSharedBlobAndStampsRecency(t *testing.T) {
+	repotest.Require(t)
 	script, home, tmp, env := downloadEnv(t, okTar)
 
 	cmd := exec.Command("bash", script, "--download", "ping")
@@ -212,6 +215,7 @@ func TestPutnamiwDownload_PublishesSharedBlobAndStampsRecency(t *testing.T) {
 }
 
 func TestPutnamiwDownload_ReusesExistingBlob(t *testing.T) {
+	repotest.Require(t)
 	script, home, tmp, env := downloadEnv(t, okTar)
 
 	run := func() {
@@ -244,6 +248,7 @@ func TestPutnamiwDownload_ReusesExistingBlob(t *testing.T) {
 }
 
 func TestPutnamiwDownload_CleansStagingOnFailure(t *testing.T) {
+	repotest.Require(t)
 	// A tar that fails after curl has written the archive: the EXIT trap must
 	// reclaim the registered temp archive/dir rather than orphan them.
 	script, home, tmp, env := downloadEnv(t, "#!/usr/bin/env bash\nexit 1\n")
@@ -276,6 +281,7 @@ func assertNothingInstalled(t *testing.T, script, home string) {
 // a registry that advertises no digest; a digest that disagrees is refused
 // whatever the environment, and nothing is installed.
 func TestPutnamiwDownload_RunsOnlyTheArchiveTheRegistryAdvertised(t *testing.T) {
+	repotest.Require(t)
 	digest := fakeArchiveSHA256()
 	wrong := strings.Repeat("0", 64)
 	cases := []struct {
@@ -329,6 +335,7 @@ func TestPutnamiwDownload_RunsOnlyTheArchiveTheRegistryAdvertised(t *testing.T) 
 // PUTNAMI_ALLOW_INSECURE_REGISTRY=1. A refused URL stops the run before any
 // fetch.
 func TestPutnamiwDownload_RefusesAPlaintextRegistry(t *testing.T) {
+	repotest.Require(t)
 	cases := []struct {
 		name, url string
 		env       []string
@@ -385,6 +392,7 @@ func TestPutnamiwDownload_RefusesAPlaintextRegistry(t *testing.T) {
 // version is left to the binary's own launcher, and a lock that records no
 // digest, such as a source workspace's, pins nothing here.
 func TestPutnamiwDownload_HonorsTheLockedCLIDigest(t *testing.T) {
+	repotest.Require(t)
 	const stubBinary = "#!/usr/bin/env bash\necho \"stub-putnami $*\"\n"
 	sum := sha256.Sum256([]byte(stubBinary))
 	digest := hex.EncodeToString(sum[:])
@@ -560,6 +568,7 @@ func runScript(t *testing.T, repo string, env []string) string {
 // source — even though the SYMLINK's own mtime is newest, the trap a naive
 // `find -newer <symlink>` would fall for. The gate resolves to the target.
 func TestPutnamiwStaleness_RebuildsOverStalePin(t *testing.T) {
+	repotest.Require(t)
 	repo, env := sourceRepo(t)
 	link, target := installPin(t, repo)
 	now := time.Now()
@@ -584,6 +593,7 @@ func TestPutnamiwStaleness_RebuildsOverStalePin(t *testing.T) {
 
 // An up-to-date pin (newer than the sources) runs as-is — no needless rebuild.
 func TestPutnamiwStaleness_RunsFreshPinAsIs(t *testing.T) {
+	repotest.Require(t)
 	repo, env := sourceRepo(t)
 	_, target := installPin(t, repo)
 	now := time.Now()
@@ -602,6 +612,7 @@ func TestPutnamiwStaleness_RunsFreshPinAsIs(t *testing.T) {
 // A consumer workspace has no CLI sources, so a pin is version-governed and runs
 // as-is — the gate must not try (and fail) to rebuild from absent sources.
 func TestPutnamiwStaleness_ConsumerWorkspaceRunsPin(t *testing.T) {
+	repotest.Require(t)
 	repo, env := sourceRepo(t)
 	_, target := installPin(t, repo)
 	if err := os.RemoveAll(filepath.Join(repo, "tooling")); err != nil {
@@ -627,6 +638,7 @@ func TestPutnamiwStaleness_ConsumerWorkspaceRunsPin(t *testing.T) {
 // install and nothing is written to .bun in the home directory. An explicit
 // cache directory is exported as it is.
 func TestPutnamiwBunCache_FollowsTheBunOfTheMachine(t *testing.T) {
+	repotest.Require(t)
 	sentinel := "#!/usr/bin/env bash\n" +
 		"echo \"BUN_CACHE=${BUN_INSTALL_CACHE_DIR:-<unset>}\"\n" +
 		"echo \"PUTNAMI_BUN_CACHE=${PUTNAMI_BUN_CACHE_DIR:-<unset>}\"\n"
@@ -840,6 +852,7 @@ func seedSourceTree(t *testing.T, repo string) {
 }
 
 func TestSeedSourceTreeIsTheSameOnAForeignMachine(t *testing.T) {
+	repotest.Require(t)
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -932,6 +945,7 @@ func sourceBlobs(t *testing.T, home string) []string {
 // A second run at the same tree state must reuse the published blob and never
 // invoke `go build` again.
 func TestPutnamiwSourceKey_SecondRunReusesTheBlob(t *testing.T) {
+	repotest.Require(t)
 	repo, home, env := gitSourceRepo(t)
 
 	out, code := runIn(t, repo, env, "ping")
@@ -972,6 +986,7 @@ func TestPutnamiwSourceKey_SecondRunReusesTheBlob(t *testing.T) {
 // the wrapper asked for, and plants both symlinks at a canary the moment the
 // name exists.
 func TestPutnamiwSourceKey_ScratchFilesStayInAPrivateDirectory(t *testing.T) {
+	repotest.Require(t)
 	repo, home, env := gitSourceRepo(t)
 	tmp := envValue(env, "TMPDIR")
 	stubBin := strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0]
@@ -1046,6 +1061,7 @@ exit 0
 // Two worktrees at the same tree state, sharing one PUTNAMI_HOME, must share one
 // blob AND one build: the second adopts the first's binary without compiling.
 func TestPutnamiwSourceKey_SiblingWorktreesShareOneBuild(t *testing.T) {
+	repotest.Require(t)
 	repo, home, env := gitSourceRepo(t)
 	sibling := filepath.Join(filepath.Dir(repo), "sibling")
 	if out, err := exec.Command("cp", "-R", repo, sibling).CombinedOutput(); err != nil {
@@ -1102,6 +1118,7 @@ func goBuildLines(t *testing.T, env []string) []string {
 // nearest enclosing .git directory, which for a linked worktree is another
 // repository, here one that answers every git call with exit 128.
 func TestPutnamiwSourceKey_VCSStampFollowsGit(t *testing.T) {
+	repotest.Require(t)
 	repo, _, env := gitSourceRepo(t)
 	root := filepath.Dir(repo)
 
@@ -1170,6 +1187,7 @@ func TestPutnamiwSourceKey_VCSStampFollowsGit(t *testing.T) {
 // invalidate the binary. The old mtime gate watched tooling/cli only, so an edit
 // under protocols/ shipped a stale engine behind a green run.
 func TestPutnamiwSourceKey_EditOutsideToolingCliForcesRebuild(t *testing.T) {
+	repotest.Require(t)
 	repo, home, env := gitSourceRepo(t)
 	if _, code := runIn(t, repo, env, "ping"); code != 0 {
 		t.Fatalf("first run failed (%d)", code)
@@ -1200,6 +1218,7 @@ func TestPutnamiwSourceKey_EditOutsideToolingCliForcesRebuild(t *testing.T) {
 // An untracked new file is source too: `git status --untracked-files=all` names
 // it and its working-tree bytes go into the key.
 func TestPutnamiwSourceKey_UntrackedFileForcesRebuild(t *testing.T) {
+	repotest.Require(t)
 	repo, _, env := gitSourceRepo(t)
 	if _, code := runIn(t, repo, env, "ping"); code != 0 {
 		t.Fatalf("first run failed (%d)", code)
@@ -1233,6 +1252,7 @@ func TestPutnamiwSourceKey_UntrackedFileForcesRebuild(t *testing.T) {
 // run cached: a gate that ran an older engine while reporting on this commit is
 // exactly the dishonest green this test guards against.
 func TestPutnamiwSourceKey_FailedBuildNeverRunsACachedBlob(t *testing.T) {
+	repotest.Require(t)
 	repo, _, env := gitSourceRepo(t)
 	if _, code := runIn(t, repo, env, "ping"); code != 0 {
 		t.Fatalf("first run failed (%d)", code)
@@ -1264,6 +1284,7 @@ func TestPutnamiwSourceKey_FailedBuildNeverRunsACachedBlob(t *testing.T) {
 // package path, so a rebuild started from a scratch repository failed with
 // "cannot find main module" (every agent script that fingerprints a temp repo).
 func TestPutnamiwSourceKey_BuildsFromTheWorkspaceWhateverTheCallerDirectory(t *testing.T) {
+	repotest.Require(t)
 	repo, _, env := gitSourceRepo(t)
 	caller := t.TempDir()
 	git(t, caller, "init", "-q", ".")
@@ -1294,6 +1315,7 @@ func TestPutnamiwSourceKey_BuildsFromTheWorkspaceWhateverTheCallerDirectory(t *t
 
 // --bootstrap rebuilds and republishes even when the key already has a blob.
 func TestPutnamiwSourceKey_BootstrapForcesRebuild(t *testing.T) {
+	repotest.Require(t)
 	repo, home, env := gitSourceRepo(t)
 	if _, code := runIn(t, repo, env, "ping"); code != 0 {
 		t.Fatalf("first run failed (%d)", code)
@@ -1316,6 +1338,7 @@ func TestPutnamiwSourceKey_BootstrapForcesRebuild(t *testing.T) {
 // This is asserted, not assumed: the fixture would silently exercise the key
 // path if the temp dir happened to sit inside a repository.
 func TestPutnamiwSourceKey_NonGitWorkspaceUsesTheMtimeGate(t *testing.T) {
+	repotest.Require(t)
 	repo, env := sourceRepo(t)
 	assertNotAGitWorkTree(t, repo)
 
@@ -1363,6 +1386,7 @@ func assertNotAGitWorkTree(t *testing.T, dir string) {
 // blob. Without that check the wrapper would run a binary the marker never
 // described, and would tell the launcher it came from this tree.
 func TestPutnamiwSourceKey_RepointedLinkIsNotTrusted(t *testing.T) {
+	repotest.Require(t)
 	repo, home, env := gitSourceRepo(t)
 	if _, code := runIn(t, repo, env, "ping"); code != 0 {
 		t.Fatalf("first run failed (%d)", code)
@@ -1437,6 +1461,7 @@ func sentinelField(t *testing.T, out, key string) string {
 // covered, because a pin that appeared on only one of them would make the proof
 // depend on cache state.
 func TestPutnamiwSourceKey_ExecsTheBlobAndExportsTheSessionPin(t *testing.T) {
+	repotest.Require(t)
 	repo, home, env := gitSourceRepo(t)
 	out, code := runIn(t, repo, env, "ping") // cold build
 	if code != 0 {
@@ -1498,6 +1523,7 @@ func TestPutnamiwSourceKey_ExecsTheBlobAndExportsTheSessionPin(t *testing.T) {
 // its bin directory first on PATH, and GOTOOLCHAIN=local reach the build
 // command alone.
 func TestPutnamiwSourceKey_BuildEnvironmentStaysOutOfTheCLI(t *testing.T) {
+	repotest.Require(t)
 	repo, _, env := gitSourceRepo(t)
 	stubBin := strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0]
 	env = append(env, "GOROOT=/caller/goroot", "GOTOOLCHAIN=auto")
@@ -1537,6 +1563,7 @@ func TestPutnamiwSourceKey_BuildEnvironmentStaysOutOfTheCLI(t *testing.T) {
 // bin directory first on PATH, and GOTOOLCHAIN=local; the CLI receives the
 // caller's.
 func TestPutnamiwSourceKey_OlderSystemGoBuildsWithTheManagedInstall(t *testing.T) {
+	repotest.Require(t)
 	for name, goWork := range map[string]string{
 		"go line":        "go 1.30.0\n",
 		"toolchain line": "go 1.26.0\n\ntoolchain go1.30.0\n",
@@ -1606,6 +1633,7 @@ exec "`+filepath.Join(stubBin, "go")+`" "$@"
 // go.dev checksum, passes curl a connect timeout and a stall limit, so a
 // black-holed connection fails instead of hanging bootstrap.
 func TestPutnamiwDownloads_BoundTheirConnections(t *testing.T) {
+	repotest.Require(t)
 	const limits = "--connect-timeout 30 --speed-limit 1024 --speed-time 60"
 	requireBounded := func(t *testing.T, argsFile string, want int) {
 		t.Helper()
@@ -1659,6 +1687,7 @@ func TestPutnamiwDownloads_BoundTheirConnections(t *testing.T) {
 // or, when the lock pins another release, the one go.dev publishes beside the
 // archive. Any other archive stops the run, and nothing is installed or built.
 func TestPutnamiwSourceKey_DownloadedGoMustMatchItsSHA256(t *testing.T) {
+	repotest.Require(t)
 	requireGoDownloadPlatform(t)
 	const archive = "FAKE-GO-ARCHIVE"
 	sum := sha256.Sum256([]byte(archive))
@@ -1783,6 +1812,7 @@ chmod +x "$dir/go/bin/go"
 // sha256_of, which checks a downloaded Go archive, hashes with openssl on a
 // host that has neither sha256sum nor shasum.
 func TestPutnamiwSHA256OfFallsBackToOpenSSL(t *testing.T) {
+	repotest.Require(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("putnamiw is a bash script; skip on Windows")
 	}
@@ -1829,8 +1859,6 @@ func TestPutnamiwSHA256OfFallsBackToOpenSSL(t *testing.T) {
 	if got, want := strings.TrimSpace(string(out)), hex.EncodeToString(sum[:]); got != want {
 		t.Errorf("sha256_of with openssl alone = %q, want %q", got, want)
 	}
-	spectest.Proves(t, "cli/engine-provenance", "build-toolchain-stays-in-the-build",
-		"a-downloaded-go-is-installed-only-at-its-locked-or-published-sha256")
 }
 
 // A concurrent `./putnamiw` at another tree state re-points the shared engine
@@ -1839,6 +1867,7 @@ func TestPutnamiwSHA256OfFallsBackToOpenSSL(t *testing.T) {
 // content-addressed and nothing rewrites it. This is the wrapper half of the
 // fix; the launcher half is in internal/launch.
 func TestPutnamiwSourceKey_ConcurrentRelinkLeavesAnEarlierPinIntact(t *testing.T) {
+	repotest.Require(t)
 	repo, home, env := gitSourceRepo(t)
 	if out, code := runIn(t, repo, env, "ping"); code != 0 {
 		t.Fatalf("first run failed (%d):\n%s", code, out)
@@ -1888,6 +1917,7 @@ func TestPutnamiwSourceKey_ConcurrentRelinkLeavesAnEarlierPinIntact(t *testing.T
 // some other tree's blob. The keyless mtime fallback is that path — no git work
 // tree, so no content key and no store blob to name.
 func TestPutnamiwSourceKey_KeylessRunUnsetsAnInheritedPin(t *testing.T) {
+	repotest.Require(t)
 	repo, _, env := gitSourceRepo(t)
 	// Drop the work tree: no git, so no source key, so the mtime fallback runs.
 	if err := os.RemoveAll(filepath.Join(repo, ".git")); err != nil {
@@ -1998,6 +2028,7 @@ func assertNoWorkspaceBin(t *testing.T, repo string) {
 // the blob, with its output on stderr. A second call at the same tree state
 // reuses the blob without compiling and prints the same line.
 func TestPutnamiwPrintEngine_PrintsTheBlobAndRunsOnlyExtensionsPrepare(t *testing.T) {
+	repotest.Require(t)
 	repo, home, env := gitSourceRepo(t)
 
 	stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
@@ -2084,6 +2115,7 @@ func TestPutnamiwPrintEngine_PrintsTheBlobAndRunsOnlyExtensionsPrepare(t *testin
 // An existing workspace link and marker stay byte-identical when --print-engine
 // builds a blob for another tree state. --bootstrap rebuilds under the same key.
 func TestPutnamiwPrintEngine_LeavesTheWorkspaceLinkAlone(t *testing.T) {
+	repotest.Require(t)
 	repo, home, env := gitSourceRepo(t)
 	if out, code := runIn(t, repo, env, "ping"); code != 0 {
 		t.Fatalf("first run failed (%d):\n%s", code, out)
@@ -2143,6 +2175,7 @@ func TestPutnamiwPrintEngine_LeavesTheWorkspaceLinkAlone(t *testing.T) {
 // is cached, and so does a failed `extensions prepare`. Every refusal does the
 // same before building anything.
 func TestPutnamiwPrintEngine_FailsWithNothingOnStdout(t *testing.T) {
+	repotest.Require(t)
 	t.Run("failed build", func(t *testing.T) {
 		repo, _, env := gitSourceRepo(t)
 		if _, _, code := runSplit(t, repo, env, "--print-engine"); code != 0 {
@@ -2256,6 +2289,7 @@ func TestPutnamiwPrintEngine_FailsWithNothingOnStdout(t *testing.T) {
 // GOTOOLCHAIN=local. A Go it cannot verify stops the mode before the command
 // starts, with nothing on stdout.
 func TestPutnamiwPrintEngine_InstallsTheLockedGoBeforeExtensionsPrepare(t *testing.T) {
+	repotest.Require(t)
 	requireGoDownloadPlatform(t)
 	const archive = "FAKE-GO-ARCHIVE"
 	sum := sha256.Sum256([]byte(archive))

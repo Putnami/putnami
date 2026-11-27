@@ -8,6 +8,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -25,6 +26,7 @@ func loadRealPlannerExtension(t *testing.T, dir, name string) *extension.Extensi
 // a flag no step reads are not channels, and publish, which publishes to a
 // registry, offers none.
 func TestPackageChannels_AreTheFlagsAStepIsPlannedOn(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "a-package-run-with-no-channel-on-says-which-option-to-set", "the-channels-of-a-packaging-command")
 	cases := []struct {
@@ -50,6 +52,7 @@ func TestPackageChannels_AreTheFlagsAStepIsPlannedOn(t *testing.T) {
 // turned on by options.package, by the run's flag or by the project's publish
 // list closes it.
 func TestInactiveChannels_NamesAProjectWithEveryChannelOff(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "a-package-run-with-no-channel-on-says-which-option-to-set", "a-project-with-every-channel-off")
 	ext := loadGoPlannerExtension(t)
@@ -102,6 +105,7 @@ func TestInactiveChannels_NamesAProjectWithEveryChannelOff(t *testing.T) {
 // A command that is not a packaging command, and a project no packaging job
 // matches, are never gaps.
 func TestInactiveChannels_IgnoresOtherCommandsAndUnmatchedProjects(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	ext := loadGoPlannerExtension(t)
 	root := t.TempDir()
@@ -121,6 +125,7 @@ func TestInactiveChannels_IgnoresOtherCommandsAndUnmatchedProjects(t *testing.T)
 // a project it matches is never a gap, even when another packaging job it
 // matches has every channel off.
 func TestInactiveChannels_AJobWithNoChannelAlwaysPackages(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "a-package-run-with-no-channel-on-says-which-option-to-set", "a-project-with-every-channel-off")
 	goExt := loadGoPlannerExtension(t)

@@ -10,6 +10,7 @@ import (
 
 	"go.putnami.dev/protocol/telemetry/cliusage"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // firstJobCommands are the eleven job commands the CLI catalog listed when the
@@ -27,6 +28,7 @@ var firstJobCommands = []string{
 // manifest declares any more stays, because a released CLI sends it; the
 // protocol test of cliusage keeps it there.
 func TestCommandVocabularyMatchesFirstPartyCommands(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	head := len(firstJobCommands)
 	if len(cliusage.Commands) < head || !slices.Equal(cliusage.Commands[:head], firstJobCommands) {
@@ -132,6 +134,7 @@ func firstPartyExtensions(t *testing.T) []*extension.ExtensionDescription {
 // putnami.workspace.json.
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("working directory: %v", err)

@@ -38,6 +38,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 const testRevision = "8d5edb7513d93b9165ba2a7cb48466d022fc3f63"
@@ -1176,6 +1177,7 @@ func TestReleaseSetMemberProjectIsOmittedWhenItIsNotRepresentable(t *testing.T) 
 }
 
 func TestReleaseSetScopePlanningResolvesTheShippedGoOwner(t *testing.T) {
+	repotest.Require(t)
 	root := findJobsRepoRoot(t)
 	path := filepath.Join(root, filepath.FromSlash("go/extension/putnami.extension.json"))
 	manifest, parseDiagnostics := extensionproto.ParseManifest(mustReadFile(t, path))
@@ -1381,6 +1383,7 @@ func shippedExtensionName(t *testing.T, extensionRoot string) string {
 // loses its profile, or another extension claims the id, a release stops being
 // able to find the package and publish jobs of an npm member.
 func TestReleaseSetScopePlanningResolvesTheShippedNpmOwner(t *testing.T) {
+	repotest.Require(t)
 	root := findJobsRepoRoot(t)
 	path := filepath.Join(root, filepath.FromSlash("typescript/extension/putnami.extension.json"))
 	manifest, err := extension.LoadManifest(path)

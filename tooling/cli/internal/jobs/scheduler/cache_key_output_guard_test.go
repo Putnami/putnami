@@ -12,6 +12,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -153,6 +154,7 @@ var keyOutputAllowlist = map[keyOutputConflict]string{
 }
 
 func TestNoCacheKeyReadsAnotherTasksLiteralOutput(t *testing.T) {
+	repotest.Require(t)
 	tasks := repositoryTasks(t)
 	outputs := literalProjectOutputs(t, tasks)
 	if len(outputs) == 0 {

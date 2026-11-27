@@ -8,6 +8,7 @@
     "/tooling/cli-document-set",
     "/tooling/cli-documents",
     "/tooling/cli-model",
+    "/tooling/cli-repository",
     "/tooling/install-scripts",
     "/tooling/repository-checks"
   ],
@@ -74,6 +75,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/tooling/extension-sdk"
         },
         {
@@ -260,12 +266,22 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
+          "producerProject": "/protocols/agentcontext"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/tooling/cli-document-set",
           "producerProject": "/protocols/architecture"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/architecture"
         },
         {
@@ -276,6 +292,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/cache"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/cache"
         },
         {
@@ -286,6 +307,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/capabilities"
         },
         {
@@ -296,6 +322,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/ci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/ci"
         },
         {
@@ -306,6 +337,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/cli"
         },
         {
@@ -316,6 +352,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/config"
         },
         {
@@ -326,6 +367,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/contracts"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/contracts"
         },
         {
@@ -336,6 +382,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/database"
         },
         {
@@ -346,6 +397,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/diagnostic"
         },
         {
@@ -356,6 +412,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/distribution"
         },
         {
@@ -366,6 +427,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/doctor"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/doctor"
         },
         {
@@ -376,6 +442,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/events"
         },
         {
@@ -386,6 +457,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/extension"
         },
         {
@@ -396,6 +472,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/features"
         },
         {
@@ -406,6 +487,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/gomod"
         },
         {
@@ -416,6 +502,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/clientcontract"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/clientcontract"
         },
         {
@@ -426,6 +517,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/collaboration"
         },
         {
@@ -436,6 +532,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/infra"
         },
         {
@@ -446,6 +547,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/job"
         },
         {
@@ -456,6 +562,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/oci"
         },
         {
@@ -466,6 +577,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/put"
         },
         {
@@ -476,6 +592,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/registry"
         },
         {
@@ -486,6 +607,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/runner"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/runner"
         },
         {
@@ -496,6 +622,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/runtime"
         },
         {
@@ -506,6 +637,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/storage"
         },
         {
@@ -516,6 +652,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/support"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/support"
         },
         {
@@ -526,6 +667,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/telemetry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/telemetry"
         },
         {
@@ -536,6 +682,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/template"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/template"
         },
         {
@@ -546,6 +697,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/workspace"
         },
         {

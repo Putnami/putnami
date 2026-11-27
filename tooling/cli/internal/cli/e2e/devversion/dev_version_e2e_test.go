@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // bootstrappedEnv is the variable the workspace bootstrap sets before it runs
@@ -35,6 +36,7 @@ func TestMain(m *testing.M) {
 // repositoryRoot is the workspace root above the test's working directory.
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -68,6 +70,7 @@ var versionLine = regexp.MustCompile(`(?m)^  \(workspace root\) \d+\.\d+\.\d+-\d
 // build information of the runtime the store holds: the release
 // putnami.lock.json pins built it, without cgo and with trimmed paths.
 func TestVersionGetRunsThroughTheDevExtensionBuiltFromSource(t *testing.T) {
+	repotest.Require(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("bin/prepare is a bash script")
 	}
@@ -166,6 +169,7 @@ func TestVersionGetRunsThroughTheDevExtensionBuiltFromSource(t *testing.T) {
 // executable. With those names swapped back, the two files and their
 // permissions are equal, so the run above proves the contributor build too.
 func TestTheContributorPrepareScriptIsTheDevOneUnderItsOwnNames(t *testing.T) {
+	repotest.Require(t)
 	repoRoot := repositoryRoot(t)
 	devPath := filepath.Join(repoRoot, "tooling", "dev", "bin", "prepare")
 	contributorPath := filepath.Join(repoRoot, "tooling", "contributor", "bin", "prepare")

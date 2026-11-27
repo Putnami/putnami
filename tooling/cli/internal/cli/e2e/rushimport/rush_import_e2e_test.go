@@ -18,6 +18,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func TestMain(m *testing.M) {
@@ -194,6 +195,7 @@ func pinToolchains(t *testing.T, root string, names ...string) {
 }
 
 func TestAnImportedRushRepositoryPassesLintTestBuildWithTheGraphObserveReads(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "rush-import-runs-through-putnami", "an-imported-rush-repository-passes-lint-test-build-with-the-graph-observe-reads")
 	clitest.RequireShell(t)
 	if _, err := exec.LookPath("bun"); err != nil {
@@ -363,6 +365,7 @@ func setScripts(t *testing.T, root, dir, scripts string) {
 // graph without claiming the project, so deps prune leaves them alone and
 // the next sync finds nothing to write back.
 func TestAnEdgeTheRushSyncWritesIsNoPhantom(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "rush-import-keeps-the-edges-the-sync-writes", "an-edge-the-rush-sync-writes-is-no-phantom")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
@@ -417,6 +420,7 @@ func TestAnEdgeTheRushSyncWritesIsNoPhantom(t *testing.T) {
 // against its baseline, and validate fails: the putnami.json files no longer
 // carry the edges a sync writes.
 func TestValidateAgainstABaselineFailsOnANewEdgeInAnImportedRushRepository(t *testing.T) {
+	repotest.Require(t)
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
 	root := importWorkspace(t, buildRuntime(t))
