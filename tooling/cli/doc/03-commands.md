@@ -1388,9 +1388,15 @@ putnami machine on                  # Let runs go through the machine process ag
 The machine process is on by default on Linux and macOS. A run that finds no
 supervisor runs in its own process and starts one, detached, when it ends; the
 next run goes through the worker of its executable. A run always runs in its
-own process in CI (`CI` set), in a hosted run (`--credential-fd`), when a job
-of a run starts it, in watch mode and for `serve`, and whenever the
-supervisor or the worker refuses or fails before the run starts.
+own process in CI (`CI`, or a CI service's own variable), in a hosted run
+(`--credential-fd`), when a job of a run starts it, in watch mode (`--watch`,
+`-w`, or a serve workload), for `publish`, `deploy` and `release`, from a
+terminal (a worker has none to give its jobs, so commands that agents,
+scripts and editors start go through it), when the worker's limits, groups,
+priority or control group differ from the command's, and whenever the
+supervisor or the worker refuses or fails before the run starts. A worker
+that ends during a run makes the command run again in its own process.
+`putnami machine status` shows why the last command ran in its own process.
 `PUTNAMI_MACHINE=off` turns it off for one command and `PUTNAMI_MACHINE=on` on;
 `machine on|off` records the user's choice in `machine.json` under the
 Putnami home. The supervisor lives in `$XDG_RUNTIME_DIR/putnami` on Linux,
