@@ -101,6 +101,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/codehost"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
           "producerProject": "/protocols/config"
         },
         {
@@ -127,6 +132,11 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/sdd-extension",
           "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/evidence"
         },
         {
           "kind": "project-dependency",
