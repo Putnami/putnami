@@ -337,7 +337,7 @@ var (
 	readJSONLEvents         = model.ReadJSONLEvents
 	readJSONLEventsObserved = model.ReadJSONLEventsObserved
 	recordsFromEvents       = model.RecordsFromEvents
-	reduceSchedulerSession  = model.ReduceSchedulerSession
+	reduceSchedulerTasks    = model.ReduceSchedulerTasks
 	taskDeclarationOf       = model.TaskDeclarationOf
 	usesDeclaredCapture     = model.UsesDeclaredCapture
 )

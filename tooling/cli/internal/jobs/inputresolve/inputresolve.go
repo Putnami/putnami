@@ -283,6 +283,11 @@ func (r *Resolver) holds(key string) bool {
 // nothing.
 func (r *Resolver) SelectsInput(query store.InputQuery, rel string) bool {
 	expansion, err := r.ResolveInput(query)
+	return expansionSelects(expansion, err, rel)
+}
+
+// expansionSelects is SelectsInput for the outcome of one resolution.
+func expansionSelects(expansion store.InputExpansion, err error, rel string) bool {
 	if err != nil {
 		return !wsproto.IsNamedOnlyInput(rel)
 	}
@@ -482,16 +487,61 @@ func (r *Resolver) ask(name string, inputs []wsproto.InputResolveQuery) ([]wspro
 // Matcher returns the resolver as the selector matcher change impact reads
 // (workspace.InputSelectorMatcher). A nil resolver's matcher selects every
 // path for each selector.
-func (r *Resolver) Matcher() workspace.InputSelectorMatcher { return matcher{r} }
-
-// matcher adapts a Resolver to workspace.InputSelectorMatcher.
-type matcher struct{ r *Resolver }
-
-func (m matcher) SelectsInput(query workspace.InputSelectorQuery, rel string) bool {
-	return m.r.SelectsInput(store.InputQuery(query), rel)
+//
+// The matcher resolves each query once (ResolveInput) and answers every later
+// path from that expansion. Change impact asks the same query for each changed
+// path of a project and each task that declares the selector, and each
+// ResolveInput digests the answer's basis again (tooling/cli ADR 0125). A
+// selection writes nothing in the work tree, so the expansion one resolution checked
+// is the one each later resolution would check again; keys, which the run
+// computes after the selection, read the resolver directly and check their
+// expansion as before. A matcher therefore lives as long as one selection.
+func (r *Resolver) Matcher() workspace.InputSelectorMatcher {
+	return &matcher{r: r, resolved: make(map[resolvedQuery]store.InputExpansion)}
 }
 
-func (m matcher) PrimeInputs(queries []workspace.InputSelectorQuery) {
+// matcher adapts a Resolver to workspace.InputSelectorMatcher, resolving each
+// query once. A resolution that fails is not kept: the next path asks again,
+// as the resolver does.
+type matcher struct {
+	r *Resolver
+
+	mu       sync.Mutex
+	resolved map[resolvedQuery]store.InputExpansion
+}
+
+// resolvedQuery names one query a matcher resolved: the answer's key and the
+// project directory its basis is digested under.
+type resolvedQuery struct {
+	key string
+	dir string
+}
+
+func (m *matcher) SelectsInput(query workspace.InputSelectorQuery, rel string) bool {
+	converted := store.InputQuery(query)
+	if m.r == nil {
+		return m.r.SelectsInput(converted, rel)
+	}
+	asked, err := m.r.request(converted)
+	if err != nil {
+		return m.r.SelectsInput(converted, rel)
+	}
+	id := resolvedQuery{key: answerKey(converted.Extension, asked), dir: converted.Dir}
+	m.mu.Lock()
+	expansion, ok := m.resolved[id]
+	m.mu.Unlock()
+	if !ok {
+		expansion, err = m.r.ResolveInput(converted)
+		if err == nil {
+			m.mu.Lock()
+			m.resolved[id] = expansion
+			m.mu.Unlock()
+		}
+	}
+	return expansionSelects(expansion, err, rel)
+}
+
+func (m *matcher) PrimeInputs(queries []workspace.InputSelectorQuery) {
 	converted := make([]store.InputQuery, len(queries))
 	for i, query := range queries {
 		converted[i] = store.InputQuery(query)

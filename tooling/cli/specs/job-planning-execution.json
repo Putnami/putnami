@@ -206,6 +206,10 @@
       "text": "A run of an unchanged workspace whose tasks are cached or run every time writes no file outside .git and .putnami. A restore holds a tree that has its bytes, a directory leading to a kept path, or a project stamp differing only in fields the scheduler owns. Tasks sharing an output write the same content. An executing task re-stamps .gen/version.json only when its identity changes. After a commit that changes no file, the next run writes only stamps, and the run after it nothing."
     },
     {
+      "id": "selection-resolves-each-selector-once",
+      "text": "An impacted selection resolves each input selector query once, by the key of its answer and its project directory, and answers every changed path and task from that expansion; a failed resolution is asked again for the next path. Keys computed after the selection check each answer's basis again. The selected tasks, their keys and their results are the ones the selection gave before."
+    },
+    {
       "id": "go-embed-cache-inputs",
       "text": "A task input that names an input selector keys the exact bytes of every file the extension that lists the selector answers through __putnami input-resolve, so a listed file edit moves the key and its dependents' keys and an older entry cannot restore. A failed call, a rejected or error answer or an unlisted selector fails the task before restore or execution; portable admission fails on a deleted listed file. Change impact reads listed files and basis paths only where the command may be planned."
     },

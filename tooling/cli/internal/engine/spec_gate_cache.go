@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.putnami.dev/cli/model/workspace"
@@ -102,6 +103,29 @@ type cachedObservationRecovery struct {
 	remoteMu     sync.Mutex
 	remoteEnd    time.Time
 	remoteMisses map[string]unconsultedCause
+
+	// planned is the run's own plan as the gate reads it, or nil when the
+	// source does not serve a run (runObservationRecovery).
+	planned *runPlanCoverage
+	// answeredMu guards answered: each candidate's outcome, once a plan of this
+	// gate derived it, or nil when the source keeps none. A candidate's answer
+	// depends on the candidate alone, so a candidate several spec owners name
+	// is planned and keyed once per gate.
+	answeredMu sync.Mutex
+	answered   map[string]*candidateOutcome
+	// plans counts the plans RecoverReports derived: one per call that met a
+	// candidate neither the run's plan nor an earlier call answered.
+	plans atomic.Int64
+}
+
+// runPlanCoverage is what the run's own plan already answers for the
+// recovery: the projects the run planned every verification command for, and
+// how many of the run's tasks for each project can write its report. A
+// selected project with none is consulted and silent, exactly as planning it
+// again would find it.
+type runPlanCoverage struct {
+	selected  map[string]bool
+	producers map[string]int
 }
 
 // unconsultedCause is why a candidate could not be consulted: prose for the
@@ -153,14 +177,64 @@ func (source *cachedObservationRecovery) readingRemote(ctx context.Context,
 // run's cache manager, then, on a local miss, the remote cache the session
 // records when its execution starts (Request.executionRemote), asked under the
 // run's context ctx.
+//
+// It also answers, from the run's own plan, every candidate the run selected
+// (selected) under every verification command, and plans again only the
+// others. The run's plan (planned) holds the same tasks for such a candidate
+// that a recovery plan would: a task's plan, like its key, depends on its
+// project and its upstream, never on the projects planned beside it. The
+// recovery plans every candidate when the run's plan was cut after planning,
+// or planned from something the recovery does not have: a measured diff,
+// which gates steps (planner.Plan's changedFiles) and narrows a project to
+// its impacted tasks (narrowToTaskScopes); an executing dry run, which drops
+// the jobs it cannot run (dropUndryableSideEffectJobs); and a lifecycle run,
+// which plans without the workspace's disable lists the recovery applies. A
+// step whose condition reads the run's other commands (WhenContext.Commands)
+// could also differ; no verification producer of this repository has one.
 func runObservationRecovery(ctx context.Context, req *Request, ws *workspace.Workspace,
-	extensions []*extension.ExtensionDescription, cache *store.CacheManager) *cachedObservationRecovery {
-	return newCachedObservationRecovery(req, ws, extensions, cache).readingRemote(ctx, req.executionRemoteEntries)
+	extensions []*extension.ExtensionDescription, cache *store.CacheManager,
+	planned []*scheduler.ScheduledJob, selected []*workspace.Project) *cachedObservationRecovery {
+	source := newCachedObservationRecovery(req, ws, extensions, cache).readingRemote(ctx, req.executionRemoteEntries)
+	if source == nil {
+		return source
+	}
+	// One gate's answers are kept for the gate: the run's store does not change
+	// under it. The read-only verification bridge keeps none, since it reads an
+	// entry again on every call.
+	source.answered = make(map[string]*candidateOutcome)
+	dryRun, _ := req.CommandParams["dry-run"].(bool)
+	if req.WorkspaceLifecycle || req.selectionEvidence.changedPaths != nil ||
+		len(req.selectionEvidence.taskScopes) > 0 || (req.ExecutesUnderDryRun && dryRun) {
+		return source
+	}
+	runCommands := make(map[string]bool, len(req.Commands))
+	for _, command := range req.Commands {
+		runCommands[command] = true
+	}
+	for _, command := range scheduler.CommandsOfKind(extensions, extension.CommandKindVerification) {
+		if !runCommands[command] {
+			return source
+		}
+	}
+	coverage := &runPlanCoverage{selected: make(map[string]bool, len(selected)), producers: map[string]int{}}
+	for _, project := range selected {
+		if project != nil {
+			coverage.selected[project.ID] = true
+		}
+	}
+	for _, job := range planned {
+		if job != nil && job.Project != nil && scheduler.ProducesVerificationReport(job) {
+			coverage.producers[job.Project.ID]++
+		}
+	}
+	source.planned = coverage
+	return source
 }
 
 // RecoverReports keys one plan of the loaded verification commands over the
-// candidate set and reports where each candidate's captured verification
-// report lives, or why it could not be consulted. Only the tasks that can
+// candidates the run's own plan does not already answer (runObservationRecovery), and
+// reports where each candidate's captured verification report lives, or why it
+// could not be consulted. Only the tasks that can
 // write the report are asked (see jobs.ProducesVerificationReport); the other
 // steps of those commands cannot answer for it.
 func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.Project) specgate.Recovery {
@@ -173,12 +247,14 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 	}
 
 	// ONE plan and ONE keying pass over the whole candidate set, rather than the
-	// per-candidate pair the issue sketched. The two are equivalent — a cache key
+	// per-candidate pair. The two are equivalent — a cache key
 	// mixes declared inputs and UPSTREAM KEYS, never the run's selection, so a
 	// task keys the same whichever projects are planned beside it (that is the
 	// property every warm hit already depends on) — and the batch pays one
-	// topological pass and one activation-probe cache instead of N of each, on a
-	// path that only runs when the gate is already in trouble.
+	// topological pass and one activation-probe cache instead of N of each. The
+	// path runs only for a spec group the session left unresolved, and only
+	// over candidates whose report producer the session did not plan: a narrowed
+	// run, or one whose tests failed or were canceled.
 	//
 	// Without a verification command no candidate has a task that can write the
 	// report, so each one is consulted and silent.
@@ -186,65 +262,95 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 	if len(commands) == 0 {
 		return recovery
 	}
-	var disabledJobs, disabledExtensions []string
-	if source.req.Config != nil && source.req.Config.Disable != nil {
-		disabledJobs, disabledExtensions = source.req.Config.Disable.Jobs, source.req.Config.Disable.Extensions
+	// A candidate the run's own plan answers has no task that can write its
+	// report: it is consulted and silent. A candidate an earlier call of this
+	// gate answered keeps that answer, since it depends on the candidate alone.
+	// Only the others are planned, once per gate however many spec owners
+	// name them. A failure reports every candidate of the call.
+	all := candidates
+	source.answeredMu.Lock()
+	unanswered := make([]*workspace.Project, 0, len(candidates))
+	for _, candidate := range candidates {
+		_, known := source.answered[candidate.ID]
+		runAnswers := source.planned != nil && source.planned.selected[candidate.ID] && source.planned.producers[candidate.ID] == 0
+		if !known && !runAnswers {
+			unanswered = append(unanswered, candidate)
+		}
 	}
-	planned, err := planner.Plan(source.ws, commands, candidates, source.extensions,
-		source.req.CommandParams, disabledJobs, disabledExtensions, nil)
-	if err != nil {
-		return source.unconsultedAll(candidates, unconsultedCause{
-			fmt.Sprintf("their test plan could not be derived: %v", err), features.UnconsultedPlanFailed})
-	}
-	keys, err := cachekey.PrecomputeKeys(source.ws, planned, source.req.CommandParams,
-		source.runVersions(), source.cache, cachekey.CacheBypass{})
-	if err != nil {
-		return source.unconsultedAll(candidates, unconsultedCause{
-			fmt.Sprintf("their cache keys could not be derived: %v", err), features.UnconsultedPlanFailed})
-	}
+	source.answeredMu.Unlock()
+	var outcomes map[string]*candidateOutcome
+	if len(unanswered) > 0 {
+		var disabledJobs, disabledExtensions []string
+		if source.req.Config != nil && source.req.Config.Disable != nil {
+			disabledJobs, disabledExtensions = source.req.Config.Disable.Jobs, source.req.Config.Disable.Extensions
+		}
+		source.plans.Add(1)
+		planned, err := planner.Plan(source.ws, commands, unanswered, source.extensions,
+			source.req.CommandParams, disabledJobs, disabledExtensions, nil)
+		if err != nil {
+			return source.unconsultedAll(all, unconsultedCause{
+				fmt.Sprintf("their test plan could not be derived: %v", err), features.UnconsultedPlanFailed})
+		}
+		keys, err := cachekey.PrecomputeKeys(source.ws, planned, source.req.CommandParams,
+			source.runVersions(), source.cache, cachekey.CacheBypass{})
+		if err != nil {
+			return source.unconsultedAll(all, unconsultedCause{
+				fmt.Sprintf("their cache keys could not be derived: %v", err), features.UnconsultedPlanFailed})
+		}
 
-	outcomes := make(map[string]*candidateOutcome, len(candidates))
-	for _, candidate := range candidates {
-		outcomes[candidate.ID] = &candidateOutcome{}
-	}
-	for _, job := range planned {
-		// Only a task that can write the report can answer for it. The
-		// test-environment steps are cache:false by contract and a generation
-		// entry can be evicted on its own; counting either read a candidate whose
-		// report entry was recorded EMPTY as unreachable, which excused its gap.
-		if job == nil || job.Project == nil || !scheduler.ProducesVerificationReport(job) {
-			continue
+		outcomes = make(map[string]*candidateOutcome, len(unanswered))
+		for _, candidate := range unanswered {
+			outcomes[candidate.ID] = &candidateOutcome{}
 		}
-		outcome := outcomes[job.Project.ID]
+		for _, job := range planned {
+			// Only a task that can write the report can answer for it. The
+			// test-environment steps are cache:false by contract and a generation
+			// entry can be evicted on its own; counting either read a candidate whose
+			// report entry was recorded EMPTY as unreachable, which excused its gap.
+			if job == nil || job.Project == nil || !scheduler.ProducesVerificationReport(job) {
+				continue
+			}
+			outcome := outcomes[job.Project.ID]
+			if outcome == nil {
+				continue // a prerequisite of a candidate, not a candidate itself
+			}
+			outcome.reportTasks++
+			hash := keys[job.Key()]
+			if hash == "" {
+				continue // the task is not cacheable, so it can never be recovered
+			}
+			outcome.keyed++
+			entry, failure := source.lookupTaskEntry(hash, job)
+			if entry == nil {
+				if outcome.remoteFailure.code == "" {
+					outcome.remoteFailure = failure
+				}
+				continue
+			}
+			outcome.entries++
+			if report := reportInEntry(source.ws.Root, job, entry); report != nil && outcome.report == nil {
+				outcome.report = report
+				source.entriesMu.Lock()
+				if source.entries == nil {
+					source.entries = make(map[string]*store.TaskEntry)
+				}
+				source.entries[report.Path] = entry
+				source.entriesMu.Unlock()
+			}
+		}
+	}
+	source.answeredMu.Lock()
+	defer source.answeredMu.Unlock()
+	for _, candidate := range all {
+		outcome, planned := outcomes[candidate.ID]
+		if planned && source.answered != nil {
+			source.answered[candidate.ID] = outcome
+		} else if !planned {
+			outcome = source.answered[candidate.ID]
+		}
 		if outcome == nil {
-			continue // a prerequisite of a candidate, not a candidate itself
+			continue // answered by the run's plan: consulted and silent
 		}
-		outcome.reportTasks++
-		hash := keys[job.Key()]
-		if hash == "" {
-			continue // the task is not cacheable, so it can never be recovered
-		}
-		outcome.keyed++
-		entry, failure := source.lookupTaskEntry(hash, job)
-		if entry == nil {
-			if outcome.remoteFailure.code == "" {
-				outcome.remoteFailure = failure
-			}
-			continue
-		}
-		outcome.entries++
-		if report := reportInEntry(source.ws.Root, job, entry); report != nil && outcome.report == nil {
-			outcome.report = report
-			source.entriesMu.Lock()
-			if source.entries == nil {
-				source.entries = make(map[string]*store.TaskEntry)
-			}
-			source.entries[report.Path] = entry
-			source.entriesMu.Unlock()
-		}
-	}
-	for _, candidate := range candidates {
-		outcome := outcomes[candidate.ID]
 		if outcome.report != nil {
 			recovery.Reports = append(recovery.Reports, *outcome.report)
 			continue

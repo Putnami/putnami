@@ -798,6 +798,19 @@
         }
       },
       {
+        "id": "selection-resolves-each-selector-once",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-selection-resolves-each-input-selector-query-once"
+          ]
+        }
+      },
+      {
         "id": "go-embed-cache-inputs",
         "stage": "coded",
         "evidenceKinds": [

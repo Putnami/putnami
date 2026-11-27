@@ -1121,13 +1121,14 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	req.specGate = &specGateOutcome{}
 	// The gate's cache-recovery source reuses THIS run's cache manager, so the
 	// memoized file-hash pass built for the execution keys is the one a recovery
-	// lookup keys against; a second manager would walk the tree again. On a local
+	// lookup keys against; a second manager would walk the tree again. It also
+	// reuses THIS run's plan, which answers every candidate the run selected. On a local
 	// miss it asks the remote cache the session executes with, under the run's
 	// context. The gate attaches when the session names a command of the
 	// verification kind in any discovered extension.
 	if gate := specGateFinalizer(req, ws, planned,
 		scheduler.CommandsOfKind(discovered.Extensions, extension.CommandKindVerification),
-		runObservationRecovery(ctx, req, ws, planningExtensions, cacheManager),
+		runObservationRecovery(ctx, req, ws, planningExtensions, cacheManager, planned, selectedProjects),
 		&projectionProducerPlan{req: req, ws: ws, projects: selectedProjects, extensions: discovered.Extensions, skipped: discovered.Skipped},
 		req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)

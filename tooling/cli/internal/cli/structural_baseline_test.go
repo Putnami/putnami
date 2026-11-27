@@ -274,7 +274,7 @@ var structuralPins = []structuralPin{
 		token: "func reduceSession(",
 		scope: productionFiles,
 		want:  1,
-		why: "the single fold both entry points run through: reduceSchedulerSession (the " +
+		why: "the single fold both entry points run through: ReduceSchedulerTasks (the " +
 			"scheduler's own end-of-run result) and ReduceRun (the renderers'). Pinned beside the " +
 			"reducer type because a second FOLD is how two callers start disagreeing about the " +
 			"same counts even while sharing one reducer struct. " +
