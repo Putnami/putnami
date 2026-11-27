@@ -436,8 +436,11 @@ spelling.
 
 ### Git candidate inputs
 
-A `git:` pattern enumerates `git ls-files -z --cached --others
---exclude-standard` in the containing repository, then applies the same
+A `git:` pattern enumerates what `git ls-files -z --cached --others
+--exclude-standard` lists in the containing repository (the engine reads the
+index and the untracked files itself and asks Git only for a state its reader
+does not read, [ADR 0112](adr/0112-the-engine-reads-the-git-index-and-the-work-tree-itself.md)),
+then applies the same
 project-relative matching and exclusions. `git:**` covers every candidate,
 including files outside the project's directory. It never walks ignored local
 directories. Missing tracked files are absent from the candidate; additions,
@@ -611,7 +614,8 @@ clientgen provider build, 46 project bindings therefore spawned 92 processes
 even while 131 tasks were restored locally. The measured binding cost was
 2,326–3,993 ms total, or about 51–87 ms per project binding.
 
-The scheduler now runs those two `ls-files` commands once for the repository
+The scheduler now reads that enumeration once for the repository, in-process
+(ADR 0112) or with those two `ls-files` commands where the reader steps aside,
 and selects each exact project's entries in memory. The shared snapshot holds
 only file enumeration: working bytes, deletions, executable/symlink modes and
 visible gitlink commits are still read when deriving a binding. Git's ignore

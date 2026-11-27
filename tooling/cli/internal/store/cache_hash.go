@@ -9,7 +9,6 @@ import (
 	"hash"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -20,8 +19,6 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
-	"go.putnami.dev/sdk/extension/gitread"
-	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 	"go.putnami.dev/tooling/cli/internal/fileindex"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
@@ -587,13 +584,11 @@ func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []s
 		root, paths = dir, read.Paths
 		index = gitutil.IndexModes{Modes: read.Modes, Unmerged: read.Unmerged}
 	} else {
-		cmd := exec.Command(gitread.Executable(), "rev-parse", "--show-toplevel")
-		cmd.Dir = dir
-		out, err := procstat.Output(cmd, procstat.Git)
+		var err error
+		root, err = gitutil.WorkTreeRoot(dir)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("resolve Git input repository: %w", err)
 		}
-		root = strings.TrimSuffix(string(out), "\n")
 		prefixes := gitInputPrefixes(root, dir, includes)
 		paths, err = candidatePaths(root, prefixes...)
 		if err != nil {

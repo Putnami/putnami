@@ -12,9 +12,11 @@ import (
 // ReleaseBaselineReader reads the release baselines of the projects of one
 // work tree, asking git once for what does not depend on the project
 // directory: the repository's state, its HEAD, its tags and each line's last
-// release (tooling/cli ADR 0110). A directory it cannot place in the work
-// tree of its root, below a .git of its own, through a symbolic link, or
-// outside the root, is read as ReadReleaseBaseline reads it.
+// release (tooling/cli ADR 0110). The lines read HEAD, the tag names, their
+// peeled objects and the tags HEAD reaches once between them (linetag.Tags).
+// A directory it cannot place in the work tree of its root, below a .git of
+// its own, through a symbolic link, or outside the root, is read as
+// ReadReleaseBaseline reads it.
 //
 // The reads describe the repository when they were first made. A run holds
 // one reader, as it holds one read of the tree facts (protocols/job ADR 0002).
@@ -37,6 +39,9 @@ type ReleaseBaselineReader struct {
 
 	releasesMu sync.Mutex
 	releases   map[string]*onceRelease
+
+	tagsReadOnce sync.Once
+	tags         *linetag.Tags
 }
 
 type onceRelease struct {
@@ -148,7 +153,8 @@ func (s rootReleaseReads) release(_, tagPattern string) (linetag.Release, bool, 
 		r.releases[tagPattern] = entry
 	}
 	r.releasesMu.Unlock()
-	entry.once.Do(func() { entry.release, entry.ok, entry.err = lastRelease(r.root, tagPattern) })
+	r.tagsReadOnce.Do(func() { r.tags = linetag.Open(r.root) })
+	entry.once.Do(func() { entry.release, entry.ok, entry.err = r.tags.LastRelease(tagPattern) })
 	return entry.release, entry.ok, entry.err
 }
 

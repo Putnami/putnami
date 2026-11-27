@@ -138,6 +138,9 @@ var clientgenFiles = map[string]string{
 		` "exports": {".": "./src/index.ts"}, "dependencies": {"@putnami/client": "workspace:*"}}` + "\n",
 }
 
+// The engine reads the index and the work tree in-process: the one config
+// call of a cold ceiling reads Git's configuration for it, and the listings it
+// replaced leave ls-files (tooling/cli ADR 0112).
 var extensionCases = []extensionCase{
 	{
 		name:        "go",
@@ -149,7 +152,7 @@ var extensionCases = []extensionCase{
 		files:       goFiles,
 		setup:       [][]string{{"projects", "sync"}},
 		command:     []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:        "engine job 9 · cli 1 · git 16 | engine git for-each-ref 1 · ls-files 5 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:        "engine job 9 · cli 1 · git 13 | engine git config 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:        "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:     true,
 	},
@@ -165,7 +168,7 @@ var extensionCases = []extensionCase{
 		files:      typescriptFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:       "engine job 8 · control 1 · git 23 | engine git for-each-ref 1 · ls-files 11 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 8 · control 1 · git 13 | engine git config 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 	},
@@ -177,7 +180,7 @@ var extensionCases = []extensionCase{
 		files:      sddFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 13 · git 23 | engine git check-ignore 1 · for-each-ref 1 · ls-files 9 · rev-parse 7 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 13 · git 14 | engine git check-ignore 1 · config 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 		// The squash-message checks read PUTNAMI_PROPOSAL_MESSAGE and Git
@@ -201,7 +204,7 @@ var extensionCases = []extensionCase{
 		files:      clientgenFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"client-generate", "--projects", "client", "--max-parallel", "1"},
-		cold:       "engine job 1 · control 1 · git 16 | engine git diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 1 · control 1 · git 15 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 2 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 	},
@@ -215,8 +218,11 @@ var extensionCases = []extensionCase{
 		files:       rustFiles,
 		setup:       [][]string{{"projects", "sync"}},
 		command:     []string{"lint,test,build", "--all", "--max-parallel", "1"},
-		cold:        "engine job 4 · git 17 | engine git check-ignore 1 · diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		plan:        "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		// The config call reads Git's configuration for the in-process
+		// listings; the ls-files they replace are not measured here
+		// (cargo-nextest absent), so their count keeps its ceiling.
+		cold: "engine job 4 · git 18 | engine git check-ignore 1 · config 1 · diff 1 · for-each-ref 1 · ls-files 4 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan: "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
 		name:       "shell",
@@ -226,7 +232,7 @@ var extensionCases = []extensionCase{
 		files:      shellFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"test", "--all", "--max-parallel", "1"},
-		cold:       "engine job 2 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 2 · git 14 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -243,7 +249,7 @@ var extensionCases = []extensionCase{
 		files:      webFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"build", "--all", "--max-parallel", "1"},
-		cold:       "engine job 5 · control 1 · git 21 | engine git for-each-ref 1 · ls-files 9 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 5 · control 1 · git 13 | engine git config 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 8 | engine git for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -254,7 +260,7 @@ var extensionCases = []extensionCase{
 		files:      cloudFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 1 · git 14 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 	},
 	{
@@ -265,7 +271,7 @@ var extensionCases = []extensionCase{
 		files:      bazelFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 1 · git 14 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 		// The graph check is planned, since the root holds the tool's files,
@@ -280,7 +286,7 @@ var extensionCases = []extensionCase{
 		files:      pantsFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 1 · git 14 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 		// The graph check is planned, since the root holds the tool's files,
@@ -295,7 +301,7 @@ var extensionCases = []extensionCase{
 		files:      moonFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 1 · git 14 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 		// The graph check is planned, since the root holds the tool's files,
@@ -310,7 +316,7 @@ var extensionCases = []extensionCase{
 		files:      turboFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 1 · git 14 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 		// The graph check is planned, since the root holds the tool's files,
@@ -325,7 +331,7 @@ var extensionCases = []extensionCase{
 		files:      nxFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 1 · git 14 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 		// The graph check is planned, since the root holds the tool's files,
@@ -340,7 +346,7 @@ var extensionCases = []extensionCase{
 		files:      rushFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		cold:       "engine job 1 · git 14 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		settles:    true,
 		// The graph check is planned, since the root holds the tool's files,

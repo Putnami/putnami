@@ -217,6 +217,9 @@ func TestProjectSourceBindingMeasuredCountsGitProcesses(t *testing.T) {
 	runGit(t, repo, "add", "root.go")
 	runGit(t, repo, "commit", "-m", "add root project")
 
+	// The process keeps a reading of Git's configuration only when its files
+	// changed no less than a second before it: date them back.
+	antedate(t, filepath.Join(repo, ".git", "config"), filepath.Join(repo, ".git", "HEAD"))
 	measured, metrics, err := ProjectSourceBindingMeasured(repo, repo)
 	if err != nil {
 		t.Fatal(err)
@@ -228,8 +231,13 @@ func TestProjectSourceBindingMeasuredCountsGitProcesses(t *testing.T) {
 	if measured != plain {
 		t.Fatalf("measured binding %q differs from ordinary binding %q", measured, plain)
 	}
-	if metrics.SpawnedProcesses != 2 {
-		t.Fatalf("spawned processes = %d, want the two ls-files calls", metrics.SpawnedProcesses)
+	// The enumeration is read in-process: the first read of a repository
+	// reads Git's configuration, the next one holds it.
+	if metrics.SpawnedProcesses != 1 {
+		t.Fatalf("spawned processes = %d, want the one git config call", metrics.SpawnedProcesses)
+	}
+	if _, metrics, err := ProjectSourceBindingMeasured(repo, repo); err != nil || metrics.SpawnedProcesses != 0 {
+		t.Fatalf("second binding: spawned processes = %d (%v), want none", metrics.SpawnedProcesses, err)
 	}
 }
 
@@ -304,7 +312,7 @@ func TestProjectSourceBindingRejectsUnmergedAndMalformedStageEntries(t *testing.
 		t.Fatal(err)
 	}
 	snapshot, metrics, err := ReadSourceBindingSnapshot(repo)
-	if err != nil || metrics.SpawnedProcesses != 2 {
+	if err != nil || metrics.SpawnedProcesses > 1 {
 		t.Fatalf("snapshot: metrics=%+v err=%v", metrics, err)
 	}
 	if _, _, err := snapshot.ProjectSourceBindingMeasured(unrelated); err != nil {
@@ -337,7 +345,7 @@ func TestSourceBindingSnapshotSharesEnumerationAcrossExactRoots(t *testing.T) {
 	}
 	runGit(t, repo, "add", "one/source.go", "one-more/source.go")
 	snapshot, metrics, err := ReadSourceBindingSnapshot(repo)
-	if err != nil || metrics.SpawnedProcesses != 2 {
+	if err != nil || metrics.SpawnedProcesses > 1 {
 		t.Fatalf("snapshot: metrics=%+v err=%v", metrics, err)
 	}
 	// Calls on the same immutable enumeration can be concurrent. Each result

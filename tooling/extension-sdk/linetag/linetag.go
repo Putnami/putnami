@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -66,74 +67,144 @@ func Version(tag, pattern string) (version string, ok bool) {
 // are errors. Git walks only as far as the tags it looks for, so a missing
 // object beyond them is not read and not reported.
 func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
+	return Open(dir).LastRelease(pattern)
+}
+
+// Tags reads the tags of the repository that holds a directory once for
+// every line: HEAD, the tag names, the objects they peel to and the tags HEAD
+// reaches. Each is the answer of the git call LastRelease makes for one line,
+// and the same for every line, so the lines of one repository ask git four
+// times between them instead of four times each. The reads describe the
+// repository when the first line asks: a caller holds one Tags while HEAD and
+// the tags do not move, as a run does.
+type Tags struct {
+	dir string
+
+	namesOnce sync.Once
+	head      string
+	refs      string
+	namesErr  error
+
+	peelOnce sync.Once
+	peeled   map[string]string // tag name to its cat-file --batch-check line
+	peelErr  error
+
+	mergedOnce sync.Once
+	merged     map[string]bool
+	mergedErr  error
+}
+
+// Open returns the tags of the repository that holds dir, read when a line
+// first asks.
+func Open(dir string) *Tags { return &Tags{dir: dir} }
+
+// LastRelease returns the last release of the line that renders its tags with
+// pattern, as the package's LastRelease answers it.
+func (t *Tags) LastRelease(pattern string) (release Release, ok bool, err error) {
 	prefix, suffix, usable := splitPattern(pattern)
 	if !usable {
 		return Release{}, false, fmt.Errorf("read the last release: %q is not a usable line tag pattern", pattern)
 	}
-	head, err := runGit(dir, nil, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}")
-	if err != nil {
-		return Release{}, false, fmt.Errorf("read the last release: %w", err)
+	t.namesOnce.Do(t.readNames)
+	if t.namesErr != nil {
+		return Release{}, false, fmt.Errorf("read the last release: %w", t.namesErr)
 	}
-	head = strings.TrimSpace(head)
-	// Listing tag names reads no object, so every release tag of the line is a
-	// candidate here, whether git can read its object or not.
-	refs, err := runGit(dir, nil, "for-each-ref", "--format=%(refname)", "refs/tags")
-	if err != nil {
-		return Release{}, false, fmt.Errorf("read the last release: %w", err)
-	}
-	candidates := releases(refs, prefix, suffix)
+	candidates := releases(t.refs, prefix, suffix)
 	if len(candidates) == 0 {
 		return Release{}, false, nil
 	}
 	slices.SortFunc(candidates, func(a, b Release) int { return CompareVersions(b.Version, a.Version) })
 
-	// One line per candidate, in order: "<object> <type> <size>" for the
-	// object the tag peels to, or "<name> missing".
-	var names strings.Builder
-	for _, candidate := range candidates {
-		names.WriteString("refs/tags/" + candidate.Tag + "^{}\n")
-	}
-	objects, err := runGit(dir, strings.NewReader(names.String()), "cat-file", "--batch-check")
-	if err != nil {
-		return Release{}, false, fmt.Errorf("read the last release: %w", err)
-	}
-	lines := strings.Split(strings.TrimSuffix(objects, "\n"), "\n")
-	if len(lines) != len(candidates) {
-		return Release{}, false, fmt.Errorf("read the last release: git cat-file answered %d lines for %d tags", len(lines), len(candidates))
+	t.peelOnce.Do(t.readPeeled)
+	if t.peelErr != nil {
+		return Release{}, false, fmt.Errorf("read the last release: %w", t.peelErr)
 	}
 	for i := range candidates {
-		fields := strings.Fields(lines[i])
+		line := t.peeled[candidates[i].Tag]
+		fields := strings.Fields(line)
 		if len(fields) != 3 {
-			return Release{}, false, fmt.Errorf("read the last release: git cannot read tag %s: %s", candidates[i].Tag, lines[i])
+			return Release{}, false, fmt.Errorf("read the last release: git cannot read tag %s: %s", candidates[i].Tag, line)
 		}
 		if fields[1] == "commit" {
 			candidates[i].Commit = fields[0]
 		}
 	}
 
-	// --merged lists every tag HEAD reaches in one walk of the history. It
-	// names HEAD by its commit, so a ref called HEAD cannot make it ambiguous.
-	// On a history it cannot read it still exits 0 and reports the missing
-	// object on an "error:" line of stderr. Warnings and trace lines on stderr
-	// are not failures.
-	merged, stderr, err := runGitCapture(dir, nil,
-		"for-each-ref", "--merged="+head, "--format=%(refname)", "refs/tags")
-	if err == nil {
-		err = reportedError(stderr)
-	}
-	if err != nil {
-		return Release{}, false, fmt.Errorf("read the last release: %w", err)
-	}
-	reached := map[string]bool{}
-	for _, release := range releases(merged, prefix, suffix) {
-		reached[release.Tag] = true
+	t.mergedOnce.Do(t.readMerged)
+	if t.mergedErr != nil {
+		return Release{}, false, fmt.Errorf("read the last release: %w", t.mergedErr)
 	}
 	for _, candidate := range candidates {
-		if candidate.Commit != "" && reached[candidate.Tag] {
+		if candidate.Commit != "" && t.merged[candidate.Tag] {
 			return candidate, true, nil
 		}
 	}
 	return Release{}, false, nil
+}
+
+// readNames reads HEAD's commit and the tag names. Listing tag names reads
+// no object, so every release tag of a line is a candidate, whether git can
+// read its object or not.
+func (t *Tags) readNames() {
+	head, err := runGit(t.dir, nil, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}")
+	if err != nil {
+		t.namesErr = err
+		return
+	}
+	t.head = strings.TrimSpace(head)
+	t.refs, t.namesErr = runGit(t.dir, nil, "for-each-ref", "--format=%(refname)", "refs/tags")
+}
+
+// readPeeled reads, in one cat-file --batch-check, the object each tag peels
+// to: one line per tag, "<object> <type> <size>", or "<name> missing".
+func (t *Tags) readPeeled() {
+	var tags []string
+	for ref := range strings.SplitSeq(t.refs, "\n") {
+		if tag, ok := strings.CutPrefix(ref, "refs/tags/"); ok && tag != "" {
+			tags = append(tags, tag)
+		}
+	}
+	var names strings.Builder
+	for _, tag := range tags {
+		names.WriteString("refs/tags/" + tag + "^{}\n")
+	}
+	objects, err := runGit(t.dir, strings.NewReader(names.String()), "cat-file", "--batch-check")
+	if err != nil {
+		t.peelErr = err
+		return
+	}
+	lines := strings.Split(strings.TrimSuffix(objects, "\n"), "\n")
+	if len(lines) != len(tags) {
+		t.peelErr = fmt.Errorf("git cat-file answered %d lines for %d tags", len(lines), len(tags))
+		return
+	}
+	t.peeled = make(map[string]string, len(tags))
+	for i, tag := range tags {
+		t.peeled[tag] = lines[i]
+	}
+}
+
+// readMerged lists every tag HEAD reaches in one walk of the history. It
+// names HEAD by its commit, so a ref called HEAD cannot make it ambiguous. On
+// a history it cannot read it still exits 0 and reports the missing object on
+// an "error:" line of stderr. Warnings and trace lines on stderr are not
+// failures.
+func (t *Tags) readMerged() {
+	merged, stderr, err := runGitCapture(t.dir, nil,
+		"for-each-ref", "--merged="+t.head, "--format=%(refname)", "refs/tags")
+	if err == nil {
+		err = reportedError(stderr)
+	}
+	if err != nil {
+		t.mergedErr = err
+		return
+	}
+	t.merged = map[string]bool{}
+	for ref := range strings.SplitSeq(merged, "\n") {
+		if tag, ok := strings.CutPrefix(ref, "refs/tags/"); ok {
+			t.merged[tag] = true
+		}
+	}
 }
 
 // releases returns the release tags of the line among refs, one ref name per

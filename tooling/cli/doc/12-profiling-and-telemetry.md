@@ -200,8 +200,12 @@ Each test runs the real CLI in a fixture workspace and reads the counts from its
 (`clitest.CountsFixture`) runs trivial `/bin/sh` tasks, so what it starts is the
 engine's alone. Its writing variant (`clitest.WritingCountsFixture`) keys each
 task on its project's Git candidates and writes a report under the ignored
-`.putnami`, so its git calls show that such a write lists no candidate again
+`.putnami`, so its counts show that such a write lists no candidate again
 ([ADR 0106](adr/0106-a-write-under-an-excluded-putnami-keeps-the-candidate-digests.md)).
+The engine reads the index and the untracked files in-process
+([ADR 0112](adr/0112-the-engine-reads-the-git-index-and-the-work-tree-itself.md)),
+so a listing is counted as an in-process read of the cut
+(`git.InProcessCutReads`), and a git call only where the reader steps aside.
 Each extension's fixture loads the extension from this tree with
 one small project it serves, and runs on one worker from no task history
 (`clitest.ForgetTaskHistory`), so its tasks run in the same order every time:
@@ -291,7 +295,7 @@ manifest, are inputs of `@putnami/cli`'s test task, so a pull request that chang
 
 | Count | What it is | How it is lowered |
 |---|---|---|
-| Git calls per job | The engine's git calls on runs of 6 and 15 tasks, each on the default store under a home of its own, whose difference, what 9 more jobs cost, is held under a ceiling of 0; the git calls of the SDK jobs, by subcommand. | The engine reads the tree once per run and hands its facts to jobs in the job context; a job reads them there instead of running git. |
+| Git calls per job | The engine's git calls on runs of 6 and 15 tasks, each on the default store under a home of its own, whose difference, what 9 more jobs cost, is held under a ceiling of 0; the git calls of the SDK jobs, by subcommand. | The engine reads the tree once per run and hands its facts to jobs in the job context; a job reads them there instead of running git. The engine reads the index and the work tree in-process, and asks Git only for objects, `status`, refs and the states its reader does not read (ADR 0112). |
 | Processes started by planning an unchanged workspace | Every process `--dry-run` starts on the workspace: git, toolchain probes, control processes. A plan reports no `run.orchestration`, so the test reads the process-wide ledger around it (`clitest.PlanCounts`). The engine's fixture also holds a whole run of the unchanged workspace, every task found in the cache. Each extension's plan is its git calls alone: a runtime handshake, a toolchain probe and an input-resolve answer are read from what the runs before recorded, and the workspace snapshot answers for the workspace probe ([ADR 0102](adr/0102-planning-reads-recorded-facts.md)), whether its toolchains are Putnami home releases or system toolchains that name their own executable ([ADR 0105](adr/0105-a-toolchain-that-names-its-own-executable-is-recorded.md)). | A probe or a read that does not depend on the change is answered from what the run already knows, or from state kept between runs. |
 | Tasks a second run executes | The tasks a run of the unchanged workspace executes once a first run, on every worker in the order its tasks take there, filled the cache, read from its task records (`clitest.ExecutedTasks`). The Go, TypeScript, sdd and clientgen cases execute none, but the tasks a case names as never served from the cache, each with its reason: the sdd checks of the proposed squash message, which read an environment variable and Git history no key holds. A library's `build~infra` skip is cached as the manifest's absence. A `--no-cache` run stores nothing, so a run after it is served from what the runs before it stored. | A key reads only what the tree holds: a fixture ignores `.gen` as `putnami init` writes it, which also ignores Python's `__pycache__` and `*.egg-info`, no lint rewrites what another task generated, and a fixture's sources are written as its lint formats them, since a lint that fixes a source changes the tree the next run reads. |
 | CLI starts per job | The `putnami` processes the SDK jobs start, such as a registry credential a job resolves itself. The Go fixture's jobs start none: a task declares `nativeRegistryCredential`, and the engine materializes it once per origin and per 4-minute window, which its own ledger counts. | The engine materializes what jobs ask the CLI for once per run and hands it to them. |

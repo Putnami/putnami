@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -416,5 +417,33 @@ func TestReadIndexModes(t *testing.T) {
 	}
 	if empty, err := parseIndexModes(nil); err != nil || len(empty.Modes) != 0 || len(empty.Unmerged) != 0 {
 		t.Fatalf("an empty index = %+v, %v", empty, err)
+	}
+}
+
+// Paths lists in the environment of the CLI's `git:` listing
+// (gitread.RepositoryEnvironment): a GIT_CONFIG_* variable that the key's
+// listing does not pass on changes nothing the task lists either.
+func TestPathsListsInTheEnvironmentOfTheKey(t *testing.T) {
+	// A home of its own: the machine's global configuration and ignore
+	// file, which RepositoryEnvironment leaves Git to read, are not the
+	// test's.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	root := repository(t, map[string]string{"a.txt": "a\n", "b.txt": "b\n"})
+	want, err := Paths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, root, "rules", "a.txt\n")
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "core.excludesFile")
+	t.Setenv("GIT_CONFIG_VALUE_0", filepath.Join(root, "rules"))
+	got, err := Paths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(got, "a.txt") || len(got) != len(want)+1 {
+		t.Fatalf("Paths under GIT_CONFIG_COUNT = %q, want %q and the rules file", got, want)
 	}
 }

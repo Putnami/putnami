@@ -101,6 +101,9 @@ type Head struct {
 	repoRoot string
 	tree     VersionInfo
 	atHead   []string
+	// tags answers each line's last release from one read of the tags
+	// (linetag.Tags).
+	tags *linetag.Tags
 }
 
 // ReadHead reads the Head of repoRoot. It refuses a shallow clone (step 1 of
@@ -124,7 +127,7 @@ func ReadHead(repoRoot string, tree *VersionInfo) (*Head, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Head{repoRoot: repoRoot, tree: *tree, atHead: atHead}, nil
+	return &Head{repoRoot: repoRoot, tree: *tree, atHead: atHead, tags: linetag.Open(repoRoot)}, nil
 }
 
 // LineVersion computes one line's version from the Head, steps 2 to 4 of
@@ -159,7 +162,7 @@ func (h *Head) LineVersion(line LineSpec) (*VersionInfo, error) {
 		return &info, nil
 	}
 
-	last, found, err := linetag.LastRelease(h.repoRoot, line.TagPattern)
+	last, found, err := h.lastRelease(line.TagPattern)
 	if err != nil {
 		return nil, err
 	}
@@ -180,6 +183,15 @@ func (h *Head) LineVersion(line LineSpec) (*VersionInfo, error) {
 	info.Base = NextVersion(last.Version, bump, true)
 	info.Full = info.Base + "-" + info.Suffix
 	return &info, nil
+}
+
+// lastRelease is the line's last release, from the Head's one read of the
+// tags; a Head built without one reads them for the line alone.
+func (h *Head) lastRelease(pattern string) (linetag.Release, bool, error) {
+	if h.tags == nil {
+		return linetag.LastRelease(h.repoRoot, pattern)
+	}
+	return h.tags.LastRelease(pattern)
 }
 
 // commitTime returns the committer time of revision. The committer time, not
@@ -302,6 +314,9 @@ func RemoteURL(repoRoot, remote string) string {
 	remote = strings.TrimSpace(remote)
 	if remote == "" {
 		return ""
+	}
+	if repo, err := openLocal(repoRoot); err == nil {
+		return strings.TrimSpace(repo.config.RemoteURLs[remote])
 	}
 	output, err := gitread.Run(repoRoot, "config", "--get", "remote."+remote+".url")
 	if err != nil {
