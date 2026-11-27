@@ -157,9 +157,10 @@ func (w *activationWitness) holds() bool {
 }
 
 // settled reports whether every recorded time lies more than the file
-// index's margin before now (ADR 0009 §2 of protocols/workspace).
-func (w *activationWitness) settled(now time.Time) bool {
-	limit := now.Add(-fileindex.Margin).UnixNano()
+// index's margin before start, the clock read before the first stat (ADR
+// 0009 §2 of protocols/workspace).
+func (w *activationWitness) settled(start time.Time) bool {
+	limit := start.Add(-fileindex.Margin).UnixNano()
 	for _, st := range w.paths {
 		if st.ModNano >= limit || st.ChangeNano >= limit {
 			return false
@@ -179,7 +180,12 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 			return w.found
 		}
 	}
-	trusted := fileindex.TrustsStats(searchRoot)
+	// The clock is read before the first stat (ADR 0009 §2 of
+	// protocols/workspace); the walk's paths are held only on the root's
+	// device, which TrustsStats vouches for.
+	start := time.Now()
+	rootStat, rootOK := fileindex.StatPath(root)
+	trusted := rootOK && fileindex.TrustsStats(root)
 	walked := map[string]fileindex.Stat{}
 	found, match := false, ""
 	activationWalks.Add(1)
@@ -199,7 +205,7 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 				return filepath.SkipDir
 			}
 			if trusted {
-				if st, ok := fileindex.StatPath(path); ok {
+				if st, ok := fileindex.StatPath(path); ok && st.Dev == rootStat.Dev {
 					walked[path] = st
 				} else {
 					trusted = false
@@ -214,7 +220,9 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 		}
 		return nil
 	})
-	if !trusted {
+	// A walk that did not list its search root (a missing prefix, or one
+	// that is not a directory) has nothing to hold its answer by.
+	if _, listed := walked[searchRoot]; !trusted || !listed || time.Now().Before(start) {
 		activationWitnesses.Delete(key)
 		return found
 	}
@@ -224,13 +232,15 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 		// the directories the walk listed before reaching them do not
 		// matter.
 		st, ok := fileindex.StatPath(match)
-		if !ok {
+		if !ok || st.Dev != rootStat.Dev {
+			activationWitnesses.Delete(key)
 			return found
 		}
 		w.paths[match] = st
 		for dir := filepath.Dir(match); ; dir = filepath.Dir(dir) {
 			before, listed := walked[dir]
 			if !listed {
+				activationWitnesses.Delete(key)
 				return found
 			}
 			w.paths[dir] = before
@@ -249,7 +259,7 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 			return found
 		}
 	}
-	if w.settled(time.Now()) {
+	if w.settled(start) {
 		activationWitnesses.Store(key, w)
 	} else {
 		activationWitnesses.Delete(key)

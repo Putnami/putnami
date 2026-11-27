@@ -95,3 +95,20 @@ func TestARecursiveActivationMatchIsAnsweredByItsWitnessUntilAPathMoves(t *testi
 		t.Error("a match under a nested project's root counted for the outer project")
 	}
 }
+
+func TestAnActivationMatchUnderAMissingPrefixIsNotHeld(t *testing.T) {
+	root := settledTree(t)
+	roots := map[string]bool{root: true}
+	if HasActivationFiles(root, []string{"later/**/*.go"}, roots) {
+		t.Fatal("a missing prefix matched")
+	}
+	if err := os.MkdirAll(filepath.Join(root, "later"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "later", "x.go"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !HasActivationFiles(root, []string{"later/**/*.go"}, roots) {
+		t.Error("a file under a prefix that came back did not match: the missing prefix was held")
+	}
+}
