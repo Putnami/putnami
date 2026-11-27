@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -74,7 +76,6 @@ func newTestS3Backend(t *testing.T, cfg S3Config, url string) *S3Backend {
 type bodyRead struct {
 	n   int64
 	err error
-	at  time.Time
 }
 
 // stallingServer reads the whole body, reports it, then holds its answer
@@ -85,7 +86,7 @@ func stallingServer(t *testing.T) (*httptest.Server, <-chan bodyRead) {
 	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		n, err := io.Copy(io.Discard, r.Body)
-		read <- bodyRead{n: n, err: err, at: time.Now()}
+		read <- bodyRead{n: n, err: err}
 		<-release
 	}))
 	t.Cleanup(srv.Close)
@@ -126,20 +127,20 @@ func TestGCSBackend_Put_RequestTimeoutBoundsAnswerAfterBody(t *testing.T) {
 	spectest.Proves(t, "go/object-storage", "deadlines-and-streams", "gcs-put-request-timeout-bounds-answer-after-body")
 	srv, read := stallingServer(t)
 
-	_, err := newTestGCSBackend(srv.URL).Put(context.Background(), "bucket", "stalled", newSlowBody(), nil)
-	assertAnswerDeadline(t, err, read, time.Now(), 0)
+	armed := recordUploadTimers(t)
+
+	_, err := newTestGCSBackend(srv.URL).Put(callerBudget(t), "bucket", "stalled", newSlowBody(), nil)
+	assertAnswerDeadline(t, err, read, armed, 0)
 }
 
 func TestGCSBackend_Put_RequestTimeoutBoundsAStorageStall(t *testing.T) {
 	spectest.Proves(t, "go/object-storage", "deadlines-and-streams", "gcs-put-request-timeout-bounds-a-storage-stall")
 	srv := readStallingServer(t)
 
-	// The caller's context only keeps a regression from hanging the test.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	started := time.Now()
-	_, err := newTestGCSBackend(srv.URL).Put(ctx, "bucket", "stalled", stallBody(), nil)
-	assertStallDeadline(t, err, time.Since(started))
+	armed := recordUploadTimers(t)
+
+	_, err := newTestGCSBackend(srv.URL).Put(callerBudget(t), "bucket", "stalled", stallBody(), nil)
+	assertStallDeadline(t, err, armed)
 }
 
 func TestS3Backend_Put_SlowBodyIsNotCutByRequestTimeout(t *testing.T) {
@@ -178,50 +179,125 @@ func TestS3Backend_Put_RequestTimeoutBoundsAnswerAfterBody(t *testing.T) {
 	spectest.Proves(t, "go/object-storage", "deadlines-and-streams", "s3-put-request-timeout-bounds-answer-after-body")
 	srv, read := stallingServer(t)
 
-	_, err := newTestS3Backend(t, S3Config{}, srv.URL).Put(context.Background(), "bucket", "stalled", newSlowBody(), nil)
-	assertAnswerDeadline(t, err, read, time.Now(), 5)
+	armed := recordUploadTimers(t)
+
+	_, err := newTestS3Backend(t, S3Config{}, srv.URL).Put(callerBudget(t), "bucket", "stalled", newSlowBody(), nil)
+	assertAnswerDeadline(t, err, read, armed, 5)
 }
 
 func TestS3Backend_Put_RequestTimeoutBoundsAStorageStall(t *testing.T) {
 	spectest.Proves(t, "go/object-storage", "deadlines-and-streams", "s3-put-request-timeout-bounds-a-storage-stall")
 	srv := readStallingServer(t)
 
-	// The caller's context only keeps a regression from hanging the test.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	started := time.Now()
-	_, err := newTestS3Backend(t, S3Config{}, srv.URL).Put(ctx, "bucket", "stalled", stallBody(), nil)
-	assertStallDeadline(t, err, time.Since(started))
+	armed := recordUploadTimers(t)
+
+	_, err := newTestS3Backend(t, S3Config{}, srv.URL).Put(callerBudget(t), "bucket", "stalled", stallBody(), nil)
+	assertStallDeadline(t, err, armed)
 }
 
-// assertAnswerDeadline checks that a Put whose body the server read in full,
-// over longer than the timeout, failed on the timeout after the body ended.
-// want is the body size the server must have read; 0 accepts any size, for a
-// multipart body that wraps the object.
-func assertAnswerDeadline(t *testing.T, err error, read <-chan bodyRead, returned time.Time, want int64) {
+// callerBudget is a caller's context that a regression cannot outlive: it is
+// canceled, never timed out, after a budget far above any scheduling delay.
+// A Put it ends fails as a cancellation, which assertDeadlineError refuses, so
+// only the Put's own request timeout can pass the test.
+func callerBudget(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	timer := time.AfterFunc(10*time.Second, cancel)
+	t.Cleanup(func() { timer.Stop(); cancel() })
+	return ctx
+}
+
+// recordUploadTimers replaces uploadTimer for the test and returns the
+// durations each Put's deadline is armed with: the timer's start and every
+// Reset. The test replaces a package variable, so it does not run in parallel.
+func recordUploadTimers(t *testing.T) func() []time.Duration {
+	t.Helper()
+	rec := &armRecord{}
+	previous := uploadTimer
+	uploadTimer = func(d time.Duration, f func()) deadlineTimer {
+		rec.add(d)
+		return &recordingTimer{timer: previous(d, f), rec: rec}
+	}
+	t.Cleanup(func() { uploadTimer = previous })
+	return rec.durations
+}
+
+// armRecord holds the durations a deadline was armed with.
+type armRecord struct {
+	mu    sync.Mutex
+	armed []time.Duration
+}
+
+func (r *armRecord) add(d time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.armed = append(r.armed, d)
+}
+
+func (r *armRecord) durations() []time.Duration {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.armed)
+}
+
+// recordingTimer records each Reset of the deadline's timer.
+type recordingTimer struct {
+	timer deadlineTimer
+	rec   *armRecord
+}
+
+func (r *recordingTimer) Stop() bool { return r.timer.Stop() }
+
+func (r *recordingTimer) Reset(d time.Duration) bool {
+	r.rec.add(d)
+	return r.timer.Reset(d)
+}
+
+// assertArmedRequestTimeout checks that the Put armed its deadline at least
+// atLeast times, and every time with RequestTimeout: at the first bytes storage
+// is handed, at each later chunk, and at the end of the body.
+func assertArmedRequestTimeout(t *testing.T, armed func() []time.Duration, atLeast int) {
+	t.Helper()
+	durations := armed()
+	if len(durations) < atLeast {
+		t.Fatalf("the Put armed its deadline %d times, want at least %d", len(durations), atLeast)
+	}
+	for _, d := range durations {
+		if d != testPutTimeout {
+			t.Fatalf("the Put armed a deadline of %s, want RequestTimeout (%s)", d, testPutTimeout)
+		}
+	}
+}
+
+// assertAnswerDeadline checks that a Put whose body the server read in full
+// failed on its own deadline while the server held the answer. want is the
+// body size the server must have read; 0 accepts any size, for a multipart
+// body that wraps the object.
+func assertAnswerDeadline(t *testing.T, err error, read <-chan bodyRead, armed func() []time.Duration, want int64) {
 	t.Helper()
 	assertDeadlineError(t, err)
+	// The slow body hands its bytes in chunks, then ends: at least the first
+	// chunk's arm and the arm after the body.
+	assertArmedRequestTimeout(t, armed, 2)
 	select {
 	case got := <-read:
 		if got.err != nil || got.n == 0 || (want > 0 && got.n != want) {
 			t.Fatalf("server read %d bytes, err %v; want the whole body", got.n, got.err)
 		}
-		if after := returned.Sub(got.at); after > 300*time.Millisecond {
-			t.Errorf("Put returned %s after the body ended; RequestTimeout is %s", after, testPutTimeout)
-		}
-	case <-time.After(time.Second):
+	case <-time.After(10 * time.Second):
+		// A safety net, not a margin: the server reports its read of the body
+		// whether the read ended or failed.
 		t.Fatal("the server never reported reading the body")
 	}
 }
 
 // assertStallDeadline checks that a Put whose server stopped reading the body
-// failed on the timeout, well before the test server releases it.
-func assertStallDeadline(t *testing.T, err error, elapsed time.Duration) {
+// failed on its own deadline, before the caller's budget and the test server's
+// release.
+func assertStallDeadline(t *testing.T, err error, armed func() []time.Duration) {
 	t.Helper()
 	assertDeadlineError(t, err)
-	if elapsed > 2*time.Second {
-		t.Errorf("Put returned after %s; a storage stall must end at RequestTimeout (%s)", elapsed, testPutTimeout)
-	}
+	assertArmedRequestTimeout(t, armed, 1)
 }
 
 func assertDeadlineError(t *testing.T, err error) {

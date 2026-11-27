@@ -518,8 +518,10 @@ func buildExtensionRuntimes(t *testing.T, store string) (tsRuntime, goRuntime st
 	}
 	tsRuntime = filepath.Join(store, "extensions", "typescript@"+e2eRuntimeVersion, "compiled", "putnami-ts")
 	goRuntime = filepath.Join(store, "extensions", "go@"+e2eRuntimeVersion, "compiled", "putnami-go")
+	testDeadline, hasDeadline := t.Deadline()
+	bound := runBound(testDeadline, hasDeadline, time.Now(), runtimeBuildDeadline)
 	build := func(source, pkg, output string) error {
-		ctx, cancel := context.WithTimeout(context.Background(), runtimeBuildDeadline)
+		ctx, cancel := context.WithTimeout(context.Background(), bound)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, goBinary, "build", "-o", output, "-ldflags", "-X main.runtimeVersion="+e2eRuntimeVersion, pkg)
 		cmd.Dir = filepath.Join(root, source)
@@ -527,7 +529,7 @@ func buildExtensionRuntimes(t *testing.T, store string) (tsRuntime, goRuntime st
 		cmd.WaitDelay = engineDumpGrace
 		if out, err := cmd.CombinedOutput(); err != nil {
 			if ctx.Err() != nil {
-				return fmt.Errorf("build %s: not built within %s: %w\n%s", source, runtimeBuildDeadline, err, out)
+				return fmt.Errorf("build %s: not built within %s: %w\n%s", source, bound, err, out)
 			}
 			return fmt.Errorf("build %s: %w\n%s", source, err, out)
 		}

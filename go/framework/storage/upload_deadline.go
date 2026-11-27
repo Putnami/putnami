@@ -28,10 +28,21 @@ type uploadDeadline struct {
 	timeout time.Duration
 
 	mu      sync.Mutex
-	timer   *time.Timer
+	timer   deadlineTimer
 	ended   bool
 	stopped bool
 }
+
+// deadlineTimer is the timer of a Put's deadline: started by uploadTimer, then
+// stopped and armed again as storage takes the body and answers.
+type deadlineTimer interface {
+	Stop() bool
+	Reset(time.Duration) bool
+}
+
+// uploadTimer starts the timer of a Put's deadline, which calls f once d has
+// passed. Tests replace it to read every duration a Put arms.
+var uploadTimer = func(d time.Duration, f func()) deadlineTimer { return time.AfterFunc(d, f) }
 
 // withUploadDeadline returns a context for one Put's storage request and its
 // deadline. A zero or negative timeout sets no deadline. Call stop when the
@@ -63,7 +74,7 @@ func (d *uploadDeadline) handed(end bool) {
 	}
 	d.ended = end
 	if d.timer == nil {
-		d.timer = time.AfterFunc(d.timeout, func() { d.cancel(errUploadDeadline) })
+		d.timer = uploadTimer(d.timeout, func() { d.cancel(errUploadDeadline) })
 		return
 	}
 	d.timer.Reset(d.timeout)
