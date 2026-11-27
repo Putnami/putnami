@@ -471,42 +471,48 @@ The design of the machine process itself is its own record.
 ### 8. What prune can settle with the record
 
 On an unchanged `--all`, prune keeps the 48 `test~test-env` and
-`test~test-env-teardown` tasks: a test's precomputed key can still be moved by
-a planned writer that is not done when `test-env` starts (the same project's
-`config-merge`, `describe`, `generate` and `infra` steps,
-`validate-workspace~codeowners`, and with `--fix` each `lint~golangci-lint`,
-whose rewritten region holds `go.work` and `go.work.sum`), and
-`SettlesBefore` accepts only a writer that finishes before the producer or
-runs after the consumer.
+`test~test-env-teardown` tasks. A first reading put that on key movement: a
+test's precomputed key can be moved by a planned writer that is not done when
+`test-env` starts (the same project's `config-merge`, `describe`, `generate`
+and `infra` steps, `validate-workspace~codeowners`, and with `--fix` each
+`lint~golangci-lint`, whose rewritten region holds `go.work` and
+`go.work.sum`), and `SettlesBefore` accepts only a writer that finishes
+before the producer or runs after the consumer. The proposal was a fixpoint
+over the plan: a writer whose entry is present at its precomputed key, whose
+outputs all equal the files on disk and whose own key no writer outside that
+set moves writes nothing, so it cannot move a key.
 
-The record does not change what a writer may reach, so it settles none of
-them by itself. It makes a third answer cheap and sound: **a writer that
-writes nothing cannot move a key.** A writer served from its entry writes only
-what differs from the files on disk (ADR 0108), so it writes nothing when its
-precomputed key has an entry and every output that entry holds equals the file
-on disk, whose digest the file index answers by stat. Prune may then treat a
-writer as settled when that holds and its own key is not moved by a writer
-outside that set, a fixpoint over the plan. Precompute then costs about 1.8 s
-instead of 4.3 s (section "Context"), and the check of the outputs costs one
-stat per output.
+Traced on 2026-11-27 on this branch, prune never reaches key movement for
+these relations. Each has `pruneIf: "!params.infra-down"`, and `test` does not
+declare that flag, so checked evaluation finds `params.infra-down` missing,
+hence invalid, on every run. The predicate was kept invalid on purpose: once
+it is valid, prune computes the plan's key movement on every run, about 3 s of
+wall on an unchanged `--all`, and settles none of the 48. The 48 processes
+cost 1.03 s of job CPU and 1.16 s of task wall summed over the workers
+(`test-env` 0.74 s, `test-env-teardown` 0.42 s). **The fixpoint is
+rejected**: it would need that movement computation, and the check of every
+writer's outputs, on every run to save at most those 1.16 s.
 
-The fixpoint holds only as far as the writers have an entry prune can find
-at their precomputed key. Traced on 2026-11-27 with the real CLI, on main and
-at `ef6c1aa2`, on a shallow clone and on a full clone with its tags: of 2,194
-cacheable jobs, none starts with a key other than its precomputed one, and
-the only jobs served where the precompute found no entry are the 112
-source-bound `describe` and `generate` steps (35 `build~describe`, 35
-`test~describe`, 22 `build~generate`, 20 `test~generate`), whose entry
-address binds the project's source binding. Binding-aware presence
-(`cachekey.CacheEntryPresentAt`) finds them, at no Git call under ADR
-0112. A count of 488 taken earlier came from a branch build whose identity
-differed from the store's entries; its other classes do not occur on main.
+Prune now spends nothing on a plan none of whose relations may prune under
+the command params, each with a `pruneIf` that is false or invalid: it
+precomputes no key. No consumer lookup could change the outcome, and the
+remote negotiation computes the keys it needs itself when the CLI is signed
+in. Measured with one binary and a switch, alternating runs, medians of
+three unchanged runs, signed out: wall 15.96 s to 14.65 s, engine CPU 18.0 s
+to 16.8 s, run CPU 20.7 s to 19.5 s. The keys summed over the tasks' key steps
+rise from 2.7 s to 3.5 s, since each task now computes what prune computed
+before it, and the longest ready wait stays at 3.0 to 3.1 s. Against main
+`35d1a8bc` on the protocol above (medians of three unchanged runs after a
+priming run, signed out): wall 16.4 s to 14.8 s, engine CPU 17.7 s to 16.1 s,
+run CPU 20.8 s to 19.5 s, keys summed 3.2 s to 3.8 s, longest ready wait
+3.4 s to 3.6 s.
 
-Prune itself still counts a source-bound entry absent: its key movement
-covers keys, not bindings. The fixpoint therefore asks
-`CacheEntryPresentAt` and checks the entry's outputs on disk. The expected
-gain, the 48 job processes, is measured when prune asks the fixpoint; this
-record creates no entry and moves no key.
+Prune evaluates `pruneIf` against the command line's params alone: a flag's
+manifest default is merged later, per job. Declaring `--infra-down` on `test`,
+which its users need to request the teardown, therefore leaves the predicate
+invalid on a run that does not name the flag, which still precomputes
+nothing; a run that names it, `--infra-down=false` included, makes it valid
+and pays the movement cost of the first paragraph.
 
 ## Consequences
 
