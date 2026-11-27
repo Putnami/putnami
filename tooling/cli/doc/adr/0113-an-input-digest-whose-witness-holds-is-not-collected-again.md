@@ -184,7 +184,11 @@ whose cut witness names `/etc/gitconfig` through the `/etc` link, and every
 digest of a workspace reached through a link. A recorded digest that
 holds enters the run's memo with the in-run witness of ADR 0109, rebuilt from
 its recorded files, so a write of the run moves it as it moves a collected
-one.
+one. That witness is prepared from the stats the record just checked (each
+selected file a regular file, each directory between it and the collection
+directory a directory), outside the memo's lock: prepared later by the first
+write that judges it, it stated every selected file again while every lookup
+of the run waited on that lock.
 
 **A sample of the answers is collected again.** Each run collects again a
 random sample of the digests the record answers: each answer with a
@@ -510,25 +514,32 @@ Measured on 2026-11-27 with the protocol above, on the same 4-core container,
 on a full clone with its 36 tags, the input digests of sections 1 to 3 with
 the sample of section 1, against main `13d56d86` (which already reads the Git
 index in-process, ADR 0112, and records the release baselines, section 4),
-medians of three unchanged runs after a priming run:
+medians of three unchanged runs after a priming run. The host was slower
+that afternoon than in the morning (main's wall 22.2 s then, 26.5 s now), so
+each run of the input record alternated with a run of main:
 
 | Measure | Main | Input record |
 |---|---|---|
-| Wall | 22.2 s | 19.2 s |
-| Engine CPU | 27.3 s | 22.5 s |
-| Run CPU (`runMs`) | 30.1 s | 25.3 s |
-| Key time summed | 7.2 s | 8.7 s |
-| Longest ready wait | 4.8 s | 5.2 s |
-| Input digests answered / collected | 0 / every one | 2,486 / 158 |
+| Wall | 26.5 s | 24.1 s |
+| Engine CPU | 32.9 s | 28.3 s |
+| Run CPU (`runMs`) | 37.5 s | 33.2 s |
+| Key time summed | 11.4 s | 10.3 s |
+| Longest ready wait | 6.3 s | 5.8 s |
+| Input digests answered / collected | 0 / every one | about 2,700 / 321 |
 
-Engine Git calls stay at 58: the section 4 record already removed the
-per-project release-baseline reads. The key time summed is the wall time
-tasks spend in their key step, waits included, not CPU: it rises by 1.5 s
-while the engine's CPU falls by 4.8 s and the wall by 3.0 s; where those
-waits come from is not measured here. The digests still collected are those of output directories restores
-rewrite on every run (a project's `.gen`, where a digest keys on files
-there), the sample, and the ones a link or a basis with no answer identity
-leaves unrecorded.
+In this alternation each binary found the release-baseline record of the
+other, which a program identity of its own empties (section 6), so both
+columns paid the per-project release-baseline reads (512 engine Git calls);
+on a run after a run of the same binary they are 58. The key time summed is
+the wall time tasks spend in their key step, waits included, not CPU. Before
+the record's witness was prepared outside the memo's lock (section 1), it
+rose instead, to 16.2 s against main's 11.5 s with a longest ready wait of
+7.7 s, measured the same way: the first write to judge each answered digest
+stated its files under that lock, 3.0 to 3.3 s a run, and the lookups that
+waited on it summed 3.7 to 5.3 s. The digests still collected are those of
+output directories restores rewrite on every run (a project's `.gen`, where
+a digest keys on files there), the sample, and the ones a link or a basis
+with no answer identity leaves unrecorded.
 
 The witness costs a stat of every witnessed path, 28 ms for the whole tree
 (a digest read through a link pays its stats at each check, section 1),
@@ -536,7 +547,7 @@ and the record is a few megabytes; a synthetic record of this repository's
 shape (15,755 distinct paths with their stats, references of 2,169 entries)
 decodes in 4 ms.
 
-- The longest ready wait stays near 5 s (4.8 s to 5.2 s). On an unchanged
+- The longest ready wait goes from 6.3 s to 5.8 s, not under 5 s. On an unchanged
   run it is set by how fast four workers drain 2,245 cache hits, and with the
   digests free each hit still pays its restore, its session record and the
   collector's work on it: the per-task fixed costs of an unchanged run,
