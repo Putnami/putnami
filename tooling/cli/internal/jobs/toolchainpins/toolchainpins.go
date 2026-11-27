@@ -172,9 +172,19 @@ func resolve(ctx context.Context, root string, opts Options, provider func(*exte
 	pins := map[string][]answered{}
 	var problems []problem
 	var failures []error
+	kept := keptExtensions(exts, committed, opts.Implicit)
 	for _, ext := range exts {
 		if err := ctx.Err(); err != nil {
 			return Result{}, err
+		}
+		if kept[ext.Name] {
+			// The implicit run keeps every one of its pins as committed
+			// (settle): the committed pin stands for the answer, and the
+			// extension is not started.
+			for _, identity := range ext.Runtime.Resolves {
+				pins[identity] = append(pins[identity], answered{extension: ext, pin: committedToolchains[identity].ProtocolToolchainEntry()})
+			}
+			continue
 		}
 		request := requestFor(ext, committedToolchains, platform, opts.Offline)
 		answer, err := provider(ext).ResolveToolchains(request)
@@ -277,6 +287,50 @@ func resolvingExtensions(root string) ([]*extension.ExtensionDescription, error)
 	}
 	sort.SliceStable(exts, func(i, j int) bool { return exts[i].Name < exts[j].Name })
 	return exts, nil
+}
+
+// keptExtensions names the extensions an implicit run does not ask: those
+// whose every identity a lock version 5 pins with a version, which settle keeps
+// as committed whatever they answer, and none of whose identities an asked
+// extension also resolves, so no disagreement between answers goes unseen.
+// Their pins are the committed ones; a problem they would answer, or a failed
+// start, surfaces when the run starts them for a job, as the probe does. An
+// explicit run asks every extension.
+func keptExtensions(exts []*extension.ExtensionDescription, committed *lockfile.LockFile, implicit bool) map[string]bool {
+	if !implicit || committed == nil || committed.Version < lockfile.FormatVersionV5 {
+		return nil
+	}
+	pinned := func(ext *extension.ExtensionDescription) bool {
+		for _, identity := range ext.Runtime.Resolves {
+			if entry, ok := committed.Toolchains[identity]; !ok || strings.TrimSpace(entry.Version) == "" {
+				return false
+			}
+		}
+		return true
+	}
+	asked := map[string]bool{}
+	kept := map[string]bool{}
+	for _, ext := range exts {
+		if pinned(ext) {
+			kept[ext.Name] = true
+			continue
+		}
+		for _, identity := range ext.Runtime.Resolves {
+			asked[identity] = true
+		}
+	}
+	for _, ext := range exts {
+		if !kept[ext.Name] {
+			continue
+		}
+		for _, identity := range ext.Runtime.Resolves {
+			if asked[identity] {
+				delete(kept, ext.Name)
+				break
+			}
+		}
+	}
+	return kept
 }
 
 // requestFor is the one request ext receives: its identities, the committed

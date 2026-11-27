@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
@@ -340,6 +341,55 @@ func TestTheImplicitRunKeepsACommittedPinAndFillsAMissingOne(t *testing.T) {
 	}
 	if got := lf.Toolchains["gopls"]; got.Version != "0.18.1" {
 		t.Fatalf("toolchains.gopls = %+v, want the answered pin", got)
+	}
+}
+
+// The implicit run starts no extension whose every identity the committed
+// lock version 5 already pins: it would keep those pins whatever the
+// extension answers. It still asks an extension with an unpinned identity,
+// and an explicit run asks every extension.
+func TestTheImplicitRunAsksNoExtensionWhosePinsAreCommitted(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/toolchain-lock", "implicit-install-fills-missing-pins",
+		"the-implicit-install-asks-no-extension-whose-pins-are-committed")
+	root := writeWorkspace(t,
+		fixtureExtension{name: "@acme/go", resolves: []string{"go"}, runs: "go"},
+		fixtureExtension{name: "@acme/ruby", resolves: []string{"ruby"}})
+	committedGo := lockfile.ToolchainEntryFromProtocol(*pin("1.26.0", "e"))
+	writeLock(t, root, lockfile.FormatVersionV5, map[string]lockfile.LockEntry{"go": committedGo})
+	answers := map[string]map[string]wsproto.ToolchainResolution{
+		"@acme/go":   {"go": {Pin: pin("1.26.1", "a")}},
+		"@acme/ruby": {"ruby": {}},
+	}
+
+	implicit := &fakeProviders{answers: answers}
+	result, err := resolve(context.Background(), root, Options{Implicit: true}, implicit.provider)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	asked := []string{}
+	for _, request := range implicit.requests() {
+		asked = append(asked, request.Extension)
+	}
+	if !slices.Equal(asked, []string{"@acme/ruby"}) {
+		t.Fatalf("the implicit run asked %v, want only the extension with an unpinned identity", asked)
+	}
+	if result.Written || len(result.Added)+len(result.Changed)+len(result.Removed) != 0 {
+		t.Fatalf("result = %+v, want the committed lock unchanged", result)
+	}
+	if answer, ok := result.Answers["go"]; !ok || answer.Extension != "@acme/go" || answer.Toolchain == nil {
+		t.Fatalf("answers[go] = %+v, want @acme/go and its runtime toolchain", result.Answers["go"])
+	}
+	if got := result.Toolchains["go"]; !sameEntry(got, committedGo) {
+		t.Fatalf("toolchains.go = %+v, want the committed pin", got)
+	}
+
+	explicit := &fakeProviders{answers: answers}
+	if _, err := resolve(context.Background(), root, Options{}, explicit.provider); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if got := len(explicit.requests()); got != 2 {
+		t.Fatalf("the explicit run asked %d extensions, want both", got)
 	}
 }
 
