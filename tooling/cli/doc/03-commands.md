@@ -1370,6 +1370,47 @@ notice has been shown on the same machine. `telemetry off` is an explicit
 opt-out and deletes the local buffer and device ID. See
 [12-profiling-and-telemetry.md](12-profiling-and-telemetry.md).
 
+### `machine`
+
+Show, stop, or turn on or off the machine process: one supervisor per machine
+and user, and behind it one engine worker per CLI executable and worktree in
+use. A run that a worker serves is the same run as one in its own process,
+with the same keys, results and exit code; the worker only keeps the process
+warm. See [ADR 0116](adr/0116-one-machine-process-keeps-every-worktree-warm.md).
+
+```bash
+putnami machine status              # The supervisor, its workers and why runs do or do not use it
+putnami machine stop                # Stop the supervisor and its workers once no run is active
+putnami machine on                  # Let runs go through the machine process
+putnami machine off                 # Run every command in its own process, and stop the machine process
+```
+
+The machine process is off by default; `putnami machine on` turns it on, on
+Linux and macOS. Once it is on, a run that finds no supervisor runs in its own
+process and starts one, detached, when it ends; the next run goes through the
+worker of its executable and worktree. Each worktree has a worker of its own,
+so two worktrees run at once; a second command in a worktree whose worker is
+busy waits for it. A run always runs in its own process in CI (`CI`, or a CI
+service's own variable), in a hosted run (`--credential-fd`), when a job of a
+run starts it, in watch mode (`--watch`, `-w`, or a serve workload), for
+`publish`, `deploy` and `release`, from a terminal whose input or output is
+redirected, when the worker's limits, groups, priority or control group
+differ from the command's, and whenever the supervisor or the worker refuses
+or fails before the run starts. A worker that ends during a run makes the
+command run again in its own process.
+At a terminal, the worker gives the run a pseudo-terminal that the command
+relays: the output, prompts, Ctrl-C and the window size behave as in a run
+in its own process. Ctrl-Z suspends the command; the run goes on and its
+output waits until the command resumes.
+`putnami machine status` shows why the last command ran in its own process.
+`PUTNAMI_MACHINE=off` turns it off for one command and `PUTNAMI_MACHINE=on` on;
+`machine on|off` records the user's choice in `machine.json` under the
+Putnami home. The supervisor lives in `$XDG_RUNTIME_DIR/putnami` on Linux,
+`$TMPDIR/putnami-<uid>` on macOS, else `~/.putnami/machine`, a directory only
+the user can open; it accepts only connections from its own user. A worker
+stops after an hour with no run, the supervisor after three hours with no
+worker.
+
 ### `completion`
 
 Generate shell completion scripts.

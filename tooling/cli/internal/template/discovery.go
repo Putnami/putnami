@@ -14,6 +14,13 @@ import (
 // several discovery passes a single invocation makes do not repeat it.
 var warnedLocks sync.Map
 
+// ForgetProcessMemos drops the notices this package printed: a machine
+// worker serves many runs, and each run warns as a run in its own process
+// does (CLI ADR 0116 §4).
+func ForgetProcessMemos() {
+	warnedLocks.Clear()
+}
+
 func warnLockOnce(workspaceRoot string, err error) {
 	if _, loaded := warnedLocks.LoadOrStore(workspaceRoot+"\x00"+err.Error(), struct{}{}); loaded {
 		return

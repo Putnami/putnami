@@ -886,3 +886,30 @@ func RefreshSnapshot(ws *Workspace, policy SnapshotWritePolicy) (*Snapshot, erro
 	}
 	return snapshot, nil
 }
+
+// ForgetProcessMemos drops what this package memoizes for the life of the
+// process. A CLI process serves one run; a machine worker serves many, and
+// a run must not read what an earlier one saw (CLI ADR 0116 §8).
+func ForgetProcessMemos() {
+	// Load keeps a workspace under the index file's identity alone, and an
+	// edit of a configuration file moves no index: a run loads the one on disk.
+	loadCache.Clear()
+	ignoredWalkDirsCache.Range(func(key, _ any) bool {
+		ignoredWalkDirsCache.Delete(key)
+		return true
+	})
+	ignoredFingerprints.Range(func(key, _ any) bool {
+		ignoredFingerprints.Delete(key)
+		return true
+	})
+	// The witnesses themselves are held: each answers under its own stats.
+	// The patterns a run read are the run's.
+	witnessFiles.Range(func(_, value any) bool {
+		if f, ok := value.(*witnessFile); ok {
+			f.mu.Lock()
+			f.used = nil
+			f.mu.Unlock()
+		}
+		return true
+	})
+}

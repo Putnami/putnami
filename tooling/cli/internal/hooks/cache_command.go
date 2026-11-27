@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -255,7 +256,7 @@ func StartDetachedCacheGC(
 	// A detached collection outlives the run: its start is counted, its CPU
 	// never.
 	procstat.Started(procstat.Control, cmd.Args)
-	_ = started.Process.Release()
+	_ = machineproc.ReleaseDetached(started)
 	return true
 }
 
