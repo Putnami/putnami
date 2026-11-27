@@ -978,7 +978,7 @@ func ComputeJobCacheHashWith(
 		job.Project.Name,
 		ws.MetadataDigestFor(job.Project),
 		embeddedVersion,
-		SelectedProjectIDs(job.SelectedProjects),
+		keyedSelectedProjectIDs(job),
 		cacheParams,
 		projRoot,
 		ws.Root,
@@ -1152,6 +1152,17 @@ func jobContractDigest(job *jobmodel.ScheduledJob) string {
 		return ""
 	}
 	return job.JobDef.ContractDigest
+}
+
+// keyedSelectedProjectIDs is what job's key holds of the run's selection: the
+// ids of the projects the plan handed a workspace-once job, or none for a job
+// whose task declares it reads no selection, whose context then carries none
+// either (jobmodel.ReadsNoSelection).
+func keyedSelectedProjectIDs(job *jobmodel.ScheduledJob) []string {
+	if jobmodel.ReadsNoSelection(job) {
+		return nil
+	}
+	return SelectedProjectIDs(job.SelectedProjects)
 }
 
 func SelectedProjectIDs(projects []*workspace.Project) []string {

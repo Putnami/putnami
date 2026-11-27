@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@test/extension",
+  "commands": {
+    "lint": {
+      "run": [{ "id": "check", "task": "lint-exec" }]
+    }
+  },
+  "tasks": {
+    "lint-exec": {
+      "kind": "command",
+      "command": "echo",
+      "selection": "none",
+      "batchable": { "tool": "echo" }
+    }
+  }
+}

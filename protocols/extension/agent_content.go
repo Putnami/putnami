@@ -163,6 +163,9 @@ func RequiredLoadContract(m *Manifest) int {
 		if declaresPublishChannels(task) {
 			required = max(required, protocolcli.PublishChannelsContract)
 		}
+		if task.ReadsNoSelection() {
+			required = max(required, protocolcli.SelectionFreeTaskContract)
+		}
 	}
 	// A vocabulary's default traits change plans wherever the manifest loads
 	// from, so its rung is part of the load floor.

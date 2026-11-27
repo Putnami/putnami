@@ -496,6 +496,26 @@ type TaskDefinition struct {
 	// and tells the job so in NativeRegistryCredentialsEnv. It is an execution
 	// fact: it enters no cache key and no task contract digest.
 	NativeRegistryCredential *TaskRegistryCredential `json:"nativeRegistryCredential,omitempty"`
+	// Selection is TaskSelectionNone when the task reads no run selection:
+	// what it does is the same whichever projects the run selected. The CLI
+	// then hands it no `selection` and no `selectedProjects` in its job
+	// context, and so no selection variable, and keys it on no selected
+	// project, so one cache entry serves every selection. Absent, a task may
+	// read the selection, and a task that runs once for the workspace is keyed
+	// on the projects the run selected. A batchable task does not declare it:
+	// a batch hands its members to the task as its selected projects. A task
+	// that declares it requires CLI contract protocolcli.SelectionFreeTaskContract.
+	Selection string `json:"selection,omitempty"`
+}
+
+// TaskSelectionNone is the TaskDefinition.Selection of a task that reads no run
+// selection.
+const TaskSelectionNone = "none"
+
+// ReadsNoSelection reports whether the task declares that it reads no run
+// selection.
+func (t TaskDefinition) ReadsNoSelection() bool {
+	return t.Selection == TaskSelectionNone
 }
 
 // TaskRegistryCredential names the endpoint of a native registry credential:

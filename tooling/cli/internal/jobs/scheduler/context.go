@@ -323,6 +323,14 @@ func buildJobContext(
 		GeneratedFrom:     projectContextGeneratedFrom(job.Project),
 	}
 	ctx.SelectedProjects = selectedProjectsContext(ws, versions, job.SelectedProjects, cmdName)
+	// A task that declares it reads no selection receives none: its key holds
+	// none (cachekey.keyedSelectedProjectIDs), so it cannot read what the key
+	// omits. Without selectedProjects it also gets no PUTNAMI_SELECTED_*
+	// variable and no selection template variable.
+	if readsNoSelection(job) {
+		ctx.SelectedProjects = nil
+		ctx.Selection = nil
+	}
 	// The complete membership travels on EVERY document, not only the
 	// workspace-scoped ones.
 	//

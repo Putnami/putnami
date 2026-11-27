@@ -329,6 +329,11 @@ type Request struct {
 	// selection FLAGS through Global and gets the resolved answer for free;
 	// nothing it can set overrides what selection actually resolved.
 	selection *protocoljob.Selection
+	// sessionRecorder forwards the session records a finalizer emits after
+	// the session to the run's session event handler, which execution binds
+	// before the scheduler starts. Unexported for the same reason preparation
+	// is.
+	sessionRecorder *lateSessionRecorder
 	// confirmsReleaseSetHead is set when the run's release set builds no
 	// member: none changed, or every changed one is reused from another
 	// channel. The finalizer still releases the set. planning reads it to
@@ -1122,7 +1127,14 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// run or restored, and fails the run on the selected projects' errors
 	// (ADR 0134).
 	if ws != nil {
-		finalizers = append(finalizers, specgate.EvidenceVerdictFinalizer(ws, planned, req.selection, os.Stderr))
+		recorder := &lateSessionRecorder{}
+		req.sessionRecorder = recorder
+		finalizers = append(finalizers, specgate.EvidenceVerdictFinalizer(ws, planned, req.selection, os.Stderr,
+			func(record scheduler.SessionRecord) {
+				if recorder.handler != nil {
+					recorder.handler(record)
+				}
+			}))
 	}
 	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, req, releaseSetRun, releaseSetOptions.Publishes, finalizers)
 	if err != nil {
@@ -1371,4 +1383,11 @@ func runAfterHooks(ctx context.Context, req *Request, verbose bool, code int, re
 		report(err)
 	}
 	return code, firstErr
+}
+
+// lateSessionRecorder holds the session event handler execution binds, so a
+// finalizer's record reaches it; a run that records no session leaves it nil
+// and the record is dropped.
+type lateSessionRecorder struct {
+	handler scheduler.SessionEventHandler
 }

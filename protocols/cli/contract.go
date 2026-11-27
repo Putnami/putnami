@@ -45,6 +45,11 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	28: ADDITIVE — a task that declares `selection: none`. From 28 on, the
+//	   CLI hands such a task no `selection` and no `selectedProjects` in its
+//	   job context and keys it on no selected project, so one cache entry
+//	   serves every selection. A reader below 28 refuses the member, so a
+//	   manifest that declares one is stamped 28 from every origin.
 //	27: ADDITIVE — a task's file output that declares `emptied`. From 27 on,
 //	   the CLI removes the file before the task executes and on a restore of
 //	   an entry that records it absent, so a cached run that wrote no file
@@ -382,7 +387,13 @@ const ToolchainProbeSelfContract = 26
 // the run that produced the entry left none, so it refuses the stamp instead.
 const EmptiedFileOutputContract = 27
 
+// SelectionFreeTaskContract is required by a manifest whose task declares
+// `selection: none`. A reader at this contract hands the task no run
+// selection and keys it on no selected project. An older reader refuses the
+// member, so it refuses the stamp instead.
+const SelectionFreeTaskContract = 28
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = EmptiedFileOutputContract
+const LatestContract = SelectionFreeTaskContract

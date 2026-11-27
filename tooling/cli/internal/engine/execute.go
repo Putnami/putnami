@@ -422,6 +422,11 @@ func (e *Engine) executeSession(
 			}
 		}
 	}
+	// A finalizer's session records, such as the evidence warnings, reach the
+	// same handler after the session.
+	if req.sessionRecorder != nil {
+		req.sessionRecorder.handler = sessionEvents
+	}
 
 	// The single execution site of the whole CLI (ADR 0001 §3): construction,
 	// remote-cache wiring and session wiring are one call, so no adapter can

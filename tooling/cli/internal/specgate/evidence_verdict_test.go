@@ -66,7 +66,7 @@ func evidenceJob(project *workspace.Project, optional bool) *jobs.ScheduledJob {
 	}
 }
 
-func (f *evidenceFixture) verdict(t *testing.T, selection *protocoljob.Selection) (map[string]EvidenceSanction, []string) {
+func (f *evidenceFixture) verdict(t *testing.T, selection *protocoljob.Selection) (map[string]EvidenceSanction, []Finding) {
 	t.Helper()
 	findings, refusals := CollectFindings(f.ws, f.planned, f.results)
 	return EvidenceVerdict(findings, refusals, selection)
@@ -91,7 +91,7 @@ func TestEvidenceVerdictFailsOnTheSelectedProjectsErrors(t *testing.T) {
 	if diagnostic.File != "billing/putnami.features.json" || diagnostic.Line != 3 || diagnostic.Code != "features.duplicate_identity" || diagnostic.Severity != "error" {
 		t.Fatalf("diagnostic = %+v, want the finding located in the workspace", diagnostic)
 	}
-	if len(warnings) != 1 || !strings.HasPrefix(warnings[0], "ledger/putnami.features.json:3:") {
+	if len(warnings) != 1 || warnings[0].Path != "ledger/putnami.features.json" || warnings[0].Project != "/ledger" {
 		t.Fatalf("warnings = %v", warnings)
 	}
 	sanctions, _ = fixture.verdict(t, selected("/billing"))
@@ -199,8 +199,8 @@ func TestEvidenceVerdictReadsACachedTaskAsOneThatRan(t *testing.T) {
 }
 
 // TestEvidenceVerdictFinalizerFailsTheRun pins the finalizer's rows: the
-// failed <project>:evidence~verdict result, its diagnostics, the warnings on
-// warn, and a run that the shared reduction then reports as failed.
+// failed <project>:evidence~verdict result, its diagnostics, the warning count
+// on warn, and a run that the shared reduction then reports as failed.
 func TestEvidenceVerdictFinalizerFailsTheRun(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "a-run-fails-on-its-selected-projects-findings", "an-error-finding-of-a-selected-project-fails-the-run")
 	fixture := newEvidenceFixture(t,
@@ -209,7 +209,7 @@ func TestEvidenceVerdictFinalizerFailsTheRun(t *testing.T) {
 		finding("ledger/c.md", "error", "docs-links"),
 	)
 	var warn strings.Builder
-	EvidenceVerdictFinalizer(fixture.ws, fixture.planned, selected("/billing"), &warn)(fixture.results)
+	EvidenceVerdictFinalizer(fixture.ws, fixture.planned, selected("/billing"), &warn, nil)(fixture.results)
 	row := fixture.results["/billing:"+EvidenceVerdictTask]
 	if row == nil || row.Status != "failed" || row.Error == nil || !strings.Contains(row.Error.Message, "billing/a.md:3") {
 		t.Fatalf("row = %+v, want a failed /billing verdict naming the finding", row)
@@ -220,7 +220,7 @@ func TestEvidenceVerdictFinalizerFailsTheRun(t *testing.T) {
 	if _, ok := fixture.results["/ledger:"+EvidenceVerdictTask]; ok {
 		t.Fatal("an unselected project's finding failed the run")
 	}
-	if warn.String() != "putnami: evidence: billing/b.md:3: docs-links at billing/b.md (docs-links)\n" {
+	if warn.String() != "putnami: evidence: /billing: 1 warning finding(s) docs-links\n" {
 		t.Fatalf("warn = %q", warn.String())
 	}
 	session := jobs.ReduceSchedulerSession(fixture.planned, fixture.results, jobs.SessionOutcome{}, 0, nil)
@@ -228,9 +228,54 @@ func TestEvidenceVerdictFinalizerFailsTheRun(t *testing.T) {
 		t.Fatal("the run succeeds with a failed evidence verdict")
 	}
 	clean := newEvidenceFixture(t, finding("ledger/c.md", "error", "docs-links"))
-	EvidenceVerdictFinalizer(clean.ws, clean.planned, selected("/billing"), io.Discard)(clean.results)
+	EvidenceVerdictFinalizer(clean.ws, clean.planned, selected("/billing"), io.Discard, nil)(clean.results)
 	if session := jobs.ReduceSchedulerSession(clean.planned, clean.results, jobs.SessionOutcome{}, 0, nil); !session.Success() {
 		t.Fatal("a run whose selected projects have no error finding fails")
+	}
+}
+
+// TestEvidenceWarningsPrintOneLinePerProjectAndRule pins the warning half:
+// stderr carries one line per counted project and rule with its count, in
+// order, and the session record carries every warning as a session record,
+// which adds no task and leaves the run's verdict alone.
+func TestEvidenceWarningsPrintOneLinePerProjectAndRule(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-run-fails-on-its-selected-projects-findings", "warnings-print-one-line-per-project-and-rule")
+	fixture := newEvidenceFixture(t,
+		finding("billing/c.md", "warning", "features.stale_evidence"),
+		finding("billing/b.md", "warning", "features.missing_evidence"),
+		finding("ledger/a.md", "warning", "features.missing_evidence"),
+		finding("billing/a.md", "warning", "features.missing_evidence"),
+		finding("README.md", "warning", "docs-links"),
+	)
+	var warn strings.Builder
+	var records []jobs.SessionRecord
+	tasks := len(fixture.results)
+	EvidenceVerdictFinalizer(fixture.ws, fixture.planned, selected("/billing"), &warn,
+		func(record jobs.SessionRecord) { records = append(records, record) })(fixture.results)
+	// /ledger is not selected; a finding no project owns counts everywhere.
+	want := "putnami: evidence: /billing: 2 warning finding(s) features.missing_evidence\n" +
+		"putnami: evidence: /billing: 1 warning finding(s) features.stale_evidence\n" +
+		"putnami: evidence: workspace: 1 warning finding(s) docs-links\n"
+	if warn.String() != want {
+		t.Fatalf("warn =\n%s\nwant\n%s", warn.String(), want)
+	}
+	var files []string
+	for _, record := range records {
+		if record.Type != EvidenceWarningRecord || record.Data["severity"] != "warning" ||
+			record.Data["task"] != fixture.planned[0].Key() || record.Data["line"] != 3 {
+			t.Errorf("warning record = %+v", record)
+		}
+		files = append(files, record.Data["file"].(string))
+	}
+	if got := strings.Join(files, ","); got != "README.md,billing/a.md,billing/b.md,billing/c.md" {
+		t.Fatalf("recorded warnings = %s, want every counted one and no other", got)
+	}
+	if len(fixture.results) != tasks {
+		t.Fatalf("the warnings added %d task row(s)", len(fixture.results)-tasks)
+	}
+	session := jobs.ReduceSchedulerSession(fixture.planned, fixture.results, jobs.SessionOutcome{}, 0, nil)
+	if !session.Success() {
+		t.Fatal("warnings failed the run")
 	}
 }
 
@@ -248,7 +293,7 @@ func TestEvidenceVerdictMergesTheWorkspaceRow(t *testing.T) {
 		for key, value := range fixture.results {
 			results[key] = value
 		}
-		EvidenceVerdictFinalizer(fixture.ws, fixture.planned, nil, io.Discard)(results)
+		EvidenceVerdictFinalizer(fixture.ws, fixture.planned, nil, io.Discard, nil)(results)
 		row := results["workspace:"+EvidenceVerdictTask]
 		if row == nil || len(row.Canonical.Diagnostics) != 2 || !strings.Contains(row.Error.Message, "README.md") || !strings.Contains(row.Error.Message, "was refused") {
 			t.Fatalf("row = %+v, want both failures", row)

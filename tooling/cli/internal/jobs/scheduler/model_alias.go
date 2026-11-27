@@ -336,6 +336,7 @@ var (
 	parseTaskStatus         = model.ParseTaskStatus
 	readJSONLEvents         = model.ReadJSONLEvents
 	readJSONLEventsObserved = model.ReadJSONLEventsObserved
+	readsNoSelection        = model.ReadsNoSelection
 	recordsFromEvents       = model.RecordsFromEvents
 	reduceSchedulerTasks    = model.ReduceSchedulerTasks
 	taskDeclarationOf       = model.TaskDeclarationOf

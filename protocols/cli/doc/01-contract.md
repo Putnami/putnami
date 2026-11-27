@@ -358,6 +358,13 @@ cached run that wrote no file restores its absence. A reader below 27 refuses
 entry's run left none, so it refuses the stamp instead. The floor binds a
 manifest wherever it loads from. Only a manifest with such an output is
 stamped 27.
+Contract `28` (`SelectionFreeTaskContract`) is additive for a task that
+declares `selection: none`. From 28 on, the CLI hands such a task no
+`selection` and no `selectedProjects` in its job context, and keys it on no
+selected project, so one cache entry serves every selection. A reader below
+28 refuses the member, so it refuses the stamp instead. The floor binds a
+manifest wherever it loads from. Only a manifest with such a task is stamped
+28.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

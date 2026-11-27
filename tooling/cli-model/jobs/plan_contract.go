@@ -212,6 +212,17 @@ func TaskDeclarationOf(job *ScheduledJob) *extension.TaskDeclaration {
 	return task.Declares
 }
 
+// ReadsNoSelection reports whether the manifest task job executes declares
+// that it reads no run selection (selection none). Such a job gets no
+// selection in its job context and keys on no selected project.
+func ReadsNoSelection(job *ScheduledJob) bool {
+	if job == nil || job.Step == nil || job.Step.Task == "" || job.Extension == nil {
+		return false
+	}
+	task, ok := job.Extension.Tasks[job.Step.Task]
+	return ok && task.ReadsNoSelection()
+}
+
 // HasExternalEffects reports whether job writes outside the workspace: its
 // command's resolved traits declare registry or cloud side effects, or the
 // manifest task it runs declares a registry or cloud effect. The capability
