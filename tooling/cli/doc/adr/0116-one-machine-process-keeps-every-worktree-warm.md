@@ -143,12 +143,15 @@ a worker on the first request of its build and evicts one by idle time
 (section 2) and by its memory budget (section 10). An evicted worker costs
 its next run a cold start, which is a run as today.
 
-**Identities.** A worker's identity is the CLI's program identity, the one the
-file index reads (`fileindex.ExecutableIdentity`: the reading-scheme version,
-the build information and the Go build ID, ADR 0009 §4 of
-`protocols/workspace`). A CLI whose identity is empty (no usable build ID)
-never uses a worker. The supervisor is identified by the protocol versions it
-speaks (section 3), not by its build.
+**Identities.** A worker is keyed by its build identity and its executable's
+path. The build identity (`fileindex.BuildIdentity`) is the SHA-256 of the
+executable's build information and Go build ID, the parts of the file
+index's program identity (ADR 0009 §4 of `protocols/workspace`) that do not
+depend on where the file lies. A client reads it from the image it runs
+(`/proc/self/exe` on Linux), so a client whose file was replaced since it
+started is not served by the new file's worker. A CLI whose identity is empty
+(no usable build ID) never uses a worker. The supervisor is identified by the
+protocol versions it speaks (section 3), not by its build.
 
 ### 2. Discovery, start and stop
 
@@ -279,14 +282,28 @@ as today, or held under section 8's rule.
 none other. A client runs in its own process when:
 
 - the machine process is turned off (section 12), or the client is in CI
-  (`CI` set), or it is a hosted run (`--credential-fd`, ADR 0055), or a nested
-  run (a `putnami` started by a job of a run, which carries `PUTNAMI_JOB_NAME`,
-  or by a worker's run, which carries `PUTNAMI_MACHINE_RUN`): a nested run
-  through the machine process could wait on the run that started it;
-- the command is not a run of the engine (`config`, `machine`, `cache gc`,
-  `install`, `--version`…), or it is `watch` or `serve`, which keep their own
-  process, or `publish`, `deploy` or `release`, which a rerun after a crash
+  (`CI`, or the variable of a CI service that sets none: Azure Pipelines,
+  Jenkins, TeamCity, CodeBuild, Buildkite…), or it is a hosted run
+  (`--credential-fd`, ADR 0055), or a nested run (a `putnami` started by a
+  job of a run, which carries `PUTNAMI_JOB_NAME`, or by the worker itself,
+  which knows it without a variable that a key's env-input glob could
+  read): a nested run through the machine process could wait on the run that
+  started it;
+- the command, read after its aliases resolve, is not a job command
+  (`config`, `machine`, an extension's own command, `--version`…), or it
+  watches (`--watch`, `-w`, or a serve workload, which watches by default),
+  or it is `publish`, `deploy` or `release`, which a rerun after a crash
   could repeat;
+- the client has a controlling terminal: a worker has none to give its jobs,
+  so a prompt that opens `/dev/tty`, the terminal's Ctrl-C and Ctrl-Z and its
+  size would not reach them. Commands without a terminal (agents, scripts,
+  editors' tasks) go through the worker; a person's terminal runs in its own
+  process;
+- the worker's process differs from the client's in what a job inherits
+  beyond the run's context: user and groups, resource limits, priority,
+  control group, or the variables the Go runtime and the time package read
+  once at start (`GOMAXPROCS`, `GOGC`, `GOMEMLIMIT`, `GODEBUG`,
+  `GOTRACEBACK`, `TZ`);
 - a run is active in the worker of its build (the second runs in its own
   process, with today's locks);
 - the supervisor or the worker refuses it: stopping, outdated (section 3),
@@ -294,16 +311,23 @@ none other. A client runs in its own process when:
 
 A refused or failed connection costs one `connect` and the run continues in
 its own process: the machine process never stands between the user and a
-run.
+run. The worker takes a request in two steps: it answers Ready, and runs the
+command only on the client's go. A client that has no Ready within 15 seconds
+(a supervisor that does not answer, a worker slow to start) sends no go and
+runs the command itself, so a command never runs twice. The client forwards
+an interrupt or a termination as such, and a worker whose client went away
+stops the run as a termination does.
 
 **What a run inside a worker does.** The same code as a run in its own
 process, with held values in place of what the run would compute, each under
 the witness rule of section 8. Its jobs are children of the worker, started
 with the client's environment and in the client's working directory, as the
 engine starts them today, once the supervisor has admitted them. Its session
-is the same session in the same place, with one more member, `run.machine`:
-whether the run went through the machine process, the held values it used,
-and the reason when it did not.
+is the same session in the same place. A session member that says whether a
+run went through the machine process, and which held values it used, comes
+with the held state; until then the client records why a command meant for
+the machine process ran in its own process, and `putnami machine status`
+shows it.
 
 ### 5. Machine-wide admission
 
@@ -401,10 +425,10 @@ worker that serves it. On Linux, one `inotify` instance (the user has 128),
 one watch per directory: the directories the default walk enters (the skip
 list of ADR 0113 §1), the directories of every witnessed path, `.git` and its
 `refs` directories, the configuration files' directories, and the toolchain
-and extension-runtime directories whose answers a worker holds. On macOS, one
-FSEvents stream per worktree root with file-level events
-(`kFSEventStreamCreateFlagFileEvents`), and one per held directory outside
-it.
+and extension-runtime directories whose answers a worker holds. macOS has
+no watcher in this implementation: FSEvents needs cgo, which the CLI is built
+without, so every path is taken by stat there, which costs what a run in its
+own process pays and skips nothing.
 
 **A change journal.** Per worktree, the supervisor keeps a sequence number
 and the paths that changed since a worker's last read, or a break marker for
@@ -557,12 +581,13 @@ prototype measures a worker's held memory per worktree (section 15).
   breaks, self-check results, last stop reasons), `putnami machine stop`.
 
 **The macOS risk.** This epic measures nothing on a Mac. What is unproven
-there: the FSEvents sync point and its coalescing, the descriptor and signal
-hand-off, `getpeereid`, and the memory figures. What bounds the risk: every
-FSEvents doubt is a break that costs stats, never a stale key (section 7);
-the self-check turns stat skipping off on its first mismatch; the comparison
-test runs on that Mac with the first measurement; and the kill switch
-above leaves runs exactly as they are today. The first macOS measurement of
+there: the descriptor and signal hand-off, `getpeereid`, the socket pair
+without `SOCK_CLOEXEC` (made under the fork lock), and the memory figures;
+the CLI is compiled for darwin, never run there. What bounds the risk: macOS
+has no watcher, so it skips no stat (section 7); a run whose worker ends runs
+again in its own process; the comparison test runs on that Mac with the
+first measurement; and the kill switch above leaves runs exactly as they are
+today. The first macOS measurement of
 the protocol of section 15 is a task of the implementation, before 0.6 is
 released.
 
