@@ -103,7 +103,8 @@ func extensionsPrepare(ctx context.Context, wsRoot string, cfg *wsproto.Config, 
 
 // prepareComparisonRuntimes resolves the baseline an --impacted run of this
 // tree resolves, and prepares the runtimes its runtime comparison looks up
-// (scheduler.PrepareComparisonRuntimes). It returns what it could not do.
+// for the paths the diff changes (scheduler.PrepareReachedComparisonRuntimes).
+// It returns what it could not do.
 func prepareComparisonRuntimes(ctx context.Context, ws *workspace.Workspace, extensions []*extension.ExtensionDescription) []string {
 	// Only a source workspace's hosted run compares runtimes (ADR 0104).
 	if !extension.SourceWorkspace(ws.Root) {
@@ -121,7 +122,7 @@ func prepareComparisonRuntimes(ctx context.Context, ws *workspace.Workspace, ext
 	if len(diff.Files) == 0 {
 		return nil
 	}
-	notes, err := scheduler.PrepareComparisonRuntimes(ctx, ws, extensions, diff.Base)
+	notes, err := scheduler.PrepareReachedComparisonRuntimes(ctx, ws, extensions, diff.Base, diff.Files)
 	if err != nil {
 		notes = append(notes, err.Error())
 	}

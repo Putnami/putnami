@@ -295,6 +295,97 @@ func TestPrepareComparisonRuntimes_LetsAHostedRunCompare(t *testing.T) {
 	}
 }
 
+// Before a hosted run, only the extensions a diff can reach are prepared for
+// the comparison: a change under the extension's directory is, a change
+// elsewhere is not, even when the extension's sources differ from the base's
+// in a way the listed diff does not show. Such a skipped runtime is never
+// taken as unchanged: the hosted comparison keeps the edge it cannot prove.
+func TestPrepareReachedComparisonRuntimes_PreparesOnlyWhatTheDiffReaches(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "a-hosted-run-compares-runtimes-prepared-before-it",
+		"extensions-prepare-prepares-only-what-the-diff-reaches")
+	storeEntries := func() int {
+		inner, _ := os.ReadDir(filepath.Join(os.Getenv("PUTNAMI_ARTIFACT_DIR"), "sha256"))
+		return len(inner)
+	}
+
+	ws, ext, base := runtimeComparisonRepo(t)
+	writeRuntimeFile(t, ext.Path, "cmd/source", "source, edited")
+	notes, err := PrepareReachedComparisonRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, base, []string{"docs/readme.md"})
+	if err != nil || len(notes) != 0 {
+		t.Fatalf("PrepareReachedComparisonRuntimes: notes %v, err %v", notes, err)
+	}
+	if got := storeEntries(); got != 0 {
+		t.Fatalf("a diff that reaches no extension prepared %d runtimes, want none", got)
+	}
+	restore := runcredential.SetForTest("bearer")
+	t.Cleanup(restore)
+	hosted := runtimeTestExtension(ext.Path)
+	hosted.RelPath = "ext"
+	got := CompareExtensionRuntimes(context.Background(), ws, []*extension.ExtensionDescription{hosted}, []string{"/ext"}, base)
+	restore()
+	if len(got) != 1 || got[0].Unchanged {
+		t.Fatalf("a hosted run compared a skipped, changed runtime as %+v, want its edge kept", got)
+	}
+
+	notes, err = PrepareReachedComparisonRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, base, []string{"ext/cmd/source"})
+	if err != nil || len(notes) != 0 {
+		t.Fatalf("PrepareReachedComparisonRuntimes: notes %v, err %v", notes, err)
+	}
+	if got := storeEntries(); got != 2 {
+		t.Fatalf("a diff under the extension prepared %d runtimes, want the head's and the base's", got)
+	}
+}
+
+// A diff reaches an extension through the local module it replaces, and
+// through the workspace lock that pins its prepare toolchains; a diff
+// elsewhere does not.
+func TestPrepareReachedComparisonRuntimes_FollowsReplacementsAndTheLock(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "a-hosted-run-compares-runtimes-prepared-before-it",
+		"extensions-prepare-prepares-only-what-the-diff-reaches")
+	storeEntries := func() int {
+		inner, _ := os.ReadDir(filepath.Join(os.Getenv("PUTNAMI_ARTIFACT_DIR"), "sha256"))
+		return len(inner)
+	}
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	extDir := filepath.Join(root, "ext")
+	writeRuntimeFixture(t, extDir, "@putnami/test", "1.2.3")
+	writeRuntimeFile(t, extDir, extension.ManifestFilename, "{}\n")
+	writeRuntimeFile(t, extDir, "go.mod", "module example.com/ext\n\ngo 1.22\n\nrequire example.com/lib v0.0.0\n\nreplace example.com/lib => ../lib\n")
+	writeRuntimeFile(t, root, "lib/go.mod", "module example.com/lib\n\ngo 1.22\n")
+	writeRuntimeFile(t, root, "lib/lib.go", "package lib\n")
+	writeRuntimeFile(t, root, "putnami.lock.json", `{"version":5,"cli":{"source":"workspace"}}`+"\n")
+	commitRuntimeRepo(t, root, "base")
+	base := gitOutput(t, root, "rev-parse", "HEAD")
+	writeRuntimeFile(t, root, "lib/lib.go", "package lib\n\nconst Edited = true\n")
+	ext := runtimeTestExtension(extDir)
+	ext.RelPath = "ext"
+	ws := &workspace.Workspace{Root: root, Projects: []*workspace.Project{{ID: "/ext", Name: "ext", Path: "ext"}}}
+	prepare := func(changed ...string) int {
+		t.Helper()
+		if err := os.RemoveAll(filepath.Join(os.Getenv("PUTNAMI_ARTIFACT_DIR"), "sha256")); err != nil {
+			t.Fatal(err)
+		}
+		notes, err := PrepareReachedComparisonRuntimes(context.Background(), ws, []*extension.ExtensionDescription{ext}, base, changed)
+		if err != nil || len(notes) != 0 {
+			t.Fatalf("PrepareReachedComparisonRuntimes(%v): notes %v, err %v", changed, notes, err)
+		}
+		return storeEntries()
+	}
+	if got := prepare("other/readme.md"); got != 0 {
+		t.Errorf("a diff outside the extension and its replacement prepared %d runtimes, want none", got)
+	}
+	if got := prepare("lib/lib.go"); got != 2 {
+		t.Errorf("a diff under the replaced module prepared %d runtimes, want the head's and the base's", got)
+	}
+	if got := prepare("putnami.lock.json"); got != 2 {
+		t.Errorf("a diff of the workspace lock prepared %d runtimes, want the head's and the base's", got)
+	}
+}
+
 // An extension whose runtime inputs are the same at the base is not prepared:
 // a hosted run answers it unchanged from the two digests alone.
 func TestPrepareComparisonRuntimes_SkipsAnUnchangedExtension(t *testing.T) {

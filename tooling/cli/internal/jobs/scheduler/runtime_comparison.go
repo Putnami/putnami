@@ -10,13 +10,17 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -372,6 +376,45 @@ func PrepareComparisonRuntimes(
 	extensions []*extension.ExtensionDescription,
 	diffBase string,
 ) ([]string, error) {
+	return prepareComparisonRuntimes(ctx, ws, extensions, diffBase, nil)
+}
+
+// PrepareReachedComparisonRuntimes is PrepareComparisonRuntimes for the
+// extensions a diff can reach (tooling/cli ADR 0128): changed lists the paths
+// the diff from diffBase changes, relative to the root of the Git work tree
+// that holds the workspace. The runtime input digest of an extension reads
+// only files under its directory and under the directories of the local
+// module replacements it reaches, with no link out of them, and the prepare
+// toolchains its lock pins. An extension none of whose directories holds a
+// changed path, while the workspace lock is unchanged, can differ from the
+// base only through a file Git lists in neither side, such as an ignored one:
+// it is skipped without reading either side, and the hosted comparison keeps
+// its edge if its runtime did change. The base tree is written only when an
+// extension remains.
+//
+// Skipping is safe whatever it skips: the hosted comparison computes both
+// digests itself and keeps the edge of an extension whose runtime it does not
+// find, so a runtime left out never makes an extension read unchanged.
+func PrepareReachedComparisonRuntimes(
+	ctx context.Context,
+	ws *workspace.Workspace,
+	extensions []*extension.ExtensionDescription,
+	diffBase string,
+	changed []string,
+) ([]string, error) {
+	if changed == nil {
+		changed = []string{}
+	}
+	return prepareComparisonRuntimes(ctx, ws, extensions, diffBase, changed)
+}
+
+func prepareComparisonRuntimes(
+	ctx context.Context,
+	ws *workspace.Workspace,
+	extensions []*extension.ExtensionDescription,
+	diffBase string,
+	changed []string,
+) ([]string, error) {
 	if runcredential.Hosted() {
 		return nil, fmt.Errorf("prepare comparison runtimes: a run that holds the run credential prepares no runtime")
 	}
@@ -387,6 +430,9 @@ func PrepareComparisonRuntimes(
 		candidates = append(candidates, ext)
 	}
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Name < candidates[j].Name })
+	if changed != nil {
+		candidates = reachedByDiff(root, candidates, changed)
+	}
 	if len(candidates) == 0 {
 		return nil, nil
 	}
@@ -431,25 +477,124 @@ func PrepareComparisonRuntimes(
 			bases = append(bases, &base)
 		}
 	}
-	notes = append(notes, prepareLocked(ctx, &workspace.Workspace{Root: root}, heads)...)
-	notes = append(notes, prepareLocked(ctx, &workspace.Workspace{Root: baseRoot}, bases)...)
+	var jobs []lockedPreparation
+	for _, ext := range heads {
+		jobs = append(jobs, lockedPreparation{ws: &workspace.Workspace{Root: root}, ext: ext})
+	}
+	for _, ext := range bases {
+		jobs = append(jobs, lockedPreparation{ws: &workspace.Workspace{Root: baseRoot}, ext: ext})
+	}
+	notes = append(notes, prepareLocked(ctx, jobs)...)
 	return notes, nil
 }
 
-// prepareLocked prepares each extension of exts in ws, one at a time so one
-// failure leaves the others prepared, and returns a note for each one it could
-// not prepare under its locked digest.
-func prepareLocked(ctx context.Context, ws *workspace.Workspace, exts []*extension.ExtensionDescription) []string {
-	var notes []string
-	for _, ext := range exts {
-		if err := SynchronizeExtensionRuntimes(ctx, ws, []*extension.ExtensionDescription{ext}, nil); err != nil {
-			notes = append(notes, fmt.Sprintf("%s: prepare the runtime of %s: %v", ext.Name, ws.Root, err))
-			continue
+// lockedPreparation is one runtime prepareLocked prepares: an extension of the
+// tree or of the base, in the workspace whose lock names its digest.
+type lockedPreparation struct {
+	ws  *workspace.Workspace
+	ext *extension.ExtensionDescription
+}
+
+// prepareLocked prepares each runtime of jobs on its own, so one failure
+// leaves the others prepared, running as many at once as a runtime
+// synchronization stage would (preparationWorkers), and returns, in the order
+// of jobs, a note for each one it could not prepare under its locked digest.
+// The runtimes of the tree and of the base are independent: each is admitted
+// to the store under its own digest, as the stage admits concurrent runtimes.
+func prepareLocked(ctx context.Context, jobs []lockedPreparation) []string {
+	results := make([]string, len(jobs))
+	prepare := func(i int) {
+		job := jobs[i]
+		if err := SynchronizeExtensionRuntimes(ctx, job.ws, []*extension.ExtensionDescription{job.ext}, nil); err != nil {
+			results[i] = fmt.Sprintf("%s: prepare the runtime of %s: %v", job.ext.Name, job.ws.Root, err)
+			return
 		}
-		locked, err := sourceBuiltRuntimeDigest(ws.Root, ext)
-		if err != nil || locked != ext.RuntimeDigest {
-			notes = append(notes, fmt.Sprintf("%s: the runtime prepared from %s is not under the digest its lock records", ext.Name, ws.Root))
+		locked, err := sourceBuiltRuntimeDigest(job.ws.Root, job.ext)
+		if err != nil || locked != job.ext.RuntimeDigest {
+			results[i] = fmt.Sprintf("%s: the runtime prepared from %s is not under the digest its lock records", job.ext.Name, job.ws.Root)
+		}
+	}
+	workers := preparationWorkers(len(jobs), runtime.NumCPU(), machineprobe.TotalMemoryBytes())
+	gate := make(chan struct{}, workers)
+	var wg sync.WaitGroup
+	for i := range jobs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			gate <- struct{}{}
+			defer func() { <-gate }()
+			prepare(i)
+		}()
+	}
+	wg.Wait()
+	var notes []string
+	for _, note := range results {
+		if note != "" {
+			notes = append(notes, note)
 		}
 	}
 	return notes
+}
+
+// workspaceLockFilename is the workspace lock at the workspace root, which
+// pins the prepare toolchains of every runtime (internal/lockfile names it;
+// the scheduler does not import that package).
+const workspaceLockFilename = "putnami.lock.json"
+
+// reachedByDiff keeps the extensions of candidates whose runtime input digest
+// a change to one of changed can move: every extension when the workspace
+// lock, which pins the prepare toolchains, changed or when the Git work tree
+// cannot be read; otherwise each extension with a changed path at or under
+// its directory or a directory of the local module replacements it reaches.
+// An extension whose replacements cannot be read is kept.
+func reachedByDiff(root string, candidates []*extension.ExtensionDescription, changed []string) []*extension.ExtensionDescription {
+	top, err := putnamigit.WorkTreeRoot(root)
+	if err != nil {
+		return candidates
+	}
+	if resolved, err := dirlink.Resolve(top); err == nil {
+		top = resolved
+	}
+	paths := make([]string, 0, len(changed))
+	for _, rel := range changed {
+		paths = append(paths, filepath.Join(top, filepath.FromSlash(rel)))
+	}
+	lock := filepath.Join(root, workspaceLockFilename)
+	for _, path := range paths {
+		if path == lock {
+			return candidates
+		}
+	}
+	var reached []*extension.ExtensionDescription
+	for _, ext := range candidates {
+		dir, err := dirlink.Resolve(ext.Path)
+		if err != nil {
+			dir = ext.Path
+		}
+		dirs := []string{dir}
+		replacements, err := cachekey.RuntimeReplacementClosure(dir)
+		if err != nil {
+			reached = append(reached, ext)
+			continue
+		}
+		for _, replacement := range replacements {
+			dirs = append(dirs, replacement.Root)
+		}
+		if anyUnder(paths, dirs) {
+			reached = append(reached, ext)
+		}
+	}
+	return reached
+}
+
+// anyUnder reports whether one of paths is one of dirs or lies under it.
+func anyUnder(paths, dirs []string) bool {
+	for _, path := range paths {
+		for _, dir := range dirs {
+			if rel, err := filepath.Rel(dir, path); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				return true
+			}
+		}
+	}
+	return false
 }

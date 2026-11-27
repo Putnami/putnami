@@ -94,6 +94,7 @@
           "kind": "acceptance",
           "checks": [
             "extensions-prepare-admits-the-runtimes-a-hosted-comparison-looks-up",
+            "extensions-prepare-prepares-only-what-the-diff-reaches",
             "a-hosted-comparison-prepares-nothing"
           ]
         }
