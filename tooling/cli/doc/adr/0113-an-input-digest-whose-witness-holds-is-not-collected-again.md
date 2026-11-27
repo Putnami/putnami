@@ -447,24 +447,32 @@ record creates no entry and moves no key.
 
 ## Consequences
 
-Expected on this repository's unchanged run, from the bound above and the
-witness's cost (a stat of every witnessed path, 28 ms for the whole tree,
-and a record of about 2.8 MB, 15,755 distinct paths with their stats and the
-references of 2,169 entries, which a synthetic record of that shape decodes in
-4 ms): engine CPU from 42.7 s
-to about 27.5 s, wall from 30.7 s to about 24.5 s, key time summed from 20.0 s
-to about 6.5 s, engine Git calls from 130 to about 90, and the prune
-precompute from 4.3 s to about 1.8 s of engine CPU. On a full clone with its
-tags, from the second bound: engine CPU from 44.5 s to about 29.5 s, wall
-from 34.7 s to about 27 s, engine Git calls from 736 to about 190, Git CPU
-from 4.9 s to about 3.5 s. The implementation measures them again on the same
-protocol, on both clones.
+Measured on 2026-11-27 with the protocol above, on the same 4-core container,
+on a full clone with its 36 tags, the input digests of sections 1 to 3
+against main `299343dc` (which already reads the Git index in-process, ADR
+0112), medians of three unchanged runs after a priming run:
 
-- The 189 Git calls left on a full clone include 32 `for-each-ref`, 16 `log`
-  and 16 `cat-file` that no baseline makes; their readers are outside this
-  decision.
+| Measure | Main | Input record |
+|---|---|---|
+| Wall | 36.3 s | 31.1 s |
+| Engine CPU | 49.3 s | 35.7 s |
+| Run CPU (`runMs`) | 52.8 s | 39.4 s |
+| Key time summed | 20.9 s | 9.0 s |
+| Longest ready wait | 12.6 s | 10.9 s |
+| Input digests answered / collected | 0 / every one | 2,838 / 319 |
 
-- The longest ready wait goes from 11.8 s to about 9.3 s, not under 5 s. On
+Engine Git calls stay at 513 on this clone: the per-project release-baseline
+reads, which section 4's record removes, separately. The digests still
+collected are those of output directories restores rewrite on every run (a
+project's `.gen`, where a digest keys on files there) and the ones a link
+or a basis with no answer identity leaves unrecorded.
+
+The witness costs a stat of every witnessed path, 28 ms for the whole tree,
+and the record is a few megabytes; a synthetic record of this repository's
+shape (15,755 distinct paths with their stats, references of 2,169 entries)
+decodes in 4 ms.
+
+- The longest ready wait goes from 12.6 s to 10.9 s, not under 5 s. On
   an unchanged run it is set by how fast four workers drain 2,239 cache hits,
   and with the digests free each hit still pays its restore (3.7 s of engine
   CPU), its session record sanitizing (3.5 s), the remote negotiation (3.0 s)

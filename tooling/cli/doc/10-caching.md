@@ -285,6 +285,21 @@ records reads those again to record them.
 [ADR 0009](../../../protocols/workspace/doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md)
 states the rule.
 
+A whole input digest survives the run the same way, in the machine-local
+input record (`.putnami/input-record`): a digest is kept with the stats of
+the files it selected and of every path its collection read to select them
+(each directory a walk or a glob listed, each path it found absent, the
+index, ignore files, configuration files and untracked directories of an
+in-process Git read for a `git:` pattern, and the basis an extension's answer
+names for an input selector). The next run answers the digest without
+collecting it while every one of those stats holds, under the same two-second
+rule and on the same filesystems. The cache key itself is still composed by
+every run and does not change. A digest with no complete witness (the empty
+pattern set, a dangling link, a cut Git listed, a selector whose extension
+names no answer identity) is collected every run.
+[ADR 0113](adr/0113-an-input-digest-whose-witness-holds-is-not-collected-again.md)
+states the rule.
+
 When no patterns are specified, all non-hidden, non-ignored files in the project are hashed (excluding `node_modules/`, `.putnami/`, `out/`, and dotfiles).
 
 A `putnami.verdict-policy.json` file, wherever it sits, is read by the CI
