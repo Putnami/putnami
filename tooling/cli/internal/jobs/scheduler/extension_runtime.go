@@ -629,7 +629,14 @@ func synchronizeDeclaredExtensionRuntimeWithEnv(
 // runtime input digest of a workspace-local extension (the value its prepared
 // runtime carries), the version of a registry-installed one. Empty when the
 // extension declares no runtime or its inputs cannot be read.
-func ExtensionImplementationIdentity(ext *extension.ExtensionDescription) string {
+//
+// An extension this run has not synchronized yet is named by
+// runtimeInputDigest. In a hosted run of a source workspace, a source-built
+// runtime is so named by the digest from the workspace lock, the one it
+// carries once loaded (tooling/cli ADR 0126). Otherwise it is the digest of
+// its inputs with the toolchains resolved so far, which synchronization may
+// change once it resolves them.
+func ExtensionImplementationIdentity(workspaceRoot string, ext *extension.ExtensionDescription) string {
 	if ext == nil {
 		return ""
 	}
@@ -642,7 +649,7 @@ func ExtensionImplementationIdentity(ext *extension.ExtensionDescription) string
 	if !ext.LocalSource {
 		return ext.Version
 	}
-	digest, err := cachekey.ExtensionRuntimeDigest(ext)
+	digest, err := runtimeInputDigest(workspaceRoot, ext)
 	if err != nil {
 		return ""
 	}

@@ -239,6 +239,7 @@
     "cli/job-planning-execution#host-rpc-version-lines",
     "cli/job-planning-execution#host-rpc-workspace-owners",
     "cli/job-planning-execution#host-rpc-workspace-probe",
+    "cli/job-planning-execution#hosted-source-built-provider-identity",
     "cli/job-planning-execution#job-context-names-member-types",
     "cli/job-planning-execution#job-flags-follow-job-commands",
     "cli/job-planning-execution#no-core-development-verb",

@@ -161,7 +161,7 @@ func WorkspaceProviderBindings(
 		}
 		bindings = append(bindings, workspace.ProviderBinding{
 			Scope:          scope,
-			Implementation: scheduler.ExtensionImplementationIdentity(ext),
+			Implementation: scheduler.ExtensionImplementationIdentity(ws.Root, ext),
 			Provider: &workspace.ExecProbeProvider{
 				Extension:         ext.Name,
 				Dir:               dir,

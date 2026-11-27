@@ -202,6 +202,10 @@
       "text": "Planning an unchanged workspace whose toolchains are Putnami home releases or name their own file (probe self) starts its git calls alone. Handshakes, probes and input-resolve answers are read from records keyed by what each follows: the runtime's store entry and file identity, the binary identity, or the extension's implementation, the request, the probe digest and the basis. A binary naming another file, as a dispatcher, is probed each run and checked once; failures are never recorded."
     },
     {
+      "id": "hosted-source-built-provider-identity",
+      "text": "A hosted run of a source workspace names a source-built provider it has not loaded yet by the digest from the workspace lock it loads the runtime under, the identity a loaded one carries, so a probe answer recorded by one synchronization of the run serves the next."
+    },
+    {
       "id": "unchanged-run-writes-nothing",
       "text": "A run of an unchanged workspace whose tasks are cached or run every time writes no file outside .git and .putnami. A restore holds a tree that has its bytes, a directory leading to a kept path, or a project stamp differing only in fields the scheduler owns. Tasks sharing an output write the same content. An executing task re-stamps .gen/version.json only when its identity changes. After a commit that changes no file, the next run writes only stamps, and the run after it nothing."
     },

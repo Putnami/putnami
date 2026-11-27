@@ -149,6 +149,34 @@ func TestAHostedRunLoadsASourceBuiltRuntimeFromTheStoreWithoutPreparingIt(t *tes
 	}
 }
 
+// A hosted run of a source workspace names a source-built provider by the
+// digest it loads the runtime under, before it loads it as after: the
+// workspace probe keys a recorded answer on that identity, and a run that
+// probes before and after loading the runtime must find one identity
+// recorded. Naming it also starts no compiler, as the hosted path requires.
+func TestAHostedRunNamesASourceBuiltProviderAsItLoadsIt(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "hosted-source-built-provider-identity",
+		"a-hosted-run-names-a-source-built-provider-as-it-loads-it")
+	f := newSourceBuiltFixture(t)
+	prepared := f.prepare(t)
+	probes := fileLines(t, f.probes)
+
+	restore := runcredential.SetForTest("run-bearer")
+	defer restore()
+	before := ExtensionImplementationIdentity(f.root, f.extension())
+	if got := fileLines(t, f.probes); got != probes {
+		t.Errorf("naming the provider probed the compiler %d times, want none", got-probes)
+	}
+	hosted := f.extension()
+	if err := synchronizeExtensionRuntimesResolving(context.Background(), f.root, []*extension.ExtensionDescription{hosted}, nil, false); err != nil {
+		t.Fatalf("a hosted run did not load the prepared runtime: %v", err)
+	}
+	after := ExtensionImplementationIdentity(f.root, hosted)
+	if before == "" || before != after || after != prepared.RuntimeDigest {
+		t.Errorf("identity before loading = %q, after = %q, want both the prepared %q", before, after, prepared.RuntimeDigest)
+	}
+}
+
 // A hosted run of a source workspace whose provider runtime the store lacks,
 // because an input changed after `putnami extensions prepare` ran, fails the
 // launch and names the step that prepares it. It prepares nothing itself.

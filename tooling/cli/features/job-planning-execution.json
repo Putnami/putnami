@@ -785,6 +785,19 @@
         }
       },
       {
+        "id": "hosted-source-built-provider-identity",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-hosted-run-names-a-source-built-provider-as-it-loads-it"
+          ]
+        }
+      },
+      {
         "id": "unchanged-run-writes-nothing",
         "stage": "coded",
         "evidenceKinds": [

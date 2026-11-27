@@ -82,7 +82,7 @@ func newRecords(storeRoot, root string, byName map[string]*extension.ExtensionDe
 			defer mu.Unlock()
 			identity, ok := identities[name]
 			if !ok {
-				identity = implementationIdentity(artifacts, byName[name])
+				identity = implementationIdentity(root, artifacts, byName[name])
 				identities[name] = identity
 			}
 			return identity
@@ -96,7 +96,7 @@ func newRecords(storeRoot, root string, byName map[string]*extension.ExtensionDe
 // workspace snapshot keys a probe answer on
 // (scheduler.ExtensionImplementationIdentity). It is "" for an extension with
 // none of them, such as a local extension that prepares no runtime.
-func implementationIdentity(artifacts *artifactstore.Store, ext *extension.ExtensionDescription) string {
+func implementationIdentity(root string, artifacts *artifactstore.Store, ext *extension.ExtensionDescription) string {
 	if ext == nil {
 		return ""
 	}
@@ -108,7 +108,7 @@ func implementationIdentity(artifacts *artifactstore.Store, ext *extension.Exten
 			return digest
 		}
 	}
-	return scheduler.ExtensionImplementationIdentity(ext)
+	return scheduler.ExtensionImplementationIdentity(root, ext)
 }
 
 // file returns the record path of key in this workspace, and the full key a
