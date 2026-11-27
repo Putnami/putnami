@@ -774,6 +774,24 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 				iox.Fprintf(os.Stderr, "[debug] file index: %v\n", err)
 			}
 		}()
+		// The release baselines a run read are answered to the next run while
+		// the commits they name hold (tooling/cli ADR 0113 §4), under the same
+		// program identity as the file index.
+		openReleaseRecord := fileindex.OpenReleaseRecord
+		if req.Global.Plan || req.previewsOnly() {
+			openReleaseRecord = fileindex.OpenReleaseRecordReadOnly
+		}
+		releaseRecord := openReleaseRecord(fileindex.ReleaseRecordPath(req.WorkspaceRoot), fileindex.ReleaseRecordIdentity(fileindex.ExecutableIdentity()))
+		restoreReleaseRecord := fileindex.UseReleaseRecord(releaseRecord)
+		defer func() {
+			restoreReleaseRecord()
+			if req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] release record: %d baselines answered\n", releaseRecord.Hits())
+			}
+			if err := releaseRecord.Save(); err != nil && req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] release record: %v\n", err)
+			}
+		}()
 	}
 	// Phase 1: load the workspace and resolve extensions — once per run.
 	ws, discovered, code, err := loadRunWorkspace(req)

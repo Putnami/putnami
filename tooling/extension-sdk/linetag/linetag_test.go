@@ -408,3 +408,89 @@ func TestTagsAnswerEveryLineWithFourGitCalls(t *testing.T) {
 		t.Errorf("git calls = %d, want 4 for every line", calls)
 	}
 }
+
+// A snapshot names HEAD and every tag with the object it peels to, an
+// unreadable one included, and costs no Git call past the reads LastRelease
+// shares: the tags any line answers from.
+func TestASnapshotNamesHEADAndEveryTagWithItsObject(t *testing.T) {
+	dir := repository(t)
+	head := git(t, dir, "rev-parse", "HEAD")
+	git(t, dir, "tag", "ts/v0.1.0")
+	git(t, dir, "tag", "-a", "go/v1.0.0", "-m", "release")
+	tree := git(t, dir, "rev-parse", "HEAD^{tree}")
+	git(t, dir, "tag", "tree-tag", tree)
+
+	tags := Open(dir)
+	got, err := tags.Head()
+	if err != nil || got != head {
+		t.Fatalf("Head = %q, %v; want %s", got, err, head)
+	}
+	if has, err := tags.HasTags(); err != nil || !has {
+		t.Fatalf("HasTags = %v, %v; want true", has, err)
+	}
+	snapshotHead, snapshot, err := tags.Snapshot()
+	if err != nil || snapshotHead != head {
+		t.Fatalf("Snapshot head = %q, %v; want %s", snapshotHead, err, head)
+	}
+	want := map[string]string{"ts/v0.1.0": head + " commit", "go/v1.0.0": head + " commit", "tree-tag": tree + " tree"}
+	if len(snapshot) != len(want) {
+		t.Fatalf("Snapshot = %+v, want %d tags", snapshot, len(want))
+	}
+	for _, tag := range snapshot {
+		if !strings.HasPrefix(tag.Object, want[tag.Name]+" ") {
+			t.Errorf("tag %s peels to %q, want %q", tag.Name, tag.Object, want[tag.Name])
+		}
+	}
+}
+
+// A repository without a tag has an empty snapshot, read without cat-file.
+func TestASnapshotWithoutTags(t *testing.T) {
+	dir := repository(t)
+	tags := Open(dir)
+	if has, err := tags.HasTags(); err != nil || has {
+		t.Fatalf("HasTags = %v, %v; want false", has, err)
+	}
+	if _, snapshot, err := tags.Snapshot(); err != nil || len(snapshot) != 0 {
+		t.Fatalf("Snapshot = %+v, %v; want no tag", snapshot, err)
+	}
+	if release, ok, err := tags.LastRelease("v{version}"); err != nil || ok {
+		t.Fatalf("LastRelease = %+v, %v, %v; want none", release, ok, err)
+	}
+}
+
+// Without a commit, the snapshot is an error.
+func TestASnapshotWithoutACommitIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	git(t, dir, "init", "--quiet")
+	tags := Open(dir)
+	if _, _, err := tags.Snapshot(); err == nil {
+		t.Fatal("Snapshot of a repository without a commit, want an error")
+	}
+	if _, err := tags.Head(); err == nil {
+		t.Fatal("Head of a repository without a commit, want an error")
+	}
+	if _, err := tags.HasTags(); err == nil {
+		t.Fatal("HasTags of a repository without a commit, want an error")
+	}
+}
+
+// Merged lists the tags HEAD reaches with the object each ref names.
+func TestMergedListsTheTagsHEADReachesWithTheirObjects(t *testing.T) {
+	dir := repository(t)
+	head := git(t, dir, "rev-parse", "HEAD")
+	git(t, dir, "tag", "ts/v0.1.0")
+	git(t, dir, "checkout", "--quiet", "-b", "side")
+	commit(t, dir, "unreached")
+	git(t, dir, "tag", "ts/v9.0.0")
+	git(t, dir, "checkout", "--quiet", "main")
+	merged, err := Open(dir).Merged()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(merged) != 1 || merged[0] != "ts/v0.1.0 "+head {
+		t.Fatalf("Merged = %q, want ts/v0.1.0 at %s alone", merged, head)
+	}
+	if _, err := Open(t.TempDir()).Merged(); err == nil {
+		t.Fatal("Merged outside a repository, want an error")
+	}
+}

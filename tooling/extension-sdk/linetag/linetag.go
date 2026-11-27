@@ -89,9 +89,10 @@ type Tags struct {
 	peeled   map[string]string // tag name to its cat-file --batch-check line
 	peelErr  error
 
-	mergedOnce sync.Once
-	merged     map[string]bool
-	mergedErr  error
+	mergedOnce  sync.Once
+	merged      map[string]bool
+	mergedLines []string // "<tag> <object>", in for-each-ref's order
+	mergedErr   error
 }
 
 // Open returns the tags of the repository that holds dir, read when a line
@@ -142,6 +143,81 @@ func (t *Tags) LastRelease(pattern string) (release Release, ok bool, err error)
 	return Release{}, false, nil
 }
 
+// Head returns HEAD's commit as this Tags read it: the commit every line's
+// last release is reached from.
+func (t *Tags) Head() (string, error) {
+	t.namesOnce.Do(t.readNames)
+	if t.namesErr != nil {
+		return "", fmt.Errorf("read HEAD: %w", t.namesErr)
+	}
+	return t.head, nil
+}
+
+// HasTags reports whether the repository has a tag, of any line, as this Tags
+// read the tag names.
+func (t *Tags) HasTags() (bool, error) {
+	t.namesOnce.Do(t.readNames)
+	if t.namesErr != nil {
+		return false, fmt.Errorf("read the tags: %w", t.namesErr)
+	}
+	return len(tagNames(t.refs)) > 0, nil
+}
+
+// TagObject is a tag and the object it peels to.
+type TagObject struct {
+	// Name is the tag name, without refs/tags/.
+	Name string
+	// Object is git's cat-file --batch-check line for the object the tag
+	// peels to: "<object> <type> <size>", or "<name> missing".
+	Object string
+}
+
+// Snapshot returns HEAD's commit and every tag, in for-each-ref's order, with
+// the object it peels to. Together with Merged, it holds every read
+// LastRelease answers a line from: a caller that holds both holds every
+// answer of LastRelease, since a commit's history is named by its ID.
+func (t *Tags) Snapshot() (head string, tags []TagObject, err error) {
+	t.namesOnce.Do(t.readNames)
+	if t.namesErr != nil {
+		return "", nil, fmt.Errorf("read the tags: %w", t.namesErr)
+	}
+	t.peelOnce.Do(t.readPeeled)
+	if t.peelErr != nil {
+		return "", nil, fmt.Errorf("read the tags: %w", t.peelErr)
+	}
+	for _, tag := range tagNames(t.refs) {
+		tags = append(tags, TagObject{Name: tag, Object: t.peeled[tag]})
+	}
+	return t.head, tags, nil
+}
+
+// Merged returns the tags HEAD reaches, each with the object its ref names
+// ("<tag> <object>"), as the read LastRelease decides reachability from
+// lists them. A caller that holds the snapshot and this listing holds every
+// answer of LastRelease, even when a tag moved between the two reads.
+func (t *Tags) Merged() ([]string, error) {
+	t.namesOnce.Do(t.readNames)
+	if t.namesErr != nil {
+		return nil, fmt.Errorf("read the tags HEAD reaches: %w", t.namesErr)
+	}
+	t.mergedOnce.Do(t.readMerged)
+	if t.mergedErr != nil {
+		return nil, fmt.Errorf("read the tags HEAD reaches: %w", t.mergedErr)
+	}
+	return slices.Clone(t.mergedLines), nil
+}
+
+// tagNames returns the tag names of a for-each-ref listing of refs/tags.
+func tagNames(refs string) []string {
+	var tags []string
+	for ref := range strings.SplitSeq(refs, "\n") {
+		if tag, ok := strings.CutPrefix(ref, "refs/tags/"); ok && tag != "" {
+			tags = append(tags, tag)
+		}
+	}
+	return tags
+}
+
 // readNames reads HEAD's commit and the tag names. Listing tag names reads
 // no object, so every release tag of a line is a candidate, whether git can
 // read its object or not.
@@ -158,11 +234,10 @@ func (t *Tags) readNames() {
 // readPeeled reads, in one cat-file --batch-check, the object each tag peels
 // to: one line per tag, "<object> <type> <size>", or "<name> missing".
 func (t *Tags) readPeeled() {
-	var tags []string
-	for ref := range strings.SplitSeq(t.refs, "\n") {
-		if tag, ok := strings.CutPrefix(ref, "refs/tags/"); ok && tag != "" {
-			tags = append(tags, tag)
-		}
+	tags := tagNames(t.refs)
+	if len(tags) == 0 {
+		t.peeled = map[string]string{}
+		return
 	}
 	var names strings.Builder
 	for _, tag := range tags {
@@ -191,7 +266,7 @@ func (t *Tags) readPeeled() {
 // failures.
 func (t *Tags) readMerged() {
 	merged, stderr, err := runGitCapture(t.dir, nil,
-		"for-each-ref", "--merged="+t.head, "--format=%(refname)", "refs/tags")
+		"for-each-ref", "--merged="+t.head, "--format=%(refname) %(objectname)", "refs/tags")
 	if err == nil {
 		err = reportedError(stderr)
 	}
@@ -200,9 +275,12 @@ func (t *Tags) readMerged() {
 		return
 	}
 	t.merged = map[string]bool{}
-	for ref := range strings.SplitSeq(merged, "\n") {
+	for line := range strings.SplitSeq(merged, "\n") {
+		// A ref name holds no space, so the object name follows the first one.
+		ref, object, _ := strings.Cut(line, " ")
 		if tag, ok := strings.CutPrefix(ref, "refs/tags/"); ok {
 			t.merged[tag] = true
+			t.mergedLines = append(t.mergedLines, tag+" "+object)
 		}
 	}
 }

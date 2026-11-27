@@ -1,12 +1,15 @@
 package git
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"go.putnami.dev/sdk/extension/linetag"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
 
 // ReleaseBaselineReader reads the release baselines of the projects of one
@@ -33,15 +36,18 @@ type ReleaseBaselineReader struct {
 	committed  bool
 	commitErr  error
 
-	tagsOnce sync.Once
-	hasTags  bool
-	tagsErr  error
-
 	releasesMu sync.Mutex
 	releases   map[string]*onceRelease
 
 	tagsReadOnce sync.Once
 	tags         *linetag.Tags
+
+	// record answers and keeps the baselines of the root's work tree under
+	// their witness (tooling/cli ADR 0113 §4); nil records nothing.
+	record      *fileindex.ReleaseRecord
+	witnessOnce sync.Once
+	witness     fileindex.ReleaseWitness
+	witnessed   bool
 }
 
 type onceRelease struct {
@@ -51,19 +57,94 @@ type onceRelease struct {
 	err     error
 }
 
-// NewReleaseBaselineReader returns a reader for the work tree at root.
+// NewReleaseBaselineReader returns a reader for the work tree at root that
+// answers from, and records into, the process's current release record
+// (fileindex.CurrentReleaseRecord), none outside a run.
 func NewReleaseBaselineReader(root string) *ReleaseBaselineReader {
-	return &ReleaseBaselineReader{root: root, releases: map[string]*onceRelease{}}
+	return NewRecordedReleaseBaselineReader(root, fileindex.CurrentReleaseRecord())
+}
+
+// NewRecordedReleaseBaselineReader returns a reader for the work tree at root
+// that answers a baseline from record when its witness holds, and records the
+// baselines it reads (tooling/cli ADR 0113 §4). A nil record records nothing.
+func NewRecordedReleaseBaselineReader(root string, record *fileindex.ReleaseRecord) *ReleaseBaselineReader {
+	return &ReleaseBaselineReader{root: root, releases: map[string]*onceRelease{}, record: record}
 }
 
 // Read reads the release baseline of the project in dir, whose version line
 // renders its tags with tagPattern, as ReadReleaseBaseline does.
+//
+// A directory of the root's work tree is answered from the reader's record
+// when the witness of the commits its baseline names holds, with no Git call
+// of its own. Otherwise it is read, and a tagged or untagged baseline is
+// recorded, kept when the record saves only if the witness, taken again then,
+// still holds.
 func (r *ReleaseBaselineReader) Read(dir, tagPattern string) (ReleaseBaseline, error) {
-	if rel, ok := r.place(dir); ok {
+	rel, ok := r.place(dir)
+	if !ok {
+		return ReadReleaseBaseline(dir, tagPattern)
+	}
+	if r.record == nil {
 		return readReleaseBaseline(dir, tagPattern, rootReleaseReads{reader: r, rel: rel})
 	}
-	return ReadReleaseBaseline(dir, tagPattern)
+	r.witnessOnce.Do(func() { r.witness, r.witnessed = r.releaseWitness() })
+	if r.witnessed {
+		if value, ok := r.record.Lookup(dir, tagPattern, r.witness); ok {
+			if baseline, ok := decodeRecordedBaseline(value, tagPattern); ok {
+				return baseline, nil
+			}
+		}
+	}
+	baseline, err := readReleaseBaseline(dir, tagPattern, rootReleaseReads{reader: r, rel: rel})
+	if err != nil || !r.witnessed {
+		return baseline, err
+	}
+	if baseline.State != ReleaseBaselineTagged && baseline.State != ReleaseBaselineUntagged {
+		return baseline, nil
+	}
+	// The record takes the whole witness again before it writes: a baseline
+	// read while a part of it moved is not kept.
+	r.record.Store(dir, tagPattern, r.witness, encodeRecordedBaseline(baseline), r.recheckWitness)
+	return baseline, nil
 }
+
+// recordedBaseline is a baseline as the record keeps it: its value, and the
+// commit and prefix that locate the files its tag holds.
+type recordedBaseline struct {
+	Baseline ReleaseBaseline `json:"baseline"`
+	Commit   string          `json:"commit,omitempty"`
+	Prefix   string          `json:"prefix,omitempty"`
+}
+
+func encodeRecordedBaseline(baseline ReleaseBaseline) []byte {
+	data, err := json.Marshal(recordedBaseline{Baseline: baseline, Commit: baseline.Commit, Prefix: baseline.Prefix})
+	if err != nil {
+		panic(fmt.Sprintf("encode release baseline: %v", err))
+	}
+	return data
+}
+
+// decodeRecordedBaseline decodes a recorded baseline; false for a value that
+// is not one of pattern's tagged or untagged baselines.
+func decodeRecordedBaseline(value []byte, pattern string) (ReleaseBaseline, bool) {
+	var recorded recordedBaseline
+	if err := json.Unmarshal(value, &recorded); err != nil {
+		return ReleaseBaseline{}, false
+	}
+	baseline := recorded.Baseline
+	baseline.Commit, baseline.Prefix = recorded.Commit, recorded.Prefix
+	switch {
+	case baseline.Pattern != pattern:
+		return ReleaseBaseline{}, false
+	case baseline.State == ReleaseBaselineTagged && baseline.Tag != "" && baseline.Commit != "":
+	case baseline.State == ReleaseBaselineUntagged && baseline.Tag == "":
+	default:
+		return ReleaseBaseline{}, false
+	}
+	return baseline, true
+}
+
+func (r *ReleaseBaselineReader) openTags() { r.tags = linetag.Open(r.root) }
 
 // place returns dir relative to the root, in slash form, when the root's
 // repository holds it and git would name it by that path.
@@ -153,13 +234,22 @@ func (s rootReleaseReads) release(_, tagPattern string) (linetag.Release, bool, 
 		r.releases[tagPattern] = entry
 	}
 	r.releasesMu.Unlock()
-	r.tagsReadOnce.Do(func() { r.tags = linetag.Open(r.root) })
+	r.tagsReadOnce.Do(r.openTags)
 	entry.once.Do(func() { entry.release, entry.ok, entry.err = r.tags.LastRelease(tagPattern) })
 	return entry.release, entry.ok, entry.err
 }
 
+// head is HEAD's commit as the reader's one read of the tags holds it, from
+// which each line's last release was reached.
+func (s rootReleaseReads) head(string) (string, error) {
+	r := s.reader
+	r.tagsReadOnce.Do(r.openTags)
+	return r.tags.Head()
+}
+
+// hasTags answers from the reader's one read of the tag names.
 func (s rootReleaseReads) hasTags(string) (bool, error) {
 	r := s.reader
-	r.tagsOnce.Do(func() { r.hasTags, r.tagsErr = dirReleaseReads{}.hasTags(r.root) })
-	return r.hasTags, r.tagsErr
+	r.tagsReadOnce.Do(r.openTags)
+	return r.tags.HasTags()
 }
