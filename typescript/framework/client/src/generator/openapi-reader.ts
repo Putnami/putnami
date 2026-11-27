@@ -455,6 +455,7 @@ function strictOperationToMethod(
     doc,
     context,
     client.stream === 'client' || client.stream === 'bidirectional',
+    client.stream === 'unary',
   );
   validateCacheInvalidationFields(client, successes, doc, context);
   if (
@@ -596,11 +597,18 @@ function readStrictRequest(input: unknown, doc: OpenApiDocument, context: Operat
   };
 }
 
+/**
+ * The declared successes: every concrete 2xx and, for a unary operation, every
+ * declared redirect (a 3xx other than 304), which the client answers rather
+ * than follows. A redirect beside raw octets stays documentation, as in the Go
+ * client: the octets travel on exactly one success status.
+ */
 function readStrictSuccesses(
   input: unknown,
   doc: OpenApiDocument,
   context: OperationContext,
   allowUpgradeOnly: boolean,
+  allowRedirects: boolean,
 ): SuccessIR[] {
   const responses = object(input, context, 'responses');
   const successes: SuccessIR[] = [];
@@ -611,7 +619,7 @@ function readStrictSuccesses(
       continue;
     }
     const status = Number(statusText);
-    if (status < 200 || status > 299) continue;
+    if ((status < 200 || status > 299) && !(allowRedirects && isRedirectStatus(status))) continue;
     const field = `responses.${statusText}`;
     const response = object(entry, context, field);
     assertKnownKeys(response, ['description', 'content', 'headers'], context, field);
@@ -626,9 +634,18 @@ function readStrictSuccesses(
     });
   }
   successes.sort((left, right) => left.status - right.status);
-  if (!successes.length && !allowUpgradeOnly)
-    unsupported('operation must declare at least one concrete 2xx response', context, 'responses');
-  return successes;
+  const octets = successes.some((success) =>
+    success.content.some((content) => content.streamed || isBinarySchemaObject(content.schema)),
+  );
+  const kept = octets ? successes.filter((success) => !isRedirectStatus(success.status)) : successes;
+  if (!kept.length && !allowUpgradeOnly)
+    unsupported('operation must declare at least one concrete 2xx or redirect response', context, 'responses');
+  return kept;
+}
+
+/** A 3xx an operation answers with instead of a body; 304 is a conditional read's answer. */
+function isRedirectStatus(status: number): boolean {
+  return status >= 300 && status <= 399 && status !== 304;
 }
 
 function readResponseHeaders(

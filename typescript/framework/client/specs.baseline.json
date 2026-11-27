@@ -24,6 +24,7 @@
     "typescript/service-clients#opaque-json",
     "typescript/service-clients#per-call-endpoint",
     "typescript/service-clients#provider-owned-websocket-wires",
+    "typescript/service-clients#redirect-success",
     "typescript/service-clients#resilience-telemetry",
     "typescript/service-clients#resource-release",
     "typescript/service-clients#response-cache",

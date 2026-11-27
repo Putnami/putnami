@@ -32,7 +32,7 @@ import {
   ClientTimeoutError,
   ClientTransportUnavailableError,
 } from './errors';
-import { HttpTransport } from './http-transport';
+import { HttpTransport, isRedirectStatus } from './http-transport';
 import { type GeneratedClientDesign, resolveClientFeatureTrace } from './generated-client-design';
 import { type RetryConfig, retryInterceptor } from './retry';
 import {
@@ -635,7 +635,7 @@ export abstract class BaseClient {
   }
 
   /** Execute a call while preserving the declared status/header variant. */
-  protected async requestResult<TResult extends { status: number; data: unknown; headers: Headers }>(
+  protected async requestResult<TResult extends { status: number; data: unknown; headers: Headers; location?: string }>(
     method: string,
     path: string,
     options?: {
@@ -662,7 +662,15 @@ export abstract class BaseClient {
     // The transport already refused any status the operation did not declare and
     // decoded the body under that status's own schema, so the widened `number`
     // here is known to be one of the result union's status literals.
-    return { status: response.status, data: response.data, headers: response.headers } as TResult;
+    // A declared redirect is answered, never followed: its target is the
+    // Location header as the provider sent it, empty when it sent none, as in
+    // the Go client.
+    return {
+      status: response.status,
+      data: response.data,
+      headers: response.headers,
+      ...(isRedirectStatus(response.status) ? { location: response.headers.get('Location') ?? '' } : {}),
+    } as TResult;
   }
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the request boundary normalizes encoding, deadlines, transport failures, and typed responses together

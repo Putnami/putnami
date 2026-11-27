@@ -470,6 +470,20 @@
           }
         },
         {
+          "id": "redirect-success",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-redirect-only-operation-is-generated",
+              "a-declared-redirect-is-answered-with-its-status-and-location-without-following-it",
+              "an-undeclared-redirect-is-still-refused",
+              "an-unrepresentable-redirect-fails-generation"
+            ]
+          }
+        },
+        {
           "id": "streamed-binary-payloads",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

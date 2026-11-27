@@ -44,7 +44,10 @@ export interface ResponseHeaderIR {
   schema: ClientSchema;
 }
 
-/** One successful HTTP result variant. All declared 2xx variants are retained. */
+/**
+ * One successful HTTP result variant. All declared 2xx variants are retained,
+ * and so is each declared redirect (a 3xx other than 304) of a unary operation.
+ */
 export interface SuccessIR {
   status: number;
   description: string;
