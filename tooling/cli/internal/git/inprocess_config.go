@@ -1,6 +1,7 @@
 package git
 
 import (
+	"crypto/sha256"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -26,6 +27,9 @@ type localConfig struct {
 	RemoteURLs map[string]string
 	// SkipHash is index.skipHash=true.
 	SkipHash bool
+	// Reading is the SHA-256 of Git's whole reading, every entry with its
+	// origin: two equal readings configure Git the same way.
+	Reading [sha256.Size]byte
 }
 
 // parseConfig reads the output of `git config -z --list --show-origin`, run

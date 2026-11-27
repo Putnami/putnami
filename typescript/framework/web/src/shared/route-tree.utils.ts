@@ -77,8 +77,12 @@ export class RouteTreeHelper<T extends BaseRouteNode> {
   ) {}
 
   /**
-   * Find or create a route node for layouts only.
-   * Creates the hierarchical structure for layouts.
+   * Find or create the layout node for `route`, and every node on the path to
+   * it. Only layout nodes are matched: a page already registered at or below
+   * an address on that path moves under the node created for it, as the child
+   * it would have been had the layout registered first, so the tree does not
+   * depend on the order in which layouts and pages register. An index page that
+   * moves gives its action to its new parent.
    */
   ensureLayoutRoute(route: string): T {
     const segments = parseRouteSegments(route);
@@ -93,7 +97,7 @@ export class RouteTreeHelper<T extends BaseRouteNode> {
 
       let found: T | undefined;
       for (const child of (current.children || []) as T[]) {
-        if (child.path === converted) {
+        if (child.path === converted && this.callbacks.isLayout(child)) {
           found = child;
           break;
         }
@@ -103,12 +107,41 @@ export class RouteTreeHelper<T extends BaseRouteNode> {
         found = this.callbacks.createLayoutNode(converted, idPath);
         current.children ||= [];
         (current.children as T[]).push(found);
+        this.adoptPages(current, found, converted);
       }
 
       current = found;
     }
 
+    this.layoutCache.clear();
     return current;
+  }
+
+  /**
+   * Move each page child of `parent` whose path starts with `segment` under
+   * `node`, the node just created for that segment.
+   */
+  private adoptPages(parent: T, node: T, segment: string): void {
+    const siblings = parent.children as T[];
+    for (const child of [...siblings]) {
+      if (child === node || this.callbacks.isLayout(child) || child.path === undefined) {
+        continue;
+      }
+      const [head, ...tail] = child.path.split('/');
+      if (head !== segment) {
+        continue;
+      }
+      siblings.splice(siblings.indexOf(child), 1);
+      const remainingPath = tail.join('/');
+      child.path = remainingPath;
+      child.index = remainingPath === '';
+      child.id = generatePageId(node.id || 'root', remainingPath);
+      if (child.index && child.action !== undefined) {
+        node.action = child.action;
+      }
+      node.children ||= [];
+      (node.children as T[]).push(child);
+    }
   }
 
   private layoutCache = new Map<string, { layout: T; remainingPath: string }>();

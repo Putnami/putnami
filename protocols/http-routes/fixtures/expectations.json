@@ -2,6 +2,7 @@
   "valid": [
     "catch-all-gomod.json",
     "catch-all-suffix-disjoint.json",
+    "committed-form.json",
     "escaped-unicode.json",
     "full.json",
     "minimal.json",
@@ -18,6 +19,7 @@
     "double-catch-all.json": "http_routes.unsupported_pattern",
     "duplicate-method.json": "http_routes.duplicate_method",
     "duplicate-template.json": "http_routes.duplicate_route",
+    "empty-digest.json": "http_routes.invalid_digest",
     "encoded-separator.json": "http_routes.invalid_path",
     "encoded-unreserved.json": "http_routes.invalid_path",
     "invalid-digest.json": "http_routes.invalid_digest",
@@ -30,6 +32,7 @@
     "missing-project.json": "http_routes.missing_provenance",
     "missing-public-edge.json": "http_routes.parse_error",
     "native-parameter.json": "http_routes.unsupported_pattern",
+    "null-digest.json": "http_routes.parse_error",
     "null-public-edge.json": "http_routes.parse_error",
     "proves-at-not-admitted.json": "http_routes.invalid_proof",
     "proves-bad-feature.json": "http_routes.invalid_proof",

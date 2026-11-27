@@ -97,17 +97,30 @@ satisfied is either fixed or waived through the
    pin to if this one is bad, and who is on the hook to say so.
 8. **The CLI provenance record is complete.** It follows the
    [release provenance policy](tooling/cli/doc/release-provenance.md): full
-   source commit and clean-tree state, exact Putnami version, builder actor or
-   execution-run identity, every target's authoritative SHA-256, all four smoke
-   results, and the release owner's approval. Current archives are unsigned and
+   source commit and clean-tree state, exact Putnami version, the builder actor
+   or the identity of the run that packaged and published (never the smoke
+   run), every target's authoritative SHA-256, all six smoke results of item 9
+   with the URL of the run that produced them, and the release owner's
+   approval. Current archives are unsigned and
    are not claimed to be byte-for-byte reproducible; the record must say so
    instead of upgrading the checksum into a signature or reproducibility claim.
 9. **The public golden path works against the candidate's own channel.** Publish
-   the candidate to a pre-release channel. When an external release execution
-   plane is configured, it must run
-   `tooling/cli/scripts/smoke-check-release.sh <channel>` on actual
-   `darwin/amd64`, `darwin/arm64`, `linux/amd64`, and `linux/arm64` runners
-   before promotion, retaining `SMOKE_DIAGNOSTICS_DIR` on failure. While
+   the candidate to a pre-release channel. The external release execution
+   plane is the secret-free `release-smoke` workflow of the public repository
+   [Putnami/release-smoke](https://github.com/Putnami/release-smoke): the
+   release owner dispatches it with `channel=<channel>` and `ref=<full source
+   commit of the candidate>`; it resolves the ref to one commit, every job
+   checks out this repository at that commit for the scripts and installs the
+   Bun version that commit's root `package.json` pins in `packageManager`. One
+   run executes `tooling/cli/scripts/smoke-check-release.sh <channel>` on
+   actual `darwin/amd64` (`macos-15-intel`), `darwin/arm64` (`macos-15`),
+   `linux/amd64` (`ubuntu-24.04`), and `linux/arm64` (`ubuntu-24.04-arm`)
+   runners before promotion, retaining `SMOKE_DIAGNOSTICS_DIR` on failure.
+   `macos-15-intel` is GitHub's last Intel macOS image and has an announced
+   end of life; once it is retired, the `darwin/amd64` result is `missing`
+   until the release owner names another actual runner. The workflow sets no
+   `SMOKE_RUN_COMMAND`: the `run` leg stays off until the release owner names
+   the command. While
    Windows support is suspended, no `windows/amd64` smoke runs: the release
    builds no Windows archive. Each fetches the public installer
    (`install.sh`), executes the exact TypeScript
@@ -120,15 +133,24 @@ satisfied is either fixed or waived through the
    `linux/amd64` and `linux/arm64` runners with Docker: it pastes the
    documented block into an image that holds Bash, `curl`, `tar` and a SHA-256
    tool and nothing else, then runs `putnami lint,test,build` and the Go path.
-   A failed or missing runner blocks promotion and is escalated to the release
-   owner. If
-   the execution plane is not configured or is unavailable, the release owner
-   runs the same four candidate jobs manually, on the four Unix runners; one
-   host is not a substitute. Any configured plane also runs
-   `latest` nightly through the default public installer URL on the four Unix
-   runners, and escalates failure before the next release. Until that
-   automation is configured or restored, the release owner runs the same
-   four-target Unix `latest` smoke nightly. This post-publication schedule
+   Those are six jobs; the run's `results` job lists the six results, one per
+   job, with the channel, the ref and the resolved commit, and the release notes copy them with the run URL
+   (`gh run list -R Putnami/release-smoke --event workflow_dispatch` finds
+   it). A failed or missing job blocks promotion and is escalated to the
+   release owner. If the workflow is unavailable, the release owner runs the
+   same six candidate jobs manually: four Unix runners and two Linux runners
+   with Docker; one host is not a substitute. The workflow also runs `latest`
+   nightly through the default public installer URL on the four Unix runners,
+   with the scripts of `main`; a nightly run lists four results.
+   GitHub notifies only the account that last changed its schedule and turns a
+   schedule off in a repository without activity for 60 days, so before each
+   release the owner checks that the newest nightly run is recent and green
+   (`gh run list -R Putnami/release-smoke --event schedule --limit 1`),
+   re-enables a schedule GitHub turned off
+   (`gh workflow enable release-smoke.yml -R Putnami/release-smoke`), and
+   escalates a failure
+   before the release. While the workflow is unavailable, the release owner
+   runs the same four-target Unix `latest` smoke nightly. This post-publication schedule
    remains outside maintainer CI by the accepted neutral-CI decision — see
    [Installing the CLI](tooling/cli/doc/22-installing-the-cli.md#the-release-smoke).
 10. **The release owner approves,** and the approval is recorded with the

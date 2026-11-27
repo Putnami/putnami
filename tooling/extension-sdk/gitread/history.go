@@ -41,13 +41,23 @@ func IsShallow(repoRoot string) (bool, error) {
 // than an empty range. An empty fromCommit walks the whole history; empty
 // pathspecs walk the whole tree.
 func CommitsSince(repoRoot, fromCommit string, pathspecs []string) ([]Commit, error) {
-	revision := "HEAD"
+	return CommitsBetween(repoRoot, fromCommit, "HEAD", pathspecs)
+}
+
+// CommitsBetween is CommitsSince up to toCommit instead of HEAD: a caller that
+// read HEAD's commit once names it, so the range stays the one it read when
+// HEAD moves meanwhile. toCommit is validated as a revision (ValidRevisionArgument).
+func CommitsBetween(repoRoot, fromCommit, toCommit string, pathspecs []string) ([]Commit, error) {
+	if !ValidRevisionArgument(toCommit) {
+		return nil, fmt.Errorf("read the commits up to %q: not a revision", toCommit)
+	}
+	revision := toCommit
 	if trimmed := strings.TrimSpace(fromCommit); trimmed != "" {
 		resolved, err := ResolveCommit(repoRoot, trimmed)
 		if err != nil {
 			return nil, err
 		}
-		revision = resolved + "..HEAD"
+		revision = resolved + ".." + toCommit
 	}
 	args := []string{"log", "--format=%H%x00%s%x00%b" + commitRecordSeparator, "--no-show-signature", revision}
 	if len(pathspecs) > 0 {

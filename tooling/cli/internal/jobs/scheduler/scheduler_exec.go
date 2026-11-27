@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -396,9 +398,9 @@ func (s *Scheduler) prepareTask(
 	}
 
 	// This project is about to execute rather than reuse an existing artifact.
-	// Refresh its version metadata once, using the scheduler-wide build time.
-	// All-hit projects deliberately keep the build time stored with their cached
-	// output and therefore avoid invalidating an otherwise identical .gen tree.
+	// Bring its version metadata to this run's identity once. A stamp whose
+	// identity already matches keeps its build time, as an all-hit project's
+	// does, so a task that executes on every run rewrites no stamp (ADR 0121).
 	// A follower executes nothing, and its keys admit no write to the project
 	// tree (lockFollowerOutputs): its leader refreshed the stamp and ran the
 	// hook in this project.
@@ -1154,6 +1156,15 @@ func (s *Scheduler) replayResultEvents(job *ScheduledJob, result *JobResult) {
 	}
 }
 
+// refreshVersionFile brings the build stamp of job's project to this run's
+// identity, once per project and session, before the first task of the
+// project that executes. It writes only when the stamp's identity differs
+// from the run's: its source binding moved since prepareRun, or no stamp is
+// there. A matching stamp keeps its bytes, build time included (ADR 0121).
+// buildTime is read only as information, by a workload's /version answer and
+// the TypeScript getBuildInfo(). No key over a plain file pattern or a generate
+// asset holds it (store.versionStampInvocationFields); a raw git: input over a
+// stamp Git does not ignore does, and moves only when the identity does.
 func (s *Scheduler) refreshVersionFile(job *ScheduledJob) {
 	if job == nil || job.Project == nil {
 		return
@@ -1166,7 +1177,7 @@ func (s *Scheduler) refreshVersionFile(job *ScheduledJob) {
 	s.versionFiles[job.Project.Path] = true
 	started := time.Now()
 	spawned := generateVersionFilesAtWithSourceBindings(
-		s.ws, []*ScheduledJob{job}, s.cfg.VersionInfo, s.versionBuildTime, false, s.capabilitySourceBindings,
+		s.ws, []*ScheduledJob{job}, s.cfg.VersionInfo, s.versionBuildTime, true, s.capabilitySourceBindings,
 	)
 	s.cacheStats.RecordLocalBindings(started, time.Now(), spawned)
 }
@@ -1190,13 +1201,13 @@ func (s *Scheduler) refreshVersionFile(job *ScheduledJob) {
 // — the restored file is left byte-for-byte alone, so buildTime does not churn.
 // When it differs, the rewrite lands on exactly the identity
 // preserveMatchingVersionFiles seeded before ANY key was computed. Either way the
-// run ends holding the same tree-only digest (store.versionStampDigest) that
-// every key computed in this run hashed, so this write cannot invalidate a key it
-// was itself an input to.
+// run ends holding the identity every key computed in this run hashed. A
+// digest memoized from the stamp the restore put back can still be stale, so
+// the caller drops the digests of the stamp whenever this call rewrote it.
 //
 // It deliberately does NOT claim the versionFiles slot refreshVersionFile owns:
-// this is a preserve-style write for a project that reused an artifact, not the
-// forced refresh a project gets when it is about to execute.
+// this write serves a project that reused an artifact, and the first task of
+// the project that executes still brings the stamp to the run's identity.
 //
 // The mutex serializes this writer against refreshVersionFile, but a cache-key
 // READ of the stamp takes no lock, so between the materialize and this call a
@@ -1208,17 +1219,33 @@ func (s *Scheduler) refreshVersionFile(job *ScheduledJob) {
 // of the stale stamp outlives the restore. Widening the window would mean
 // giving the stamp a lock every key computation has to take, which is a cost
 // paid on every task to close a window nothing reaches.
-func (s *Scheduler) restampRestoredVersionStamp(job *ScheduledJob, entry *store.TaskEntry) {
+//
+// It returns the stamp's path when it rewrote the stamp, so the restore drops
+// the digests of the stamp it replaced even when the restore wrote no output
+// (ADR 0119).
+func (s *Scheduler) restampRestoredVersionStamp(job *ScheduledJob, entry *store.TaskEntry) string {
 	if job == nil || job.Project == nil || !restoreReplacesVersionStamp(entry) {
-		return
+		return ""
 	}
 	s.versionFilesMu.Lock()
 	defer s.versionFilesMu.Unlock()
+	stamp := ""
+	if s.ws != nil {
+		stamp = filepath.Join(s.ws.Root, job.Project.Path, filepath.FromSlash(versionStampRelPath))
+	}
+	before, beforeErr := os.Lstat(stamp)
 	started := time.Now()
 	spawned := generateVersionFilesAtWithSourceBindings(
 		s.ws, []*ScheduledJob{job}, s.cfg.VersionInfo, s.versionBuildTime, true, s.capabilitySourceBindings,
 	)
 	s.cacheStats.RecordLocalBindings(started, time.Now(), spawned)
+	after, afterErr := os.Lstat(stamp)
+	if stamp == "" || (beforeErr == nil && afterErr == nil && os.SameFile(before, after) &&
+		before.ModTime().Equal(after.ModTime()) && before.Size() == after.Size()) ||
+		(beforeErr != nil && afterErr != nil) {
+		return ""
+	}
+	return stamp
 }
 
 // emitSessionJobEnd emits a session event for job completion.

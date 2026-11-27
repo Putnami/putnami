@@ -94,7 +94,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "an-empty-listing-stays-an-answer"
+              "an-empty-listing-stays-an-answer",
+              "a-version-1-document-refuses-the-tree"
             ]
           }
         },

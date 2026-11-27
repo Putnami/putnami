@@ -122,10 +122,22 @@ The smoke runs, in order:
 
 `putnami.ci.json` has neither schedules nor an operating-system matrix, so an
 external release execution plane runs the candidate gate on the four macOS and
-Linux targets (the Windows job is ADR 0052 §7) and the nightly `latest` monitor
+Linux targets (no Windows job runs while Windows support is suspended) and the
+nightly `latest` monitor
 on the same four, and a failure escalates to the release
-owner ([ADR 0011](0011-release-governance-and-neutral-ci.md)). Without a working
-plane, the same runs are required manually. Everything assertable before
+owner ([ADR 0011](0011-release-governance-and-neutral-ci.md)). That plane is the
+secret-free `release-smoke` workflow of the separate public repository
+Putnami/release-smoke: the release owner dispatches it with the candidate
+channel and a ref it resolves to one commit, whose scripts it checks out and
+whose `packageManager` Bun version it installs. One run executes the four
+release smoke jobs, on `macos-15-intel`, `macos-15`, `ubuntu-24.04` and
+`ubuntu-24.04-arm`, and the two first-use jobs of section 7 of this ADR, and
+lists six results; the nightly run lists four. `macos-15-intel` is GitHub's
+last Intel macOS image and has an announced end of life. The workflow sets no
+`SMOKE_RUN_COMMAND`, so the `run` leg of section 6 stays off until the release
+owner names the command. It is not maintainer CI: this repository holds no
+workflow for it. Without a
+working plane, the same runs are required manually. Everything assertable before
 publication stays in the CLI's local test suite.
 
 ### 6. The run form resolves its extension from an unsigned command map

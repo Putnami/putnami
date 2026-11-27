@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/fileindex"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -384,7 +386,7 @@ func TestTheExtensionCounts(t *testing.T) {
 	clitest.RequireShell(t)
 	// The cases share one Putnami home, so its copies are made once.
 	home := t.TempDir()
-	held := 0
+	held, unwritten := 0, 0
 	for _, tc := range extensionCases {
 		t.Run(tc.name, func(t *testing.T) {
 			root := prepareExtensionCase(t, home, tc)
@@ -405,12 +407,19 @@ func TestTheExtensionCounts(t *testing.T) {
 			// but those that run every time. It comes last, so the ledgers above
 			// count what they counted before it.
 			if tc.settles {
+				trace, stop := scheduler.TraceKeys()
+				defer stop()
 				executed, ended := clitest.ExecutedTasks(t, root, tc.command...)
+				stop()
+				holdPrecomputedKeys(t, trace)
 				if ended != cold.Tasks {
 					t.Errorf("a run after a run of the unchanged workspace ended %d tasks, want the %d it selects", ended, cold.Tasks)
 				}
 				if !slices.Equal(sorted(executed), sorted(tc.everyRun)) {
 					t.Errorf("a run after a run of the unchanged workspace executed %v, want only %v", executed, tc.everyRun)
+				}
+				if unchangedRunWritesNothing(t, root, tc.command) {
+					unwritten++
 				}
 			}
 			holdCeiling(t, "a run with every task executed", cold.Ledger(), tc.cold)
@@ -429,6 +438,12 @@ func TestTheExtensionCounts(t *testing.T) {
 	if held > 0 {
 		spectest.Proves(t, "cli/job-planning-execution", "unchanged-planning-reads-records",
 			"planning-an-unchanged-workspace-starts-only-git")
+	}
+	// A settling case whose unchanged runs wrote nothing, before and after a
+	// commit, proves the rule.
+	if unwritten > 0 {
+		spectest.Proves(t, "cli/job-planning-execution", "unchanged-run-writes-nothing",
+			"an-unchanged-run-writes-no-file-in-the-work-tree")
 	}
 }
 
@@ -517,6 +532,109 @@ func sorted(keys []string) []string {
 	out := slices.Clone(keys)
 	slices.Sort(out)
 	return out
+}
+
+// unchangedRunWritesNothing holds that a run of the unchanged workspace writes
+// no file in the work tree: it creates, removes, replaces or modifies none.
+// A file is the same when its inode, size and modification time are. The
+// run's own records under .putnami and Git's under .git are not the work tree.
+// Neither a cache hit whose outputs the tree already holds, nor a task that
+// executes on every run, rewrites a generated tree or a build stamp.
+//
+// It holds the same after a commit that changes no file: the first run after it
+// writes each build stamp the new commit names, and the cache entries, keyed
+// on the tree, still serve the generated trees that carry the earlier commit's
+// stamp. A run after that one writes nothing either.
+func unchangedRunWritesNothing(t *testing.T, root string, command []string) bool {
+	t.Helper()
+	if !runWritesNothing(t, root, command) {
+		return false
+	}
+	clitest.RunGit(t, root, "commit", "--allow-empty", "-m", "unchanged")
+	for _, path := range writtenBy(t, root, command) {
+		if !strings.HasSuffix("/"+path, "/.gen/version.json") {
+			t.Errorf("the first run after a commit that changes no file wrote %s, want only the build stamps the commit names", path)
+		}
+	}
+	return runWritesNothing(t, root, command)
+}
+
+// runWritesNothing runs command once in root and reports whether the run wrote
+// no file in the work tree, failing t when it did.
+func runWritesNothing(t *testing.T, root string, command []string) bool {
+	t.Helper()
+	if written := writtenBy(t, root, command); len(written) > 0 {
+		t.Errorf("a run of the unchanged workspace wrote %d files, want none: %v", len(written), written)
+		return false
+	}
+	return true
+}
+
+// writtenBy runs command once in root and returns, sorted, the work tree files
+// the run created, removed, replaced or modified.
+func writtenBy(t *testing.T, root string, command []string) []string {
+	t.Helper()
+	before := workTreeFiles(t, root)
+	clitest.RunCounts(t, root, command...)
+	after := workTreeFiles(t, root)
+	var written []string
+	for path, file := range after {
+		if was, ok := before[path]; !ok || was != file {
+			written = append(written, path)
+		}
+	}
+	for path := range before {
+		if _, ok := after[path]; !ok {
+			written = append(written, path)
+		}
+	}
+	slices.Sort(written)
+	return written
+}
+
+// workTreeFile is what tells two states of one work tree file apart. A
+// status-change time or a link count moves when the store links a file it
+// captures, which writes nothing in the tree, so neither is part of it.
+type workTreeFile struct {
+	inode    uint64
+	size     int64
+	modified int64
+}
+
+// workTreeFiles reads every file of the work tree at root, outside the .git
+// and .putnami directories at its root, by its slash path relative to root.
+func workTreeFiles(t *testing.T, root string) map[string]workTreeFile {
+	t.Helper()
+	files := map[string]workTreeFile{}
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if name := entry.Name(); filepath.Dir(path) == root && (name == ".git" || name == ".putnami") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		file := workTreeFile{size: info.Size(), modified: info.ModTime().UnixNano()}
+		if identity, ok := store.FileIdentityOf(info); ok {
+			file.inode = identity.Inode
+		}
+		files[filepath.ToSlash(rel)] = file
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("reading the work tree: %v", err)
+	}
+	return files
 }
 
 // unchangedRunReadsNoSource holds that a run of the unchanged workspace reads

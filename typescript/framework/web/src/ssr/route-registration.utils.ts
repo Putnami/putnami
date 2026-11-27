@@ -46,6 +46,7 @@ export interface ReactPageOptions {
   loader?: LoaderModule | LazyLoaderModule;
   action?: ActionModule | LazyActionModule;
   statusCode?: number;
+  /** A not-found page's own middleware, composed after its ancestor layouts' in place of page middleware. */
   notFoundMiddleware?: HttpMiddleware[];
   /**
    * Static render metadata, emitted by the generator when the page used
@@ -194,9 +195,8 @@ interface RouteLoaderRegistration {
   /** JSON endpoint suffix (`.json` for pages, `-layout.json` for layouts). */
   suffix: string;
   /**
-   * Layout + page middleware for the endpoint. A thunk (rather than an array) is
-   * used when an ancestor layout is lazy and its `.secure()` can only be
-   * resolved at request time (see {@link RouteMiddlewareResolver}).
+   * Layout + page middleware for the endpoint, resolved at its first request
+   * (see {@link RouteMiddlewareResolver}).
    */
   middleware: MiddlewareSource;
   routeOptions?: RouteOptions;
@@ -254,9 +254,8 @@ interface RouteActionRegistration {
   action: ActionModule | LazyActionModule;
   isLazy: boolean;
   /**
-   * Layout + page middleware for the action. A thunk (rather than an array) is
-   * used when an ancestor layout is lazy and its `.secure()` can only be
-   * resolved at request time (see {@link RouteMiddlewareResolver}).
+   * Layout + page middleware for the action, resolved at its first request
+   * (see {@link RouteMiddlewareResolver}).
    */
   middleware: MiddlewareSource;
   routeOptions?: RouteOptions;

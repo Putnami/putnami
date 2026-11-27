@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/sdk/extension/gitread"
@@ -70,6 +71,11 @@ func (b ReleaseBaseline) Value() string {
 	return string(data)
 }
 
+// projectReads counts the baselines read past the line's last release: the
+// reads of the object the release holds at the project and of the commits
+// since it, which a recorded baseline saves. A test reads it.
+var projectReads atomic.Int64
+
 // lastRelease resolves a line's last release. It is a variable only so a test
 // can move a tag between that read and the reads that follow it.
 var lastRelease = linetag.LastRelease
@@ -98,6 +104,9 @@ type releaseReads interface {
 	// nil error is a repository without one.
 	hasCommit(dir string) (bool, error)
 	release(dir, tagPattern string) (linetag.Release, bool, error)
+	// head names the commit a line's last release was reached from, up to
+	// which the commits since the release are read.
+	head(dir string) (string, error)
 	// hasTags answers whether the repository has a tag of any line.
 	hasTags(dir string) (bool, error)
 }
@@ -123,6 +132,8 @@ func (dirReleaseReads) hasCommit(dir string) (bool, error) {
 func (dirReleaseReads) release(dir, tagPattern string) (linetag.Release, bool, error) {
 	return lastRelease(dir, tagPattern)
 }
+
+func (dirReleaseReads) head(string) (string, error) { return "HEAD", nil }
 
 func (dirReleaseReads) hasTags(dir string) (bool, error) {
 	refs, err := gitread.Run(dir, "for-each-ref", "--count=1", "--format=%(refname)", "refs/tags")
@@ -180,6 +191,7 @@ func readReleaseBaseline(dir, tagPattern string, reads releaseReads) (ReleaseBas
 		return baseline, nil
 	}
 
+	projectReads.Add(1)
 	baseline.State, baseline.Tag = ReleaseBaselineTagged, last.Tag
 	baseline.Commit, baseline.Prefix = last.Commit, prefix
 	// The object is read from the commit LastRelease returned, never through
@@ -188,7 +200,11 @@ func readReleaseBaseline(dir, tagPattern string, reads releaseReads) (ReleaseBas
 	if baseline.Object, err = objectAtCommit(dir, last.Commit, prefix); err != nil {
 		return ReleaseBaseline{}, err
 	}
-	commits, err := gitread.CommitsSince(dir, last.Commit, []string{"."})
+	head, err := reads.head(dir)
+	if err != nil {
+		return ReleaseBaseline{}, err
+	}
+	commits, err := gitread.CommitsBetween(dir, last.Commit, head, []string{"."})
 	if err != nil {
 		return ReleaseBaseline{}, err
 	}

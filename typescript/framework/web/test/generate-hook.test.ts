@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -150,4 +151,55 @@ describe('bin/generate.ts route evaluation', () => {
     expect(fragment.routes.every((route) => route.provenance.project === projectName)).toBe(true);
     expect(fragment.routes.every((route) => route.provenance.package === '@putnami/web')).toBe(true);
   }, 120_000);
+  specTest(
+    'registers the layouts of every scan root before the pages, errors and not-found pages of any',
+    {
+      feature: 'typescript/web-application-delivery',
+      requirement: 'route-graph',
+      check: 'the-route-graph-does-not-depend-on-the-registration-order',
+    },
+    async () => {
+      const { projectRoot, contextPath } = createProject();
+      linkConsumerDependencies(projectRoot);
+      // The scan root with the pages, the error and the not-found page comes
+      // before the one with their layout.
+      writeFileSync(
+        join(projectRoot, 'putnami.json'),
+        `${JSON.stringify({
+          name: projectName,
+          tags: ['ts'],
+          options: {
+            '@putnami/web:generate': {
+              react: { scanRoots: [{ path: 'src/pages' }, { path: 'src/layouts' }] },
+            },
+          },
+        })}\n`,
+      );
+      const files: Record<string, string> = {
+        'src/pages/w/[workspace]/page.tsx': 'export default function Page() {\n  return <h1>Workspace</h1>;\n}\n',
+        'src/pages/w/[workspace]/error.tsx': 'export default function Failed() {\n  return <h1>Failed</h1>;\n}\n',
+        'src/pages/w/[workspace]/not-found.tsx': 'export default function Missing() {\n  return <h1>Missing</h1>;\n}\n',
+        'src/layouts/w/[workspace]/layout.tsx':
+          "import { Outlet } from 'react-router';\nexport default function Layout() {\n  return <Outlet />;\n}\n",
+      };
+      for (const [path, source] of Object.entries(files)) {
+        mkdirSync(join(projectRoot, path, '..'), { recursive: true });
+        writeFileSync(join(projectRoot, path), source);
+      }
+
+      expectCompleteEvaluation(await runHook(projectRoot, contextPath));
+
+      const application = readFileSync(join(projectRoot, '.gen', 'src', 'app', '.react-application.gen.tsx'), 'utf8');
+      const layoutAt = application.indexOf(".reactLayout('/w/:workspace'");
+      expect(layoutAt).toBeGreaterThan(-1);
+      for (const registration of [
+        ".reactPage('/w/:workspace'",
+        ".reactError('/w/:workspace'",
+        ".reactNotFound('/w/:workspace'",
+      ]) {
+        expect(application.indexOf(registration)).toBeGreaterThan(layoutAt);
+      }
+    },
+    120_000,
+  );
 });

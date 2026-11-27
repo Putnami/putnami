@@ -265,9 +265,9 @@ type Scheduler struct {
 	// machineprobe/environment.go.
 	environmentBegin machineprobe.EnvironmentSample
 
-	// versionBuildTime is shared by every real execution in this scheduler run.
-	// versionFiles tracks projects already refreshed after their first cache
-	// miss, avoiding a timestamp rewrite before each sibling step. The source
+	// versionBuildTime is the build time this run writes into a stamp whose
+	// identity it changes. versionFiles tracks projects already brought to the
+	// run's identity before their first execution (refreshVersionFile). The source
 	// binding memo shares this mutex: refreshes/restamps are its readers, while
 	// completed executions and source-visible restores invalidate entries.
 	versionBuildTime         string
@@ -287,6 +287,12 @@ type Scheduler struct {
 	// that keeps a sensitive artifact's path and bytes off every published
 	// surface. Nil for every plan with no finalizer.
 	invocations *invocationRuntime
+	// planKeys is what prune computed before the run, which negotiation
+	// reads (prepareRemote); nil when prune computed nothing.
+	planKeys *cachekey.PlanKeys
+	// keyTrace records each job's precomputed key beside the key it computes
+	// at its start, while a test traces keys (TraceKeys); nil otherwise.
+	keyTrace *keyTrace
 
 	// metrics records per-job ready/start timing so Run can report ready wait
 	// and the critical path. Initialized per Run.
@@ -673,10 +679,18 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 	// Negotiate the finalizes relations' consumer frontiers BEFORE any producer
 	// can materialize a resource: an all-hit frontier prunes the producer and
 	// its finalizer together.
-	s.invocations.prune(
+	// Negotiation reads the keys prune computed for this plan rather than
+	// computing them again: no job runs between the two.
+	pruneStarted := time.Now()
+	s.planKeys = s.invocations.prune(
 		s.ws, s.planned, s.commandParams, s.cfg.VersionInfo,
 		s.cache, s.bypass, s.cacheStats,
 	)
+	var precomputed map[string]string
+	if s.planKeys != nil {
+		precomputed = s.planKeys.Keys
+	}
+	s.keyTrace = s.startKeyTrace(precomputed, time.Since(pruneStarted))
 }
 
 // Run executes all planned jobs respecting the dependency DAG.
@@ -957,6 +971,8 @@ func (s *Scheduler) prepareRemote(ctx context.Context) {
 	if s.remote == nil {
 		return
 	}
+	s.remote.UsePlanKeys(s.planKeys)
+	s.planKeys = nil
 	s.remote.Negotiate(ctx, s.ws, s.planned, s.commandParams, s.cfg.VersionInfo, s.cache, s.bypass)
 	// Warm the hit-dependencies of misses in the background so a local
 	// build finds its cached inputs already materialized.
@@ -1129,6 +1145,7 @@ func (s *Scheduler) finalizeRun(
 ) *SchedulerResult {
 	// Mark any remaining planned jobs as canceled (if aborted).
 	s.synthesizeCanceledResults(results, mu)
+	s.keyTrace.finish()
 
 	if s.cfg.FinalizeResults != nil {
 		s.cfg.FinalizeResults(results)

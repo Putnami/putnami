@@ -20,7 +20,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -899,16 +898,17 @@ func assertProbesFoundNothing(t *testing.T, role, report string) {
 // run or found the publish credential.
 func assertNoProbeFoundTheBearer(t *testing.T, role string, findings map[string]finding) {
 	t.Helper()
-	rootExempt := runtime.GOOS == "linux" && os.Geteuid() == 0
 	for _, probe := range searchProbes() {
 		f, ok := findings[probe]
 		switch {
 		case !ok:
 			t.Errorf("%s: probe %q did not run", role, probe)
+		case !f.Checked && f.Partial > 0 && readByRoot(probe):
+			t.Logf("%s: probe %q copied %d descriptors of the engine in part as root; root is outside the same-user threat model", role, probe, f.Partial)
 		case !f.Checked:
 			t.Errorf("%s: probe %q recorded no check (detail %q)", role, probe, f.Detail)
 		case slices.Contains(f.Found, "bearer"):
-			if rootExempt && slices.Contains(platformSearchProbes(), probe) {
+			if readByRoot(probe) {
 				t.Logf("%s: probe %q read the engine as root; root is outside the same-user threat model", role, probe)
 				continue
 			}

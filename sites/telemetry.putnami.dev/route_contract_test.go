@@ -111,7 +111,8 @@ func TestRouteEnforcementIsExplicitlyEnabled(t *testing.T) {
 }
 
 // describedRouteArtifact runs the framework's describe surface over a server
-// wired exactly like main(), returning the canonical bytes it would write.
+// wired exactly like main() and answers the committed form of the inventory
+// it writes: the bytes describe commits to schema/http-routes.json.
 func describedRouteArtifact(t *testing.T, server *phttp.ServerPlugin) []byte {
 	t.Helper()
 	if err := server.Configure(context.Background(), app.NewModule(appName)); err != nil {
@@ -125,7 +126,11 @@ func describedRouteArtifact(t *testing.T, server *phttp.ServerPlugin) []byte {
 	if err != nil {
 		t.Fatalf("read described inventory: %v", err)
 	}
-	return body
+	committed, diags := httproutes.CommittedForm(body)
+	if len(diags) != 0 {
+		t.Fatalf("committed form of the described inventory: %v", diags)
+	}
+	return committed
 }
 
 // declaredRoutes projects the committed artifact into the exact-match table the
@@ -328,9 +333,10 @@ func TestRouteArtifactIsIndependentOfDeployTimeConfig(t *testing.T) {
 }
 
 // TestCommittedRouteArtifactIsCanonical pins the determinism invariant the
-// gateway reconciler relies on: the committed bytes are the canonical form of
-// their own content — same protocol, same ordering, same digest, byte-for-byte
-// idempotent under a re-canonicalization round trip.
+// gateway reconciler relies on: the committed bytes are the committed form of
+// their own content — same protocol, same ordering, no digest, byte-for-byte
+// idempotent under a re-canonicalization round trip — and the parser derives
+// the digest from the routes.
 func TestCommittedRouteArtifactIsCanonical(t *testing.T) {
 	spectest.Proves(t, "telemetry-putnami-dev/cli-usage-receiver", "declared-surface-is-complete", "the-committed-artifact-is-canonical")
 	committed := readRouteArtifact(t)
@@ -346,9 +352,9 @@ func TestCommittedRouteArtifactIsCanonical(t *testing.T) {
 		t.Fatalf("digest = %q, want a sha256: digest", manifest.Digest)
 	}
 
-	// Re-canonicalizing recomputes ordering and digest from the routes alone, so
-	// equality here proves the committed digest matches the committed routes.
-	canonical, diags := httproutes.CanonicalJSON(manifest)
+	// Re-canonicalizing recomputes the ordering from the routes alone, so
+	// equality here proves the committed bytes are canonical.
+	canonical, diags := httproutes.CommittedJSON(manifest)
 	if len(diags) != 0 {
 		t.Fatalf("canonicalize committed manifest: %v", diags)
 	}

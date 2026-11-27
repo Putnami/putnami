@@ -30,6 +30,5 @@
         "evidencePath": ".gen/public/analytics"
       }
     }
-  ],
-  "digest": "sha256:7a968f8f5f1cdd4b39797511a004eae0658123ad64f8e4763cca7a12f519a4ed"
+  ]
 }

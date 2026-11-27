@@ -17,6 +17,5 @@
         "evidencePath": "src/api/consumed-items/get.ts"
       }
     }
-  ],
-  "digest": "sha256:d9049cb33d11772e66954ec443cf7e424fa9719472b3a60c076ade428fc9d00b"
+  ]
 }

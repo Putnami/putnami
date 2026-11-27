@@ -1,6 +1,4 @@
 import { type HttpMiddleware, type HttpRequestContext, HttpResponse, type RouteHandler } from '@putnami/application';
-import type { PageDefinition } from './page';
-import { normalizeRoute } from './route-cache.utils';
 
 export function composeMiddleware(
   layout: HttpMiddleware[] | undefined,
@@ -13,10 +11,10 @@ export function composeMiddleware(
 }
 
 /**
- * A middleware chain that is either known synchronously (an array) or can only
- * be resolved at request time (a thunk). The thunk form exists for lazy layouts:
- * a `.secure()` declared on a lazily-imported layout cannot be read until its
- * module loads, which happens on first request rather than at registration.
+ * A middleware chain that is either known synchronously (an array) or resolved
+ * at the first request (a thunk). Route handlers below a layout use the thunk
+ * form, so an ancestor layout's `.secure()` wraps them whether the layout
+ * registers before or after them, and whether its module is eager or lazy.
  * `undefined` means "no middleware".
  */
 export type MiddlewareSource = HttpMiddleware[] | (() => Promise<HttpMiddleware[] | undefined>) | undefined;
@@ -113,48 +111,4 @@ export function wrapWithMiddlewareRaw<T>(
     }
     return handlerResult;
   };
-}
-
-/**
- * Collect middleware from all ancestor layouts for a route, ordered from the
- * root layout down to the route's nearest layout.
- */
-export function collectLayoutMiddleware(
-  layoutMiddleware: Map<string, HttpMiddleware[]>,
-  route: string,
-): HttpMiddleware[] | undefined {
-  const normalized = normalizeRoute(route);
-  const segments = normalized.split('/').filter(Boolean);
-  const collected: HttpMiddleware[] = [];
-
-  const rootMw = layoutMiddleware.get('/');
-  if (rootMw) collected.push(...rootMw);
-
-  let path = '';
-  for (const seg of segments) {
-    path += `/${seg}`;
-    const mw = layoutMiddleware.get(path);
-    if (mw) collected.push(...mw);
-  }
-
-  return collected.length > 0 ? collected : undefined;
-}
-
-/**
- * Compose page middleware from layout and page config sources. Loader cache
- * middleware is NOT included here — it is applied only to the JSON endpoint
- * inside registerJsonEndpoint().
- */
-export function resolvePageMiddleware(
-  layoutMiddleware: Map<string, HttpMiddleware[]>,
-  route: string,
-  pageDef: PageDefinition | undefined,
-  notFoundMiddleware: HttpMiddleware[] | undefined,
-): HttpMiddleware[] | undefined {
-  if (notFoundMiddleware) {
-    return notFoundMiddleware;
-  }
-  const layoutMw = collectLayoutMiddleware(layoutMiddleware, route);
-  const pageMw = pageDef?.middleware && pageDef.middleware.length > 0 ? [...pageDef.middleware] : undefined;
-  return composeMiddleware(layoutMw, pageMw);
 }

@@ -74,6 +74,5 @@
         "evidencePath": "src/api/files/[id]/get.ts"
       }
     }
-  ],
-  "digest": "sha256:ced51bec8155b1391733dfa48263dba04545648d2fad9c20d067187d0d08f61f"
+  ]
 }

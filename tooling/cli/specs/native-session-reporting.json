@@ -77,10 +77,20 @@
         "When the selector names an extension the workspace does not load, or one that serves no such command there, the warning names the selector or the extension.",
         "It echoes no other cause: one may carry provider output."
       ]
+    },
+    {
+      "id": "detached-delivery",
+      "text": [
+        "A terminal job run, not hosted, not a CI job, with a finalized session, stops each reporter at its durable checkpoint and returns.",
+        "A detached sessions replay delivers its session, and the three newest other finalized incomplete sessions no process delivers, which it names.",
+        "A resent frame keeps its identity and bytes: the receiver holds each frame once.",
+        "Hosted runs, CI jobs and other adapters drain before they return."
+      ]
     }
   ],
   "decisions": [
     "tooling/cli/doc/adr/0033-native-session-reporting.md",
-    "tooling/cli/doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md"
+    "tooling/cli/doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md",
+    "tooling/cli/doc/adr/0115-a-local-run-hands-its-report-upload-to-a-detached-replay.md"
   ]
 }

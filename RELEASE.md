@@ -21,18 +21,24 @@ The candidate binary matrix is:
 | --- | --- | --- |
 | macOS (`darwin`) | Candidate | Candidate |
 | Linux | Candidate | Candidate |
-| Windows | Candidate | Not built |
+| Windows | Suspended | Not built |
 
 Each target must pass the public golden-path smoke on an actual matching runner
 before it is advertised as supported. Candidate runs block promotion; the four
 macOS and Linux targets also monitor `latest` nightly through the public
-installer URL. The Windows host exists only for a run, so it has no nightly job.
-Post-publication automation, when configured, belongs to an external release
-execution plane because the repository CI schema has no schedule or
-operating-system matrix. The release owner owns escalation and the documented
-five-runner manual fallback whether or not that plane is available. Without
-that automation, the fallback includes the same four-target `latest` run
-nightly until automation is configured or restored.
+installer URL. While Windows support is suspended, no Windows job runs.
+Post-publication automation belongs to an external release execution plane,
+the `release-smoke` workflow of Putnami/release-smoke, because the repository
+CI schema has no schedule or operating-system matrix. It checks out the
+candidate's commit, installs the Bun version that commit pins in
+`packageManager`, and runs the release smoke on `macos-15-intel`, `macos-15`,
+`ubuntu-24.04` and `ubuntu-24.04-arm` and the first-use smoke on two Linux
+runners: a candidate run lists six results, a nightly run four.
+`macos-15-intel` is GitHub's last Intel macOS image and has an announced end
+of life. The release owner owns
+escalation and the documented six-job manual fallback whether or not that
+plane is available. Without it, the fallback includes the same four-target
+`latest` run nightly until it is restored.
 
 ## Release rehearsal
 

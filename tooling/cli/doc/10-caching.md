@@ -137,6 +137,26 @@ baseline once, so a tag created during the run is seen by the next run.
 What does not depend on the project, the repository's state, HEAD and its
 tags, is read once per run for every project its work tree holds
 ([ADR 0110](adr/0110-a-run-reads-the-release-state-of-its-repository-once.md)).
+
+A run records each tagged or untagged baseline it reads in
+`.putnami/release-record`, keyed by the project directory, the tag pattern and
+the witness of the commits the baseline names: HEAD's commit, every tag with
+the object it peels to, the tags HEAD reaches, the repository state (a full clone, the work tree's
+prefix), the absence of replace refs, grafts and reftables, Git's whole
+configuration reading and the `GIT_` variables, `HOME` and `XDG_CONFIG_HOME`.
+Git names its objects by their content, so the tree a tag's commit holds and
+the commits since it never change: the next run whose witness is the same
+answers each baseline from the record, with no `rev-parse`, `ls-tree` or `log`
+of its own. Any other witness reads the baselines again, as above, and a
+baseline read is written only when the witness, taken again when the run
+saves the record, has not moved. A shallow
+clone, a repository without a commit and a directory outside every work tree
+record nothing, and neither does a history that `GIT_REPLACE_REF_BASE`,
+`GIT_NO_REPLACE_OBJECTS` or `GIT_GRAFT_FILE` may rewrite. The record has the
+file index's envelope: another CLI executable, or a damaged file, starts with
+an empty record, concurrent runs merge into it under a lock, and an entry no
+run used in its last 32 saves is dropped (ADR 0113, section 4).
+
 Declaring the input requires CLI contract 7. See
 [ADR 0062](adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md).
 
@@ -588,6 +608,7 @@ producer starts.
 2. Check if the task-owned entry exists under `blobs/`, at the address the key and the entry format give (see [Task-owned entries](#task-owned-entries-declared-outputs)).
 3. Read `result.json` to restore the job result (status, data, error, and compact summary events).
 4. Materialize each declared output from the entry's `files/` to its real location. A destination that already holds the output (the same files, bytes, permission bits and directories, outside the subtrees it cedes) is left untouched: its bytes are compared with the manifest's digests through the file index, so an unchanged run neither reads the entry's files nor rewrites the output, and the output keeps the stat the index recorded ([ADR 0108](adr/0108-a-cache-hit-reads-its-entry-and-writes-only-what-differs.md)).
+   Only the outputs the restore wrote, or found holding the output but changed since the run began to read the tree, are then invalidated: the memoized input digests, the run's candidate cut and the source bindings they can move. The stamp is invalidated too when the restore's re-stamp rewrote it. A restore where nothing counts invalidates nothing; one that failed invalidates every recorded output ([ADR 0119](adr/0119-a-restore-invalidates-only-what-it-wrote.md)).
 5. Skip subprocess execution.
 
 The skipped task process does not make the hit free: the CLI still computes
@@ -625,7 +646,7 @@ hashing remain owned by the capabilities protocol. Gitlink worktree checks
 retain their separately counted `rev-parse` processes.
 
 This snapshot is run-local and invalidated with the source-binding memo after
-real task execution and around source-visible output restores. A new file,
+real task execution and after a restore that wrote a source-visible output. A new file,
 index update or changed ignore rule is therefore enumerated on the next
 binding miss. Restoring project `.gen` outputs keeps the snapshot and bindings:
 those bytes are excluded from source-v1. Workspace-rooted restores invalidate
@@ -1544,6 +1565,21 @@ provider now starts whenever at least one planned job will execute locally, not
 only when the run has remote keys to negotiate. A fully warm rebuild — every
 planned job a local hit — still starts no provider at all.
 
+Negotiation decides the plan's key movement (which files a result-only
+restore may skip) only once a provider it started serves the run. When the
+plan's declarations alone show such a job (a task with no cache key, one with
+external effects, or one that reuses no entry), it starts the provider before it
+keys anything. A provider that serves nothing — signed out, disabled — answers
+`initialize` not ready, and the run then computes no key and no key movement
+for it: it would warm nothing, and the run never starts it again. Without such
+a job, the keys are computed and only the movement is skipped. A fully warm
+rebuild that no provider serves yet starts none and decides no movement either;
+should a later miss start one, that provider counts every serialization edge as a reader of files,
+so it may restore files it could have skipped, never fewer. A provider that
+serves the run is negotiated with as before, from the keys, and the key
+movement when there is one, that the pruning of invocation-scoped resources
+already computed for the same plan.
+
 ### Scoping the bypass to some projects
 
 `--projects <p>` plans `p` **and its whole dependency closure** — a project
@@ -1971,10 +2007,23 @@ this build's identity.
 The stamp is also the one file the emptying of an executing task's `.gen`
 leaves in place (see
 [Task-owned entries](#task-owned-entries-declared-outputs)). The scheduler
-writes it once per project and session, before the first task of that project
-executes, so a second task of the session that owns `.gen` still finds it. The
-emptying keeps the whole document, so the fields other writers merged into it
-survive, as they survive a re-stamp.
+brings it to the run's identity once per project and session, before the first
+task of that project executes, so a second task of the session that owns `.gen`
+still finds it. The emptying keeps the whole document, so the fields other
+writers merged into it survive, as they survive a re-stamp.
+
+That write, too, is skipped when every identity field already matches: an
+executing task keeps the stamp's bytes, `buildTime` included, as a cache hit
+does (ADR 0121). A task that runs on every run of an unchanged workspace
+therefore rewrites no stamp. `buildTime` names the invocation that first
+stamped the identity; its readers, a workload's `/version` answer and the
+TypeScript `getBuildInfo()`, take it as information.
+
+A restore also holds a project's `.gen` whose stamp, `<project>/.gen/version.json`,
+differs from the entry's only in the fields the scheduler owns (`buildTime`,
+the commit fields, `name`, `capabilityRoot`, `capabilityPackages`): the
+re-stamp writes this run's values over them anyway, so an entry reused
+across commits rewrites nothing. The fields other writers merged are compared.
 
 ### Watch Mode
 

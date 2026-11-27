@@ -1,12 +1,14 @@
 package store
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -85,8 +87,8 @@ var pathExchange = exchangePaths
 var errKeptConflict = errors.New("the restored entry holds bytes at a ceded path")
 
 // MaterializeTaskOutput places one of an entry's recorded outputs at dest and
-// reports whether dest now holds it: true when it wrote the output, and when
-// dest already held it and was left untouched (ADR 0108).
+// reports whether it wrote dest: false when dest already held the output and
+// was left untouched (ADR 0108).
 //
 // An output recorded TaskOutputEmpty returns (false, nil) WITHOUT touching dest.
 // That is the binding invariant of the explicit empty state: an empty output is
@@ -134,6 +136,15 @@ var errKeptConflict = errors.New("the restored entry holds bytes at a ceded path
 // cross filesystems. A swap from stagingRoot that still fails with EXDEV (two
 // mounts of one filesystem) is restaged beside dest and published again.
 func (s *LocalStore) MaterializeTaskOutput(entry *TaskEntry, id, dest, stagingRoot string, keep ...string) (bool, error) {
+	return s.materializeTaskOutput(entry, id, dest, stagingRoot, 0, keep)
+}
+
+// materializeTaskOutput is MaterializeTaskOutput. A dest it leaves untouched
+// is also reported as written when quietBefore is not zero and something in
+// dest changed at or after it, in Unix nanoseconds, or when the platform
+// gives no change time: some process may have written those bytes after a
+// read of this run, which the caller then invalidates as a write (ADR 0119).
+func (s *LocalStore) materializeTaskOutput(entry *TaskEntry, id, dest, stagingRoot string, quietBefore int64, keep []string) (bool, error) {
 	if entry == nil {
 		return false, fmt.Errorf("materialize %q: nil entry", id)
 	}
@@ -153,11 +164,28 @@ func (s *LocalStore) MaterializeTaskOutput(entry *TaskEntry, id, dest, stagingRo
 
 	src := filepath.Join(entry.FilesDir, id)
 	modes := manifestModes(entry.Manifest)
-	if keepHeldDestinations && destinationHolds(entry.Manifest, out.Kind, src, dest, id, keep) {
+	// stamp is where, relative to dest, this output holds the project's build
+	// stamp, which the scheduler writes again after the restore
+	// (restoreReplacesVersionStamp): "." for a file output at it, "" when the
+	// output holds none. A stamp anywhere else is compared whole.
+	stamp := ""
+	if out.Root == proto.OutputRootProject {
+		const projectStamp = ".gen/version.json"
+		switch rel := path.Clean(filepath.ToSlash(out.Path)); {
+		case out.Kind == proto.OutputKindFile && rel == projectStamp:
+			stamp = "."
+		case out.Kind == proto.OutputKindDirectory && rel == ".":
+			stamp = projectStamp
+		case out.Kind == proto.OutputKindDirectory && strings.HasPrefix(projectStamp, rel+"/"):
+			stamp = strings.TrimPrefix(projectStamp, rel+"/")
+		}
+	}
+	changes := heldChanges{quietBefore: quietBefore}
+	if keepHeldDestinations && destinationHolds(entry.Manifest, out.Kind, src, dest, id, stamp, keep, &changes) {
 		// dest already holds what the restore would write: the same files,
 		// bytes, modes and directories. Leaving it untouched keeps its stat,
 		// so the file index answers its digests on the next run.
-		return true, nil
+		return changes.recent, nil
 	}
 	switch out.Kind {
 	case proto.OutputKindFile:
@@ -803,9 +831,14 @@ func randomSuffix() string {
 // subtrees. A file's digest is read through the file index, so an unchanged
 // destination is answered without reading it, under the index's rule
 // (protocols/workspace ADR 0009). src is walked for its directories and
-// stated, never read. A file the manifest does not list, a link or any other
-// kind of file, on either side, answers false, and the restore writes.
-func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep []string) bool {
+// stated; only its project build stamp is read, because a stamp that differs
+// from it in the fields the scheduler owns alone is held
+// (destinationFileDigest). A file the manifest does not list, a link or any
+// other kind of file, on either side, answers false, and the restore writes.
+//
+// changes records whether a path it stated in dest changed recently
+// (heldChanges).
+func destinationHolds(manifest *cache.Manifest, kind, src, dest, id, stamp string, keep []string, changes *heldChanges) bool {
 	if manifest == nil {
 		return false
 	}
@@ -820,7 +853,8 @@ func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep
 		payload, err := os.Lstat(src)
 		file, ok := files[id]
 		return err == nil && payload.Mode().IsRegular() && ok &&
-			destinationFileStats(dest, file) && destinationFileDigest(dest, file)
+			destinationFileStats(dest, file, stamp == ".", changes) && destinationFileDigest(dest, src, file, stamp == ".") &&
+			destinationFileStats(dest, file, stamp == ".", changes)
 	case proto.OutputKindDirectory:
 	default:
 		return false
@@ -841,13 +875,25 @@ func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep
 		}
 		return false
 	}
+	// A directory on the way to a kept path is one the restore leaves in
+	// place to hold it (pruneAround), even when src lacks it: what it holds
+	// beside the kept path is still compared.
+	onTheWayToKept := func(rel string) bool {
+		for _, sub := range keep {
+			if strings.HasPrefix(strings.TrimSuffix(sub, "/"), rel+"/") {
+				return true
+			}
+		}
+		return false
+	}
 	prefix := id + "/"
 	expected := map[string]bool{}
 	// The digests are taken once every stat agreed, so an output that differs
 	// in its tree, a mode or a size reads none of its files.
 	type digestCheck struct {
-		path string
-		file cache.FileEntry
+		path, src string
+		file      cache.FileEntry
+		stamp     bool
 	}
 	var digests []digestCheck
 	err := filepath.WalkDir(src, func(p string, entry fs.DirEntry, err error) error {
@@ -870,12 +916,13 @@ func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep
 			if err != nil || !held.IsDir() || !sameModeBits(held.Mode(), info.Mode().Perm()) {
 				return errNotHeld
 			}
+			changes.note(held)
 		case info.Mode().IsRegular():
 			file, ok := files[prefix+rel]
-			if !ok || !destinationFileStats(target, file) {
+			if !ok || !destinationFileStats(target, file, rel == stamp, changes) {
 				return errNotHeld
 			}
-			digests = append(digests, digestCheck{path: target, file: file})
+			digests = append(digests, digestCheck{path: target, src: p, file: file, stamp: rel == stamp})
 		default:
 			return errNotHeld
 		}
@@ -902,7 +949,7 @@ func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep
 			}
 			return nil
 		}
-		if !expected[rel] {
+		if !expected[rel] && (!entry.IsDir() || !onTheWayToKept(rel)) {
 			return errNotHeld
 		}
 		return nil
@@ -911,11 +958,36 @@ func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep
 		return false
 	}
 	for _, check := range digests {
-		if !destinationFileDigest(check.path, check.file) {
+		if !destinationFileDigest(check.path, check.src, check.file, check.stamp) {
 			return false
+		}
+		// A write between the first stat and the digest is seen here.
+		if changes.quietBefore != 0 {
+			info, err := os.Lstat(check.path)
+			if err != nil {
+				return false
+			}
+			changes.note(info)
 		}
 	}
 	return true
+}
+
+// heldChanges answers whether a destination destinationHolds found holding
+// the output changed at or after quietBefore: recent is set when a path it
+// stated there has a change time at or after it, or no change time. A zero
+// quietBefore asks nothing.
+type heldChanges struct {
+	quietBefore int64
+	recent      bool
+}
+
+func (c *heldChanges) note(info os.FileInfo) {
+	if c.quietBefore == 0 || c.recent {
+		return
+	}
+	ctime, _, _, _, ok := fileChangeTime(info)
+	c.recent = !ok || ctime >= c.quietBefore
 }
 
 // keepHeldDestinations leaves a destination that already holds the restored
@@ -933,18 +1005,34 @@ func sameModeBits(mode, perm os.FileMode) bool {
 }
 
 // destinationFileStats reports whether the file at path is a regular file with
-// file's permission bits, and its size when the manifest records one.
-func destinationFileStats(path string, file cache.FileEntry) bool {
+// file's permission bits, and its size when the manifest records one. The
+// size of the project's build stamp (stamp) is not compared: it follows the
+// fields destinationFileDigest leaves out of it.
+func destinationFileStats(path string, file cache.FileEntry, stamp bool, changes *heldChanges) bool {
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || !sameModeBits(info.Mode(), os.FileMode(file.Mode).Perm()) {
 		return false
 	}
-	return file.Size == 0 || info.Size() == file.Size
+	changes.note(info)
+	return file.Size == 0 || info.Size() == file.Size || stamp
 }
 
-// destinationFileDigest reports whether the file at path has file's digest,
-// read through the file index.
-func destinationFileDigest(path string, file cache.FileEntry) bool {
+// destinationFileDigest reports whether the file at path has the content of
+// the payload src, recorded as file: file's digest, read through the file
+// index. The project's build stamp (stamp), the <project>/.gen/version.json
+// the scheduler writes again after every restore that replaces it
+// (restoreReplacesVersionStamp), holds the content when it differs from the
+// payload only in the fields that re-stamp writes
+// (VersionStampRestampedFields): the restore would write the producing run's
+// values, and the scheduler would then write this run's over them (ADR 0121). Every other field of it is compared, and any
+// other stamp is compared whole.
+func destinationFileDigest(path, src string, file cache.FileEntry, stamp bool) bool {
+	if stamp {
+		held := indexedDigest(path, versionStampRestampedVariant, func() []byte {
+			return versionStampDigest(path, VersionStampRestampedFields)
+		})
+		return held != nil && bytes.Equal(held, versionStampDigest(src, VersionStampRestampedFields))
+	}
 	digest := indexedDigest(path, rawContentVariant, func() []byte {
 		return rawContentDigest(path, nil)
 	})

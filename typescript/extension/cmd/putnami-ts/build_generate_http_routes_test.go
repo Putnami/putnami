@@ -316,6 +316,17 @@ func assertGenerateFailsWithoutPublishing(t *testing.T, ctx *pctx.Context, proje
 	}
 }
 
+// committedRouteInventory is the committed form of canonicalRouteInventory:
+// the artifact without its digest.
+func committedRouteInventory(t *testing.T, fragments ...string) []byte {
+	t.Helper()
+	body, diags := httproutes.CommittedForm(canonicalRouteInventory(t, fragments...))
+	if diag.HasErrors(diags) {
+		t.Fatalf("committed form: %v", diags)
+	}
+	return body
+}
+
 // canonicalRouteInventory is the putnami.http-routes.v1 artifact the protocol
 // itself canonicalizes from the fragments, independent of the extension.
 func canonicalRouteInventory(t *testing.T, fragments ...string) []byte {
@@ -388,11 +399,12 @@ func writeCommittedInfra(t *testing.T, projectPath string) {
 	}
 }
 
-// Successful hooks commit the aggregate verbatim: the tracked file holds the
-// exact canonical bytes the protocol defines, the build asset under .gen is
-// unchanged, and the strict parser accepts the committed copy with its digest.
-func TestDoGenerate_CommitsTheRouteInventoryVerbatim(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "successful-hooks-commit-the-aggregate-verbatim")
+// Successful hooks commit the aggregate without its digest: the tracked file
+// holds the committed form the protocol defines, the build asset under .gen
+// is the canonical artifact with its digest, and the strict parser accepts the
+// committed copy and derives the artifact's digest.
+func TestDoGenerate_CommitsTheRouteInventoryWithoutItsDigest(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "successful-hooks-commit-the-aggregate-without-its-digest")
 	mockBunResolution(t)
 	ctx, projectPath := newInfraHookProject(t)
 	mockRouteHook(t, projectPath, map[string]string{"web": webRoutesFragment, "application": applicationRoutesFragment})
@@ -406,12 +418,19 @@ func TestDoGenerate_CommitsTheRouteInventoryVerbatim(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read emitted route inventory: %v", err)
 	}
-	committed := readCommittedRoutes(t, projectPath)
-	if string(committed) != string(emitted) {
-		t.Fatalf("committed inventory differs from the emitted one\ncommitted:\n%s\nemitted:\n%s", committed, emitted)
+	if want := canonicalRouteInventory(t, webRoutesFragment, applicationRoutesFragment); string(emitted) != string(want) {
+		t.Fatalf("emitted inventory is not the canonical artifact\ngot:\n%s\nwant:\n%s", emitted, want)
 	}
-	if want := canonicalRouteInventory(t, webRoutesFragment, applicationRoutesFragment); string(committed) != string(want) {
-		t.Fatalf("committed inventory is not the canonical protocol bytes\ngot:\n%s\nwant:\n%s", committed, want)
+	committed := readCommittedRoutes(t, projectPath)
+	if want := committedRouteInventory(t, webRoutesFragment, applicationRoutesFragment); string(committed) != string(want) {
+		t.Fatalf("committed inventory is not the committed form\ngot:\n%s\nwant:\n%s", committed, want)
+	}
+	if strings.Contains(string(committed), `"digest"`) {
+		t.Fatalf("committed inventory carries a digest:\n%s", committed)
+	}
+	artifact, diags := httproutes.ParseAndValidateManifest(emitted)
+	if artifact == nil || len(diags) != 0 {
+		t.Fatalf("strict parse of the emitted inventory: %v", diags)
 	}
 	manifest, diags := httproutes.ParseAndValidateManifest(committed)
 	if manifest == nil || len(diags) != 0 {
@@ -419,6 +438,9 @@ func TestDoGenerate_CommitsTheRouteInventoryVerbatim(t *testing.T) {
 	}
 	if len(manifest.Routes) != 5 {
 		t.Fatalf("routes = %d, want 5", len(manifest.Routes))
+	}
+	if manifest.Digest != artifact.Digest {
+		t.Fatalf("derived digest = %q, want the artifact's %q", manifest.Digest, artifact.Digest)
 	}
 	if got := result.Assets[HTTPRoutesRelPath]; got != emittedRoutesPath(projectPath) {
 		t.Fatalf("route inventory asset = %q, want the .gen build asset %q", got, emittedRoutesPath(projectPath))
@@ -464,7 +486,7 @@ func TestDoGenerate_RewritesTheRouteInventoryOnlyWhenItChanges(t *testing.T) {
 	if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 		t.Fatalf("third doGenerate: %v", err)
 	}
-	if got, want := readCommittedRoutes(t, projectPath), canonicalRouteInventory(t, webRoutesFragment); string(got) != string(want) {
+	if got, want := readCommittedRoutes(t, projectPath), committedRouteInventory(t, webRoutesFragment); string(got) != string(want) {
 		t.Fatalf("a changed inventory was not committed\ngot:\n%s\nwant:\n%s", got, want)
 	}
 	entries, err := os.ReadDir(filepath.Dir(committedRoutesPath(projectPath)))
@@ -488,7 +510,7 @@ func TestDoGenerate_CommitsAKnownEmptyRouteInventory(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "a-complete-empty-fragment-commits-an-empty-inventory")
 	mockBunResolution(t)
 	ctx, projectPath := newInfraHookProject(t)
-	writeCommittedRoutes(t, projectPath, canonicalRouteInventory(t, webRoutesFragment))
+	writeCommittedRoutes(t, projectPath, committedRouteInventory(t, webRoutesFragment))
 	mockRouteHook(t, projectPath, map[string]string{"application": emptyRoutesFragment})
 
 	result, err := doGenerate(ctx, jsonl.New(), projectPath, nil)
@@ -496,7 +518,7 @@ func TestDoGenerate_CommitsAKnownEmptyRouteInventory(t *testing.T) {
 		t.Fatalf("doGenerate: %v", err)
 	}
 	committed := readCommittedRoutes(t, projectPath)
-	if want := canonicalRouteInventory(t, emptyRoutesFragment); string(committed) != string(want) {
+	if want := committedRouteInventory(t, emptyRoutesFragment); string(committed) != string(want) {
 		t.Fatalf("committed inventory is not the canonical empty inventory\ngot:\n%s\nwant:\n%s", committed, want)
 	}
 	if !strings.Contains(string(committed), `"routes": []`) {
@@ -551,7 +573,7 @@ func TestDoGenerate_RemovesTheRouteInventoryWithoutAProducer(t *testing.T) {
 		refuseProcesses(t)
 		ctx, root := makeTestCtx(t)
 		projectPath := filepath.Join(root, "project")
-		writeCommittedRoutes(t, projectPath, canonicalRouteInventory(t, webRoutesFragment))
+		writeCommittedRoutes(t, projectPath, committedRouteInventory(t, webRoutesFragment))
 
 		if _, err := doGenerate(ctx, jsonl.New(), projectPath, nil); err != nil {
 			t.Fatalf("doGenerate: %v", err)
@@ -567,7 +589,7 @@ func TestDoGenerate_RemovesTheRouteInventoryWithoutAProducer(t *testing.T) {
 		mockBunResolution(t)
 		refuseProcesses(t)
 		ctx, projectPath := newInfraHookProject(t)
-		writeCommittedRoutes(t, projectPath, canonicalRouteInventory(t, webRoutesFragment))
+		writeCommittedRoutes(t, projectPath, committedRouteInventory(t, webRoutesFragment))
 		if err := os.Remove(filepath.Join(projectPath, "node_modules", "infra-ext", "putnami.extension.json")); err != nil {
 			t.Fatal(err)
 		}
@@ -604,7 +626,7 @@ func TestDoGenerate_RemovesTheRouteInventoryWithoutAProducer(t *testing.T) {
 // route.
 func TestDoGenerate_FailsWhenARouteProducerIsUnavailable(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "unavailable-route-producers-fail-generate")
-	prior := canonicalRouteInventory(t, webRoutesFragment, applicationRoutesFragment)
+	prior := committedRouteInventory(t, webRoutesFragment, applicationRoutesFragment)
 
 	t.Run("a hook reports its routes unavailable after writing a fragment and a requirement", func(t *testing.T) {
 		mockBunResolution(t)
@@ -744,7 +766,7 @@ func writeBody(body string) func(t *testing.T, path string) {
 // nor its silence is evidence of the routes the project serves.
 func TestDoGenerate_FailsWithoutACompleteRouteEvaluation(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "a-missing-or-malformed-route-evaluation-fails-naming-the-hook")
-	prior := canonicalRouteInventory(t, webRoutesFragment, applicationRoutesFragment)
+	prior := committedRouteInventory(t, webRoutesFragment, applicationRoutesFragment)
 
 	t.Run("a legacy hook that wrote no fragment", func(t *testing.T) {
 		mockBunResolution(t)
@@ -816,7 +838,7 @@ func TestDoGenerate_RouteProducerFailureIsBatchEqualToSolo(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "a-missing-or-malformed-route-evaluation-fails-naming-the-hook")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "a-failed-generate-preserves-the-committed-route-and-infra-facts")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "a-batched-generate-commits-the-solo-bytes")
-	prior := canonicalRouteInventory(t, webRoutesFragment, applicationRoutesFragment)
+	prior := committedRouteInventory(t, webRoutesFragment, applicationRoutesFragment)
 
 	cases := []struct {
 		name  string
@@ -899,7 +921,7 @@ func TestDoGenerate_RouteProducerFailureIsBatchEqualToSolo(t *testing.T) {
 			if !ok || sibling.Status != "OK" || len(sibling.Diagnostics) != 0 {
 				t.Fatalf("batch results = %+v, want /sibling OK without diagnostics", results)
 			}
-			if got, want := readCommittedRoutes(t, siblingPath), canonicalRouteInventory(t, webRoutesFragment); string(got) != string(want) {
+			if got, want := readCommittedRoutes(t, siblingPath), committedRouteInventory(t, webRoutesFragment); string(got) != string(want) {
 				t.Fatalf("the sibling did not commit its own inventory\ngot:\n%s\nwant:\n%s", got, want)
 			}
 			if manifest := readCommittedInfra(t, siblingPath); len(manifest.Databases) != 1 || manifest.Databases[0].Name != "primary" {
@@ -915,7 +937,7 @@ func TestDoGenerate_RouteProducerFailureIsBatchEqualToSolo(t *testing.T) {
 // the project serves no route.
 func TestDoGenerate_PreservesTheRouteInventoryWhenHooksFailOrDoNotRun(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "a-failed-generate-preserves-the-committed-route-and-infra-facts")
-	prior := canonicalRouteInventory(t, webRoutesFragment, applicationRoutesFragment)
+	prior := committedRouteInventory(t, webRoutesFragment, applicationRoutesFragment)
 
 	assertPreserved := func(t *testing.T, projectPath string) {
 		t.Helper()

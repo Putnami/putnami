@@ -9,6 +9,7 @@ package git
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -373,6 +374,7 @@ func readConfig(repo *localRepo) (*localConfig, int, error) {
 	if err != nil {
 		return nil, 1, err
 	}
+	config.Reading = sha256.Sum256([]byte(output))
 	var learned []string
 	for _, file := range files {
 		if !slices.Contains(known, file) {

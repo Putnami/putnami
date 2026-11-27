@@ -165,6 +165,7 @@ func authoredExtensionProvidersDomain() *arch.Builder {
 				arch.Bind("/go/extension", "/protocols/features"),
 				arch.Bind("/go/extension", "/protocols/gomod"),
 				arch.Bind("/go/extension", "/protocols/grpc-services"),
+				arch.Bind("/go/extension", "/protocols/http-routes"),
 				arch.Bind("/go/extension", "/protocols/infra"),
 				arch.Bind("/go/extension", "/protocols/job"),
 				arch.Bind("/go/extension", "/protocols/oci"),

@@ -48,7 +48,8 @@ type RemoteCache struct {
 	Trust store.CacheTrust
 
 	// keys maps a job key to its precomputed cache key (from Negotiate), only
-	// for a job whose key no planned write can move (cachekey.PlanKeyMovement); localHits
+	// for a job whose key no planned write can move (cachekey.PlanKeyMovement),
+	// and only when negotiation started a provider that serves the run; localHits
 	// records keys already present locally before negotiation. Neither
 	// addresses a restore or an upload: both use the key the scheduler computes
 	// when the job starts.
@@ -80,6 +81,10 @@ type RemoteCache struct {
 	// looked up at (SetSourceBoundEntryKey). Nil means negotiation cannot
 	// tell whether such a task hits locally.
 	sourceBoundEntryKey func(job *jobmodel.ScheduledJob, key string) (string, bool)
+
+	// planKeys is what the next Negotiate reads instead of computing it
+	// (UsePlanKeys), or nil.
+	planKeys *cachekey.PlanKeys
 }
 
 // Stats returns this run's accumulated cache activity, or nil for a nil cache
@@ -126,12 +131,8 @@ func (r *RemoteCache) sourceBoundHitsLocally(job *jobmodel.ScheduledJob, hash st
 	if r.sourceBoundEntryKey == nil {
 		return false
 	}
-	entryKey, ok := r.sourceBoundEntryKey(job, hash)
-	if !ok {
-		return false
-	}
-	entry, err := cm.LookupTaskEntry(entryKey)
-	return err == nil && entry != nil
+	present, err := cachekey.CacheEntryPresentAt(cm, job, hash, r.sourceBoundEntryKey)
+	return err == nil && present
 }
 
 // RecordSetup attributes the pre-run provider resolution time to this run's cache
@@ -274,26 +275,33 @@ func (r *RemoteCache) Negotiate(
 	if r == nil || cm == nil {
 		return
 	}
-	var movement cachekey.KeyMovement
-	if ws != nil {
-		movement = cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams, Resolver: cm.InputResolver()}, planned)
-		r.dependedOn = dependedOnJobs(planned, &movement)
+	precomputed := r.planKeys
+	r.planKeys = nil
+	// A plan whose declarations alone show a job executing here starts the
+	// provider whatever its keys are (executesLocally below), so it is started
+	// first. A provider that serves nothing (signed out, disabled, failed to
+	// start) then costs no key and no key movement: it would warm nothing and
+	// the run never starts it again. --no-cache starts it only for a key, and
+	// computes none, so it keeps the order below. A key precompute that fails
+	// after this start leaves the provider started, which the base order did
+	// not; the run's jobs then reach its object cache.
+	var started time.Duration
+	if !bypass.All && executesWithoutKeys(planned, bypass) {
+		begin := time.Now()
+		if _, ok := r.ensureProvider(ctx, ws, cm); !ok {
+			return
+		}
+		started = time.Since(begin)
+	}
+	var keys map[string]string
+	if precomputed != nil && precomputed.Keys != nil {
+		keys = precomputed.Keys
 	} else {
-		r.dependedOn = dependedOnJobs(planned, nil)
-	}
-
-	keys, err := cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cm, bypass, r.stats)
-	if err != nil {
-		slog.Warn("remote cache: key precompute failed; skipping remote cache", "error", err)
-		return
-	}
-	r.Keys = keys
-	if len(movement.Moving) > 0 {
-		r.Keys = make(map[string]string, len(keys))
-		for jobKey, hash := range keys {
-			if !movement.Moving[jobKey] {
-				r.Keys[jobKey] = hash
-			}
+		var err error
+		keys, err = cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cm, bypass, r.stats)
+		if err != nil {
+			slog.Warn("remote cache: key precompute failed; skipping remote cache", "error", err)
+			return
 		}
 	}
 	r.LocalHits = make(map[string]bool)
@@ -368,13 +376,46 @@ func (r *RemoteCache) Negotiate(
 	// --no-cache consults nothing remote, so it keeps the provider down too
 	// (PrecomputeKeys already omitted every key, which is why this flag has to be
 	// read explicitly rather than inferred from an empty key set).
-	if len(providerKeys) == 0 && (bypass.All || !executesLocally) {
+	if len(providerKeys) == 0 && (bypass.All || !executesLocally) && !r.providerServing() {
+		// No provider serves the run, so no key movement is decided: it only
+		// tells which files a result-only restore may skip, and only a serving
+		// provider restores. One a later miss starts counts every
+		// serialization edge (dependedOnJobs with no movement): it restores
+		// files it might have skipped, never the reverse. A provider started
+		// before negotiation (a hosted run, a run-marker lookup) that serves
+		// the run goes on below, as before.
+		r.dependedOn = dependedOnJobs(planned, nil)
 		return
 	}
-	start := time.Now()
+	// The negotiation's recorded time includes the provider start, wherever
+	// it happened.
+	start := time.Now().Add(-started)
 	sess, ok := r.ensureProvider(ctx, ws, cm)
 	if !ok {
 		return
+	}
+	// The key movement is decided once the provider serves the run, from the
+	// tree as it stands: no job has run yet. Prune's, when it decided one for
+	// the same plan, is the same.
+	var movement cachekey.KeyMovement
+	if ws != nil {
+		if precomputed != nil && precomputed.Movement != nil {
+			movement = *precomputed.Movement
+		} else {
+			movement = cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams, Resolver: cm.InputResolver()}, planned)
+		}
+		r.dependedOn = dependedOnJobs(planned, &movement)
+	} else {
+		r.dependedOn = dependedOnJobs(planned, nil)
+	}
+	r.Keys = keys
+	if len(movement.Moving) > 0 {
+		r.Keys = make(map[string]string, len(keys))
+		for jobKey, hash := range keys {
+			if !movement.Moving[jobKey] {
+				r.Keys[jobKey] = hash
+			}
+		}
 	}
 	// Only now is the provider's echo known, so only now can a local
 	// result-only entry count as a local hit. Before it, the rule answers that
@@ -392,6 +433,44 @@ func (r *RemoteCache) Negotiate(
 	}
 	// Record the key set as misses; a restore promotes each served key to a hit.
 	r.stats.RecordNegotiate(time.Since(start).Nanoseconds(), len(providerKeys), 0)
+}
+
+// providerServing reports whether a provider session already started and
+// answered ready.
+func (r *RemoteCache) providerServing() bool {
+	if !r.IsProviderBacked() {
+		return false
+	}
+	r.provider.mu.Lock()
+	defer r.provider.mu.Unlock()
+	return r.provider.session != nil && r.provider.ready
+}
+
+// executesWithoutKeys reports whether the declarations of planned alone show
+// a job that executes on this machine, the condition under which Negotiate
+// starts the provider whatever the keys are: a job with no cache key, one with
+// external effects, or one that reuses no entry (not a declared-capture task).
+// A source-bound task counts only once its key is known, as in Negotiate.
+func executesWithoutKeys(planned []*jobmodel.ScheduledJob, bypass cachekey.CacheBypass) bool {
+	for _, job := range planned {
+		if !cachekey.IsCacheEnabled(job, bypass) || jobmodel.HasExternalEffects(job) {
+			return true
+		}
+		if !cachekey.TaskIsSourceBound(job) && !jobmodel.UsesDeclaredCapture(job) {
+			return true
+		}
+	}
+	return false
+}
+
+// UsePlanKeys makes the next Negotiate read keys instead of computing them
+// again. The scheduler hands it what prune computed for the same plan, with
+// the same inputs, before any job ran. Negotiate reads them once. A nil cache
+// ignores it.
+func (r *RemoteCache) UsePlanKeys(keys *cachekey.PlanKeys) {
+	if r != nil {
+		r.planKeys = keys
+	}
 }
 
 // resultOnlyKeys returns the declared-capture provider keys, in providerKeys

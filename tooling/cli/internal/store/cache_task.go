@@ -43,13 +43,40 @@ func (cm *CacheManager) IngestTaskEntry(stagingRoot string, spec TaskEntrySpec) 
 }
 
 // MaterializeTaskOutput places one recorded output at dest and reports whether
-// any bytes were written. An output recorded empty leaves dest untouched. The
+// the restore must count as a write of dest: true when it wrote bytes, and
+// when dest already held the output but something there changed since this
+// run's reads of the tree began (SetTreeReadsSince), which another session may
+// have written after a read this run memoized (ADR 0119). A dest that held the
+// output, unchanged since then, is left untouched and reports false. An output
+// recorded empty leaves dest untouched. The
 // replacement is staged in stagingRoot when rename(2) can reach dest from
 // there, and beside dest otherwise. For a directory output that cedes the
 // output-relative subpaths in keep, whatever dest already holds at each of
 // them survives the swap (see LocalStore.MaterializeTaskOutput).
 func (cm *CacheManager) MaterializeTaskOutput(entry *TaskEntry, id, dest, stagingRoot string, keep ...string) (bool, error) {
-	return cm.store.MaterializeTaskOutput(entry, id, dest, stagingRoot, keep...)
+	return cm.store.materializeTaskOutput(entry, id, dest, stagingRoot, cm.quietBefore(), keep)
+}
+
+// treeReadsMargin widens the start of a run's reads backward, so a write the
+// filesystem's clock stamps a little before the instant it happened still
+// falls after it.
+const treeReadsMargin = 2 * time.Second
+
+// processStart bounds every read this process made of the tree from below.
+var processStart = time.Now()
+
+// SetTreeReadsSince moves the instant from which this manager's run read the
+// tree, which is the start of the process unless set. A held destination that
+// changed at or after it counts as written (MaterializeTaskOutput).
+func (cm *CacheManager) SetTreeReadsSince(since time.Time) {
+	cm.readsSince.Store(since.UnixNano())
+}
+
+func (cm *CacheManager) quietBefore() int64 {
+	if since := cm.readsSince.Load(); since != 0 {
+		return since
+	}
+	return processStart.Add(-treeReadsMargin).UnixNano()
 }
 
 // TryClaimTaskEntry claims the computation of key's task-owned entry. See

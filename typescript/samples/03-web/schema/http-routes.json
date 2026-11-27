@@ -148,6 +148,5 @@
         "evidencePath": "src/app/tasks/[id]/action.ts"
       }
     }
-  ],
-  "digest": "sha256:b862e97c67c0e52e97ff42a5093b0a48d87ef97f150dcc2fd395664f90207964"
+  ]
 }

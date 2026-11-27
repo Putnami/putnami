@@ -179,6 +179,96 @@ func normalizeSensitiveMember(name string) string {
 	return out.String()
 }
 
+// MachineOutputMemberRedaction returns what sanitization v1 writes in place of
+// the value of a member named name, and whether it replaces that value: the
+// value of a sensitive member becomes "[REDACTED]". It reads name as bytes, so
+// a producer that scans encoded JSON asks it without a copy.
+func MachineOutputMemberRedaction(name []byte) (string, bool) {
+	// Every sensitive name is lowercase ASCII and at most
+	// machineOutputLongestSensitiveMember bytes long, so a longer or non-ASCII
+	// name is not sensitive.
+	var normalized [machineOutputSensitiveMemberBuffer]byte
+	n := 0
+	for _, c := range name {
+		switch {
+		case c == '-' || c == '_' || c == '.':
+			continue
+		case c >= 'A' && c <= 'Z':
+			c += 'a' - 'A'
+		case c >= 0x80:
+			return "", false
+		}
+		if n == machineOutputLongestSensitiveMember {
+			return "", false
+		}
+		normalized[n] = c
+		n++
+	}
+	if machineOutputSensitiveMembers[string(normalized[:n])] {
+		return machineOutputRedacted, true
+	}
+	return "", false
+}
+
+// machineOutputLongestSensitiveMember is the length of the longest key of
+// machineOutputSensitiveMembers; MachineOutputMemberRedaction normalizes a
+// name into a buffer of machineOutputSensitiveMemberBuffer bytes, which a test
+// holds above it.
+var machineOutputLongestSensitiveMember = func() int {
+	longest := 0
+	for name := range machineOutputSensitiveMembers {
+		longest = max(longest, len(name))
+	}
+	return longest
+}()
+
+const machineOutputSensitiveMemberBuffer = 64
+
+// IsPlainMachineOutputString reports, without sanitizing text, that
+// SanitizeMachineOutputString leaves it as it is: text is printable ASCII,
+// so it holds no control, terminal sequence or invalid UTF-8, and no literal
+// that starts a match of the private key header or of a credential pattern.
+// A false answer says nothing: the caller sanitizes. A producer that already
+// holds the encoded bytes of a string uses it to skip the patterns for the
+// identifiers, paths and times that make up most of a session stream.
+func IsPlainMachineOutputString(text []byte) bool {
+	for _, c := range text {
+		if c < 0x20 || c > 0x7e {
+			return false
+		}
+	}
+	for _, prefix := range machineOutputCredentialPrefixes {
+		if bytes.Contains(text, prefix) {
+			return false
+		}
+	}
+	for i := 0; i+3 < len(text); i++ {
+		switch {
+		case text[i] == 'g' && text[i+1] == 'h' && strings.IndexByte("pousr", text[i+2]) >= 0 && text[i+3] == '_':
+			return false
+		case text[i] == 'x' && text[i+1] == 'o' && text[i+2] == 'x' && strings.IndexByte("baprs", text[i+3]) >= 0:
+			return false
+		}
+	}
+	return true
+}
+
+// machineOutputCredentialPrefixes holds, for the private key header and for
+// each of machineOutputTokenPatterns in order, the literal every match starts
+// with, but gh[pousr]_ and xox[baprs]-, which IsPlainMachineOutputString
+// matches itself. A test pairs each pattern with a match of it that is not
+// plain, so a pattern added without its prefix fails.
+var machineOutputCredentialPrefixes = [][]byte{
+	[]byte("-----BEGIN "),
+	[]byte("AKIA"),
+	[]byte("ASIA"),
+	[]byte("github_pat_"),
+	[]byte("glpat-"),
+	[]byte("AIza"),
+	[]byte("sk_live_"),
+	[]byte("sk_test_"),
+}
+
 func checkMachineOutputSanitized(v *validator, path string, value any) {
 	switch typed := value.(type) {
 	case map[string]any:

@@ -144,7 +144,7 @@
     {
       "id": "committed-route-inventory-drift",
       "text": [
-        "Describe is the one writer of an app's committed schema/http-routes.json and fails on its drift: when the inventory a build writes or a cache hit restores differs from the committed bytes, the build fails with generated-output-drift and the worktree holds the regenerated file.",
+        "Describe is the one writer of an app's committed schema/http-routes.json, the committed form of the .gen inventory without its digest (protocols/http-routes ADR 0003), and fails on its drift: when the inventory a build writes or a cache hit restores differs from the committed bytes, the build fails with generated-output-drift and the worktree holds the regenerated file.",
         "A successful describe that commits no inventory removes a copy an earlier run left; a failed one leaves it as it was."
       ]
     },

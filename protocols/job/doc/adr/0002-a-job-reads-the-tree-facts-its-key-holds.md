@@ -107,8 +107,17 @@ must not decide it. The context is the other way a fact reaches a job.
    holds `\` or `:` at the tag, in any of its parts, is such a failure: on
    Windows the first is a separator and the second names a drive or a
    stream, so the extraction is refused on every platform and the line's
-   jobs read Git. That is an accepted cost for names this repository does
-   not use. A Windows reserved device name is refused on Windows only.
+   jobs read Git. Two files whose names differ only in case are refused the
+   same way, on every platform: on a file system that ignores case the
+   second would overwrite the first. Unicode normalization, which APFS and
+   HFS+ also ignore, is not compared. A name that is not valid UTF-8 is
+   refused the same way: Windows writes it with each invalid byte replaced,
+   so two such names could meet. That is an accepted cost for names this
+   repository does not use. A Windows reserved device name is refused on
+   Windows only. The listings of the context do not refuse such a name: the
+   key, read from Git, holds its bytes, while the context's JSON carries it
+   with each invalid byte replaced by U+FFFD, which names no file on disk
+   and can make two paths of a listing equal.
 7. **The member is additive.** `tree` is an optional v2 member (ADR 0001). The
    SDK accessor answers from it when present and falls back to Git when it is
    absent, except for the release baseline, whose reader keeps its own Git

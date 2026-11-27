@@ -734,12 +734,65 @@ runs the whole public golden path against a published channel. The repository's
 maintainer CI intentionally has no schedule or operating-system matrix: per
 [ADR 0011](adr/0011-release-governance-and-neutral-ci.md), an external release
 execution plane is the automation boundary for those post-publication
-invocations instead of adding a second GitHub Actions surface.
+invocations instead of adding a second GitHub Actions surface to this
+repository.
 
-Any configured plane must fan the candidate channel out to four jobs before
-promotion, on the four actual Unix runners. It also runs the default public
-endpoint against `latest` nightly on the same four runners. While Windows
-support is suspended, no `windows/amd64` job runs: the release builds no Windows
+That plane is the `release-smoke` workflow,
+`.github/workflows/release-smoke.yml`, of the public repository
+[Putnami/release-smoke](https://github.com/Putnami/release-smoke). It holds no
+secret, its token has `contents: read` only, and its actions are pinned by
+commit SHA. A dispatch takes two inputs. `channel` must match
+`^[a-z][a-z0-9-]{0,63}$`, so an exact version is refused. `ref` is any ref of
+this repository; a `resolve` job turns it into one 40-hex commit. Every job
+checks out this repository at that commit, so it runs the scripts of the
+candidate, and installs the Bun version that commit's root `package.json` pins
+in `packageManager`. Before promotion the release owner dispatches it for the
+candidate channel and the candidate's full source commit:
+
+```bash
+gh workflow run release-smoke.yml -R Putnami/release-smoke -f channel=<candidate-channel> -f ref=<candidate-commit>
+gh run list -R Putnami/release-smoke --event workflow_dispatch --limit 1
+```
+
+One run fans the candidate channel out to six jobs:
+
+| Job | Runner label | Runs |
+|---|---|---|
+| `release-smoke-darwin-amd64` | `macos-15-intel` | `smoke-check-release.sh <candidate-channel>` |
+| `release-smoke-darwin-arm64` | `macos-15` | `smoke-check-release.sh <candidate-channel>` |
+| `release-smoke-linux-amd64` | `ubuntu-24.04` | `smoke-check-release.sh <candidate-channel>` |
+| `release-smoke-linux-arm64` | `ubuntu-24.04-arm` | `smoke-check-release.sh <candidate-channel>` |
+| `first-use-linux-amd64` | a `linux/amd64` runner | `smoke-first-use.sh <candidate-channel>` in image mode, with the runner's Docker |
+| `first-use-linux-arm64` | a `linux/arm64` runner | `smoke-first-use.sh <candidate-channel>` in image mode, with the runner's Docker |
+
+`macos-15-intel` is GitHub's last Intel macOS image, and GitHub has announced
+its end of life. Once GitHub retires it, `release-smoke-darwin-amd64` has no
+runner: its result is `missing` and every run fails until the release owner
+names another actual `darwin/amd64` runner.
+
+A failed release smoke job keeps `SMOKE_DIAGNOSTICS_DIR` as a run artifact; a
+failed first-use job keeps its whole output, which is all the evidence that
+script prints. Artifacts are kept 90 days. The `results` job always runs: its
+summary names the channel, the ref, the resolved commit and the run URL, with
+one row per expected job, `pass`, `fail` or `missing`, and it fails unless every
+expected job passed. A candidate run lists six results; the release notes copy
+them with the run URL. The workflow also runs nightly at 03:17 UTC
+(`17 3 * * *`): the four release smoke jobs against `latest`, with the default
+installer URL and the scripts of `main`, so a nightly run lists four results.
+GitHub turns a schedule off in a repository without activity for 60 days and
+notifies only the account that last changed it, so before each release the
+release owner checks that the newest nightly run is recent and green, and
+re-enables the workflow when GitHub turned its schedule off:
+
+```bash
+gh run list -R Putnami/release-smoke --event schedule --limit 1
+gh workflow enable release-smoke.yml -R Putnami/release-smoke
+```
+
+The workflow sets no `SMOKE_RUN_COMMAND`: the `run` leg stays off until the
+release owner names the command ([The run scenario](#the-run-scenario)).
+
+While Windows support is suspended, no `windows/amd64` job runs: the release builds no Windows
 archive for it to install. `smoke-check-release.ps1`, the PowerShell port of the
 same legs, stays in the tree for when support is put back
 ([`windows-support-is-suspended`](../decisions/windows-support-is-suspended.json)):
@@ -750,14 +803,15 @@ same legs, stays in the tree for when support is put back
 | `smoke-check-release.sh latest` (default installer URL) | the four Unix runners | Nightly public monitor; page the release owner and stop the next release until triaged. |
 | `smoke-first-use.sh <candidate-channel>` | `linux/amd64`, `linux/arm64`, with Docker | Blocks promotion. See [The first-use smoke](#the-first-use-smoke). |
 
-When that external plane is not configured or is unavailable, the release owner
-runs the same four candidate jobs manually before promotion and the same four
-Unix `latest` jobs nightly until automation is configured or restored; one local
+When that workflow is unavailable, the release owner runs the same six candidate
+jobs manually before promotion and the same four Unix `latest` jobs nightly
+until the workflow is restored; one local
 host is not a matrix substitute:
 
 ```bash
-tooling/cli/scripts/smoke-check-release.sh canary
-tooling/cli/scripts/smoke-check-release.sh              # public latest
+tooling/cli/scripts/smoke-check-release.sh canary   # each of the four Unix targets
+tooling/cli/scripts/smoke-first-use.sh canary       # linux/amd64 and linux/arm64, with Docker
+tooling/cli/scripts/smoke-check-release.sh          # public latest, nightly
 ```
 
 It fetches `https://putnami.dev/install.sh` by default and selects the candidate
@@ -900,11 +954,13 @@ outside the starter workspace, so the one-liner runs as script text and the
 script's exit status is the command's. The leg holds the result to the same
 three checks, with the smoke's recording `sudo` on `PATH`.
 
-The release plane runs the smoke on darwin and linux: once the command map lists
-a command, each of the four runners above (`darwin/amd64`, `darwin/arm64`,
-`linux/amd64`, `linux/arm64`) sets `SMOKE_RUN_COMMAND` to a listed command that
-reads no input, for the candidate gate and for the nightly `latest` monitor. A
-manual run by the release owner does the same. A command can pass the leg only
+The release plane runs the smoke on darwin and linux. The `run` leg stays off
+there until the release owner names the command: the `release-smoke` workflow
+sets no `SMOKE_RUN_COMMAND`. Once the command map lists a command that reads no
+input and the release owner names it, each of the four release smoke jobs
+(`darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`) sets
+`SMOKE_RUN_COMMAND` to it, for the candidate gate and for the nightly `latest`
+monitor. A manual run by the release owner does the same. A command can pass the leg only
 once the release its entry resolves to runs without a workspace and is readable
 by the smoke's anonymous installer, so the release owner turns the leg on for a
 command after both hold.

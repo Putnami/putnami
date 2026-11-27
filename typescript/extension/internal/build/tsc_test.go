@@ -309,6 +309,158 @@ func TestCheckTscOutputsRefusesAnUnignoredOrTrackedOutput(t *testing.T) {
 	}
 }
 
+// TestCheckTscOutputsFoldsCaseOnACaseInsensitiveVolume proves that an outDir
+// spelled with other case than the cut is compared as the volume compares it:
+// folded where the file system ignores case, as spelled where it does not.
+func TestCheckTscOutputsFoldsCaseOnACaseInsensitiveVolume(t *testing.T) {
+	root, project := tscWorkspace(t, map[string]string{
+		"libs/lib/package.json":  libPackage("tsc -b"),
+		"libs/lib/tsconfig.json": strings.Replace(libConfig, `"outDir": "dist"`, `"outDir": "Dist"`, 1),
+	})
+	plan, err := PlanTsc(project, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(plan.OutDir) != "Dist" {
+		t.Fatalf("outDir = %s, want the config's Dist", plan.OutDir)
+	}
+	context := func(files ...job.CandidateFile) *job.Context {
+		return &job.Context{WorkspaceRoot: root, Tree: &job.Tree{
+			Directory:            "libs/lib",
+			CandidateDirectories: []string{"libs/lib"},
+			CandidateFiles:       append([]job.CandidateFile{{Path: "libs/lib/package.json", Mode: job.CandidateModeRegular}}, files...),
+		}}
+	}
+	t.Setenv("PATH", "")
+	previous := foldsCase
+	t.Cleanup(func() { foldsCase = previous })
+
+	for _, tc := range []struct {
+		name  string
+		folds bool
+		file  job.CandidateFile
+		code  string
+	}{
+		{"untracked, folding volume", true, job.CandidateFile{Path: "libs/lib/dist/index.js", Mode: job.CandidateModeUntracked}, CodeTscOutputIgnored},
+		{"tracked, folding volume", true, job.CandidateFile{Path: "libs/lib/DIST/index.js", Mode: job.CandidateModeRegular}, CodeTscOutputTracked},
+		{"tracked link above, folding volume", true, job.CandidateFile{Path: "libs/lib/dist", Mode: job.CandidateModeSymlink}, CodeTscOutputTracked},
+		{"untracked, case-sensitive volume", false, job.CandidateFile{Path: "libs/lib/dist/index.js", Mode: job.CandidateModeUntracked}, ""},
+		{"tracked, case-sensitive volume", false, job.CandidateFile{Path: "libs/lib/dist/index.js", Mode: job.CandidateModeRegular}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			foldsCase = func(string) bool { return tc.folds }
+			err := CheckTscOutputs(root, project, plan, context(tc.file))
+			if tc.code == "" {
+				if err != nil {
+					t.Errorf("CheckTscOutputs = %v, want the outputs accepted", err)
+				}
+				return
+			}
+			if !isTscError(err, tc.code) || !strings.Contains(err.Error(), strings.TrimPrefix(tc.file.Path, "libs/lib/")) {
+				t.Errorf("CheckTscOutputs = %v, want %s naming %s", err, tc.code, tc.file.Path)
+			}
+		})
+	}
+
+	// An outDir below a link the cut lists as one entry, in other case.
+	below := strings.Replace(libConfig, `"outDir": "dist"`, `"outDir": "Out/dist"`, 1)
+	if err := os.WriteFile(filepath.Join(project, "tsconfig.json"), []byte(below), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plan, err = PlanTsc(project, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	link := job.CandidateFile{Path: "libs/lib/out", Mode: job.CandidateModeSymlink}
+	foldsCase = func(string) bool { return true }
+	if err := CheckTscOutputs(root, project, plan, context(link)); !isTscError(err, CodeTscOutputTracked) || !strings.Contains(err.Error(), "below out,") {
+		t.Errorf("an outDir below a link in other case on a folding volume = %v, want %s naming the link", err, CodeTscOutputTracked)
+	}
+	foldsCase = func(string) bool { return false }
+	if err := CheckTscOutputs(root, project, plan, context(link)); err != nil {
+		t.Errorf("an outDir beside a link of other case on a case-sensitive volume = %v, want it accepted", err)
+	}
+}
+
+// TestCheckTscOutputsFoldsCaseWhenItAsksGit proves the same folding on the
+// path that asks Git, for a context without the cut: an outDir spelled Dist
+// holds the dist/ file the index tracks where the volume ignores case.
+func TestCheckTscOutputsFoldsCaseWhenItAsksGit(t *testing.T) {
+	if _, err := osexec.LookPath("git"); err != nil {
+		t.Skip("git is not on PATH")
+	}
+	root, project := tscWorkspace(t, map[string]string{
+		".gitignore":             "Dist/\n",
+		"libs/lib/package.json":  libPackage("tsc -b"),
+		"libs/lib/tsconfig.json": strings.Replace(libConfig, `"outDir": "dist"`, `"outDir": "Dist"`, 1),
+		"libs/lib/dist/index.js": "",
+	})
+	for _, args := range [][]string{{"init", "-q"}, {"add", "-f", "libs/lib/dist/index.js"}} {
+		if out, err := osexec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	plan, err := PlanTsc(project, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := foldsCase
+	t.Cleanup(func() { foldsCase = previous })
+
+	foldsCase = func(string) bool { return true }
+	if err := CheckTscOutputs(root, project, plan, nil); !isTscError(err, CodeTscOutputTracked) || !strings.Contains(err.Error(), "dist/index.js") {
+		t.Errorf("CheckTscOutputs on a folding volume = %v, want %s naming dist/index.js", err, CodeTscOutputTracked)
+	}
+	foldsCase = func(string) bool { return false }
+	if err := CheckTscOutputs(root, project, plan, nil); isTscError(err, CodeTscOutputTracked) {
+		t.Errorf("CheckTscOutputs on a case-sensitive volume = %v, want Dist and dist compared as spelled", err)
+	}
+}
+
+// TestFoldsCaseComparesTheSwappedName proves the probe on the volume that
+// holds the test's temporary directory: it folds exactly when the swapped
+// name opens the same directory.
+func TestFoldsCaseComparesTheSwappedName(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "Probe")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := os.Stat(filepath.Join(filepath.Dir(dir), "pROBE"))
+	want := err == nil
+	if got := foldsCase(dir); got != want {
+		t.Errorf("foldsCase(%s) = %v, want %v", dir, got, want)
+	}
+	// A distinct directory under the swapped name is not the same file.
+	if !want {
+		if err := os.Mkdir(filepath.Join(filepath.Dir(dir), "pROBE"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if foldsCase(dir) {
+			t.Errorf("foldsCase(%s) = true beside a distinct pROBE", dir)
+		}
+	}
+	// An entry of the directory is probed first: a distinct entry under the
+	// swapped name is not the same file.
+	if err := os.WriteFile(filepath.Join(dir, "Entry"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := foldsCase(dir); got != want {
+		t.Errorf("foldsCase(%s) with an entry = %v, want %v", dir, got, want)
+	}
+	if !want {
+		if err := os.WriteFile(filepath.Join(dir, "eNTRY"), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if foldsCase(dir) {
+			t.Errorf("foldsCase(%s) = true beside a distinct eNTRY", dir)
+		}
+	}
+	// A path of no letter up to the root folds nothing.
+	if foldsCase(string(filepath.Separator)) {
+		t.Error("foldsCase(/) = true, want false")
+	}
+}
+
 // The check reads the candidate cut its key holds from the job context and
 // starts no Git (doc/adr/0015): a tracked path in an output refuses it, an
 // untracked one, which Git does not ignore, refuses it too, and an output that

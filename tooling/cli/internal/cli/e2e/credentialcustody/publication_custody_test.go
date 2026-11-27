@@ -520,11 +520,6 @@ func TestHostilePublicationJobFindsNoPublishCredential(t *testing.T) {
 		t.Errorf("provider calls = %q; the engine asked the publish credential", calls)
 	}
 
-	rootExempt := runtime.GOOS == "linux" && os.Geteuid() == 0
-	platform := map[string]bool{}
-	for _, probe := range platformSearchProbes() {
-		platform[probe] = true
-	}
 	for role, report := range map[string]string{"publication": fx.jobReport, "hook": fx.hookReport} {
 		findings := readFindings(t, report)
 		for _, probe := range searchProbes() {
@@ -532,10 +527,12 @@ func TestHostilePublicationJobFindsNoPublishCredential(t *testing.T) {
 			switch {
 			case !ok:
 				t.Errorf("%s: probe %q did not run", role, probe)
+			case !f.Checked && f.Partial > 0 && readByRoot(probe):
+				t.Logf("%s: probe %q copied %d descriptors of the engine in part as root; root is outside the same-user threat model", role, probe, f.Partial)
 			case !f.Checked:
 				t.Errorf("%s: probe %q recorded no check (detail %q)", role, probe, f.Detail)
 			case slices.Contains(f.Found, "bearer"):
-				if rootExempt && platform[probe] {
+				if readByRoot(probe) {
 					t.Logf("%s: probe %q read the engine as root; root is outside the same-user threat model", role, probe)
 					continue
 				}

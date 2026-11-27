@@ -20,7 +20,7 @@ corpus under [`fixtures/`](fixtures/).
 | Role | Implementation |
 | --- | --- |
 | Producer (Go) | `go.putnami.dev/http` — `ServerPlugin.Describe` canonicalizes typed API, manual, and static-mount routes into `schema/http-routes.json` (`go/framework/http/http_routes.go`). |
-| Producer (TypeScript) | `@putnami/application` and `@putnami/web` emit per-project route fragments; the TypeScript extension aggregates them into `.gen/schema/http-routes.json` (`typescript/extension/internal/build/http_routes.go`) and commits that file verbatim to the same `schema/http-routes.json` (`typescript/extension/cmd/putnami-ts/build_generate.go`). |
+| Producer (TypeScript) | `@putnami/application` and `@putnami/web` emit per-project route fragments; the TypeScript extension aggregates them into `.gen/schema/http-routes.json` (`typescript/extension/internal/build/http_routes.go`) and commits its committed form to the same `schema/http-routes.json` (`typescript/extension/cmd/putnami-ts/build_generate.go`). |
 | Consumer (in repo) | `sites/telemetry.putnami.dev` pins its committed inventory against what the running server describes, then proves every undeclared path and method is rejected. |
 | Consumer (out of repo) | The deployment edge that builds a default-deny allowlist from the artifact. Ingestion and reconciliation stay outside this contract. |
 
@@ -196,7 +196,27 @@ The schema URI and digest field are excluded from the digest projection.
 Equivalent inventories therefore serialize byte-identically and produce the
 same digest regardless of input route or method order.
 
+## The committed form
+
+An inventory has two forms of one version. The artifact form above, with its
+`digest`, is the file a build leaves under `.gen/schema/http-routes.json` for
+package and deploy. The committed form, which a project commits to
+`schema/http-routes.json`, is the same canonical bytes without the `digest`
+member: two pull requests that change different routes then touch only their
+own route lines. `CommittedJSON` and `CommittedForm` in Go, and
+`serializeCommittedHttpRoutes` in TypeScript, produce it.
+
+`digest` is optional. A strict parser accepts an inventory without one and
+returns it with the digest it computes from the routes, the value the artifact
+form carries; a present digest must match, and an empty one is
+`http_routes.invalid_digest`. A consumer built before this rule refuses a
+committed inventory as a whole, which fails safe toward deny: upgrade every
+reader of committed inventories before its producers write the committed form.
+[ADR 0003](doc/adr/0003-the-committed-inventory-derives-its-digest.md)
+records this choice.
+
 The golden under `fixtures/equivalence/` pins the exact cross-language byte
+form, and `http-routes.committed.golden.json` beside it pins the committed
 form. `fixtures/valid/`, `fixtures/invalid/`, and `fixtures/expectations.json`
 are the shared Go/TypeScript conformance corpus.
 
@@ -226,6 +246,12 @@ toward deny. Upgrade every consumer of an inventory before a producer writes
 `proves` into it.
 [ADR 0002](doc/adr/0002-optional-members-fail-closed-on-old-consumers.md)
 records this choice.
+
+`digest` became optional under the same rule, so a project commits its
+inventory without it (see [the committed form](#the-committed-form)). Its
+computation is unchanged and every manifest that carried it keeps its bytes
+and digest; a consumer that predates the change refuses a manifest without it
+and fails safe toward deny.
 
 ## Non-goals
 

@@ -170,7 +170,9 @@ describe('ReactClientGenerator', () => {
     // The layout loader is threaded with the framework-owned route pattern so the
     // client does not rely on React Router's experimental `unstable_pattern`.
     expect(dashboardNode?.loader).toBe("layoutLoaderHandler('/dashboard')");
-    expect(indexChild?.loader).toBe('pageLoaderHandler()');
+    // A page without loader.ts has no loader, as when the layout registers first.
+    expect(indexChild?.id).toBe('root-dashboard-page');
+    expect(indexChild?.loader).toBeUndefined();
   });
 
   it('adds pages with colocated loader and action handlers', () => {
@@ -269,16 +271,96 @@ describe('ReactClientGenerator', () => {
     expect(lines.filter((line) => line.includes('\\'))).toEqual([]);
   });
 
+  describe('a route graph built from two scan roots', () => {
+    // The layout comes from one scan root, the pages and the action from the
+    // other, so either root may register first.
+    const layoutRoot = { scannedDir: '/scanned-a', relativeGenDir: './src/a' };
+    const pageRoot = { scannedDir: '/scanned-b', relativeGenDir: './src/b' };
+    const addLayouts = (g: Generator) => g.addLayout('w/[workspace]/layout.tsx', layoutRoot);
+    const addPages = (g: Generator) => {
+      g.addPage('w/page.tsx', pageRoot);
+      g.addPage('w/[workspace]/page.tsx', pageRoot);
+      g.addPage('w/[workspace]/settings/page.tsx', pageRoot);
+    };
+    const orders = [
+      { name: 'the layout root first', add: (g: Generator) => (addLayouts(g), addPages(g)) },
+      { name: 'the page root first', add: (g: Generator) => (addPages(g), addLayouts(g)) },
+    ];
+
+    type Shape = { path?: string; id?: string; index?: boolean; action?: string; children?: Shape[] };
+    // React Router ranks sibling routes by their paths, not by their order.
+    const shape = (node: Shape): Shape => ({
+      path: node.path,
+      id: node.id,
+      ...(node.index ? { index: true } : {}),
+      ...(node.action ? { action: node.action } : {}),
+      ...(node.children?.length
+        ? { children: node.children.map(shape).sort((a, b) => String(a.id).localeCompare(String(b.id))) }
+        : {}),
+    });
+
+    for (const order of orders) {
+      specTest(
+        `nests each page under its layout at a multi-segment address, with ${order.name}`,
+        {
+          feature: 'typescript/web-application-delivery',
+          requirement: 'route-graph',
+          check: 'the-route-graph-does-not-depend-on-the-registration-order',
+        },
+        async () => {
+          mockFileExists.mockImplementation((path: string) => path === '/scanned-b/w/[workspace]/action.ts');
+          const generator = new ReactClientGenerator('/client.tsx', './src/app', '/scanned');
+          order.add(generator);
+
+          expect(shape(generator.root)).toEqual({
+            path: '/',
+            id: 'root',
+            children: [
+              {
+                path: 'w',
+                id: 'root-w',
+                children: [
+                  { path: '', id: 'root-w-page', index: true },
+                  {
+                    path: ':workspace',
+                    id: 'root-w-workspace-layout',
+                    action: '/w/:workspace/action.ts',
+                    children: [
+                      { path: '', id: 'root-w-workspace-page', index: true, action: '/w/:workspace/action.ts' },
+                      { path: 'settings', id: 'root-w-workspace-settings-page' },
+                    ],
+                  },
+                ],
+              },
+            ],
+          });
+
+          const routes = generatedRoutes(generator);
+          const router = createMemoryRouter(routes, { initialEntries: ['/w/42/settings'] });
+          await router.initialize();
+          expect(router.state.matches.map((m) => m.route.id)).toEqual([
+            'root',
+            'root-w',
+            'root-w-workspace-layout',
+            'root-w-workspace-settings-page',
+          ]);
+          router.dispose();
+          expect(await submit(routes, '/w/42')).toEqual({ posted: '/w/42', status: undefined });
+          expect(await submit(routes, '/w/42?index')).toEqual({ posted: '/w/42', status: undefined });
+        },
+      );
+    }
+  });
+
   describe('a layout that shares its address with a page', () => {
     // Each directory holds layout.tsx, page.tsx and action.ts, and `href` is
     // the address a form in the page posts to. Generation adds a scan root's
     // layouts before its pages, so a page comes first only from another scan
-    // root. At a multi-segment address that order does not nest the page under
-    // the layout at all, so the page-first order is covered where it does.
+    // root.
     const directories = [
-      { name: 'a plain directory', dir: 'n/', href: '/n', pageFirst: true },
-      { name: 'the root directory', dir: '', href: '/', pageFirst: true },
-      { name: 'a parameter directory', dir: 'r/[run]/', href: '/r/42', pageFirst: false },
+      { name: 'a plain directory', dir: 'n/', href: '/n' },
+      { name: 'the root directory', dir: '', href: '/' },
+      { name: 'a parameter directory', dir: 'r/[run]/', href: '/r/42' },
     ];
     const orders = [
       {
@@ -291,8 +373,8 @@ describe('ReactClientGenerator', () => {
       },
     ];
 
-    for (const { name, dir, href, pageFirst } of directories) {
-      for (const order of pageFirst ? orders : orders.slice(0, 1)) {
+    for (const { name, dir, href } of directories) {
+      for (const order of orders) {
         specTest(
           `routes a post to ${name} to its page action, with ${order.name}`,
           {
@@ -320,7 +402,7 @@ describe('ReactClientGenerator', () => {
           check: 'a-layout-without-an-index-page-action-answers-405',
         },
         async () => {
-          for (const order of pageFirst ? orders : orders.slice(0, 1)) {
+          for (const order of orders) {
             const generator = new ReactClientGenerator('/client.tsx', './src/app', '/scanned');
             order.add(generator, dir);
 

@@ -32,6 +32,5 @@
         "evidencePath": "src/api/users/get.ts"
       }
     }
-  ],
-  "digest": "sha256:e5760b1e2d24d9c982d022399e7bd3f333fc0bb433c6693f6659de79c0ba6c9a"
+  ]
 }

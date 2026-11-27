@@ -404,6 +404,38 @@ func TestProviderSessionInitialize_Readiness(t *testing.T) {
 	}
 }
 
+// A configured session whose token command fails at initialize (a signed-out
+// developer) serves nothing, and says so in Ready: core then computes nothing
+// for it. The session warning still tells the developer to sign in.
+func TestProviderSessionInitialize_ASignedOutSessionIsNotReady(t *testing.T) {
+	t.Setenv("PUTNAMI_CACHE_URL", "")
+	t.Setenv("PUTNAMI_CACHE_TOKEN", "")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("a signed-out session reached the cache server: %s", r.URL.Path)
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	signedOut := &clicore.TokenSource{Command: []string{"sh", "-c", "echo 'cloud authentication is required' >&2; exit 3"}}
+	if err := WriteCacheConfig(dir, &CacheConfig{Enabled: true, URL: srv.URL, Mode: "full", Token: signedOut}); err != nil {
+		t.Fatal(err)
+	}
+	var logw bytes.Buffer
+	s := newProviderSession(dir, &logw)
+	defer s.close()
+	res := mustInit(t, s, &cache.InitializeParams{
+		ProtocolVersion: cache.ProviderProtocolVersion,
+		BlobExchangeDir: t.TempDir(),
+		Mode:            cache.ModeFull,
+		Capabilities:    []string{cache.CapabilityObjectCache},
+	})
+	if res.Ready {
+		t.Error("a session whose token command failed → ready, want not ready")
+	}
+	if !strings.Contains(logw.String(), "remote cache disabled for this session") {
+		t.Errorf("the session did not tell the developer why: %q", logw.String())
+	}
+}
+
 // TestProviderSessionRestore_Hit exercises the data plane end-to-end: a restore
 // negotiates a hit against a fake cache server, downloads the hit's blob, and
 // lands it content-correct in the blob-exchange directory for core to ingest.

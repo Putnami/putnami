@@ -63,50 +63,17 @@ export class ReactClientGenerator {
     const scannedDir = options?.scannedDir ?? this.scannedDir;
     const relativeGenDir = options?.relativeGenDir ?? this.relativeGenDir;
     const node = this.ensureLayoutRoute(route) as ExtendedClientRouteNode;
-    const previousRelatifGenDir = node._relativeGenDir;
     const id = node.id || 'root';
     node.id = `${id}-layout`;
     node.isLayout = true;
     node._relativeGenDir = relativeGenDir;
 
-    if (node.element && !node.element.endsWith('layout.tsx') && !node.element.endsWith('layout')) {
-      // There was a page here before the layout, move it to a child
-      node.children ||= [];
-      let pageRoute = node.children.find((c: ClientRouteNode) => c.path === '' && !c.isLayout) as
-        | ExtendedClientRouteNode
-        | undefined;
-      if (!pageRoute) {
-        pageRoute = {
-          path: '',
-          index: true,
-        };
-        node.children.push(pageRoute);
-      }
-      pageRoute.id = `${id}-page`;
-      pageRoute.element = node.element;
-      pageRoute.isPage = true;
-      node.isPage = undefined;
-      pageRoute._relativeGenDir = previousRelatifGenDir;
-      pageRoute.loader = `pageLoaderHandler()`;
-      // The layout keeps the page's action as its own (see addPage).
-      pageRoute.action = node.action;
-    }
     node.element = layoutFile;
     if (fileExists(joinPath(scannedDir, getDirectoryName(layoutFile), 'layout.loader.ts'))) {
       // Thread the framework-owned route pattern so the client builds the
       // `-layout.json` URL from it instead of React Router's experimental
       // `unstable_pattern` field (see client/form/loader.handler.ts).
       node.loader = `layoutLoaderHandler('${route}')`;
-      // If an index page already exists under this layout and has no loader yet,
-      // reuse the layout loader for the page so the client also sees a loader there.
-      if (node.children) {
-        const indexChild = node.children.find((c: ClientRouteNode) => c.path === '' && !c.isLayout) as
-          | ExtendedClientRouteNode
-          | undefined;
-        if (indexChild && !indexChild.loader) {
-          indexChild.loader = node.loader;
-        }
-      }
     }
   }
 

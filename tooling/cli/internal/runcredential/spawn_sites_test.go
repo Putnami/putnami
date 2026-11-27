@@ -124,6 +124,9 @@ var spawnSites = map[string]spawnSite{
 	"extension/http_client.go:AuthorizeRegistryRequestWithCLI": {spawns: 1, verdict: hostedNever, by: "extension/http_client.go:authorizeRegistryRequest",
 		via: "resolve", why: "putnami cloud registry-token, the host-keyed registry credential"},
 
+	"sessionreporter/detached_replay.go:replayCommand": {spawns: 1, verdict: hostedNever, by: "sessionreporter/detached_replay.go:replayCommand",
+		why: "putnami sessions replay, the CLI itself: a hosted run drains its reporting and starts no detached replay"},
+
 	// Variables that hold a spawn helper; their uses are classified above.
 	"extension/http_client.go:ResolveRegistryToken":                            {spawns: 1, verdict: alias},
 	"jobs/scheduler/native_registry_credential.go:materializeNativeCredential": {spawns: 1, verdict: alias},
@@ -259,7 +262,7 @@ var spawnSites = map[string]spawnSite{
 	"git/repository_state.go:RepositoryState": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through treefacts.RepositoryState: rev-parse"},
 	"git/release_baseline.go:readReleaseBaseline": {spawns: 2, verdict: noRepositoryCode,
-		why: "read verbs only, through gitread.CommitsSince and gitread.Unmanaged: rev-parse, log"},
+		why: "read verbs only, through gitread.CommitsBetween and gitread.Unmanaged: rev-parse, log"},
 	"git/release_baseline.go:dirReleaseReads.state": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through the gitread runners: rev-parse"},
 	"git/release_baseline.go:dirReleaseReads.hasCommit": {spawns: 1, verdict: noRepositoryCode,
@@ -268,7 +271,9 @@ var spawnSites = map[string]spawnSite{
 		why: "read verbs only, through linetag.LastRelease: rev-parse, for-each-ref, cat-file"},
 	"git/release_baseline.go:dirReleaseReads.hasTags": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through the gitread runners: for-each-ref"},
-	"git/release_reads.go:rootReleaseReads.release": {spawns: 1, verdict: noRepositoryCode,
+	"git/release_witness.go:(*ReleaseBaselineReader).recheckWitness": {spawns: 1, verdict: noRepositoryCode,
+		why: "read verbs only, through the linetag.Tags that linetag.Open returns: rev-parse, for-each-ref, cat-file; its state read is dirReleaseReads.state, classified there"},
+	"git/release_reads.go:(*ReleaseBaselineReader).openTags": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through the linetag.Tags that linetag.Open returns: rev-parse, for-each-ref, cat-file"},
 	"git/release_baseline.go:lastRelease": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through linetag.LastRelease: for-each-ref, cat-file"},
@@ -776,7 +781,7 @@ var spawnCalls = map[string]map[string]bool{
 		"ResolveToken": true, "ResolveTokenWithCLI": true, "EnsureNativeCredential": true, "MaterializeNativeCredential": true,
 	},
 	"go.putnami.dev/sdk/extension/gitread": {
-		"CommitsSince": true, "CurrentBranch": true, "CurrentBranchName": true, "Executable": true,
+		"CommitsBetween": true, "CommitsSince": true, "CurrentBranch": true, "CurrentBranchName": true, "Executable": true,
 		"HeadSHA": true, "IsAncestorOf": true, "IsShallow": true, "OriginHeadRef": true, "RefExists": true,
 		"ResolveCommit": true, "Run": true, "RunCapture": true, "RunCaptureEnv": true,
 		"SymbolicAbbrevRef": true, "TrunkRef": true, "Unmanaged": true, "UpstreamIsSelfCounterpart": true,

@@ -88,6 +88,5 @@
         "evidencePath": "src/api/tasks/[id]/put.ts"
       }
     }
-  ],
-  "digest": "sha256:a89fc0e033b455f00567db7ea99d4d9edceb453ec41a520c306dd777dcc0d76c"
+  ]
 }

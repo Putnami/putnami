@@ -236,6 +236,15 @@ type Request struct {
 	// caller; session metadata has no origin field, so its audit run must not
 	// take that slot.
 	EphemeralSession bool
+	// DetachedReporting lets the run return before its session reporting
+	// delivered: it stops each reporter at its durable checkpoint and starts a
+	// detached `sessions replay` for the rest, unless the run is hosted, runs
+	// in CI or could not finalize its session (ADR 0115). Only the terminal
+	// job adapter sets it; every other adapter drains before it returns.
+	DetachedReporting bool
+	// startReplay starts a detached replay of a session. Nil starts
+	// `sessions replay` with this executable; only tests replace it.
+	startReplay replayLauncher
 	// ExecutesUnderDryRun keeps --dry-run from short-circuiting into the engine's
 	// plan-only preview, so the jobs actually run.
 	//
@@ -763,6 +772,24 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 			}
 			if err := index.Save(); err != nil && req.Global.Debug {
 				iox.Fprintf(os.Stderr, "[debug] file index: %v\n", err)
+			}
+		}()
+		// The release baselines a run read are answered to the next run while
+		// the commits they name hold (tooling/cli ADR 0113 §4), under the same
+		// program identity as the file index.
+		openReleaseRecord := fileindex.OpenReleaseRecord
+		if req.Global.Plan || req.previewsOnly() {
+			openReleaseRecord = fileindex.OpenReleaseRecordReadOnly
+		}
+		releaseRecord := openReleaseRecord(fileindex.ReleaseRecordPath(req.WorkspaceRoot), fileindex.ReleaseRecordIdentity(fileindex.ExecutableIdentity()))
+		restoreReleaseRecord := fileindex.UseReleaseRecord(releaseRecord)
+		defer func() {
+			restoreReleaseRecord()
+			if req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] release record: %d baselines answered\n", releaseRecord.Hits())
+			}
+			if err := releaseRecord.Save(); err != nil && req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] release record: %v\n", err)
 			}
 		}()
 	}

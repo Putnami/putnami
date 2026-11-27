@@ -1,6 +1,7 @@
 package gitread_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -88,5 +89,44 @@ func TestIsShallowTellsAShallowCloneFromAFullOne(t *testing.T) {
 	shallow, err = gitread.IsShallow(clone)
 	if err != nil || !shallow {
 		t.Fatalf("IsShallow(depth 1) = %v, %v; want true", shallow, err)
+	}
+}
+
+// CommitsBetween reads up to the commit it names, wherever HEAD is.
+func TestCommitsBetweenStopsAtTheCommitItNames(t *testing.T) {
+	t.Parallel()
+	dir := initGitRepo(t)
+	base, err := gitread.HeadSHA(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCommit(t, dir, "a.txt", "feat: first", "")
+	named, err := gitread.HeadSHA(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCommit(t, dir, "b.txt", "feat: second", "")
+
+	commits, err := gitread.CommitsBetween(dir, base, named, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(commits) != 1 || commits[0].SHA != named {
+		t.Fatalf("CommitsBetween = %#v, want the named commit alone", commits)
+	}
+}
+
+// CommitsBetween refuses an end that is not a revision, such as an option or
+// an empty name, instead of handing it to git log.
+func TestCommitsBetweenRefusesAnEndThatIsNotARevision(t *testing.T) {
+	t.Parallel()
+	dir := initGitRepo(t)
+	for _, end := range []string{"", "--output=" + filepath.Join(dir, "written"), " HEAD"} {
+		if _, err := gitread.CommitsBetween(dir, "", end, nil); err == nil {
+			t.Errorf("CommitsBetween up to %q, want an error", end)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "written")); !os.IsNotExist(err) {
+		t.Errorf("git log wrote a file through the end argument (%v)", err)
 	}
 }

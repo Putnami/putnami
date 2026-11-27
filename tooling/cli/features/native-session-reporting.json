@@ -129,6 +129,21 @@
             "an-unavailable-provider-echoes-no-other-cause"
           ]
         }
+      },
+      {
+        "id": "detached-delivery",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-local-run-returns-before-its-upload-and-a-detached-replay-delivers",
+            "an-interrupted-delivery-reaches-the-receiver-on-a-later-run-exactly-once",
+            "hosted-and-ci-runs-drain-before-they-return"
+          ]
+        }
       }
     ]
   }

@@ -223,7 +223,6 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string, hook
 	// runner so the two languages keep one manifest shape.
 	manifestData, err := json.MarshalIndent(&build.GenerateResult{
 		Hash:    genResult.Hash,
-		Mode:    genResult.Mode,
 		Exports: genresult.Relativize(projectPath, genResult.Exports),
 		Assets:  genresult.Relativize(projectPath, genResult.Assets),
 	}, "", "  ")
@@ -327,7 +326,7 @@ func projectCommitsCapabilityManifest(projectPath string) (bool, error) {
 // promotes the description — and it is what lets `architecture validate` read
 // DARC evidence from a committed file without running a build.
 func promoteCapabilityManifest(projectPath, emittedPath string) (string, error) {
-	return promoteSchemaArtifact(projectPath, emittedPath, CapabilityManifestRelPath)
+	return promoteSchemaArtifact(projectPath, emittedPath, CapabilityManifestRelPath, nil)
 }
 
 // commitCapabilityManifest makes the committed capability manifest equal what
@@ -356,14 +355,15 @@ func commitCapabilityManifest(projectPath, emittedPath string, optedIn bool) err
 const HTTPRoutesRelPath = "schema/http-routes.json"
 
 // commitHTTPRoutes makes the committed route inventory equal what the preBuild
-// hooks produced. The caller invokes it only after every hook returned with a
+// hooks produced, in its committed form: the aggregate without its digest
+// (protocols/http-routes ADR 0003). The caller invokes it only after every hook returned with a
 // complete route evaluation and the aggregate validated
 // (hooks.Result.Unavailable is empty). emittedPath is that aggregate, promoted
-// verbatim, including a known-empty one; it is "" when no hook wrote a
+// in its committed form, including a known-empty one; it is "" when no hook wrote a
 // fragment, and then a committed copy has no producer and is removed.
 func commitHTTPRoutes(projectPath, emittedPath string) error {
 	if emittedPath != "" {
-		_, err := promoteSchemaArtifact(projectPath, emittedPath, HTTPRoutesRelPath)
+		_, err := promoteSchemaArtifact(projectPath, emittedPath, HTTPRoutesRelPath, build.CommittedHTTPRoutes)
 		return err
 	}
 	committed := filepath.Join(projectPath, filepath.FromSlash(HTTPRoutesRelPath))
@@ -412,7 +412,8 @@ func preBuildBun(workspaceRoot, projectPath string) (string, error) {
 
 // promoteSchemaArtifact copies a file a framework producer emitted under .gen
 // to relPath in the tracked tree, and returns the committed path. It never
-// composes content: the producer stays the artifact's sole author.
+// composes content: the producer stays the artifact's sole author. A non-nil
+// committedForm maps the emitted bytes to the bytes the project commits.
 //
 // An empty emittedPath, or one that does not exist, promotes nothing and
 // leaves a committed copy as it stands. The write is atomic: the bytes go to a
@@ -420,7 +421,7 @@ func preBuildBun(workspaceRoot, projectPath string) (string, error) {
 // renamed over the committed path, so neither a crash nor a concurrent writer
 // leaves a truncated file. It is skipped when the bytes already match, so a
 // warm build does not touch the file's mtime.
-func promoteSchemaArtifact(projectPath, emittedPath, relPath string) (string, error) {
+func promoteSchemaArtifact(projectPath, emittedPath, relPath string, committedForm func([]byte) ([]byte, error)) (string, error) {
 	if emittedPath == "" {
 		return "", nil
 	}
@@ -430,6 +431,11 @@ func promoteSchemaArtifact(projectPath, emittedPath, relPath string) (string, er
 			return "", nil
 		}
 		return "", fmt.Errorf("read emitted %s: %w", relPath, err)
+	}
+	if committedForm != nil {
+		if emitted, err = committedForm(emitted); err != nil {
+			return "", fmt.Errorf("committed form of %s: %w", relPath, err)
+		}
 	}
 	committed := filepath.Join(projectPath, filepath.FromSlash(relPath))
 	if current, err := os.ReadFile(committed); err == nil && string(current) == string(emitted) { //nolint:gosec // a project-relative committed artifact

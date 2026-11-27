@@ -698,7 +698,23 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 	if coreSaysReadOnly && s.serving() && s.readOnly {
 		result.Capabilities = append(result.Capabilities, cache.CapabilityReadOnly)
 	}
+	// A session whose token command already failed (signed out) serves
+	// nothing: the client memoizes the failure, so no operation of this run
+	// can reach the cache. It says so in Ready, and core then stops it and
+	// decides no key movement for it. A session that awaits a hosted run's credential
+	// keeps it, since that credential replaces the token source.
+	if result.Ready && s.runCredentialCaller == nil && s.tokenCommandFailed() {
+		result.Ready = false
+	}
 	return providerOK(req, result)
+}
+
+// tokenCommandFailed reports whether an operation of this session already
+// met the memoized token-command error (logCacheError).
+func (s *providerSession) tokenCommandFailed() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.tokenCommandFailureLogged
 }
 
 // resolveSessionMode is the materialization mode of a session: core's intent,

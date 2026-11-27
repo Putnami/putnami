@@ -353,6 +353,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/extension",
+          "producerProject": "/protocols/http-routes"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
           "producerProject": "/protocols/infra"
         },
         {

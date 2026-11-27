@@ -113,6 +113,11 @@ to engine 21 and jobs 0, the same total.
   refused: that file is in the build's key.
 - The build's key moves when an untracked file Git does not ignore appears
   under the project, as its `git:` input already did outside `node_modules`.
-- Paths are compared as the cut spells them. On a case-insensitive file
-  system, an `outDir` spelled `Dist` while the cut lists `dist/` is not seen
-  as holding the files, where `check-ignore` honored `core.ignorecase`.
+- Paths are compared as the project directory compares names. Where it
+  ignores case, found by looking one of its entries up under its name with
+  the case of its ASCII letters swapped, the check folds ASCII letters as
+  `core.ignoreCase` does, so an `outDir` spelled `Dist` holds the `dist/`
+  files the cut lists. Where it does not, `Dist` and `dist` are two
+  directories and are compared as spelled. Whether the directory ignores
+  case is a fact of the volume the key does not hold; it only changes the
+  verdict of a config whose output names differ from the files in case.
