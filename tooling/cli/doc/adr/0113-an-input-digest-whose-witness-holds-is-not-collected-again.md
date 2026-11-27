@@ -392,6 +392,39 @@ the witness is the contract it answers to:
 
 The design of the machine process itself is its own record.
 
+### 8. What prune can settle with the record
+
+On an unchanged `--all`, prune keeps the 48 `test~test-env` and
+`test~test-env-teardown` tasks: a test's precomputed key can still be moved by
+a planned writer that is not done when `test-env` starts (the same project's
+`config-merge`, `describe`, `generate` and `infra` steps,
+`validate-workspace~codeowners`, and with `--fix` each `lint~golangci-lint`,
+whose rewritten region holds `go.work` and `go.work.sum`), and
+`SettlesBefore` accepts only a writer that finishes before the producer or
+runs after the consumer.
+
+The record does not change what a writer may reach, so it settles none of
+them by itself. It makes a third answer cheap and sound: **a writer that
+writes nothing cannot move a key.** A writer served from its entry writes only
+what differs from the files on disk (ADR 0108), so it writes nothing when its
+precomputed key has an entry and every output that entry holds equals the file
+on disk, whose digest the file index answers by stat. Prune may then treat a
+writer as settled when that holds and its own key is not moved by a writer
+outside that set, a fixpoint over the plan. Precompute then costs about 1.8 s
+instead of 4.3 s (section "Context"), and the check of the outputs costs one
+stat per output.
+
+The fixpoint holds only as far as the writers have an entry at their
+precomputed key, and on this repository it collapses today on 488 jobs that
+have none. Some are absent by construction: a source-bound task's entry
+address binds the project's source binding, which `CacheEntryPresent` does
+not compute; with ADR 0112's in-process reader it can, at no Git call. Each
+other one must be classified before the gain is claimed. This record creates
+no entry. The expected gain, the 48 job processes, is therefore conditional:
+the implementation classifies the 488, makes prune ask the fixpoint, and
+measures what it settles. If a class has no entry for a reason this record
+cannot change, the gain is reported as what remains.
+
 ## Consequences
 
 Expected on this repository's unchanged run, from the bound above and the
