@@ -2,8 +2,11 @@ package planner
 
 import (
 	"bytes"
+	"encoding/json"
+	"maps"
 	"path/filepath"
-	"sort"
+	"slices"
+	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fileindex"
@@ -20,7 +23,12 @@ import (
 // (project, command) pair would pay for an answer the common `files`/`contains`
 // gate never reads.
 type activationScope struct {
-	projRoot     string
+	// wsRoot is the workspace root the activation witnesses are kept under;
+	// empty, an answer is computed and not kept.
+	wsRoot   string
+	projRoot string
+	// projectType is the project's declared type, "" when it declares none.
+	projectType  string
 	closureRoots func() []string
 	cache        *planCache
 	// changedFiles are the run's changed files the project owns,
@@ -45,7 +53,11 @@ func pipelineExpansionOptions(
 ) extension.PipelineExpansionOptions {
 	scope := activationScope{cache: cache}
 	if ws != nil && ws.Root != "" {
+		scope.wsRoot = ws.Root
 		scope.projRoot = filepath.Join(ws.Root, proj.Path)
+	}
+	if proj != nil {
+		scope.projectType = proj.Type
 	}
 	// Resolve the closure at most once per project, through core's single
 	// closure definition so the gate and the runtime read the same set.
@@ -96,6 +108,11 @@ func pipelineExpansionOptions(
 
 // stepIsActive reports whether a step's activation gate is satisfied. A nil
 // gate (the common case) is always active.
+//
+// The answer of a gate that reads the tree is decided once per plan for a
+// project, and kept between runs with the witnesses of what it read (CLI ADR
+// 0132): while every recorded stat holds, the next run answers it with a stat
+// per path instead of a walk and a read per file.
 func stepIsActive(act *extension.StepActivation, scope activationScope) bool {
 	if act == nil {
 		return true
@@ -112,7 +129,101 @@ func stepIsActive(act *extension.StepActivation, scope activationScope) bool {
 	if scope.projRoot == "" {
 		return true
 	}
-	if len(act.Files) > 0 && !hasActivationFiles(scope.projRoot, act.Files, scope.cache) {
+	key, witnessed := activationKey(act, scope)
+	if scope.cache != nil {
+		if v, ok := scope.cache.activation[key]; ok {
+			return v
+		}
+	}
+	var probe *workspace.ActivationProbe
+	active, held := false, false
+	if witnessed {
+		active, held = workspace.HeldActivation(scope.wsRoot, key)
+		if !held {
+			probe = workspace.NewActivationProbe(scope.wsRoot)
+		}
+	}
+	if !held {
+		active = treeGateHolds(act, scope, probe)
+		if witnessed {
+			workspace.RecordActivation(scope.wsRoot, key, active, probe)
+		}
+	}
+	if scope.cache != nil {
+		scope.cache.activation[key] = active
+	}
+	return active
+}
+
+// activationKey names a gate's tree question for a project: its project, the
+// gate without its change condition, and the facts outside the tree it
+// depends on (the project's type, its closure, the workspace's project
+// roots). witnessed is false when the gate also reads the diff below its top
+// level, which no witness answers for.
+func activationKey(act *extension.StepActivation, scope activationScope) (string, bool) {
+	gate := *act
+	gate.ChangedFiles = nil
+	encoded, err := json.Marshal(gate)
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(scope.wsRoot, scope.projRoot)
+	if err != nil || scope.wsRoot == "" {
+		rel = scope.projRoot
+	}
+	var b strings.Builder
+	b.WriteString(filepath.ToSlash(rel))
+	b.WriteByte(0)
+	b.Write(encoded)
+	// reads reports whether the gate, or with nested only one of its
+	// alternatives at any depth, has the condition has selects.
+	var reads func(g *extension.StepActivation, nested bool, has func(*extension.StepActivation) bool) bool
+	reads = func(g *extension.StepActivation, nested bool, has func(*extension.StepActivation) bool) bool {
+		if !nested && has(g) {
+			return true
+		}
+		for i := range g.AnyOf {
+			if reads(&g.AnyOf[i], false, has) {
+				return true
+			}
+		}
+		return false
+	}
+	if reads(act, false, func(g *extension.StepActivation) bool { return len(g.ProjectTypes) > 0 }) {
+		b.WriteString("\x00type=")
+		b.WriteString(scope.projectType)
+	}
+	if reads(act, false, func(g *extension.StepActivation) bool { return len(g.ClosureFiles) > 0 }) && scope.closureRoots != nil {
+		b.WriteString("\x00closure=")
+		for _, root := range scope.closureRoots() {
+			if r, err := filepath.Rel(scope.wsRoot, root); err == nil {
+				root = r
+			}
+			b.WriteString(filepath.ToSlash(root))
+			b.WriteByte(1)
+		}
+	}
+	if scope.cache != nil {
+		b.WriteString("\x00projects=")
+		b.WriteString(scope.cache.rootsDigest)
+	}
+	witnessed := scope.wsRoot != "" && !reads(act, true, func(g *extension.StepActivation) bool { return len(g.ChangedFiles) > 0 })
+	return b.String(), witnessed
+}
+
+// treeGateHolds evaluates every condition of the gate but its top-level change
+// condition, recording what it reads into probe, which may be nil. Conditions
+// are read in a fixed order, and an alternative's first holding member ends
+// the read, so one tree gives one witness.
+func treeGateHolds(act *extension.StepActivation, scope activationScope, probe *workspace.ActivationProbe) bool {
+	if len(act.ProjectTypes) > 0 && !slices.Contains(act.ProjectTypes, scope.projectType) {
+		return false
+	}
+	var projectRoots map[string]bool
+	if scope.cache != nil {
+		projectRoots = scope.cache.projectRoots
+	}
+	if len(act.Files) > 0 && !workspace.HasActivationFilesProbed(scope.projRoot, act.Files, projectRoots, probe) {
 		return false
 	}
 	// A closure gate asks the question the step's task will answer at runtime:
@@ -131,7 +242,7 @@ func stepIsActive(act *extension.StepActivation, scope activationScope) bool {
 		}
 		matched := false
 		for _, root := range roots {
-			if hasActivationFiles(root, act.ClosureFiles, scope.cache) {
+			if workspace.HasActivationFilesProbed(root, act.ClosureFiles, projectRoots, probe) {
 				matched = true
 				break
 			}
@@ -141,42 +252,27 @@ func stepIsActive(act *extension.StepActivation, scope activationScope) bool {
 		}
 	}
 	// Iterate content gates in sorted order for deterministic probing.
-	paths := make([]string, 0, len(act.Contains))
-	for path := range act.Contains {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-	for _, path := range paths {
-		if !fileContains(scope.projRoot, path, act.Contains[path], scope.cache) {
+	// A missing or unreadable file reports false, so activation fails closed.
+	for _, path := range slices.Sorted(maps.Keys(act.Contains)) {
+		full := filepath.Join(scope.projRoot, path)
+		probe.File(full)
+		data, err := fileindex.ReadFile(full)
+		if err != nil || !bytes.Contains(data, []byte(act.Contains[path])) {
 			return false
 		}
 	}
-	return true
-}
-
-// fileContains reports whether the project-relative file contains the
-// substring. Results are memoized per (absolute path, substring).
-func fileContains(projRoot, relPath, substr string, cache *planCache) bool {
-	full := filepath.Join(projRoot, relPath)
-	if cache != nil {
-		key := full + "\x00" + substr
-		if v, ok := cache.fileContains[key]; ok {
-			return v
+	// An alternative's change condition reads the diff like the top-level one.
+	if len(act.AnyOf) > 0 {
+		for i := range act.AnyOf {
+			alt := &act.AnyOf[i]
+			if len(alt.ChangedFiles) > 0 && !extension.SelectsChangedFile(scope.changedFiles, alt.ChangedFiles) {
+				continue
+			}
+			if treeGateHolds(alt, scope, probe) {
+				return true
+			}
 		}
-		v := fileContainsUncached(full, substr)
-		cache.fileContains[key] = v
-		return v
-	}
-	return fileContainsUncached(full, substr)
-}
-
-// fileContainsUncached reads the file, through the file index, and reports
-// substring membership. A read error (missing/unreadable file) reports false
-// so activation fails closed.
-func fileContainsUncached(path, substr string) bool {
-	data, err := fileindex.ReadFile(path)
-	if err != nil {
 		return false
 	}
-	return bytes.Contains(data, []byte(substr))
+	return true
 }

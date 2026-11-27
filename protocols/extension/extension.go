@@ -436,6 +436,16 @@ type StepActivation struct {
 	// step is never planned there. It is the vocabulary of
 	// protocolcli.ChangedFilesContract.
 	ChangedFiles []string `json:"changedFiles,omitempty"`
+	// ProjectTypes lists project types; the step is active only if the
+	// project's declared type is one of them. The empty string stands for a
+	// project that declares no type. Empty means no type gate.
+	ProjectTypes []string `json:"projectTypes,omitempty"`
+	// AnyOf lists alternative gates; the step is active only if at least one
+	// of them holds, in addition to every other condition of this gate. A
+	// step whose work has several independent sources (an import, a committed
+	// file it reconciles, an output it clears) names each one here. Empty
+	// means no alternative is required.
+	AnyOf []StepActivation `json:"anyOf,omitempty"`
 }
 
 // InputBindingFromContext is the `from` of an input binding that reads a

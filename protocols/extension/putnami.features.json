@@ -337,7 +337,9 @@
               "prompt-host-hooks-require-contract-25",
               "prompt-host-hooks-below-contract-25-do-not-load",
               "emptied-file-outputs-require-contract-27",
-              "emptied-file-outputs-below-contract-27-do-not-load"
+              "emptied-file-outputs-below-contract-27-do-not-load",
+              "context-activation-requires-contract-28",
+              "context-activation-below-contract-28-does-not-load"
             ]
           }
         },

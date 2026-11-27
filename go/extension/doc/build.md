@@ -377,6 +377,20 @@ those bytes.
 
 ## Execution Flow
 
+A step that the project gives no work is not planned
+([CLI ADR 0132](../../../tooling/cli/doc/adr/0132-a-plan-holds-only-the-steps-a-project-context-gives-work-to.md)): its gate is decided once per plan, from
+the project's files, and kept until one of them changes.
+
+- **Config merge** is planned when the project or a member of its dependency
+  closure has `conf/.env.yaml` or `conf/.env.<env>.yaml`.
+- **Infra** is planned for a workload, and for a project that holds a
+  `.gen/requirements.json` or a `.gen/infra/runtime.json` an earlier workload
+  build left, which its run clears.
+- **Tidy** stays planned: whether a module is tidy is the go command's answer
+  over its imports.
+- **Generate** stays planned: its key reads the project's sources, and every
+  dependent reaches them through it.
+
 1. **Tidy** (unless `--skip-deps`). With `--tidy=false`, the default when the
    `CI` environment variable is set, build runs `go mod tidy -diff` instead and
    writes neither file: an untidy module fails with the diff and names
@@ -461,7 +475,8 @@ those bytes.
    - Findings (a malformed contribution, a merge conflict, an unused override)
      are reported as task warnings and never fail the build. A failed write or
      removal fails it
-   - Skipped for libraries (see [Project classification](#project-classification))
+   - Not planned for libraries (see [Project classification](#project-classification)),
+     unless a library holds an output an earlier workload build left
    - Does not depend on compile: it reads no binary and its key does not fold
      the compile key. Write serialization of `.gen` still orders it after the
      compile, an edge that keeps none of the compile's files, so a cache hit

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 )
@@ -79,32 +80,57 @@ func UsesJobExtension(proj *Project, job *extension.JobDefinition, matchedActiva
 // against the part after "**". The walk enters no directory of
 // ProjectWalkExcludedDirs and no other project's root in projectRoots.
 func HasActivationFiles(projRoot string, patterns []string, projectRoots map[string]bool) bool {
+	return HasActivationFilesProbed(projRoot, patterns, projectRoots, nil)
+}
+
+// HasActivationFilesProbed is HasActivationFiles recording what it read into
+// probe, which may be nil.
+func HasActivationFilesProbed(projRoot string, patterns []string, projectRoots map[string]bool, probe *ActivationProbe) bool {
 	for _, pattern := range patterns {
-		if strings.Contains(pattern, "**") {
-			if matchDoubleStarGlob(projRoot, pattern, projectRoots) {
-				return true
-			}
-		} else {
-			matches, _ := filepath.Glob(filepath.Join(projRoot, pattern))
-			if len(matches) > 0 {
-				return true
-			}
+		found := false
+		visitActivationGlob(projRoot, pattern, projectRoots, probe, func(string) bool {
+			found = true
+			return true
+		})
+		if found {
+			return true
 		}
 	}
 	return false
 }
 
-// matchDoubleStarGlob handles glob patterns containing ** (recursive match).
-// Go's filepath.Glob does not support **. This function walks the directory
-// tree within the owning project and matches each file against the non-**
-// suffix of the pattern.
-func matchDoubleStarGlob(root, pattern string, projectRoots map[string]bool) bool {
+// visitActivationGlob calls visit with each file under root that matches
+// pattern, until it returns true. A pattern without "**" is a filepath.Glob
+// under root, its matches in lexical order; one with "**" walks the tree under
+// its static prefix, entering no directory of ProjectWalkExcludedDirs below
+// its search root and no other project's root in projectRoots, and matches
+// each file name against the part after "**". probe, which may be nil,
+// records each directory listed and each absent search root.
+func visitActivationGlob(root, pattern string, projectRoots map[string]bool, probe *ActivationProbe, visit func(path string) bool) {
 	root = filepath.Clean(root)
+	if !strings.Contains(pattern, "**") {
+		full := filepath.Join(root, pattern)
+		dir := filepath.Dir(full)
+		if hasGlobMeta(strings.TrimPrefix(dir, root)) {
+			probe.Untrusted()
+		} else if st, ok := fileindex.LstatAny(dir); ok && st.Mode&modeType == modeDirectory {
+			probe.Dir(dir)
+		} else {
+			probe.Absent(full)
+		}
+		matches, _ := filepath.Glob(full)
+		for _, match := range matches {
+			if visit(match) {
+				return
+			}
+		}
+		return
+	}
 	// Split on "**/" or "**" to get the suffix pattern.
 	// e.g. "**/*.test.ts" → suffix "*.test.ts"
 	// e.g. "src/**/*.go"  → prefix "src", suffix "*.go"
 	parts := strings.SplitN(pattern, "**", 2)
-	prefix := strings.TrimSuffix(parts[0], string(filepath.Separator))
+	prefix := strings.TrimSuffix(strings.TrimSuffix(parts[0], "/"), string(filepath.Separator))
 	suffix := strings.TrimPrefix(parts[1], string(filepath.Separator))
 	// Also handle forward slashes (JSON manifests use them)
 	suffix = strings.TrimPrefix(suffix, "/")
@@ -116,19 +142,23 @@ func matchDoubleStarGlob(root, pattern string, projectRoots map[string]bool) boo
 	// A static prefix cannot start inside a nested declared project.
 	for dir := searchRoot; dir != root; dir = filepath.Dir(dir) {
 		if projectRoots[dir] {
-			return false
+			probe.Dir(dir)
+			return
 		}
 		if filepath.Dir(dir) == dir {
 			break
 		}
 	}
+	if st, ok := fileindex.LstatAny(searchRoot); !ok || st.Mode&modeType != modeDirectory {
+		probe.Absent(filepath.Join(searchRoot, "x"))
+		if !ok {
+			return
+		}
+	}
 
-	found := false
 	_ = filepath.WalkDir(searchRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil || found {
-			if found {
-				return filepath.SkipAll
-			}
+		if err != nil {
+			probe.Untrusted()
 			return nil
 		}
 		if d.IsDir() {
@@ -137,19 +167,19 @@ func matchDoubleStarGlob(root, pattern string, projectRoots map[string]bool) boo
 			if path != root && projectRoots[filepath.Clean(path)] {
 				return filepath.SkipDir
 			}
-			// Skip common non-project directories for performance
-			if ProjectWalkExcludedDirs[d.Name()] {
+			// Skip common non-project directories for performance, below
+			// the search root: a project rooted at a directory named dist is
+			// still walked.
+			if path != searchRoot && ProjectWalkExcludedDirs[d.Name()] {
 				return filepath.SkipDir
 			}
+			probe.Dir(path)
 			return nil
 		}
 		// Match the filename against the suffix pattern
-		matched, _ := filepath.Match(suffix, d.Name())
-		if matched {
-			found = true
+		if matched, _ := filepath.Match(suffix, d.Name()); matched && visit(path) {
 			return filepath.SkipAll
 		}
 		return nil
 	})
-	return found
 }

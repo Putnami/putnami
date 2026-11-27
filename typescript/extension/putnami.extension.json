@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/typescript",
-  "cliContract": 27,
+  "cliContract": 28,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-ts",
@@ -330,7 +330,13 @@
             "transpile",
             "types",
             "compile"
-          ]
+          ],
+          "activation": {
+            "anyOf": [
+              { "projectTypes": ["application", ""] },
+              { "files": [".gen/requirements.json", ".gen/infra/runtime.json"] }
+            ]
+          }
         }
       ]
     },
@@ -826,7 +832,8 @@
         {
           "id": "docs",
           "task": "lint-docs",
-          "if": "params.docs-links"
+          "if": "params.docs-links",
+          "activation": { "files": ["**/*.md"] }
         }
       ]
     },

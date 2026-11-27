@@ -99,8 +99,9 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: EmptiedFileOutputContract for a file output that declares
-// emptied, PromptHostHooksContract for a host hook at UserPromptSubmit or
+// the manifest: ContextActivationContract for a step activation that declares
+// projectTypes or anyOf, EmptiedFileOutputContract for a file
+// output that declares emptied, PromptHostHooksContract for a host hook at UserPromptSubmit or
 // one that declares async, ProviderMembersContract for a provider operation
 // that declares members, DependencyClosureContract for a command that depends on a
 // command across its project's dependency closure, BuildGraphEdgesContract for
@@ -246,7 +247,30 @@ func RequiredLoadContract(m *Manifest) int {
 	if DeclaresEmptiedFileOutput(m) {
 		required = max(required, protocolcli.EmptiedFileOutputContract)
 	}
+	// A gate on the project's sources, its type or alternatives plans the
+	// step only in a reader that evaluates it, whatever origin the manifest
+	// loads from.
+	if DeclaresContextActivation(m) {
+		required = max(required, protocolcli.ContextActivationContract)
+	}
 	return required
+}
+
+// DeclaresContextActivation reports whether a step activation of the manifest
+// declares projectTypes or anyOf: the vocabulary of
+// protocolcli.ContextActivationContract.
+func DeclaresContextActivation(m *Manifest) bool {
+	if m == nil {
+		return false
+	}
+	for _, command := range m.Commands {
+		for _, step := range command.Run {
+			if step.Activation != nil && (len(step.Activation.ProjectTypes) > 0 || len(step.Activation.AnyOf) > 0) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // DeclaresEmptiedFileOutput reports whether a task of the manifest declares a

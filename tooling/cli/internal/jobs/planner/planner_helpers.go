@@ -35,11 +35,6 @@ type planCache struct {
 	// not a nested project that owns its own files.
 	projectRoots map[string]bool
 
-	// fileContains is keyed by absolutePath + "\x00" + substring and memoizes
-	// step-activation content probes (e.g. "does this go.mod require the app
-	// framework?") so the same file is read at most once per Plan.
-	fileContains map[string]bool
-
 	// closureRoots is keyed by project ID and memoizes the absolute roots of a
 	// project's dependency closure, so a closureFiles gate walks the graph once
 	// per project instead of once per (project, command, step).
@@ -51,6 +46,14 @@ type planCache struct {
 	// measured no diff, so a gated step plans nowhere and a binding binds
 	// nothing.
 	ownedChangedFiles map[string][]string
+
+	// activation is keyed by a gate's activation key and memoizes its answer,
+	// so a gate two commands share for one project is decided once per Plan.
+	activation map[string]bool
+	// rootsDigest names the workspace's project roots, relative to its root:
+	// a recursive gate enters no other project's root, so its kept answer
+	// depends on them.
+	rootsDigest string
 }
 
 // newPlanCache returns an empty cache; callers do not need to know its shape.
@@ -61,8 +64,8 @@ func newPlanCache() *planCache {
 		extActivates:           make(map[string]bool),
 		hasFiles:               make(map[string]bool),
 		projectRoots:           make(map[string]bool),
-		fileContains:           make(map[string]bool),
 		closureRoots:           make(map[string][]string),
+		activation:             make(map[string]bool),
 	}
 }
 

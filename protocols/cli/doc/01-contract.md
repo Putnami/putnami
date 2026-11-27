@@ -358,6 +358,13 @@ cached run that wrote no file restores its absence. A reader below 27 refuses
 entry's run left none, so it refuses the stamp instead. The floor binds a
 manifest wherever it loads from. Only a manifest with such an output is
 stamped 27.
+Contract `28` (`ContextActivationContract`) is additive for a step activation
+that declares `projectTypes` or `anyOf`. From 28 on, the planner plans such a
+step only where the project's type is listed, or one of the alternatives
+holds, and keeps each
+answer under the witnesses of the files it read (CLI ADR 0132). A reader below
+28 refuses the members, so the floor binds a manifest wherever it loads from.
+Only a manifest with such a gate is stamped 28.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

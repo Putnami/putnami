@@ -45,6 +45,11 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	28: ADDITIVE — a step activation that declares `projectTypes` or
+//	   `anyOf`. From 28 on, the planner plans the step only where the
+//	   project's type is listed, or one alternative holds, and keeps each
+//	   answer under the witnesses of what it read. A reader below 28 refuses the members, so a
+//	   manifest that declares one is stamped 28 from every origin.
 //	27: ADDITIVE — a task's file output that declares `emptied`. From 27 on,
 //	   the CLI removes the file before the task executes and on a restore of
 //	   an entry that records it absent, so a cached run that wrote no file
@@ -382,7 +387,13 @@ const ToolchainProbeSelfContract = 26
 // the run that produced the entry left none, so it refuses the stamp instead.
 const EmptiedFileOutputContract = 27
 
+// ContextActivationContract is required by a manifest whose step activation
+// declares projectTypes or anyOf. A reader at this contract plans the step
+// only where the project's type or one of the alternatives gives it work. An older reader refuses the members, so the
+// manifest is stamped 28 from every origin.
+const ContextActivationContract = 28
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = EmptiedFileOutputContract
+const LatestContract = ContextActivationContract

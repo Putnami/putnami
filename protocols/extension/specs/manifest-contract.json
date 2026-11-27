@@ -166,7 +166,7 @@
     {
       "id": "later-rungs-raise-the-contract-floor",
       "text": [
-        "A step that gates on or binds the run's changed files requires contract 16, a hostHooks member contract 17, a dependency on a command across the dependency closure, ^command, contract 22, a host hook at UserPromptSubmit or one that declares async contract 25, and a task file output that declares emptied contract 27, each only when used.",
+        "A step that gates on or binds the run's changed files requires contract 16, a hostHooks member contract 17, a dependency on a command across the dependency closure, ^command, contract 22, a host hook at UserPromptSubmit or one that declares async contract 25, a task file output that declares emptied contract 27, and a step activation that declares projectTypes or anyOf contract 28, each only when used.",
         "A manifest stamped below the rung its vocabulary requires does not load."
       ]
     },

@@ -5,9 +5,13 @@
 package planner
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
+	"strings"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	protocoljob "go.putnami.dev/protocol/job"
@@ -45,9 +49,14 @@ func Plan(
 	// computed once per Plan invocation.
 	cache := newPlanCache()
 	cache.ownedChangedFiles = workspace.OwnedChangedFiles(ws, changedFiles)
+	rels := make([]string, 0, len(ws.Projects))
 	for _, project := range ws.Projects {
 		cache.projectRoots[filepath.Clean(filepath.Join(ws.Root, filepath.FromSlash(project.Path)))] = true
+		rels = append(rels, filepath.ToSlash(filepath.Clean(project.Path)))
 	}
+	slices.Sort(rels)
+	rootsSum := sha256.Sum256([]byte(strings.Join(rels, "\x00")))
+	cache.rootsDigest = hex.EncodeToString(rootsSum[:])
 	recordEffectiveCommand := func(key, command string, params extension.ParamMap) {
 		if cache.effectiveCommands[key] == nil {
 			cache.effectiveCommands[key] = make(map[string]bool)

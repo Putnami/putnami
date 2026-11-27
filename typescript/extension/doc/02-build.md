@@ -704,7 +704,12 @@ Emits the workload's deployability manifest at `<project>/.gen/requirements.json
 
 Findings (a malformed contribution, a merge conflict, an unused override) are
 reported as task warnings and never fail the build. A failed write or removal
-fails it. The phase is skipped for libraries.
+fails it. The phase is not planned for a library
+([CLI ADR 0132](../../../tooling/cli/doc/adr/0132-a-plan-holds-only-the-steps-a-project-context-gives-work-to.md)), unless the library holds a `.gen/requirements.json` or a
+`.gen/infra/runtime.json` an earlier workload build left, which its run clears.
+Generate stays planned for every project: it stamps the sources' content hash
+into `.gen/version.json`, which `getBuildInfo()` reads, and its result feeds
+`transpile`, `types` and `compile`.
 
 The phase is cached. Its key holds every file it reads: the committed
 `infra/requirements.json` of every project in the closure, with that project's

@@ -192,8 +192,47 @@ of projects:
 | `files` | Active only if at least one project file matches one of these globs |
 | `contains` | Map of project-relative file path → required substring; active only if every file exists and contains its substring |
 | `changedFiles` | Active only if at least one of the run's changed files that the project owns, project-relative, matches one of these globs |
+| `closureFiles` | Active only if a member of the project's dependency closure, the project included, has a file matching one of these globs |
+| `projectTypes` | Active only if the project's declared type is listed; `""` stands for a project that declares no type |
+| `anyOf` | Alternative gates; active only if at least one of them holds, in addition to every other condition |
 
 A step is active only when **every** declared condition holds, and conditions fail closed — a missing or unreadable file makes the step inactive, mirroring the runtime skip checks so pruning never removes a step that would have done real work.
+
+A step's gate states when the step has work for the project, and every source
+of work gets its own alternative: the Go `infra` step is active for a
+workload, or for a project that holds an output an earlier workload build
+left, which its run clears:
+
+```json
+{
+  "id": "infra",
+  "task": "build-infra",
+  "dependsOn": ["generate", "describe"],
+  "activation": {
+    "anyOf": [
+      { "projectTypes": ["application", ""] },
+      { "files": [".gen/requirements.json", ".gen/infra/runtime.json"] }
+    ]
+  }
+}
+```
+
+A step whose key others read through `^step` carries its project's inputs to
+them: dropping it removes them from every dependent's key. Gate only a step
+whose result no key chain follows, or whose chain carries nothing when it is
+idle.
+
+The planner decides each gate once per plan for a project, and keeps the
+answer between runs with the witnesses of what it read: the stats of the
+directories it listed, of the files it read, and of the nearest directory of
+each path it found absent (CLI ADR 0132). While they hold, the next run
+answers the gate without a walk or a read. `projectTypes` and `anyOf` require
+`cliContract` 28.
+
+An inactive step is idle, not unwanted: `if` and dead-code elimination read
+the manifest's own topology, so the steps an inactive step would have waited
+for stay as live as they were, and the plan differs from the
+scheduled-and-skipped one by the idle steps alone.
 
 `changedFiles` reads the change, not the tree. A project owns a changed file
 when it is the nearest project whose directory holds the file; a project that
@@ -203,7 +242,7 @@ measured no diff (`--all`, `--projects`, a specification gate) has no changed
 file, so the step is never planned there. A manifest with the gate requires
 `cliContract` 16.
 
-Unlike `if` (which drops an excluded step's edges), an inactive `activation` step is **spliced out**: its dependents inherit its dependencies, so ordering and data-flow through the remaining steps are preserved. This removes a no-op node — and its process spawn and cache lookup — from the DAG instead of scheduling it just to skip. Older toolchains that predate `activation` ignore the field and fall back to scheduling-and-skipping, so adding a `files`, `closureFiles` or `contains` gate is backward compatible. A `changedFiles` gate is not: the step does work only for a change, so its rung refuses an older reader.
+Unlike `if` (which drops an excluded step's edges), an inactive `activation` step is **spliced out**: its dependents inherit its dependencies, so ordering and data-flow through the remaining steps are preserved. This removes a no-op node — and its process spawn and cache lookup — from the DAG instead of scheduling it just to skip. Older toolchains that predate `activation` ignore the field and fall back to scheduling-and-skipping, so adding a `files`, `closureFiles` or `contains` gate is backward compatible. A `changedFiles` gate is not: the step does work only for a change, so its rung refuses an older reader. Nor are `projectTypes` and `anyOf`, which an older reader's strict decoding refuses: their rung, 28, refuses the manifest with the remedy instead.
 
 ## Output Bindings
 
