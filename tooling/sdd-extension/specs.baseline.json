@@ -7,6 +7,7 @@
     "tooling/specification-driven-development#architecture-adoption-policy",
     "tooling/specification-driven-development#authoring-never-grants-a-permission",
     "tooling/specification-driven-development#codeowners-follow-declared-owners",
+    "tooling/specification-driven-development#configured-docs-patterns-select-the-documents",
     "tooling/specification-driven-development#coverage-debt-only-shrinks",
     "tooling/specification-driven-development#declared-inputs-cover-the-read-set",
     "tooling/specification-driven-development#enforce-needs-anchors",

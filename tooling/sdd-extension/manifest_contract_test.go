@@ -440,7 +440,9 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 		Task("docs-links-validate", proto.TaskDefinition{
 			Description: "Check every relative link and anchor in every README.md file and doc/ tree of the workspace, once per run whatever the selection: the documents no project owns, the projects without a language extension, and a link from one project into another that a change to the other breaks. It applies the SDK's docslinks rule, which each language extension's lint-docs task applies inside its project. " +
 				"A link may name any file of the workspace, so the task reads the workspace's Git candidate cut and its key is the input `git:**`, which holds that cut: " +
-				"deleting or renaming a link target, or editing a heading, moves the key, and a link to an ignored file is broken, as it is in a clone.",
+				"deleting or renaming a link target, or editing a heading, moves the key, and a link to an ignored file is broken, as it is in a clone. " +
+				"A workspace that lists docs entries in options.evidence.documents names its documents instead: the task checks exactly the files those patterns select, " +
+				"no project opt-out applies, and an entry that selects no file fails the task.",
 			Kind:      "command",
 			Command:   "{extensionRuntime}",
 			Args:      []string{"docs-links-validate"},
@@ -620,7 +622,10 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 	// drop a block its tasks cannot read. `publish` is listed because the spec
 	// reader consults a project's publish block; being a command name, it stays
 	// in the key of every extension providing `publish` regardless.
-	built.OptionNamespaces = []string{"sdd", "publish"}
+	// `evidence` is listed because the link check reads the documents the
+	// workspace's options.evidence.documents configures. That block lives in
+	// putnami.workspace.json, which the task's `git:**` input already keys.
+	built.OptionNamespaces = []string{"sdd", "publish", "evidence"}
 
 	if err := sdkmanifest.Validate(built); err != nil {
 		t.Fatalf("the manifest is not conformant once the runtime is attached: %v", err)

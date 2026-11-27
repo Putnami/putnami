@@ -94,10 +94,16 @@
     {
       "id": "every-document-has-working-links",
       "text": [
-        "validate-workspace checks every relative link and anchor in every README.md file and doc/ tree of the workspace, whatever the selection, with the rule each language extension's lint-docs task applies.",
-        "A missing file, a path whose case differs on disk, an anchor no heading of the target defines, or a path that leaves the workspace fails naming the file, line and link.",
-        "A project whose lint options set docs-links false is skipped.",
-        "Links with a scheme and absolute paths are not checked."
+        "validate-workspace checks every relative link and anchor of every README.md file and doc/ tree, or of the documents the docs patterns select, whatever the selection, with the rule of lint-docs.",
+        "A missing file, a path whose case differs on disk, an anchor no heading of the target defines, or a path leaving the workspace fails naming the file, line and link.",
+        "Without docs patterns, a project whose lint options set docs-links false is skipped. Scheme links and absolute paths are not checked."
+      ]
+    },
+    {
+      "id": "configured-docs-patterns-select-the-documents",
+      "text": [
+        "When options.evidence.documents holds entries of type docs, the link check reads the files of the Git candidate cut their patterns select, and lint options skip no project; entries of the other types (spec, decision, architecture) are left to their own checks.",
+        "An entry with another type, an unknown member, no include pattern, or patterns that select no file fails the step naming it."
       ]
     },
     {

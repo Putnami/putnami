@@ -34,6 +34,10 @@ import (
 // and each extension manifest, goes through one docslinks.Reader: inside a Git
 // work tree it reads the candidate cut and nothing else, and the task is
 // cached on the input `git:**`, which holds that cut.
+//
+// A workspace that lists docs entries in options.evidence.documents names its
+// documents instead: the gate reads exactly the files their patterns select,
+// and no project opt-out applies (docs_patterns.go).
 
 // DocsLinksReport is the result of the documentation link gate.
 type DocsLinksReport struct {
@@ -52,9 +56,10 @@ type DocsLinkFinding struct {
 	Message string `json:"message"`
 }
 
-// BuildDocsLinksResult checks every document of ws: each project's documents,
-// unless the project turns the check off, then the documents outside every
-// project. workspaceOptions are the workspace's option blocks, whose
+// BuildDocsLinksResult checks every document of ws: the files the
+// workspace's docs patterns select, or, without docs patterns, each project's
+// documents, unless the project turns the check off, then the documents
+// outside every project. workspaceOptions are the workspace's option blocks, whose
 // `docs-links` a project's own options override. It returns the broken links
 // as a findings list and as the SDK's findings, which the task reports with
 // line and column.
@@ -64,7 +69,7 @@ func BuildDocsLinksResult(ws *workspace.Workspace, workspaceOptions map[string]m
 	if err != nil {
 		return report, nil, fmt.Errorf("docs-links: %w", err)
 	}
-	files, err := workspaceDocuments(reader, ws, workspaceOptions)
+	files, err := checkedDocuments(reader, ws, workspaceOptions)
 	if err != nil {
 		return report, nil, protocolcli.Classify(fmt.Errorf("list the workspace documents: %w", err),
 			protocolcli.ErrInvalidConfig)
@@ -94,6 +99,36 @@ func BuildDocsLinksResult(ws *workspace.Workspace, workspaceOptions map[string]m
 			protocolcli.ErrInvalidConfig), report)
 	}
 	return report, findings, nil
+}
+
+// checkedDocuments returns the documents the gate checks, sorted. When the
+// workspace lists docs entries in options.evidence.documents, they are the
+// files the entries' patterns select, and the lint docs-links option skips no
+// project: the patterns are the whole selection. An entry that selects no
+// file fails. Otherwise, entries of other types included, they are the
+// default documents workspaceDocuments returns.
+func checkedDocuments(reader *docslinks.Reader, ws *workspace.Workspace, workspaceOptions map[string]map[string]any) ([]string, error) {
+	sets, configured, err := ConfiguredDocsPatterns(workspaceOptions)
+	if err != nil {
+		return nil, err
+	}
+	if !configured {
+		return workspaceDocuments(reader, ws, workspaceOptions)
+	}
+	lists := make([][]string, 0, len(sets))
+	for _, set := range sets {
+		selected, err := reader.SelectedDocuments(set.Patterns)
+		if err != nil {
+			return nil, err
+		}
+		// An entry that selects nothing is a typo the check would otherwise
+		// pass silently, with every link left unchecked.
+		if len(selected) == 0 {
+			return nil, fmt.Errorf("%s.patterns select no file of the workspace", set.Field)
+		}
+		lists = append(lists, selected)
+	}
+	return unionSorted(lists...), nil
 }
 
 // workspaceDocuments returns the documents the gate checks, sorted, from one

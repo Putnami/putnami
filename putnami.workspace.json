@@ -198,6 +198,26 @@
       "deploy": {
         "enabled": false
       }
+    },
+    "evidence": {
+      "documents": [
+        {
+          "type": "docs",
+          "patterns": [
+            "**/README.md",
+            "**/doc/**/*.md",
+            "!**/node_modules/**",
+            "!**/vendor/**",
+            "!**/testdata/**",
+            "!**/dist/**",
+            "!**/.*/**/*",
+            "!**/_*/**/*"
+          ]
+        }
+      ]
+    },
+    "lint": {
+      "docs-links": false
     }
   },
   "output": "text",

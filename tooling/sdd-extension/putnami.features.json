@@ -199,6 +199,20 @@
           }
         },
         {
+          "id": "configured-docs-patterns-select-the-documents",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-patterns-select-the-documents",
+              "an-invalid-entry-fails"
+            ]
+          }
+        },
+        {
           "id": "squash-keeps-the-breaking-marker",
           "stage": "coded",
           "evidenceKinds": [

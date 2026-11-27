@@ -182,6 +182,33 @@ the verdict.
   name any file of the workspace, so it reads the Git candidate cut and is
   cached on the input `git:**`: a link to a file Git ignores is broken, as it
   is in a clone.
+
+  A workspace can name its documents instead. Each entry of
+  `options.evidence.documents` in `putnami.workspace.json` whose `type` is
+  `docs` selects files by `patterns`, in the file-pattern grammar with `!`
+  exclusions, and the step then checks exactly the files of the candidate cut
+  those patterns select. The `docs-links` lint option no longer removes a
+  project: the patterns are the whole selection. A workspace that names its
+  documents usually turns the per-project `lint-docs` tasks off with
+  `"lint": { "docs-links": false }` in the same file, since this step already
+  checks every document once. Entries of the other document types (`spec`,
+  `decision`, `architecture`) are left to the checks of those documents, and
+  a list without a `docs` entry keeps the default documents. An entry with an
+  unknown `type`, a member other than `type`, `format` and `patterns`, no
+  include pattern, or patterns that select no file fails the step, naming the
+  entry. The block lives in `putnami.workspace.json`, which the step's
+  `git:**` input keys.
+
+  ```json
+  "options": {
+    "evidence": {
+      "documents": [
+        { "type": "docs", "patterns": ["**/README.md", "**/doc/**/*.md", "!**/node_modules/**", "!**/.*/**/*"] }
+      ]
+    },
+    "lint": { "docs-links": false }
+  }
+  ```
 - **`breaking-marker-validate`** — the breaking-marker step. A pull request
   merges by squash: the commits of its branch are dropped, and only the squash
   commit reaches the base branch. `putnami version` reads the breaking marker

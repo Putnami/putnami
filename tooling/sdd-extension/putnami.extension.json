@@ -2,7 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/sdd",
   "cliContract": 11,
-  "optionNamespaces": ["sdd", "publish"],
+  "optionNamespaces": ["sdd", "publish", "evidence"],
   "extensionDependencies": {},
   "runtime": {
     "executable": "compiled/putnami-sdd",
@@ -841,7 +841,7 @@
       "declares": {}
     },
     "docs-links-validate": {
-      "description": "Check every relative link and anchor in every README.md file and doc/ tree of the workspace, once per run whatever the selection: the documents no project owns, the projects without a language extension, and a link from one project into another that a change to the other breaks. It applies the SDK's docslinks rule, which each language extension's lint-docs task applies inside its project. A link may name any file of the workspace, so the task reads the workspace's Git candidate cut and its key is the input `git:**`, which holds that cut: deleting or renaming a link target, or editing a heading, moves the key, and a link to an ignored file is broken, as it is in a clone.",
+      "description": "Check every relative link and anchor in every README.md file and doc/ tree of the workspace, once per run whatever the selection: the documents no project owns, the projects without a language extension, and a link from one project into another that a change to the other breaks. It applies the SDK's docslinks rule, which each language extension's lint-docs task applies inside its project. A link may name any file of the workspace, so the task reads the workspace's Git candidate cut and its key is the input `git:**`, which holds that cut: deleting or renaming a link target, or editing a heading, moves the key, and a link to an ignored file is broken, as it is in a clone. A workspace that lists docs entries in options.evidence.documents names its documents instead: the task checks exactly the files those patterns select, no project opt-out applies, and an entry that selects no file fails the task.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
