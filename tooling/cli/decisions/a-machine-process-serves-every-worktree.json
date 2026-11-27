@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "a-machine-process-serves-every-worktree",
+  "statement": "one machine process per machine and user may keep every worktree warm; it accelerates and never decides: a run without it gives the same keys and results, and CI never depends on it",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0115-one-machine-process-keeps-every-worktree-warm.md",
+  "reviewOnly": true
+}
