@@ -301,6 +301,18 @@ func ParseAndValidateVerificationReport(data []byte) (*VerificationReport, []dia
 }
 
 func requireExactProtocolVersion(data []byte, supported ...int) error {
+	if raw, scanned, err := scanProtocolVersion(data); scanned {
+		if err != nil {
+			return err
+		}
+		return supportedProtocolVersion(raw, supported)
+	}
+	return requireExactProtocolVersionTokens(data, supported...)
+}
+
+// requireExactProtocolVersionTokens is requireExactProtocolVersion through
+// the encoding/json token stream, for a document scanProtocolVersion declines.
+func requireExactProtocolVersionTokens(data []byte, supported ...int) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	token, err := decoder.Token()
 	if err != nil {
@@ -339,12 +351,106 @@ func requireExactProtocolVersion(data []byte, supported ...int) error {
 	if !found {
 		return protocolVersionError{message: "protocolVersion is required"}
 	}
+	return supportedProtocolVersion(raw, supported)
+}
+
+func supportedProtocolVersion(raw []byte, supported []int) error {
 	for _, version := range supported {
 		if string(raw) == strconv.Itoa(version) {
 			return nil
 		}
 	}
 	return protocolVersionError{message: fmt.Sprintf("protocolVersion token %q is not supported (want exact integer token %s)", raw, supportedVersionList(supported))}
+}
+
+// scanProtocolVersion reads the raw protocolVersion token of a document that
+// is one valid JSON value, without the token stream's allocations. It answers
+// the same token or the same error as requireExactProtocolVersionTokens, and
+// ok false (the caller then walks the tokens) for an invalid document or a
+// top-level key written with an escape, and for a document that is not an
+// object.
+func scanProtocolVersion(data []byte) (raw []byte, scanned bool, err error) {
+	if !json.Valid(data) {
+		return nil, false, nil
+	}
+	i := skipJSONSpace(data, 0)
+	if data[i] != '{' {
+		// The token walk answers a top-level number float64 cannot hold
+		// with the decoder's own error, so it answers every non-object.
+		return nil, false, nil
+	}
+	i = skipJSONSpace(data, i+1)
+	found := false
+	for data[i] != '}' {
+		end := jsonStringEnd(data, i)
+		key := data[i+1 : end-1]
+		if bytes.IndexByte(key, '\\') >= 0 {
+			return nil, false, nil
+		}
+		i = skipJSONSpace(data, end)
+		i = skipJSONSpace(data, i+1) // the colon
+		valueEnd := jsonValueEnd(data, i)
+		if string(key) == "protocolVersion" {
+			if found {
+				return nil, true, protocolVersionError{message: "protocolVersion must appear exactly once"}
+			}
+			found = true
+			raw = data[i:valueEnd]
+		}
+		i = skipJSONSpace(data, valueEnd)
+		if data[i] == ',' {
+			i = skipJSONSpace(data, i+1)
+		}
+	}
+	if !found {
+		return nil, true, protocolVersionError{message: "protocolVersion is required"}
+	}
+	return raw, true, nil
+}
+
+func skipJSONSpace(data []byte, i int) int {
+	for i < len(data) && (data[i] == ' ' || data[i] == '\t' || data[i] == '\n' || data[i] == '\r') {
+		i++
+	}
+	return i
+}
+
+// jsonStringEnd returns the index just after the string that opens at i.
+func jsonStringEnd(data []byte, i int) int {
+	for i++; data[i] != '"'; i++ {
+		if data[i] == '\\' {
+			i++
+		}
+	}
+	return i + 1
+}
+
+// jsonValueEnd returns the index just after the valid value that starts at i.
+func jsonValueEnd(data []byte, i int) int {
+	switch data[i] {
+	case '"':
+		return jsonStringEnd(data, i)
+	case '{', '[':
+		depth := 0
+		for ; ; i++ {
+			switch data[i] {
+			case '"':
+				i = jsonStringEnd(data, i) - 1
+			case '{', '[':
+				depth++
+			case '}', ']':
+				depth--
+				if depth == 0 {
+					return i + 1
+				}
+			}
+		}
+	default:
+		for i < len(data) && !strings.ContainsRune(",}] \t\n\r", rune(data[i])) {
+			i++
+		}
+		return i
+	}
 }
 
 // supportedVersionList renders the accepted exact integer tokens so a version
@@ -376,13 +482,22 @@ func decodeStrictJSON(data []byte, output any) error {
 	return nil
 }
 
+// nullLiteral is the JSON token rejectExplicitNulls looks for.
+var nullLiteral = []byte("null")
+
 type nullValueError struct{ field string }
 
 func (err nullValueError) Error() string {
 	return "explicit null is not allowed; omit optional fields or provide their concrete wire type"
 }
 
+// rejectExplicitNulls runs after decodeStrictJSON accepted data, so data is one
+// valid JSON value. A JSON null is the literal token null, so a document whose
+// bytes never spell it holds no explicit null, and its second decode is skipped.
 func rejectExplicitNulls(data []byte) error {
+	if !bytes.Contains(data, nullLiteral) {
+		return nil
+	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	var value any

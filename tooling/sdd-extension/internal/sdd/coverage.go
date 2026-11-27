@@ -119,7 +119,7 @@ func BuildFeatureCoverageResult(ws *workspace.Workspace, workspaceOptions map[st
 	// A manifest or a spec that fails to parse covers nothing here; the
 	// project-scoped validate steps report the document itself.
 	manifests := featureengine.DiscoverAuthoredManifestsWith(ws, reader)
-	specs := featureengine.DiscoverSpecsWith(ws, nil, reader)
+	specs := featureengine.DiscoverSpecsWithManifests(ws, nil, reader, manifests.Manifests)
 	authored := make(map[string]bool)
 	for _, id := range featureproto.AuthoredFeatureIDs(manifests.Manifests) {
 		authored[id] = true

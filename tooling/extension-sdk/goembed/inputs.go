@@ -31,7 +31,7 @@ func Patterns(filename string, src []byte) ([]string, error) {
 	if excludedByConstraint(src) {
 		return nil, nil
 	}
-	f, err := parser.ParseFile(token.NewFileSet(), filename, src, parser.ParseComments)
+	f, err := parser.ParseFile(token.NewFileSet(), filename, src, parser.ParseComments|parser.SkipObjectResolution)
 	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", filename, err)
 	}

@@ -246,7 +246,7 @@ func loadSpecRepository(ws *workspace.Workspace, selection Selection) (*specRepo
 	// The identity tier runs first so spec discovery can tell a document that
 	// details a selected feature from one that details somebody else's.
 	selected := featureengine.SelectAuthored(scope, manifests.Manifests)
-	discovery := featureengine.DiscoverSpecs(ws, scope)
+	discovery := featureengine.DiscoverSpecsFrom(ws, scope, manifests.Manifests)
 	// Repository validation keeps the workspace-wide inputs: a duplicate spec or
 	// an unauthored feature reference must be detected against every document,
 	// not against the slice the caller happens to be looking at.

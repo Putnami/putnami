@@ -426,7 +426,7 @@ type parsedFile struct {
 
 func parseFile(filename string) *parsedFile {
 	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+	f, err := parser.ParseFile(fset, filename, nil, parser.ParseComments|parser.SkipObjectResolution)
 	if err != nil {
 		return nil
 	}

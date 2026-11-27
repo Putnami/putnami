@@ -118,6 +118,22 @@ func DiscoverSpecs(ws *workspace.Workspace, scope *Scope) SpecDiscoveryResult {
 	return discoverSpecs(ws, scope, reader, external, featureproto.SpecReaderFor)
 }
 
+// DiscoverSpecsFrom is DiscoverSpecs for a caller that already holds the
+// authored manifests DiscoverAuthoredManifests(ws) returned: the external spec
+// references are resolved against them instead of discovering and parsing
+// every manifest of the workspace a second time.
+func DiscoverSpecsFrom(ws *workspace.Workspace, scope *Scope, manifests []featureproto.ManifestSource) SpecDiscoveryResult {
+	if ws == nil {
+		return DiscoverSpecs(ws, scope)
+	}
+	reader, err := NewOSReader(ws.Root)
+	if err != nil {
+		return DiscoverSpecs(ws, scope)
+	}
+	external := func() (Reader, error) { return NewTaskReaderFrom(ws.Tree, ws.Root) }
+	return discoverSpecsFor(ws, scope, reader, external, featureproto.SpecReaderFor, manifests)
+}
+
 // DiscoverSpecsWith is DiscoverSpecs through reader. A step cached on the input
 // `git:**` passes the candidate cut (NewTaskReader), so a spec its key does
 // not hold is never read.
@@ -126,12 +142,27 @@ func DiscoverSpecsWith(ws *workspace.Workspace, scope *Scope, reader Reader) Spe
 	return discoverSpecs(ws, scope, reader, external, featureproto.SpecReaderFor)
 }
 
+// DiscoverSpecsWithManifests is DiscoverSpecsWith for a caller that already
+// holds DiscoverAuthoredManifestsWith(ws, reader).Manifests.
+func DiscoverSpecsWithManifests(ws *workspace.Workspace, scope *Scope, reader Reader,
+	manifests []featureproto.ManifestSource) SpecDiscoveryResult {
+	external := func() (Reader, error) { return reader, nil }
+	return discoverSpecsFor(ws, scope, reader, external, featureproto.SpecReaderFor, manifests)
+}
+
 // discoverSpecs reads native specs through reader and external ones through the
 // reader openExternal returns. An external file is read through the Git
 // candidate cut, because that is what the spec tasks key: a file the key does
 // not hold is never read.
 func discoverSpecs(ws *workspace.Workspace, scope *Scope, reader Reader, openExternal func() (Reader, error),
 	lookup specReaderLookup) SpecDiscoveryResult {
+	return discoverSpecsFor(ws, scope, reader, openExternal, lookup, nil)
+}
+
+// discoverSpecsFor is discoverSpecs with the authored manifests the external
+// references resolve against; nil discovers them through reader.
+func discoverSpecsFor(ws *workspace.Workspace, scope *Scope, reader Reader, openExternal func() (Reader, error),
+	lookup specReaderLookup, manifests []featureproto.ManifestSource) SpecDiscoveryResult {
 	if ws == nil {
 		return SpecDiscoveryResult{Diagnostics: []diag.Diagnostic{
 			diag.Errorf(featureproto.ErrorCodeParseError, "workspace", "workspace is required"),
@@ -200,7 +231,10 @@ func discoverSpecs(ws *workspace.Workspace, scope *Scope, reader Reader, openExt
 			})
 		}
 	}
-	external := discoverExternalSpecs(ws, scope, DiscoverAuthoredManifestsWith(ws, reader).Manifests, openExternal, lookup)
+	if manifests == nil {
+		manifests = DiscoverAuthoredManifestsWith(ws, reader).Manifests
+	}
+	external := discoverExternalSpecs(ws, scope, manifests, openExternal, lookup)
 	specs = append(specs, external.specs...)
 	diagnostics = append(diagnostics, external.diagnostics...)
 	for reference := range external.outOfScope {

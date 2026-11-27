@@ -362,7 +362,7 @@ func parseProject(projectPath string) (*token.FileSet, map[string]*ast.File, str
 
 	h := sha256.New()
 	for _, p := range paths {
-		f, err := parser.ParseFile(fset, p, nil, parser.ParseComments)
+		f, err := parser.ParseFile(fset, p, nil, parser.ParseComments|parser.SkipObjectResolution)
 		if err != nil {
 			// Bad source is the user's problem; record nothing for that
 			// file and let go build surface the real diagnostic.
