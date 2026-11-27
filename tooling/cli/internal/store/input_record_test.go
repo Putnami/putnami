@@ -147,6 +147,8 @@ var recordPatternSets = [][]string{
 	{"src/*/x.txt"},
 	{"src/[ab]/*.json"},
 	{"src/a/deep/**/*.txt", "notes.txt"},
+	{"../shared/**/*.txt"},
+	{"src/*/l*"},
 }
 
 // TestTheInputRecordServesNoFalseHit writes the tree at random between runs
@@ -166,6 +168,7 @@ func TestTheInputRecordServesNoFalseHit(t *testing.T) {
 				"src/b/y.go": "package b", "src/b/x.txt": "x", "src/a/deep/z/w.txt": "w",
 				"notes.txt": "n", "docs/readme.md": "# r", "top.go": "package top",
 			})
+			writeRecordTree(t, root, map[string]string{"shared/a/s.txt": "s"})
 			for round := range 25 {
 				record := useRecordAt(t, root)
 				cm := NewCacheManager(nil)
@@ -191,7 +194,12 @@ func TestTheInputRecordServesNoFalseHit(t *testing.T) {
 				// later time than any stat the record took.
 				time.Sleep(15 * time.Millisecond)
 				for range 1 + rng.Intn(3) {
-					mutateTree(t, rng, project)
+					// A write above the project reaches its "../" patterns.
+					if rng.Intn(4) == 0 {
+						mutateTree(t, rng, filepath.Join(root, "shared"))
+					} else {
+						mutateTree(t, rng, project)
+					}
 				}
 			}
 		})
@@ -210,7 +218,24 @@ func mutateTree(t *testing.T, rng *rand.Rand, project string) {
 		names := []string{"n.go", "n_test.go", "n.json", "n.txt", "x.txt", "readme.md", "w.txt"}
 		return fmt.Sprintf("%d%s", rng.Intn(3), names[rng.Intn(len(names))])
 	}
-	switch op := rng.Intn(10); {
+	switch op := rng.Intn(11); {
+	case op == 10: // point a link somewhere else
+		var links []string
+		_ = filepath.WalkDir(project, func(path string, d os.DirEntry, err error) error {
+			if err == nil && d.Type()&os.ModeSymlink != 0 {
+				links = append(links, path)
+			}
+			return nil
+		})
+		if len(links) > 0 {
+			link := pick(links)
+			must(t, os.Remove(link))
+			target := pick(dirs)
+			if len(files) > 0 && rng.Intn(2) == 0 {
+				target = pick(files)
+			}
+			must(t, os.Symlink(target, link))
+		}
 	case op == 0 && len(files) > 0: // remove a file
 		must(t, os.Remove(pick(files)))
 	case op == 1: // create a file

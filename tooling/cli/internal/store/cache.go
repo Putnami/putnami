@@ -308,8 +308,10 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 		recorded, recordable = recordKey(key, patterns)
 	}
 	if recordable {
-		if hash, witness, ok := recordedInputDigest(record, recorded, dir, patterns); ok {
-			cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns), witness)
+		if hash, witness, memoize, ok := recordedInputDigest(record, recorded, dir, patterns); ok {
+			if memoize {
+				cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns), witness)
+			}
 			return hash, nil
 		}
 	}
@@ -323,6 +325,9 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 
 	if witness != nil && witness.unmemoized {
 		return hash, nil
+	}
+	if witness != nil && witness.recordOnly {
+		witness = nil
 	}
 	cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns), witness)
 	return hash, nil

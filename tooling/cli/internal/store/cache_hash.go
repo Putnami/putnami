@@ -240,7 +240,7 @@ func collectPatternFilesWith(cut CandidateSource, dir string, patterns []string)
 	}
 	var facts collectionFacts
 	files, linked, listed := collectOrdinaryFiles(dir, ordinaryPatterns, excludes)
-	facts.matchedLink, facts.listed = linked, listed
+	facts.matchedLink, facts.listed, facts.unlisted = linked, listed, listed == nil && len(ordinaryPatterns) > 0
 	if len(gitPatterns) > 0 {
 		candidates, fromCut, absent, err := collectGitFilesWith(cut, dir, gitPatterns, excludes)
 		if err != nil {
@@ -261,6 +261,8 @@ type collectionFacts struct {
 	absent      []string
 	cut         *CandidateCut
 	matchedLink bool
+	// unlisted says a pattern's listing could not be named (listedGlob).
+	unlisted bool
 	// listed holds the paths an ordinary pattern's selection depends on
 	// besides the files it selected: each directory a walk or a glob
 	// listed, and each path a pattern without a glob looked up. A missing
@@ -360,6 +362,7 @@ func collectDefaultFiles(dir string) ([]fileEntry, error) {
 func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry, bool, []string) {
 	var files []fileEntry
 	var listed []string
+	unlisted := false
 	matchedLink := false
 	// throughLink reports whether a match below root, a pattern's static
 	// prefix, is a symbolic link or lies under a directory below root that is
@@ -399,12 +402,13 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry,
 		} else {
 			full := filepath.Join(dir, pattern)
 			matches, _ = filepath.Glob(full)
-			if strings.ContainsAny(filepath.Base(full), globMetacharacters) {
-				// Glob lists the directory of its last segment; a glob before
-				// it leaves the digest unrecorded (newSelectionWitness).
-				listed = append(listed, filepath.Dir(full))
+			// What Glob read, for the input record's witness: a listing that
+			// does not select what Glob selected leaves the digest
+			// unrecorded (ADR 0113 §1).
+			if seen, read := listedGlob(full); slices.Equal(seen, matches) {
+				listed = append(listed, read...)
 			} else {
-				listed = append(listed, full)
+				unlisted = true
 			}
 			// A glob before the last segment can reach a directory link
 			// whose target holds no match yet: no name says where a later
@@ -434,7 +438,56 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry,
 			}
 		}
 	}
+	if unlisted {
+		listed = nil
+	}
 	return files, matchedLink, listed
+}
+
+// listedGlob is filepath.Glob that also returns the paths it read: each
+// directory it listed and each path without a glob it looked up. Their
+// stats witness its selection in the input record (ADR 0113 §1). Its matches
+// are Glob's for every pattern Glob accepts; a caller records nothing when
+// they differ.
+func listedGlob(pattern string) (matches, read []string) {
+	if !strings.ContainsAny(pattern, globMetacharacters) {
+		read = append(read, pattern)
+		if _, err := os.Lstat(pattern); err != nil {
+			return nil, read
+		}
+		return []string{pattern}, read
+	}
+	parent, file := filepath.Split(pattern)
+	switch parent {
+	case "":
+		parent = "."
+	case string(filepath.Separator):
+	default:
+		parent = parent[:len(parent)-1]
+	}
+	parents := []string{parent}
+	if strings.ContainsAny(parent, globMetacharacters) {
+		if parent == pattern {
+			return nil, read
+		}
+		parents, read = listedGlob(parent)
+	}
+	for _, d := range parents {
+		read = append(read, d)
+		if info, err := os.Stat(d); err != nil || !info.IsDir() {
+			continue
+		}
+		entries, err := os.ReadDir(d)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if matched, err := filepath.Match(file, entry.Name()); err == nil && matched {
+				matches = append(matches, filepath.Join(d, entry.Name()))
+			}
+		}
+	}
+	return matches, read
 }
 
 // ordinaryFileEntry stats one match of an ordinary pattern, following links.
@@ -1324,12 +1377,59 @@ func witnessedHashFiles(cut CandidateSource, dir string, patterns []string, expa
 	if err != nil {
 		return "", nil, err
 	}
+	// What the input record witnesses: every file the collection selected
+	// and every path it read to select them (ADR 0113 §1). An input selector
+	// leaves none: its files come from an answer.
+	record := &recordWitness{
+		dir: collected.dir, listed: collected.facts.listed, unlisted: collected.facts.unlisted,
+		absent: collected.facts.absent,
+	}
+	if collected.facts.cut != nil {
+		record.cutWitness = collected.facts.cut.Witness
+	}
+	includes, _ := wsproto.SplitFilePatterns(patterns)
+	for _, include := range includes {
+		_, git := wsproto.GitFilePattern(include)
+		record.candidates = record.candidates || git
+		record.ordinary = record.ordinary || !git
+	}
+	for _, file := range collected.files {
+		if file.exact {
+			record = nil
+			break
+		}
+		record.selected = append(record.selected, file.path)
+	}
 	if collected.facts.matchedLink {
 		// A write where the link leads, which may lie outside the digest's
 		// region, can move it unseen: the digest is not memoized.
-		return hash, &selectionWitness{unmemoized: true}, nil
+		return hash, &selectionWitness{unmemoized: true, record: record}, nil
 	}
-	return hash, newSelectionWitness(collected.dir, patterns, collected.files, collected.facts), nil
+	witness := newSelectionWitness(collected.dir, patterns, collected.files, collected.facts)
+	if witness == nil {
+		return hash, &selectionWitness{recordOnly: true, record: record}, nil
+	}
+	witness.record = record
+	return hash, witness, nil
+}
+
+// recordWitness is what the input record keeps beside a collected digest:
+// the files it selected and the paths it read to select them (ADR 0113 §1).
+type recordWitness struct {
+	dir      string
+	selected []string
+	// listed holds each directory the collection listed and each path it
+	// looked up; unlisted says the collection could not name them.
+	listed   []string
+	unlisted bool
+	// absent holds the selected Git candidates absent from the work tree,
+	// relative to dir; cutWitness the witness of the cut they were listed
+	// from, nil when Git listed it.
+	absent     []string
+	cutWitness []string
+	// candidates and ordinary say whether a Git candidate pattern and an
+	// ordinary one select files.
+	candidates, ordinary bool
 }
 
 // collectedFiles is the directory a digest collected its files under and the

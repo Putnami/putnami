@@ -69,8 +69,14 @@ func (r *localRepo) cutWitness(cut *localCut) []string {
 	// The .git entry and the commondir file name the repository a linked
 	// worktree reads; the index moves whenever Git writes it.
 	witness := []string{
-		filepath.Join(r.root, ".git"), filepath.Join(r.gitDir, "commondir"),
+		filepath.Join(r.gitDir, "commondir"),
 		filepath.Join(r.gitDir, "index"), filepath.Join(r.commonDir, "info", "exclude"),
+	}
+	// A .git file names the repository of a linked worktree; a .git
+	// directory is witnessed by the root's listing, which the walk read,
+	// and its own stat moves with every lock Git takes in it.
+	if info, err := os.Lstat(filepath.Join(r.root, ".git")); err == nil && !info.IsDir() {
+		witness = append(witness, filepath.Join(r.root, ".git"))
 	}
 	if excludes, err := r.config.excludesFile(); err == nil && excludes != "" {
 		witness = append(witness, excludes)

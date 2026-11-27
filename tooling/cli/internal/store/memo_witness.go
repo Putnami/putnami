@@ -49,13 +49,12 @@ type selectionWitness struct {
 	// unstaged deletion is.
 	cut    string
 	absent []string
-	// listed holds the directories the collection listed and the paths it
-	// looked up besides the files it selected (collectionFacts.listed): with
-	// the selected files, what the input record witnesses (ADR 0113).
-	listed []string
-	// cutWitness holds the paths whose stats witness the cut the candidates
-	// were listed from, when the reader read it in-process (ADR 0113 §3).
-	cutWitness []string
+	// record is what the input record witnesses of the digest (ADR 0113),
+	// nil when it records nothing; recordOnly marks a witness that holds
+	// only that, for a digest the names alone do not decide, which no memo
+	// keeps under this rule.
+	record     *recordWitness
+	recordOnly bool
 	// unmemoized marks a digest no memo keeps: an ordinary pattern matched a
 	// symbolic link, whose target a write can create or change anywhere.
 	unmemoized bool
@@ -121,10 +120,8 @@ func newSelectionWitness(dir string, patterns []string, files []fileEntry, facts
 	}
 	if candidates && facts.cut != nil {
 		w.cut = cutFingerprint(*facts.cut)
-		w.cutWitness = facts.cut.Witness
 	}
 	w.absent = facts.absent
-	w.listed = facts.listed
 	for _, file := range files {
 		if file.exact || !strings.HasPrefix(file.path, dir+string(filepath.Separator)) {
 			return nil
@@ -473,56 +470,86 @@ func recordKey(key string, patterns []string) (string, bool) {
 // every part of its witness holds now, with the in-run witness of ADR 0109
 // rebuilt from the files it recorded: its value is the digest and how many of
 // the witness's first parts are the files it selected.
-func recordedInputDigest(record *fileindex.Record, key, dir string, patterns []string) (string, *selectionWitness, bool) {
+func recordedInputDigest(record *fileindex.Record, key, dir string, patterns []string) (hash string, witness *selectionWitness, memoize, ok bool) {
 	value, parts, ok := record.Answer(InputDigestTable, key, record.Hold)
 	if !ok {
-		return "", nil, false
+		return "", nil, false, false
 	}
-	hash, count, _ := strings.Cut(string(value), "\x00")
-	n, err := strconv.Atoi(count)
-	if hash == "" || err != nil || n < 0 || n > len(parts) {
-		return "", nil, false
+	fields := strings.Split(string(value), "\x00")
+	if len(fields) != 3 || fields[0] == "" {
+		return "", nil, false, false
+	}
+	n, err := strconv.Atoi(fields[1])
+	if err != nil || n < 0 || n > len(parts) {
+		return "", nil, false, false
 	}
 	files := make([]fileEntry, n)
 	for i, part := range parts[:n] {
 		files[i] = fileEntry{path: part.Path}
 	}
-	return hash, newSelectionWitness(dir, patterns, files, collectionFacts{}), true
+	return fields[0], newSelectionWitness(dir, patterns, files, collectionFacts{}), fields[2] == "memoized", true
 }
 
 // recordInputDigest offers a collected digest to the input record with its
-// witness: the stat of each file it selected, then of each directory it
-// listed and each path it looked up, a missing one by its nearest existing
-// directory (ADR 0113 §1). A digest whose selection the names alone do not
-// decide (no witness), that read through a link, or that reads Git
-// candidates is not offered; the record refuses one with a part written
-// within the margin of its clock.
+// witness (ADR 0113 §1): the lstat of each file it selected, then of each
+// path it read to select them, a missing one by its nearest existing
+// directory. A path whose last element is a link is witnessed with what it
+// leads to: a write there moves the digest, and so does a new target. A
+// digest of Git candidates adds the witness of the cut (§3) and reads a link
+// it selects as Git does, by its text. Nothing is offered for a digest with
+// no record witness (an input selector), one whose listing could not be
+// named, or one of candidates Git listed; the record refuses one with a part
+// written within the margin of its clock.
 func recordInputDigest(record *fileindex.Record, key, hash string, witness *selectionWitness) {
-	if witness == nil || witness.unmemoized {
+	if witness == nil || witness.record == nil {
 		return
 	}
-	// A digest of Git candidates alone reads each one as Git lists it, a
-	// link included, so its links take no witness of their own; any other
-	// digest reads through no link (prepare).
-	gitOnly := witness.candidates && !slices.ContainsFunc(witness.includes, func(include string) bool {
-		_, git := wsproto.GitFilePattern(include)
-		return !git
-	})
-	if witness.candidates && witness.cutWitness == nil || !gitOnly && !witness.prepare() {
+	w := witness.record
+	if w.unlisted || w.candidates && w.cutWitness == nil {
 		return
 	}
-	listed := slices.Concat(witness.listed, witness.cutWitness)
-	for _, rel := range witness.absent {
-		listed = append(listed, filepath.Join(witness.dir, filepath.FromSlash(rel)))
+	listed := slices.Concat(w.listed, w.cutWitness)
+	for _, rel := range w.absent {
+		listed = append(listed, filepath.Join(w.dir, filepath.FromSlash(rel)))
 	}
-	parts := make([]fileindex.RecordPart, 0, len(witness.selected)+len(listed))
+	// The selected files come first, each once, as the collection
+	// selected them; then every other path, once.
+	parts := make([]fileindex.RecordPart, 0, len(w.selected)+len(listed))
+	var others []fileindex.RecordPart
 	seen := make(map[string]bool, cap(parts))
-	for _, path := range witness.selected {
+	for _, path := range w.selected {
+		seen[path] = true
+	}
+	add := func(path string, st fileindex.Stat) {
+		if !seen[path] {
+			seen[path] = true
+			others = append(others, fileindex.RecordPart{Path: path, Stat: st})
+		}
+	}
+	// witnessLink adds what a link leads to; a dangling one is no witness.
+	witnessLink := func(path string) bool {
+		target, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return false
+		}
+		st, ok := fileindex.LstatAny(target)
+		add(target, st)
+		return ok
+	}
+	for _, path := range w.selected {
 		st, ok := fileindex.LstatAny(path)
-		if !ok || st.Mode&modeTypeMask != modeRegular && !(gitOnly && st.Mode&modeTypeMask == modeSymlink) {
+		if !ok {
 			return
 		}
-		seen[path] = true
+		switch st.Mode & modeTypeMask {
+		case modeRegular:
+		case modeSymlink:
+			if w.ordinary && !witnessLink(path) {
+				return
+			}
+		default:
+			return
+		}
 		parts = append(parts, fileindex.RecordPart{Path: path, Stat: st})
 	}
 	for _, path := range listed {
@@ -534,15 +561,19 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 			existing = filepath.Dir(existing)
 			st, ok = fileindex.LstatAny(existing)
 		}
-		if !ok {
+		if !ok || st.Mode&modeTypeMask == modeSymlink && !witnessLink(existing) {
 			return
 		}
-		if !seen[existing] {
-			seen[existing] = true
-			parts = append(parts, fileindex.RecordPart{Path: existing, Stat: st})
-		}
+		add(existing, st)
 	}
-	record.Put(InputDigestTable, key, []byte(hash+"\x00"+strconv.Itoa(len(witness.selected))), parts)
+	parts = append(parts, others...)
+	// The value is the digest, how many of the first parts are the files it
+	// selected, and whether the run's memo keeps it (unmemoized).
+	kept := "memoized"
+	if witness.unmemoized {
+		kept = "unmemoized"
+	}
+	record.Put(InputDigestTable, key, []byte(hash+"\x00"+strconv.Itoa(len(w.selected))+"\x00"+kept), parts)
 }
 
 // modeTypeMask and modeRegular are the file-type bits of a stat's mode and

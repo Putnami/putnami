@@ -76,6 +76,10 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "p")
 	writeRecordTree(t, project, map[string]string{"src/a.go": "a", "README.md": "r", "x.json": "{}"})
+	writeRecordTree(t, root, map[string]string{"shared/s.txt": "s"})
+	must(t, os.Symlink("README.md", filepath.Join(project, "link.md")))
+	must(t, os.MkdirAll(filepath.Join(project, "d"), 0o755))
+	must(t, os.Symlink("missing.md", filepath.Join(project, "d", "dangling.md")))
 	runGit(t, project, "init", "-q")
 	cases := []struct {
 		name     string
@@ -90,8 +94,11 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 		{"the empty pattern set (the default walk)", nil, false},
 		{"Git candidates Git listed (ADR 0113 §3: its fallback)", []string{"git:**"}, false},
 		{"an input selector (ADR 0113 §1: after its basis witness)", []string{"go:sources"}, false},
-		{"a glob before the last segment", []string{"*/a.go"}, false},
-		{"a character class", []string{"[sx]*.json"}, false},
+		{"a glob before the last segment", []string{"s*/a.go"}, true},
+		{"a character class", []string{"[sx]*.json"}, true},
+		{"a pattern above the directory", []string{"../shared/*.txt"}, true},
+		{"a link to a file", []string{"link.md"}, true},
+		{"a dangling link", []string{"d/dangling.md"}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

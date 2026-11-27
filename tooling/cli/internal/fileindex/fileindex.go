@@ -988,3 +988,14 @@ func LstatAny(path string) (Stat, bool) {
 	}
 	return statFile(info)
 }
+
+// StatAny returns the stat of what path names once its links are followed;
+// ok is false for a missing path or a dangling link, and on a platform whose
+// stat this package does not decode.
+func StatAny(path string) (Stat, bool) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return Stat{}, false
+	}
+	return statFile(info)
+}
