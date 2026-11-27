@@ -3,9 +3,12 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -98,9 +101,10 @@ func (s *machineOutputState) summary(sessionID string) protocolcli.MachineOutput
 	}
 }
 
-// sanitizedMachineRecord produces compact, terminal-safe JSON. The token walk
-// applies sanitization recursively to every current and future string value
-// while retaining the original struct/member order and exact number lexemes.
+// sanitizedMachineRecord produces compact, terminal-safe JSON. It applies
+// sanitization to every current and future string value of the record while
+// retaining the original struct/member order and exact number lexemes
+// (sanitizeMarshaledJSON).
 func sanitizedMachineRecord(record any) ([]byte, error) {
 	return sanitizedMachineJSON(record, false)
 }
@@ -114,115 +118,34 @@ func sanitizedMachineJSON(document any, indent bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-	var compact bytes.Buffer
-	if err := writeSanitizedJSONValue(decoder, &compact); err != nil {
+	compact, err := sanitizeMarshaledJSON(raw)
+	if err != nil {
 		return nil, err
 	}
 	if indent {
 		var formatted bytes.Buffer
-		if err := json.Indent(&formatted, compact.Bytes(), "", "  "); err != nil {
+		if err := json.Indent(&formatted, compact, "", "  "); err != nil {
 			return nil, err
 		}
 		return formatted.Bytes(), nil
 	}
-	return compact.Bytes(), nil
+	return compact, nil
 }
 
-func writeSanitizedJSONValue(decoder *json.Decoder, out *bytes.Buffer) error {
-	token, err := decoder.Token()
-	if err != nil {
-		return err
-	}
-	switch typed := token.(type) {
-	case json.Delim:
-		switch typed {
-		case '{':
-			out.WriteByte('{')
-			first := true
-			for decoder.More() {
-				nameToken, err := decoder.Token()
-				if err != nil {
-					return err
-				}
-				name, ok := nameToken.(string)
-				if !ok {
-					return fmt.Errorf("machine output object member is %T", nameToken)
-				}
-				if !first {
-					out.WriteByte(',')
-				}
-				first = false
-				encodedName, _ := json.Marshal(name)
-				out.Write(encodedName)
-				out.WriteByte(':')
-				if replacement, sensitive := sanitizedSensitiveMember(name); sensitive {
-					var discarded any
-					if err := decoder.Decode(&discarded); err != nil {
-						return err
-					}
-					encoded, _ := json.Marshal(replacement)
-					out.Write(encoded)
-					continue
-				}
-				if err := writeSanitizedJSONValue(decoder, out); err != nil {
-					return err
-				}
-			}
-			if _, err := decoder.Token(); err != nil {
-				return err
-			}
-			out.WriteByte('}')
-		case '[':
-			out.WriteByte('[')
-			first := true
-			for decoder.More() {
-				if !first {
-					out.WriteByte(',')
-				}
-				first = false
-				if err := writeSanitizedJSONValue(decoder, out); err != nil {
-					return err
-				}
-			}
-			if _, err := decoder.Token(); err != nil {
-				return err
-			}
-			out.WriteByte(']')
-		default:
-			return fmt.Errorf("unexpected machine output delimiter %q", typed)
-		}
-	case string:
-		encoded, _ := json.Marshal(protocolcli.SanitizeMachineOutputString(typed))
-		out.Write(encoded)
-	case json.Number:
-		out.WriteString(typed.String())
-	case bool:
-		if typed {
-			out.WriteString("true")
-		} else {
-			out.WriteString("false")
-		}
-	case nil:
-		out.WriteString("null")
-	default:
-		return fmt.Errorf("unexpected machine output token %T", token)
-	}
-	return nil
-}
-
-func sanitizedSensitiveMember(name string) (string, bool) {
-	probe := map[string]any{name: "value"}
-	sanitized, _ := protocolcli.SanitizeMachineOutputValue(probe).(map[string]any)
-	replacement, ok := sanitized[name].(string)
-	return replacement, ok && replacement != "value"
-}
-
+// sanitizedSessionRecord returns the sanitized line of record and what the
+// output budget classifies it by (machineOutputState.admit): its record kind
+// and, for a task:event, its sanitized event. A task's lifecycle and a test
+// case are classified by their kind alone, a constant sanitization leaves as
+// it is, so their line is not decoded again and the other members of the
+// returned record are left empty.
 func sanitizedSessionRecord(record protocolcli.SessionStreamRecord) ([]byte, protocolcli.SessionStreamRecord, error) {
 	line, err := sanitizedMachineRecord(record)
 	if err != nil {
 		return nil, protocolcli.SessionStreamRecord{}, err
+	}
+	switch record.Record {
+	case protocolcli.RecordTaskStart, protocolcli.RecordTaskEnd, protocolcli.RecordTestCase:
+		return line, protocolcli.SessionStreamRecord{Record: record.Record}, nil
 	}
 	var sanitized protocolcli.SessionStreamRecord
 	if err := json.Unmarshal(line, &sanitized); err != nil {
@@ -410,20 +333,30 @@ func (r *sessionRecordingRenderer) emitMissingTaskEnds(run machine.Run) {
 }
 
 // record records records as one group: it holds the lock across the group, so
-// no record another goroutine records lands between two of them.
+// no record another goroutine records lands between two of them. Records are
+// sanitized before the lock is taken: every worker records each task it ends,
+// and sanitizing under the lock would make them wait for one another.
 func (r *sessionRecordingRenderer) record(records ...protocolcli.SessionStreamRecord) {
+	type sanitizedRecord struct {
+		line       []byte
+		classified protocolcli.SessionStreamRecord
+		err        error
+	}
+	sanitized := make([]sanitizedRecord, len(records))
+	for i, record := range records {
+		sanitized[i].line, sanitized[i].classified, sanitized[i].err = sanitizedSessionRecord(record)
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, record := range records {
-		line, sanitized, err := sanitizedSessionRecord(record)
-		if err != nil {
+	for _, record := range sanitized {
+		if record.err != nil {
 			if r.writeErr == nil {
-				r.writeErr = err
+				r.writeErr = record.err
 			}
 			continue
 		}
-		r.state.admit(sanitized, int64(len(line)+1))
-		r.append(line)
+		r.state.admit(record.classified, int64(len(record.line)+1))
+		r.append(record.line)
 	}
 }
 
@@ -477,4 +410,128 @@ func machineSessionEvent(record jobs.SessionRecord, at time.Time) (protocolcli.S
 		Identity:        &identity,
 		Event:           event,
 	}, true
+}
+
+// errUnexpectedJSON reports bytes json.Marshal does not write.
+var errUnexpectedJSON = errors.New("machine output: unexpected JSON")
+
+// sanitizeMarshaledJSON applies sanitization v1 to raw, the compact output of
+// json.Marshal, in one pass over its bytes, keeping its member order and
+// number lexemes. It writes what a token walk writes when it decodes every
+// string, sanitizes it and encodes it again (the tests hold the two to the
+// same bytes). A string with no escape and valid UTF-8 encodes again as the
+// same bytes, so such a member name, and such a value sanitization leaves as
+// it is, are copied as they stand. Any other string is decoded and encoded
+// again: json.Marshal writes invalid UTF-8 as an escaped U+FFFD, which encodes
+// again as the character itself, and copies the bytes of a json.Marshaler or a
+// json.RawMessage, invalid UTF-8 included, as they are. A session record of an
+// unchanged run holds hundreds of thousands of strings, nearly all plain
+// identifiers, paths and times (protocolcli.IsPlainMachineOutputString): this
+// keeps their cost to a byte scan.
+func sanitizeMarshaledJSON(raw []byte) ([]byte, error) {
+	out := make([]byte, 0, len(raw)+16)
+	var open []byte // '{' or '[' of each container not yet closed
+	expectName := false
+	// A sensitive member's value is sanitized like any other, then replaced
+	// once it ends: redactAt is where it starts in out, redactDepth the open
+	// containers around it, redactPending set between its name and its colon.
+	redactAt, redactDepth := -1, 0
+	redactPending := false
+	var redaction string
+	for i := 0; i < len(raw); {
+		switch c := raw[i]; c {
+		case '{', '[':
+			open = append(open, c)
+			expectName = c == '{'
+			out = append(out, c)
+			i++
+			continue
+		case '}', ']':
+			if len(open) == 0 {
+				return nil, errUnexpectedJSON
+			}
+			open = open[:len(open)-1]
+			expectName = false
+			out = append(out, c)
+			i++
+		case ',':
+			if len(open) == 0 {
+				return nil, errUnexpectedJSON
+			}
+			expectName = open[len(open)-1] == '{'
+			out = append(out, c)
+			i++
+			continue
+		case ':':
+			out = append(out, c)
+			i++
+			if redactPending {
+				redactPending = false
+				redactAt, redactDepth = len(out), len(open)
+			}
+			continue
+		case '"':
+			end, escaped := i+1, false
+			for ; end < len(raw) && raw[end] != '"'; end++ {
+				if raw[end] == '\\' {
+					escaped = true
+					end++
+				}
+			}
+			if end >= len(raw) {
+				return nil, errUnexpectedJSON
+			}
+			end++
+			encoded := raw[i:end]
+			i = end
+			if expectName {
+				expectName = false
+				name := encoded[1 : len(encoded)-1]
+				if escaped || !utf8.Valid(name) {
+					var decoded string
+					if err := json.Unmarshal(encoded, &decoded); err != nil {
+						return nil, err
+					}
+					name = []byte(decoded)
+					encoded, _ = json.Marshal(decoded)
+				}
+				out = append(out, encoded...)
+				if replacement, sensitive := protocolcli.MachineOutputMemberRedaction(name); sensitive && redactAt < 0 {
+					redactPending, redaction = true, replacement
+				}
+				continue
+			}
+			if !escaped && protocolcli.IsPlainMachineOutputString(encoded[1:len(encoded)-1]) {
+				out = append(out, encoded...)
+				break
+			}
+			var text string
+			if err := json.Unmarshal(encoded, &text); err != nil {
+				return nil, err
+			}
+			if sanitized := protocolcli.SanitizeMachineOutputString(text); escaped || sanitized != text || !utf8.Valid(encoded) {
+				encoded, _ = json.Marshal(sanitized)
+			}
+			out = append(out, encoded...)
+		default:
+			end := i
+			for end < len(raw) && strings.IndexByte(",}]:", raw[end]) < 0 {
+				end++
+			}
+			if end == i {
+				return nil, errUnexpectedJSON
+			}
+			out = append(out, raw[i:end]...)
+			i = end
+		}
+		if redactAt >= 0 && len(open) == redactDepth {
+			encoded, _ := json.Marshal(redaction)
+			out = append(out[:redactAt], encoded...)
+			redactAt = -1
+		}
+	}
+	if len(open) != 0 || redactAt >= 0 || redactPending {
+		return nil, errUnexpectedJSON
+	}
+	return out, nil
 }
