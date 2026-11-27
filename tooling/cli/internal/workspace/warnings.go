@@ -3,6 +3,7 @@ package workspace
 import (
 	"io"
 	"slices"
+	"sync"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -15,8 +16,13 @@ import (
 // reads the workspace reports its warnings through a WarningReport, so the same
 // state reads the same on every surface.
 type WarningReport struct {
-	w        io.Writer
+	w io.Writer
+	// mu guards reported: a run may add a warning from a worker while it
+	// renders (Add).
+	mu       sync.Mutex
 	reported []Warning
+	// unwritten holds the warnings Keep kept and Flush has not written yet.
+	unwritten []Warning
 }
 
 // NewWarningReport returns a report that writes to w. A nil w writes nothing
@@ -43,9 +49,53 @@ func (r *WarningReport) Report(ws *Workspace) {
 	}
 }
 
+// Add writes and keeps warning, a warning the run raises after its load,
+// unless the report already holds it. A nil report does nothing.
+func (r *WarningReport) Add(warning Warning) {
+	if r == nil || !r.add(warning) {
+		return
+	}
+	if r.w != nil {
+		iox.Fprintf(r.w, "putnami: warning: %s\n", warning.Message)
+	}
+}
+
+// Keep keeps warning, unless the report already holds it, without writing
+// it: a warning raised while the run renders, which a write would tear. Its
+// result carries it at once, and Flush writes it once the run rendered. A nil
+// report does nothing.
+func (r *WarningReport) Keep(warning Warning) {
+	if r == nil || !r.add(warning) {
+		return
+	}
+	r.mu.Lock()
+	r.unwritten = append(r.unwritten, warning)
+	r.mu.Unlock()
+}
+
+// Flush writes each warning Keep kept and no Flush wrote yet. A nil report
+// does nothing.
+func (r *WarningReport) Flush() {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	unwritten := r.unwritten
+	r.unwritten = nil
+	r.mu.Unlock()
+	if r.w == nil {
+		return
+	}
+	for _, warning := range unwritten {
+		iox.Fprintf(r.w, "putnami: warning: %s\n", warning.Message)
+	}
+}
+
 // add keeps warning unless the report already holds it, and reports whether it
 // kept it.
 func (r *WarningReport) add(warning Warning) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if slices.Contains(r.reported, warning) {
 		return false
 	}
@@ -58,7 +108,9 @@ func (r *WarningReport) Warnings() []Warning {
 	if r == nil {
 		return nil
 	}
-	return r.reported
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.reported)
 }
 
 // Envelope returns every reported warning in its result envelope shape, in

@@ -84,8 +84,10 @@ type fileEntry struct {
 // dir. The segment before "**" is treated as a literal directory prefix.
 // Heavy non-project directories are skipped for performance.
 //
-// It also reports whether a match is a symbolic link.
-func globDoubleStar(dir, pattern string) ([]string, bool) {
+// It also reports whether a match is a symbolic link, and the directories
+// the walk listed, its search root first (absent when the root does not
+// exist), for the input record's witness (tooling/cli ADR 0113).
+func globDoubleStar(dir, pattern string) ([]string, bool, []string) {
 	pattern = filepath.ToSlash(pattern)
 	parts := strings.SplitN(pattern, "**", 2)
 	prefix := strings.Trim(strings.TrimSuffix(parts[0], "/"), "/")
@@ -97,6 +99,12 @@ func globDoubleStar(dir, pattern string) ([]string, bool) {
 
 	var matches []string
 	linked := false
+	listed := []string{searchRoot}
+	if _, err := os.Lstat(searchRoot); err != nil {
+		// The search root is absent: what the record witnesses is that it
+		// stays absent (missingPrefix marks it).
+		listed[0] = missingPrefix + searchRoot
+	}
 	_ = filepath.WalkDir(searchRoot, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -111,6 +119,7 @@ func globDoubleStar(dir, pattern string) ([]string, bool) {
 			case "node_modules", ".git", ".putnami", "out", "dist", "vendor":
 				return filepath.SkipDir
 			}
+			listed = append(listed, p)
 			return nil
 		}
 		rel, relErr := filepath.Rel(dir, p)
@@ -123,7 +132,7 @@ func globDoubleStar(dir, pattern string) ([]string, bool) {
 		}
 		return nil
 	})
-	return matches, linked
+	return matches, linked, listed
 }
 
 // collectFiles returns a sorted, deduplicated list of files matching
@@ -183,10 +192,12 @@ func collectFilesWith(cut CandidateSource, dir string, patterns []string, expand
 		return nil, collectionFacts{}, err
 	}
 	for _, selector := range selectors {
-		files, err = appendSelectorFiles(dir, files, expander, selector)
+		var basis wsproto.InputBasis
+		files, basis, err = appendSelectorFiles(dir, files, expander, selector)
 		if err != nil {
 			return nil, collectionFacts{}, err
 		}
+		facts.bases = append(facts.bases, basis)
 	}
 	return sortedUniqueFileEntries(files), facts, nil
 }
@@ -235,14 +246,14 @@ func collectPatternFilesWith(cut CandidateSource, dir string, patterns []string)
 		}
 	}
 	var facts collectionFacts
-	files, linked := collectOrdinaryFiles(dir, ordinaryPatterns, excludes)
-	facts.matchedLink = linked
+	files, linked, listed := collectOrdinaryFiles(dir, ordinaryPatterns, excludes)
+	facts.matchedLink, facts.listed, facts.unlisted = linked, listed, listed == nil && len(ordinaryPatterns) > 0
 	if len(gitPatterns) > 0 {
-		candidates, fromCut, absent, err := collectGitFilesWith(cut, dir, gitPatterns, excludes)
+		candidates, fromCut, absent, witness, err := collectGitFilesWith(cut, dir, gitPatterns, excludes)
 		if err != nil {
 			return nil, collectionFacts{}, err
 		}
-		files, facts.cut, facts.absent = append(files, candidates...), fromCut, absent
+		files, facts.cut, facts.absent, facts.cutWitness = append(files, candidates...), fromCut, absent, witness
 	}
 	return files, facts, nil
 }
@@ -257,6 +268,19 @@ type collectionFacts struct {
 	absent      []string
 	cut         *CandidateCut
 	matchedLink bool
+	// unlisted says a pattern's listing could not be named (listedGlob).
+	unlisted bool
+	// cutWitness holds the paths whose stats witness the listing the Git
+	// candidates came from, nil when Git listed it (ADR 0113 §3).
+	cutWitness []string
+	// bases holds the basis of each input selector's answer, relative to
+	// the collection's directory: what the extension read to list its files.
+	bases []wsproto.InputBasis
+	// listed holds the paths an ordinary pattern's selection depends on
+	// besides the files it selected: each directory a walk or a glob
+	// listed, and each path a pattern without a glob looked up. A missing
+	// one is witnessed by its nearest existing directory (ADR 0113).
+	listed []string
 }
 
 // selectorExpansionAttempts bounds how many times one selector is expanded
@@ -274,17 +298,17 @@ const selectorExpansionAttempts = 3
 // expanded again, so the files are those of a list every file of which was
 // there, never a list less the file that vanished. A file the last expansion
 // still lists and that is still gone is an invalid selection.
-func appendSelectorFiles(dir string, files []fileEntry, expander InputExpander, selector string) ([]fileEntry, error) {
+func appendSelectorFiles(dir string, files []fileEntry, expander InputExpander, selector string) ([]fileEntry, wsproto.InputBasis, error) {
 	if expander == nil {
-		return nil, fmt.Errorf("%w: no expander for selector %q", ErrInputSelector, selector)
+		return nil, wsproto.InputBasis{}, fmt.Errorf("%w: no expander for selector %q", ErrInputSelector, selector)
 	}
 	for attempt := 1; ; attempt++ {
-		listed, err := statSelectorFiles(dir, expander, selector)
+		listed, basis, err := statSelectorFiles(dir, expander, selector)
 		if err == nil {
-			return append(files, listed...), nil
+			return append(files, listed...), basis, nil
 		}
 		if attempt == selectorExpansionAttempts || !errors.Is(err, errListedFileGone) {
-			return nil, err
+			return nil, wsproto.InputBasis{}, err
 		}
 	}
 }
@@ -296,13 +320,13 @@ var errListedFileGone = errors.New("the listed file is gone")
 // statSelectorFiles expands selector in dir once and stats each file it
 // lists. A listed file that does not exist is an error errListedFileGone
 // marks.
-func statSelectorFiles(dir string, expander InputExpander, selector string) ([]fileEntry, error) {
+func statSelectorFiles(dir string, expander InputExpander, selector string) ([]fileEntry, wsproto.InputBasis, error) {
 	expansion, err := expander.ExpandInput(dir, selector)
 	if err != nil {
 		if !errors.Is(err, ErrInputSelector) {
 			err = fmt.Errorf("%w: expand %s: %w", ErrInputSelector, selector, err)
 		}
-		return nil, err
+		return nil, wsproto.InputBasis{}, err
 	}
 	files := make([]fileEntry, 0, len(expansion.Files))
 	for _, rel := range expansion.Files {
@@ -310,13 +334,13 @@ func statSelectorFiles(dir string, expander InputExpander, selector string) ([]f
 		info, err := os.Lstat(target)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				return nil, fmt.Errorf("%w: stat resolved input %s: %w (%w)", ErrInputSelector, target, err, errListedFileGone)
+				return nil, wsproto.InputBasis{}, fmt.Errorf("%w: stat resolved input %s: %w (%w)", ErrInputSelector, target, err, errListedFileGone)
 			}
-			return nil, fmt.Errorf("%w: stat resolved input %s: %w", ErrInputSelector, target, err)
+			return nil, wsproto.InputBasis{}, fmt.Errorf("%w: stat resolved input %s: %w", ErrInputSelector, target, err)
 		}
 		files = append(files, fileEntry{path: target, info: info, exact: true})
 	}
-	return files, nil
+	return files, expansion.Basis, nil
 }
 
 func collectDefaultFiles(dir string) ([]fileEntry, error) {
@@ -348,8 +372,10 @@ func collectDefaultFiles(dir string) ([]fileEntry, error) {
 // selected or not, or a file a link leads to: a write where the link leads,
 // which may lie outside the digest's region, changes what the digest reads or
 // adds a file the names of the selection do not show.
-func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry, bool) {
+func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry, bool, []string) {
 	var files []fileEntry
+	var listed []string
+	unlisted := false
 	matchedLink := false
 	// throughLink reports whether a match below root, a pattern's static
 	// prefix, is a symbolic link or lies under a directory below root that is
@@ -382,10 +408,21 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry,
 		var matches []string
 		if strings.Contains(pattern, "**") {
 			var linked bool
-			matches, linked = globDoubleStar(dir, pattern)
+			var walked []string
+			matches, linked, walked = globDoubleStar(dir, pattern)
 			matchedLink = matchedLink || linked
+			listed = append(listed, walked...)
 		} else {
-			matches, _ = filepath.Glob(filepath.Join(dir, pattern))
+			full := filepath.Join(dir, pattern)
+			matches, _ = filepath.Glob(full)
+			// What Glob read, for the input record's witness: a listing that
+			// does not select what Glob selected leaves the digest
+			// unrecorded (ADR 0113 §1).
+			if seen, read := listedGlob(full); slices.Equal(seen, matches) {
+				listed = append(listed, read...)
+			} else {
+				unlisted = true
+			}
 			// A glob before the last segment can reach a directory link
 			// whose target holds no match yet: no name says where a later
 			// write adds one.
@@ -414,7 +451,65 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry,
 			}
 		}
 	}
-	return files, matchedLink
+	if unlisted {
+		listed = nil
+	}
+	return files, matchedLink, listed
+}
+
+// missingPrefix marks, in a collection's listed paths, a path it found
+// absent when it read it: the input record witnesses that it stays absent
+// (fileindex.AbsentPart). NUL cannot occur in a path.
+const missingPrefix = "\x00missing\x00"
+
+// listedGlob is filepath.Glob that also returns the paths it read: each
+// directory it listed and each path without a glob it looked up. Their
+// stats witness its selection in the input record (ADR 0113 §1). Its matches
+// are Glob's for every pattern Glob accepts; a caller records nothing when
+// they differ.
+func listedGlob(pattern string) (matches, read []string) {
+	if !strings.ContainsAny(pattern, globMetacharacters) {
+		if _, err := os.Lstat(pattern); err != nil {
+			return nil, append(read, missingPrefix+pattern)
+		}
+		return []string{pattern}, append(read, pattern)
+	}
+	parent, file := filepath.Split(pattern)
+	switch parent {
+	case "":
+		parent = "."
+	case string(filepath.Separator):
+	default:
+		parent = parent[:len(parent)-1]
+	}
+	parents := []string{parent}
+	if strings.ContainsAny(parent, globMetacharacters) {
+		if parent == pattern {
+			return nil, read
+		}
+		parents, read = listedGlob(parent)
+	}
+	for _, d := range parents {
+		info, err := os.Stat(d)
+		if _, missing := os.Lstat(d); missing != nil {
+			read = append(read, missingPrefix+d)
+			continue
+		}
+		read = append(read, d)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		entries, err := os.ReadDir(d)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if matched, err := filepath.Match(file, entry.Name()); err == nil && matched {
+				matches = append(matches, filepath.Join(d, entry.Name()))
+			}
+		}
+	}
+	return matches, read
 }
 
 // ordinaryFileEntry stats one match of an ordinary pattern, following links.
@@ -572,31 +667,32 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 // It also returns the read of the cut it listed from, nil when it asked Git,
 // and the selected candidates the listing names that are absent from the work
 // tree, relative to dir: a write that restores one moves the digest.
-func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []string) ([]fileEntry, *CandidateCut, []string, error) {
+func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []string) ([]fileEntry, *CandidateCut, []string, []string, error) {
 	var root string
 	var paths []string
 	var index gitutil.IndexModes
+	var witness []string
 	read, fromCut := CandidateCut{}, false
 	if cut != nil && wholeCut(includes) {
 		read, fromCut = cut(dir)
 	}
 	if fromCut {
-		root, paths = dir, read.Paths
+		root, paths, witness = dir, read.Paths, read.Witness
 		index = gitutil.IndexModes{Modes: read.Modes, Unmerged: read.Unmerged}
 	} else {
 		var err error
 		root, err = gitutil.WorkTreeRoot(dir)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("resolve Git input repository: %w", err)
+			return nil, nil, nil, nil, fmt.Errorf("resolve Git input repository: %w", err)
 		}
 		prefixes := gitInputPrefixes(root, dir, includes)
-		paths, err = candidatePaths(root, prefixes...)
+		paths, witness, err = candidatePaths(root, prefixes...)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		index, err = gitutil.ReadIndexModes(root, prefixes...)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 	}
 	var files []fileEntry
@@ -604,7 +700,7 @@ func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []s
 	for _, path := range paths {
 		rel, err := filepath.Rel(dir, filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		// The includes are all "git:" patterns, which SelectsPath matches as
 		// MatchFilePattern does, less a file only a naming pattern selects.
@@ -612,7 +708,7 @@ func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []s
 			continue
 		}
 		if index.Unmerged[path] {
-			return nil, nil, nil, fmt.Errorf("git candidate %q has an unmerged index entry", path)
+			return nil, nil, nil, nil, fmt.Errorf("git candidate %q has an unmerged index entry", path)
 		}
 		full := filepath.Join(dir, rel)
 		info, err := os.Lstat(full)
@@ -621,17 +717,17 @@ func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []s
 			continue // An unstaged tracked deletion is absent from the cut.
 		}
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("git candidate %q: %w", path, err)
+			return nil, nil, nil, nil, fmt.Errorf("git candidate %q: %w", path, err)
 		}
 		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
-			return nil, nil, nil, fmt.Errorf("git candidate %q is not a regular file or symlink", path)
+			return nil, nil, nil, nil, fmt.Errorf("git candidate %q is not a regular file or symlink", path)
 		}
 		files = append(files, fileEntry{path: full, info: info, gitCandidate: true, indexMode: index.Modes[path]})
 	}
 	if fromCut {
-		return files, &read, absent, nil
+		return files, &read, absent, witness, nil
 	}
-	return files, nil, absent, nil
+	return files, nil, absent, witness, nil
 }
 
 // CandidateCut is one read of the candidate cut of a work tree's directory:
@@ -642,6 +738,9 @@ type CandidateCut struct {
 	Paths    []string
 	Modes    map[string]string
 	Unmerged map[string]bool
+	// Witness holds the absolute paths whose stats witness the listing when
+	// it was read in-process, nil when Git listed it (ADR 0113 §3).
+	Witness []string
 }
 
 // CandidateSource answers the candidate cut of dir from a read the run
@@ -662,7 +761,7 @@ func wholeCut(includes []string) bool {
 
 // candidatePaths is gitutil.CandidatePaths. It is a variable only so a test
 // can read the bound a key lists its candidates under.
-var candidatePaths = gitutil.CandidatePaths
+var candidatePaths = gitutil.CandidatePathsWitnessed
 
 // gitInputPrefixes returns, as slash paths relative to the repository root,
 // the directory or file every candidate each include pattern selects lies at
@@ -1301,12 +1400,72 @@ func witnessedHashFiles(cut CandidateSource, dir string, patterns []string, expa
 	if err != nil {
 		return "", nil, err
 	}
+	// What the input record witnesses: every file the collection selected
+	// and every path it read to select them (ADR 0113 §1). An input selector
+	// leaves none: its files come from an answer.
+	record := &recordWitness{
+		dir: collected.dir, listed: collected.facts.listed, unlisted: collected.facts.unlisted,
+		absent: collected.facts.absent,
+	}
+	// The collection may read the directory the digest is keyed by through
+	// a link; the links of both are witnessed (recordInputDigest).
+	if absolute, err := filepath.Abs(dir); err == nil {
+		record.keyDir = filepath.Clean(absolute)
+	} else {
+		record = nil
+	}
+	if record != nil {
+		record.cutWitness = collected.facts.cutWitness
+		includes, excludes := wsproto.SplitFilePatterns(patterns)
+		record.excludes = excludes
+		for _, include := range includes {
+			_, git := wsproto.GitFilePattern(include)
+			record.candidates = record.candidates || git
+			record.ordinary = record.ordinary || !git
+		}
+		record.bases = collected.facts.bases
+		for _, file := range collected.files {
+			record.selected = append(record.selected, file.path)
+		}
+	}
 	if collected.facts.matchedLink {
 		// A write where the link leads, which may lie outside the digest's
 		// region, can move it unseen: the digest is not memoized.
-		return hash, &selectionWitness{unmemoized: true}, nil
+		return hash, &selectionWitness{unmemoized: true, record: record}, nil
 	}
-	return hash, newSelectionWitness(collected.dir, patterns, collected.files, collected.facts), nil
+	witness := newSelectionWitness(collected.dir, patterns, collected.files, collected.facts)
+	if witness == nil {
+		return hash, &selectionWitness{recordOnly: true, record: record}, nil
+	}
+	witness.record = record
+	return hash, witness, nil
+}
+
+// recordWitness is what the input record keeps beside a collected digest:
+// the files it selected and the paths it read to select them (ADR 0113 §1).
+type recordWitness struct {
+	// dir is the directory the collection read; keyDir the one the digest
+	// is keyed by, the same but where a link leads elsewhere.
+	dir      string
+	keyDir   string
+	selected []string
+	// listed holds each directory the collection listed and each path it
+	// looked up; unlisted says the collection could not name them.
+	listed   []string
+	unlisted bool
+	// absent holds the selected Git candidates absent from the work tree,
+	// relative to dir; cutWitness the witness of the cut they were listed
+	// from, nil when Git listed it.
+	absent     []string
+	cutWitness []string
+	// candidates and ordinary say whether a Git candidate pattern and an
+	// ordinary one select files.
+	candidates, ordinary bool
+	// bases holds the basis of each input selector's answer.
+	bases []wsproto.InputBasis
+	// excludes are the exclusions of the patterns: a directory one excludes
+	// as a whole holds nothing the digest selects.
+	excludes []string
 }
 
 // collectedFiles is the directory a digest collected its files under and the

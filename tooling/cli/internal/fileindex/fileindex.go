@@ -978,15 +978,26 @@ var onLocalFilesystem = func(dir string) bool {
 	}
 }
 
-// StatPath returns the stat the index compares for whatever is at path, a
-// directory included, without following a final link; ok is false for a
-// missing path and on a platform whose stat this package does not decode.
-func StatPath(path string) (Stat, bool) {
+// LstatAny returns the stat of whatever is at path, a directory or a link
+// included, without following a link; ok is false for a missing path and on
+// a platform whose stat this package does not decode.
+func LstatAny(path string) (Stat, bool) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		return Stat{}, false
 	}
-	return statOf(info)
+	return statFile(info)
+}
+
+// StatAny returns the stat of what path names once its links are followed;
+// ok is false for a missing path or a dangling link, and on a platform whose
+// stat this package does not decode.
+func StatAny(path string) (Stat, bool) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return Stat{}, false
+	}
+	return statFile(info)
 }
 
 // TrustsStats reports whether a stat answers for what lies below dir: dir is

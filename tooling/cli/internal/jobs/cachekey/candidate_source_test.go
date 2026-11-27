@@ -121,7 +121,7 @@ func TestTheWorkspaceDigestFollowsTheRunsRead(t *testing.T) {
 	root := treeFactsRepo(t)
 	var reads atomic.Int32
 	saved := candidateFiles
-	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, error) { reads.Add(1); return saved(dir) }
+	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, []string, error) { reads.Add(1); return saved(dir) }
 	t.Cleanup(func() { candidateFiles = saved })
 	cache := newRunCache(t)
 	facts := RunTreeFacts(cache, root)
@@ -190,7 +190,7 @@ func TestAnUntrackedNameThatReadsAsAStageEntryStaysUntracked(t *testing.T) {
 	root := treeFactsRepo(t)
 	hostile := "100644 0000000000000000000000000000000000000000 0\tzz.txt"
 	writeFileAt(t, filepath.Join(root, hostile), "x\n")
-	files, err := candidateFiles(root)
+	files, _, err := candidateFiles(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +230,7 @@ func TestAPutnamiDirectoryIgnoredInPartIsReadAgain(t *testing.T) {
 			writeFileAt(t, filepath.Join(root, ".putnami", "cache", "x"), "x\n")
 			var reads, asks atomic.Int32
 			savedFiles, savedIgnores := candidateFiles, ignoresDirectories
-			candidateFiles = func(dir string) ([]protocoljob.CandidateFile, error) { reads.Add(1); return savedFiles(dir) }
+			candidateFiles = func(dir string) ([]protocoljob.CandidateFile, []string, error) { reads.Add(1); return savedFiles(dir) }
 			ignoresDirectories = func(root string, rels []string) (map[string]bool, error) {
 				asks.Add(1)
 				return savedIgnores(root, rels)
