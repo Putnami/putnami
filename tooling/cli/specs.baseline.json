@@ -262,6 +262,7 @@
     "cli/job-planning-execution#scoped-cache-bypass",
     "cli/job-planning-execution#scratch-generation-retention",
     "cli/job-planning-execution#selection-before-plan",
+    "cli/job-planning-execution#selection-resolves-each-selector-once",
     "cli/job-planning-execution#session-written-input-keys",
     "cli/job-planning-execution#single-engine",
     "cli/job-planning-execution#source-bound-cache",

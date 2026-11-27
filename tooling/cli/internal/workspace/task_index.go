@@ -62,7 +62,10 @@ type InputSelectorQuery struct {
 }
 
 // InputSelectorMatcher answers which paths an input selector reads, through
-// the extension that lists it.
+// the extension that lists it. A matcher may answer every path of a query from
+// its first resolution (tooling/cli ADR 0125), so it, and the task index that
+// holds it, lives as long as one selection: a later write in the work tree is
+// not seen by it.
 type InputSelectorMatcher interface {
 	// SelectsInput reports whether the selector reads rel, a slash path
 	// relative to the query's directory: a file its expansion lists, or a path
