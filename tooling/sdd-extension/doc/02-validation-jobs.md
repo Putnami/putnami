@@ -7,13 +7,17 @@ contract.
 
 | Command | Activation | Steps | Cached |
 |---|---|---|---|
-| `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents, verdict policies also on the listing of the candidate cut; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The agent attribution is keyed on the squash message and `putnami.workspace.json`. The breaking marker and the feature-coverage ratchet are never cached |
+| `validate` | project-scoped, on `putnami.features.json`, `features/*.json` or `specs/*.json` | `specs-validate` | yes: on its documents |
+| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate`, `features-validate` | yes: architecture, ratchet and verdict policies on their documents, verdict policies also on the listing of the candidate cut; decisions, recipes, CODEOWNERS, docs links, feature coverage and features on the Git candidate cut. The agent attribution is keyed on the squash message and `putnami.workspace.json`. The breaking marker and the feature-coverage ratchet are never cached |
 
 Two commands rather than one, because one command carries one activation and
-these two have different subjects. A project's features and specs are a
-per-project question; the architecture graph is a property of the whole
-workspace and answering it 82 times would be 82 identical answers.
+these two have different subjects. A project's specs are a per-project
+question; the architecture graph is a property of the whole workspace and
+answering it 82 times would be 82 identical answers. A project's features are
+a per-project question too, but their read set is the whole workspace, so one
+`features-validate` task answers it for every project and states its findings
+as evidence fragments the CLI judges per selected project
+([ADR 0006](adr/0006-feature-validation-runs-once-and-states-its-findings.md)).
 
 That split is scheduling reality, not a user-facing concept — nobody thinks
 "validate my work, per activation model". So `validate` declares
@@ -32,18 +36,23 @@ putnami lint,test,build,validate --impacted --enforce-coverage
 
 ## What each step checks
 
-- **`features-validate`** — discovers `putnami.features.json` at the workspace
+- **`features-validate`** — runs once, as a step of `validate-workspace`, and
+  evaluates every project `validate` activates on as that project's own task
+  did. Each evaluation discovers `putnami.features.json` at the workspace
   root and exact project roots, loads the separate evidence artifacts and
   Capability Manifests, coalesces identical dependency copies by semantic owner,
-  and reports sorted diagnostics. Missing, stale, contradicted, and unclassified
-  evidence are assessment *warnings*; malformed documents, conflicting copies,
-  and broken or ambiguous contribution references *fail*. A feature may list
+  and reports sorted diagnostics, which the step states as finding fragments
+  (see [Findings are evidence fragments](#findings-are-evidence-fragments)).
+  Missing, stale, contradicted, and unclassified evidence are assessment
+  *warnings*; malformed documents, conflicting copies, and broken or ambiguous
+  contribution references are *errors*, which fail a run that selects the
+  project owning the file they name. A feature may list
   the command paths that carry it under `surface`. The step
   resolves each name against the `putnami.extension.json` at the same project
   root as the declaring manifest: a command key that is not internal, the path
   of a command-group subcommand, or a verb name. It reads only
   those members, so a field a newer extension protocol adds does not fail it.
-  A name that file does not serve fails as `features.unresolved_surface`. A
+  A name that file does not serve is the error `features.unresolved_surface`. A
   project root without an extension manifest is not resolved, and no other
   extension, lock or installed state is read. `putnami features validate`
   resolves the same way; `features inspect` and `features list` report the
@@ -708,10 +717,18 @@ and re-keys the task.
 
 ```json
 "inputs": {
+  "workspaceCandidateFiles": { "from": "runtime" },
   "repository": { "from": "workspace", "files": ["git:**"] },
   "manifest": { "from": "project", "files": ["putnami.features.json", "features/*.json"] }
 }
 ```
+
+The task is workspace-once, so its project is rooted at the workspace root.
+The project port names the root's own manifest only so that the project side
+of the key is not empty: the CLI keys an empty project side on every file under
+the project root, ignored build output included. The key on the whole cut is
+an interim: the collector of ADR 0006 of `protocols/evidence` keys each check
+on the files it reads.
 
 The extension manifest that resolves a surface is a file of the cut, so
 `git:**` already holds it. A `putnami.extension.json` that git ignores is
@@ -738,22 +755,58 @@ holds that cut:
   is read at the tree base version `0.0.0`, the version the CLI gives a task
   the cache can serve (ADR 0060 of the CLI) and every build stamp records, so
   no Git tag and no missing commit changes a verdict the key cannot see.
-- The report names the worktree and no commit, and its selection names no
-  baseline ref, so a replayed entry is true of the run that replays it.
+- Nothing the task writes names a commit or a baseline ref, so a replayed
+  entry is true of the run that replays it.
 
 Two runs on one tree therefore share one entry, whatever the commit, the ref
-or the checkout. The cut is a workspace port, so one digest of it serves every
-project's key in a run. The project port names the project's own manifest
-only so that the project side of the key is not empty: the CLI keys an empty
-project side on every file under the project root, ignored build output
-included. Outside a Git work tree the task reads the disk, and the `git:` input
-has no key, so it runs every time.
+or the checkout. Outside a Git work tree the task reads the disk, and the `git:`
+input has no key, so it runs every time.
 
-The `specs` step does not depend on this one. A step's key holds the key of
-every step it depends on, so an edge to a task keyed on the whole cut would
-move every project's `specs-validate` key on any edit anywhere in the
+The `specs` step of `validate` does not depend on this one. A step's key holds
+the key of every step it depends on, so an edge to a task keyed on the whole
+cut would move every project's `specs-validate` key on any edit anywhere in the
 repository. `specs-validate` reads the feature manifests itself and reports one
-that fails to parse, so the two steps run side by side.
+that fails to parse.
+
+#### Findings are evidence fragments
+
+The task validates each project `validate` activates on: a project whose root
+holds `putnami.features.json`, a `features/*.json` or a `specs/*.json` document
+in the candidate cut, and whose resolved extensions or dependencies name this
+extension. It evaluates each one as a selection of that one project, as the
+project's own task did. The evaluations run in parallel, on the CPUs the
+scheduler grants the job, and share one reader of the cut that answers each
+read once and one strict parse of each authored document; the answers merge in
+project order, so the bytes do not depend on how many run at once.
+
+It states every diagnostic of every evaluation as a `finding` fragment of
+source format `putnami-sdd` in `putnami-evidence.jsonl`, a required file of its
+command output that it writes on every run, empty when nothing is found. The
+rule is the diagnostic code; the severity and the message are the diagnostic's
+own. The subject path is the workspace-relative file the diagnostic names, and
+the member after `#` is the symbol. Equal fragments are one. A diagnostic that
+names no file is placed at the file it is about: the `featureAuthority` warning
+at the project's `putnami.json`, the workspace view and the revision at
+`putnami.workspace.json`, any other at the `putnami.features.json` of the
+project whose evaluation reported it.
+
+The task publishes no diagnostic and succeeds whatever the findings say. It
+declares `selection: none`: the CLI hands it no selection and keys it on no
+selected project, so it writes the same file under every selection and one
+cache entry serves `--all`, `--impacted` and `--projects`. After the session,
+the CLI fails the run once per selected project with an error finding in its
+files, as `<project>:evidence~verdict`, counts a finding in a file no project
+owns under every selection, prints on stderr one line per counted project and
+rule with the count of its warnings, and records each warning in the session
+(ADR 0134 of the CLI).
+
+A finding counts for the project that owns the file it names. Some checks of
+one project's evaluation name another project's file: a manifest of any
+project that does not parse, the later declaration of a feature id declared
+twice, a record followed across a project boundary, and the first capability
+manifest a contribution finding names. A run narrowed to the first project
+does not fail on those; a run that selects the owner does
+([ADR 0006](adr/0006-feature-validation-runs-once-and-states-its-findings.md)).
 
 `putnami features validate`, the interactive command, still reads the disk,
 the version Git resolved, and the HEAD commit it reports.

@@ -11,6 +11,7 @@ import (
 	archproto "go.putnami.dev/protocol/architecture"
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
 	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
@@ -36,11 +37,14 @@ import (
 //
 // Both were green. So no test here asserts only that a healthy fixture passes:
 // each passing case also asserts the NON-ZERO count that proves the run read the
-// documents, and each of the three jobs has a seeded-violation twin that must
-// fail with the gate's exit code. A guard that refuses a partial view is
-// asserted together with the evidence that the engine underneath would have
-// answered "clean" — an unnecessary guard and a load-bearing one look identical
-// from the outside, and only the second is worth keeping.
+// documents, and each of the three jobs has a seeded-violation twin. The specs
+// and architecture twins must fail with the gate's exit code; the features
+// twin must state its violation as an error finding and succeed, because the
+// CLI decides on the findings (features_workspace_test.go). A guard that
+// refuses a partial view is asserted together with the evidence that the
+// engine underneath would have answered "clean" — an unnecessary guard and a
+// load-bearing one look identical from the outside, and only the second is
+// worth keeping.
 
 // --- the harness ------------------------------------------------------------
 
@@ -365,19 +369,19 @@ func summaryOf(t *testing.T, data map[string]any, member string) float64 {
 // --- features-validate ------------------------------------------------------
 
 // TestFeaturesValidatePassesAndReportsWhatItRead is the healthy half of the
-// first `validate` step.
+// features step of `validate-workspace`.
 //
 // The counts are asserted to be NON-ZERO, not merely error-free. A job that
 // resolved no membership, discovered no root, and read no manifest returns
-// exactly the same status and exactly the same absence of diagnostics; the only
+// exactly the same status and exactly the same absence of findings; the only
 // thing that separates the two is that one of them says it saw a feature.
 func TestFeaturesValidatePassesAndReportsWhatItRead(t *testing.T) {
 	root := validationFixture(t, validInvoicingSpec)
-	outcome := runJob(t, runFeaturesValidate,
-		projectJobContext(root, billingMember(root), platformMember(root)))
+	ctx := featuresJobContext(root, sddMember(billingMember(root)), sddMember(platformMember(root)))
+	outcome := runJob(t, runFeaturesValidate, ctx)
 
 	if outcome.err != nil {
-		t.Fatalf("features-validate failed on a healthy project: %v", outcome.err)
+		t.Fatalf("features-validate failed on a healthy workspace: %v", outcome.err)
 	}
 	if outcome.status != "OK" {
 		t.Errorf("status = %q, want OK", outcome.status)
@@ -385,60 +389,30 @@ func TestFeaturesValidatePassesAndReportsWhatItRead(t *testing.T) {
 	if outcome.exitCode() != protocolcli.ExitSuccess {
 		t.Errorf("exit code = %d, want %d", outcome.exitCode(), protocolcli.ExitSuccess)
 	}
-	if outcome.data["valid"] != true {
-		t.Errorf("valid = %#v, want true", outcome.data["valid"])
+	if got := summaryOf(t, outcome.data, "features"); got != 2 {
+		t.Errorf("summary.features = %v, want 2; a run that read nothing also reports no error", got)
 	}
-	if got := summaryOf(t, outcome.data, "features"); got != 1 {
-		t.Errorf("summary.features = %v, want 1; a run that read nothing also reports no error", got)
+	if got := summaryOf(t, outcome.data, "requirements"); got != 2 {
+		t.Errorf("summary.requirements = %v, want 2", got)
 	}
-	if got := summaryOf(t, outcome.data, "requirements"); got != 1 {
-		t.Errorf("summary.requirements = %v, want 1", got)
+	// A passing run still states what it found. The engine's warnings are not
+	// blocking and they are not silent: they are fragments the CLI prints.
+	_, fragments := writtenFragments(t, ctx)
+	if len(fragments) == 0 {
+		t.Error("the run stated no finding; the fixture's requirements carry no evidence")
 	}
-	// A passing run still publishes what it found. The engine's warnings are not
-	// blocking and they are not silent.
-	assertReportDiagnosticsReachTheWire(t, outcome)
-	for _, event := range outcome.diagnostics() {
-		if event.Severity != nil && *event.Severity == runtimeproto.SeverityError {
-			t.Errorf("a passing run published an error diagnostic: %+v", event)
+	for _, fragment := range fragments {
+		if fragment.Severity == evidence.FindingError {
+			t.Errorf("a healthy workspace stated an error finding: %+v", fragment)
 		}
+	}
+	if len(outcome.diagnostics()) != 0 {
+		t.Errorf("the step published diagnostics:\n%s", outcome.stream)
 	}
 	// The human line the CLI prints for the task carries the same counts, so a
 	// reader of the run log sees the size of what was checked.
-	if want := "features: 1 feature(s), 1 requirement(s)"; !strings.Contains(outcome.summaryLine(), want) {
+	if want := "features: 2 project(s), 2 feature(s), 2 requirement(s)"; !strings.Contains(outcome.summaryLine(), want) {
 		t.Errorf("summary line = %q, want one containing %q", outcome.summaryLine(), want)
-	}
-}
-
-// TestFeaturesValidateFailsOnASeededViolation is what makes the test above
-// non-vacuous, and it is the gate's own contract: a broken durable manifest must
-// stop the run with a classified error, because the SDK turns that
-// classification into the process exit code.
-func TestFeaturesValidateFailsOnASeededViolation(t *testing.T) {
-	root := validationFixture(t, validInvoicingSpec)
-	// The relation now points at an identity no manifest in the workspace mints.
-	writeFixture(t, filepath.Join(root, "billing", featureproto.ManifestFilename),
-		billingManifest(`{"kind": "parent", "target": "platform/nonexistent"}`))
-
-	outcome := runJob(t, runFeaturesValidate,
-		projectJobContext(root, billingMember(root), platformMember(root)))
-
-	if outcome.err == nil {
-		t.Fatal("features-validate accepted a manifest whose relation resolves to nothing")
-	}
-	if outcome.status != "" {
-		t.Errorf("status = %q, want the empty status a failed job returns", outcome.status)
-	}
-	if outcome.exitCode() != protocolcli.ExitUsage {
-		t.Errorf("exit code = %d, want %d (contract violation)", outcome.exitCode(), protocolcli.ExitUsage)
-	}
-	// The report travels with the failure: the CLI's failure envelope carries it,
-	// and a verdict with no data tells a reader only that something broke.
-	if outcome.data["valid"] != false {
-		t.Errorf("valid = %#v, want false in the failure payload", outcome.data["valid"])
-	}
-	assertReportDiagnosticsReachTheWire(t, outcome)
-	if !hasDiagnosticEvent(outcome.diagnostics(), "features.dangling_relation") {
-		t.Errorf("diagnostic events = %+v, want the dangling-relation report", outcome.diagnostics())
 	}
 }
 
@@ -453,32 +427,31 @@ func TestFeaturesValidateFailsOnASeededViolation(t *testing.T) {
 // tooling/scaffold, and a one-project identity tier reported that real relation
 // as dangling.
 //
-// So narrowing projectValidationView's MEMBERSHIP to the job's own project — the
-// obvious "optimization", since the projection is one project anyway — turns
-// every cross-project relation in the repository into a red gate. Both sides are
-// asserted, because only the pair distinguishes "resolves" from "never checked".
+// Both sides are asserted, because only the pair distinguishes "resolves" from
+// "never checked".
 func TestFeaturesValidateResolvesRelationsAcrossTheWholeMembership(t *testing.T) {
 	root := validationFixture(t, validInvoicingSpec)
-
-	seeing := runJob(t, runFeaturesValidate,
-		projectJobContext(root, billingMember(root), platformMember(root)))
-	if seeing.err != nil {
-		t.Fatalf("a real cross-project relation was reported as broken: %v", seeing.err)
+	dangling := func(ctx *pctx.Context) bool {
+		t.Helper()
+		outcome := runJob(t, runFeaturesValidate, ctx)
+		if outcome.err != nil {
+			t.Fatalf("features-validate failed: %v", outcome.err)
+		}
+		_, fragments := writtenFragments(t, ctx)
+		for _, fragment := range fragments {
+			if fragment.Rule == featureproto.ErrorCodeDanglingRelation {
+				return true
+			}
+		}
+		return false
 	}
-	// The projection stays the job's own project: seeing the sibling must not
-	// make this task report the sibling's features under its own key.
-	if got := summaryOf(t, seeing.data, "features"); got != 1 {
-		t.Errorf("summary.features = %v, want only the job's own project's", got)
-	}
 
-	blind := runJob(t, runFeaturesValidate, projectJobContext(root, billingMember(root)))
-	if blind.err == nil {
+	if dangling(featuresJobContext(root, sddMember(billingMember(root)), sddMember(platformMember(root)))) {
+		t.Fatal("a real cross-project relation was stated as dangling")
+	}
+	if !dangling(featuresJobContext(root, sddMember(billingMember(root)))) {
 		t.Fatal("a one-project membership resolved a relation authored in another project; " +
 			"this pair no longer measures the membership tier")
-	}
-	if !hasDiagnosticEvent(blind.diagnostics(), "features.dangling_relation") {
-		t.Errorf("diagnostics = %+v, want the dangling-relation report the narrow view produces",
-			blind.diagnostics())
 	}
 }
 
@@ -977,8 +950,7 @@ func TestProjectValidationViewRefusesAContextWithNoProject(t *testing.T) {
 	}
 
 	for name, job := range map[string]cli.JobFunc{
-		"features-validate": runFeaturesValidate,
-		"specs-validate":    runSpecsValidate,
+		"specs-validate": runSpecsValidate,
 	} {
 		outcome := runJob(t, job, empty)
 		if outcome.err == nil {
@@ -991,6 +963,13 @@ func TestProjectValidationViewRefusesAContextWithNoProject(t *testing.T) {
 		if !strings.Contains(outcome.err.Error(), "no project to validate") {
 			t.Errorf("%s error = %q, want one naming the cause", name, outcome.err)
 		}
+	}
+
+	// The features step is workspace-scoped, and refuses the same context for
+	// the membership it lacks.
+	if outcome := runJob(t, runFeaturesValidate, empty); outcome.err == nil ||
+		!strings.Contains(outcome.err.Error(), "workspaceProjects") {
+		t.Fatalf("features-validate error = %v, want one naming the missing membership", outcome.err)
 	}
 
 	// Without the guard: the engine reads the same empty view and reports a clean
@@ -1207,11 +1186,6 @@ func TestReportDataRefusesAReportItCannotEncode(t *testing.T) {
 	if _, _, err := finish(map[string]any{"broken": make(chan int)}, nil); err == nil {
 		t.Error("finish accepted a report it cannot encode")
 	}
-}
-
-// hasDiagnosticEvent reports whether the stream carried a diagnostic with code.
-func hasDiagnosticEvent(events []runtimeproto.Event, code string) bool {
-	return findDiagnosticEvent(events, code) != nil
 }
 
 // findDiagnosticEvent returns the first diagnostic carrying code, or nil.

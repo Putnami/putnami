@@ -2690,6 +2690,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/spec-driven-development/adr/feature-validation-runs-once-and-states-its-findings",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/spec-driven-development/adr/the-squash-commit-keeps-the-breaking-marker",
       "methods": [
         "GET",
@@ -5840,6 +5855,21 @@
     {
       "match": "exact",
       "path": "/fr/docs/spec-driven-development/adr/every-project-carries-a-feature-a-spec-or-a-feature-authority",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/fr/docs/spec-driven-development/adr/feature-validation-runs-once-and-states-its-findings",
       "methods": [
         "GET",
         "HEAD"

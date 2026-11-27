@@ -251,8 +251,8 @@ activation:
 
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
-| `validate` | one project, activated by `putnami.features.json`, `features/*.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents, verdict policies also on the listing of the candidate cut; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The agent attribution is keyed on the squash message and `putnami.workspace.json`. The breaking marker and the feature-coverage ratchet are never cached |
+| `validate` | one project, activated by `putnami.features.json`, `features/*.json` or `specs/*.json` | `specs-validate` | yes: on its documents |
+| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate`, `features-validate` | yes: architecture, ratchet and verdict policies on their documents, verdict policies also on the listing of the candidate cut; decisions, recipes, CODEOWNERS, docs links, feature coverage and features on the Git candidate cut. The agent attribution is keyed on the squash message and `putnami.workspace.json`. The breaking marker and the feature-coverage ratchet are never cached |
 
 Both are in the canonical gate:
 
@@ -313,19 +313,26 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   configuration, where `feature-coverage-validate` reads each
   `featureAuthority`. Outside a Git work tree the steps read the disk, and the
   `git:` input has no key, so they run every time.
-- `features-validate` reads the same Git candidate cut: the feature manifests
-  and evidence at every root, the capability manifests evidence reaches, and
-  every file a source binding hashes. A binding records each bound file's bytes
-  or link text and its executable bit, and the `git:` key holds the bit too
-  (ADR 0063 of the CLI). A submodule or an unmerged path produces no key, so the
+- `features-validate` runs once, as a step of `validate-workspace`, and
+  validates every project `validate` activates on, each as its own task did
+  before. It reads the same Git candidate cut: the feature manifests and
+  evidence at every root, the capability manifests evidence reaches, and every
+  file a source binding hashes. A binding records each bound file's bytes or
+  link text and its executable bit, and the `git:` key holds the bit too (ADR
+  0063 of the CLI). A submodule or an unmerged path produces no key, so the
   task then runs uncached rather than replay a verdict about another commit.
   Every project is read at the tree base version `0.0.0`, the version the CLI
-  gives a task the cache can serve (ADR 0060 of the CLI), and the report names
-  no commit and no baseline ref. Two runs on one tree share one entry, whatever
-  the commit, the ref or the checkout. The cut is a workspace port, so one
-  digest serves every project's key; a project port naming
-  `putnami.features.json` and `features/*.json` keeps the project side off
-  ignored build output.
+  gives a task the cache can serve (ADR 0060 of the CLI), and nothing it
+  writes names a commit or a baseline ref. Two runs on one tree share one
+  entry, whatever the commit, the ref or the checkout. The key on the whole cut
+  is an interim, until the collector of ADR 0006 of `protocols/evidence` keys
+  each check on the files it reads. The task states each finding as an
+  evidence fragment in `putnami-evidence.jsonl`, located at the file it names,
+  and succeeds whatever they say: the CLI fails a run on the error findings of
+  the projects it selected, and prints their warnings. It declares
+  `selection: none`, so the CLI keys it on no selected project and one entry
+  serves every selection
+  ([ADR 0006](doc/adr/0006-feature-validation-runs-once-and-states-its-findings.md)).
 - `breaking-marker-validate` is never cached. It compares the proposed squash
   message in `PUTNAMI_PROPOSAL_MESSAGE` with the commits since the run's
   impacted baseline, and the candidate cut holds neither the variable nor the

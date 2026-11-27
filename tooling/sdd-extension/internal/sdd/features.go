@@ -244,9 +244,11 @@ func BuildFeatureValidationResult(ws *workspace.Workspace, selection Selection) 
 // build stamp records for a capability package.
 const treeBaseVersion = "0.0.0"
 
-// BuildFeatureTaskValidationResult is BuildFeatureValidationResult for the
-// cached `validate` step, whose key is the input `git:**`. Its verdict is a
-// function of the candidate cut that key holds, and of nothing else:
+// BuildFeatureTaskValidationResult is BuildFeatureValidationResult for a
+// cached task whose key is the input `git:**`. The features step of
+// `validate-workspace` runs the same evaluation once per project
+// (BuildFeatureFindingsResult). Its verdict is a function of the candidate cut
+// that key holds, and of nothing else:
 //
 //   - It reads the cut (features.NewTaskReader): an ignored file is absent,
 //     and a source binding records what the key holds, the executable bit
@@ -270,7 +272,15 @@ func BuildFeatureTaskValidationResult(ws *workspace.Workspace, selection Selecti
 	if err != nil {
 		return FeatureValidationReport{}, fmt.Errorf("features validate: %w", err)
 	}
-	ws = atTreeBaseVersion(ws)
+	result, revision := evaluateFeatureTask(atTreeBaseVersion(ws), reader, nil, selection)
+	return featureValidationResult(selection, result, revision)
+}
+
+// evaluateFeatureTask is the evaluation BuildFeatureTaskValidationResult
+// reports, over a view already at the tree base version and a reader of the
+// candidate cut. documents, when set, is shared by the evaluations of one
+// tree.
+func evaluateFeatureTask(ws *workspace.Workspace, reader featureengine.Reader, documents *featureengine.DocumentCache, selection Selection) (featureengine.Result, featureengine.Revision) {
 	revision := featureengine.Revision{Kind: featureengine.RevisionKindWorktree}
 	result := featureengine.Aggregate(featureengine.Request{
 		Workspace:       ws,
@@ -278,8 +288,9 @@ func BuildFeatureTaskValidationResult(ws *workspace.Workspace, selection Selecti
 		Revision:        revision,
 		Scope:           selectedScope(ws, selection),
 		ResolveSurfaces: true,
+		Documents:       documents,
 	})
-	return featureValidationResult(selection, result, revision)
+	return result, revision
 }
 
 // atTreeBaseVersion returns a view of ws in which every project carries the
