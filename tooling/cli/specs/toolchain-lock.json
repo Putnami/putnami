@@ -18,7 +18,7 @@
     {
       "id": "extensions-answer-pins",
       "text": [
-        "putnami install, putnami init, putnami projects create and the implicit install send, before any workspace-install, one toolchain-resolve request to each installed extension whose manifest lists runtime.resolves.",
+        "putnami install, putnami init, putnami projects create and the implicit install send, before any workspace-install, one toolchain-resolve request to each installed extension whose manifest lists runtime.resolves, except one the implicit install keeps the pins of.",
         "The request names those identities, the lock's committed entries for them, the host platform and whether the run is offline.",
         "The CLI validates each answer with the workspace protocol's rules before it uses it."
       ]
@@ -34,6 +34,7 @@
       "id": "implicit-install-fills-missing-pins",
       "text": [
         "The implicit install a command runs first keeps a committed format 5 pin as committed, takes the answer for every other identity it asks for, and removes no pin.",
+        "It asks no extension whose every identity holds such a pin and no asked extension resolves, and takes the committed pins as its answer.",
         "When no pin changes, it writes nothing."
       ]
     },

@@ -48,7 +48,8 @@
         "verification": {
           "kind": "acceptance",
           "checks": [
-            "the-implicit-install-keeps-a-committed-pin-and-fills-a-missing-one"
+            "the-implicit-install-keeps-a-committed-pin-and-fills-a-missing-one",
+            "the-implicit-install-asks-no-extension-whose-pins-are-committed"
           ]
         }
       },

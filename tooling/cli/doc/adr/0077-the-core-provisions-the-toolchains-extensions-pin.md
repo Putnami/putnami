@@ -38,7 +38,12 @@ A runtime toolchain candidate may come from `provisioned`, under CLI contract
    the workspace probe's transport and timeout. The request carries the lock's
    committed entries for those identities, the host platform, and whether the
    run is offline. The core names no language, release index or declaration
-   file.
+   file. The implicit install asks no extension whose every identity the lock
+   already pins at format 5, when no asked extension resolves one of those
+   identities: decision 2 keeps those pins whatever it answers, so the
+   committed pins stand for its answer and its runtime is not started for
+   them (2026-11-27; on a fresh clone of this repository with an empty Go
+   build cache, about 10 s of a 135 to 150 s first command).
 2. **The answers become the lock's toolchains.** An explicit command writes
    exactly the answered pins: an identity the answer omits, or that no
    installed extension answers for, is removed. The implicit install keeps a
