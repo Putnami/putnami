@@ -61,6 +61,17 @@ digest. An already clean tree keeps the same digest and its status can be reused
 on the next lint; a pass that changed keyed sources is marked non-restorable,
 so every worktree still applies its own edits.
 
+### The key covers the dependencies
+
+Both tools type-check a project against its workspace dependencies, and
+`staticcheck` carries facts such as a deprecation across packages, so editing a
+dependency's API can change a dependent's findings. The three lint tasks
+therefore key on the non-test `.go` files, `go.mod` and `go.sum` of every
+project in the dependency closure, `.gen` excluded, as well as on their own
+sources. A dependency's test file does not re-run its dependents' lint; any
+other Go edit re-runs the lint of every project that depends on it. Embedded
+files of a dependency stay out of the key: they move no type.
+
 ## GolangCI-Lint batching
 
 When the scheduler has several compatible `golangci-lint` jobs ready at the same

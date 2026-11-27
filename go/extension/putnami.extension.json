@@ -1318,6 +1318,7 @@
         "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "dependencies": { "from": "closure", "files": ["**/*.go", "!**/*_test.go", "!**/.gen/**", "go.mod", "go.sum"] },
         "config": { "from": "project", "files": [".golangci.yml", ".golangci.yaml"] },
         "fix": { "from": "params" },
         "new": { "from": "params" },
@@ -1364,6 +1365,7 @@
         "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "dependencies": { "from": "closure", "files": ["**/*.go", "!**/*_test.go", "!**/.gen/**", "go.mod", "go.sum"] },
         "config": { "from": "project", "files": [".golangci.yml", ".golangci.yaml"] },
         "fix": { "from": "params" },
         "new": { "from": "params" },
@@ -1458,6 +1460,7 @@
         "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "dependencies": { "from": "closure", "files": ["**/*.go", "!**/*_test.go", "!**/.gen/**", "go.mod", "go.sum"] },
         "extensionVersion": { "from": "runtime" }
       },
       "outputs": {

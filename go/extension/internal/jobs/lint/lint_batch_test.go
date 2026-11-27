@@ -540,6 +540,7 @@ func TestManifestStaticcheckBatchKeepsPerProjectCacheIdentity(t *testing.T) {
 		"sources":          "project",
 		"modules":          "project",
 		"workspaceModules": "workspace",
+		"dependencies":     "closure",
 		"extensionVersion": "runtime",
 	}
 	if len(task.Inputs) != len(wantInputs) {
