@@ -590,7 +590,13 @@ App.Run took the dispatch, so what it holds carries the stat of each
 extension manifest and root its discovery read, taken as it read them. The
 decision refuses a request once one of those or of the held dispatch moved;
 one that moved after the decision withdraws everything the held run offers
-the run. A run that discovered a local-source extension outside the
+the run. So does anything the decision witnessed that moved after it, which a
+re-check finds at a sync point before App.Run takes the dispatch, before an
+engine run takes what the held run computed, and before the scheduler answers
+a plan: a first-use bootstrap or a before-hook that wrote the worktree leaves
+the run nothing of the held run, its plans' records included, since a record
+matches a plan by its jobs alone. A run that discovered a local-source
+extension outside the
 workspace's own path extensions whose runtime is prepared from its inputs is
 not held: that runtime's digest reads inputs no witness covers. It opens no
 file index, input record or

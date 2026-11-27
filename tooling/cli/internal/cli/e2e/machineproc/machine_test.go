@@ -580,6 +580,80 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 	}
 }
 
+// TestABeforeHookThatWritesTheWorktreeWithdrawsTheHeldRun pins the re-check
+// after the decision (CLI ADR 0116 §6a): a before-hook that writes a file of
+// the worktree after the worker decided a request answerable withdraws
+// everything the held run offers, so neither the engine nor the scheduler
+// answers the run from it, and the run gives what a run in its own process
+// gives. The hook writes only once a file outside the worktree, which no
+// witness covers, exists, so the request stays the held one.
+func TestABeforeHookThatWritesTheWorktreeWithdrawsTheHeldRun(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("a run is answered from memory only where the platform has a watcher")
+	}
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	root := clitest.WritingCountsFixture(t, 2)
+	trigger := filepath.Join(t.TempDir(), "write")
+	configPath := filepath.Join(root, "putnami.workspace.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hook, err := json.Marshal(fmt.Sprintf(`if [ -f %q ]; then printf 'p000 written by a hook\n' > apps/p000/src.txt; fi`, trigger))
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, found := strings.CutPrefix(string(data), "{")
+	if !found {
+		t.Fatalf("the workspace configuration %q is no object", data)
+	}
+	clitest.WriteFile(t, configPath, `{"hooks":{"cli":{"before":[`+string(hook)+`]}},`+config)
+	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\n")
+	clitest.RunGit(t, root, "add", "-A")
+	clitest.RunGit(t, root, "commit", "-m", "a before-hook")
+	args := []string{"lint,test,build", "--all"}
+	local := func(step string) []string {
+		t.Helper()
+		t.Setenv(machineproc.Env, "off")
+		forgetProcessMemos()
+		if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
+			t.Fatalf("%s: exit %d in its own process\n%s", step, code, out)
+		}
+		return latestTasks(t, root)
+	}
+	served := func(step string) ([]string, *machineproc.MemoryDecision) {
+		t.Helper()
+		t.Setenv(machineproc.Env, "on")
+		forgetProcessMemos()
+		if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
+			t.Fatalf("%s: exit %d through the worker\n%s", step, code, out)
+		}
+		return latestTasks(t, root), awaitMemoryDecision(t, step)
+	}
+	local("the first settling run")
+	settled := time.Now().Add(fileindex.Margin)
+	local("the second settling run")
+	startSupervisor(t)
+	time.Sleep(time.Until(settled))
+	if _, d := served("the first request"); d.Kept != "kept" {
+		t.Fatalf("the first request: %+v, want it kept", d)
+	}
+	if _, d := served("the second request"); !d.Answerable || !d.Answered || d.Kept != "kept" {
+		t.Fatalf("the second request: %+v, want it answered and kept", d)
+	}
+
+	clitest.WriteFile(t, trigger, "")
+	computed, d := served("a request whose before-hook writes the worktree")
+	if !d.Answerable || d.Answered || d.PlanSkipped || !strings.Contains(d.Reason, "the worktree changed after the decision") {
+		t.Fatalf("a request whose before-hook writes the worktree: %+v, want answerable, then withdrawn after the hook's write and computed", d)
+	}
+	own := local("a run in its own process after the hook's write")
+	if got, want := strings.Join(normalize(computed), "\n"), strings.Join(normalize(own), "\n"); got != want || len(own) != 6 {
+		t.Errorf("tasks differ, or are not the 6 asked\nthrough the worker:\n%s\nin its own process:\n%s", got, want)
+	}
+}
+
 // evictServedEntry removes from the store the entry the task of the session
 // line task (latestTasks) was served from, as a collection evicts it.
 func evictServedEntry(t *testing.T, root, task string) {

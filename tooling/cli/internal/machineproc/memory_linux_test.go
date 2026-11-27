@@ -335,6 +335,55 @@ func TestAHeldDispatchIsOfferedOnlyBeforeTheRunComputedAnything(t *testing.T) {
 	}
 }
 
+// TestAWriteAfterTheDecisionWithdrawsEveryOffer pins the re-check after the
+// decision (CLI ADR 0116 §6a): once the worktree was written since the
+// decision was taken, as a first-use bootstrap or a before-hook can, the first
+// re-check, App.Run's, an engine run's or the scheduler's, withdraws
+// everything the held run offers the run, and the decision says why. A plan's
+// record matches by its jobs alone, so the scheduler checks again itself: an
+// engine run the held run did not answer re-checks nothing.
+func TestAWriteAfterTheDecisionWithdrawsEveryOffer(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	w, root := watchedTree(t, 0)
+	m := RunMemory{}
+	offer := func() runMemory {
+		return runMemory{
+			check:           &memoryCheck{},
+			offered:         []any{"answered plan"},
+			offeredRuns:     []heldEngineRun{{record: "first engine run", plan: 0}},
+			offeredDispatch: "dispatch",
+		}
+	}
+	for name, first := range map[string]func() any{
+		"App.Run's":            func() any { return TakeDispatch(root) },
+		"a version snapshot's": func() any { return m.PeekRun(root) },
+		"an engine run's":      func() any { return m.TakeRun(root) },
+		"the scheduler's":      func() any { return m.Take(root) },
+	} {
+		armMemory(t, w, root, offer())
+		write(t, filepath.Join(root, "c", "g.txt"), "written by a before-hook before "+name+" re-check")
+		if offered := first(); offered != nil {
+			t.Errorf("%s re-check after a write: offered %v, want nothing", name, offered)
+		}
+		if TakeDispatch(root) != nil || m.PeekRun(root) != nil || m.TakeRun(root) != nil || m.Take(root) != nil {
+			t.Errorf("%s re-check after a write left something offered", name)
+		}
+		memory.Lock()
+		refused := memory.run.refused
+		memory.Unlock()
+		if want := "the worktree changed after the decision: " + filepath.Join(root, "c", "g.txt"); refused != want {
+			t.Errorf("%s re-check recorded %q, want %q", name, refused, want)
+		}
+	}
+
+	// A plan of a run whose engine runs the held run did not answer is
+	// answered while nothing moved.
+	armMemory(t, w, root, runMemory{check: &memoryCheck{}, offered: []any{"answered plan"}})
+	if record := m.Take(root); record != "answered plan" {
+		t.Errorf("nothing moved: the plan was offered %v, want the held record", record)
+	}
+}
+
 // heldRecord is a record the worker holds that carries witnesses of its own,
 // as the engine's record of an engine run does.
 type heldRecord struct {

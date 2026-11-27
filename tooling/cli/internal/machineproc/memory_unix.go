@@ -151,21 +151,30 @@ type RunMemory struct{}
 
 // Take returns the record the held run left for the next plan of the run in
 // root, or nil: for a run not decided answerable, past the plans the held run
-// executed, and once a plan of the run was computed, after which the held
-// records no longer describe what the run left on disk.
+// executed, once a plan of the run was computed, after which the held records
+// no longer describe what the run left on disk, and once anything the
+// decision witnessed moved since it was taken, which withdraws everything the
+// held run offers the run (recheck). A plan's record matches by its jobs
+// alone, so it answers only a run whose world is still the decision's.
 func (RunMemory) Take(root string) any {
 	memory.Lock()
-	defer memory.Unlock()
 	r := &memory.run
 	if !r.armed || !sameRoot(r.root, root) {
+		memory.Unlock()
 		return nil
 	}
 	i := r.taken
 	r.taken++
-	if r.computed > 0 || i >= len(r.offered) {
+	if r.computed > 0 || i >= len(r.offered) || r.check == nil {
+		memory.Unlock()
 		return nil
 	}
-	return r.offered[i]
+	offered, check, w := r.offered[i], r.check, memory.watcher
+	memory.Unlock()
+	if !recheck(root, w, check) {
+		return nil
+	}
+	return offered
 }
 
 // Keep records what a plan of the run left, and whether it was answered.
@@ -253,9 +262,10 @@ func (RunMemory) Witness(path string) string { return statWitness(path) }
 
 // offerRun is TakeRun, which takes the engine run's position when take is set,
 // and PeekRun, which does not. What the held engine run computed is offered
-// only while every file its discovery read holds the stat it was read with
-// (movedRecord); one that moved withdraws everything the held run offers the
-// run, as a moved manifest of the held dispatch does.
+// only while nothing the decision witnessed moved (recheck) and every file
+// its discovery read holds the stat it was read with (movedRecord); either
+// that moved withdraws everything the held run offers the run, as a moved
+// manifest of the held dispatch does.
 func offerRun(root string, take bool) any {
 	memory.Lock()
 	r := &memory.run
@@ -275,7 +285,7 @@ func offerRun(root string, take bool) any {
 	}
 	offered, check, w := r.offeredRuns[i].record, r.check, memory.watcher
 	memory.Unlock()
-	if !stillHolds(w, check) {
+	if !recheck(root, w, check) {
 		return nil
 	}
 	if moved := movedRecord(offered); moved != "" {
@@ -328,19 +338,47 @@ func heldMoved(held *heldRun) string {
 	return ""
 }
 
-// stillHolds checks again, at a sync point, what the decision witnessed: no
-// write in the worktree since it was taken, and no witness outside it moved.
-func stillHolds(w *Watcher, check *memoryCheck) bool {
-	return w != nil && w.Sync(check.root, memorySyncTimeout) == nil &&
-		worktreeChanges(w.Since(check.root, check.seq), check.root) == "" &&
-		movedWitness(check.witness, outsideWitness(check.root)) == ""
+// movedSince checks again, at a sync point, what the decision witnessed, and
+// names what moved since it was taken: a write in the worktree, or a witness
+// outside it; "" when nothing did.
+func movedSince(w *Watcher, check *memoryCheck) string {
+	if w == nil {
+		return "the platform has no watcher"
+	}
+	if err := w.Sync(check.root, memorySyncTimeout); err != nil {
+		return "the watcher did not reach its sync point"
+	}
+	if changed := worktreeChanges(w.Since(check.root, check.seq), check.root); changed != "" {
+		return "the worktree changed after the decision: " + changed
+	}
+	if moved := movedWitness(check.witness, outsideWitness(check.root)); moved != "" {
+		return "a witness outside the worktree moved after the decision: " + moved
+	}
+	return ""
+}
+
+// recheck reports whether nothing the decision witnessed moved since it was
+// taken. When something did (a first-use bootstrap or a before-hook wrote the
+// worktree, Git moved), it withdraws everything the held run offers the run in
+// root, the engine runs, the dispatch and the plans' records alike, and
+// records why: what the run computes from then on was never the held run's
+// (CLI ADR 0116 §6a).
+func recheck(root string, w *Watcher, check *memoryCheck) bool {
+	moved := movedSince(w, check)
+	if moved == "" {
+		return true
+	}
+	withdraw(root, moved)
+	return false
 }
 
 // TakeDispatch returns what the held run's App.Run loaded before it
 // dispatched (the workspace configuration and the extensions its dispatch
 // discovered), for the App.Run of a run in root the worker decided
 // answerable, before any engine run or plan of it, once the worker checked
-// again what the decision witnessed; nil otherwise (CLI ADR 0116 §6a).
+// again what the decision witnessed; nil otherwise (CLI ADR 0116 §6a). What
+// moved since the decision withdraws everything the held run offers the run
+// (recheck).
 func TakeDispatch(root string) any {
 	memory.Lock()
 	r := &memory.run
@@ -351,7 +389,7 @@ func TakeDispatch(root string) any {
 	}
 	offered, check, w := r.offeredDispatch, r.check, memory.watcher
 	memory.Unlock()
-	if !stillHolds(w, check) {
+	if !recheck(root, w, check) {
 		return nil
 	}
 	return offered
