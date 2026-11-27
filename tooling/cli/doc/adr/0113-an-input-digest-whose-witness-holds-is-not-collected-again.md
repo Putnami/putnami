@@ -507,9 +507,12 @@ priming run, signed out): wall 16.4 s to 14.8 s, engine CPU 17.7 s to 16.1 s,
 run CPU 20.8 s to 19.5 s, keys summed 3.2 s to 3.8 s, longest ready wait
 3.4 s to 3.6 s.
 
-Declaring `--infra-down` on `test`, which its users need to request the
-teardown, makes the predicate valid on every run and brings the movement cost
-back, unless prune first checks that the movement can settle a relation.
+Prune evaluates `pruneIf` against the command line's params alone: a flag's
+manifest default is merged later, per job. Declaring `--infra-down` on `test`,
+which its users need to request the teardown, therefore leaves the predicate
+invalid on a run that does not name the flag, which still precomputes
+nothing; a run that names it, `--infra-down=false` included, makes it valid
+and pays the movement cost of the first paragraph.
 
 ## Consequences
 
