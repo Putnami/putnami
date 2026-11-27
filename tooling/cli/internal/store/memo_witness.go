@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"io/fs"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -580,7 +581,29 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 		}
 		add(path, st)
 	}
+	// A directory an exclusion excludes as a whole ("!**/.gen/**") holds
+	// nothing the digest selects, whatever it lists.
+	excludedDirectory := func(path string) bool {
+		rel, err := filepath.Rel(w.dir, path)
+		if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+			return false
+		}
+		rel = filepath.ToSlash(rel)
+		for _, exclude := range w.excludes {
+			if whole, ok := strings.CutSuffix(exclude, "/**"); ok {
+				for at := rel; at != "."; at = pathpkg.Dir(at) {
+					if wsproto.MatchFilePattern(at, whole) {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
 	for _, path := range listed {
+		if excludedDirectory(path) {
+			continue
+		}
 		// A missing path is witnessed by the nearest directory above it that
 		// exists: its listing shows the path stays missing.
 		existing := filepath.Clean(path)

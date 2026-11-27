@@ -150,6 +150,7 @@ var recordPatternSets = [][]string{
 	{"../shared/**/*.txt"},
 	{"src/*/l*"},
 	{"go:sources", "*.txt"},
+	{"**/*.go", "!**/gen/**"},
 }
 
 // TestTheInputRecordServesNoFalseHit writes the tree at random between runs
@@ -168,6 +169,7 @@ func TestTheInputRecordServesNoFalseHit(t *testing.T) {
 				"src/a/x.go": "package a", "src/a/x_test.go": "package a", "src/a/c.json": "{}",
 				"src/b/y.go": "package b", "src/b/x.txt": "x", "src/a/deep/z/w.txt": "w",
 				"notes.txt": "n", "docs/readme.md": "# r", "top.go": "package top",
+				"src/a/gen/g.go": "package gen",
 			})
 			writeRecordTree(t, root, map[string]string{"shared/a/s.txt": "s"})
 			for round := range 25 {
@@ -353,6 +355,8 @@ var gitRecordPatternSets = [][]string{
 	{"git:**"},
 	{"git:**/*.go"},
 	{"git:**", "!git:**/*.txt"},
+	{"git:a/**"},
+	{"git:**/*.go", "c/**/*.txt", "*.txt"},
 }
 
 // TestTheInputRecordServesNoFalseHitOfGitCandidates is the randomized test of

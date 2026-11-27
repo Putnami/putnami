@@ -68,9 +68,9 @@ func (r *localRepo) cutWitness(cut *localCut) []string {
 	}
 	// The .git entry and the commondir file name the repository a linked
 	// worktree reads; the index moves whenever Git writes it.
-	witness := []string{
-		filepath.Join(r.gitDir, "commondir"),
-		filepath.Join(r.gitDir, "index"), filepath.Join(r.commonDir, "info", "exclude"),
+	witness := []string{filepath.Join(r.gitDir, "index"), filepath.Join(r.commonDir, "info", "exclude")}
+	if r.linked {
+		witness = append(witness, filepath.Join(r.gitDir, "commondir"))
 	}
 	// A .git file names the repository of a linked worktree; a .git
 	// directory is witnessed by the root's listing, which the walk read,
@@ -81,7 +81,16 @@ func (r *localRepo) cutWitness(cut *localCut) []string {
 	if excludes, err := r.config.excludesFile(); err == nil && excludes != "" {
 		witness = append(witness, excludes)
 	}
-	witness = append(witness, cached.files...)
+	// A configuration file that does not exist is not read; Git reads one
+	// under the git directory only where the configuration names it, so its
+	// absence there is witnessed by the configuration, not by the git
+	// directory's stat, which every lock Git takes moves.
+	for _, file := range cached.files {
+		if _, err := os.Lstat(file); err != nil && (strings.HasPrefix(file, r.gitDir+string(filepath.Separator)) || strings.HasPrefix(file, r.commonDir+string(filepath.Separator))) {
+			continue
+		}
+		witness = append(witness, file)
+	}
 	for _, dir := range cut.Directories {
 		witness = append(witness, filepath.Join(r.root, filepath.FromSlash(dir)))
 	}

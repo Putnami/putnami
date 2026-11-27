@@ -244,11 +244,11 @@ func collectPatternFilesWith(cut CandidateSource, dir string, patterns []string)
 	files, linked, listed := collectOrdinaryFiles(dir, ordinaryPatterns, excludes)
 	facts.matchedLink, facts.listed, facts.unlisted = linked, listed, listed == nil && len(ordinaryPatterns) > 0
 	if len(gitPatterns) > 0 {
-		candidates, fromCut, absent, err := collectGitFilesWith(cut, dir, gitPatterns, excludes)
+		candidates, fromCut, absent, witness, err := collectGitFilesWith(cut, dir, gitPatterns, excludes)
 		if err != nil {
 			return nil, collectionFacts{}, err
 		}
-		files, facts.cut, facts.absent = append(files, candidates...), fromCut, absent
+		files, facts.cut, facts.absent, facts.cutWitness = append(files, candidates...), fromCut, absent, witness
 	}
 	return files, facts, nil
 }
@@ -265,6 +265,9 @@ type collectionFacts struct {
 	matchedLink bool
 	// unlisted says a pattern's listing could not be named (listedGlob).
 	unlisted bool
+	// cutWitness holds the paths whose stats witness the listing the Git
+	// candidates came from, nil when Git listed it (ADR 0113 §3).
+	cutWitness []string
 	// bases holds the basis of each input selector's answer, relative to
 	// the collection's directory: what the extension read to list its files.
 	bases []wsproto.InputBasis
@@ -650,31 +653,32 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 // It also returns the read of the cut it listed from, nil when it asked Git,
 // and the selected candidates the listing names that are absent from the work
 // tree, relative to dir: a write that restores one moves the digest.
-func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []string) ([]fileEntry, *CandidateCut, []string, error) {
+func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []string) ([]fileEntry, *CandidateCut, []string, []string, error) {
 	var root string
 	var paths []string
 	var index gitutil.IndexModes
+	var witness []string
 	read, fromCut := CandidateCut{}, false
 	if cut != nil && wholeCut(includes) {
 		read, fromCut = cut(dir)
 	}
 	if fromCut {
-		root, paths = dir, read.Paths
+		root, paths, witness = dir, read.Paths, read.Witness
 		index = gitutil.IndexModes{Modes: read.Modes, Unmerged: read.Unmerged}
 	} else {
 		var err error
 		root, err = gitutil.WorkTreeRoot(dir)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("resolve Git input repository: %w", err)
+			return nil, nil, nil, nil, fmt.Errorf("resolve Git input repository: %w", err)
 		}
 		prefixes := gitInputPrefixes(root, dir, includes)
-		paths, err = candidatePaths(root, prefixes...)
+		paths, witness, err = candidatePaths(root, prefixes...)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		index, err = gitutil.ReadIndexModes(root, prefixes...)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 	}
 	var files []fileEntry
@@ -682,7 +686,7 @@ func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []s
 	for _, path := range paths {
 		rel, err := filepath.Rel(dir, filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		// The includes are all "git:" patterns, which SelectsPath matches as
 		// MatchFilePattern does, less a file only a naming pattern selects.
@@ -690,7 +694,7 @@ func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []s
 			continue
 		}
 		if index.Unmerged[path] {
-			return nil, nil, nil, fmt.Errorf("git candidate %q has an unmerged index entry", path)
+			return nil, nil, nil, nil, fmt.Errorf("git candidate %q has an unmerged index entry", path)
 		}
 		full := filepath.Join(dir, rel)
 		info, err := os.Lstat(full)
@@ -699,17 +703,17 @@ func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []s
 			continue // An unstaged tracked deletion is absent from the cut.
 		}
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("git candidate %q: %w", path, err)
+			return nil, nil, nil, nil, fmt.Errorf("git candidate %q: %w", path, err)
 		}
 		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
-			return nil, nil, nil, fmt.Errorf("git candidate %q is not a regular file or symlink", path)
+			return nil, nil, nil, nil, fmt.Errorf("git candidate %q is not a regular file or symlink", path)
 		}
 		files = append(files, fileEntry{path: full, info: info, gitCandidate: true, indexMode: index.Modes[path]})
 	}
 	if fromCut {
-		return files, &read, absent, nil
+		return files, &read, absent, witness, nil
 	}
-	return files, nil, absent, nil
+	return files, nil, absent, witness, nil
 }
 
 // CandidateCut is one read of the candidate cut of a work tree's directory:
@@ -743,7 +747,7 @@ func wholeCut(includes []string) bool {
 
 // candidatePaths is gitutil.CandidatePaths. It is a variable only so a test
 // can read the bound a key lists its candidates under.
-var candidatePaths = gitutil.CandidatePaths
+var candidatePaths = gitutil.CandidatePathsWitnessed
 
 // gitInputPrefixes returns, as slash paths relative to the repository root,
 // the directory or file every candidate each include pattern selects lies at
@@ -1389,10 +1393,9 @@ func witnessedHashFiles(cut CandidateSource, dir string, patterns []string, expa
 		dir: collected.dir, listed: collected.facts.listed, unlisted: collected.facts.unlisted,
 		absent: collected.facts.absent,
 	}
-	if collected.facts.cut != nil {
-		record.cutWitness = collected.facts.cut.Witness
-	}
-	includes, _ := wsproto.SplitFilePatterns(patterns)
+	record.cutWitness = collected.facts.cutWitness
+	includes, excludes := wsproto.SplitFilePatterns(patterns)
+	record.excludes = excludes
 	for _, include := range includes {
 		_, git := wsproto.GitFilePattern(include)
 		record.candidates = record.candidates || git
@@ -1434,6 +1437,9 @@ type recordWitness struct {
 	candidates, ordinary bool
 	// bases holds the basis of each input selector's answer.
 	bases []wsproto.InputBasis
+	// excludes are the exclusions of the patterns: a directory one excludes
+	// as a whole holds nothing the digest selects.
+	excludes []string
 }
 
 // collectedFiles is the directory a digest collected its files under and the
