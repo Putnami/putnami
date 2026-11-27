@@ -1350,6 +1350,7 @@ func TestThePortConfigKeysTheImageThroughTheCompileStep(t *testing.T) {
 // does not read moves its key for nothing. The lint tasks declare none: the
 // skip guard reads the files their key holds (doc/adr/0014). build-tsc reads
 // its outputs' tracked and unignored paths from the candidate cut (doc/adr/0015).
+// build-emit lists its own project's files from the same cut (doc/adr/0016).
 // validate-api keeps the release
 // baseline of tooling/cli ADR 0062: releaseBaselineFiles adds nothing to a
 // key, and candidateFiles adds the working tree's candidate cut.
@@ -1361,6 +1362,7 @@ func TestTasksDeclareTheTreeFactsTheyRead(t *testing.T) {
 		proto.RuntimeInputWorkspaceCandidateFiles: true,
 	}
 	want := map[string][]string{
+		"build-emit":   {proto.RuntimeInputCandidateFiles},
 		"build-tsc":    {proto.RuntimeInputCandidateFiles},
 		"lint-docs":    {proto.RuntimeInputWorkspaceCandidateFiles},
 		"validate-api": {proto.RuntimeInputCandidateFiles, proto.RuntimeInputReleaseBaseline, proto.RuntimeInputReleaseBaselineFiles},
