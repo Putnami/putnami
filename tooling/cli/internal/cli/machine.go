@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"os"
+	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
@@ -89,6 +90,9 @@ func machineStatus(output string) error {
 		if m.Answered && m.PlanSkipped {
 			answer = "yes, answered from memory without loading or planning"
 		}
+		if held := heldSteps(m); m.Answered && held != "" {
+			answer += " (held: " + held + ")"
+		}
 		iox.Fprintf(os.Stdout, "  Last worker run answerable from memory: %s; %s (%s)\n", answer, m.Kept, m.Root)
 	}
 	if !result.Running {
@@ -130,4 +134,19 @@ func shortBuild(build string) string {
 		return build[:12]
 	}
 	return build
+}
+
+// heldSteps names what an answered run took from the held run besides its
+// load, plan and tasks (CLI ADR 0116 §6a), or "".
+func heldSteps(m *machineproc.MemoryDecision) string {
+	var held []string
+	for _, step := range []struct {
+		name string
+		held bool
+	}{{"dispatch", m.DispatchHeld}, {"version snapshot", m.VersionsHeld}, {"finalizers", m.FinalizersHeld}} {
+		if step.held {
+			held = append(held, step.name)
+		}
+	}
+	return strings.Join(held, ", ")
 }

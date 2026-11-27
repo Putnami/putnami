@@ -499,7 +499,9 @@ command as usual:
    configuration: the system, global and repository files, those they
    include, and the excludes and attributes files they name. Their stats are
    witnessed too; Git lists the configuration's files once per worktree, and
-   again when one of them or HEAD moved.
+   again when one of them or HEAD moved. So is the global configuration under
+   the Putnami home, which every load of the workspace's configuration and
+   every extension discovery merges.
 4. The platform has a watcher: on macOS, which has none (section 7), no run
    is answered from memory.
 
@@ -553,8 +555,19 @@ never a wrong answer; the collection's recency rule is unchanged. A run in its o
 the same task results from its full computation: memory decides nothing a
 witness would not.
 
-**Where it answers today.** The worker decides before the run. The engine then
-skips loading and planning: an engine run takes what the held run's engine run
+**Where it answers today.** The worker decides before the run. The CLI's
+dispatch then skips its load: before it dispatches a job command, a run's
+App.Run opens the workspace's file index read-only, loads the workspace's
+configuration and discovers its extensions, which loads the workspace, and a
+run of a request decided answerable takes what the held run's App.Run loaded
+instead, once the worker checked the journal and step 3's witnesses again,
+before any engine run or plan of the run. Discovery also reads extension
+manifests no witness covers (one the configuration names outside the
+worktree, a link in the worktree's state to a stored one), so the held load
+carries the stat of every manifest it read, taken when discovery read it; one
+that moved withdraws everything the held run offers the run, which then loads
+and plans what is on disk (`dispatchHeld` says App.Run took it). The engine
+then skips loading and planning: an engine run takes what the held run's engine run
 at the same position computed before phase 4 (the loaded workspace, the
 discovered extensions, the selected projects, the final plan, and the flags,
 parameters and versions they resolved) when it asks the same (workspace,
@@ -624,9 +637,10 @@ records why (`a served task's cache entry moved: <task>`). A plan that
 differs, a plan the held run did not leave a record for, and every plan after
 one the run computed run as usual. `putnami machine status` says whether the
 last run a worker served was answered, whether without loading and planning
-(`planSkipped`), without reading the version snapshot from Git
-(`versionsHeld`) and without running the finalizers (`finalizersHeld`), and
-why a run decided answerable was not.
+(`planSkipped`), without loading what it dispatches (`dispatchHeld`),
+without reading the version snapshot from Git (`versionsHeld`) and without
+running the finalizers (`finalizersHeld`), and why a run decided answerable
+was not.
 
 ### 7. How it learns of changes
 

@@ -87,6 +87,10 @@ type MemoryDecision struct {
 	// finalizers replayed what the held run's did, the spec gate's record
 	// included, instead of running them (CLI ADR 0116 §6a).
 	FinalizersHeld bool `json:"finalizersHeld"`
+	// DispatchHeld says App.Run took what the held run's App.Run loaded
+	// before it dispatched, the workspace configuration and the extensions
+	// its dispatch discovered, instead of loading them (CLI ADR 0116 §6a).
+	DispatchHeld bool `json:"dispatchHeld"`
 	// Kept says the run that followed is held for the next request, or why
 	// not.
 	Kept string `json:"kept"`

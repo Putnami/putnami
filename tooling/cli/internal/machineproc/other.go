@@ -65,3 +65,15 @@ func (RunMemory) PeekRun(string) any { return nil }
 
 // Reused records nothing.
 func (RunMemory) Reused(string, string, bool) {}
+
+// TakeDispatch offers nothing.
+func TakeDispatch(string) any { return nil }
+
+// KeepDispatch holds nothing.
+func KeepDispatch(string, any, bool) {}
+
+// DispatchMoved withdraws nothing.
+func DispatchMoved(string, string) {}
+
+// Witness takes no stat on a platform without a machine process.
+func Witness(string) string { return "" }

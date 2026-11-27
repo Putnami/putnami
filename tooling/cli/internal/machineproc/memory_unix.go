@@ -46,6 +46,9 @@ type heldRun struct {
 	// runs are what the run's engine runs computed before they executed, in
 	// order; nil when one of them left nothing or plans is nil.
 	runs []heldEngineRun
+	// dispatch is what the run's App.Run loaded before it dispatched, or nil
+	// (TakeDispatch).
+	dispatch any
 }
 
 // heldEngineRun is what an engine run computed before it executed: its
@@ -112,6 +115,11 @@ type runMemory struct {
 	// than compute ("versions", "finalizers"), the engine runs that took it
 	// and those that computed it (Reused).
 	reused map[string]*reuseCount
+	// offeredDispatch is what the held run's App.Run loaded before it
+	// dispatched; nil unless the run is answerable. dispatch is what this
+	// run's App.Run loaded, and dispatchHeld says it took the offered one.
+	offeredDispatch, dispatch any
+	dispatchHeld              bool
 }
 
 // reuseCount is how many engine runs of a run took a step from the held run,
@@ -259,12 +267,69 @@ func offerRun(root string, take bool) any {
 	}
 	offered, check, w := r.offeredRuns[i].record, r.check, memory.watcher
 	memory.Unlock()
-	if w == nil || w.Sync(check.root, memorySyncTimeout) != nil ||
-		worktreeChanges(w.Since(check.root, check.seq), check.root) != "" ||
-		movedWitness(check.witness, outsideWitness(check.root)) != "" {
+	if !stillHolds(w, check) {
 		return nil
 	}
 	return offered
+}
+
+// stillHolds checks again, at a sync point, what the decision witnessed: no
+// write in the worktree since it was taken, and no witness outside it moved.
+func stillHolds(w *Watcher, check *memoryCheck) bool {
+	return w != nil && w.Sync(check.root, memorySyncTimeout) == nil &&
+		worktreeChanges(w.Since(check.root, check.seq), check.root) == "" &&
+		movedWitness(check.witness, outsideWitness(check.root)) == ""
+}
+
+// TakeDispatch returns what the held run's App.Run loaded before it
+// dispatched (the workspace configuration and the extensions its dispatch
+// discovered), for the App.Run of a run in root the worker decided
+// answerable, before any engine run or plan of it, once the worker checked
+// again what the decision witnessed; nil otherwise (CLI ADR 0116 §6a).
+func TakeDispatch(root string) any {
+	memory.Lock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) || r.check == nil || r.offeredDispatch == nil ||
+		r.taken > 0 || r.runsTaken > 0 {
+		memory.Unlock()
+		return nil
+	}
+	offered, check, w := r.offeredDispatch, r.check, memory.watcher
+	memory.Unlock()
+	if !stillHolds(w, check) {
+		return nil
+	}
+	return offered
+}
+
+// KeepDispatch hands the worker what the App.Run of the run in root loaded
+// before it dispatched, and whether it took it from TakeDispatch. It is held
+// with the run when the run is kept.
+func KeepDispatch(root string, record any, held bool) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) {
+		return
+	}
+	r.dispatch, r.dispatchHeld = record, held && record != nil
+}
+
+// DispatchMoved withdraws everything the held run offers the run in root:
+// App.Run found that a file it read to dispatch, which no witness of the
+// decision covers, moved since the held run read it. Every engine run and
+// plan of the run computes, and the decision records why.
+func DispatchMoved(root, reason string) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) {
+		return
+	}
+	r.check, r.offered, r.offeredRuns, r.offeredDispatch = nil, nil, nil, nil
+	if r.refused == "" {
+		r.refused = reason
+	}
 }
 
 // KeepRun records what an engine run of the run computed before it executed,
@@ -361,7 +426,7 @@ func beforeRun(req request) (*memoryCheck, MemoryDecision) {
 	// read the same held run.
 	run := runMemory{armed: true, root: root}
 	if decision.Answerable {
-		run.offered, run.offeredRuns, run.check = held.plans, held.runs, check
+		run.offered, run.offeredRuns, run.check, run.offeredDispatch = held.plans, held.runs, check, held.dispatch
 	}
 	memory.Lock()
 	memory.run = run
@@ -381,6 +446,7 @@ func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
 	decision.PlanSkipped = run.skipped > 0 && run.planned == 0
 	decision.VersionsHeld = run.allHeld("versions")
 	decision.FinalizersHeld = run.allHeld("finalizers")
+	decision.DispatchHeld = run.dispatchHeld
 	if run.refused != "" {
 		decision.Reason = run.refused
 	}
@@ -394,7 +460,7 @@ func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
 		if plans == nil || run.runsPartial || len(runs) == 0 {
 			runs = nil
 		}
-		decision.Kept = keep(check, code, plans, runs)
+		decision.Kept = keep(check, code, plans, runs, run.dispatch)
 	}
 	if dir, err := Dir(os.Getenv, false); err == nil {
 		if data, err := json.Marshal(decision); err == nil {
@@ -406,7 +472,7 @@ func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
 	}
 }
 
-func keep(check *memoryCheck, code int, plans []any, runs []heldEngineRun) string {
+func keep(check *memoryCheck, code int, plans []any, runs []heldEngineRun, dispatch any) string {
 	memory.Lock()
 	delete(memory.held, check.root)
 	w := memory.watcher
@@ -424,7 +490,7 @@ func keep(check *memoryCheck, code int, plans []any, runs []heldEngineRun) strin
 		return "not kept: the run changed the worktree: " + changed
 	}
 	memory.Lock()
-	memory.held[check.root] = &heldRun{request: check.request, seq: check.seq, witness: check.witness, plans: plans, runs: runs}
+	memory.held[check.root] = &heldRun{request: check.request, seq: check.seq, witness: check.witness, plans: plans, runs: runs, dispatch: dispatch}
 	memory.Unlock()
 	return "kept"
 }
@@ -493,9 +559,10 @@ func worktreeChanges(j Journal, root string) string {
 // outsideWitness takes what a run reads that the worktree's journal does not
 // see: the stats of Git's HEAD, configuration, packed refs and every
 // directory of its refs, the digest of the index's entries (a run's status
-// refreshes the index's cached stats without changing an entry), and the
-// stats of the directories of the Putnami home that hold extension runtimes
-// and toolchains.
+// refreshes the index's cached stats without changing an entry), the stats
+// of the directories of the Putnami home that hold extension runtimes and
+// toolchains, and of its global configuration, which every load of the
+// workspace's configuration merges.
 //
 // The version snapshot a held run read is reused under it (CLI ADR 0116 §6a),
 // so it also takes what Git's status, diff and abbreviated names read besides
@@ -519,7 +586,7 @@ func outsideWitness(root string) map[string]string {
 	}
 	paths = append(paths, gitConfigFiles(root)...)
 	if home, err := os.UserHomeDir(); err == nil {
-		for _, name := range []string{"artifacts", "artifacts/sha256", "artifacts/cli-source", "toolchains", "tools"} {
+		for _, name := range []string{"config.json", "artifacts", "artifacts/sha256", "artifacts/cli-source", "toolchains", "tools"} {
 			paths = append(paths, filepath.Join(home, ".putnami", name))
 		}
 	}
@@ -530,6 +597,11 @@ func outsideWitness(root string) map[string]string {
 	witness["git index entries"] = indexEntries(root)
 	return witness
 }
+
+// Witness is the stat of path as the decision's witnesses hold it; an absent
+// path is witnessed absent. App.Run witnesses with it the files it reads to
+// dispatch that the decision does not cover.
+func Witness(path string) string { return statWitness(path) }
 
 // statWitness is the stat of path as a witness holds it; an absent path is
 // witnessed absent.

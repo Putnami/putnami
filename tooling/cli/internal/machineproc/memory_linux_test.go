@@ -269,3 +269,91 @@ func TestTheWitnessTakesGitsConfigurationAndWhatItNames(t *testing.T) {
 		t.Errorf("nothing changed: moved %q", moved)
 	}
 }
+
+// TestAHeldDispatchIsOfferedOnlyBeforeTheRunComputedAnything pins how the
+// worker offers App.Run what the held run's App.Run loaded before it
+// dispatched (CLI ADR 0116 §6a): to a run decided answerable, before any
+// engine run or plan of it, and while nothing the decision witnessed moved. A
+// file App.Run read that no witness covers and that moved withdraws every
+// offer of the run, and the decision says why.
+func TestAHeldDispatchIsOfferedOnlyBeforeTheRunComputedAnything(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	w, root := watchedTree(t, 0)
+	offer := func() runMemory {
+		return runMemory{
+			check:           &memoryCheck{},
+			offered:         []any{"answered plan"},
+			offeredRuns:     []heldEngineRun{{record: "first engine run", plan: 0}},
+			offeredDispatch: "dispatch",
+		}
+	}
+	armMemory(t, w, root, offer())
+	if offered := TakeDispatch(t.TempDir()); offered != nil {
+		t.Fatalf("another worktree was offered %v", offered)
+	}
+	if offered := TakeDispatch(root); offered != "dispatch" {
+		t.Fatalf("offered %v, want what the held run's App.Run loaded", offered)
+	}
+	KeepDispatch(root, "dispatch", true)
+	memory.Lock()
+	kept := memory.run
+	memory.Unlock()
+	if kept.dispatch != "dispatch" || !kept.dispatchHeld {
+		t.Fatalf("kept %v (held %v), want the dispatch taken", kept.dispatch, kept.dispatchHeld)
+	}
+
+	for name, arm := range map[string]func(*runMemory){
+		"a run not decided answerable": func(r *runMemory) { r.check = nil },
+		"an engine run already taken":  func(r *runMemory) { r.runsTaken = 1 },
+		"a plan already taken":         func(r *runMemory) { r.taken = 1 },
+		"nothing held":                 func(r *runMemory) { r.offeredDispatch = nil },
+	} {
+		run := offer()
+		arm(&run)
+		armMemory(t, w, root, run)
+		if offered := TakeDispatch(root); offered != nil {
+			t.Errorf("%s: offered %v, want nothing", name, offered)
+		}
+	}
+	armMemory(t, w, root, offer())
+	write(t, filepath.Join(root, "c", "g.txt"), "written before the dispatch")
+	if offered := TakeDispatch(root); offered != nil {
+		t.Errorf("a write after the decision: offered %v, want nothing", offered)
+	}
+
+	armMemory(t, w, root, offer())
+	DispatchMoved(root, "an extension's manifest moved: /x/putnami.extension.json")
+	m := RunMemory{}
+	if TakeDispatch(root) != nil || m.PeekRun(root) != nil || m.TakeRun(root) != nil || m.Take(root) != nil {
+		t.Error("a moved manifest left something offered")
+	}
+	memory.Lock()
+	refused := memory.run.refused
+	memory.Unlock()
+	if refused != "an extension's manifest moved: /x/putnami.extension.json" {
+		t.Errorf("recorded %q, want the moved manifest", refused)
+	}
+}
+
+// TestTheWitnessTakesThePutnamiHomesConfiguration pins that the decision
+// witnesses the global configuration every load of the workspace's
+// configuration merges, which a held dispatch skips reading.
+func TestTheWitnessTakesThePutnamiHomesConfiguration(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	root := t.TempDir()
+	before := outsideWitness(root)
+	path := filepath.Join(home, ".putnami", "config.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, path, `{"options":{}}`)
+	if moved := movedWitness(before, outsideWitness(root)); moved != path && moved != filepath.Dir(path) {
+		t.Errorf("moved %q, want the global configuration", moved)
+	}
+	before = outsideWitness(root)
+	write(t, path, `{"options":{"*":{"verbose":true}}}`)
+	if moved := movedWitness(before, outsideWitness(root)); moved != path {
+		t.Errorf("an edit: moved %q, want %q", moved, path)
+	}
+}
