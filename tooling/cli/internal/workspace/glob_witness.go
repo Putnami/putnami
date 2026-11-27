@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
@@ -19,7 +20,7 @@ import (
 const GlobWitnessFilename = "probe-witness.json"
 
 // globWitnessVersion is the file's format.
-const globWitnessVersion = 1
+const globWitnessVersion = 2
 
 // persistedWitnesses is the file: paths are shared by every input, which
 // names them by index.
@@ -29,6 +30,10 @@ type persistedWitnesses struct {
 	// ExecutableIdentity): a file another build wrote is not read, since its
 	// digests may follow another reading.
 	Program string `json:"program"`
+	// Stamp is the clock, in Unix nanoseconds, when the file was written: a
+	// file whose stamp lies ahead of the clock is not read, since the clock
+	// went back and a stat may repeat (ADR 0009 §4 of protocols/workspace).
+	Stamp int64 `json:"stamp"`
 	// Ignored is the git-ignored set the inputs' walks skipped.
 	Ignored string             `json:"ignored"`
 	Paths   []persistedPath    `json:"paths"`
@@ -80,12 +85,13 @@ func loadGlobWitnesses(root string) {
 			return
 		}
 		var file persistedWitnesses
-		if json.Unmarshal(data, &file) != nil || file.Version != globWitnessVersion || file.Program != program {
+		if json.Unmarshal(data, &file) != nil || file.Version != globWitnessVersion || file.Program != program ||
+			file.Stamp <= 0 || file.Stamp > time.Now().UnixNano() {
 			return
 		}
 		for _, input := range file.Inputs {
 			w := &globWitness{ignored: file.Ignored, digest: input.Digest, paths: make(map[string]fileindex.Stat, len(input.Paths))}
-			valid := true
+			valid, directory := true, false
 			for _, i := range input.Paths {
 				if i < 0 || i >= len(file.Paths) {
 					valid = false
@@ -93,13 +99,23 @@ func loadGlobWitnesses(root string) {
 				}
 				p := file.Paths[i]
 				w.paths[filepath.Join(root, filepath.FromSlash(p.Path))] = p.Stat
+				directory = directory || p.Stat.Mode&modeType == modeDirectory
 			}
-			if valid {
+			// A witness holds its walk's search root at least: one without a
+			// directory holds nothing.
+			if valid && directory {
 				globWitnesses.LoadOrStore(root+"\x00"+input.Pattern, w)
 			}
 		}
 	})
 }
+
+// modeType and modeDirectory are the file type bits of a stat's mode and
+// their value for a directory.
+const (
+	modeType      = 0o170000
+	modeDirectory = 0o040000
+)
 
 // markGlobWitnessesDirty records that root holds a witness its file does not.
 func markGlobWitnessesDirty(root string) {
@@ -138,39 +154,28 @@ func SaveGlobWitnesses(root string, policy SnapshotWritePolicy) {
 		return
 	}
 	ignored := ignoredFingerprint(root)
-	file := persistedWitnesses{Version: globWitnessVersion, Program: program, Ignored: ignored}
-	index := map[string]int{}
+	file := persistedWitnesses{Version: globWitnessVersion, Program: program, Stamp: time.Now().UnixNano(), Ignored: ignored}
+	held := map[string]*globWitness{}
 	prefix := root + "\x00"
 	globWitnesses.Range(func(key, value any) bool {
 		name, _ := key.(string)
 		w, ok := value.(*globWitness)
-		if !ok || !strings.HasPrefix(name, prefix) || w.ignored != ignored {
-			return true
+		if ok && strings.HasPrefix(name, prefix) && w.ignored == ignored && used[strings.TrimPrefix(name, prefix)] {
+			held[strings.TrimPrefix(name, prefix)] = w
 		}
-		pattern := strings.TrimPrefix(name, prefix)
-		if !used[pattern] {
-			return true
-		}
-		input := persistedPattern{Pattern: pattern, Digest: w.digest}
-		for abs, st := range w.paths {
-			rel, err := filepath.Rel(root, abs)
-			if err != nil || strings.HasPrefix(rel, "..") {
-				return true // a path outside the workspace: not persisted
-			}
-			rel = filepath.ToSlash(rel)
-			i, seen := index[rel]
-			if !seen {
-				i = len(file.Paths)
-				index[rel] = i
-				file.Paths = append(file.Paths, persistedPath{Path: rel, Stat: st})
-			}
-			input.Paths = append(input.Paths, i)
-		}
-		sort.Ints(input.Paths)
-		file.Inputs = append(file.Inputs, input)
 		return true
 	})
-	sort.Slice(file.Inputs, func(i, j int) bool { return file.Inputs[i].Pattern < file.Inputs[j].Pattern })
+	patterns := make([]string, 0, len(held))
+	for pattern := range held {
+		patterns = append(patterns, pattern)
+	}
+	sort.Strings(patterns)
+	index := map[string]int{}
+	for _, pattern := range patterns {
+		if input, ok := persistWitness(root, pattern, held[pattern], index, &file); ok {
+			file.Inputs = append(file.Inputs, input)
+		}
+	}
 	data, err := json.Marshal(file)
 	if err != nil {
 		return
@@ -190,4 +195,35 @@ func SaveGlobWitnesses(root string, policy SnapshotWritePolicy) {
 		return
 	}
 	_ = os.Rename(name, filepath.Join(dir, GlobWitnessFilename))
+}
+
+// persistWitness is w as the file keeps it, its paths named by their index in
+// file.Paths, which it extends in sorted order. A witness with a path outside
+// root is not kept.
+func persistWitness(root, pattern string, w *globWitness, index map[string]int, file *persistedWitnesses) (persistedPattern, bool) {
+	rels := make(map[string]fileindex.Stat, len(w.paths))
+	for abs, st := range w.paths {
+		rel, err := filepath.Rel(root, abs)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+			return persistedPattern{}, false
+		}
+		rels[filepath.ToSlash(rel)] = st
+	}
+	names := make([]string, 0, len(rels))
+	for rel := range rels {
+		names = append(names, rel)
+	}
+	sort.Strings(names)
+	input := persistedPattern{Pattern: pattern, Digest: w.digest}
+	for _, rel := range names {
+		i, seen := index[rel]
+		if !seen {
+			i = len(file.Paths)
+			index[rel] = i
+			file.Paths = append(file.Paths, persistedPath{Path: rel, Stat: rels[rel]})
+		}
+		input.Paths = append(input.Paths, i)
+	}
+	sort.Ints(input.Paths)
+	return input, true
 }
