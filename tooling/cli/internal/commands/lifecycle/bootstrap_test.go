@@ -465,3 +465,51 @@ func TestCaptureProcessOutput_DrainsBothStreamsBeyondPipeCapacity(t *testing.T) 
 		t.Fatalf("captured %d stderr bytes, want %d", len(gotErr), len(wantErr))
 	}
 }
+
+// A machine worker serves many runs in one process. After each it restores
+// its own environment, and before the next it forgets the process memos
+// (ForgetProcessMemos), so its next run in a workspace evaluates the
+// lock-pinned artifacts and the first-use bootstrap again, as a run in its own
+// process does (CLI ADR 0116 §4). A process that keeps the memos skips both.
+func TestAWorkerRunEvaluatesTheBootstrapAgain(t *testing.T) {
+	resetBootstrapEnv(t)
+	t.Setenv(artifactsEnsuredEnv, "")
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
+	installs := spyInstall(t, nil)
+	ensured := 0
+	agentWorkflows := ensureAgentWorkflows
+	ensureAgentWorkflows = func(context.Context, string, *wsproto.Config) error {
+		ensured++
+		return nil
+	}
+	t.Cleanup(func() { ensureAgentWorkflows = agentWorkflows })
+	t.Cleanup(ForgetProcessMemos)
+	ws := t.TempDir()
+	writeLock(t, ws, "putnami.lock.json", `{}`) // stale: the spy writes no marker
+	cfg := &wsproto.Config{}
+
+	run := func(forget bool) {
+		t.Helper()
+		t.Setenv(workspaceBootstrappedEnv, "")
+		t.Setenv(artifactsEnsuredEnv, "")
+		if forget {
+			ForgetProcessMemos()
+		}
+		_ = EnsureArtifacts(context.Background(), ws, cfg)
+		if err := EnsureWorkspaceBootstrap(context.Background(), ws, cfg, BootstrapOptions{Command: "build"}); err != nil {
+			t.Fatalf("EnsureWorkspaceBootstrap: %v", err)
+		}
+	}
+	run(true)
+	if *installs != 1 || ensured != 1 {
+		t.Fatalf("first run: %d installs, %d artifact passes, want 1 and 1", *installs, ensured)
+	}
+	run(false)
+	if *installs != 1 || ensured != 1 {
+		t.Fatalf("a run in a process that keeps its memos: %d installs, %d artifact passes, want the first run's", *installs, ensured)
+	}
+	run(true)
+	if *installs != 2 || ensured != 2 {
+		t.Errorf("a worker's next run: %d installs, %d artifact passes, want 2 and 2", *installs, ensured)
+	}
+}

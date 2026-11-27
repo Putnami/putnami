@@ -297,8 +297,11 @@ context as a value instead (123 reads of the environment, the working
 directory or the standard streams in 64 files of the engine) is needed only
 for one worker to serve concurrent runs, and waits for a measurement that
 shows concurrent runs of one build to be worth it. Memos that outlive a run
-(the workspace load memo, the toolchain probe answers) are reset by the run
-as today, or held under section 8's rule.
+are reset before the next one or held under section 8's rule: the run resets
+the toolchain probe answers as today, and the worker forgets what a CLI
+process keeps for its life without a witness (the workspace load memo, the
+once-per-process passes of the first-use bootstrap and of the lock-pinned
+artifacts, the warnings a process prints once).
 
 **Which runs go through it.** Every run a worker can serve the same way, and
 none other. A client runs in its own process when:

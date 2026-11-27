@@ -22,12 +22,14 @@ import (
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/store"
+	"go.putnami.dev/tooling/cli/internal/template"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -45,13 +47,23 @@ func TestMain(m *testing.M) {
 				if err != nil {
 					return cli.ExitError
 				}
-				workspace.ForgetProcessMemos()
-				extension.ForgetProcessMemos()
+				forgetProcessMemos()
 				return app.Run(ctx, args)
 			}))
 		}
 	}
 	os.Exit(clitest.Main(m))
+}
+
+// forgetProcessMemos drops what a CLI process memoizes for its life, as a
+// worker does before each run (cmd/putnami). The test process runs every
+// command meant to run in its own process, and forgets them before each, so
+// each starts with none, as a new process does.
+func forgetProcessMemos() {
+	workspace.ForgetProcessMemos()
+	extension.ForgetProcessMemos()
+	lifecycle.ForgetProcessMemos()
+	template.ForgetProcessMemos()
 }
 
 // taskResult is what the comparison holds equal for one task.
@@ -212,6 +224,12 @@ func TestARunThroughTheMachineProcessGivesTheSameKeysAndResults(t *testing.T) {
 		}},
 	}
 	args := []string{"lint,test,build", "--all"}
+	// Each command starts as a new process does, with no memo of an earlier
+	// one, whether it runs here or in the worker.
+	run := func() (int, string) {
+		forgetProcessMemos()
+		return clitest.RunGateArgs(t, root, args...)
+	}
 	worker := 0
 	for _, round := range rounds {
 		round.write(t)
@@ -219,13 +237,13 @@ func TestARunThroughTheMachineProcessGivesTheSameKeysAndResults(t *testing.T) {
 		// (the projects' embedded version), so each round first settles the
 		// tree with a run in its own process.
 		t.Setenv(machineproc.Env, "off")
-		if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
+		if code, out := run(); code != 0 {
 			t.Fatalf("%s: settling run exit %d\n%s", round.name, code, out)
 		}
 
 		before, _ := workerRuns(t)
 		t.Setenv(machineproc.Env, "on")
-		onCode, onOut := clitest.RunGateArgs(t, root, args...)
+		onCode, onOut := run()
 		on := latestTasks(t, root)
 		after, pids := workerRuns(t)
 		if served := after - before; served != 1 {
@@ -238,10 +256,10 @@ func TestARunThroughTheMachineProcessGivesTheSameKeysAndResults(t *testing.T) {
 		worker = pids[0]
 
 		t.Setenv(machineproc.Env, "off")
-		offCode, offOut := clitest.RunGateArgs(t, root, args...)
+		offCode, offOut := run()
 		off := latestTasks(t, root)
 		// Control: a second run in its own process gives the same tasks.
-		clitest.RunGateArgs(t, root, args...)
+		run()
 		if again := latestTasks(t, root); strings.Join(normalize(again), "\n") != strings.Join(normalize(off), "\n") {
 			t.Errorf("%s: two runs in their own process differ: the fixture is not settled", round.name)
 		}

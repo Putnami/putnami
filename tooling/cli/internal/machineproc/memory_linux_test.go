@@ -357,3 +357,34 @@ func TestTheWitnessTakesThePutnamiHomesConfiguration(t *testing.T) {
 		t.Errorf("an edit: moved %q, want %q", moved, path)
 	}
 }
+
+// TestAWorktreeGitDoesNotManageIsAskedAgain pins the worker's memo of a
+// worktree's Git directories: one Git does not manage is asked again, so a
+// repository created in it after the worker first saw it is witnessed.
+func TestAWorktreeGitDoesNotManageIsAskedAgain(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(root))
+	t.Cleanup(func() {
+		memory.Lock()
+		delete(memory.gitDirs, root)
+		memory.Unlock()
+	})
+	if dirs := gitDirs(root); len(dirs) != 0 {
+		t.Fatalf("a directory Git does not manage has Git directories %v", dirs)
+	}
+	if out, err := exec.Command(gitread.Executable(), "-C", root, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	resolved, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(resolved, ".git")
+	dirs := gitDirs(root)
+	for _, dir := range dirs {
+		if dir == want || dir == filepath.Join(root, ".git") {
+			return
+		}
+	}
+	t.Errorf("after git init the Git directories are %v, want %s", dirs, want)
+}

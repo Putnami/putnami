@@ -766,7 +766,8 @@ func movedWitness(held, now map[string]string) string {
 }
 
 // gitDirs is the worktree's Git directory and its common directory, read once
-// per worktree.
+// per worktree that Git manages. A worktree Git does not manage is asked again
+// each time: a repository created in it later is witnessed from then on.
 func gitDirs(root string) []string {
 	memory.Lock()
 	dirs, ok := memory.gitDirs[root]
@@ -790,9 +791,11 @@ func gitDirs(root string) []string {
 			}
 		}
 	}
-	memory.Lock()
-	memory.gitDirs[root] = dirs
-	memory.Unlock()
+	if len(dirs) > 0 {
+		memory.Lock()
+		memory.gitDirs[root] = dirs
+		memory.Unlock()
+	}
 	return dirs
 }
 

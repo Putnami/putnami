@@ -11,6 +11,7 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/cli"
+	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/githooks"
@@ -19,6 +20,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/launch"
 	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
+	"go.putnami.dev/tooling/cli/internal/template"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -84,6 +86,8 @@ func runMachine(args []string) (int, bool) {
 			// before each run: the run must read what is on disk now.
 			workspace.ForgetProcessMemos()
 			extension.ForgetProcessMemos()
+			lifecycle.ForgetProcessMemos()
+			template.ForgetProcessMemos()
 			app, err := cli.NewApp()
 			if err != nil {
 				iox.Fprintf(os.Stderr, "putnami: %v\n", err)

@@ -116,10 +116,12 @@ func readManifestNoDiagnostics(dir string) *extproto.Manifest {
 
 // ForgetProcessMemos drops the option ownership this package memoizes for the
 // life of the process: a machine worker serves many runs, and a manifest can
-// change between two (CLI ADR 0116 §8).
+// change between two (CLI ADR 0116 §8). It drops the discovery warnings it
+// printed too, so each run warns as a run in its own process does.
 func ForgetProcessMemos() {
 	namespaceOwnershipCache.Range(func(key, _ any) bool {
 		namespaceOwnershipCache.Delete(key)
 		return true
 	})
+	warnedOnce.Clear()
 }

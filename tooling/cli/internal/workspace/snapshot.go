@@ -891,6 +891,9 @@ func RefreshSnapshot(ws *Workspace, policy SnapshotWritePolicy) (*Snapshot, erro
 // process. A CLI process serves one run; a machine worker serves many, and
 // a run must not read what an earlier one saw (CLI ADR 0116 §8).
 func ForgetProcessMemos() {
+	// Load keeps a workspace under the index file's identity alone, and an
+	// edit of a configuration file moves no index: a run loads the one on disk.
+	loadCache.Clear()
 	ignoredWalkDirsCache.Range(func(key, _ any) bool {
 		ignoredWalkDirsCache.Delete(key)
 		return true

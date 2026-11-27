@@ -20,7 +20,8 @@ import (
 // PUTNAMI_* subprocess inheritance (job subprocesses start from os.Environ).
 const artifactsEnsuredEnv = "PUTNAMI_ARTIFACTS_ENSURED"
 
-// ensuredWorkspaces dedupes EnsureArtifacts to once per workspace per process.
+// ensuredWorkspaces dedupes EnsureArtifacts to once per workspace per process,
+// and per run in a machine worker (ForgetProcessMemos).
 var ensuredWorkspaces sync.Map // wsRoot -> struct{}
 
 // EnsureArtifacts materializes the workspace's lock-PINNED registry extensions,
