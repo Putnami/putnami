@@ -1544,6 +1544,21 @@ provider now starts whenever at least one planned job will execute locally, not
 only when the run has remote keys to negotiate. A fully warm rebuild — every
 planned job a local hit — still starts no provider at all.
 
+Negotiation decides the plan's key movement (which files a result-only
+restore may skip) only once a provider it started serves the run. When the
+plan's declarations alone show such a job (a task with no cache key, one with
+external effects, or one that reuses no entry), it starts the provider before it
+keys anything. A provider that serves nothing — signed out, disabled — answers
+`initialize` not ready, and the run then computes no key and no key movement
+for it: it would warm nothing, and the run never starts it again. Without such
+a job, the keys are computed and only the movement is skipped. A fully warm
+rebuild that no provider serves yet starts none and decides no movement either;
+should a later miss start one, that provider counts every serialization edge as a reader of files,
+so it may restore files it could have skipped, never fewer. A provider that
+serves the run is negotiated with as before, from the keys, and the key
+movement when there is one, that the pruning of invocation-scoped resources
+already computed for the same plan.
+
 ### Scoping the bypass to some projects
 
 `--projects <p>` plans `p` **and its whole dependency closure** — a project

@@ -328,7 +328,7 @@ func (rt *invocationRuntime) prune(
 	cache *store.CacheManager,
 	bypass cachekey.CacheBypass,
 	stats *cachekey.CacheStats,
-) map[string]string {
+) *cachekey.PlanKeys {
 	if rt == nil || cache == nil || bypass.All {
 		return nil
 	}
@@ -381,7 +381,7 @@ func (rt *invocationRuntime) prune(
 		rel.recheck = recheck
 		rel.mu.Unlock()
 	}
-	return keys
+	return &cachekey.PlanKeys{Keys: keys, Movement: movement}
 }
 
 // cachedEntryPresent reports whether the local store already holds the job's

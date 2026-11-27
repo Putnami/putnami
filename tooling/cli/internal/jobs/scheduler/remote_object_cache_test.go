@@ -397,6 +397,30 @@ func TestNegotiateDoesNotSpawnTheProviderForAFullyWarmRun(t *testing.T) {
 	if got := warmRemote.ObjectCacheSocket(); got != "" {
 		t.Fatalf("a fully warm rebuild spun up the provider: socket %q", got)
 	}
+	// No provider serves the run, so negotiation decided no key movement and
+	// recorded no key.
+	if warmRemote.Keys != nil {
+		t.Fatalf("a fully warm rebuild recorded keys %v", warmRemote.Keys)
+	}
+}
+
+// A provider started before negotiation (a hosted run, a run-marker lookup)
+// that serves the run gets its key movement decided, as before, even when
+// every planned job is a local hit.
+func TestNegotiateDecidesTheMovementForAProviderAlreadyServing(t *testing.T) {
+	f := newObjectCacheFixture(t, nil, true, false)
+	if cold := f.run(t, SchedulerConfig{MaxParallel: 1}); !cold.Success {
+		t.Fatalf("cold run failed: %+v", cold.Results)
+	}
+
+	warmRemote := f.loadRemote(t, nil)
+	if err := warmRemote.StartProvider(context.Background(), f.ws, f.cache); err != nil {
+		t.Fatal(err)
+	}
+	warmRemote.Negotiate(context.Background(), f.ws, f.planned, nil, nil, f.cache, cachekey.CacheBypass{})
+	if warmRemote.Keys == nil {
+		t.Fatal("a provider serving the run before negotiation got no key movement decided")
+	}
 }
 
 // TestNegotiateAsksForTheObjectCacheCapability pins the bootstrap: core lists
