@@ -252,11 +252,9 @@ func nxTests(t *testing.T, root, base, log string) ([]string, string) {
 		tested = append(tested, targets...)
 	}
 	slices.Sort(tested)
-	// Every task of the run is uncached: no lookup, so no hit and no miss,
-	// and nothing is stored.
-	if !strings.Contains(out, "Cache: 0 local hit · 0 miss") {
-		t.Errorf("the run looked up or stored Putnami cache entries for delegated tasks:\n%s", out)
-	}
+	// Every task of the run is uncached: no key, so no lookup, no hit, no
+	// miss, and nothing stored.
+	clitest.RequireUncachedRun(t, root, "test", out)
 	return tested, out
 }
 
