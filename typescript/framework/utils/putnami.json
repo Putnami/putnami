@@ -6,18 +6,6 @@
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
   "options": {
-    "test": {
-      "filePatterns": [
-        "../*/src/**/*.ts",
-        "../*/src/**/*.tsx",
-        "../*/src/**/*.mts",
-        "../*/src/**/*.mjs",
-        "../*/bin/**/*.ts",
-        "../*/bin/**/*.tsx",
-        "../*/bin/**/*.mts",
-        "../*/bin/**/*.mjs"
-      ]
-    },
     "package": {
       "npm": true
     },

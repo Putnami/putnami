@@ -16,7 +16,10 @@ The checks that read this repository's files as text, on every change:
 - every pattern a `putnami.json` declares outside its project is spelled the
   way the cache key matches it;
 - the shipped `go.mod` and `package.json` manifests name no Putnami Cloud
-  package.
+  package;
+- the product sources of the TypeScript framework packages follow the Windows
+  path rules: no native path tested against `'/'`, no rename outside
+  `@putnami/runtime/robustio`, no `PWD` read outside `getProjectRoot`.
 
 ## Why it depends on nothing
 
