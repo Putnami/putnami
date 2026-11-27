@@ -31,8 +31,18 @@ const (
 )
 
 // bootstrappedWorkspaces dedupes EnsureWorkspaceBootstrap to once per workspace
-// per process.
+// per process, and per run in a machine worker (ForgetProcessMemos).
 var bootstrappedWorkspaces sync.Map // wsRoot -> struct{}
+
+// ForgetProcessMemos drops the workspaces this process bootstrapped and
+// materialized the lock-pinned artifacts of. A CLI process serves one run; a
+// machine worker serves many, and each of its runs evaluates the first-use
+// bootstrap and the pinned artifacts as a run in its own process does (CLI
+// ADR 0116 §4).
+func ForgetProcessMemos() {
+	bootstrappedWorkspaces.Clear()
+	ensuredWorkspaces.Clear()
+}
 
 // installRunner is the install action invoked when the workspace is stale. It is
 // a package var so tests can substitute a spy without running a real install.

@@ -137,6 +137,10 @@ var spawnSites = map[string]spawnSite{
 	// runs no hook runs no repository code.
 	"commands/agentctx/context_pack.go:resolveWorkspaceRevision": {spawns: 2, verdict: noRepositoryCode,
 		why: "git rev-parse; gitread.Executable asks /usr/bin/xcrun, a fixed program, for the git to run"},
+	"machineproc/client_unix.go:Start": {spawns: 1, verdict: noRepositoryCode,
+		why: "this CLI's own executable as the machine supervisor (CLI ADR 0116); a hosted run never starts it (servesThroughMachine)"},
+	"machineproc/supervisor_unix.go:(*supervisor).startWorker": {spawns: 1, verdict: noRepositoryCode,
+		why: "the CLI executable a client of the same user named, as its build's worker, after its build identity and owner are checked; each run it serves records its repository code as a run in its own process does"},
 	"commands/cachecmd/cache_verify.go:CacheVerifyCommand": {spawns: 1, verdict: noRepositoryCode,
 		why: "git rev-parse, through gitread.HeadSHA"},
 	"commands/cachecmd/cache_verify.go:removeDetachedWorktrees": {spawns: 2, verdict: noRepositoryCode,

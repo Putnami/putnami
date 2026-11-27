@@ -10,6 +10,7 @@ import (
 	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -61,7 +62,7 @@ func StartDetachedReplay(ctx context.Context, wsRoot, sessionID string) error {
 	}
 	// A detached replay outlives the run: its start is counted, its CPU never.
 	procstat.Started(procstat.Control, cmd.Args)
-	return started.Process.Release()
+	return machineproc.ReleaseDetached(started)
 }
 
 // replayCommand is the detached replay of sessionID: it inherits the run's

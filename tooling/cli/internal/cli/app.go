@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/launch"
+	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/runnerprovider"
@@ -231,6 +232,14 @@ func (a *App) Run(ctx context.Context, args []string) int {
 
 	aliases, aliasWarnings := processAliases(cfg, providerMode, extensions)
 	parsed := parseArgs(args, aliases, extensionGroups)
+	// The authoritative engine of this command is this process: the worker of
+	// its build may run it instead, warm (CLI ADR 0116). Anything the machine
+	// process does not serve runs here as before.
+	if !providerChild && !providerMode && servesThroughMachine(parsed, aliases, extensionGroups) {
+		if code, served := machineproc.Serve(ctx, args); served {
+			return code
+		}
+	}
 	if providerMode && !extensionGroups[parsed.Commands[0]] {
 		iox.Fprintf(os.Stderr, "putnami: internal release-set provider command group is unavailable\n")
 		return ExitUsage
