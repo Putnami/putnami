@@ -501,7 +501,11 @@ in. Measured with one binary and a switch, alternating runs, medians of
 three unchanged runs, signed out: wall 15.96 s to 14.65 s, engine CPU 18.0 s
 to 16.8 s, run CPU 20.7 s to 19.5 s. The keys summed over the tasks' key steps
 rise from 2.7 s to 3.5 s, since each task now computes what prune computed
-before it, and the longest ready wait stays at 3.0 to 3.1 s.
+before it, and the longest ready wait stays at 3.0 to 3.1 s. Against main
+`35d1a8bc` on the protocol above (medians of three unchanged runs after a
+priming run, signed out): wall 16.4 s to 14.8 s, engine CPU 17.7 s to 16.1 s,
+run CPU 20.8 s to 19.5 s, keys summed 3.2 s to 3.8 s, longest ready wait
+3.4 s to 3.6 s.
 
 Declaring `--infra-down` on `test`, which its users need to request the
 teardown, makes the predicate valid on every run and brings the movement cost
