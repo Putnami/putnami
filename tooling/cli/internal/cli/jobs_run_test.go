@@ -344,3 +344,14 @@ func TestApplyPublishDryRun_OtherShapesKeepThePreview(t *testing.T) {
 		})
 	}
 }
+
+// A terminal job run may return before its session reporting delivered: the
+// engine then hands what remains to a detached replay (ADR 0115).
+func TestTheTerminalRequestDetachesItsReporting(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/native-session-reporting", "detached-delivery", "a-local-run-returns-before-its-upload-and-a-detached-replay-delivers")
+	req := terminalRequest(&ParsedArgs{Commands: []string{"build"}}, &wsproto.Config{}, t.TempDir(), nil, false)
+	if !req.DetachedReporting {
+		t.Fatal("the terminal request drains its reporting")
+	}
+}

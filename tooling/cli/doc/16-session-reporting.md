@@ -30,7 +30,9 @@ The reporter is a declared subscriber of the session's event stream
 events chunk leaves once a full 64 KiB frame of the view is ready, or 10 seconds
 after the previous events chunk. The first events chunk waits 10 seconds from the reporter's start.
 A long run therefore sends a number of chunks bounded by its duration, not one per
-record. When the graph ends, the reporter sends the rest at once. When it stops, `.putnami/sessions/<id>/subscribers.json` records its evidence:
+record. When the graph ends, the reporter sends the rest at once, or, for a
+job run from the terminal, leaves it to a background replay (see
+[Delivery after the run returns](#delivery-after-the-run-returns)). When it stops, `.putnami/sessions/<id>/subscribers.json` records its evidence:
 `delivered`, `partial` or `lost`, the last acknowledged position, and how many
 records it never acknowledged. `putnami sessions inspect <id>` prints it. A replay
 rewrites only the entries of the reporters it replays. See the
@@ -202,6 +204,38 @@ keeps every reporter token out of every process environment:
 
 A run without `--credential-fd` is unchanged: no handshake, and each token
 reaches only its own reporter's environment.
+
+## Delivery after the run returns
+
+A job run from the terminal returns once its result is durable locally. When
+it ends, the CLI stops each reporter at its checkpoint instead of waiting for
+the upload, and starts `putnami sessions replay --session <id>` in the
+background, in a session of its own, with the same selectors and tokens.
+That replay sends the rest. The run also starts one for each of the three
+newest other sessions that are finalized, not yet delivered, and that no
+replay is delivering, and names them in one line:
+
+```text
+putnami: 1 earlier session(s) not delivered by their reporters; replaying them in the background (putnami sessions inspect <id>)
+```
+
+So a session that an interrupted replay, an offline machine, a sleep or a
+logout left is delivered by a later run. A session killed before it was
+finalized cannot be replayed. Each frame keeps its sequence, offset and bytes
+across these replays, so the receiver stores it once. The background replay
+writes nothing to the terminal: its outcome stays in the session's
+checkpoint and evidence, which `putnami sessions inspect <id>` prints, and
+the diagnostics below appear only on a run that waits for its delivery or on
+`putnami sessions replay`.
+
+The run waits for its delivery, as before, when it must deliver before it
+exits: a hosted run (`--credential-fd`), a CI job (`CI`, `JENKINS_URL`,
+`TF_BUILD` or `TEAMCITY_VERSION` set), a run whose session could not be
+finalized, and every command that is not a job run from the terminal. Set
+`CI=true` to keep the delivery in the foreground anywhere else, for example
+in a container reclaimed as soon as its command ends; `CI` also selects
+the CI defaults of the flags that declare one. See
+[ADR 0115](adr/0115-a-local-run-hands-its-report-upload-to-a-detached-replay.md).
 
 ## Replay
 

@@ -1,6 +1,8 @@
 # ADR 0033 — The engine owns session reporting through one event stream
 
 - **Status**: accepted
+- **Amended by**: [ADR 0115](0115-a-local-run-hands-its-report-upload-to-a-detached-replay.md):
+  a local terminal job run no longer drains its reporting before it returns
 - **Scope**: `tooling/cli/internal/engine`, `internal/sessionstream`,
   `internal/sessionreporter`, `protocols/cli` (session reporting v1 and v2,
   session subscribers)

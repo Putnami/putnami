@@ -214,7 +214,9 @@ func runReporterBuild(t *testing.T, role string, hosted, install bool) (output s
 	if install {
 		autoInstall = "PUTNAMI_NO_AUTO_INSTALL="
 	}
-	code, output := runEngine(t, self, wsRoot, home, hosted, autoInstall,
+	// CI keeps a local run's reporting in the foreground (ADR 0115), so the
+	// log is whole once the run returns, wherever the test runs.
+	code, output := runEngine(t, self, wsRoot, home, hosted, autoInstall, "CI=true",
 		protocolcli.SessionReporterEnv+"=@fixture/reporter", protocolcli.SessionReporterTokenEnv+"="+reporterEnvToken)
 	if code != 0 {
 		t.Fatalf("build exit=%d, want 0\n%s", code, output)

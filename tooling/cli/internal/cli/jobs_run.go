@@ -91,6 +91,9 @@ func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc 
 		// injected only so the engine stops importing internal/commands;
 		// a nil gate fails a production run closed.
 		Preflight: doctor.DoctorPreflight,
+		// A terminal run returns once its result is durable locally; a
+		// detached replay delivers its session reporting (ADR 0115).
+		DetachedReporting: true,
 	}
 	applyPublishDryRun(&req, parsed, extensions)
 	return req

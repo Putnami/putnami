@@ -282,6 +282,7 @@
     "cli/job-planning-execution#workspace-scoped-help",
     "cli/native-session-reporting#bounded-transport",
     "cli/native-session-reporting#credential-boundary",
+    "cli/native-session-reporting#detached-delivery",
     "cli/native-session-reporting#durable-replay",
     "cli/native-session-reporting#engine-lifecycle",
     "cli/native-session-reporting#spec-verification-record",

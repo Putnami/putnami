@@ -124,6 +124,9 @@ var spawnSites = map[string]spawnSite{
 	"extension/http_client.go:AuthorizeRegistryRequestWithCLI": {spawns: 1, verdict: hostedNever, by: "extension/http_client.go:authorizeRegistryRequest",
 		via: "resolve", why: "putnami cloud registry-token, the host-keyed registry credential"},
 
+	"sessionreporter/detached_replay.go:replayCommand": {spawns: 1, verdict: hostedNever, by: "sessionreporter/detached_replay.go:replayCommand",
+		why: "putnami sessions replay, the CLI itself: a hosted run drains its reporting and starts no detached replay"},
+
 	// Variables that hold a spawn helper; their uses are classified above.
 	"extension/http_client.go:ResolveRegistryToken":                            {spawns: 1, verdict: alias},
 	"jobs/scheduler/native_registry_credential.go:materializeNativeCredential": {spawns: 1, verdict: alias},
