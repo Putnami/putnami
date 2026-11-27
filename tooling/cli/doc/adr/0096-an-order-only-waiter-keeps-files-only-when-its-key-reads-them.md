@@ -40,7 +40,10 @@ to restore and executed.
    declares an output `readByDependents`, when both belong to one shared
    execution (a follower captures what its leader wrote), or when the task is
    not planned. When key movement cannot be computed, every serialization edge
-   counts.
+   counts, and so it does when the negotiation has no declared-capture key
+   left to prefetch, every one being a local hit: deciding the movement then
+   cost an unchanged signed-in run of this repository 1.8 s of CPU before its first
+   task, for an answer only a later miss would read (amended 2026-11-27).
 2. **Infra does not depend on compile.** The Go `build` command's `infra` step
    depends on `generate` and `describe` only. Its key stops folding the
    compile key, and it runs when the compile fails. Write serialization of

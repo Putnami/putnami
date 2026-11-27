@@ -1594,7 +1594,10 @@ rebuild that no provider serves yet starts none and decides no movement either;
 should a later miss start one, that provider counts every serialization edge as a reader of files,
 so it may restore files it could have skipped, never fewer. A provider that
 serves the run is negotiated with as before, from the keys and the key
-movement it computes for the plan.
+movement it computes for the plan. When no declared-capture key is left to
+prefetch, every one being a local hit, a provider that serves the run decides no
+key movement either: it counts every serialization edge, the same answer for a
+later miss.
 
 ### Scoping the bypass to some projects
 
