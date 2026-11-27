@@ -774,10 +774,10 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 			record = fileindex.OpenRecord(fileindex.RecordPath(req.WorkspaceRoot), fileindex.RecordIdentity())
 		}
 		// A record whose sampled answer differed from a collection is
-		// discarded: the run says so once, while it renders, and its result
-		// carries it.
+		// discarded: the run's result carries it from then on, and the run
+		// writes it once, after it rendered.
 		record.OnDiscard(func(reason string) {
-			req.workspaceWarnings.Add(workspace.Warning{
+			req.workspaceWarnings.Keep(workspace.Warning{
 				Code:    "cache.input_record_discarded",
 				Message: reason + "; the input record is discarded and every input digest is collected (tooling/cli ADR 0113)",
 			})
@@ -797,6 +797,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 			if err := record.Save(); err != nil && req.Global.Debug {
 				iox.Fprintf(os.Stderr, "[debug] input record: %v\n", err)
 			}
+			req.workspaceWarnings.Flush()
 		}()
 		// The release baselines a run read are answered to the next run while
 		// the commits they name hold (tooling/cli ADR 0113 §4), under the same

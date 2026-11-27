@@ -333,6 +333,23 @@ func CurrentRecord() *Record {
 	return r
 }
 
+// Drop drops the value recorded in table at k, from this process and from the
+// file at the next save: a caller found it differs from a computation the
+// run cannot tell from a write of its own. A nil r drops nothing.
+func (r *Record) Drop(table, k string) {
+	if r == nil {
+		return
+	}
+	id := recordKey{table, k}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, isLoaded := r.loaded[id]; isLoaded {
+		r.stale[id] = true
+	}
+	delete(r.fresh, id)
+	delete(r.confirmed, id)
+}
+
 // Answer returns the value recorded in table at k when holds accepts its
 // parts. A value whose parts do not hold is dropped from the file at the next
 // save. holds must take the stat of every part now and compare it with the
@@ -349,7 +366,7 @@ func (r *Record) Answer(table, k string, holds func(parts []RecordPart) bool) ([
 	}
 	e, found := r.fresh[id]
 	_, isLoaded := r.loaded[id]
-	if !found {
+	if !found && !r.stale[id] {
 		e, found = r.loaded[id]
 	}
 	r.mu.Unlock()

@@ -21,6 +21,8 @@ type WarningReport struct {
 	// renders (Add).
 	mu       sync.Mutex
 	reported []Warning
+	// unwritten holds the warnings Keep kept and Flush has not written yet.
+	unwritten []Warning
 }
 
 // NewWarningReport returns a report that writes to w. A nil w writes nothing
@@ -54,6 +56,37 @@ func (r *WarningReport) Add(warning Warning) {
 		return
 	}
 	if r.w != nil {
+		iox.Fprintf(r.w, "putnami: warning: %s\n", warning.Message)
+	}
+}
+
+// Keep keeps warning, unless the report already holds it, without writing
+// it: a warning raised while the run renders, which a write would tear. Its
+// result carries it at once, and Flush writes it once the run rendered. A nil
+// report does nothing.
+func (r *WarningReport) Keep(warning Warning) {
+	if r == nil || !r.add(warning) {
+		return
+	}
+	r.mu.Lock()
+	r.unwritten = append(r.unwritten, warning)
+	r.mu.Unlock()
+}
+
+// Flush writes each warning Keep kept and no Flush wrote yet. A nil report
+// does nothing.
+func (r *WarningReport) Flush() {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	unwritten := r.unwritten
+	r.unwritten = nil
+	r.mu.Unlock()
+	if r.w == nil {
+		return
+	}
+	for _, warning := range unwritten {
 		iox.Fprintf(r.w, "putnami: warning: %s\n", warning.Message)
 	}
 }

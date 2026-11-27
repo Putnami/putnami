@@ -356,6 +356,9 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 					return "", err
 				}
 				if collected != hash {
+					// A write of the run came between: the answer may be
+					// sound, but nothing tells, so its entry is dropped.
+					record.Drop(InputDigestTable, recorded)
 					hash, memoize = collected, false
 				}
 			}

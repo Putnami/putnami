@@ -227,3 +227,46 @@ func TestAWriteBetweenAnAnswerAndItsSampleKeepsTheRecord(t *testing.T) {
 		t.Fatalf("got %s (fresh %s), discarded %q: want the collection and the record kept", got, want, next.Discarded())
 	}
 }
+
+// A sampled answer that differs while a write of the run came between, even
+// one elsewhere, is not trusted again: neither later in the run nor by the
+// next run.
+func TestAnAnswerAWriteExcusedIsDropped(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	must(t, err)
+	p := filepath.Join(root, "p")
+	writeRecordTree(t, p, map[string]string{"src/a.go": "a"})
+	writeRecordTree(t, root, map[string]string{"other/out/x.txt": "x"})
+	patterns := []string{"src/**/*.go"}
+	record := useRecordAt(t, root)
+	want, err := NewCacheManager(nil).HashFiles(p, patterns, nil, ProjectConfigScope{})
+	must(t, err)
+	plantInputDigest(t, record, p, patterns, "planted")
+	must(t, record.Save())
+
+	next := useRecordAt(t, root)
+	next.SetSampleRate(1)
+	cm := NewCacheManager(nil)
+	original := memoizedHashFiles
+	t.Cleanup(func() { memoizedHashFiles = original })
+	unrelated := filepath.Join(root, "other", "out", "x.txt")
+	memoizedHashFiles = func(cut CandidateSource, dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, *selectionWitness, error) {
+		memoizedHashFiles = original
+		must(t, os.WriteFile(unrelated, []byte("y"), 0o644))
+		cm.InvalidateFileHashesUnder([]string{unrelated})
+		return original(cut, dir, patterns, expander, scope)
+	}
+	if got, err := cm.HashFiles(p, patterns, nil, ProjectConfigScope{}); err != nil || got != want {
+		t.Fatalf("got %q, %v; want the collection %s", got, err, want)
+	}
+	next.SetSampleRate(-1)
+	if again, _ := cm.HashFiles(p, patterns, nil, ProjectConfigScope{}); again != want {
+		t.Fatalf("later in the run the record answers %q; a collection gives %s", again, want)
+	}
+	must(t, next.Save())
+
+	useRecordAt(t, root)
+	if third, _ := NewCacheManager(nil).HashFiles(p, patterns, nil, ProjectConfigScope{}); third != want {
+		t.Fatalf("the next run answers %q; a collection gives %s", third, want)
+	}
+}

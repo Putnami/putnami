@@ -178,7 +178,10 @@ which drops every digest) drops them all. A stat taken while a write was
 dropped answers its lookup but is not kept. The parts of a digest whose
 witness has a link are stated again at every check and never kept: a write
 the run names by the physical path does not reach a stat kept under the
-linked spelling. A recorded digest that
+linked spelling. Such a digest costs a stat of each of its parts at each
+check rather than once per run: on macOS every digest of Git candidates,
+whose cut witness names `/etc/gitconfig` through the `/etc` link, and every
+digest of a workspace reached through a link. A recorded digest that
 holds enters the run's memo with the in-run witness of ADR 0109, rebuilt from
 its recorded files, so a write of the run moves it as it moves a collected
 one.
@@ -190,7 +193,8 @@ about 25 of this repository's 2,480 answers, and every answer of a record of
 16 entries or fewer. A sampled answer that differs from its collection, or
 whose collection now fails, shows a witness the record should not have
 trusted, in a class no test foresaw, unless a write of the run came between
-the answer and the collection: the run uses the collection (or returns its
+the answer and the collection, in which case the run uses the collection
+and drops that entry alone: the run uses the collection (or returns its
 error), discards the whole record and every digest the run memoized, so it
 collects every digest again for the rest of the run, saves an empty record,
 and reports one warning (`cache.input_record_discarded`) that names the
@@ -201,8 +205,8 @@ becomes a miss within the run that samples it, and every run after it starts
 from an empty record. The sample does not check the file witness: its
 collection reads file contents through the file index, which answers by the
 same stat (ADR 0009). The sample costs about 25 collections a run, 1 % of the
-collections the record saves on this repository, and at most 16 a run on a
-smaller one. The tests that assert no false hit turn the sample off, so a
+collections the record saves on this repository, and about 16 a run on a
+smaller one (an answer looked up again after a write is sampled again). The tests that assert no false hit turn the sample off, so a
 false hit fails them instead of being corrected.
 
 ### 2. The racy rule, for files and for directories
@@ -526,7 +530,8 @@ rewrite on every run (a project's `.gen`, where a digest keys on files
 there), the sample, and the ones a link or a basis with no answer identity
 leaves unrecorded.
 
-The witness costs a stat of every witnessed path, 28 ms for the whole tree,
+The witness costs a stat of every witnessed path, 28 ms for the whole tree
+(a digest read through a link pays its stats at each check, section 1),
 and the record is a few megabytes; a synthetic record of this repository's
 shape (15,755 distinct paths with their stats, references of 2,169 entries)
 decodes in 4 ms.
