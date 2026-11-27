@@ -187,10 +187,12 @@ func collectFilesWith(cut CandidateSource, dir string, patterns []string, expand
 		return nil, collectionFacts{}, err
 	}
 	for _, selector := range selectors {
-		files, err = appendSelectorFiles(dir, files, expander, selector)
+		var basis wsproto.InputBasis
+		files, basis, err = appendSelectorFiles(dir, files, expander, selector)
 		if err != nil {
 			return nil, collectionFacts{}, err
 		}
+		facts.bases = append(facts.bases, basis)
 	}
 	return sortedUniqueFileEntries(files), facts, nil
 }
@@ -263,6 +265,9 @@ type collectionFacts struct {
 	matchedLink bool
 	// unlisted says a pattern's listing could not be named (listedGlob).
 	unlisted bool
+	// bases holds the basis of each input selector's answer, relative to
+	// the collection's directory: what the extension read to list its files.
+	bases []wsproto.InputBasis
 	// listed holds the paths an ordinary pattern's selection depends on
 	// besides the files it selected: each directory a walk or a glob
 	// listed, and each path a pattern without a glob looked up. A missing
@@ -285,17 +290,17 @@ const selectorExpansionAttempts = 3
 // expanded again, so the files are those of a list every file of which was
 // there, never a list less the file that vanished. A file the last expansion
 // still lists and that is still gone is an invalid selection.
-func appendSelectorFiles(dir string, files []fileEntry, expander InputExpander, selector string) ([]fileEntry, error) {
+func appendSelectorFiles(dir string, files []fileEntry, expander InputExpander, selector string) ([]fileEntry, wsproto.InputBasis, error) {
 	if expander == nil {
-		return nil, fmt.Errorf("%w: no expander for selector %q", ErrInputSelector, selector)
+		return nil, wsproto.InputBasis{}, fmt.Errorf("%w: no expander for selector %q", ErrInputSelector, selector)
 	}
 	for attempt := 1; ; attempt++ {
-		listed, err := statSelectorFiles(dir, expander, selector)
+		listed, basis, err := statSelectorFiles(dir, expander, selector)
 		if err == nil {
-			return append(files, listed...), nil
+			return append(files, listed...), basis, nil
 		}
 		if attempt == selectorExpansionAttempts || !errors.Is(err, errListedFileGone) {
-			return nil, err
+			return nil, wsproto.InputBasis{}, err
 		}
 	}
 }
@@ -307,13 +312,13 @@ var errListedFileGone = errors.New("the listed file is gone")
 // statSelectorFiles expands selector in dir once and stats each file it
 // lists. A listed file that does not exist is an error errListedFileGone
 // marks.
-func statSelectorFiles(dir string, expander InputExpander, selector string) ([]fileEntry, error) {
+func statSelectorFiles(dir string, expander InputExpander, selector string) ([]fileEntry, wsproto.InputBasis, error) {
 	expansion, err := expander.ExpandInput(dir, selector)
 	if err != nil {
 		if !errors.Is(err, ErrInputSelector) {
 			err = fmt.Errorf("%w: expand %s: %w", ErrInputSelector, selector, err)
 		}
-		return nil, err
+		return nil, wsproto.InputBasis{}, err
 	}
 	files := make([]fileEntry, 0, len(expansion.Files))
 	for _, rel := range expansion.Files {
@@ -321,13 +326,13 @@ func statSelectorFiles(dir string, expander InputExpander, selector string) ([]f
 		info, err := os.Lstat(target)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				return nil, fmt.Errorf("%w: stat resolved input %s: %w (%w)", ErrInputSelector, target, err, errListedFileGone)
+				return nil, wsproto.InputBasis{}, fmt.Errorf("%w: stat resolved input %s: %w (%w)", ErrInputSelector, target, err, errListedFileGone)
 			}
-			return nil, fmt.Errorf("%w: stat resolved input %s: %w", ErrInputSelector, target, err)
+			return nil, wsproto.InputBasis{}, fmt.Errorf("%w: stat resolved input %s: %w", ErrInputSelector, target, err)
 		}
 		files = append(files, fileEntry{path: target, info: info, exact: true})
 	}
-	return files, nil
+	return files, expansion.Basis, nil
 }
 
 func collectDefaultFiles(dir string) ([]fileEntry, error) {
@@ -1393,11 +1398,8 @@ func witnessedHashFiles(cut CandidateSource, dir string, patterns []string, expa
 		record.candidates = record.candidates || git
 		record.ordinary = record.ordinary || !git
 	}
+	record.bases = collected.facts.bases
 	for _, file := range collected.files {
-		if file.exact {
-			record = nil
-			break
-		}
 		record.selected = append(record.selected, file.path)
 	}
 	if collected.facts.matchedLink {
@@ -1430,6 +1432,8 @@ type recordWitness struct {
 	// candidates and ordinary say whether a Git candidate pattern and an
 	// ordinary one select files.
 	candidates, ordinary bool
+	// bases holds the basis of each input selector's answer.
+	bases []wsproto.InputBasis
 }
 
 // collectedFiles is the directory a digest collected its files under and the

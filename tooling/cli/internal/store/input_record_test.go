@@ -149,6 +149,7 @@ var recordPatternSets = [][]string{
 	{"src/a/deep/**/*.txt", "notes.txt"},
 	{"../shared/**/*.txt"},
 	{"src/*/l*"},
+	{"go:sources", "*.txt"},
 }
 
 // TestTheInputRecordServesNoFalseHit writes the tree at random between runs
@@ -172,12 +173,13 @@ func TestTheInputRecordServesNoFalseHit(t *testing.T) {
 			for round := range 25 {
 				record := useRecordAt(t, root)
 				cm := NewCacheManager(nil)
+				expander := basisExpander{identity: "ext"}
 				for _, patterns := range recordPatternSets {
-					got, err := cm.HashFiles(project, patterns, nil, ProjectConfigScope{})
+					got, err := cm.HashFiles(project, patterns, expander, ProjectConfigScope{})
 					if err != nil {
 						t.Fatal(err)
 					}
-					want, err := hashFiles(project, patterns, nil, ProjectConfigScope{})
+					want, err := hashFiles(project, patterns, expander, ProjectConfigScope{})
 					if err != nil {
 						t.Fatal(err)
 					}

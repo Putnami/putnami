@@ -1,13 +1,16 @@
 package store
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
 
@@ -84,21 +87,23 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 	cases := []struct {
 		name     string
 		patterns []string
+		expander InputExpander
 		recorded bool
 	}{
-		{"a recursive walk", []string{"src/**/*.go"}, true},
-		{"a glob in the last segment", []string{"*.json"}, true},
-		{"a literal name", []string{"README.md"}, true},
-		{"an exclusion", []string{"**/*", "!README.md"}, true},
-		{"a missing prefix", []string{"missing/**"}, true},
-		{"the empty pattern set (the default walk)", nil, false},
-		{"Git candidates Git listed (ADR 0113 §3: its fallback)", []string{"git:**"}, false},
-		{"an input selector (ADR 0113 §1: after its basis witness)", []string{"go:sources"}, false},
-		{"a glob before the last segment", []string{"s*/a.go"}, true},
-		{"a character class", []string{"[sx]*.json"}, true},
-		{"a pattern above the directory", []string{"../shared/*.txt"}, true},
-		{"a link to a file", []string{"link.md"}, true},
-		{"a dangling link", []string{"d/dangling.md"}, false},
+		{"a recursive walk", []string{"src/**/*.go"}, nil, true},
+		{"a glob in the last segment", []string{"*.json"}, nil, true},
+		{"a literal name", []string{"README.md"}, nil, true},
+		{"an exclusion", []string{"**/*", "!README.md"}, nil, true},
+		{"a missing prefix", []string{"missing/**"}, nil, true},
+		{"the empty pattern set (the default walk)", nil, nil, false},
+		{"Git candidates Git listed (ADR 0113 §3: its fallback)", []string{"git:**"}, nil, false},
+		{"an input selector whose answers name their identity", []string{"go:sources"}, basisExpander{identity: "ext"}, true},
+		{"an input selector whose answers name none", []string{"go:sources"}, basisExpander{}, false},
+		{"a glob before the last segment", []string{"s*/a.go"}, nil, true},
+		{"a character class", []string{"[sx]*.json"}, nil, true},
+		{"a pattern above the directory", []string{"../shared/*.txt"}, nil, true},
+		{"a link to a file", []string{"link.md"}, nil, true},
+		{"a dangling link", []string{"d/dangling.md"}, nil, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -107,8 +112,8 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 				t.Skip("this platform or filesystem keeps no input record")
 			}
 			recorded := false
-			if key, ok := recordKey("k", c.patterns); ok {
-				hash, witness, err := witnessedHashFiles(nil, project, c.patterns, nil, ProjectConfigScope{})
+			if key, ok := recordKey("k", c.patterns, c.expander); ok {
+				hash, witness, err := witnessedHashFiles(nil, project, c.patterns, c.expander, ProjectConfigScope{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -132,4 +137,34 @@ func statOf(t *testing.T, path string) fileindex.Stat {
 		t.Skip("this platform's stat is not decoded")
 	}
 	return st
+}
+
+// basisExpander answers the selector go:sources with every .go file under
+// src, read now, and the basis that says so; identity is the identity of its
+// answers, "" for one that names none.
+type basisExpander struct{ identity string }
+
+func (e basisExpander) ExpandInput(dir, selector string) (InputExpansion, error) {
+	if selector != "go:sources" {
+		return InputExpansion{}, fmt.Errorf("%w: no answer for %q", ErrInputSelector, selector)
+	}
+	var files []string
+	_ = filepath.WalkDir(filepath.Join(dir, "src"), func(path string, d os.DirEntry, err error) error {
+		if err == nil && d.Type().IsRegular() && strings.HasSuffix(path, ".go") {
+			rel, _ := filepath.Rel(dir, path)
+			files = append(files, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	sort.Strings(files)
+	return InputExpansion{Files: files, Basis: wsproto.InputBasis{Listing: [][]string{{"src/**/*.go"}}}}, nil
+}
+
+func (e basisExpander) Identity() string { return "basis" }
+
+func (e basisExpander) RecordIdentity() string {
+	if e.identity == "" {
+		return ""
+	}
+	return e.Identity() + "\x00" + e.identity
 }

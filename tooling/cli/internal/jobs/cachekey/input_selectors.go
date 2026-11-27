@@ -158,3 +158,25 @@ func (e *jobInputExpander) Identity() string {
 	}
 	return b.String()
 }
+
+// RecordIdentity is Identity with what each selector's answer depends on
+// beside its basis (inputresolve.Resolver.AnswerIdentity), and "" when one of
+// them has none: the input record then keeps no digest of the job's
+// selectors (tooling/cli ADR 0113 §1).
+func (e *jobInputExpander) RecordIdentity() string {
+	answers, ok := e.resolver.(interface{ AnswerIdentity(extension string) string })
+	if !ok || e.refused != "" {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(e.Identity())
+	for _, query := range e.queries {
+		identity := answers.AnswerIdentity(query.Extension)
+		if identity == "" {
+			return ""
+		}
+		b.WriteString("\x00")
+		b.WriteString(identity)
+	}
+	return b.String()
+}

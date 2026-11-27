@@ -305,7 +305,7 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 	record := fileindex.CurrentRecord()
 	recorded, recordable := "", false
 	if record != nil {
-		recorded, recordable = recordKey(key, patterns)
+		recorded, recordable = recordKey(key, patterns, expander)
 	}
 	if recordable {
 		if hash, witness, memoize, ok := recordedInputDigest(record, recorded, dir, patterns); ok {

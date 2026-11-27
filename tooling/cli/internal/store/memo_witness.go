@@ -435,18 +435,27 @@ func globDoubleStarReaches(rel, prefix string) bool {
 const InputDigestTable = "input-digest"
 
 // recordKey is the input record's key of a digest of patterns, and false
-// when the record may not answer it: a pattern set with an input selector,
-// or none. A digest that reads Git candidates is keyed by the environment
-// that selects the repository, its index and its configuration too: their
-// values decide the cut as much as the files do (ADR 0113 §3). Whether a
+// when the record may not answer it: the empty pattern set, or input
+// selectors whose expander names no answer identity. A digest of input
+// selectors is keyed by what their answers depend on beside their basis
+// (recordIdentity), and one that reads Git candidates by the environment
+// that selects the repository, its index and its configuration: their values
+// decide the cut as much as the files do (ADR 0113 §1, §3). Whether a
 // collected digest is recorded is decided from its witness
 // (recordInputDigest).
-func recordKey(key string, patterns []string) (string, bool) {
+func recordKey(key string, patterns []string, expander InputExpander) (string, bool) {
 	git := false
 	for _, pattern := range patterns {
 		if extensionproto.NamesInputSelector(pattern) {
-			return "", false
+			identified, ok := expander.(interface{ RecordIdentity() string })
+			if !ok || identified.RecordIdentity() == "" {
+				return "", false
+			}
+			key += "\x00selectors\x00" + identified.RecordIdentity()
+			break
 		}
+	}
+	for _, pattern := range patterns {
 		_, candidate := wsproto.GitFilePattern(strings.TrimPrefix(pattern, "!"))
 		git = git || candidate
 	}
@@ -512,6 +521,18 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 	for _, rel := range w.absent {
 		listed = append(listed, filepath.Join(w.dir, filepath.FromSlash(rel)))
 	}
+	// An answer's files hold while what the extension read holds: the
+	// directories its basis lists, and the paths a content set selects,
+	// each read as the basis digest reads it, a link by its text.
+	var contents []string
+	for _, basis := range w.bases {
+		directories, content, err := wsproto.InputBasisPaths(w.dir, basis)
+		if err != nil {
+			return
+		}
+		listed = append(listed, directories...)
+		contents = append(contents, content...)
+	}
 	// The selected files come first, each once, as the collection
 	// selected them; then every other path, once.
 	parts := make([]fileindex.RecordPart, 0, len(w.selected)+len(listed))
@@ -551,6 +572,13 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 			return
 		}
 		parts = append(parts, fileindex.RecordPart{Path: path, Stat: st})
+	}
+	for _, path := range contents {
+		st, ok := fileindex.LstatAny(path)
+		if !ok {
+			return
+		}
+		add(path, st)
 	}
 	for _, path := range listed {
 		// A missing path is witnessed by the nearest directory above it that
