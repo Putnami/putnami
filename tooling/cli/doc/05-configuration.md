@@ -350,8 +350,10 @@ For a managed mirror, declare
 provider authorizes this destination and copies eligible public members using
 its configured native registry credential. The CLI carries the destination in
 the release request; it never copies a private artifact just because a mirror
-was declared. Mirror destinations are bounded registry hosts/paths or HTTPS
-URLs without credentials, queries or fragments.
+was declared. It carries it only when every member of that ecosystem in the
+released set carries a release version, so canary and pull-request versions
+never reach the external registry. Mirror destinations are bounded registry
+hosts/paths or HTTPS URLs without credentials, queries or fragments.
 
 ## Breadcrumb Configuration
 

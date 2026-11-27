@@ -51,10 +51,18 @@
         "publish carries distribution.registries.<ecosystem>.mirror.to in the same release request, including an already-current publication.",
         "The CLI does not widen visibility, choose eligible members or send mirror credentials; the provider durably accepts authorized copies of public immutable members."
       ]
+    },
+    {
+      "id": "mirror-intent-copies-released-versions-only",
+      "text": [
+        "publish carries an ecosystem's mirror destination only when every member of that ecosystem in the released set carries a release version: a version with no prerelease part.",
+        "A canary or pull-request publication, whose members carry prerelease versions, requests no copy for that ecosystem and still releases its channels; publish prints which member withheld it."
+      ]
     }
   ],
   "decisions": [
     "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md",
-    "tooling/cli/doc/adr/0061-channel-and-ci-commands-leave-the-core-cli.md"
+    "tooling/cli/doc/adr/0061-channel-and-ci-commands-leave-the-core-cli.md",
+    "tooling/cli/doc/adr/0114-a-mirror-copies-released-versions-only.md"
   ]
 }

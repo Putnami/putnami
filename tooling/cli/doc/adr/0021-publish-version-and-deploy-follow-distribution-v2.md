@@ -67,7 +67,9 @@ and the release call themselves follow
    or handles provider credentials. The provider owns mirror acceptance, retry
    and completion
    ([Distribution ADR 0004](../../../../protocols/distribution/doc/adr/0004-mirror-intent-in-the-release-transaction.md)).
-   Channel promotion adds no mirror policy.
+   Channel promotion adds no mirror policy. Since
+   [ADR 0114](0114-a-mirror-copies-released-versions-only.md), the CLI leaves
+   out an ecosystem whose released set holds a prerelease member.
 7. **Without a release-set provider**, a full publish (`--all`, or a tagged
    commit) publishes every member to the declared registries and moves no
    channel. `publish --impacted --channel` is refused, because it needs a head.

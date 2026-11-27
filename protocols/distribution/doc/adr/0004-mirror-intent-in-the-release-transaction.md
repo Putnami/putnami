@@ -28,6 +28,8 @@ already-current set cannot recover the lost intent.
 3. The CLI carries the declared map in its single release operation. An entry
    whose ecosystem has no member in the set creates no copy intent. Only
    members whose stored visibility is `public` after resolution are eligible.
+   The CLI omits an ecosystem's entry when a member of that ecosystem carries
+   a prerelease version (`@putnami/cli` ADR 0114).
 4. A `released` or `already-current` answer requires durable copy intent
    written in the same transaction as release acceptance. A `conflict` creates
    none. Acceptance does not confirm that a copy completed: the provider

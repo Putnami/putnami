@@ -3092,6 +3092,8 @@ func (run *ReleaseSetRun) commit(ctx context.Context, results map[string]*jobmod
 		}
 		channels = append(channels, request)
 	}
+	mirrors, withheld := ReleasedMirrorTargets(run.mirrors, finalSet.Members)
+	reportWithheldMirrors(run.mirrors, withheld)
 	request := &distribution.ReleaseRequest{
 		ProtocolVersion: distribution.ProtocolVersion,
 		Namespace:       run.plan.Namespace,
@@ -3102,7 +3104,7 @@ func (run *ReleaseSetRun) commit(ctx context.Context, results map[string]*jobmod
 		// level: the provider resolves the chain per member and ratchets it
 		// (D5).
 		Visibility: chain,
-		Mirrors:    maps.Clone(run.mirrors),
+		Mirrors:    maps.Clone(mirrors),
 	}
 	response, err := run.release(ctx, request, finalSet)
 	if err != nil {
