@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -225,4 +226,74 @@ func normalize(tasks []string) []string {
 		out[i] = fmt.Sprintf("%s %s ok=%v", fields[0], fields[1], ok)
 	}
 	return out
+}
+
+// TestARunWhoseWorkerEndsRunsAgainInItsOwnProcess kills the worker during a
+// run: the client runs the command itself, and gets the result and the exit
+// code a run in its own process gets (CLI ADR 0116 §2, a crash never fails a
+// run).
+func TestARunWhoseWorkerEndsRunsAgainInItsOwnProcess(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("the worker's orphans are ended on Linux only")
+	}
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	root := clitest.WritingCountsFixture(t, 1)
+	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\n")
+	// The tasks sleep long enough for the test to kill the worker during the
+	// run, and write their report as the fixture's do.
+	manifestPath := filepath.Join(root, "extension", "putnami.extension.json")
+	manifest, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slow := strings.ReplaceAll(string(manifest), `printf '%s\\n' \"$0\" \u003e \"$1\"`, `sleep 2; printf '%s\\n' \"$0\" \u003e \"$1\"`)
+	if slow == string(manifest) {
+		t.Fatalf("the fixture's task command was not found in %s", manifest)
+	}
+	clitest.WriteFile(t, manifestPath, slow)
+	clitest.RunGit(t, root, "add", "-A")
+	clitest.RunGit(t, root, "commit", "-m", "slow tasks")
+	startSupervisor(t)
+	t.Setenv(machineproc.Env, "on")
+
+	killed := make(chan error, 1)
+	go func() {
+		deadline := time.Now().Add(20 * time.Second)
+		for time.Now().Before(deadline) {
+			if r, err := machineproc.Query("status"); err == nil {
+				for _, w := range r.Status.Workers {
+					if w.Busy {
+						time.Sleep(500 * time.Millisecond)
+						killed <- syscall.Kill(w.PID, syscall.SIGKILL)
+						return
+					}
+				}
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		killed <- fmt.Errorf("no busy worker in time")
+	}()
+	code, out := clitest.RunGateArgs(t, root, "lint,test,build", "--all")
+	if err := <-killed; err != nil {
+		t.Fatalf("kill the worker: %v", err)
+	}
+	if code != 0 {
+		t.Fatalf("exit %d after the worker ended, want 0\n%s", code, out)
+	}
+	if !strings.Contains(out, "running it again in this process") {
+		t.Errorf("the client did not say it ran the command again:\n%s", out)
+	}
+	if last := machineproc.ReadLastLocal(); last == nil || !strings.Contains(last.Reason, "ended during the run") {
+		t.Errorf("machine status does not say why the run ran in its own process: %+v", last)
+	}
+	tasks := latestTasks(t, root)
+	if len(tasks) != 3 {
+		t.Fatalf("the run ran %d tasks, want 3: %v", len(tasks), tasks)
+	}
+	for _, task := range normalize(tasks) {
+		if !strings.HasSuffix(task, "ok=true") {
+			t.Errorf("task did not succeed: %s", task)
+		}
+	}
 }

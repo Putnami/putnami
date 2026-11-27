@@ -27,3 +27,14 @@ func Supervise() int { return 1 }
 
 // Work refuses on a platform without a machine process.
 func Work(RunFunc) int { return 1 }
+
+// LastLocal is why the last command meant for the machine process ran in its
+// own process.
+type LastLocal struct {
+	Time   string `json:"time"`
+	Reason string `json:"reason"`
+	Dir    string `json:"dir"`
+}
+
+// ReadLastLocal answers nil on a platform without a machine process.
+func ReadLastLocal() *LastLocal { return nil }

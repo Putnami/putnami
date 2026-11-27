@@ -67,13 +67,15 @@ type Reply struct {
 
 // event is what a worker sends a client it serves.
 type event struct {
-	// Started says the run has begun: from then on a lost connection is a
-	// lost run, not one the client may run again.
+	// Started says the run has begun.
 	Started bool `json:"started,omitempty"`
 	// Exit is the run's exit code, its last event.
 	Exit *int `json:"exit,omitempty"`
 	// Refused is a refusal before the run began; the client runs it itself.
 	Refused string `json:"refused,omitempty"`
+	// Lost says the worker ended during the run, after the supervisor ended
+	// what the run had started: the client runs the command itself.
+	Lost bool `json:"lost,omitempty"`
 }
 
 // signal is what a client sends the worker that serves it.

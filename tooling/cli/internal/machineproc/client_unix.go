@@ -4,6 +4,7 @@ package machineproc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net"
 	"os"
@@ -21,8 +22,8 @@ import (
 // does not accept in that time is not used.
 const connectTimeout = 500 * time.Millisecond
 
-// lostRunExit is the exit code of a run whose worker went away after it
-// started: an interrupted run's code.
+// lostRunExit is the exit code of a run the user interrupted and whose worker
+// then went away: an interrupted run's code.
 const lostRunExit = 130
 
 // startWanted records that this command looked for a supervisor and found
@@ -51,9 +52,10 @@ func dial(dir string) (*conn, error) {
 // Serve runs args through the worker of this CLI's build, with the process's
 // environment as it started (SaveProcessContext), its working directory,
 // umask and standard streams. served is false when the machine process did
-// not run the command: none is running, it refused, or it failed before the
-// run began; the caller then runs the command itself. A run that began and
-// lost its worker answers lostRunExit.
+// not run the command: none is running, it refused, it failed before the run
+// began, or its worker ended during the run; the caller then runs the command
+// itself. A run the user interrupted and whose worker then ended answers
+// lostRunExit.
 func Serve(ctx context.Context, args []string) (code int, served bool) {
 	if d := Decide(os.Getenv, ReadSetting(os.Getenv), DefaultOn); !d.Use {
 		return 0, false
@@ -74,6 +76,7 @@ func Serve(ctx context.Context, args []string) (code int, served bool) {
 	c, err := dial(dir)
 	if err != nil {
 		startWanted = true
+		recordLocal(dir, "no supervisor answered")
 		return 0, false
 	}
 	defer c.c.Close() //nolint:errcheck // the run is over
@@ -92,14 +95,21 @@ func Serve(ctx context.Context, args []string) (code int, served bool) {
 		Args: args, Env: env, Dir: wd, Umask: umask,
 	}
 	if err := c.send(req, os.Stdin, os.Stdout, os.Stderr); err != nil {
+		recordLocal(dir, "the request could not be sent")
 		return 0, false
 	}
-	return await(ctx, c)
+	code, served, reason := await(ctx, c)
+	if !served {
+		recordLocal(dir, reason)
+	}
+	return code, served
 }
 
 // await reads the worker's events until the run's exit, and forwards an
-// interrupt when ctx ends.
-func await(ctx context.Context, c *conn) (int, bool) {
+// interrupt when ctx ends. A run the machine process refused, or whose worker
+// ended before its exit, is not served: the caller runs it itself, unless
+// the user interrupted it.
+func await(ctx context.Context, c *conn) (code int, served bool, reason string) {
 	events := make(chan event)
 	failed := make(chan error, 1)
 	go func() {
@@ -114,6 +124,15 @@ func await(ctx context.Context, c *conn) (int, bool) {
 	}()
 	started, interrupted := false, false
 	done := ctx.Done()
+	lost := func(why string) (int, bool, string) {
+		if interrupted {
+			return lostRunExit, true, ""
+		}
+		if started {
+			_, _ = os.Stderr.WriteString("putnami: the machine process ended during the run; running it again in this process\n")
+		}
+		return 0, false, why
+	}
 	for {
 		select {
 		case <-done:
@@ -125,9 +144,11 @@ func await(ctx context.Context, c *conn) (int, bool) {
 		case ev := <-events:
 			switch {
 			case ev.Refused != "":
-				return 0, false
+				return 0, false, "refused: " + ev.Refused
+			case ev.Lost:
+				return lost("the worker ended during the run")
 			case ev.Exit != nil:
-				return *ev.Exit, true
+				return *ev.Exit, true, ""
 			case ev.Started:
 				started = true
 				if ctx.Err() != nil && !interrupted {
@@ -136,13 +157,52 @@ func await(ctx context.Context, c *conn) (int, bool) {
 				}
 			}
 		case <-failed:
-			if !started {
-				return 0, false
-			}
-			_, _ = os.Stderr.WriteString("putnami: the machine process ended during the run\n")
-			return lostRunExit, true
+			return lost("the connection closed before the run's exit")
 		}
 	}
+}
+
+// lastLocalName records why the last command meant for the machine process
+// ran in its own process; `putnami machine status` shows it.
+const lastLocalName = "last-local.json"
+
+// LastLocal is why the last command meant for the machine process ran in its
+// own process.
+type LastLocal struct {
+	Time   string `json:"time"`
+	Reason string `json:"reason"`
+	Dir    string `json:"dir"`
+}
+
+func recordLocal(dir, reason string) {
+	wd, _ := os.Getwd()
+	data, err := json.Marshal(LastLocal{Time: time.Now().UTC().Format(time.RFC3339), Reason: reason, Dir: wd})
+	if err != nil {
+		return
+	}
+	path := filepath.Join(dir, lastLocalName)
+	tmp := path + ".tmp"
+	if os.WriteFile(tmp, data, 0o600) == nil {
+		_ = os.Rename(tmp, path)
+	}
+}
+
+// ReadLastLocal is the last command that ran in its own process although the
+// machine process was on, or nil.
+func ReadLastLocal() *LastLocal {
+	dir, err := Dir(os.Getenv, false)
+	if err != nil {
+		return nil
+	}
+	data, err := os.ReadFile(filepath.Join(dir, lastLocalName))
+	if err != nil {
+		return nil
+	}
+	var last LastLocal
+	if json.Unmarshal(data, &last) != nil {
+		return nil
+	}
+	return &last
 }
 
 // Query sends op ("status" or "stop") to the running supervisor.

@@ -15,7 +15,8 @@ import (
 // servesThroughMachine reports whether args may run in a worker of the
 // machine process (CLI ADR 0116 §4): a command that runs the engine, not a
 // hosted run, not watch mode, not a structured command (install, config,
-// machine…), and not serve, which keeps its own process.
+// machine…), not serve, which keeps its own process, and not publish, deploy
+// or release, which a lost worker's rerun could repeat.
 func servesThroughMachine(args []string) bool {
 	if runcredential.Hosted() || len(args) == 0 {
 		return false
@@ -25,7 +26,13 @@ func servesThroughMachine(args []string) bool {
 		return false
 	}
 	for _, verb := range strings.Split(first, ",") {
-		if verb == "serve" {
+		switch verb {
+		case "serve":
+			return false
+		case "publish", "deploy", "release":
+			// A worker that ends during a run makes its client run the
+			// command again: a command with effects outside the workspace
+			// runs in its own process, once.
 			return false
 		}
 	}
@@ -47,12 +54,15 @@ type machineStatusResult struct {
 	Reason  string              `json:"reason,omitempty"`
 	Setting string              `json:"setting,omitempty"`
 	Machine *machineproc.Status `json:"machine,omitempty"`
+	// LastLocal is why the last command meant for the machine process ran in
+	// its own process.
+	LastLocal *machineproc.LastLocal `json:"lastLocal,omitempty"`
 }
 
 func machineStatus(output string) error {
 	setting := machineproc.ReadSetting(os.Getenv)
 	decision := machineproc.Decide(os.Getenv, setting, machineproc.DefaultOn)
-	result := machineStatusResult{Use: decision.Use, Reason: decision.Reason, Setting: setting}
+	result := machineStatusResult{Use: decision.Use, Reason: decision.Reason, Setting: setting, LastLocal: machineproc.ReadLastLocal()}
 	if r, err := machineproc.Query("status"); err == nil && r.OK {
 		result.Running, result.Machine = true, r.Status
 	}
@@ -65,6 +75,9 @@ func machineStatus(output string) error {
 		iox.Fprintln(os.Stdout, "  Machine process: on")
 	default:
 		iox.Fprintf(os.Stdout, "  Machine process: off (%s)\n", decision.Reason)
+	}
+	if last := result.LastLocal; last != nil {
+		iox.Fprintf(os.Stdout, "  Last run in its own process: %s, %s (%s)\n", last.Time, last.Reason, last.Dir)
 	}
 	if !result.Running {
 		iox.Fprintln(os.Stdout, "  Supervisor: not running")

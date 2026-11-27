@@ -49,6 +49,10 @@ func supervisorEnv(environ []string) []string {
 }
 
 type worker struct {
+	// client is the supervisor's copy of the connection of the run the
+	// worker serves: when the worker ends during the run, the supervisor
+	// tells the client, which runs the command itself (lost).
+	client     *conn
 	exeInfo    os.FileInfo
 	key        string
 	build      string
@@ -71,6 +75,7 @@ type supervisor struct {
 
 	mu        sync.Mutex
 	workers   map[string]*worker
+	pids      map[int]bool // every worker process started and not yet reaped
 	lastUsed  time.Time
 	stopping  bool
 	stopped   chan struct{}
@@ -107,12 +112,14 @@ func Supervise() int {
 		return 1
 	}
 	listener.SetUnlinkOnClose(true)
+	becomeSubreaper()
 	exe, _ := os.Executable()
 	exeInfo, _ := os.Stat(exe)
 	s := &supervisor{exeInfo: exeInfo,
 		dir: dir, exe: exe, started: time.Now(), listener: listener,
-		workers: map[string]*worker{}, lastUsed: time.Now(), stopped: make(chan struct{}),
+		workers: map[string]*worker{}, pids: map[int]bool{}, lastUsed: time.Now(), stopped: make(chan struct{}),
 	}
+	liveWorkers = s.workerPIDs
 	s.describe()
 	fmt.Fprintf(os.Stderr, "machine: supervisor %d listening, protocol %d\n", os.Getpid(), ProtocolVersion)
 	go s.watchIdle()
@@ -195,10 +202,14 @@ func (s *supervisor) route(c *conn, req request, files []*os.File) {
 	err = w.ctrl.send(req, append(files, connFile)...)
 	closeAll(files)
 	_ = connFile.Close()
-	_ = c.c.Close()
 	if err != nil {
+		_ = c.c.Close()
 		s.release(w)
+		return
 	}
+	s.mu.Lock()
+	w.client = c
+	s.mu.Unlock()
 }
 
 // claim returns the idle worker of req's build, starting it when none runs,
@@ -283,7 +294,13 @@ func (s *supervisor) startWorker(key, build, exe string) (*worker, error) {
 	cmd.Env = supervisorEnv(os.Environ())
 	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
 	cmd.ExtraFiles = []*os.File{theirs}
-	if err := cmd.Start(); err != nil {
+	s.mu.Lock()
+	err = cmd.Start()
+	if err == nil {
+		s.pids[cmd.Process.Pid] = true
+	}
+	s.mu.Unlock()
+	if err != nil {
 		_ = ctrl.c.Close()
 		return nil, err
 	}
@@ -301,13 +318,11 @@ func (s *supervisor) startWorker(key, build, exe string) (*worker, error) {
 	select {
 	case err := <-ready:
 		if err != nil {
-			_ = cmd.Process.Kill()
-			_ = cmd.Wait()
+			s.forget(cmd)
 			return nil, err
 		}
 	case <-time.After(readyTimeout):
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
+		s.forget(cmd)
 		return nil, errors.New("worker not ready in time")
 	}
 	fmt.Fprintf(os.Stderr, "machine: worker %d started for build %s\n", cmd.Process.Pid, short(build))
@@ -326,6 +341,10 @@ func (s *supervisor) follow(w *worker) {
 		}
 		if msg.Op == "done" {
 			s.mu.Lock()
+			if w.client != nil {
+				_ = w.client.c.Close()
+				w.client = nil
+			}
 			w.busy = false
 			w.runs++
 			w.lastUsed = time.Now()
@@ -338,10 +357,22 @@ func (s *supervisor) follow(w *worker) {
 	_ = w.ctrl.c.Close()
 	_ = w.cmd.Wait()
 	s.mu.Lock()
+	delete(s.pids, w.cmd.Process.Pid)
+	s.mu.Unlock()
+	// Whatever the worker's run started outlives it: end it before the client
+	// runs the command again.
+	endOrphans()
+	s.mu.Lock()
 	if s.workers[w.key] == w {
 		delete(s.workers, w.key)
 	}
+	client := w.client
+	w.client = nil
 	s.mu.Unlock()
+	if client != nil {
+		_ = client.send(event{Lost: true})
+		_ = client.c.Close()
+	}
 	close(w.gone)
 	fmt.Fprintf(os.Stderr, "machine: worker %d ended\n", w.cmd.Process.Pid)
 	s.describe()
@@ -407,6 +438,7 @@ func (s *supervisor) watchIdle() {
 	ticker := time.NewTicker(idleCheck)
 	defer ticker.Stop()
 	for range ticker.C {
+		reapOrphans()
 		now := time.Now()
 		s.mu.Lock()
 		var idle []*worker
@@ -498,4 +530,24 @@ func sameFile(path string, info os.FileInfo) bool {
 	}
 	now, err := os.Stat(path)
 	return err == nil && os.SameFile(now, info) && now.ModTime().Equal(info.ModTime())
+}
+
+// forget kills and reaps a worker that never became ready.
+func (s *supervisor) forget(cmd *exec.Cmd) {
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+	s.mu.Lock()
+	delete(s.pids, cmd.Process.Pid)
+	s.mu.Unlock()
+}
+
+// workerPIDs is the set of worker processes, which are no orphans.
+func (s *supervisor) workerPIDs() map[int]bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pids := make(map[int]bool, len(s.pids))
+	for pid := range s.pids {
+		pids[pid] = true
+	}
+	return pids
 }
