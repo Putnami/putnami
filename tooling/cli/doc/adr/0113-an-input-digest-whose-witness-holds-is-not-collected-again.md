@@ -172,6 +172,19 @@ holds enters the run's memo with the in-run witness of ADR 0109, rebuilt from
 its recorded files, so a write of the run moves it as it moves a collected
 one.
 
+**A sample of the answers is collected again.** Each run collects again a
+random sample of the digests the record answers: each answer with a
+probability of 16 over the entries the record loaded, and at least 1 %, so
+about 28 of this repository's 2,800 answers. A sampled answer that differs
+from its collection shows a witness the record should not have trusted, in a
+class no test foresaw: the run uses the collected digest, discards the whole
+record for the rest of the run, which then collects every digest, saves an
+empty record, and reports one warning (`cache.input_record_discarded`) that
+names the digest, its directory and its patterns, in its output and in its
+result. An unknown false-hit class becomes a miss within the run that samples
+it, and every run after it starts from an empty record. The sample costs about
+1 % of what the record saves (measured in Consequences).
+
 ### 2. The racy rule, for files and for directories
 
 Every part of a witness follows ADR 0009 §2, against the clock the run that

@@ -43,6 +43,17 @@ func (r *WarningReport) Report(ws *Workspace) {
 	}
 }
 
+// Add writes and keeps warning, a warning the run raises after its load,
+// unless the report already holds it. A nil report does nothing.
+func (r *WarningReport) Add(warning Warning) {
+	if r == nil || !r.add(warning) {
+		return
+	}
+	if r.w != nil {
+		iox.Fprintf(r.w, "putnami: warning: %s\n", warning.Message)
+	}
+}
+
 // add keeps warning unless the report already holds it, and reports whether it
 // kept it.
 func (r *WarningReport) add(warning Warning) bool {

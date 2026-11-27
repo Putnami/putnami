@@ -540,3 +540,51 @@ func mutateGitTree(t *testing.T, rng *rand.Rand, root string) {
 		}
 	}
 }
+
+// TestASampledAnswerThatDiffersDiscardsTheRecord plants a wrong value in the
+// record under a witness that holds, as an unknown false-hit class would: the
+// run checks the answer, returns the collected digest, discards the record,
+// and its save leaves no entry (ADR 0113 §1).
+func TestASampledAnswerThatDiffersDiscardsTheRecord(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "p")
+	writeRecordTree(t, project, map[string]string{"src/a.go": "a"})
+	patterns := []string{"src/**/*.go"}
+
+	record := useRecordAt(t, root)
+	want, err := NewCacheManager(nil).HashFiles(project, patterns, nil, ProjectConfigScope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, _ := recordKey(project+"|"+strings.Join(patterns, ",")+"||", patterns, nil)
+	_, parts, ok := record.Answer(InputDigestTable, key, record.Hold)
+	if !ok {
+		t.Fatal("the digest was not recorded")
+	}
+	if !record.Put(InputDigestTable, key, []byte("planted\x00"+fmt.Sprint(1)+"\x00memoized"), parts) {
+		t.Fatal("the planted value was refused")
+	}
+	if err := record.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	next := useRecordAt(t, root)
+	next.SetSampleRate(1)
+	got, err := NewCacheManager(nil).HashFiles(project, patterns, nil, ProjectConfigScope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("the run answered %s; want the collected %s", got, want)
+	}
+	if next.Discarded() == "" || !strings.Contains(next.Discarded(), "planted") {
+		t.Fatalf("the record was not discarded (%q)", next.Discarded())
+	}
+	if err := next.Save(); err != nil {
+		t.Fatal(err)
+	}
+	after := useRecordAt(t, root)
+	if _, _, ok := after.Answer(InputDigestTable, key, after.Hold); ok {
+		t.Fatal("a discarded record kept an entry")
+	}
+}

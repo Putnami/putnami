@@ -788,6 +788,14 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 			if err := record.Save(); err != nil && req.Global.Debug {
 				iox.Fprintf(os.Stderr, "[debug] input record: %v\n", err)
 			}
+			// A record whose sampled answer differed from a collection is
+			// discarded: the run says so, once, and its result carries it.
+			if reason := record.Discarded(); reason != "" {
+				req.workspaceWarnings.Add(workspace.Warning{
+					Code:    "cache.input_record_discarded",
+					Message: reason + "; the input record is discarded and every input digest is collected (tooling/cli ADR 0113)",
+				})
+			}
 		}()
 	}
 	// Phase 1: load the workspace and resolve extensions — once per run.

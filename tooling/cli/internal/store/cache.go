@@ -309,10 +309,23 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 	}
 	if recordable {
 		if hash, witness, memoize, ok := recordedInputDigest(record, recorded, dir, patterns); ok {
-			if memoize {
-				cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns), witness)
+			// A sample of the answers is collected again (ADR 0113 §1): one
+			// that differs shows a witness the record should not have
+			// trusted, and the record is discarded for good.
+			sampled := record.Sample()
+			if sampled {
+				if collected, _, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope); err == nil && collected != hash {
+					record.Discard(fmt.Sprintf("the input record answered %s for %s %s, which a collection gives as %s",
+						hash, dir, strings.Join(patterns, ","), collected))
+				}
 			}
-			return hash, nil
+			if record.Discarded() == "" {
+				if memoize {
+					cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns), witness)
+				}
+				return hash, nil
+			}
+			recordable = false
 		}
 	}
 	hash, witness, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope)

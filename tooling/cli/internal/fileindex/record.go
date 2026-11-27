@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"sort"
@@ -101,6 +102,12 @@ type Record struct {
 	generation uint64
 
 	answered, computed atomic.Int64
+
+	// sampleRate is the share of answers a caller checks (Sample), and
+	// discarded the reason the record was discarded (Discard), "" while it
+	// is not.
+	sampleRate float64
+	discarded  string
 
 	// stats holds the stats the run took to check witnesses (Hold): one stat
 	// per path per run, dropped by the run's writes (Forget). under maps a
@@ -213,6 +220,67 @@ func (r *Record) load() {
 	r.loaded, r.generation = disk.entries, disk.generation
 }
 
+// minimumSamples is how many answers a run checks at least, and
+// minimumSampleRate the least share of answers it checks (Sample).
+const (
+	minimumSamples    = 16
+	minimumSampleRate = 0.01
+)
+
+// Sample reports whether the caller checks the value the record just
+// answered by computing it again: each answer with a probability of 16 over
+// the entries the record loaded, and at least 1 %. A value that differs is a
+// witness the record should not have trusted, and the caller discards the
+// record (Discard).
+func (r *Record) Sample() bool {
+	if !r.enabled() {
+		return false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.sampleRate == 0 {
+		r.sampleRate = minimumSampleRate
+		if n := len(r.loaded); n > 0 && float64(minimumSamples)/float64(n) > r.sampleRate {
+			r.sampleRate = float64(minimumSamples) / float64(n)
+		}
+	}
+	return rand.Float64() < r.sampleRate //nolint:gosec // a sample, not a secret
+}
+
+// SetSampleRate sets the share of answers Sample checks; a test checks every
+// one with 1.
+func (r *Record) SetSampleRate(rate float64) {
+	r.mu.Lock()
+	r.sampleRate = rate
+	r.mu.Unlock()
+}
+
+// Discard drops every entry of the record for the rest of the process, which
+// then answers and records nothing, and makes its save write an empty record:
+// a value it answered differed from the value computed again, so no entry of
+// it is trusted. reason says which; the first reason is kept.
+func (r *Record) Discard(reason string) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.discarded == "" {
+		r.discarded = reason
+	}
+	r.loaded, r.fresh, r.confirmed, r.stale = map[recordKey]recordEntry{}, map[recordKey]recordEntry{}, map[recordKey]bool{}, map[recordKey]bool{}
+}
+
+// Discarded returns the reason the record was discarded, "" when it was not.
+func (r *Record) Discarded() string {
+	if r == nil {
+		return ""
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.discarded
+}
+
 // currentRecord is the record the run's computations consult; nil answers nothing.
 var currentRecord atomic.Pointer[Record]
 
@@ -242,6 +310,10 @@ func (r *Record) Answer(table, k string, holds func(parts []RecordPart) bool) ([
 	}
 	id := recordKey{table, k}
 	r.mu.Lock()
+	if r.discarded != "" {
+		r.mu.Unlock()
+		return nil, nil, false
+	}
 	e, found := r.fresh[id]
 	_, isLoaded := r.loaded[id]
 	if !found {
@@ -295,6 +367,10 @@ func (r *Record) Put(table, k string, value []byte, parts []RecordPart) bool {
 	}
 	e := recordEntry{value: bytes.Clone(value), parts: append([]RecordPart(nil), parts...)}
 	r.mu.Lock()
+	if r.discarded != "" {
+		r.mu.Unlock()
+		return false
+	}
 	r.fresh[recordKey{table, k}] = e
 	r.mu.Unlock()
 	return true
@@ -327,6 +403,7 @@ func (r *Record) Save() error {
 		return nil
 	}
 	r.mu.Lock()
+	discarded := r.discarded != ""
 	fresh := make(map[recordKey]recordEntry, len(r.fresh))
 	for k, e := range r.fresh {
 		fresh[k] = e
@@ -344,7 +421,7 @@ func (r *Record) Save() error {
 		}
 	}
 	r.mu.Unlock()
-	if len(fresh) == 0 && len(stale) == 0 && !aging {
+	if len(fresh) == 0 && len(stale) == 0 && !aging && !discarded {
 		return nil
 	}
 
@@ -369,6 +446,11 @@ func (r *Record) Save() error {
 	merged := map[recordKey]recordEntry{}
 	stamp := r.clock
 	var generation uint64
+	if discarded {
+		// A discarded record writes no entry: every run after it computes
+		// each value again, and records it anew.
+		return writeRecordAtomic(r.file, encodeRecord(recordFile{identity: r.identity, stamp: stamp, entries: merged}))
+	}
 	if data, readErr := os.ReadFile(r.file); readErr == nil { //nolint:gosec // the record under the workspace's .putnami directory
 		if disk, decodeErr := decodeRecord(data); decodeErr == nil && disk.identity == r.identity && disk.stamp <= now {
 			merged, generation = disk.entries, disk.generation
