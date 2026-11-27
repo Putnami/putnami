@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 
 	"go.putnami.dev/sdk/extension/gitread"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
 
 // CacheManager integrates the LocalStore with job execution to provide
@@ -299,9 +300,21 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 		return cached, nil
 	}
 
+	// A digest the input record holds is answered when its witness holds,
+	// without collecting it (ADR 0113).
+	record := fileindex.CurrentRecord()
+	if record != nil && recordablePatterns(patterns) {
+		if hash, witness, ok := recordedInputDigest(record, key, dir, patterns); ok {
+			cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns), witness)
+			return hash, nil
+		}
+	}
 	hash, witness, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope)
 	if err != nil {
 		return "", err
+	}
+	if record != nil && recordablePatterns(patterns) {
+		recordInputDigest(record, key, hash, witness)
 	}
 
 	if witness != nil && witness.unmemoized {
@@ -376,6 +389,7 @@ func (cm *CacheManager) InvalidateFileHashes() {
 		return
 	}
 	everything := InputRegion{unbounded: true}
+	fileindex.CurrentRecord().ForgetAll()
 	cm.fileHashes.invalidate(everything, nil, nil)
 	cm.extraFileHashes.invalidate(everything, nil, nil)
 }
@@ -397,6 +411,15 @@ func (cm *CacheManager) InvalidateFileHashesUnder(paths []string) {
 		return
 	}
 	written := PathsRegion(paths)
+	if record := fileindex.CurrentRecord(); record != nil {
+		forgotten := slices.Clone(paths)
+		for _, p := range paths {
+			if absolute, err := filepath.Abs(p); err == nil {
+				forgotten = append(forgotten, linkTarget(absolute))
+			}
+		}
+		record.Forget(forgotten)
+	}
 	var excluded *candidateExclusion
 	if exclusion := cm.exclusion.Load(); exclusion != nil && *exclusion != nil {
 		excluded = &candidateExclusion{paths: slices.Clone(paths), exclude: *exclusion}

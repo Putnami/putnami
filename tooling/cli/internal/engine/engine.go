@@ -755,14 +755,29 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		index.Adopt(fileindex.Current())
 		restoreIndex := fileindex.Use(index)
 		restoreConfigReader := wsproto.UseConfigReader(fileindex.ReadFile)
+		// The input digests of cache keys are answered from the workspace's
+		// input record while their witnesses hold (tooling/cli ADR 0113), under
+		// the same rule: a run that only plans reads it and writes nothing.
+		var record *fileindex.Record
+		if req.Global.Plan || req.previewsOnly() {
+			record = fileindex.OpenRecordReadOnly(fileindex.RecordPath(req.WorkspaceRoot), fileindex.RecordIdentity(), time.Now().UnixNano())
+		} else {
+			record = fileindex.OpenRecord(fileindex.RecordPath(req.WorkspaceRoot), fileindex.RecordIdentity())
+		}
+		restoreRecord := fileindex.UseRecord(record)
 		defer func() {
+			restoreRecord()
 			restoreConfigReader()
 			restoreIndex()
 			if req.Global.Debug {
 				iox.Fprintf(os.Stderr, "[debug] file index: %d digests answered, %d files read\n", index.Hits(), index.Reads())
+				iox.Fprintf(os.Stderr, "[debug] input record: %d values answered, %d computed\n", record.Answered(), record.Computed())
 			}
 			if err := index.Save(); err != nil && req.Global.Debug {
 				iox.Fprintf(os.Stderr, "[debug] file index: %v\n", err)
+			}
+			if err := record.Save(); err != nil && req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] input record: %v\n", err)
 			}
 		}()
 	}

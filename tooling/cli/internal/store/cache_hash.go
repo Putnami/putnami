@@ -84,8 +84,10 @@ type fileEntry struct {
 // dir. The segment before "**" is treated as a literal directory prefix.
 // Heavy non-project directories are skipped for performance.
 //
-// It also reports whether a match is a symbolic link.
-func globDoubleStar(dir, pattern string) ([]string, bool) {
+// It also reports whether a match is a symbolic link, and the directories
+// the walk listed, its search root first (absent when the root does not
+// exist), for the input record's witness (tooling/cli ADR 0113).
+func globDoubleStar(dir, pattern string) ([]string, bool, []string) {
 	pattern = filepath.ToSlash(pattern)
 	parts := strings.SplitN(pattern, "**", 2)
 	prefix := strings.Trim(strings.TrimSuffix(parts[0], "/"), "/")
@@ -97,6 +99,7 @@ func globDoubleStar(dir, pattern string) ([]string, bool) {
 
 	var matches []string
 	linked := false
+	listed := []string{searchRoot}
 	_ = filepath.WalkDir(searchRoot, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -111,6 +114,7 @@ func globDoubleStar(dir, pattern string) ([]string, bool) {
 			case "node_modules", ".git", ".putnami", "out", "dist", "vendor":
 				return filepath.SkipDir
 			}
+			listed = append(listed, p)
 			return nil
 		}
 		rel, relErr := filepath.Rel(dir, p)
@@ -123,7 +127,7 @@ func globDoubleStar(dir, pattern string) ([]string, bool) {
 		}
 		return nil
 	})
-	return matches, linked
+	return matches, linked, listed
 }
 
 // collectFiles returns a sorted, deduplicated list of files matching
@@ -235,8 +239,8 @@ func collectPatternFilesWith(cut CandidateSource, dir string, patterns []string)
 		}
 	}
 	var facts collectionFacts
-	files, linked := collectOrdinaryFiles(dir, ordinaryPatterns, excludes)
-	facts.matchedLink = linked
+	files, linked, listed := collectOrdinaryFiles(dir, ordinaryPatterns, excludes)
+	facts.matchedLink, facts.listed = linked, listed
 	if len(gitPatterns) > 0 {
 		candidates, fromCut, absent, err := collectGitFilesWith(cut, dir, gitPatterns, excludes)
 		if err != nil {
@@ -257,6 +261,11 @@ type collectionFacts struct {
 	absent      []string
 	cut         *CandidateCut
 	matchedLink bool
+	// listed holds the paths an ordinary pattern's selection depends on
+	// besides the files it selected: each directory a walk or a glob
+	// listed, and each path a pattern without a glob looked up. A missing
+	// one is witnessed by its nearest existing directory (ADR 0113).
+	listed []string
 }
 
 // selectorExpansionAttempts bounds how many times one selector is expanded
@@ -348,8 +357,9 @@ func collectDefaultFiles(dir string) ([]fileEntry, error) {
 // selected or not, or a file a link leads to: a write where the link leads,
 // which may lie outside the digest's region, changes what the digest reads or
 // adds a file the names of the selection do not show.
-func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry, bool) {
+func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry, bool, []string) {
 	var files []fileEntry
+	var listed []string
 	matchedLink := false
 	// throughLink reports whether a match below root, a pattern's static
 	// prefix, is a symbolic link or lies under a directory below root that is
@@ -382,10 +392,20 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry,
 		var matches []string
 		if strings.Contains(pattern, "**") {
 			var linked bool
-			matches, linked = globDoubleStar(dir, pattern)
+			var walked []string
+			matches, linked, walked = globDoubleStar(dir, pattern)
 			matchedLink = matchedLink || linked
+			listed = append(listed, walked...)
 		} else {
-			matches, _ = filepath.Glob(filepath.Join(dir, pattern))
+			full := filepath.Join(dir, pattern)
+			matches, _ = filepath.Glob(full)
+			if strings.ContainsAny(filepath.Base(full), globMetacharacters) {
+				// Glob lists the directory of its last segment; a glob before
+				// it leaves the digest unrecorded (newSelectionWitness).
+				listed = append(listed, filepath.Dir(full))
+			} else {
+				listed = append(listed, full)
+			}
 			// A glob before the last segment can reach a directory link
 			// whose target holds no match yet: no name says where a later
 			// write adds one.
@@ -414,7 +434,7 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry,
 			}
 		}
 	}
-	return files, matchedLink
+	return files, matchedLink, listed
 }
 
 // ordinaryFileEntry stats one match of an ordinary pattern, following links.

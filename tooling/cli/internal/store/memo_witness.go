@@ -7,12 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode"
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
 
 // selectionWitness is what a memoized input digest read, kept so that a write
@@ -47,6 +49,10 @@ type selectionWitness struct {
 	// unstaged deletion is.
 	cut    string
 	absent []string
+	// listed holds the directories the collection listed and the paths it
+	// looked up besides the files it selected (collectionFacts.listed): with
+	// the selected files, what the input record witnesses (ADR 0113).
+	listed []string
 	// unmemoized marks a digest no memo keeps: an ordinary pattern matched a
 	// symbolic link, whose target a write can create or change anywhere.
 	unmemoized bool
@@ -114,6 +120,7 @@ func newSelectionWitness(dir string, patterns []string, files []fileEntry, facts
 		w.cut = cutFingerprint(*facts.cut)
 	}
 	w.absent = facts.absent
+	w.listed = facts.listed
 	for _, file := range files {
 		if file.exact || !strings.HasPrefix(file.path, dir+string(filepath.Separator)) {
 			return nil
@@ -420,3 +427,92 @@ func globDoubleStarReaches(rel, prefix string) bool {
 	}
 	return true
 }
+
+// InputDigestTable is the table of the input record (fileindex.Record) that
+// holds the input digests of cache keys, keyed by their memo key
+// (lookupFileHash), each with its witness (tooling/cli ADR 0113 §1).
+const InputDigestTable = "input-digest"
+
+// recordablePatterns reports whether a digest of patterns may be answered
+// from the input record: an ordinary pattern set, with no input selector and
+// no Git candidate pattern, whose witness this store takes alone. Whether a
+// collected digest is recorded is decided again from its witness
+// (recordInputDigest).
+func recordablePatterns(patterns []string) bool {
+	for _, pattern := range patterns {
+		if _, git := wsproto.GitFilePattern(strings.TrimPrefix(pattern, "!")); git || extensionproto.NamesInputSelector(pattern) {
+			return false
+		}
+	}
+	return len(patterns) > 0
+}
+
+// recordedInputDigest answers the digest the input record holds at key when
+// every part of its witness holds now, with the in-run witness of ADR 0109
+// rebuilt from the files it recorded: its value is the digest and how many of
+// the witness's first parts are the files it selected.
+func recordedInputDigest(record *fileindex.Record, key, dir string, patterns []string) (string, *selectionWitness, bool) {
+	value, parts, ok := record.Answer(InputDigestTable, key, record.Hold)
+	if !ok {
+		return "", nil, false
+	}
+	hash, count, _ := strings.Cut(string(value), "\x00")
+	n, err := strconv.Atoi(count)
+	if hash == "" || err != nil || n < 0 || n > len(parts) {
+		return "", nil, false
+	}
+	files := make([]fileEntry, n)
+	for i, part := range parts[:n] {
+		files[i] = fileEntry{path: part.Path}
+	}
+	return hash, newSelectionWitness(dir, patterns, files, collectionFacts{}), true
+}
+
+// recordInputDigest offers a collected digest to the input record with its
+// witness: the stat of each file it selected, then of each directory it
+// listed and each path it looked up, a missing one by its nearest existing
+// directory (ADR 0113 §1). A digest whose selection the names alone do not
+// decide (no witness), that read through a link, or that reads Git
+// candidates is not offered; the record refuses one with a part written
+// within the margin of its clock.
+func recordInputDigest(record *fileindex.Record, key, hash string, witness *selectionWitness) {
+	if witness == nil || witness.unmemoized || witness.candidates || !witness.prepare() {
+		return
+	}
+	parts := make([]fileindex.RecordPart, 0, len(witness.selected)+len(witness.listed))
+	seen := make(map[string]bool, cap(parts))
+	for _, path := range witness.selected {
+		st, ok := fileindex.LstatAny(path)
+		if !ok || st.Mode&modeTypeMask != modeRegular {
+			return
+		}
+		seen[path] = true
+		parts = append(parts, fileindex.RecordPart{Path: path, Stat: st})
+	}
+	for _, path := range witness.listed {
+		// A missing path is witnessed by the nearest directory above it that
+		// exists: its listing shows the path stays missing.
+		existing := filepath.Clean(path)
+		st, ok := fileindex.LstatAny(existing)
+		for !ok && filepath.Dir(existing) != existing {
+			existing = filepath.Dir(existing)
+			st, ok = fileindex.LstatAny(existing)
+		}
+		if !ok {
+			return
+		}
+		if !seen[existing] {
+			seen[existing] = true
+			parts = append(parts, fileindex.RecordPart{Path: existing, Stat: st})
+		}
+	}
+	record.Put(InputDigestTable, key, []byte(hash+"\x00"+strconv.Itoa(len(witness.selected))), parts)
+}
+
+// modeTypeMask and modeRegular are the file-type bits of a stat's mode and
+// their value for a regular file, the same on every platform whose stat the
+// file index decodes.
+const (
+	modeTypeMask = 0o170000
+	modeRegular  = 0o100000
+)

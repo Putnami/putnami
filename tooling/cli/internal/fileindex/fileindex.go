@@ -977,3 +977,14 @@ var onLocalFilesystem = func(dir string) bool {
 		dir = parent
 	}
 }
+
+// LstatAny returns the stat of whatever is at path, a directory or a link
+// included, without following a link; ok is false for a missing path and on
+// a platform whose stat this package does not decode.
+func LstatAny(path string) (Stat, bool) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return Stat{}, false
+	}
+	return statFile(info)
+}
