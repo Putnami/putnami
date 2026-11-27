@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/putnami-evidence-fragment.json",
+  "title": "Evidence fragment",
+  "description": "One line of a putnami-evidence.jsonl file: one fact a task observed about a change. A fragment states no project, task, commit or verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "kind", "source", "subject"],
+  "properties": {
+    "protocolVersion": { "const": 1 },
+    "kind": { "enum": ["finding"] },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format"],
+      "properties": {
+        "format": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "maxLength": 4096 },
+        "tool": { "type": "string", "maxLength": 4096 }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "symbol": { "type": "string", "maxLength": 4096 },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "rule": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "severity": { "enum": ["error", "warning", "info"] },
+    "message": { "type": "string", "minLength": 1, "maxLength": 4096 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "finding" } } },
+      "then": { "required": ["rule", "severity", "message"] }
+    }
+  ]
+}

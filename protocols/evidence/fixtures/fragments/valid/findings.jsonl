@@ -1,0 +1,2 @@
+{"protocolVersion":1,"kind":"finding","source":{"format":"putnami-sdd"},"subject":{"path":"cloud/extension/putnami.features.json","symbol":"features[0].requirements[0]"},"rule":"features.missing_evidence","severity":"warning","message":"requirement \"member-only\" has no supporting evidence"}
+{"protocolVersion":1,"kind":"finding","source":{"format":"golangci-lint","tool":"golangci-lint 2.4"},"subject":{"path":"go/framework/errors/attr.go","line":12,"column":3},"rule":"errcheck","severity":"error","message":"the error is not checked"}

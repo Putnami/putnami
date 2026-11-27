@@ -142,6 +142,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/codehost"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
           "producerProject": "/protocols/collaboration"
         },
         {
@@ -178,6 +183,11 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli",
           "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/evidence"
         },
         {
           "kind": "project-dependency",
@@ -452,6 +462,21 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/evidence"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/evidence"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
+          "producerProject": "/protocols/evidence"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
           "producerProject": "/protocols/extension"
         },
         {
@@ -508,6 +533,21 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-repository",
           "producerProject": "/protocols/clientcontract"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-document-set",
+          "producerProject": "/protocols/codehost"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/codehost"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-repository",
+          "producerProject": "/protocols/codehost"
         },
         {
           "kind": "project-dependency",

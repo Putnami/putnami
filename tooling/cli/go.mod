@@ -35,8 +35,10 @@ require (
 )
 
 require (
+	go.putnami.dev/protocol/codehost v0.0.0 // indirect
 	go.putnami.dev/protocol/database v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
+	go.putnami.dev/protocol/evidence v0.0.0
 	go.putnami.dev/protocol/gomod v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	golang.org/x/mod v0.36.0 // indirect
@@ -81,3 +83,7 @@ replace go.putnami.dev/protocol/storage => ../../protocols/storage
 replace go.putnami.dev/protocol/oci => ../../protocols/oci
 
 replace go.putnami.dev/protocol/registry => ../../protocols/registry
+
+replace go.putnami.dev/protocol/evidence => ../../protocols/evidence
+
+replace go.putnami.dev/protocol/codehost => ../../protocols/codehost

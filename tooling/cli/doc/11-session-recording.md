@@ -441,6 +441,7 @@ that fail on the same code failed the same check.
 | Feature decisions | `decisions-validate` | `features.decision_violated`, `features.invalid_decision_registry`, `features.decisions_unreadable` |
 | Architecture rules | `architecture-validate` | the `architecture.*` codes of the rule that failed |
 | Protocol fixtures | the protocol's `test` (Go conformance tests) | `GO_TEST_ASSERTION` per failed assertion line, `GO_TEST_FAILURE` when no assertion explains the failure |
+| Evidence verdict | `<project>:evidence~verdict`, or `workspace:evidence~verdict` for findings no project owns ([ADR 0134](adr/0134-a-run-fails-on-the-findings-of-the-projects-it-selected.md)) | the rule each finding names, as its producer names it, which is not a code of the CLI; `evidence.*` and `features.*` read errors for a refused fragment file |
 
 The SDD extension's codes are documented with its jobs in
 [Validation jobs](../../sdd-extension/doc/02-validation-jobs.md).

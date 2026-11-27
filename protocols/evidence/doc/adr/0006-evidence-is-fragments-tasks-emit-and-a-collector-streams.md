@@ -160,7 +160,7 @@ flowchart LR
 ### 4. Fragments travel as packages of the session report
 
 Evidence adds no transport. It rides the package transport of the session
-report (`@putnami/cli` ADR 0133, a run delivers its report as task packages
+report (`@putnami/cli` ADR 0135, a run delivers its report as task packages
 sent in parallel), as one more package kind.
 
 ```mermaid
@@ -196,7 +196,7 @@ sequenceDiagram
   session stream writer as `events.jsonl`, and each line carries the task's
   identity key and the fragment kind. Appending never blocks the run.
 - **The package worker seals from the spool.** Beside its collector over
-  `events.jsonl`, the package worker of ADR 0133 runs a collector over
+  `events.jsonl`, the package worker of ADR 0135 runs a collector over
   `evidence.jsonl`. It seals one package of kind `evidence` per task key when
   that task's `task:end` reaches `events.jsonl`, when the package reaches
   4 MiB, or when the stream ends. The header is
@@ -273,7 +273,7 @@ over them, and Delivery reads one model whether a workspace produced it or not.
   reader. `protocols/features` keeps the verification report until its
   retirement record. The change evidence document version 1 is unchanged.
 - The Delivery receiver accepts the `evidence` package kind on the package
-  routes of ADR 0133, and computes the verdict with the shared package. This
+  routes of ADR 0135, and computes the verdict with the shared package. This
   is specified here and built in Putnami Cloud's repository.
 - A workspace that configures no document patterns gets no repository-level
   document evidence. Templates write the defaults, and `putnami doctor` names

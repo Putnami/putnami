@@ -65,3 +65,7 @@ replace go.putnami.dev/protocol/oci => ../../protocols/oci
 replace go.putnami.dev/protocol/registry => ../../protocols/registry
 
 replace go.putnami.dev/tooling/cli => ../cli
+
+replace go.putnami.dev/protocol/codehost => ../../protocols/codehost
+
+replace go.putnami.dev/protocol/evidence => ../../protocols/evidence

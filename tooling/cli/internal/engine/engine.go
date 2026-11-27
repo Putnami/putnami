@@ -1118,6 +1118,12 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)
 	}
+	// The evidence verdict reads the finding fragments every result carries,
+	// run or restored, and fails the run on the selected projects' errors
+	// (ADR 0134).
+	if ws != nil {
+		finalizers = append(finalizers, specgate.EvidenceVerdictFinalizer(ws, planned, req.selection, os.Stderr))
+	}
 	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, req, releaseSetRun, releaseSetOptions.Publishes, finalizers)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)

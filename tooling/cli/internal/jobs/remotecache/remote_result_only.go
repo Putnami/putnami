@@ -107,8 +107,9 @@ func requestedByRun(job *jobmodel.ScheduledJob) bool {
 // declaresPostRunReport reports whether job declares a report that a reader
 // consults on disk after the scheduler finishes: the feature verification
 // report and the executable criteria projection, which the spec gate reads
-// from the command output directory. A command-output file whose path the
-// task reports at run time may be either, so it counts too. Every other
+// from the command output directory, and the evidence fragment file, which the
+// evidence verdict reads there (CLI ADR 0134). A command-output file whose path
+// the task reports at run time may be either, so it counts too. Every other
 // post-run reader uses the replayed result, which a status-only hit carries.
 func declaresPostRunReport(job *jobmodel.ScheduledJob) bool {
 	declaration := jobmodel.TaskDeclarationOf(job)
@@ -120,7 +121,7 @@ func declaresPostRunReport(job *jobmodel.ScheduledJob) bool {
 			continue
 		}
 		switch output.Path {
-		case "", features.VerificationReportFilename, features.SpecCriteriaProjectionFilename:
+		case "", features.VerificationReportFilename, features.SpecCriteriaProjectionFilename, cachekey.EvidenceFragmentFilename:
 			return true
 		}
 	}

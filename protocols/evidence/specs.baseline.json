@@ -28,6 +28,10 @@
     "evidence/change-evidence-document#the-subject-names-the-change",
     "evidence/change-evidence-document#timestamps-and-diagnostics-are-well-formed",
     "evidence/change-evidence-document#version-1-and-closed-vocabularies",
-    "evidence/change-evidence-document#version-1-changes-only-by-addition"
+    "evidence/change-evidence-document#version-1-changes-only-by-addition",
+    "evidence/evidence-fragment#a-finding-names-its-rule-and-location",
+    "evidence/evidence-fragment#fragment-lines-are-strict",
+    "evidence/evidence-fragment#fragments-are-bounded",
+    "evidence/evidence-fragment#the-fragment-artifact-is-reserved"
   ]
 }

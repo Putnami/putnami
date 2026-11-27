@@ -140,6 +140,7 @@ type schemaNode struct {
 	Ref        string                 `json:"$ref"`
 	Enum       []string               `json:"enum"`
 	Pattern    string                 `json:"pattern"`
+	Minimum    *int                   `json:"minimum"`
 }
 
 func readSchema(t *testing.T) *schemaNode {

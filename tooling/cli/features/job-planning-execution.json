@@ -550,6 +550,22 @@
         }
       },
       {
+        "id": "a-run-fails-on-its-selected-projects-findings",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-error-finding-of-a-selected-project-fails-the-run",
+            "a-finding-of-an-unselected-project-does-not-fail-the-run",
+            "a-cached-task-contributes-its-findings",
+            "a-finding-no-project-owns-fails-every-selection"
+          ]
+        }
+      },
+      {
         "id": "declared-verification-producers",
         "stage": "coded",
         "evidenceKinds": [

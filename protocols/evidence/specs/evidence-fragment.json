@@ -1,0 +1,42 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "evidence/evidence-fragment",
+  "outcomes": [
+    "A task's observations reach the CLI and Putnami Cloud as data the cache keeps, never as a task of their own",
+    "One reader decides what a fragment file says, so the producer, the CLI and Delivery cannot disagree about it"
+  ],
+  "nonGoals": [
+    "Deciding a verdict: a fragment states a fact, and the reader that applies a policy decides",
+    "The fragment kinds other than finding, which later versions of this feature add"
+  ],
+  "requirements": [
+    {
+      "id": "fragment-lines-are-strict",
+      "text": [
+        "A fragment file holds one JSON object per line, each of protocolVersion 1 and of a closed kind, finding in this version.",
+        "A line that is blank, not an object, of another version or kind, or that holds an undeclared member or a member of the wrong type fails, naming its line."
+      ]
+    },
+    {
+      "id": "a-finding-names-its-rule-and-location",
+      "text": [
+        "A finding carries source.format, subject.path, a clean slash path relative to the task's project that never leaves it, and optionally subject.symbol, subject.line and subject.column.",
+        "It names its rule, a severity of error, warning or info, and a message; it states no project, task or verdict."
+      ]
+    },
+    {
+      "id": "fragments-are-bounded",
+      "text": [
+        "A fragment file holds at most 50000 fragments and 16 MiB; a string is at most 4 KiB.",
+        "A file over a bound fails as a whole."
+      ]
+    },
+    {
+      "id": "the-fragment-artifact-is-reserved",
+      "text": [
+        "The reserved artifact identity putnami-evidence names the file putnami-evidence.jsonl in a task's command output, so a cache hit that restores the file restores the artifact."
+      ]
+    }
+  ]
+}

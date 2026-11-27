@@ -67,6 +67,7 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeInvalidTimestamp:           true,
 	ErrorCodeInvalidDiagnostic:          true,
 	ErrorCodeTooLarge:                   true,
+	ErrorCodeInvalidFragment:            true,
 }
 
 // Patterns. The schema declares the same expressions, and a conformance test

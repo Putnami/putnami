@@ -105,6 +105,36 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   (`evidence.unknown_field`), so a reader updates before its producers write
   them.
 
+## Evidence fragments
+
+A task states what it observed about a change as **evidence fragments**: one
+JSON object per line of `putnami-evidence.jsonl` in its command output
+(`schemas/evidence-fragment.json`, `ParseFragments`, `EncodeFragments`). The
+task declares the file as a required command-output file and writes it on
+every run, empty when it finds nothing, so the cache keeps it with the task and
+a cache hit gives back the same file. The reserved artifact identity
+`putnami-evidence` names it. A fragment states no
+project, task, commit or verdict: the reader stamps the project that owns its
+path and applies its policy (the CLI's evidence verdict, ADR 0134 of
+`@putnami/cli`).
+
+| Member | Content |
+| --- | --- |
+| `protocolVersion` | `1` |
+| `kind` | `finding`, the only kind of this version; a later one adds kinds by addition |
+| `source` | `format`, an open lowercase slug naming the shape the producer translated (`putnami-sdd`, `golangci-lint`), and an optional `tool` |
+| `subject` | `path`, a clean slash path relative to the task's project that never leaves it, and an optional `symbol`, `line` and `column` (from 1; a column needs its line) |
+| `rule`, `severity`, `message` | For a finding: the rule as its checker names it, `error`, `warning` or `info`, and what it reports |
+
+The reader is strict: a blank or malformed line, another version or kind, an
+undeclared, null or repeated member, or a member of the wrong type fails the
+whole file, naming the line as `fragments[<index>]`. A file holds at most
+50,000 fragments and 16 MiB, and a string at most 4 KiB (`evidence.too_large`;
+the CLI's bounded file reader refuses a larger file before it parses it). A
+value that breaks its kind's rules, such as a line or column of 0, is
+`evidence.invalid_fragment`. `EncodeFragments` reads its own output back, so it
+never writes a file the reader refuses.
+
 ## Conformance
 
 `fixtures/expectations.json` lists every fixture: each valid one validates

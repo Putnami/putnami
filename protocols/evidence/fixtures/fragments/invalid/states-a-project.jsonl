@@ -1,0 +1,1 @@
+{"protocolVersion":1,"kind":"finding","source":{"format":"x"},"subject":{"path":"a.md"},"rule":"r","severity":"error","message":"m","project":"/a"}

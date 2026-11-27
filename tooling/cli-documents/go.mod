@@ -63,3 +63,7 @@ replace (
 )
 
 replace go.putnami.dev/protocol/runner => ../../protocols/runner
+
+replace go.putnami.dev/protocol/codehost => ../../protocols/codehost
+
+replace go.putnami.dev/protocol/evidence => ../../protocols/evidence

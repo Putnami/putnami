@@ -1,0 +1,1 @@
+{"protocolVersion":1,"kind":"finding","source":{"format":"x"},"subject":{"path":"../outside.md"},"rule":"r","severity":"error","message":"m"}

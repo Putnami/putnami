@@ -199,6 +199,16 @@ func rawEventsFromCache(events []cache.ActionEvent) []jobmodel.RawJobEvent {
 	return out
 }
 
+// EvidenceFragmentFilename and EvidenceFragmentArtifactID are the reserved
+// evidence fragment file and its artifact id, FragmentFilename and
+// FragmentArtifactID of protocols/evidence. The jobs packages keep the names
+// only and import no evidence type; the evidence verdict's tests pin the
+// equality.
+const (
+	EvidenceFragmentFilename   = "putnami-evidence.jsonl"
+	EvidenceFragmentArtifactID = "putnami-evidence"
+)
+
 // RestoreReservedDeclaredArtifactEvents recovers the structural artifact
 // records a task-owned cache entry can prove even when its ActionResult predates
 // event persistence or came from a provider without the action-events
@@ -208,8 +218,11 @@ func rawEventsFromCache(events []cache.ActionEvent) []jobmodel.RawJobEvent {
 // session.
 //
 // Most artifacts cannot be reconstructed from a filesystem declaration alone:
-// its output id, display name and kind are runtime result data. These two are
-// different because protocols/features reserves their identity and filename,
+// its output id, display name and kind are runtime result data. The evidence
+// fragment file is different because protocols/evidence reserves its identity
+// and filename, and the evidence verdict reads it after the scheduler finishes
+// (CLI ADR 0134). The other two are different because protocols/features
+// reserves their identity and filename,
 // and the producer rule (jobmodel.ProducesVerificationReport,
 // jobmodel.ProducesSpecCriteriaProjection) names the task that writes each: a
 // task of a verification or criteria command that declares the file. They are
@@ -234,6 +247,11 @@ func RestoreReservedDeclaredArtifactEvents(job *jobmodel.ScheduledJob, entry *st
 		case output.Path == features.SpecCriteriaProjectionFilename && jobmodel.ProducesSpecCriteriaProjection(job):
 			id = features.SpecCriteriaProjectionArtifactID
 			name = "Executable criteria projection"
+		case output.Path == EvidenceFragmentFilename:
+			// Any task may state evidence: the file's reserved name is the
+			// producer rule (CLI ADR 0134).
+			id = EvidenceFragmentArtifactID
+			name = "Evidence fragments"
 		default:
 			continue
 		}

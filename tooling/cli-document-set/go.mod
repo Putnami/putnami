@@ -23,6 +23,7 @@ require (
 	go.putnami.dev/protocol/cache v0.0.0 // indirect
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 	go.putnami.dev/protocol/clientcontract v0.0.0 // indirect
+	go.putnami.dev/protocol/codehost v0.0.0 // indirect
 	go.putnami.dev/protocol/collaboration v0.0.0 // indirect
 	go.putnami.dev/protocol/config v0.0.0 // indirect
 	go.putnami.dev/protocol/contracts v0.0.0 // indirect
@@ -31,6 +32,7 @@ require (
 	go.putnami.dev/protocol/distribution v0.0.0 // indirect
 	go.putnami.dev/protocol/doctor v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
+	go.putnami.dev/protocol/evidence v0.0.0 // indirect
 	go.putnami.dev/protocol/extension v0.0.0 // indirect
 	go.putnami.dev/protocol/features v0.0.0 // indirect
 	go.putnami.dev/protocol/gomod v0.0.0 // indirect
@@ -85,3 +87,7 @@ replace (
 )
 
 replace go.putnami.dev/protocol/runner => ../../protocols/runner
+
+replace go.putnami.dev/protocol/codehost => ../../protocols/codehost
+
+replace go.putnami.dev/protocol/evidence => ../../protocols/evidence

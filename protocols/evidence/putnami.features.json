@@ -383,6 +383,72 @@
           }
         }
       ]
+    },
+    {
+      "id": "evidence/evidence-fragment",
+      "type": "feature",
+      "name": "Evidence fragment",
+      "outcome": "A task states what it observed about a change, one fact per line, in one strict and bounded format that the CLI and every reader interpret the same way, and that the cache keeps with the task.",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "fragment-lines-are-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-valid-file-parses",
+              "a-malformed-line-fails-naming-it",
+              "an-undeclared-member-fails"
+            ]
+          }
+        },
+        {
+          "id": "a-finding-names-its-rule-and-location",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-finding-carries-rule-severity-and-message",
+              "a-path-leaving-the-task-fails"
+            ]
+          }
+        },
+        {
+          "id": "fragments-are-bounded",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-oversized-file-fails",
+              "an-oversized-string-fails"
+            ]
+          }
+        },
+        {
+          "id": "the-fragment-artifact-is-reserved",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reserved-identity-names-the-file"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

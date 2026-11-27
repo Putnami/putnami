@@ -1487,9 +1487,12 @@ orders the two jobs, such as the Go `infra` step after `compile`, keeps no
 file.
 A post-run report is the feature verification report or the executable
 criteria projection, which the spec gate reads from the command output
-directory after the run, or a command-output file whose path the task reports
-at run time. A task that polices drift compares the restored bytes with the
-committed ones, which needs the bytes.
+directory after the run, the evidence fragment file `putnami-evidence.jsonl`,
+which the evidence verdict reads there
+([ADR 0134](adr/0134-a-run-fails-on-the-findings-of-the-projects-it-selected.md)),
+or a command-output file whose path the task reports at run time. A task that
+polices drift compares the restored bytes with the committed ones, which needs
+the bytes.
 
 A status-only hit needs a provider that echoes `restore-result-only`
 ([`16-cache-provider-rpc.md`](16-cache-provider-rpc.md)). The provider then
