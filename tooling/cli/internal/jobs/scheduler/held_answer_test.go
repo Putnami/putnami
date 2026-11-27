@@ -477,7 +477,7 @@ func TestAHeldPlanIsAnsweredOnlyWhileTheStoreHoldsItsEntries(t *testing.T) {
 				}
 				for _, key := range []string{"/app:build", "/app:test"} {
 					if used := heldTestLastUse(t, root, key); used.Before(before) {
-						t.Errorf("%s: last use %v, want stamped by the answer at or after %v", key, used, before)
+						t.Errorf("%s: last use %v, want stamped after the answer at or after %v", key, used, before)
 					}
 				}
 				return
@@ -555,3 +555,7 @@ func TestAWorkersRunWitnessesTheEntriesItsHitsRead(t *testing.T) {
 		t.Fatalf("after a clean: answered %v, refused %q; want refused for a moved entry", result != nil, refused)
 	}
 }
+
+// The tests stamp an answer's last use in place, so a test reads it as soon
+// as the answer returned and its store outlives the stamping.
+func init() { stampLastUse = func(stamp func()) { stamp() } }

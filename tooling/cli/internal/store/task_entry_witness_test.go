@@ -66,7 +66,7 @@ func TestServeWitnessedServesOnlyTheEntriesTheHeldRunWasServed(t *testing.T) {
 	if fresh.Sound() {
 		t.Fatalf("a lookup of an entry written just now witnessed %+v, want nothing", fresh)
 	}
-	if moved := NewLocalStore(stores["untouched"]).ServeWitnessed([]EntryWitness{fresh}); moved != 0 {
+	if moved := serveAndWait(NewLocalStore(stores["untouched"]), []EntryWitness{fresh}); moved != 0 {
 		t.Fatalf("an unsound witness served as %d, want refused as 0", moved)
 	}
 	if fresh := resultOnlyWitnessOf(t, stores["result-only"], resultOnlyKeyA); fresh.Sound() {
@@ -85,7 +85,8 @@ func TestServeWitnessedServesOnlyTheEntriesTheHeldRunWasServed(t *testing.T) {
 		}
 		before := time.Now()
 		answer := NewLocalStore(root)
-		if moved := answer.ServeWitnessed(witnesses); moved != -1 {
+		moved := serveAndWait(answer, witnesses)
+		if moved != -1 {
 			t.Fatalf("untouched entries: moved %d, want -1", moved)
 		}
 		// The stamp is a hit's: this handle's generation, bumped once, and the
@@ -97,7 +98,7 @@ func TestServeWitnessedServesOnlyTheEntriesTheHeldRunWasServed(t *testing.T) {
 			}
 		}
 		// The stamp is not part of the witness: a later answer still holds.
-		if moved := NewLocalStore(root).ServeWitnessed(witnesses); moved != -1 {
+		if moved := serveAndWait(NewLocalStore(root), witnesses); moved != -1 {
 			t.Fatalf("after an answer's own stamp: moved %d, want -1", moved)
 		}
 	})
@@ -114,7 +115,7 @@ func TestServeWitnessedServesOnlyTheEntriesTheHeldRunWasServed(t *testing.T) {
 		if err := os.Rename(taskBlobDir(NewLocalStore(root), hashB), filepath.Join(trash, "0")); err != nil {
 			t.Fatal(err)
 		}
-		if moved := NewLocalStore(root).ServeWitnessed(witnesses); moved != 1 {
+		if moved := serveAndWait(NewLocalStore(root), witnesses); moved != 1 {
 			t.Fatalf("one entry evicted: moved %d, want 1", moved)
 		}
 		if used, _ := readLastUsed(taskBlobDir(NewLocalStore(root), hashA)); !used.Equal(stampedA) {
@@ -128,7 +129,7 @@ func TestServeWitnessedServesOnlyTheEntriesTheHeldRunWasServed(t *testing.T) {
 		if _, _, err := CleanStore(root); err != nil {
 			t.Fatal(err)
 		}
-		if moved := NewLocalStore(root).ServeWitnessed(witnesses); moved != 0 {
+		if moved := serveAndWait(NewLocalStore(root), witnesses); moved != 0 {
 			t.Fatalf("a cleaned store: moved %d, want 0", moved)
 		}
 	})
@@ -145,7 +146,7 @@ func TestServeWitnessedServesOnlyTheEntriesTheHeldRunWasServed(t *testing.T) {
 		if again := publishedEntry(NewLocalStore(root), hashA); again == nil {
 			t.Fatal("the entry was not published again")
 		}
-		if moved := NewLocalStore(root).ServeWitnessed(witnesses); moved != 0 {
+		if moved := serveAndWait(NewLocalStore(root), witnesses); moved != 0 {
 			t.Fatalf("one entry published again: moved %d, want 0", moved)
 		}
 	})
@@ -158,7 +159,7 @@ func TestServeWitnessedServesOnlyTheEntriesTheHeldRunWasServed(t *testing.T) {
 		}
 		before := time.Now()
 		answer := NewLocalStore(root)
-		if moved := answer.ServeWitnessed([]EntryWitness{w}); moved != -1 {
+		if moved := serveAndWait(answer, []EntryWitness{w}); moved != -1 {
 			t.Fatalf("an untouched result-only entry: moved %d, want -1", moved)
 		}
 		if used, gen := readLastUsed(answer.blobDir(ResultOnlyTaskEntryAddress(resultOnlyKeyA))); used.Before(before) || gen != answer.gen {
@@ -167,7 +168,7 @@ func TestServeWitnessedServesOnlyTheEntriesTheHeldRunWasServed(t *testing.T) {
 		if err := os.RemoveAll(answer.blobDir(ResultOnlyTaskEntryAddress(resultOnlyKeyA))); err != nil {
 			t.Fatal(err)
 		}
-		if moved := NewLocalStore(root).ServeWitnessed([]EntryWitness{w}); moved != 0 {
+		if moved := serveAndWait(NewLocalStore(root), []EntryWitness{w}); moved != 0 {
 			t.Fatalf("an evicted result-only entry: moved %d, want 0", moved)
 		}
 	})
@@ -176,7 +177,7 @@ func TestServeWitnessedServesOnlyTheEntriesTheHeldRunWasServed(t *testing.T) {
 		root := stores["result-only shadowed"]
 		w := resultOnlyWitnessOf(t, root, resultOnlyKeyA)
 		putWithFile(t, NewLocalStore(root), resultOnlyKeyA, "main.js", "built")
-		if moved := NewLocalStore(root).ServeWitnessed([]EntryWitness{w}); moved != 0 {
+		if moved := serveAndWait(NewLocalStore(root), []EntryWitness{w}); moved != 0 {
 			t.Fatalf("a task-owned entry published at the result-only key: moved %d, want 0", moved)
 		}
 	})
@@ -205,7 +206,7 @@ func TestServeWitnessedChecksALargeSetOverTheProcessors(t *testing.T) {
 	}
 	before := time.Now()
 	answer := NewLocalStore(root)
-	if moved := answer.ServeWitnessed(witnesses); moved != -1 {
+	if moved := serveAndWait(answer, witnesses); moved != -1 {
 		t.Fatalf("untouched entries: moved %d, want -1", moved)
 	}
 	for _, key := range keys {
@@ -217,7 +218,15 @@ func TestServeWitnessedChecksALargeSetOverTheProcessors(t *testing.T) {
 	if err := os.RemoveAll(taskBlobDir(answer, keys[last])); err != nil {
 		t.Fatal(err)
 	}
-	if moved := NewLocalStore(root).ServeWitnessed(witnesses); moved != last {
+	if moved := serveAndWait(NewLocalStore(root), witnesses); moved != last {
 		t.Fatalf("the last entry evicted: moved %d, want %d", moved, last)
 	}
+}
+
+// serveAndWait answers witnesses on s and waits for the stamps it writes
+// after it returned.
+func serveAndWait(s *LocalStore, witnesses []EntryWitness) int {
+	moved, stamp := s.ServeWitnessed(witnesses)
+	stamp()
+	return moved
 }

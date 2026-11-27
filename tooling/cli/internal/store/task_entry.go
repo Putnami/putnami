@@ -536,18 +536,18 @@ const witnessParallelFloor = 64
 // entry holds when every file its lookup read has its stat; a result-only one
 // when its record has its stat and no task-owned descriptor, which a lookup
 // serves first, stands at its key. It holds the store's shared lock once for
-// all of them, so no collection evicts an entry between its check and its
-// stamp, and checks every witness before it stamps any. It returns the index
-// of a witness whose entry moved, and stamps nothing then, or -1 when every
-// entry holds (CLI ADR 0116 §6a).
+// all of them, and returns the stamping of their last use, which the caller
+// runs once its answer returned. It returns the index
+// of a witness whose entry moved, with a stamping that stamps nothing, or -1
+// when every entry holds (CLI ADR 0116 §6a).
 //
 // Each witness costs what a hit's lookup of a memoized entry costs, the stat
 // of its files and one last-use write, without the lock and the generation
 // each lookup takes; a set above witnessParallelFloor is spread over the
 // processors, in contiguous ranges that stop once one entry moved.
-func (s *LocalStore) ServeWitnessed(witnesses []EntryWitness) int {
+func (s *LocalStore) ServeWitnessed(witnesses []EntryWitness) (int, func()) {
 	if len(witnesses) == 0 {
-		return -1
+		return -1, func() {}
 	}
 	s.ensureGeneration()
 	release := s.lockShared()
@@ -578,6 +578,16 @@ func (s *LocalStore) ServeWitnessed(witnesses []EntryWitness) int {
 	dirs := make([]string, len(witnesses))
 	var moved atomic.Int64
 	moved.Store(-1)
+	// holds reports whether the entry witness i was taken of still is at
+	// dirs[i].
+	holds := func(i int) bool {
+		w := witnesses[i]
+		if w.record == "" {
+			return statTaskEntry(dirs[i]) == w.stats
+		}
+		st, ok := fileindex.Lstat(filepath.Join(dirs[i], resultOnlyRecordFilename))
+		return taskEntryFileStat{stat: st, ok: ok} == w.recordStat
+	}
 	each(func(i int) bool {
 		w := witnesses[i]
 		dirs[i] = s.blobDir(w.address)
@@ -598,14 +608,25 @@ func (s *LocalStore) ServeWitnessed(witnesses []EntryWitness) int {
 		return holds
 	})
 	if i := moved.Load(); i >= 0 {
-		return int(i)
+		return int(i), func() {}
 	}
-	now := time.Now()
-	each(func(i int) bool {
-		writeLastUsed(dirs[i], now, s.gen)
-		return true
-	})
-	return -1
+	// The last-use stamps are the caller's to write once its answer returned:
+	// the check above, under the shared lock, is what keeps the answer sound.
+	// A stamp that is late or never written can only cost a later miss, should
+	// a collection run first, never a wrong answer. Each entry is checked
+	// again under the lock before its stamp, so an entry evicted in between is
+	// not stamped (CLI ADR 0116 §6a).
+	return -1, func() {
+		release := s.lockShared()
+		defer release()
+		now := time.Now()
+		each(func(i int) bool {
+			if holds(i) {
+				writeLastUsed(dirs[i], now, s.gen)
+			}
+			return true
+		})
+	}
 }
 
 // TryClaimTaskEntry attempts to own the computation that will publish key's

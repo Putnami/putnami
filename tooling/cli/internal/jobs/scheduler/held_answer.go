@@ -215,9 +215,14 @@ func answerHeld(ctx context.Context, req RunRequest, offered any) (*SchedulerRes
 		return nil, nil, ""
 	}
 	start := time.Now()
-	if moved := req.Cache.ServeWitnessed(held.entries); moved >= 0 {
+	moved, stamp := req.Cache.ServeWitnessed(held.entries)
+	if moved >= 0 {
 		return nil, nil, "a served task's cache entry moved: " + held.served[moved]
 	}
+	// The served entries' last use is stamped once the answer returned: the
+	// witnesses just checked keep the answer sound, and a late stamp can only
+	// cost a later miss (CLI ADR 0116 §6a).
+	defer stampLastUse(stamp)
 	s := &Scheduler{
 		planned:              req.Plan,
 		cfg:                  req.Config,
@@ -289,3 +294,7 @@ func answerHeld(ctx context.Context, req RunRequest, offered any) (*SchedulerRes
 		Tasks:    tasks,
 	}, record, ""
 }
+
+// stampLastUse runs an answer's last-use stamping once the answer returned,
+// off its critical path. Tests run it in place.
+var stampLastUse = func(stamp func()) { go stamp() }

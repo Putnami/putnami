@@ -514,9 +514,13 @@ steps get a key, those reads must become declared inputs.
 restore, no replay. The worker renders the held result with the current
 times, writes the session the contract requires (its records will reference
 the held session's task records once the per-task report packages allow it,
-and are written in full until then), stamps the last use of each cache entry a
-task was served from, as a local-cache hit does, and returns the held exit
-code. A run in its own process, in CI or on macOS gets the same exit code and
+and are written in full until then), and returns the held exit code. It
+stamps the last use of each cache entry a task was served from, as a
+local-cache hit does, once the answer has returned: the check of every
+entry's witness, under the store's shared lock, is what keeps the answer
+sound, and each entry is checked again before its stamp. A stamp that is late
+or never written can only cost a later miss, should a collection run first,
+never a wrong answer; the collection's recency rule is unchanged. A run in its own process, in CI or on macOS gets the same exit code and
 the same task results from its full computation: memory decides nothing a
 witness would not.
 
