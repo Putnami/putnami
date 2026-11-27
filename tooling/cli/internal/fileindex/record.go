@@ -94,14 +94,14 @@ type Record struct {
 	// or the fixed clock of OpenRecordAt.
 	now func(dir string) (int64, error)
 
-	mu         sync.Mutex
-	loaded     map[recordKey]recordEntry
-	fresh      map[recordKey]recordEntry
+	mu     sync.Mutex
+	loaded map[recordKey]recordEntry
+	fresh  map[recordKey]recordEntry
 	// rechecks holds, by witness, the check a value recorded with
 	// PutRechecked must pass again when the record saves; rechecked names
 	// the witness of each such fresh value.
-	rechecks  map[string]func() bool
-	rechecked map[recordKey]string
+	rechecks   map[string]func() bool
+	rechecked  map[recordKey]string
 	confirmed  map[recordKey]bool
 	stale      map[recordKey]bool
 	generation uint64
