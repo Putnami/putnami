@@ -1,15 +1,14 @@
 # ADR 0113 — An input digest whose witness holds is not collected again
 
-- **Status**: proposed
+- **Status**: accepted (2026-11-27)
 - **Date**: 2026-11-26
 - **Amends**: [ADR 0109](0109-a-write-drops-a-memoized-digest-only-when-it-can-move-it.md)
   (its rejected alternative "Keep the digests across runs" becomes this
   decision), and extends the rule of `protocols/workspace`
   [ADR 0009](../../../../protocols/workspace/doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md)
   from a file to a directory
-- **Depends on**: ADR 0112, "The engine reads the Git index and the work tree
-  itself" (proposed beside this one), whose in-process reader gives the cut's
-  witness (section 3)
+- **Depends on**: [ADR 0112](0112-the-engine-reads-the-git-index-and-the-work-tree-itself.md),
+  whose in-process reader gives the cut's witness (section 3)
 - **Scope**: `@putnami/cli` (`internal/store`: the input digests of cache keys;
   `internal/fileindex`: the record's envelope; `internal/jobs/cachekey`: the
   key inputs, the prune precompute and the release baselines of the tree
@@ -243,7 +242,7 @@ back, is not answered: the run collects it through Git.
 
 The witness says the listing is unchanged. It does not answer the run's own
 read of the cut, which ADR 0112 §3 keeps reading afresh when a write of the
-run asks it. Until ADR 0112's reader lands, no `git:` digest is recorded.
+run asks it.
 
 ### 4. A release baseline is recorded by the commits it names
 
@@ -259,26 +258,37 @@ Every part of a baseline but the repository's state is a function of commit
 ids, the prefix and the pattern: Git's objects are named by their content, so
 the object a commit holds at a path, and the commits between two commits that
 touch it, never change. The witness is therefore what names those commits,
-and the run reads it once anyway, through the shared tag reads of ADR 0112 §7
-and the repository state of ADR 0110:
+read through the shared tag reads of ADR 0112 §8 and the repository state of
+ADR 0110:
 
 - the commit HEAD names;
 - every tag name with the object it peels to (a fingerprint of the whole
   list, not only of the pattern's tags: an untagged line keys on whether the
   repository has any tag);
+- the tags HEAD reaches, each with the object its ref names (the
+  `for-each-ref --merged` read the last release is decided from);
 - the repository's state: inside a work tree, not shallow, and the root's
   prefix, from which the project's prefix follows;
 - that nothing rewrites history as Git reads it: no replace ref (no
   `refs/replace` directory and no `refs/replace/` line in `packed-refs`, read
   in-process), no `info/grafts` file, and none of `GIT_REPLACE_REF_BASE`,
   `GIT_NO_REPLACE_OBJECTS`, `GIT_GRAFT_FILE` set;
-- the configuration witness of section 3, since a commit encoding setting
-  changes the bytes of a commit's message that the breaking-change check
-  parses.
+- Git's whole configuration reading (the SHA-256 of `git config -z --list
+  --show-origin`, as the in-process reader keeps it under ADR 0112's stamps)
+  and the values of every `GIT_` variable, `HOME` and `XDG_CONFIG_HOME`: a
+  commit encoding setting changes the bytes of a commit's message that the
+  breaking-change check parses, and this reading covers includes,
+  conditional includes and command-line configuration, which the file stats
+  of section 3 do not.
 
 A baseline whose witness holds is answered with no Git call of its own: no
 `rev-parse` of its tag, no `ls-tree`, no `log`. One whose witness moved is read
-again, as today, and recorded again. A shallow repository, a repository
+again, as today. A baseline a run read is written only when the whole
+witness, taken again from reads of its own when the run saves the record, is
+unchanged: a tag, HEAD or the configuration that moved while the baselines
+were read leaves them out. What remains: a configuration, replace-ref or
+grafts change that comes and goes between the witness and the per-project
+`log` read. A shallow repository, a repository
 outside every work tree and one with no commit read their state as today and
 record nothing: their baselines take no per-project read. The breaking-change
 check is the CLI's code, so another CLI build empties the record (section 6).
@@ -363,8 +373,11 @@ envelope and rules:
   holds at most 16,384 entries (2,169 on this repository) and 1,048,576
   witnessed paths. A run that only confirms entries writes nothing until they
   come halfway to being dropped, as the file index does.
-- **Release baselines.** The same file holds the baselines of section 4,
-  under the same rules, as a second kind of entry.
+- **Release baselines.** Until the input record is on main, the baselines
+  live in their own file, `.putnami/release-record`
+  (`internal/fileindex/release_record.go`), with the same envelope rules and
+  their own lock and 16,384-entry cap; they move into the input record as a
+  table afterwards.
 - **What writes nothing.** `--plan`, a preview-only `--dry-run`, and a process
   that cannot read the clock read the record and write nothing.
 
@@ -414,29 +427,23 @@ outside that set, a fixpoint over the plan. Precompute then costs about 1.8 s
 instead of 4.3 s (section "Context"), and the check of the outputs costs one
 stat per output.
 
-The fixpoint holds only as far as the writers have an entry at their
-precomputed key, and on this repository it collapses today on 488 jobs that
-have none. Counted by task name on an unchanged `--all`: `lint~docs` 150,
-`validate~features` 123, `test~describe` and `build~describe` 35 each,
-`build~compile` 27, `build~generate` 25, `test~generate` 23, `test~test` 4,
-`build~infra` 3, and one each of 13 other tasks. Every one of them uses
-declared capture and was served from the local cache in the same run. So
-either the key it computed at its start differs from its precomputed key, or
-`CacheEntryPresent` cannot address its entry:
+The fixpoint holds only as far as the writers have an entry prune can find
+at their precomputed key. Traced on 2026-11-27 with the real CLI, on main and
+at `ef6c1aa2`, on a shallow clone and on a full clone with its tags: of 2,194
+cacheable jobs, none starts with a key other than its precomputed one, and
+the only jobs served where the precompute found no entry are the 112
+source-bound `describe` and `generate` steps (35 `build~describe`, 35
+`test~describe`, 22 `build~generate`, 20 `test~generate`), whose entry
+address binds the project's source binding. Binding-aware presence
+(`cachekey.CacheEntryPresentAt`) finds them, at no Git call under ADR
+0112. A count of 488 taken earlier came from a branch build whose identity
+differed from the store's entries; its other classes do not occur on main.
 
-- the `describe` and `generate` steps are source-bound, and their entry
-  address binds the project's source binding, which `CacheEntryPresent` does
-  not compute. With ADR 0112's in-process reader it can, at no Git call;
-- for the others, no cause is traced yet. A precomputed key that differs from
-  the key computed at the start is a divergence of its own: prune and the
-  remote negotiation both read the precomputed keys.
-
-This record creates no entry and moves no key, so the expected gain, the 48
-job processes, is conditional. The implementation first adds a test that
-compares, on a fixture plan, each job's precomputed key with the key it
-computes at its start, traces each class it finds, and then makes prune ask
-the fixpoint and measures what it settles. A class this record cannot change
-is reported as what remains.
+Prune itself still counts a source-bound entry absent: its key movement
+covers keys, not bindings. The fixpoint therefore asks
+`CacheEntryPresentAt` and checks the entry's outputs on disk. The expected
+gain, the 48 job processes, is measured when prune asks the fixpoint; this
+record creates no entry and moves no key.
 
 ## Consequences
 
