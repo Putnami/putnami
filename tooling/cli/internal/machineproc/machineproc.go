@@ -7,6 +7,7 @@ package machineproc
 
 import (
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 )
@@ -24,6 +25,25 @@ const Env = "PUTNAMI_MACHINE"
 // machine process again. It is no environment variable, which an env-input
 // glob of a key could read (CLI ADR 0116 §8).
 var inWorker bool
+
+// ReleaseDetached lets go of cmd, a process started detached from the run
+// that started it (proctree.StartDetached), which outlives the run. A CLI
+// process releases it: the process exits soon after, and the child's new
+// parent reaps it when it ends. A worker outlives its runs, and a child it
+// never waits stays a zombie until the worker exits, so a worker waits that
+// child in the background instead (CLI ADR 0116 §4). It waits that child
+// alone, never any child, so no other wait of the process loses the status it
+// expects.
+func ReleaseDetached(cmd *exec.Cmd) error {
+	if cmd == nil || cmd.Process == nil {
+		return nil
+	}
+	if inWorker {
+		go func() { _ = cmd.Wait() }()
+		return nil
+	}
+	return cmd.Process.Release()
+}
 
 // jobEnv is set in the environment of every job a run starts
 // (scheduler.JobEnvironment): a CLI that sees it is a nested run.

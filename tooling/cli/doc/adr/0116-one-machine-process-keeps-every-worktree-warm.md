@@ -368,12 +368,16 @@ on `/dev/tty`, and Ctrl-C during the run.
 process, with held values in place of what the run would compute, each under
 the witness rule of section 8. Its jobs are children of the worker, started
 with the client's environment and in the client's working directory, as the
-engine starts them today, once the supervisor has admitted them. Its session
-is the same session in the same place. A session member that says whether a
-run went through the machine process, and which held values it used, comes
-with the held state; until then the client records why a command meant for
-the machine process ran in its own process, and `putnami machine status`
-shows it.
+engine starts them today, once the supervisor has admitted them. A process a
+run starts detached to outlive it (a cache collection, a session's delivery)
+is waited by the worker in the background, since a child no process waits
+stays a zombie of the worker for the worker's life; a run in its own process
+releases it, and the process that adopts it when that run exits reaps it.
+Its session is the same session in the same place. A session member that
+says whether a run went through the machine process, and which held values
+it used, comes with the held state; until then the client records why a
+command meant for the machine process ran in its own process, and
+`putnami machine status` shows it.
 
 ### 5. Machine-wide admission
 
