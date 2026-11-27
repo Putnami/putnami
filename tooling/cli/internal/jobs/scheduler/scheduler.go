@@ -138,6 +138,10 @@ type SchedulerResult struct {
 	// renderers' Finish reads (SessionOutcome.Tasks), for the session writer
 	// to read too instead of decoding every task's results again.
 	Tasks []ScheduledTask
+	// served is the witness of the entry each task served from the local
+	// cache was read from, by job key, when a machine worker runs the plan
+	// (held_answer.go); nil otherwise.
+	served map[string]store.EntryWitness
 }
 
 // Scheduler executes a DAG of scheduled jobs with parallel goroutines.
@@ -285,6 +289,13 @@ type Scheduler struct {
 	// (lockSourceBoundProjects).
 	sourceBoundLocks   map[string]*sync.Mutex
 	sourceBoundLocksMu sync.Mutex
+
+	// servedEntries is the witness of the entry each task served from the
+	// local cache was read from, by job key: what a machine worker holds the
+	// run's answer under (held_answer.go, CLI ADR 0116 §6a). It is nil, and
+	// nothing is recorded, outside a worker.
+	servedEntries   map[string]store.EntryWitness
+	servedEntriesMu sync.Mutex
 
 	// invocations owns the plan's `finalizes` relations: the private
 	// invocation scratch each producer writes into, the non-secret lease that
@@ -515,9 +526,17 @@ func RunPlan(ctx context.Context, req RunRequest) *SchedulerResult {
 	// not leak an inherited transport to remote cache negotiation or jobs.
 	ctx = CaptureProcessCapabilities(ctx)
 	// A machine worker answers a plan it holds from memory, and holds what a
-	// plan that executed nothing leaves (CLI ADR 0116 §6a, held_answer.go);
-	// any other run, and every plan it cannot answer, runs as it always did.
-	return runOrAnswer(ctx, req, servedHeldRuns(), func() *SchedulerResult { return req.scheduler().Run(ctx) })
+	// plan that executed nothing leaves (CLI ADR 0116 §6a, held_answer.go),
+	// with the witness of each entry its hits read; any other run, and every
+	// plan it cannot answer, runs as it always did.
+	memory := servedHeldRuns()
+	return runOrAnswer(ctx, req, memory, func() *SchedulerResult {
+		s := req.scheduler()
+		if memory != nil {
+			s.servedEntries = map[string]store.EntryWitness{}
+		}
+		return s.Run(ctx)
+	})
 }
 
 // scheduler builds the fully configured scheduler for the request: RunPlan's
@@ -1215,6 +1234,8 @@ func (s *Scheduler) finalizeRun(
 		Cache:    cacheStats,
 		Session:  session,
 		Tasks:    tasks,
+		// Every worker has returned: nothing records a witness any more.
+		served: s.servedEntries,
 	}
 }
 

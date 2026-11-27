@@ -146,7 +146,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  35,
-		funcs:  328,
+		funcs:  331,
 		why: "internal/store: the content-addressed local cache. Entries and task entries " +
 			"(success, failure and result-only), CAS, leases, GC with its in-run budget, " +
 			"generations, the remote bridge, the build-tagged platform halves (materialization, " +

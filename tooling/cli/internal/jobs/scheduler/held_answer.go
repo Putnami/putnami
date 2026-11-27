@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sync"
 	"time"
+
+	"go.putnami.dev/tooling/cli/internal/store"
 )
 
 // An unchanged run that a machine worker serves is answered from memory (CLI
@@ -16,7 +18,11 @@ import (
 // later run the worker decided answerable is answered from that record when it
 // plans the same jobs: no prune, no key, no lookup, no restore, no worker and
 // no task stats, only what a local-cache hit emits to the renderer, task by
-// task. A process that is no worker holds nothing, and every plan runs.
+// task. It answers only while the store holds the very entry each task the
+// held run served from the local cache was served from, which the record
+// witnesses (store.EntryWitness), and serves those entries again as a hit
+// does, stamping their last use. A process that is no worker holds nothing,
+// and every plan runs.
 
 // HeldRuns is the memory of the machine worker this process is. The worker
 // installs it with ServeHeldRuns: the scheduler does not import the machine
@@ -31,6 +37,10 @@ type HeldRuns interface {
 	// nil when it leaves nothing a later run may be answered with, and
 	// whether it was answered from the record Take returned.
 	Keep(root string, record any, answered bool)
+	// Refused tells the worker why the record Take returned answered no plan
+	// although the plan was the one it holds: an entry a task of the held run
+	// was served from moved since. The plan then runs, and Keep follows.
+	Refused(root, reason string)
 }
 
 // heldRuns is the memory ServeHeldRuns installed, nil outside a worker.
@@ -64,29 +74,53 @@ func runOrAnswer(ctx context.Context, req RunRequest, memory HeldRuns, run func(
 		return run()
 	}
 	root := req.Workspace.Root
-	if result, record := answerHeld(ctx, req, memory.Take(root)); result != nil {
+	result, record, refused := answerHeld(ctx, req, memory.Take(root))
+	if result != nil {
 		memory.Keep(root, record, true)
 		return result
 	}
-	result := run()
+	if refused != "" {
+		memory.Refused(root, refused)
+	}
+	result = run()
 	memory.Keep(root, holdRecord(req, result), false)
 	return result
 }
 
+// witnessServed records the witness of the entry job's local hit read, for
+// the record a worker holds of the plan (holdRecord); outside a worker it
+// records nothing.
+func (s *Scheduler) witnessServed(job *ScheduledJob, witness store.EntryWitness) {
+	if s.servedEntries == nil {
+		return
+	}
+	s.servedEntriesMu.Lock()
+	s.servedEntries[job.Key()] = witness
+	s.servedEntriesMu.Unlock()
+}
+
 // heldPlan is what a plan leaves for the worker to hold: the jobs it planned,
-// in plan order, and its result. Results and Session are copies, so what the
-// engine does with the result it was handed never reaches a later answer.
+// in plan order, its result, and the witness of each entry a task of it was
+// served from. Results and Session are copies, so what the engine does with
+// the result it was handed never reaches a later answer.
 type heldPlan struct {
 	keys   []string
 	deps   [][]string
 	result SchedulerResult
+	// entries are the witnesses of the entries the tasks served from the
+	// local cache were read from, and served those tasks' keys, in plan order.
+	entries []store.EntryWitness
+	served  []string
 }
 
 // holdRecord is the record of a plan a later run may be answered with, or nil.
 // Only a plan that executed nothing leaves one: every task served from the
 // local cache or skipped, the run successful and not cut short. A plan the
 // held path cannot replay as it ran leaves none either: a framework-owned
-// job, a serve step, or a run that refuses the cache or verifies it.
+// job, a serve step, or a run that refuses the cache or verifies it. Nor does
+// a plan with a task served from the local cache whose entry its lookup did
+// not witness: one read less than the file index's margin after it was
+// written, or that moved while it was read (store.EntryWitness).
 //
 // It returns an untyped nil, never a nil *heldPlan, so the worker can tell a
 // plan that left nothing from one that left a record.
@@ -101,6 +135,7 @@ func holdRecord(req RunRequest, result *SchedulerResult) any {
 		result: *result,
 	}
 	held.result.Results = make(map[string]*JobResult, len(result.Results))
+	held.result.served = nil
 	for i, job := range req.Plan {
 		if job == nil {
 			return nil
@@ -115,6 +150,16 @@ func holdRecord(req RunRequest, result *SchedulerResult) any {
 		served := r.Reuse == ReuseLocalCache || (r.Reuse == ReuseNone && r.Status == string(TaskStatusSkipped))
 		if !served {
 			return nil
+		}
+		// A local hit is answered only while the store holds the entry it
+		// read (CLI ADR 0116 §6a): with no witness of it, nothing answers it.
+		if r.Reuse == ReuseLocalCache {
+			witness, ok := result.served[key]
+			if !ok || !witness.Sound() {
+				return nil
+			}
+			held.entries = append(held.entries, witness)
+			held.served = append(held.served, key)
 		}
 		copied := *r
 		held.result.Results[key] = &copied
@@ -149,7 +194,12 @@ func (h *heldPlan) matches(planned []*ScheduledJob) bool {
 // answerHeld answers req from offered, the record the worker holds for this
 // plan, and returns the result with the record to keep holding; it returns a
 // nil result, and the plan runs, when offered is no record, the run may not be
-// answered, or the plan differs from the held one.
+// answered, or the plan differs from the held one. It returns a nil result
+// and why when an entry a task of the held run was served from moved since:
+// evicted by a collection or a clean, or published again by another run. The
+// answer reports each such task served from the local cache, so it first
+// checks every entry's witness and serves the entries again as a hit's lookup
+// does, stamping their last use, before it renders anything.
 //
 // The renderer and the session recorder see what a local-cache hit makes them
 // see, task by task in plan order: the job's start, the held result's events
@@ -159,12 +209,15 @@ func (h *heldPlan) matches(planned []*ScheduledJob) bool {
 // held one, with the current times: this run's wall, its orchestration
 // report and its preparation (CLI ADR 0116 §6a, "the held result with the
 // current times").
-func answerHeld(ctx context.Context, req RunRequest, offered any) (*SchedulerResult, any) {
+func answerHeld(ctx context.Context, req RunRequest, offered any) (*SchedulerResult, any, string) {
 	held, ok := offered.(*heldPlan)
 	if !ok || held == nil || ctx.Err() != nil || !holdable(req) || !held.matches(req.Plan) {
-		return nil, nil
+		return nil, nil, ""
 	}
 	start := time.Now()
+	if moved := req.Cache.ServeWitnessed(held.entries); moved >= 0 {
+		return nil, nil, "a served task's cache entry moved: " + held.served[moved]
+	}
 	s := &Scheduler{
 		planned:              req.Plan,
 		cfg:                  req.Config,
@@ -234,5 +287,5 @@ func answerHeld(ctx context.Context, req RunRequest, offered any) (*SchedulerRes
 		Cache:    held.result.Cache,
 		Session:  &session,
 		Tasks:    tasks,
-	}, record
+	}, record, ""
 }

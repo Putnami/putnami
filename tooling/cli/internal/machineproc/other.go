@@ -51,6 +51,9 @@ func (RunMemory) Take(string) any { return nil }
 // Keep holds nothing.
 func (RunMemory) Keep(string, any, bool) {}
 
+// Refused records nothing.
+func (RunMemory) Refused(string, string) {}
+
 // TakeRun offers nothing.
 func (RunMemory) TakeRun(string) any { return nil }
 

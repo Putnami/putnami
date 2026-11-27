@@ -23,8 +23,10 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machineproc"
+	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -408,8 +410,9 @@ func TestAnUnchangedRequestIsDecidedAnswerableFromMemory(t *testing.T) {
 // and writes none of the state files a load and a plan maintain; the
 // scheduler answers its plan from the held one; the run records its session
 // and gives the tasks and the exit code a run in its own process gives on the
-// same tree. After a write in the worktree, and for a request with other
-// arguments, the next request loads, plans and runs its plan, and still gives
+// same tree. Once an entry a task was served from is evicted from the store,
+// after a write in the worktree, and for a request with other arguments, the
+// next request is not answered from memory, runs its plan, and still gives
 // what a run in its own process gives (CLI ADR 0116 §6a).
 func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 	if runtime.GOOS != "linux" {
@@ -436,8 +439,13 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 		return localArgs(step, args...)
 	}
 	local("the first settling run")
+	// A task served from the local cache is held under the witness of its
+	// entry, taken once the entry's files are the file index's margin old:
+	// the held run reads the entries the first settling run published.
+	settled := time.Now().Add(fileindex.Margin)
 	local("the second settling run")
 	startSupervisor(t)
+	time.Sleep(time.Until(settled))
 	// servedArgs runs a request through the worker, and returns its exit
 	// code, the tasks of the session it recorded and the worker's decision.
 	servedArgs := func(step string, args ...string) (int, []string, *machineproc.MemoryDecision) {
@@ -492,8 +500,33 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 		t.Fatalf("the unchanged request again: %+v, want it answered without a plan, with the tasks of a run in its own process", d)
 	}
 
+	// An entry the store no longer holds, which a collection, a clean or
+	// another worktree's run evicted, is not the one the answer would report
+	// served: the next request is refused at the answer, runs its plan, which
+	// executes that task again, and gives what a run in its own process gives.
+	evictServedEntry(t, root, answered[0])
+	code, computed, d := served("after an eviction")
+	if !d.Answerable || d.Answered || !strings.Contains(d.Reason, "a served task's cache entry moved") {
+		t.Fatalf("after an eviction: %+v, want answerable, refused at the answer for the moved entry and computed", d)
+	}
+	if code != 0 {
+		t.Fatalf("after an eviction: exit %d, want 0", code)
+	}
+	localCode, own = local("a run in its own process after the eviction")
+	if localCode != code {
+		t.Errorf("after an eviction: exit %d in its own process, %d through the worker", localCode, code)
+	}
+	if got, want := strings.Join(normalize(computed), "\n"), strings.Join(normalize(own), "\n"); got != want || len(computed) != 6 {
+		t.Errorf("after an eviction: tasks differ, or are not the 6 asked\nthrough the worker:\n%s\nin its own process:\n%s", got, want)
+	}
+	// The run executed a task, so the worker holds none: the next request
+	// computes, and is held.
+	if _, _, d := served("the request that settles the eviction"); d.Answered || d.Kept != "kept" {
+		t.Fatalf("the request that settles the eviction: %+v, want computed and kept", d)
+	}
+
 	clitest.WriteFile(t, filepath.Join(root, "apps", "p001", "src.txt"), "p001 edited\n")
-	code, computed, d := served("after a write")
+	code, computed, d = served("after a write")
 	if d.Answerable || d.Answered || d.PlanSkipped || !strings.Contains(d.Reason, "the worktree changed") {
 		t.Fatalf("after a write: %+v, want unanswerable for the worktree's change, planned and computed", d)
 	}
@@ -523,6 +556,23 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 	}
 	if got, want := strings.Join(normalize(computed), "\n"), strings.Join(normalize(own), "\n"); got != want || len(own) != 2 {
 		t.Errorf("with other arguments: tasks differ, or are not the 2 asked\nthrough the worker:\n%s\nin its own process:\n%s", got, want)
+	}
+}
+
+// evictServedEntry removes from the store the entry the task of the session
+// line task (latestTasks) was served from, as a collection evicts it.
+func evictServedEntry(t *testing.T, root, task string) {
+	t.Helper()
+	fields := strings.Fields(task)
+	if len(fields) < 2 || !strings.HasPrefix(fields[1], "sha256:") {
+		t.Fatalf("the task %q names no input digest", task)
+	}
+	entry, err := store.NewLocalStore(store.ResolveStoreRoot(root)).LookupTaskEntry(strings.TrimPrefix(fields[1], "sha256:"))
+	if err != nil || entry == nil || entry.FilesDir == "" {
+		t.Fatalf("the entry the task %q was served from: %v, %v", task, entry, err)
+	}
+	if err := os.RemoveAll(filepath.Dir(entry.FilesDir)); err != nil {
+		t.Fatal(err)
 	}
 }
 

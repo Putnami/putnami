@@ -101,6 +101,9 @@ type runMemory struct {
 	// skipped and planned count the engine runs answered from what the held
 	// run computed and those that loaded and planned.
 	skipped, planned int
+	// refused says why a plan the held run's record matched was not answered
+	// from it: an entry a task of the held run was served from moved since.
+	refused string
 }
 
 // memoryCheck is the state a decision took before the run: the journal
@@ -155,6 +158,18 @@ func (RunMemory) Keep(root string, record any, answered bool) {
 		r.answered++
 	} else {
 		r.computed++
+	}
+}
+
+// Refused records why the record Take returned answered no plan of the run:
+// the scheduler found that an entry a task of the held run was served from
+// moved since (CLI ADR 0116 §6a). The decision records the first reason.
+func (RunMemory) Refused(root, reason string) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if r.armed && sameRoot(r.root, root) && r.refused == "" {
+		r.refused = reason
 	}
 }
 
@@ -304,6 +319,9 @@ func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
 	memory.Unlock()
 	decision.Answered = run.answered > 0 && run.computed == 0
 	decision.PlanSkipped = run.skipped > 0 && run.planned == 0
+	if run.refused != "" {
+		decision.Reason = run.refused
+	}
 	if check != nil {
 		plans, runs := run.plans, run.runs
 		if run.partial || len(plans) == 0 {

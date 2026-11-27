@@ -514,9 +514,11 @@ steps get a key, those reads must become declared inputs.
 restore, no replay. The worker renders the held result with the current
 times, writes the session the contract requires (its records will reference
 the held session's task records once the per-task report packages allow it,
-and are written in full until then), and returns the held exit code. A run in its own process, in CI
-or on macOS gets the same exit code and the same task results from its full
-computation: memory decides nothing a witness would not.
+and are written in full until then), stamps the last use of each cache entry a
+task was served from, as a local-cache hit does, and returns the held exit
+code. A run in its own process, in CI or on macOS gets the same exit code and
+the same task results from its full computation: memory decides nothing a
+witness would not.
 
 **Where it answers today.** The worker decides before the run. The engine then
 skips loading and planning: an engine run takes what the held run's engine run
@@ -544,11 +546,30 @@ run executed at the same position, from the result that plan left: no prune,
 no key, no lookup, no restore and no task worker. The renderer and the session
 recorder see, task by task in plan order, what a local-cache hit makes them
 see (its start, its entry's events, its completion), the session is recorded
-as any run's is, and the result is the held one with the current times. A plan
-that differs, a plan the held run did not leave a record for, and every plan
-after one the run computed run as usual. `putnami machine status` says whether
-the last run a worker served was answered, and whether without loading and
-planning (`planSkipped`).
+as any run's is, and the result is the held one with the current times.
+Before it renders anything, the scheduler checks step 3's witness of each
+served task's cache entry, which the held run's hit took when its lookup read
+the entry: the stat (device, inode, mode, owner, size, modification and
+status-change times) of each file the lookup read, the entry's descriptor,
+result, metadata and manifest, or a result-only entry's record with no
+task-owned descriptor at its key. These are the stats the store's own memo of
+an entry is held under, taken only of files the file index's margin old
+(`protocols/workspace` ADR 0009), so a file written after them moves one
+whatever the filesystem's tick; a plan with a hit whose lookup read younger
+files leaves no record. The store never writes a published entry's files: an
+entry evicted by any process's collection or by `putnami cache clean` has no
+descriptor, and one published again at its address by another run is new
+files. When every witness holds, the answer stamps each entry's last use with
+this run's store generation, as a hit's lookup does, under the same hold of the
+store's shared lock as the check, so no collection evicts an entry between the
+two and none ages out what answers serve; per served task, that is what a hit
+pays to look up a memoized entry, four stats and one last-use write, spread
+over the processors. When one moved, the plan runs as usual, and the worker
+records why (`a served task's cache entry moved: <task>`). A plan that
+differs, a plan the held run did not leave a record for, and every plan after
+one the run computed run as usual. `putnami machine status` says whether the
+last run a worker served was answered, whether without loading and planning
+(`planSkipped`), and why a run decided answerable was not.
 
 ### 7. How it learns of changes
 

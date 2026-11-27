@@ -79,6 +79,9 @@ func machineStatus(output string) error {
 		answer := "no, " + m.Reason
 		if m.Answerable {
 			answer = "yes"
+			if m.Reason != "" {
+				answer = "yes, not answered: " + m.Reason
+			}
 		}
 		if m.Answered {
 			answer = "yes, answered from memory"

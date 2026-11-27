@@ -1,6 +1,7 @@
 package machineproc
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -99,5 +100,36 @@ func TestAnEngineRunIsHeldAndOfferedOnlyWithItsPlansRecord(t *testing.T) {
 	write(t, filepath.Join(root, "c", "g.txt"), "written by a before-hook")
 	if offered := m.TakeRun(root); offered != nil {
 		t.Errorf("a write after the decision: offered %v, want nothing", offered)
+	}
+}
+
+// TestARefusedAnswerRecordsWhy pins what the worker records of a run decided
+// answerable whose plan the scheduler refused to answer from the held record,
+// because an entry a task of the held run was served from moved since: the
+// decision is not answered, and gives the first reason the scheduler told for
+// this worktree (CLI ADR 0116 §6a).
+func TestARefusedAnswerRecordsWhy(t *testing.T) {
+	dir, err := os.MkdirTemp("", "pm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+	if _, err := Dir(os.Getenv, true); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	m := RunMemory{}
+
+	armMemory(t, nil, root, runMemory{})
+	m.Refused(t.TempDir(), "another worktree's entry moved")
+	m.Refused(root, "a served task's cache entry moved: /app:test")
+	m.Refused(root, "a later reason")
+	m.Take(root)
+	m.Keep(root, nil, false)
+	afterRun(nil, MemoryDecision{Root: root, Answerable: true}, 0)
+	d := ReadLastMemory()
+	if d == nil || !d.Answerable || d.Answered || d.Reason != "a served task's cache entry moved: /app:test" {
+		t.Fatalf("recorded %+v, want answerable, not answered, with the scheduler's first reason for this worktree", d)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
 
 // Result-only task entries — "this task, at this key, succeeded with this
@@ -96,6 +97,10 @@ type ResultOnlyTaskEntry struct {
 	// Metadata is the provenance sidecar. Size is zero and OutputFiles empty:
 	// the entry holds no file.
 	Metadata *EntryMetadata
+
+	// Witness identifies the record the lookup read the entry from, when it
+	// answers for it (EntryWitness); its zero value otherwise.
+	Witness EntryWitness
 }
 
 // resultOnlyRecord is the content of resultOnlyRecordFilename.
@@ -123,6 +128,10 @@ func ResultOnlyTaskEntryAddress(key string) string {
 // LookupResultOnlyTaskEntry returns the result-only entry recorded for key, or
 // nil for a miss. A hit stamps the entry's lastUsed sidecar under the shared
 // store lock, so a concurrent GC cannot evict it between the read and the use.
+//
+// The entry carries the stat of its record as its witness when the record was
+// a margin older than the clock and kept its stat while it was read (CLI ADR
+// 0116 §6a, EntryWitness).
 func (s *LocalStore) LookupResultOnlyTaskEntry(key string) *ResultOnlyTaskEntry {
 	if key == "" {
 		return nil
@@ -133,9 +142,19 @@ func (s *LocalStore) LookupResultOnlyTaskEntry(key string) *ResultOnlyTaskEntry 
 
 	address := ResultOnlyTaskEntryAddress(key)
 	blobDir := s.blobDir(address)
+	now := time.Now()
+	record := filepath.Join(blobDir, resultOnlyRecordFilename)
+	before, ok := fileindex.Lstat(record)
 	entry := loadResultOnlyTaskEntry(blobDir, address, key)
 	if entry == nil {
 		return nil
+	}
+	if after, still := fileindex.Lstat(record); ok && still && after == before &&
+		(taskEntryStats{{stat: before, ok: true}}).settled(now) {
+		entry.Witness = EntryWitness{
+			address: TaskEntryAddress(key), record: address,
+			recordStat: taskEntryFileStat{stat: before, ok: true},
+		}
 	}
 	writeLastUsed(blobDir, time.Now(), s.gen)
 	return entry
