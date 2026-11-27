@@ -339,23 +339,6 @@ export class ReactApplication {
     if (!node.id.endsWith('-layout')) {
       node.id += '-layout';
     }
-    if (node.element && typeof node.element !== 'string') {
-      // There was a page here before the layout, move it to a child
-      node.children ||= [];
-      let pageRoute = node.children.find((c: RouteObject) => c.path === '' && !c.id?.endsWith('-layout'));
-      if (!pageRoute) {
-        pageRoute = {
-          path: '',
-          index: true,
-        };
-        node.children.push(pageRoute);
-      }
-      pageRoute.id = `${node.id.slice(0, -7)}-page`;
-      pageRoute.element = node.element;
-      pageRoute.loader = node.loader;
-      pageRoute.action = node.action;
-    }
-
     const isLazyLayout = typeof options.layout === 'function';
     const isLazyLoader = typeof options.loader === 'function';
 

@@ -155,19 +155,24 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
 
   emitProgress('Scanning for React components', 10, 'scan');
 
-  for (const root of scanRoots) {
+  // Every scan root registers its layouts before any root registers a page,
+  // an error or a not-found page, so each of those attaches to its layout and
+  // reads its middleware whatever the order of the scan roots.
+  const roots = scanRoots.map((root) => ({
+    root,
+    options: {
+      routePrefix: root.routePrefix,
+      scannedDir: root.scanPath,
+      relativeGenDir: relativePath(resolvedGenScanDir, root.scanPath),
+    },
+    layoutLoaders: [] as LayoutLoaderCandidate[],
+  }));
+
+  for (const { root, options, layoutLoaders } of roots) {
     emitLog(
       'info',
       `Scanning React files in ${root.relativePath}${root.routePrefix ? ` (prefix ${root.routePrefix})` : ''}`,
     );
-
-    const relativeGenDir = relativePath(resolvedGenScanDir, root.scanPath);
-    const options = {
-      routePrefix: root.routePrefix,
-      scannedDir: root.scanPath,
-      relativeGenDir,
-    };
-    const layoutLoaders: LayoutLoaderCandidate[] = [];
 
     for (const f of new Glob('**/layout.tsx').scanSync(root.scanPath)) {
       layouts.push(joinPath(root.relativePath, f));
@@ -179,6 +184,9 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
         layoutLoaders.push({ route: applyRoutePrefix(asRoute(f), root.routePrefix), absPath: loaderPath });
       }
     }
+  }
+
+  for (const { root, options, layoutLoaders } of roots) {
     for (const f of new Glob('**/page.tsx').scanSync(root.scanPath)) {
       pages.push(joinPath(root.relativePath, f));
       // Detect `.static()` so the route is registered as SSG/ISR and pre-rendered.
@@ -224,6 +232,9 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
         manifestRoutes.set(route, { route, mode: 'ssr', hydration: 'full' });
       }
     }
+  }
+
+  for (const { root, options } of roots) {
     for (const f of new Glob('**/error.tsx').scanSync(root.scanPath)) {
       errors.push(joinPath(root.relativePath, f));
       appGenerator.addError(f, options);
@@ -237,7 +248,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
     for (const f of new Glob('**/*.island.tsx').scanSync(root.scanPath)) {
       const id = islandIdFromFile(joinPath(root.routePrefix ?? '', f));
       appGenerator.addIsland(f, id, options);
-      islandGenerator.add(f, id, relativeGenDir);
+      islandGenerator.add(f, id, options.relativeGenDir);
       manifestIslands.push({ id, strategy: await detectIslandStrategy(joinPath(root.scanPath, f)) });
     }
   }

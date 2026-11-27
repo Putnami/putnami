@@ -149,6 +149,10 @@ graph TD
     style D fill:#81d4fa
 ```
 
+A page nests under the layout of its directory and of each directory above it,
+on the server and in the client, even when the layout comes from another scan
+root (see `scanRoots` in [configuration](./configuration.md)).
+
 ### Loaders (`loader.ts`)
 
 Loaders fetch data before rendering. They run on the server and receive the `HttpRequestContext`.

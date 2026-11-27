@@ -224,7 +224,8 @@
               "an-action-endpoint-is-registered-when-declared",
               "an-index-page-is-placed-at-its-parent",
               "several-dynamic-segments-are-mapped-together",
-              "the-default-scan-path-applies-when-none-is-configured"
+              "the-default-scan-path-applies-when-none-is-configured",
+              "the-route-graph-does-not-depend-on-the-registration-order"
             ]
           }
         },
