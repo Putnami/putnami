@@ -1,6 +1,6 @@
 # ADR 0100 — Admission charges the CPU it grants
 
-- **Status**: accepted, amended 2026-11-25; decision admission-charges-the-cpu-it-grants retired on 2026-11-26; this ADR remains the record
+- **Status**: accepted, amended 2026-11-25 and 2026-11-27; decision admission-charges-the-cpu-it-grants retired on 2026-11-26; decision a-no-cache-gate-reports-its-load-and-does-not-bound-it settled on 2026-11-27; this ADR remains the record
 - **Date**: 2026-11-24
 - **Scope**: `@putnami/cli` (`internal/jobs/scheduler`), `run.orchestration`
   of the `result-v2` contract (`go.putnami.dev/protocol/cli`, one more
@@ -236,3 +236,82 @@ The runs, their reports, sessions, task histories and load samples are in
 - From an empty history the full gate still holds a load of about 3.5 times
   the CPUs: a cold task is granted the whole machine until its first run is
   measured.
+
+## Amendment — 2026-11-27: the cold load is reported, not bounded
+
+### Context
+
+The amendment of 2026-11-25 left the cold rule to be measured again once
+every tool a job starts honored its grant. The target was a one-minute load
+under 1.5 times the CPUs on a no-cache gate, with a wall time no longer than
+before.
+
+### Decision
+
+1. **A task with no history keeps the first-cold rule.** It is granted the
+   whole capacity and charged one CPU, raised by its weight, as decision 4 of
+   the amendment of 2026-11-25 keeps it.
+2. **The load of a no-cache run is reported, not bounded.**
+   `run.orchestration.capacity` samples the sum of the running ceilings and
+   the one-minute load; no admission rule targets the load. Decision
+   `a-no-cache-gate-reports-its-load-and-does-not-bound-it` records it.
+
+### Measurements
+
+`./putnamiw lint,test,build,validate --all --no-cache --enforce-coverage` on
+a 4-CPU Linux container (Intel Xeon @ 2.10 GHz, 15.7 GiB with a 13.4 GiB
+cgroup memory limit, no CPU quota), on branch `epic-1535/1450` from `main` at
+`ef6c1aa2`. A `main` run ran either at `769b00a7`, whose measurement knobs do
+nothing while their environment variables are unset, or with the scheduler
+package and `features/job-planning-execution.json` of `ef6c1aa2` checked out
+over the candidate. The task history was removed before each run unless
+noted. Each run started alone once the one-minute load fell below 1.0, and
+the options alternated with `main` in one tree, with the CLI rebuilt before
+each run. Wall is `run.durationMs`. The one-minute load was read from
+`/proc/loadavg` every 5 s, and is given as median / 90th percentile / peak.
+Granted is the mean of the `run.orchestration.capacity` samples, and busy
+CPUs are task CPU over wall.
+
+| Run | Wall | Load | Granted | Busy CPUs |
+|---|---|---|---|---|
+| `main` (sessions `20261126-221759-7773e4`, `20261126-232404-5baaa9`, `20261127-001514-c7db1f`) | 602.7, 558.3, 563.3 s | 17.1/20.5/24.9, 16.8/20.2/23.8, 16.6/20.4/25.4 | 15.4 | 3.62 to 3.68 |
+| `main`, from the history `20261126-221759-7773e4` left (`20261126-225423-64f7f4`) | 569.6 s | 7.2/13.0/16.0 | 5.4 | 3.31 |
+| A: a cold task granted and charged its task kind's seed (`77f8ff3b`; `20261127-000118-7e8382`, `20261127-002716-c9027c`) | 730.0, 672.9 s | 5.1/7.2/9.8, 4.6/6.5/8.1 | 4.0 | 2.81 to 2.90 |
+| B: no subprocess starts while the smoothed runnable threads reach 1.5 times the CPUs (`769b00a7` with `PUTNAMI_EXP_PRESSURE=1.5`; `20261126-223046-32af05`) | 645.1 s | 8.9/12.9/16.9 | 9.3 | 3.10 |
+
+A first run of `main` on the fresh container, with a cold Go build cache, took
+1,095.8 s with a load of 19.2/27.2/30.9 (`20261126-214555-450997`). It is left
+out of the comparison, as are four failed runs of A: three failed the
+scheduler's complexity ceiling in the CLI's own tests, and one passed A
+through an environment variable that the CLI's unit tests inherited.
+
+Rejected:
+
+- **A, the cold seed charged whole**: half the capacity for a declared-heavy
+  step and one CPU otherwise, charged whole, which is the fallback of the kind
+  seed this ADR's context rejected, measured again. It meets the load bound at 1.2 times the
+  CPUs, but the gate took 24 % longer than `main` (medians 701 s and 563 s).
+  The long pole is not the cause: `/tooling/cli` tests took 230 to 261 s
+  under a ceiling of 2, against 256 to 275 s under 4. The busy CPUs fell from
+  3.65 to 2.85, because a light cold task is charged one CPU and fills less,
+  and the workers are as many as the CPUs.
+- **B, admission bounded by the machine's runnable threads**: the threads
+  were sampled every 100 ms from `/proc/loadavg` and smoothed, with the first
+  waiter starting while nothing held CPU. The gate took 645 s, 7 to 16 %
+  longer than `main`, and the load stayed at 2.2 times the CPUs: a task
+  admitted below the threshold still starts its whole grant of threads.
+
+### Consequences
+
+- From an empty history, a no-cache gate keeps a one-minute load of about 4.2
+  times the CPUs at the median and 3.8 on average. The machine is saturated, with 3.65 of 4 CPUs busy, so the
+  load above the CPU count is runnable threads waiting, not throughput lost.
+- From a task history, the same gate holds 1.8 times the CPUs at the median:
+  its running ceilings sum to 5.4 CPUs on average against 15.4.
+- The bound was the median one-minute load. A future rule that bounds the
+  cold load cites a no-cache gate at least as fast as `main`'s, measured the
+  same way.
+- The candidate commits `77f8ff3b` and `769b00a7` are on branch
+  `epic-1535/1450`, and the session records, the load series and their
+  summary stayed on the measuring machine.
+

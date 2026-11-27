@@ -558,7 +558,10 @@ fractional charge never leaves a CPU idle behind it:
 
 [ADR 0100](adr/0100-admission-charges-the-cpu-it-grants.md) records why a
 history-backed task is charged its measured occupancy and granted the CPUs
-left free, and why a cold task keeps the first-cold rule.
+left free, and why a cold task keeps the first-cold rule: every cold rule
+measured to hold the load under 1.5 times the CPUs lengthened the run, so the
+one-minute load of a no-cache run is reported in `run.orchestration.capacity`,
+not bounded.
 
 CPU capacity is the machine's logical CPUs clamped to its captured cgroup
 bandwidth quota. At the opening environment sample, memory capacity captures
@@ -633,9 +636,9 @@ The bootstrap distinguishes two kinds of cache miss:
   while admission charges one CPU, raised by an explicit CPU weight, and uses
   the declared resource class for memory: 512 MiB for a light task or 1280 MiB
   for a declared-heavy task, clamped to the machine. Charging a cold task its
-  whole ceiling, or a seed of it, left CPUs idle on a fresh checkout, as
-  measured before every tool a job starts honored its grant (ADR 0100 has the
-  measurement; the rule is to be measured again). The grant is
+  whole ceiling, or a seed of it, left CPUs idle on a fresh checkout: measured
+  again once every tool a job starts honored its grant, the seed charged whole
+  lengthened the no-cache gate by about a quarter (ADR 0100). The grant is
   never persisted as proven CPU demand; the execution still records its
   measured RSS and actual observation ceiling so the next regular-cold run has
   contextual evidence.
