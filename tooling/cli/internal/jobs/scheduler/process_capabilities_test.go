@@ -1228,11 +1228,11 @@ printf '%s\n' '{"v":2,"type":"result","data":{"status":"success"}}'
 		if tidy == nil {
 			delete(results, tidyJob.Key())
 		}
-		if runtime.authorizeReady(effect, results, &mu) {
+		if runtime.authorizeReady(effect, results, &mu, nil) {
 			t.Fatalf("%s: protected job received its grant behind ancestor result %+v", name, tidy)
 		}
 	}
-	if !runtime.authorizeReady(effect, settled(&JobResult{Status: "skipped"}), &mu) {
+	if !runtime.authorizeReady(effect, settled(&JobResult{Status: "skipped"}), &mu, nil) {
 		t.Fatal("protected job was denied its grant behind an in-job skipped ancestor")
 	}
 }

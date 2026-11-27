@@ -300,9 +300,6 @@ func TestPlanKeyMovementCountsOnlyWritesThatReachASelectedFile(t *testing.T) {
 		if got := movement.Writers[consumer.Key()]; !reflect.DeepEqual(got, []string{embed.Key(), unnest.Key()}) {
 			t.Fatalf("writers of compile = %v, want both: removing a go.mod the listing selects can change the answer", got)
 		}
-		if cachekey.SettlesBefore(producer, consumer, movement, cachekey.JobsByKey(planned)) {
-			t.Fatal("compile's key settles before the producer starts, although the writer of sub/assets/x.txt may run after it")
-		}
 	})
 
 	t.Run("a selector that does not expand", func(t *testing.T) {
@@ -480,14 +477,15 @@ func (f *invocationFixture) publishConsumerEntry(t *testing.T, cm *store.CacheMa
 	}
 }
 
-// A relation pruned on a consumer key that a write before the producer may
-// move is confirmed when the producer starts. A write that left the layers as
-// they were keeps the pruning; a write that changed them withdraws it, so the
-// producer provisions the resource the consumer then runs against, instead of
-// the consumer being served a verdict about bytes it no longer reads.
-func TestInvocation_PruningOnAMovableConsumerKeyIsConfirmedWhenTheProducerStarts(t *testing.T) {
+// A consumer whose key a write before it may move decides its setup from the
+// key it computes when it starts. A write that left the layers as they were
+// keeps the hit, so the setup never starts; a write that changed them makes
+// the consumer miss, so the setup provisions the resource the consumer then
+// runs against, instead of the consumer being served a verdict about bytes it
+// no longer reads.
+func TestInvocation_ASetupFollowsTheKeyItsConsumerComputesWhenItStarts(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
-		"pruning-on-a-movable-consumer-key-is-confirmed-when-the-producer-starts")
+		"a-setup-follows-the-key-its-consumer-computes-when-it-starts")
 	cases := []struct {
 		name       string
 		written    string
@@ -544,67 +542,12 @@ func TestInvocation_PruningOnAMovableConsumerKeyIsConfirmedWhenTheProducerStarts
 	}
 }
 
-// The confirmation computes consumer keys under the run's lock
-// (Scheduler.cachedAtCurrentKey), which the coordinator holds while it takes
-// every relation's lock to find the finalizers to run (runReadyFinalizers). The
-// confirmation therefore holds no relation's lock while it waits for the run's:
-// here the coordinator takes the run's lock while the confirmation is under
-// way, and both must finish.
-func TestInvocation_PruningConfirmationHoldsNoRelationAcrossTheRunLock(t *testing.T) {
-	fixture := newInvocationFixture(t, provisionBody, consumeBody)
-	invocations := newInvocationRuntime(fixture.ws, fixture.planned)
-	rel := invocations.byProducer[fixture.producer.Key()]
-	if rel == nil {
-		t.Fatal("the fixture's producer heads no relation")
-	}
-	rel.pruned, rel.recheck = true, true
-
-	var mu sync.Mutex
-	confirming, coordinating, coordinated := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	var enter sync.Once
-	go func() {
-		<-confirming
-		mu.Lock()
-		close(coordinating)
-		invocations.pendingFinalizers(map[string]*JobResult{}, true)
-		mu.Unlock()
-		close(coordinated)
-	}()
-	confirmed := make(chan bool, 1)
-	go func() {
-		confirmed <- invocations.isPruned(fixture.producer, func(*ScheduledJob) bool {
-			enter.Do(func() { close(confirming) })
-			<-coordinating
-			// The consumer's key is computed under the run's lock, and it has no
-			// entry.
-			mu.Lock()
-			defer mu.Unlock()
-			return false
-		})
-	}()
-
-	deadline := time.After(30 * time.Second)
-	select {
-	case pruned := <-confirmed:
-		if pruned {
-			t.Fatal("a consumer with no entry at its current key left the relation pruned")
-		}
-	case <-deadline:
-		t.Fatal("the pruning confirmation and the finalizer pass wait for each other's lock")
-	}
-	select {
-	case <-coordinated:
-	case <-deadline:
-		t.Fatal("the finalizer pass never finished")
-	}
-}
-
-// A consumer key that a write may move after the producer starts cannot be
-// confirmed in time, so the relation is not pruned: the producer provisions,
-// and the consumer runs against the resource once the write moved its key.
-func TestInvocation_ConsumerKeyAWriteMayMoveAfterTheProducerStartsIsNeverPruned(t *testing.T) {
+// A writer that waits for the setup is outside the consumer frontier, so the
+// setup stays eager: it provisions, and the consumer runs against the resource
+// once the write moved its key.
+func TestInvocation_ASetupAWriterWaitsForStaysEager(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
-		"pruning-on-a-movable-consumer-key-is-confirmed-when-the-producer-starts")
+		"a-setup-follows-the-key-its-consumer-computes-when-it-starts")
 	t.Parallel()
 	fixture := newInvocationFixture(t, provisionBody, consumeBody)
 	fixture.cacheConsumerOfLayers()

@@ -183,9 +183,9 @@ func (rt *invocationRuntime) provisioned(job *ScheduledJob, result *JobResult) *
 // never happened as an unrelated failure and let the consumers run against a
 // resource that was never provisioned.
 //
-// A PRUNED relation is exempt: its producer is "skipped" precisely because
-// every consumer was already served from cache, and marking that as a setup
-// failure would block the consumers the pruning exists to serve.
+// A lazy producer that was never needed never reaches it: its skipped row is
+// written once its whole frontier is terminal (settleUnneededProducers), when
+// no consumer is left to block.
 func (rt *invocationRuntime) observe(job *ScheduledJob, result *JobResult) {
 	if rt == nil {
 		return
@@ -195,9 +195,7 @@ func (rt *invocationRuntime) observe(job *ScheduledJob, result *JobResult) {
 		return
 	}
 	rel.mu.Lock()
-	if !rel.pruned {
-		rel.setupFailed = true
-	}
+	rel.setupFailed = true
 	rel.mu.Unlock()
 }
 

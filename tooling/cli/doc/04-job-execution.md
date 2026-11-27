@@ -1029,12 +1029,13 @@ the private path), because bytes it did not read cannot be redacted.
 
 **Cache identity.** A consumer's cache key folds in the producing action's
 digest — derived from the producer's declared inputs, never from what it
-produced. Negotiation runs before provisioning: when every consumer in the
-frontier is already cached, the producer and its finalizer are both skipped. A
-consumer whose inputs another planned task may write is checked again when the
-producer starts, at the key it computes then; when a task that can move that
-key may finish after the producer starts, the producer is not skipped (see
-[Outputs written earlier in the session](10-caching.md#outputs-written-earlier-in-the-session)).
+produced. The producer starts when its first consumer misses the cache, at the
+key that consumer computes when it starts, after every task that can move it
+(ADR 0129): when every consumer in the frontier is served from the cache, the
+producer and its finalizer are both skipped, and a consumer that misses runs
+after the producer finished. A false or invalid `finalizes.pruneIf`, read under
+the params the producer receives and its command's flag defaults, starts the
+producer as an ordinary step.
 
 **Exactly once.** Producer start arms the finalizer. It runs once when the
 consumer frontier becomes terminal, and once at the end of the run otherwise —

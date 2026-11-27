@@ -1718,7 +1718,7 @@ func TestCoordinatorStateTransitions_CompletionThenDispatch(t *testing.T) {
 		totalCompleted := 0
 
 		failed := &JobResult{Status: "failed"}
-		groupFailed, newlyReady := s.recordCompletedGroup(
+		groupFailed, newlyReady, _ := s.recordCompletedGroup(
 			jobGroupDone{jobs: []jobDone{{job: producer, result: failed}}},
 			state, results, &mu, &totalCompleted)
 

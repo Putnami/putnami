@@ -1,6 +1,9 @@
 # ADR 0113 — An input digest whose witness holds is not collected again
 
-- **Status**: accepted (2026-11-27)
+- **Status**: accepted (2026-11-27), amended by
+  [ADR 0129](0129-a-setup-task-starts-when-its-first-consumer-misses-the-cache.md):
+  the prune of section 8 is removed; a setup starts when its first consumer
+  misses the cache
 - **Date**: 2026-11-26
 - **Amends**: [ADR 0109](0109-a-write-drops-a-memoized-digest-only-when-it-can-move-it.md)
   (its rejected alternative "Keep the digests across runs" becomes this

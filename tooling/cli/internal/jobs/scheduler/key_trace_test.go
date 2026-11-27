@@ -62,14 +62,14 @@ func TestTheKeyTraceCollectsARunOnceInstalled(t *testing.T) {
 		t.Fatal("stop left the trace installed")
 	}
 	var s Scheduler
-	if s.startKeyTrace(map[string]string{"x": "y"}, 0) != nil {
+	if s.startKeyTrace() != nil {
 		t.Fatal("a run started with no trace installed traced its keys")
 	}
 
 	// A run whose keys cannot be traced is recorded with the reason.
 	trace, stop = TraceKeys()
 	defer stop()
-	s.startKeyTrace(nil, 0).finish()
+	s.startKeyTrace().finish()
 	if prunes := trace.Prunes(); len(prunes) != 1 || prunes[0].Err == "" {
 		t.Fatalf("prunes = %+v, want one run that names why it traced nothing", prunes)
 	}

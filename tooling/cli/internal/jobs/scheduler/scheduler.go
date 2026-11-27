@@ -5,6 +5,7 @@ package scheduler
 
 import (
 	"context"
+	"maps"
 	"os"
 	"runtime"
 	"sync"
@@ -292,9 +293,6 @@ type Scheduler struct {
 	// that keeps a sensitive artifact's path and bytes off every published
 	// surface. Nil for every plan with no finalizer.
 	invocations *invocationRuntime
-	// planKeys is what prune computed before the run, which negotiation
-	// reads (prepareRemote); nil when prune computed nothing.
-	planKeys *cachekey.PlanKeys
 	// keyTrace records each job's precomputed key beside the key it computes
 	// at its start, while a test traces keys (TraceKeys); nil otherwise.
 	keyTrace *keyTrace
@@ -681,21 +679,37 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 	// of which a dependency DAG can express. The coordinator runs over the
 	// schedulable plan (planner.SchedulableJobs) and this runtime owns the finalizers.
 	s.invocations = newInvocationRuntime(s.ws, s.planned)
-	// Negotiate the finalizes relations' consumer frontiers BEFORE any producer
-	// can materialize a resource: an all-hit frontier prunes the producer and
-	// its finalizer together.
-	// Negotiation reads the keys prune computed for this plan rather than
-	// computing them again: no job runs between the two.
-	pruneStarted := time.Now()
-	s.planKeys = s.invocations.prune(
-		s.ws, s.planned, s.commandParams, s.cfg.VersionInfo,
-		s.cache, s.bypass, s.cacheStats,
-	)
-	var precomputed map[string]string
-	if s.planKeys != nil {
-		precomputed = s.planKeys.Keys
-	}
-	s.keyTrace = s.startKeyTrace(precomputed, time.Since(pruneStarted))
+	// A lazy relation's producer waits for the first consumer that misses the
+	// cache (invocation_lazy.go, CLI ADR 0129). Deciding which relations are
+	// lazy reads the producer's delivered params and the plan, and computes no
+	// key.
+	//
+	// A pipeline step's job definition carries no flags, so its delivered
+	// params never hold its command's flag defaults. pruneIf reads those
+	// defaults, aliases included, under the delivered params, so a declared
+	// flag the command line leaves out reads as its default, not as missing.
+	s.invocations.decideLazy(s.planned, func(job *ScheduledJob) extension.ParamMap {
+		params := cachekey.DeliveredJobParams(job, s.taskParams, cachekey.JobConfigDefaults(s.ws, job))
+		if job.Extension == nil {
+			return params
+		}
+		command := job.Extension.Jobs[jobCommandName(job)]
+		if command == nil {
+			return params
+		}
+		ci := cachekey.InCI()
+		defaults := extension.ParamMap{}
+		for name, flag := range command.Flags {
+			if value := flag.DefaultFor(ci); value != nil {
+				defaults[name] = value
+			}
+		}
+		merged := extension.ParamMap{}
+		cachekey.ApplyProjectedParamLayer(merged, defaults)
+		maps.Copy(merged, params)
+		return merged
+	})
+	s.keyTrace = s.startKeyTrace()
 }
 
 // Run executes all planned jobs respecting the dependency DAG.
@@ -788,7 +802,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	// Uses a pending queue to avoid blocking on readyCh while doneCh has results.
 	// The queue dispatches historical long poles first so the task that bounds
 	// the makespan starts immediately instead of behind the short tail.
-	pending := state.Ready()
+	pending, released := s.parkReady(state.Ready(), state)
 	sortPendingLongestFirst(pending)
 	for _, job := range pending {
 		s.metrics.markReady(job.Key())
@@ -797,6 +811,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	}
 	inFlight := 0
 	totalCompleted := 0
+	pending = s.queueReady(pending, released, state, results, &mu, &totalCompleted)
 
 	for totalCompleted < state.Size() {
 		// Try to send pending jobs to workers without blocking
@@ -873,7 +888,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 		// Process completion
 		s.releaseGroupResources(completed)
 		inFlight--
-		groupFailed, newlyReady := s.recordCompletedGroup(completed, state, results, &mu, &totalCompleted)
+		groupFailed, newlyReady, deferred := s.recordCompletedGroup(completed, state, results, &mu, &totalCompleted)
 
 		// A batch boundary: the cheap in-run budget check. It never blocks this
 		// loop; a due collection pass runs beside the work still in flight, which
@@ -891,7 +906,10 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 			break
 		}
 
-		pending = s.queueReady(pending, newlyReady, state, results, &mu, &totalCompleted)
+		var again []*ScheduledJob
+		pending, again = s.deferToProducers(pending, deferred)
+		pending = s.queueReady(pending, append(newlyReady, again...), state, results, &mu, &totalCompleted)
+		s.settleUnneededProducers(results, &mu, &totalCompleted)
 	}
 
 finish:
@@ -976,8 +994,6 @@ func (s *Scheduler) prepareRemote(ctx context.Context) {
 	if s.remote == nil {
 		return
 	}
-	s.remote.UsePlanKeys(s.planKeys)
-	s.planKeys = nil
 	s.remote.Negotiate(ctx, s.ws, s.planned, s.commandParams, s.cfg.VersionInfo, s.cache, s.bypass)
 	// Warm the hit-dependencies of misses in the background so a local
 	// build finds its cached inputs already materialized.
@@ -1050,8 +1066,14 @@ func (s *Scheduler) recordCompletedGroup(
 	results map[string]*JobResult,
 	mu *sync.Mutex,
 	totalCompleted *int,
-) (groupFailed bool, newlyReady []*ScheduledJob) {
+) (groupFailed bool, newlyReady, deferred []*ScheduledJob) {
 	for _, done := range completed.jobs {
+		// A consumer that missed the cache before its lazy producer finished
+		// is not done: it waits for the producer (deferToProducers).
+		if done.deferred {
+			deferred = append(deferred, done.job)
+			continue
+		}
 		*totalCompleted++
 
 		s.waits.stampWaits(done.job, done.result)
@@ -1063,9 +1085,15 @@ func (s *Scheduler) recordCompletedGroup(
 		s.emitSessionJobEnd(done.job, done.result)
 		s.invocations.observe(done.job, done.result)
 		groupFailed = groupFailed || done.result.Status == "failed"
+		// A parked producer was completed in the DAG when it was parked; its
+		// own completion releases the consumers that deferred to it.
+		if waiting, parked := s.invocations.finishParked(done.job); parked {
+			newlyReady = append(newlyReady, waiting...)
+			continue
+		}
 		newlyReady = append(newlyReady, state.Complete(done.job.Key())...)
 	}
-	return groupFailed, newlyReady
+	return groupFailed, newlyReady, deferred
 }
 
 // queueReady admits the jobs a completion just unblocked into the pending
@@ -1086,10 +1114,18 @@ func (s *Scheduler) queueReady(
 	totalCompleted *int,
 ) []*ScheduledJob {
 	queued := false
-	for _, job := range newlyReady {
+	ready := append([]*ScheduledJob(nil), newlyReady...)
+	for i := 0; i < len(ready); i++ {
+		job := ready[i]
 		s.verbWaves.ready(job)
 		if s.shouldSkip(job, results, mu) {
 			s.skipJob(job, state, results, mu, totalCompleted)
+			continue
+		}
+		// A lazy producer is parked, not queued: the jobs that waited for it
+		// become ready now (invocation_lazy.go).
+		if s.invocations.park(job) {
+			ready = append(ready, state.Complete(job.Key())...)
 			continue
 		}
 		s.metrics.markReady(job.Key())
@@ -1398,6 +1434,9 @@ func (s *Scheduler) drainInFlight(doneCh <-chan jobGroupDone, count int, results
 		completed := <-doneCh
 		s.releaseGroupResources(completed)
 		for _, done := range completed.jobs {
+			if done.deferred {
+				continue
+			}
 			s.waits.stampWaits(done.job, done.result)
 			mu.Lock()
 			if _, exists := results[done.job.Key()]; !exists {
@@ -1455,7 +1494,7 @@ func (s *Scheduler) shouldSkip(job *ScheduledJob, results map[string]*JobResult,
 	// Capability gates are not weakened by --continue-on-error. Structural
 	// dominance was proven before execution; here every functional ancestor must
 	// also have reached a successful terminal result before the private grant.
-	if !s.processCapabilities.authorizeReady(job, results, mu) {
+	if !s.processCapabilities.authorizeReady(job, results, mu, s.invocations.parkedProducer) {
 		return true
 	}
 	if s.cfg.ContinueOnError {

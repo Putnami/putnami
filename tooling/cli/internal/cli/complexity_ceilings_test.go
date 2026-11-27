@@ -126,11 +126,12 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:         "invocation",
 		prefix:       "internal/jobs/scheduler/invocation",
-		files:        5,
-		funcs:        56,
+		files:        6,
+		funcs:        62,
 		perFileFuncs: 16,
 		why: "internal/jobs/scheduler/invocation*.go: the run-time half of the invocation-scoped " +
-			"lifecycle. Pruning a `finalizes` relation the planner resolved, the private scratch " +
+			"lifecycle. Starting a `finalizes` relation's producer only for a consumer that misses " +
+			"the cache (LAZINESS), the private scratch " +
 			"and the lease that outlives a SIGKILL, the sensitive-artifact leak guard (needle " +
 			"derivation, a bounded producer spool and redaction), and exactly-once finalization. " +
 			"The unit arrived as one file and was split along its invariants, so the risk is the " +

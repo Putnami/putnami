@@ -39,9 +39,9 @@
 //     warm consumer is warm because its inputs are unchanged and not because a
 //     secret happened to repeat.
 //
-// THIS file owns the runtime relation and the decision that precedes any
-// execution: the pruning that answers "does this resource need to exist at all"
-// before anything is provisioned. The plan-time half of the relation lives in
+// THIS file owns the runtime relation. Whether the resource needs to exist at
+// all is decided at run time, by the first consumer that misses the cache
+// (invocation_lazy.go, CLI ADR 0129). The plan-time half of the relation lives in
 // internal/jobs/planner/invocation.go: resolving `finalizes` onto plan nodes
 // (which is also where the producing-action stamp the cache identity needs is
 // attached) and the one-invocation-per-step rule that keeps ownership of a step
@@ -51,17 +51,11 @@
 package scheduler
 
 import (
-	"fmt"
-	"strings"
 	"sync"
 
-	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
-
-	extensionproto "go.putnami.dev/protocol/extension"
 )
 
 // invocationRelation is one `finalizes` relation resolved onto plan nodes.
@@ -72,8 +66,9 @@ import (
 //
 // It owns the whole lifecycle of one invocation-scoped resource: the private
 // scratch, the lease, the artifacts' confinement, and the single finalizer run.
-// Its mutex guards every mutable member because the producer's worker, the
-// consumers' workers and the coordinator all touch it.
+// Its mutex guards every mutable member the producer's worker, the consumers'
+// workers and the coordinator share; waiting, which only the coordinator
+// touches, is the one exception.
 type invocationRelation struct {
 	planner.InvocationRelation
 
@@ -81,13 +76,27 @@ type invocationRelation struct {
 	// armed records that the producer STARTED. It is the finalizer's trigger and
 	// is never cleared: a producer that failed still armed cleanup.
 	armed bool
-	// pruned records that every consumer was already cached, so neither the
-	// producer nor the finalizer has any work to do.
-	pruned bool
-	// recheck records that pruned rests on a consumer key an earlier task's
-	// writes may move, so the producer confirms it before it is skipped
-	// (isPruned).
-	recheck bool
+	// lazy records that the producer starts only when a consumer misses the
+	// cache (invocation_lazy.go). It is decided once, before the run, and never
+	// changes.
+	lazy bool
+	// parked records that the coordinator completed the lazy producer in the
+	// DAG without dispatching it, so its consumers became ready before it ran.
+	parked bool
+	// requested records that a consumer missed and the producer was queued.
+	requested bool
+	// producerDone records that the producer finished, whatever its verdict. A
+	// consumer that misses reads it to decide whether it may execute now.
+	producerDone bool
+	// notNeeded records that the parked producer's frontier became terminal
+	// without a request, and the producer got its skipped row.
+	notNeeded bool
+	// missed holds, by consumer key, the key a deferred consumer missed at.
+	missed map[string]string
+	// waiting holds the consumers that missed before the producer finished,
+	// queued again once it does. Only the coordinator touches it, outside the
+	// mutex.
+	waiting []*ScheduledJob
 	// finalized makes the finalizer's execution exactly-once across the
 	// frontier-completion path and the end-of-run sweep.
 	finalized bool
@@ -207,204 +216,4 @@ func (rt *invocationRuntime) relationFor(job *ScheduledJob) *invocationRelation 
 		return nil
 	}
 	return rt.participants[job.Key()]
-}
-
-// unservedPrunedConsumer returns the typed error of a consumer of a pruned
-// relation whose stored entry could not be served: the relation provisioned
-// nothing, so the consumer fails with this error and does not execute. It
-// returns nil for every other job.
-func (rt *invocationRuntime) unservedPrunedConsumer(job *ScheduledJob) *JobError {
-	if rt == nil || job == nil {
-		return nil
-	}
-	rel := rt.byConsumer[job.Key()]
-	if rel == nil {
-		return nil
-	}
-	rel.mu.Lock()
-	pruned := rel.pruned
-	rel.mu.Unlock()
-	if !pruned {
-		return nil
-	}
-	return &JobError{Code: extensionproto.FailureSensitiveSetupFailed, Message: fmt.Sprintf(
-		"blocked: %s was not provisioned because this task's cached entry was found, and the entry could not be served; run again, and if this repeats, the stored entry is damaged: run putnami cache clean",
-		rel.Producer.Key())}
-}
-
-// isPruned reports whether the job is the PRODUCER or the FINALIZER of a
-// relation whose whole consumer frontier was already cached.
-//
-// A CONSUMER is deliberately not matched, and that asymmetry is the whole point
-// of the predicate. Pruning is decided BY the consumers: the relation is pruned
-// precisely because every consumer's entry is already in the local store, so a
-// consumer that reached this check must be allowed to fall through to
-// lookupRestoreOrClaim and be SERVED that entry — its stored verdict replayed
-// and its declared outputs materialized.
-//
-// A producer about to start confirms, once, a pruning decided on a consumer key
-// that may have moved since (prune): present answers for each consumer from the
-// key it computes now, and the first absent entry withdraws the pruning, so the
-// producer runs and its finalizer with it. present runs without the relation's
-// lock: it takes the run's lock, which the coordinator holds while it takes
-// every relation's (pendingFinalizers, settleFinalizers), so a relation's lock
-// is never held while the run's is awaited. Nothing reads pruned meanwhile:
-// only the producer's own start claims the confirmation, and the finalizer
-// waits for the producer to arm it.
-func (rt *invocationRuntime) isPruned(job *ScheduledJob, present func(consumer *ScheduledJob) bool) bool {
-	if rt == nil || job == nil {
-		return false
-	}
-	key := job.Key()
-	rel := rt.byProducer[key]
-	producer := rel != nil
-	if rel == nil {
-		rel = rt.byFinalizer[key]
-	}
-	if rel == nil {
-		return false
-	}
-	rel.mu.Lock()
-	confirm := producer && rel.pruned && rel.recheck
-	if confirm {
-		rel.recheck = false
-	}
-	pruned := rel.pruned
-	rel.mu.Unlock()
-	if !confirm {
-		return pruned
-	}
-
-	confirmed := true
-	for _, consumer := range rel.Consumers {
-		if !present(consumer) {
-			confirmed = false
-			break
-		}
-	}
-	rel.mu.Lock()
-	defer rel.mu.Unlock()
-	if !confirmed {
-		rel.pruned = false
-	}
-	return rel.pruned
-}
-
-// prune marks the relations whose consumers are ALL already served from the
-// local store, so neither the producer nor its finalizer runs.
-//
-// Negotiation before materialization is the contract's wording and the reason
-// this runs before the first task opens: the producer is uncacheable by
-// construction (a task with an invocation-scoped output must set cache:false),
-// so if it were allowed to start first it would provision a resource nobody was
-// ever going to read.
-//
-// A consumer whose entry lives only in the REMOTE cache is deliberately treated
-// as a miss here. Remote hits are discovered lazily, per task, during execution
-// (RemoteCache.Restore); asking the provider up front would turn every relation
-// into a synchronous round trip. Provisioning a resource nobody reads is a
-// wasted setup, not a correctness failure — the finalizer still tears it down.
-//
-// A manifest can condition pruning on command params through finalizes.pruneIf.
-// This is the provider-neutral escape hatch for a producer whose action is not
-// solely in service of its consumer frontier for a particular request. False
-// and malformed expressions keep the lifecycle: an optimization may waste work
-// when uncertain, but it must never swallow an imperative side effect.
-//
-// A consumer key a planned write may move (cachekey.PlanKeyMovement) is only an
-// estimate here: the consumer will look its entry up at the key it computes
-// when it starts. Such a relation is pruned only when every job that can move
-// that key finishes before the producer starts (cachekey.SettlesBefore), and the
-// producer confirms the decision then, from the keys the consumers compute at
-// that moment (isPruned). Otherwise it is not pruned: a consumer that
-// missed its entry would run against a resource nobody provisioned.
-//
-// A plan none of whose relations may prune under the command params (each
-// with a pruneIf that is false or invalid) precomputes no key: no consumer
-// lookup could change the outcome, and the remote negotiation computes the
-// keys it needs itself (tooling/cli ADR 0113 §8).
-//
-// It returns the keys it precomputed, nil when it computed none.
-func (rt *invocationRuntime) prune(
-	ws *workspace.Workspace,
-	planned []*ScheduledJob,
-	commandParams map[string]any,
-	versions cachekey.RunVersions,
-	cache *store.CacheManager,
-	bypass cachekey.CacheBypass,
-	stats *cachekey.CacheStats,
-) *cachekey.PlanKeys {
-	if rt == nil || cache == nil || bypass.All {
-		return nil
-	}
-	prunable := make(map[*invocationRelation]bool, len(rt.relations))
-	for _, rel := range rt.relations {
-		expression := strings.TrimSpace(rel.Finalizer.Step.Finalizes.PruneIf)
-		prune, valid := expression == "", true
-		if !prune {
-			prune, valid = extension.EvaluateExpressionChecked(expression, &extension.WhenContext{Params: commandParams})
-		}
-		if valid && prune {
-			prunable[rel] = true
-		}
-	}
-	if len(prunable) == 0 {
-		return nil
-	}
-	keys, err := cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cache, bypass, stats)
-	if err != nil {
-		return nil
-	}
-	var movement *cachekey.KeyMovement
-	var byKey map[string]*ScheduledJob
-	for _, rel := range rt.relations {
-		if !prunable[rel] {
-			continue
-		}
-		allHit := len(rel.Consumers) > 0
-		for _, consumer := range rel.Consumers {
-			hash, ok := keys[consumer.Key()]
-			if !ok || !cachedEntryPresent(cache, consumer, hash) {
-				allHit = false
-				break
-			}
-		}
-		if !allHit {
-			continue
-		}
-		if movement == nil {
-			decided := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams, Resolver: cache.InputResolver()}, planned)
-			movement = &decided
-			byKey = cachekey.JobsByKey(planned)
-		}
-		recheck, settled := false, true
-		for _, consumer := range rel.Consumers {
-			if !movement.Moving[consumer.Key()] {
-				continue
-			}
-			recheck = true
-			if !cachekey.SettlesBefore(rel.Producer, consumer, *movement, byKey) {
-				settled = false
-				break
-			}
-		}
-		if !settled {
-			continue
-		}
-		rel.mu.Lock()
-		rel.pruned = true
-		rel.recheck = recheck
-		rel.mu.Unlock()
-	}
-	return &cachekey.PlanKeys{Keys: keys, Movement: movement}
-}
-
-// cachedEntryPresent reports whether the local store already holds the job's
-// entry at hash, using the same address the execution path would look it up at.
-//
-// A source-bound task's entry counts absent here (cachekey.CacheEntryPresent):
-// prune decides on key movement, which covers keys and not source bindings.
-func cachedEntryPresent(cache *store.CacheManager, job *ScheduledJob, hash string) bool {
-	present, err := cachekey.CacheEntryPresent(cache, job, hash)
-	return err == nil && present
 }

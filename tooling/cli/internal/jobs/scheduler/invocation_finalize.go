@@ -190,8 +190,8 @@ func (s *Scheduler) runFinalizer(
 }
 
 // settleFinalizers records a terminal row for every finalizer that never ran:
-// its producer was pruned by an all-hit consumer frontier, or never started at
-// all. They are SKIPPED rather than canceled — there was nothing to clean up.
+// its lazy producer was never requested because every consumer was served from
+// the cache, or it never started at all. They are SKIPPED rather than canceled — there was nothing to clean up.
 func (s *Scheduler) settleFinalizers(results map[string]*JobResult, mu *sync.Mutex) {
 	if s.invocations == nil {
 		return

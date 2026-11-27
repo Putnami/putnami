@@ -6,18 +6,18 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 // KeyTraceEntry is what one cacheable job of a traced run keyed: the key the
-// run precomputed for it before any task ran (PrecomputeKeys, in prune),
+// run precomputed for it before any task ran (PrecomputeKeys, as the remote
+// negotiation computes it),
 // whether the local store held its entry where the job would look it up then
 // (entryPresentAtCurrentBinding), the key it computed when it started, and
 // whether the local store served it.
 //
-// Prune and the remote negotiation decide on the precomputed key, and the
+// The remote negotiation decides on the precomputed key, and the
 // job looks its entry up at the key it starts with, so on an unchanged run
 // the two name one entry.
 type KeyTraceEntry struct {
@@ -66,13 +66,12 @@ type KeyTrace struct {
 	prunes  []PruneTrace
 }
 
-// PruneTrace is what one traced run's prune cost and settled: its wall, the
-// precompute of every key included, and its finalizes relations, with those
-// it pruned. Err names why the run traced no key.
+// PruneTrace is what one traced run decided about its finalizes relations:
+// how many it holds, and how many have a producer that waits for a consumer
+// that misses the cache (CLI ADR 0129). Err names why the run traced no key.
 type PruneTrace struct {
-	Wall      time.Duration
 	Relations int
-	Pruned    int
+	Lazy      int
 	Err       string
 }
 
@@ -121,22 +120,22 @@ type keyTrace struct {
 
 // startKeyTrace records the run's precomputed keys, and whether the local
 // store holds each job's entry where the job would look it up, when a trace
-// is installed; nil otherwise. A plan with no finalizes relation precomputes
-// no key in prune, so the trace computes them as the remote negotiation does.
-// A run whose keys cannot be precomputed is recorded with the reason, so a
-// test reads it as a failure, not as a run with nothing to hold.
-func (s *Scheduler) startKeyTrace(precomputed map[string]string, pruneWall time.Duration) *keyTrace {
+// is installed; nil otherwise. The trace computes the keys as the remote
+// negotiation does: the scheduler precomputes none itself. A run whose keys
+// cannot be precomputed is recorded with the reason, so a test reads it as a
+// failure, not as a run with nothing to hold.
+func (s *Scheduler) startKeyTrace() *keyTrace {
 	trace := installedKeyTrace.Load()
 	if trace == nil || s.bypass.All {
 		return nil
 	}
-	run := &keyTrace{trace: trace, prune: PruneTrace{Wall: pruneWall}, byJob: map[string]*KeyTraceEntry{}}
+	run := &keyTrace{trace: trace, byJob: map[string]*KeyTraceEntry{}}
 	if s.invocations != nil {
 		run.prune.Relations = len(s.invocations.relations)
 		for _, rel := range s.invocations.relations {
 			rel.mu.Lock()
-			if rel.pruned {
-				run.prune.Pruned++
+			if rel.lazy {
+				run.prune.Lazy++
 			}
 			rel.mu.Unlock()
 		}
@@ -145,13 +144,10 @@ func (s *Scheduler) startKeyTrace(precomputed map[string]string, pruneWall time.
 		run.prune.Err = "the run has no cache"
 		return run
 	}
-	if precomputed == nil {
-		keys, err := cachekey.PrecomputeKeys(s.ws, s.planned, s.commandParams, s.cfg.VersionInfo, s.cache, s.bypass)
-		if err != nil {
-			run.prune.Err = err.Error()
-			return run
-		}
-		precomputed = keys
+	precomputed, err := cachekey.PrecomputeKeys(s.ws, s.planned, s.commandParams, s.cfg.VersionInfo, s.cache, s.bypass)
+	if err != nil {
+		run.prune.Err = err.Error()
+		return run
 	}
 	for _, key := range slices.Sorted(maps.Keys(precomputed)) {
 		entry := &KeyTraceEntry{Job: key, Precomputed: precomputed[key]}

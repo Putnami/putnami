@@ -501,7 +501,7 @@ func matrixFixture(t *testing.T, server *fakeCacheServer) (*captureFixture, *rem
 func (f *captureFixture) declaredLookup(ctx context.Context, job *ScheduledJob) (string, *JobResult) {
 	var mu sync.Mutex
 	hashes := map[string]string{}
-	hash, result, release := f.sched.lookupDeclaredEntry(ctx, job, nil, &mu, hashes, nil)
+	hash, result, release := f.sched.lookupDeclaredEntry(ctx, job, nil, &mu, hashes, nil, lazyMiss{})
 	release()
 	return hash, result
 }

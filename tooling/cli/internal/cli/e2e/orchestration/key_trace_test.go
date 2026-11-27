@@ -119,7 +119,7 @@ func holdPrecomputedKeys(t *testing.T, trace *scheduler.KeyTrace) keyTraceSummar
 		t.Fatalf("no run was traced: %s", summary)
 	}
 	for _, prune := range prunes {
-		t.Logf("prune: %s, %d of %d relations pruned", prune.Wall, prune.Pruned, prune.Relations)
+		t.Logf("relations: %d of %d lazy", prune.Lazy, prune.Relations)
 		if prune.Err != "" {
 			t.Errorf("a traced run precomputed no key: %s", prune.Err)
 		}

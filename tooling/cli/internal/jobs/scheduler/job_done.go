@@ -4,6 +4,10 @@ package scheduler
 type jobDone struct {
 	job    *ScheduledJob
 	result *JobResult
+	// deferred marks a consumer that missed the cache before its lazy
+	// producer finished: it has no result yet, and the coordinator queues it
+	// again once the producer did (invocation_lazy.go).
+	deferred bool
 }
 
 // jobGroup is one scheduler dispatch. A singleton preserves the historical

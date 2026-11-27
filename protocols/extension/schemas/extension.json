@@ -1150,7 +1150,7 @@
         "pruneIf": {
           "type": "string",
           "minLength": 1,
-          "description": "Optional plan-time expression over command params. An all-hit consumer frontier prunes the producer and finalizer only when this evaluates true. Empty defaults to prunable; false or malformed expressions keep the lifecycle so pruning cannot swallow an imperative side effect."
+          "description": "Optional expression over command params. The producer waits for a consumer that misses the cache, and is skipped with its finalizer when every consumer is served from the cache, only when this evaluates true. Empty defaults to lazy; false or malformed expressions keep the lifecycle so the skip cannot swallow an imperative side effect."
         }
       }
     },

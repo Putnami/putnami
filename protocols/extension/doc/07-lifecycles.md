@@ -558,17 +558,22 @@ Sensitive bytes and paths remain confined to the private tree.
 
 ### Execution and cache identity
 
-- Cache negotiation happens **before** materialization. Because `finalizes`
-  names the producer and its consumers, an all-hit frontier of the consumers
-  the plan holds prunes the producer and its finalizer together; any consumer
-  miss keeps the producer and arms exactly one finalizer. A plan that holds no
-  consumer leaves the finalizer inert.
+- The producer starts when its first consumer misses the cache. Because
+  `finalizes` names the producer and its consumers, core holds the producer
+  back until a consumer it plans looks its entry up at the key it computes when
+  it starts and misses; that consumer then waits for the producer, which runs
+  once and arms exactly one finalizer. When every consumer is served from the
+  cache, or does not run, neither the producer nor its finalizer starts. A
+  plan that holds no consumer leaves the finalizer inert. A producer that a
+  step outside its consumers waits for always runs.
 - A relation whose producer sometimes performs an imperative side effect beyond
-  serving its frontier can declare `finalizes.pruneIf`, a plan-time expression
-  over command params. Core prunes an all-hit frontier only when the expression
-  is true; false or malformed expressions fail safe by running the producer and
-  its finalizer. For example, `"pruneIf": "!params.teardown"` preserves warm-run
-  pruning while ensuring an explicit teardown request is never swallowed.
+  serving its frontier can declare `finalizes.pruneIf`, an expression over the
+  params the producer receives (the workspace options and the command line)
+  and its command's flag defaults. Core holds the producer back only when the
+  expression is true; false or malformed expressions fail safe by running the
+  producer and its finalizer. For example, `"pruneIf": "!params.teardown"`
+  keeps a warm run free of setup while ensuring an explicit teardown request
+  is never swallowed.
 - Downstream cache identity uses the producing action's digest, **never** the
   secret's content.
 - The finalizer runs **exactly once** whenever its producer started — including

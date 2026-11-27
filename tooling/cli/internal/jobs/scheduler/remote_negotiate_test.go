@@ -2,8 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"maps"
-	"slices"
 	"testing"
 
 	cache "go.putnami.dev/protocol/cache"
@@ -77,59 +75,6 @@ func TestNegotiateComputesNoKeyWhenTheProviderServesNothing(t *testing.T) {
 	}
 	if len(n.server.prefetched()) != 0 {
 		t.Fatalf("the provider was asked to prefetch %v", n.server.prefetched())
-	}
-}
-
-// A provider that serves the run (signed in) is negotiated with exactly as
-// before: the same keys recorded, the same keys prefetched, whether the
-// negotiation computes the keys itself or reads the ones prune computed for
-// the same plan, with or without the key movement prune decided.
-func TestNegotiateWithThePlanKeysOfPruneNegotiatesAsWithout(t *testing.T) {
-	n := newNegotiateFixture(t, false)
-
-	computed := n.remote(t)
-	computed.Negotiate(t.Context(), n.f.ws, n.planned, nil, nil, n.f.cache, cachekey.CacheBypass{})
-	wantPrefetch := n.server.prefetched()
-	if len(wantPrefetch) == 0 {
-		t.Fatal("the fixture prefetched nothing; the test cannot compare negotiations")
-	}
-	if len(computed.Keys) == 0 {
-		t.Fatal("the fixture recorded no key; the test cannot compare negotiations")
-	}
-	if _, moving := computed.Keys[n.planned[2].Key()]; moving {
-		t.Fatal("the fixture's check is not moving; the test cannot prove the movement is reused")
-	}
-
-	keys, err := cachekey.PrecomputeKeys(n.f.ws, n.planned, nil, nil, n.f.cache, cachekey.CacheBypass{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: n.f.ws, Resolver: n.f.cache.InputResolver()}, n.planned)
-	for _, tc := range []struct {
-		name     string
-		movement *cachekey.KeyMovement
-	}{
-		{name: "keys and movement", movement: &movement},
-		{name: "keys alone", movement: nil},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			n.server.mu.Lock()
-			n.server.prefetch = nil
-			n.server.mu.Unlock()
-			reused := n.remote(t)
-			reused.UsePlanKeys(&cachekey.PlanKeys{Keys: keys, Movement: tc.movement})
-			reused.Negotiate(t.Context(), n.f.ws, n.planned, nil, nil, n.f.cache, cachekey.CacheBypass{})
-
-			if !maps.Equal(reused.Keys, computed.Keys) {
-				t.Errorf("keys = %v, want %v", reused.Keys, computed.Keys)
-			}
-			if !maps.Equal(reused.LocalHits, computed.LocalHits) {
-				t.Errorf("local hits = %v, want %v", reused.LocalHits, computed.LocalHits)
-			}
-			if got := n.server.prefetched(); !slices.Equal(got, wantPrefetch) {
-				t.Errorf("prefetched %v, want %v", got, wantPrefetch)
-			}
-		})
 	}
 }
 

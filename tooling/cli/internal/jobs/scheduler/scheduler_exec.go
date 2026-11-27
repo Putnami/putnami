@@ -246,7 +246,8 @@ func (s *Scheduler) executeJobGroup(
 // openTask is the read side of ONE task's lifecycle: cache lookup, restore or
 // claim, and the shared-execution rendezvous. It returns a work item when the
 // task must execute, or nil plus the terminal row when it must not — a cache
-// hit or a pruned producer. It holds no task-output lock while it waits: a
+// hit — or nil plus a deferred mark for a consumer whose lazy producer has not
+// run yet. It holds no task-output lock while it waits: a
 // restore takes and releases its own (restoreDeclaredCacheHit), and the
 // execution's locks are taken after it returns.
 func (s *Scheduler) openTask(
@@ -258,39 +259,22 @@ func (s *Scheduler) openTask(
 ) (*taskWork, jobDone) {
 	started := time.Now()
 
-	// A relation whose whole consumer frontier was already cached provisions
-	// nothing: the producer is pruned here, and its finalizer is never armed
-	// (settleFinalizers records the skipped row). The CONSUMERS are not pruned —
-	// they are the reason the relation was, so each one falls through to the
-	// lookup below and is served the entry that made the pruning decision. A
-	// decision taken on a consumer key that may have moved since is confirmed
-	// first, from the key that consumer computes now.
-	if s.invocations.isPruned(job, func(consumer *ScheduledJob) bool {
-		return s.cachedAtCurrentKey(consumer, mu, hashes)
-	}) {
-		s.renderer.JobStart(job)
-		return nil, jobDone{job: job, result: &JobResult{
-			Status:   "skipped",
-			Error:    &JobError{Message: "every consumer of this invocation-scoped resource was served from cache"},
-			TaskWall: time.Since(started),
-		}}
-	}
-
 	cacheEnabled := cachekey.IsCacheEnabled(job, s.bypass)
-	cacheHash, cachedResult, release := s.lookupRestoreOrClaim(ctx, job, cacheEnabled, mu, hashes, admission)
+	lazy := s.invocations.lazyOpen(job)
+	cacheHash, cachedResult, release := s.lookupRestoreOrClaim(ctx, job, cacheEnabled, mu, hashes, admission, lazy)
 	if cachedResult != nil {
 		cachedResult.CacheKey = cacheHash
 		cachedResult.TaskWall = time.Since(started)
 		return nil, jobDone{job: job, result: cachedResult}
 	}
-	if cause := s.invocations.unservedPrunedConsumer(job); cause != nil {
+	// A consumer of a lazy relation that missed the cache before its producer
+	// finished does not execute yet: it defers before it claims the key, and
+	// the coordinator starts the producer and queues it again once the
+	// producer finished (invocation_lazy.go). It opened no row.
+	if lazy.deferMiss {
 		release()
-		s.renderer.JobStart(job)
-		return nil, jobDone{job: job, result: &JobResult{
-			Status:   string(TaskStatusFailed),
-			Error:    cause,
-			TaskWall: time.Since(started),
-		}}
+		s.invocations.recordMiss(job, cacheHash)
+		return nil, jobDone{job: job, deferred: true}
 	}
 
 	// This task's own entry could not serve it. A plan-level shared node is the
@@ -960,6 +944,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 	mu *sync.Mutex,
 	hashes map[string]string,
 	admission *groupAdmission,
+	lazy lazyMiss,
 ) (string, *JobResult, func()) {
 	noop := func() {}
 	if s.cache == nil {
@@ -1014,7 +999,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 		}
 		return hash, nil, noop
 	}
-	return s.lookupDeclaredEntry(ctx, job, hashCopy, mu, hashes, admission)
+	return s.lookupDeclaredEntry(ctx, job, hashCopy, mu, hashes, admission, lazy)
 }
 
 // cacheCoalescer is the three store operations the claim-or-wait loop needs,

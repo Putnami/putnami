@@ -836,9 +836,9 @@ func TestInvocation_ProducerFailingBeforeItStartsBlocksItsFrontier(t *testing.T)
 	}
 }
 
-// TestInvocation_AllHitFrontierPrunesSetupAndFinalizer pins negotiation before
-// materialization: when every consumer is already cached, nothing is
-// provisioned and nothing is torn down.
+// TestInvocation_AllHitFrontierPrunesSetupAndFinalizer pins that when every
+// consumer is already cached, nothing is provisioned and nothing is torn down:
+// the lazy setup is never requested (CLI ADR 0129).
 func TestInvocation_AllHitFrontierPrunesSetupAndFinalizer(t *testing.T) {
 	t.Parallel()
 	fixture := newInvocationFixture(t, provisionBody, consumeBody)
@@ -1108,11 +1108,11 @@ func TestInvocation_PrunedRelationStillServesTheConsumersCachedResult(t *testing
 	}
 }
 
-// TestInvocation_PrunedConsumerWhoseEntryCannotBeServedNeverExecutes holds the
-// other side of that contract: a relation pruned on a consumer's entry that
-// then cannot be served leaves the consumer with no resource, so the consumer
-// fails with a typed error instead of executing without it.
-func TestInvocation_PrunedConsumerWhoseEntryCannotBeServedNeverExecutes(t *testing.T) {
+// TestInvocation_ConsumerWhoseEntryCannotBeServedRunsAfterItsSetup holds the
+// other side of that contract: a consumer whose entry is found but cannot be
+// served misses, so its lazy setup starts and the consumer executes against
+// the resource, never without it (CLI ADR 0129).
+func TestInvocation_ConsumerWhoseEntryCannotBeServedRunsAfterItsSetup(t *testing.T) {
 	t.Parallel()
 	fixture := newInvocationFixture(t, provisionBody, consumeBody)
 	fixture.consumer.Step.Task = "consume-cached"
@@ -1180,16 +1180,18 @@ func TestInvocation_PrunedConsumerWhoseEntryCannotBeServedNeverExecutes(t *testi
 	defer cancel()
 	result := fixture.run(t, ctx, SchedulerConfig{MaxParallel: 2}, cache)
 
-	if got := result.Results[fixture.producer.Key()]; got == nil || got.Status != "skipped" {
-		t.Fatalf("producer result = %+v, want skipped by an all-hit frontier", got)
+	if got := result.Results[fixture.producer.Key()]; got == nil || got.Status != "success" {
+		t.Fatalf("producer result = %+v, want it to provision for the consumer that missed", got)
 	}
-	failed := result.Results[fixture.consumer.Key()]
-	if failed == nil || failed.Status != string(TaskStatusFailed) || failed.Error == nil ||
-		failed.Error.Code != extensionproto.FailureSensitiveSetupFailed {
-		t.Fatalf("consumer result = %+v, want a typed setup failure", failed)
+	executed := result.Results[fixture.consumer.Key()]
+	if executed == nil || executed.Status != "success" || executed.ReuseKind().CacheHit() {
+		t.Fatalf("consumer result = %+v, want an execution", executed)
 	}
-	if _, err := os.Stat(fixture.consumed); !os.IsNotExist(err) {
-		t.Error("the consumer executed without the resource its relation never provisioned")
+	if _, err := os.Stat(fixture.consumed); err != nil {
+		t.Errorf("the consumer did not execute against the resource its setup provisioned: %v", err)
+	}
+	if got := fixture.teardownCount(t); got != 1 {
+		t.Errorf("finalizer ran %d times, want exactly once", got)
 	}
 }
 

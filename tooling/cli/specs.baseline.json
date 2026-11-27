@@ -242,6 +242,7 @@
     "cli/job-planning-execution#hosted-source-built-provider-identity",
     "cli/job-planning-execution#job-context-names-member-types",
     "cli/job-planning-execution#job-flags-follow-job-commands",
+    "cli/job-planning-execution#lazy-invocation-setup",
     "cli/job-planning-execution#no-core-development-verb",
     "cli/job-planning-execution#planned-write-reach",
     "cli/job-planning-execution#preview-no-effects",

@@ -81,10 +81,6 @@ type RemoteCache struct {
 	// looked up at (SetSourceBoundEntryKey). Nil means negotiation cannot
 	// tell whether such a task hits locally.
 	sourceBoundEntryKey func(job *jobmodel.ScheduledJob, key string) (string, bool)
-
-	// planKeys is what the next Negotiate reads instead of computing it
-	// (UsePlanKeys), or nil.
-	planKeys *cachekey.PlanKeys
 }
 
 // Stats returns this run's accumulated cache activity, or nil for a nil cache
@@ -275,8 +271,6 @@ func (r *RemoteCache) Negotiate(
 	if r == nil || cm == nil {
 		return
 	}
-	precomputed := r.planKeys
-	r.planKeys = nil
 	// A plan whose declarations alone show a job executing here starts the
 	// provider whatever its keys are (executesLocally below), so it is started
 	// first. A provider that serves nothing (signed out, disabled, failed to
@@ -293,16 +287,10 @@ func (r *RemoteCache) Negotiate(
 		}
 		started = time.Since(begin)
 	}
-	var keys map[string]string
-	if precomputed != nil && precomputed.Keys != nil {
-		keys = precomputed.Keys
-	} else {
-		var err error
-		keys, err = cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cm, bypass, r.stats)
-		if err != nil {
-			slog.Warn("remote cache: key precompute failed; skipping remote cache", "error", err)
-			return
-		}
+	keys, err := cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cm, bypass, r.stats)
+	if err != nil {
+		slog.Warn("remote cache: key precompute failed; skipping remote cache", "error", err)
+		return
 	}
 	r.LocalHits = make(map[string]bool)
 
@@ -395,15 +383,10 @@ func (r *RemoteCache) Negotiate(
 		return
 	}
 	// The key movement is decided once the provider serves the run, from the
-	// tree as it stands: no job has run yet. Prune's, when it decided one for
-	// the same plan, is the same.
+	// tree as it stands: no job has run yet.
 	var movement cachekey.KeyMovement
 	if ws != nil {
-		if precomputed != nil && precomputed.Movement != nil {
-			movement = *precomputed.Movement
-		} else {
-			movement = cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams, Resolver: cm.InputResolver()}, planned)
-		}
+		movement = cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams, Resolver: cm.InputResolver()}, planned)
 		r.dependedOn = dependedOnJobs(planned, &movement)
 	} else {
 		r.dependedOn = dependedOnJobs(planned, nil)
@@ -461,16 +444,6 @@ func executesWithoutKeys(planned []*jobmodel.ScheduledJob, bypass cachekey.Cache
 		}
 	}
 	return false
-}
-
-// UsePlanKeys makes the next Negotiate read keys instead of computing them
-// again. The scheduler hands it what prune computed for the same plan, with
-// the same inputs, before any job ran. Negotiate reads them once. A nil cache
-// ignores it.
-func (r *RemoteCache) UsePlanKeys(keys *cachekey.PlanKeys) {
-	if r != nil {
-		r.planKeys = keys
-	}
 }
 
 // resultOnlyKeys returns the declared-capture provider keys, in providerKeys

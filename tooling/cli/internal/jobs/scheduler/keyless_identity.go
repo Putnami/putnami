@@ -10,8 +10,8 @@ import (
 // the keys this run published into hashes, read under mu, and for each
 // keyless dependency what it stands for (cachekey.KeylessResolver). A keyless
 // identity is the one memoized when its job started (memoizeKeylessIdentity),
-// else, for a job pruned or not started yet, computed when a dependent first
-// asks, as PrecomputeKeys computes it before anything runs.
+// else, for a lazy producer that is parked or a job not started yet, computed
+// when a dependent first asks, as PrecomputeKeys computes it before anything runs.
 func (s *Scheduler) dependencyKeys(job *ScheduledJob, mu *sync.Mutex, hashes map[string]string) map[string]string {
 	return s.keylessResolver(mu, hashes).View(job)
 }

@@ -1016,8 +1016,23 @@
           "checks": [
             "an-earlier-task-output-moves-the-key-of-its-reader",
             "a-precomputed-key-a-write-may-move-is-never-looked-up-or-shared",
-            "pruning-on-a-movable-consumer-key-is-confirmed-when-the-producer-starts",
+            "a-setup-follows-the-key-its-consumer-computes-when-it-starts",
             "a-written-link-target-moves-the-key-of-a-reader-through-the-link"
+          ]
+        }
+      },
+      {
+        "id": "lazy-invocation-setup",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-all-hit-frontier-starts-no-setup-and-no-finalizer",
+            "one-missing-consumer-starts-exactly-its-setup-and-finalizer",
+            "a-consumer-that-misses-runs-after-its-setup"
           ]
         }
       },

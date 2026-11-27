@@ -373,11 +373,12 @@ type FinalizesRelation struct {
 	// invocation artifacts. Cleanup waits until each the plan holds reaches a
 	// terminal state; a consumer the plan dropped never uses them.
 	Consumers []string `json:"consumers"`
-	// PruneIf is an optional plan-time expression over command params. The
-	// relation is eligible for all-hit frontier pruning only when it evaluates
-	// true. Empty preserves the default: every all-hit frontier is prunable.
-	// A false or malformed expression fails safe by keeping the producer and
-	// finalizer, so pruning cannot swallow an explicitly requested side effect.
+	// PruneIf is an optional expression over command params. The producer
+	// waits for a consumer that misses the cache, and is skipped with its
+	// finalizer when none does, only when it evaluates true. Empty preserves
+	// the default: every relation is lazy. A false or malformed expression
+	// fails safe by keeping the producer and finalizer, so the skip cannot
+	// swallow an explicitly requested side effect.
 	PruneIf string `json:"pruneIf,omitempty"`
 }
 

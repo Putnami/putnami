@@ -534,10 +534,14 @@ func newProcessCapabilityRuntime(
 	}
 }
 
+// waived names an ancestor the grant does not wait for: a lazy invocation
+// producer (invocationRuntime.parkedProducer). Its consumers are ancestors too
+// and are still required, and they run only after it succeeded.
 func (runtime *processCapabilityRuntime) authorizeReady(
 	job *ScheduledJob,
 	results map[string]*JobResult,
 	resultsMu *sync.Mutex,
+	waived func(key string) bool,
 ) bool {
 	if runtime == nil || runtime.authorization == nil || job == nil {
 		return true
@@ -548,6 +552,9 @@ func (runtime *processCapabilityRuntime) authorizeReady(
 	}
 	resultsMu.Lock()
 	for _, leaf := range required {
+		if waived != nil && waived(leaf) {
+			continue
+		}
 		if !CapabilityAncestorSatisfied(results[leaf]) {
 			resultsMu.Unlock()
 			return false
@@ -569,8 +576,9 @@ func (runtime *processCapabilityRuntime) authorizeReady(
 // with no inputs) — is the complete terminal result of a task that was
 // consulted, not a gap in the gate. Only a failure, a cancellation, an absent
 // result, or a skip the scheduler synthesized on the task's behalf denies the
-// grant: skipJob and the pruned-invocation path always record their cause as
-// the result's error, so a skip that carries one never came from the task.
+// grant: skipJob and the not-needed row of a lazy invocation producer always
+// record their cause as the result's error, so a skip that carries one never
+// came from the task.
 func CapabilityAncestorSatisfied(result *JobResult) bool {
 	if result == nil {
 		return false

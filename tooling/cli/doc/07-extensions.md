@@ -863,9 +863,11 @@ Rules worth internalizing before writing one:
   A plan that holds no consumer leaves the finalizer inert.
 - Nothing may bind an input from a finalizer, and neither a finalizer task nor
   its command may export a result: cleanup reports lifecycle status, not data.
-- Cache negotiation happens **before** materialization. An all-hit frontier
-  prunes the producer and its finalizer together; any consumer miss keeps the
-  producer and arms exactly one finalizer.
+- The producer starts when its first consumer misses the cache (ADR 0129).
+  A frontier served entirely from the cache starts neither the producer nor
+  its finalizer; the first consumer miss starts the producer, once, and arms
+  exactly one finalizer, and that consumer runs after it. A false or invalid
+  `finalizes.pruneIf` always runs the producer.
 - The producer, its listed consumers and the finalizer — and nobody else —
   receive `invocation: {id, artifactRoot}` in their job context and the
   `{invocationArtifactRoot}` template token in their manifest arguments.

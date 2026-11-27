@@ -259,7 +259,11 @@
     },
     {
       "id": "session-written-input-keys",
-      "text": "A task is looked up, stored and shared at the key of the bytes it reads when it starts: a declared output an earlier task of the session wrote, by executing, whatever its verdict, or by restoring its entry, moves that key. A key computed before any task runs is never used for a task whose inputs another planned task may write. A resource pruned on such a consumer key is confirmed from the consumer's key when its producer starts, and provisioned when a write that can move that key may finish later."
+      "text": "A task is looked up, stored and shared at the key of the bytes it reads when it starts: a declared output an earlier task of the session wrote, by executing, whatever its verdict, or by restoring its entry, moves that key. A key computed before any task runs is never used for a task whose inputs another planned task may write. A setup a consumer starts is decided by the key that consumer computes when it starts."
+    },
+    {
+      "id": "lazy-invocation-setup",
+      "text": "A finalizes relation whose pruneIf is absent, or valid and true, and whose producer no job outside its consumers waits for, starts its producer only when a consumer misses the cache, once, before any consumer executes. When every consumer is served from the cache or does not run, neither the producer nor its finalizer starts a process: the producer is skipped as not needed. A false or invalid pruneIf keeps the producer running."
     },
     {
       "id": "planned-write-reach",

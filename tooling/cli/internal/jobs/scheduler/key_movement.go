@@ -1,8 +1,8 @@
 // Which cache keys a task's writes can move.
 //
 // A cache key reads file bytes through the CacheManager's memo. A run computes a
-// job's key before any task runs — PrecomputeKeys, for the remote negotiation
-// and the invocation pruning — and again when the job starts, in
+// job's key before any task runs — PrecomputeKeys, for the remote
+// negotiation — and again when the job starts, in
 // lookupRestoreOrClaim. Only the second one addresses a lookup, a restore, a
 // capture and an upload, and between the two, earlier tasks write their
 // declared outputs. Two rules keep it the key of the bytes the job reads:
@@ -12,27 +12,20 @@
 //     start: finalizeExecutedJob for an execution, restoreDeclaredCacheHit for
 //     a restore;
 //   - a decision taken on a precomputed key is trusted only for a job whose
-//     key no planned write can move (cachekey.PlanKeyMovement): the negotiation records
-//     no other job's key, and a pruning that rests on a movable consumer key
-//     is confirmed from the key the consumer computes once every write that
-//     can move it happened (invocationRuntime.isPruned).
+//     key no planned write can move (cachekey.PlanKeyMovement): the negotiation
+//     records no other job's key. A lazy invocation producer is decided by the
+//     key each consumer computes when it starts (invocation_lazy.go).
 package scheduler
 
 import (
-	"sync"
-
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/store"
 )
 
-// cachedAtCurrentKey reports whether the local store holds job's entry at the
-// key it computes now, from the dependency keys this run published and the
-// tree as it stands: the key lookupRestoreOrClaim computes when the job starts,
-// once nothing that can move it is left to run.
-func (s *Scheduler) cachedAtCurrentKey(job *ScheduledJob, mu *sync.Mutex, hashes map[string]string) bool {
-	if s.cache == nil {
-		return false
-	}
-	hashCopy := s.dependencyKeys(job, mu, hashes)
-	hash, err := cachekey.ComputeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
-	return err == nil && cachedEntryPresent(s.cache, job, hash)
+// cachedEntryPresent reports whether the local store already holds the job's
+// entry at hash, using the same address the execution path would look it up at.
+// A source-bound task's entry counts absent here (cachekey.CacheEntryPresent).
+func cachedEntryPresent(cache *store.CacheManager, job *ScheduledJob, hash string) bool {
+	present, err := cachekey.CacheEntryPresent(cache, job, hash)
+	return err == nil && present
 }

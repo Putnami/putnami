@@ -607,18 +607,12 @@ link drops the digest of an input that reads its target. A link below that
 directory is not followed. A task that rewrites its sources drops every digest
 (see [Source-writing fix tasks](#source-writing-fix-tasks)).
 
-The remote negotiation and the pruning of an invocation-scoped resource key the
-whole plan before any task runs. When another planned task may write a file a
-task reads — an output whose path a port reports counts as its whole root —
-that precomputed key is only an estimate: the provider may warm it, but the task
-is never looked up or stored under it. A resource pruned on such a consumer key
-is confirmed when its producer starts, from the key the consumer computes then,
-and is provisioned when a task that can move that key may finish after the
-producer starts.
-When no relation of the plan may be pruned under the command's params (each
-names a `pruneIf` that is false, or invalid because a param it reads is
-missing), the pruning keys nothing, and only the remote negotiation keys the
-plan, when the CLI is signed in.
+The remote negotiation keys the whole plan before any task runs. When another
+planned task may write a file a task reads — an output whose path a port
+reports counts as its whole root — that precomputed key is only an estimate:
+the provider may warm it, but the task is never looked up or stored under it.
+An invocation-scoped resource is provisioned when its first consumer misses at
+the key it computes when it starts, never on a precomputed key (ADR 0129).
 
 ## Cache Lifecycle
 
@@ -1596,9 +1590,8 @@ a job, the keys are computed and only the movement is skipped. A fully warm
 rebuild that no provider serves yet starts none and decides no movement either;
 should a later miss start one, that provider counts every serialization edge as a reader of files,
 so it may restore files it could have skipped, never fewer. A provider that
-serves the run is negotiated with as before, from the keys, and the key
-movement when there is one, that the pruning of invocation-scoped resources
-already computed for the same plan.
+serves the run is negotiated with as before, from the keys and the key
+movement it computes for the plan.
 
 ### Scoping the bypass to some projects
 
@@ -1882,8 +1875,9 @@ The local store and the remote cache use the same store key.
 6. The failure cache neither records nor replays a source-bound failure. Its
    record lives at the cache key alone, and the cause can be a file the key
    leaves out, such as an invalid `putnami.features.json`.
-7. Invocation pruning and the impact plan work from cache keys alone, so they
-   report a source-bound entry as absent. Remote negotiation never offers the
+7. The impact plan works from cache keys alone, so it reports a source-bound
+   entry as absent; a lazy invocation producer is decided by its consumer's
+   own lookup, at the store key. Remote negotiation never offers the
    task's key, and the restore fetches the remote entry on demand at its store
    key. Negotiation looks for a local entry at the store key: with one, a warm
    run starts no cache provider for the task; without one, the task may

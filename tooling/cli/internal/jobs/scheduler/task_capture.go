@@ -853,6 +853,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 	mu *sync.Mutex,
 	hashes map[string]string,
 	admission *groupAdmission,
+	lazy lazyMiss,
 ) (string, *JobResult, func()) {
 	noop := func() {}
 
@@ -883,6 +884,14 @@ func (s *Scheduler) lookupDeclaredEntry(
 	if !ok {
 		s.keyTrace.started(job, hash, false)
 		return hash, nil, noop
+	}
+
+	// A consumer that already missed at this key before its lazy producer ran
+	// asked every store then; it claims the key now (invocation_lazy.go).
+	if lazy.missed == hash && !lazy.deferMiss {
+		s.keyTrace.started(job, hash, false)
+		result, release := s.coalesceMiss(ctx, job, entryKey, declaredCoalescer{scheduler: s, job: job, key: hash, mu: mu, hashes: hashes}, admission)
+		return hash, result, release
 	}
 
 	restoreStarted := time.Now()
@@ -950,6 +959,13 @@ func (s *Scheduler) lookupDeclaredEntry(
 	// from a different domain than any address the remote path can name.
 	if replayed := s.replayFailedEntry(job, hash); replayed != nil {
 		return hash, replayed, noop
+	}
+
+	// A consumer whose lazy producer has not run defers here, before it claims
+	// the key: the producer runs first, and the consumer claims the key when
+	// it opens again (invocation_lazy.go).
+	if lazy.deferMiss {
+		return hash, nil, noop
 	}
 
 	result, release := s.coalesceMiss(ctx, job, entryKey, declaredCoalescer{scheduler: s, job: job, key: hash, mu: mu, hashes: hashes}, admission)
