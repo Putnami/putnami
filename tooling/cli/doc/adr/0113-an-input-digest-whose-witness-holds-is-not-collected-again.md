@@ -462,7 +462,11 @@ protocol, on both clones.
   and with the digests free each hit still pays its restore (3.7 s of engine
   CPU), its session record sanitizing (3.5 s), the remote negotiation (3.0 s)
   and the collector's work on them (2.9 s): the per-task fixed costs of
-  an unchanged run, which are separate work.
+  an unchanged run, which are separate work. The owner moved the < 5 s
+  ready-wait criterion to the per-task fixed-cost work on 2026-11-27. This
+  decision is done when no input digest is collected while its witness holds,
+  the randomized write tests find no false hit, and the gain is measured on
+  the protocol above.
 - The first run in a new worktree, and the first after a CLI build changes,
   collects every digest: the record loads empty.
 - A digest whose witness touches a path written less than two seconds before
