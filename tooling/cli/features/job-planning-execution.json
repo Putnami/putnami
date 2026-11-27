@@ -785,6 +785,19 @@
         }
       },
       {
+        "id": "unchanged-run-writes-nothing",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-unchanged-run-writes-no-file-in-the-work-tree"
+          ]
+        }
+      },
+      {
         "id": "go-embed-cache-inputs",
         "stage": "coded",
         "evidenceKinds": [
