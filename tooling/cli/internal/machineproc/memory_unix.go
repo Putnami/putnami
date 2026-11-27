@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // The worker's memory of the last run it served per worktree, and whether a
@@ -262,7 +264,7 @@ func sigString(sig FileSig) string {
 // indexEntries is the digest of the index's entries: mode, object, stage
 // and path of each.
 func indexEntries(root string) string {
-	out, err := exec.Command("git", "-C", root, "ls-files", "--stage", "-z").Output() //nolint:gosec // fixed arguments
+	out, err := exec.Command(gitread.Executable(), "-C", root, "ls-files", "--stage", "-z").Output() //nolint:gosec // fixed arguments
 	if err != nil {
 		return "unreadable"
 	}
@@ -294,7 +296,7 @@ func gitDirs(root string) []string {
 	if ok {
 		return dirs
 	}
-	out, err := exec.Command("git", "-C", root, "rev-parse", "--absolute-git-dir", "--git-common-dir").Output() //nolint:gosec // fixed arguments
+	out, err := exec.Command(gitread.Executable(), "-C", root, "rev-parse", "--absolute-git-dir", "--git-common-dir").Output() //nolint:gosec // fixed arguments
 	if err == nil {
 		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 		seen := map[string]bool{}
