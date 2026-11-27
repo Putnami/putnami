@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -268,5 +269,47 @@ func TestAnAnswerAWriteExcusedIsDropped(t *testing.T) {
 	useRecordAt(t, root)
 	if third, _ := NewCacheManager(nil).HashFiles(p, patterns, nil, ProjectConfigScope{}); third != want {
 		t.Fatalf("the next run answers %q; a collection gives %s", third, want)
+	}
+}
+
+// A digest the record answers enters the run's memo with its witness already
+// prepared from the stats the record took: the first write that judges it
+// then states no file while it holds the memo's lock.
+func TestARecordedDigestEntersTheMemoPrepared(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	must(t, err)
+	p := filepath.Join(root, "p")
+	writeRecordTree(t, p, map[string]string{"src/a.go": "a", "src/deep/b.go": "b"})
+	patterns := []string{"src/**/*.go"}
+	record := useRecordAt(t, root)
+	if _, err := NewCacheManager(nil).HashFiles(p, patterns, nil, ProjectConfigScope{}); err != nil {
+		t.Fatal(err)
+	}
+	must(t, record.Save())
+
+	next := useRecordAt(t, root)
+	cm := NewCacheManager(nil)
+	if _, err := cm.HashFiles(p, patterns, nil, ProjectConfigScope{}); err != nil {
+		t.Fatal(err)
+	}
+	if next.Answered() != 1 {
+		t.Fatalf("answered %d, want the recorded digest answered", next.Answered())
+	}
+	cm.fileHashes.mu.Lock()
+	defer cm.fileHashes.mu.Unlock()
+	if len(cm.fileHashes.entries) != 1 {
+		t.Fatalf("the memo holds %d entries, want the answered one", len(cm.fileHashes.entries))
+	}
+	for _, entry := range cm.fileHashes.entries {
+		w := entry.witness
+		if w == nil {
+			t.Fatal("the answered digest has no in-run witness")
+		}
+		want := []string{regionPath(filepath.Join(p, "src", "a.go")), regionPath(filepath.Join(p, "src", "deep", "b.go"))}
+		ran := false
+		w.prepared.Do(func() { ran = true })
+		if ran || !w.usable || fmt.Sprint(w.files) != fmt.Sprint(want) {
+			t.Fatalf("prepared before any write = %v, usable %v, files %v: want prepared, usable, %v", !ran, w.usable, w.files, want)
+		}
 	}
 }

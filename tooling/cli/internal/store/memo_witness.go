@@ -497,7 +497,42 @@ func recordedInputDigest(record *fileindex.Record, key, dir string, patterns []s
 	for i, part := range parts[:n] {
 		files[i] = fileEntry{path: part.Path}
 	}
-	return fields[0], newSelectionWitness(dir, patterns, files, collectionFacts{}), fields[2] == "memoized", true
+	witness = newSelectionWitness(dir, patterns, files, collectionFacts{})
+	if witness == nil {
+		return fields[0], nil, fields[2] == "memoized", true
+	}
+	// The record just took the stat of every part: when it shows each
+	// selected file regular and each directory between it and dir a
+	// directory, the witness is prepared from them here, outside the memo's
+	// lock, instead of by the first write that asks (prepare), which stats
+	// them again while every lookup waits on that lock.
+	directories := make(map[string]bool, len(parts)-n)
+	for _, part := range parts[n:] {
+		if part.Stat.Mode&modeTypeMask == modeDirectory {
+			directories[filepath.Clean(part.Path)] = true
+		}
+	}
+	linkFree := true
+	for _, part := range parts[:n] {
+		if part.Stat.Mode&modeTypeMask != modeRegular {
+			linkFree = false
+			break
+		}
+		for d := filepath.Dir(part.Path); d != dir && d != filepath.Dir(d) && linkFree; d = filepath.Dir(d) {
+			linkFree = directories[d]
+		}
+	}
+	if linkFree {
+		witness.prepared.Do(func() {
+			prepared := make([]string, len(witness.selected))
+			for i, path := range witness.selected {
+				prepared[i] = regionPath(path)
+			}
+			slices.Sort(prepared)
+			witness.files, witness.usable = prepared, true
+		})
+	}
+	return fields[0], witness, fields[2] == "memoized", true
 }
 
 // recordInputDigest offers a collected digest to the input record with its
@@ -697,7 +732,8 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 // their value for a regular file, the same on every platform whose stat the
 // file index decodes.
 const (
-	modeTypeMask = 0o170000
-	modeRegular  = 0o100000
-	modeSymlink  = 0o120000
+	modeTypeMask  = 0o170000
+	modeRegular   = 0o100000
+	modeSymlink   = 0o120000
+	modeDirectory = 0o040000
 )
