@@ -166,6 +166,13 @@ directories it already knows, and merges the answers.
   answer is replayed. The current digest is read through the file index
   (`.putnami/file-index`): a file whose stat is the one recorded with its digest
   is not read again ([ADR 0009](../../../protocols/workspace/doc/adr/0009-a-files-stat-decides-that-it-is-unchanged.md)).
+  A recursive input (`**/*.go`) is answered the same way without a walk:
+  `.putnami/probe-witness.json` keeps its digest with the stat of every
+  directory its walk listed and every file it read, and while each stat holds
+  the input holds. A moved stat, a link, a path written within the file
+  index's margin, another CLI build or a file system the index does not trust
+  walks it again. The file is rewritten only when a run records a witness it
+  did not hold, never under `--plan` or a preview.
 - When an input moved, exactly the providers that declare it are re-probed;
   everyone else's recorded answer is carried forward.
 - A changed input no provider claims — `putnami.json`, the workspace config, a

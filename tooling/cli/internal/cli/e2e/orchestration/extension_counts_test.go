@@ -20,6 +20,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // extensionCase is the fixture of one extension built here: a workspace that
@@ -547,6 +548,12 @@ func sorted(keys []string) []string {
 // stamp. A run after that one writes nothing either.
 func unchangedRunWritesNothing(t *testing.T, root string, command []string) bool {
 	t.Helper()
+	// The probe records a witness only of paths older than the file index's
+	// margin, and writes its witness file when it records one. A run past the
+	// margin records every witness of the unchanged tree; the runs below
+	// then hold them and write nothing.
+	time.Sleep(fileindex.Margin + 100*time.Millisecond)
+	clitest.RunCounts(t, root, command...)
 	if !runWritesNothing(t, root, command) {
 		return false
 	}
@@ -603,6 +610,8 @@ type workTreeFile struct {
 
 // workTreeFiles reads every file of the work tree at root, outside the .git
 // and .putnami directories at its root, by its slash path relative to root.
+// It reads the probe's witness file under .putnami too: a run whose witnesses
+// held writes it no more than the tree.
 func workTreeFiles(t *testing.T, root string) map[string]workTreeFile {
 	t.Helper()
 	files := map[string]workTreeFile{}
@@ -633,6 +642,13 @@ func workTreeFiles(t *testing.T, root string) map[string]workTreeFile {
 	})
 	if err != nil {
 		t.Fatalf("reading the work tree: %v", err)
+	}
+	if info, err := os.Lstat(filepath.Join(root, ".putnami", workspace.GlobWitnessFilename)); err == nil {
+		file := workTreeFile{size: info.Size(), modified: info.ModTime().UnixNano()}
+		if identity, ok := store.FileIdentityOf(info); ok {
+			file.inode = identity.Inode
+		}
+		files[".putnami/"+workspace.GlobWitnessFilename] = file
 	}
 	return files
 }
