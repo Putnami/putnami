@@ -294,9 +294,10 @@ in-process Git read for a `git:` pattern, and the basis an extension's answer
 names for an input selector). The next run answers the digest without
 collecting it while every one of those stats holds, under the same two-second
 rule and on the same filesystems. The cache key itself is still composed by
-every run and does not change. A digest with no complete witness (the empty
-pattern set, a dangling link, a cut Git listed, a selector whose extension
-names no answer identity) is collected every run.
+every run and does not change. A digest with no complete witness (one that
+reads through a symbolic link, the empty pattern set, a glob before the last
+segment, a cut Git listed, a selector whose extension names no answer
+identity) is collected every run.
 [ADR 0113](adr/0113-an-input-digest-whose-witness-holds-is-not-collected-again.md)
 states the rule.
 

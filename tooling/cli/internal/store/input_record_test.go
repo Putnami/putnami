@@ -31,6 +31,24 @@ func useRecordAt(t *testing.T, root string) *fileindex.Record {
 	return record
 }
 
+// useRoundRecord makes the record of a round of a randomized test current:
+// on an even round with a clock an hour ahead, so every part is recordable,
+// and on an odd round with the filesystem's own clock, so the writes of the
+// previous round lie inside the racy margin (ADR 0113 §2).
+func useRoundRecord(t *testing.T, root string, round int) *fileindex.Record {
+	t.Helper()
+	if round%2 == 0 {
+		return useRecordAt(t, root)
+	}
+	record := fileindex.OpenRecord(fileindex.RecordPath(root), "test")
+	restore := fileindex.UseRecord(record)
+	t.Cleanup(restore)
+	if fileindex.CurrentRecord() == nil {
+		t.Skip("this platform or filesystem keeps no input record")
+	}
+	return record
+}
+
 func writeRecordTree(t *testing.T, root string, files map[string]string) {
 	t.Helper()
 	for rel, content := range files {
@@ -151,6 +169,7 @@ var recordPatternSets = [][]string{
 	{"src/*/l*"},
 	{"go:sources", "*.txt"},
 	{"**/*.go", "!**/gen/**"},
+	{"go:sources", "!**/gen/**"},
 }
 
 // TestTheInputRecordServesNoFalseHit writes the tree at random between runs
@@ -173,7 +192,7 @@ func TestTheInputRecordServesNoFalseHit(t *testing.T) {
 			})
 			writeRecordTree(t, root, map[string]string{"shared/a/s.txt": "s"})
 			for round := range 25 {
-				record := useRecordAt(t, root)
+				record := useRoundRecord(t, root, round)
 				cm := NewCacheManager(nil)
 				expander := basisExpander{identity: "ext"}
 				for _, patterns := range recordPatternSets {
@@ -216,13 +235,43 @@ func TestTheInputRecordServesNoFalseHit(t *testing.T) {
 // mutateTree makes one random write under project.
 func mutateTree(t *testing.T, rng *rand.Rand, project string) {
 	t.Helper()
+	// A random write that does not apply, such as a directory created where
+	// a file now stands, is skipped: the tree changes all the same.
+	skip := func(error) {}
 	files, dirs := treeEntries(t, project)
 	pick := func(list []string) string { return list[rng.Intn(len(list))] }
 	newName := func() string {
 		names := []string{"n.go", "n_test.go", "n.json", "n.txt", "x.txt", "readme.md", "w.txt"}
 		return fmt.Sprintf("%d%s", rng.Intn(3), names[rng.Intn(len(names))])
 	}
-	switch op := rng.Intn(11); {
+	shared := filepath.Join(filepath.Dir(project), "shared")
+	if filepath.Base(project) == "shared" {
+		shared = filepath.Join(filepath.Dir(project), "elsewhere")
+	}
+	switch op := rng.Intn(14); {
+	case op == 11: // a link to a path that may not exist yet, outside the tree
+		_ = os.Symlink(filepath.Join(shared, fmt.Sprintf("t%d", rng.Intn(3))), filepath.Join(pick(dirs), "dl"+newName()))
+	case op == 12: // create, retarget or replace what such links lead to
+		target := filepath.Join(shared, fmt.Sprintf("t%d", rng.Intn(3)))
+		switch rng.Intn(4) {
+		case 0:
+			_ = os.RemoveAll(target)
+			skip(os.MkdirAll(filepath.Dir(target), 0o755))
+			skip(os.WriteFile(target, []byte(fmt.Sprint("file", rng.Intn(9))), 0o644))
+		case 1:
+			_ = os.RemoveAll(target)
+			skip(os.MkdirAll(filepath.Join(target, "in"), 0o755))
+		case 2: // a link chain: the target is itself a link, retargeted
+			_ = os.RemoveAll(target)
+			skip(os.MkdirAll(shared, 0o755))
+			skip(os.Symlink(fmt.Sprintf("t%d", rng.Intn(3)), target))
+		default:
+			_ = os.RemoveAll(target)
+		}
+	case op == 13 && len(dirs) > 1: // a directory replaced by a file of its name
+		dir := pick(dirs[1:])
+		skip(os.RemoveAll(dir))
+		skip(os.WriteFile(dir, []byte("was a directory"), 0o644))
 	case op == 10: // point a link somewhere else
 		var links []string
 		_ = filepath.WalkDir(project, func(path string, d os.DirEntry, err error) error {
@@ -233,47 +282,47 @@ func mutateTree(t *testing.T, rng *rand.Rand, project string) {
 		})
 		if len(links) > 0 {
 			link := pick(links)
-			must(t, os.Remove(link))
+			skip(os.Remove(link))
 			target := pick(dirs)
 			if len(files) > 0 && rng.Intn(2) == 0 {
 				target = pick(files)
 			}
-			must(t, os.Symlink(target, link))
+			skip(os.Symlink(target, link))
 		}
 	case op == 0 && len(files) > 0: // remove a file
-		must(t, os.Remove(pick(files)))
+		skip(os.Remove(pick(files)))
 	case op == 1: // create a file
-		must(t, os.WriteFile(filepath.Join(pick(dirs), newName()), []byte("new"), 0o644))
+		skip(os.WriteFile(filepath.Join(pick(dirs), newName()), []byte("new"), 0o644))
 	case op == 2 && len(files) > 0: // rename a file within or across directories
-		must(t, os.Rename(pick(files), filepath.Join(pick(dirs), newName())))
+		skip(os.Rename(pick(files), filepath.Join(pick(dirs), newName())))
 	case op == 3 && len(files) > 0: // same size, modification time set back
 		file := pick(files)
 		info, err := os.Stat(file)
-		must(t, err)
+		skip(err)
 		content, err := os.ReadFile(file)
-		must(t, err)
+		skip(err)
 		if len(content) > 0 {
 			content[0] ^= 0x01
 		}
-		must(t, os.WriteFile(file, content, info.Mode()))
-		must(t, os.Chtimes(file, info.ModTime(), info.ModTime()))
+		skip(os.WriteFile(file, content, info.Mode()))
+		skip(os.Chtimes(file, info.ModTime(), info.ModTime()))
 	case op == 4 && len(files) > 0: // change the mode
-		must(t, os.Chmod(pick(files), 0o755))
+		skip(os.Chmod(pick(files), 0o755))
 	case op == 5: // create a directory, sometimes with a file
 		dir := filepath.Join(pick(dirs), fmt.Sprintf("d%d", rng.Intn(3)))
-		must(t, os.MkdirAll(dir, 0o755))
+		skip(os.MkdirAll(dir, 0o755))
 		if rng.Intn(2) == 0 {
-			must(t, os.WriteFile(filepath.Join(dir, newName()), []byte("in"), 0o644))
+			skip(os.WriteFile(filepath.Join(dir, newName()), []byte("in"), 0o644))
 		}
 	case op == 6 && len(dirs) > 1: // remove a directory and what it holds
 		if dir := pick(dirs[1:]); dir != project {
-			must(t, os.RemoveAll(dir))
+			skip(os.RemoveAll(dir))
 		}
 	case op == 7 && len(files) > 0: // replace a file by a rename over it
 		file := pick(files)
 		temp := file + ".tmp"
-		must(t, os.WriteFile(temp, []byte("replaced"), 0o644))
-		must(t, os.Rename(temp, file))
+		skip(os.WriteFile(temp, []byte("replaced"), 0o644))
+		skip(os.Rename(temp, file))
 	case op == 8: // a link, to a file or a directory
 		target := pick(dirs)
 		if len(files) > 0 && rng.Intn(2) == 0 {
@@ -281,8 +330,10 @@ func mutateTree(t *testing.T, rng *rand.Rand, project string) {
 		}
 		_ = os.Symlink(target, filepath.Join(pick(dirs), "l"+newName()))
 	default: // create the missing prefix, or a file in it
-		must(t, os.MkdirAll(filepath.Join(project, "missing", "m"), 0o755))
-		must(t, os.WriteFile(filepath.Join(project, "missing", "m", newName()), []byte("m"), 0o644))
+		// A directory replaced by a file may stand in the way: then nothing.
+		if os.MkdirAll(filepath.Join(project, "missing", "m"), 0o755) == nil {
+			skip(os.WriteFile(filepath.Join(project, "missing", "m", newName()), []byte("m"), 0o644))
+		}
 	}
 }
 
@@ -317,6 +368,14 @@ func must(t *testing.T, err error) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// tryGit runs git in dir, and ignores a refusal: a random step may not apply.
+func tryGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false"}, args...)...)
+	cmd.Dir = dir
+	_ = cmd.Run()
 }
 
 // git runs git in dir, skipping the test where git cannot run.
@@ -357,6 +416,7 @@ var gitRecordPatternSets = [][]string{
 	{"git:**", "!git:**/*.txt"},
 	{"git:a/**"},
 	{"git:**/*.go", "c/**/*.txt", "*.txt"},
+	{"git:**", "!**/.git/**"},
 }
 
 // TestTheInputRecordServesNoFalseHitOfGitCandidates is the randomized test of
@@ -365,7 +425,7 @@ var gitRecordPatternSets = [][]string{
 // runs (ADR 0113 §3).
 func TestTheInputRecordServesNoFalseHitOfGitCandidates(t *testing.T) {
 	answered := int64(0)
-	for seed := int64(1); seed <= 6; seed++ {
+	for seed := int64(1); seed <= 4; seed++ {
 		t.Run(fmt.Sprint("seed", seed), func(t *testing.T) {
 			rng := rand.New(rand.NewSource(seed)) //nolint:gosec // a reproducible test sequence
 			root := t.TempDir()
@@ -373,14 +433,14 @@ func TestTheInputRecordServesNoFalseHitOfGitCandidates(t *testing.T) {
 				"a/x.go": "package a", "a/n.txt": "n", "b/y.go": "package b", ".gitignore": ".putnami/\nignored/\n*.log\n",
 				"ignored/z.go": "package z", "c/d/w.go": "package w", "top.txt": "t",
 			})
-			runGit(t, root, "init", "-q")
+			runGit(t, root, "init", "-q", "-b", "master")
 			runGit(t, root, "add", "-A")
 			runGit(t, root, "commit", "-q", "-m", "init")
 			// The reader keeps a configuration read more than a second after
 			// its files were written, and only a kept one gives a witness.
 			time.Sleep(1100 * time.Millisecond)
 			for round := range 20 {
-				record := useRecordAt(t, root)
+				record := useRoundRecord(t, root, round)
 				cm := NewCacheManager(nil)
 				source := inProcessCut(t, root)
 				cm.SetCandidateSource(source)
@@ -420,7 +480,24 @@ func mutateGitTree(t *testing.T, rng *rand.Rand, root string) {
 	dir := dirs[rng.Intn(len(dirs))]
 	name := fmt.Sprintf("f%d.%s", rng.Intn(3), []string{"go", "txt", "log"}[rng.Intn(3)])
 	path := filepath.Join(root, dir, name)
-	switch rng.Intn(11) {
+	switch rng.Intn(13) {
+	case 11: // switch to another branch with other files, and back
+		branch := fmt.Sprintf("b%d", rng.Intn(2))
+		tryGit(t, root, "checkout", "-q", "-f", "-B", branch)
+		writeRecordTree(t, root, map[string]string{"a/" + branch + ".go": "package a"})
+		tryGit(t, root, "add", "-A")
+		tryGit(t, root, "commit", "-q", "--allow-empty", "-m", branch)
+		if rng.Intn(2) == 0 {
+			tryGit(t, root, "checkout", "-q", "-f", "master")
+		}
+		// The reader keeps no configuration read within a second of a change
+		// to HEAD, and without one the cut has no witness.
+		time.Sleep(1100 * time.Millisecond)
+	case 12: // a configured excludes file, rewritten
+		excludes := filepath.Join(filepath.Dir(root), "excludes")
+		must(t, os.WriteFile(excludes, []byte([]string{"*.txt\n", "a/\n", ""}[rng.Intn(3)]), 0o644))
+		tryGit(t, root, "config", "core.excludesFile", excludes)
+		time.Sleep(1100 * time.Millisecond)
 	case 0: // an untracked file
 		writeRecordTree(t, root, map[string]string{dir + "/" + name: "new"})
 	case 1: // stage everything

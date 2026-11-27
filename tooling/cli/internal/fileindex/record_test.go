@@ -1,6 +1,7 @@
 package fileindex
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -281,5 +282,160 @@ func TestAnAbsentPartHoldsWhileNothingIsThere(t *testing.T) {
 	after := OpenRecord(path, "id")
 	if _, _, ok := after.Answer("digests", "k", after.Hold); ok {
 		t.Fatal("an absent part held once its path existed")
+	}
+}
+
+// A stat Hold takes while a write lands and Forget runs is stored after the
+// Forget: the run keeps the stat from before the write.
+func TestAStatTakenAcrossAForgetIsNotHeld(t *testing.T) {
+	clock := time.Now().Add(time.Hour).UnixNano()
+	withRecordClock(t, &clock)
+	root := t.TempDir()
+	file := filepath.Join(root, "a.txt")
+	if err := os.WriteFile(file, []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	part := recordPartOf(t, file)
+	r := OpenRecord(RecordPath(root), "id")
+	// Prime stats so Forget does not take its empty-map early return.
+	r.Hold([]RecordPart{recordPartOf(t, root)})
+
+	statTaken, release := make(chan struct{}), make(chan struct{})
+	saved := recordLstat
+	recordLstat = func(p string) (Stat, bool) {
+		st, ok := saved(p)
+		if p == file {
+			close(statTaken)
+			<-release
+		}
+		return st, ok
+	}
+	t.Cleanup(func() { recordLstat = saved })
+
+	done := make(chan bool)
+	go func() { done <- r.Hold([]RecordPart{part}) }()
+	<-statTaken
+	time.Sleep(20 * time.Millisecond)
+	if err := os.WriteFile(file, []byte("changed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r.Forget([]string{file})
+	close(release)
+	<-done
+	recordLstat = saved
+	if r.Hold([]RecordPart{part}) {
+		t.Errorf("after a write and its Forget, Hold still answers the pre-write stat")
+	}
+}
+
+func TestForgetAllDropsEveryHeldStat(t *testing.T) {
+	clock := time.Now().Add(time.Hour).UnixNano()
+	withRecordClock(t, &clock)
+	root, path, file := recordFixture(t)
+	part := recordPartOf(t, file)
+	r := OpenRecord(path, "id")
+	if !r.Hold([]RecordPart{part}) {
+		t.Fatal("a part that holds did not")
+	}
+	time.Sleep(20 * time.Millisecond)
+	if err := os.WriteFile(file, []byte("changed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !r.Hold([]RecordPart{part}) {
+		t.Fatal("a held stat was taken again without a Forget")
+	}
+	r.ForgetAll()
+	if r.Hold([]RecordPart{part}) {
+		t.Fatal("ForgetAll kept the stat from before the write")
+	}
+	_ = root
+}
+
+// TestADirectoryStatMovesWithItsListing checks, on each filesystem the
+// machine offers here (the test's temporary directory, and tmpfs at /dev/shm
+// where it exists), what the input record relies on (tooling/cli ADR 0113
+// §2): a directory's stat moves when an entry is created, removed, renamed in
+// or out, replaced by a rename or linked.
+func TestADirectoryStatMovesWithItsListing(t *testing.T) {
+	roots := []string{t.TempDir()}
+	if info, err := os.Stat("/dev/shm"); err == nil && info.IsDir() {
+		if dir, err := os.MkdirTemp("/dev/shm", "record-test-"); err == nil {
+			t.Cleanup(func() { os.RemoveAll(dir) })
+			roots = append(roots, dir)
+		}
+	}
+	for _, root := range roots {
+		if !recordLocal(root) {
+			continue
+		}
+		dir := filepath.Join(root, "d")
+		other := filepath.Join(root, "other")
+		for _, p := range []string{dir, other} {
+			if err := os.MkdirAll(p, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.WriteFile(filepath.Join(dir, "f"), []byte("f"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		steps := []struct {
+			name  string
+			write func() error
+		}{
+			{"create a file", func() error { return os.WriteFile(filepath.Join(dir, "n"), nil, 0o644) }},
+			{"remove a file", func() error { return os.Remove(filepath.Join(dir, "n")) }},
+			{"create a directory", func() error { return os.Mkdir(filepath.Join(dir, "s"), 0o755) }},
+			{"remove a directory", func() error { return os.Remove(filepath.Join(dir, "s")) }},
+			{"rename within", func() error { return os.Rename(filepath.Join(dir, "f"), filepath.Join(dir, "g")) }},
+			{"rename out", func() error { return os.Rename(filepath.Join(dir, "g"), filepath.Join(other, "g")) }},
+			{"rename in", func() error { return os.Rename(filepath.Join(other, "g"), filepath.Join(dir, "f")) }},
+			{"replace by a rename", func() error {
+				if err := os.WriteFile(filepath.Join(other, "t"), []byte("t"), 0o644); err != nil {
+					return err
+				}
+				return os.Rename(filepath.Join(other, "t"), filepath.Join(dir, "f"))
+			}},
+			{"create a link", func() error { return os.Symlink("f", filepath.Join(dir, "l")) }},
+		}
+		for _, step := range steps {
+			before, ok := LstatAny(dir)
+			if !ok {
+				t.Skip("this platform's stat is not decoded")
+			}
+			time.Sleep(15 * time.Millisecond)
+			if err := step.write(); err != nil {
+				t.Fatal(err)
+			}
+			if after, _ := LstatAny(dir); after == before {
+				t.Errorf("%s: %s left the directory's stat unchanged", root, step.name)
+			}
+		}
+	}
+}
+
+func TestASaveKeepsTheRecordWithinItsCaps(t *testing.T) {
+	clock := time.Now().Add(time.Hour).UnixNano()
+	withRecordClock(t, &clock)
+	_, path, file := recordFixture(t)
+	savedEntries, savedParts := recordMaxEntries, recordMaxParts
+	recordMaxEntries, recordMaxParts = 3, 100
+	t.Cleanup(func() { recordMaxEntries, recordMaxParts = savedEntries, savedParts })
+	r := OpenRecord(path, "id")
+	for i := range 5 {
+		r.Put("digests", fmt.Sprint("k", i), []byte("v"), []RecordPart{recordPartOf(t, file)})
+	}
+	if err := r.Save(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	disk, err := decodeRecord(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(disk.entries) != 3 {
+		t.Fatalf("the record holds %d entries past its cap of 3", len(disk.entries))
 	}
 }

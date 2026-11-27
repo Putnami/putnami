@@ -45,18 +45,18 @@ import (
 // It lives beside the file index because it is the file index's rule applied
 // to a computation rather than to one file, under the same envelope.
 
-// Filename is the record's filename under a workspace's `.putnami/`.
+// RecordFilename is the record's filename under a workspace's `.putnami/`.
 const RecordFilename = "input-record"
 
-// lockName is the lock a saving run holds while it merges into the file.
+// recordLockName is the lock a saving run holds while it merges into the file.
 const recordLockName = "input-record.lock"
 
-// Scheme is the version of what the record's tables hold and how their
+// RecordScheme is the version of what the record's tables hold and how their
 // witnesses are taken. It is part of the record's identity: a CLI that
 // changes either changes it, and loads an older record empty.
 const RecordScheme = "1"
 
-// maxEntries bounds the entries one file holds, and maxParts the parts of
+// recordMaxEntries bounds the entries one file holds, and recordMaxParts the parts of
 // all its entries; past either, a Save keeps only what its run recorded or
 // confirmed.
 var (
@@ -64,7 +64,7 @@ var (
 	recordMaxParts   = 1 << 20
 )
 
-// Part is one path a value's computation read, with the stat it had: a file
+// RecordPart is one path a value's computation read, with the stat it had: a file
 // it read, a directory it listed, or the nearest existing directory above a
 // path it found absent.
 type RecordPart struct {
@@ -106,9 +106,15 @@ type Record struct {
 	// per path per run, dropped by the run's writes (Forget). under maps a
 	// comparison-form directory to the held paths below it, so a write drops
 	// them without a scan of every held stat.
+	// stats is keyed by the exact cleaned path; folded and under are keyed
+	// by the comparison form (comparisonPath), so a write spelled in another
+	// case still drops the stat. forgets counts Forget calls: a stat taken
+	// across one is returned but not held.
 	statsMu sync.Mutex
 	stats   map[string]heldStat
+	folded  map[string][]string
 	under   map[string][]string
+	forgets uint64
 }
 
 type heldStat struct {
@@ -116,12 +122,12 @@ type heldStat struct {
 	ok bool
 }
 
-// Path is the record file of the workspace at root.
+// RecordPath is the record file of the workspace at root.
 func RecordPath(root string) string {
 	return filepath.Join(root, ".putnami", RecordFilename)
 }
 
-// Identity is the identity a record of the running program is written and
+// RecordIdentity is the identity a record of the running program is written and
 // read under: the record's scheme and the file index's identity of the
 // executable. A process with no executable identity has none, and its record
 // answers and records nothing.
@@ -141,7 +147,7 @@ var (
 	recordLstat = LstatAny
 )
 
-// Open reads the filesystem clock in the record's directory and loads the
+// OpenRecord reads the filesystem clock in the record's directory and loads the
 // record file at path. It returns a record that answers and records nothing
 // under the identity "", where the platform's stat is not decoded, where the
 // directory is not on a listed local filesystem, or when the clock cannot be
@@ -160,7 +166,7 @@ func OpenRecord(path, identity string) *Record {
 	return r
 }
 
-// OpenReadOnly loads the record file at path to answer values, and writes
+// OpenRecordReadOnly loads the record file at path to answer values, and writes
 // nothing: no directory, no clock file, no entry. Its clock is the process's.
 func OpenRecordReadOnly(path, identity string, now int64) *Record {
 	r := newRecord(path, identity)
@@ -207,17 +213,17 @@ func (r *Record) load() {
 	r.loaded, r.generation = disk.entries, disk.generation
 }
 
-// current is the record the run's computations consult; nil answers nothing.
+// currentRecord is the record the run's computations consult; nil answers nothing.
 var currentRecord atomic.Pointer[Record]
 
-// Use makes r the record Current returns, and returns a function that
+// UseRecord makes r the record CurrentRecord returns, and returns a function that
 // restores the previous one.
 func UseRecord(r *Record) (restore func()) {
 	previous := currentRecord.Swap(r)
 	return func() { currentRecord.CompareAndSwap(r, previous) }
 }
 
-// Current is the record of the run, or nil.
+// CurrentRecord is the record of the run, or nil.
 func CurrentRecord() *Record {
 	r := currentRecord.Load()
 	if !r.enabled() {
@@ -404,7 +410,36 @@ func (r *Record) Save() error {
 		}
 		merged = kept
 	}
+	// What this run recorded or confirmed can itself exceed the caps: keep
+	// entries in key order until either is reached.
+	if len(merged) > recordMaxEntries || recordParts(merged) > recordMaxParts {
+		keys := make([]recordKey, 0, len(merged))
+		for k := range merged {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			return keys[i].table < keys[j].table || keys[i].table == keys[j].table && keys[i].key < keys[j].key
+		})
+		capped, parts := make(map[recordKey]recordEntry, recordMaxEntries), 0
+		for _, k := range keys {
+			e := merged[k]
+			if len(capped) == recordMaxEntries || parts+len(e.parts) > recordMaxParts {
+				break
+			}
+			capped[k], parts = e, parts+len(e.parts)
+		}
+		merged = capped
+	}
 	return writeRecordAtomic(r.file, encodeRecord(recordFile{identity: r.identity, stamp: stamp, generation: generation, entries: merged}))
+}
+
+// recordParts counts the parts of entries.
+func recordParts(entries map[recordKey]recordEntry) int {
+	parts := 0
+	for _, e := range entries {
+		parts += len(e.parts)
+	}
+	return parts
 }
 
 func sameParts(a, b []RecordPart) bool {
@@ -656,50 +691,66 @@ func AbsentPart(path string) RecordPart { return RecordPart{Path: path} }
 func (p RecordPart) Absent() bool { return p.Stat == Stat{} }
 
 func (r *Record) heldStat(path string) (Stat, bool) {
-	k := comparisonPath(path)
+	exact := filepath.Clean(path)
 	r.statsMu.Lock()
-	held, found := r.stats[k]
+	held, found := r.stats[exact]
+	generation := r.forgets
 	r.statsMu.Unlock()
 	if found {
 		return held.st, held.ok
 	}
-	st, ok := recordLstat(path)
+	st, ok := recordLstat(exact)
 	r.statsMu.Lock()
-	if r.stats == nil {
-		r.stats, r.under = map[string]heldStat{}, map[string][]string{}
+	defer r.statsMu.Unlock()
+	if r.forgets != generation {
+		// A write was forgotten while the stat was taken: it may predate
+		// the write, so it answers this call and is not held.
+		return st, ok
 	}
-	r.stats[k] = heldStat{st: st, ok: ok}
+	if r.stats == nil {
+		r.stats, r.folded, r.under = map[string]heldStat{}, map[string][]string{}, map[string][]string{}
+	}
+	r.stats[exact] = heldStat{st: st, ok: ok}
+	k := comparisonPath(exact)
+	r.folded[k] = append(r.folded[k], exact)
 	for parent := slashParent(k); ; parent = slashParent(parent) {
-		r.under[parent] = append(r.under[parent], k)
+		r.under[parent] = append(r.under[parent], exact)
 		if slashParent(parent) == parent {
 			break
 		}
 	}
-	r.statsMu.Unlock()
 	return st, ok
 }
 
-// Forget drops the stats Hold took at, under and above each of paths: a
-// write of the run there may have moved them. The caller names each path as
-// written and with its links followed. A nil r forgets nothing.
+// Forget drops the stats Hold took at, under and above each of paths, in
+// any spelling of their case: a write of the run there may have moved them.
+// The caller names each path as written and with its links followed. A nil
+// r forgets nothing.
 func (r *Record) Forget(paths []string) {
 	if r == nil {
 		return
 	}
 	r.statsMu.Lock()
 	defer r.statsMu.Unlock()
+	r.forgets++
 	if len(r.stats) == 0 {
 		return
 	}
+	dropFolded := func(k string) {
+		for _, exact := range r.folded[k] {
+			delete(r.stats, exact)
+		}
+		delete(r.folded, k)
+	}
 	for _, p := range paths {
 		root := comparisonPath(p)
-		delete(r.stats, root)
+		dropFolded(root)
 		for _, below := range r.under[root] {
 			delete(r.stats, below)
 		}
 		delete(r.under, root)
 		for parent := slashParent(root); ; parent = slashParent(parent) {
-			delete(r.stats, parent)
+			dropFolded(parent)
 			if slashParent(parent) == parent {
 				break
 			}
@@ -713,7 +764,8 @@ func (r *Record) ForgetAll() {
 		return
 	}
 	r.statsMu.Lock()
-	r.stats, r.under = nil, nil
+	r.forgets++
+	r.stats, r.folded, r.under = nil, nil, nil
 	r.statsMu.Unlock()
 }
 

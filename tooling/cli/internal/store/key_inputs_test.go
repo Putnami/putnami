@@ -80,7 +80,8 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 	project := filepath.Join(root, "p")
 	writeRecordTree(t, project, map[string]string{"src/a.go": "a", "README.md": "r", "x.json": "{}"})
 	writeRecordTree(t, root, map[string]string{"shared/s.txt": "s"})
-	must(t, os.Symlink("README.md", filepath.Join(project, "link.md")))
+	must(t, os.MkdirAll(filepath.Join(project, "l"), 0o755))
+	must(t, os.Symlink("../README.md", filepath.Join(project, "l", "link.md")))
 	must(t, os.MkdirAll(filepath.Join(project, "d"), 0o755))
 	must(t, os.Symlink("missing.md", filepath.Join(project, "d", "dangling.md")))
 	runGit(t, project, "init", "-q")
@@ -89,24 +90,31 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 		patterns []string
 		expander InputExpander
 		recorded bool
+		env      map[string]string
 	}{
-		{"a recursive walk", []string{"src/**/*.go"}, nil, true},
-		{"a glob in the last segment", []string{"*.json"}, nil, true},
-		{"a literal name", []string{"README.md"}, nil, true},
-		{"an exclusion", []string{"**/*", "!README.md"}, nil, true},
-		{"a missing prefix", []string{"missing/**"}, nil, true},
-		{"the empty pattern set (the default walk)", nil, nil, false},
-		{"Git candidates Git listed (ADR 0113 §3: its fallback)", []string{"git:**"}, nil, false},
-		{"an input selector whose answers name their identity", []string{"go:sources"}, basisExpander{identity: "ext"}, true},
-		{"an input selector whose answers name none", []string{"go:sources"}, basisExpander{}, false},
-		{"a glob before the last segment", []string{"s*/a.go"}, nil, true},
-		{"a character class", []string{"[sx]*.json"}, nil, true},
-		{"a pattern above the directory", []string{"../shared/*.txt"}, nil, true},
-		{"a link to a file", []string{"link.md"}, nil, true},
-		{"a dangling link", []string{"d/dangling.md"}, nil, false},
+		{"a recursive walk", []string{"src/**/*.go"}, nil, true, nil},
+		{"a glob in the last segment", []string{"*.json"}, nil, true, nil},
+		{"a literal name", []string{"README.md"}, nil, true, nil},
+		{"an exclusion", []string{"**/*.go", "*.md", "!README.md"}, nil, true, nil},
+		{"a missing prefix", []string{"missing/**"}, nil, true, nil},
+		{"the empty pattern set (the default walk)", nil, nil, false, nil},
+		{"Git candidates of a configuration the reader reads again (no witness)", []string{"git:**"}, nil, false, nil},
+		{"an input selector whose answers name their identity", []string{"go:sources"}, basisExpander{identity: "ext"}, true, nil},
+		{"an input selector whose answers name none", []string{"go:sources"}, basisExpander{}, false, nil},
+		{"a glob before the last segment (it may read through a link)", []string{"s*/a.go"}, nil, false, nil},
+		{"a character class", []string{"[sx]*.json"}, nil, true, nil},
+		{"a pattern above the directory", []string{"../shared/*.txt"}, nil, true, nil},
+		{"a link to a file", []string{"l/link.md"}, nil, false, nil},
+		{"a walk that meets a link", []string{"l/**"}, nil, false, nil},
+		{"a dangling link", []string{"d/dangling.md"}, nil, false, nil},
+		{"Git candidates Git lists (the reader's fallback: GIT_INDEX_FILE)", []string{"git:**"}, nil, false,
+			map[string]string{"GIT_INDEX_FILE": filepath.Join(project, ".git", "index")}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			for name, value := range c.env {
+				t.Setenv(name, value)
+			}
 			record := fileindex.OpenRecordAt(fileindex.RecordPath(t.TempDir()), "test", time.Now().Add(time.Hour).UnixNano())
 			if !record.Recordable(statOf(t, project)) {
 				t.Skip("this platform or filesystem keeps no input record")

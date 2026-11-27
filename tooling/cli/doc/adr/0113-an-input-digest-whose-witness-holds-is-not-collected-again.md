@@ -110,24 +110,34 @@ The witness of a digest is:
 
 - **Each selected file**: its absolute path and its stat, the stat of ADR 0009
   (device, inode, mode, owner and group, size, modification and status-change
-  times to the nanosecond), taken by the collection as it selected the file. A
+  times to the nanosecond), taken once the digest is computed (section 2). A
   file whose stat equals the recorded one has the digest its reading recorded,
   under the rule of ADR 0009. A file the key reads as unreadable is witnessed
   the same way.
-- **Each directory the collection listed**: its absolute path and its stat,
-  taken before and after the listing. This covers a `**` walk from a
-  pattern's static prefix, the directories `filepath.Glob` lists for a
-  pattern's glob segments, and the default walk of the empty pattern set. A
+- **Each directory the collection listed**: its absolute path and its stat.
+  This covers a `**` walk from a pattern's static prefix, the directory
+  `filepath.Glob` lists for a pattern's last segment, and each path a pattern
+  without a glob looks up. The collection names what it read: a second
+  reading of the glob (`listedGlob`) must select what `filepath.Glob`
+  selected, or nothing is recorded. A pattern with a `..` segment or a
+  character class is recorded that way. A
   directory's modification and status-change times move when an entry is
   created, removed or renamed in it (section 2), so an equal stat says the
   listing is unchanged; a change below it is seen through the directory that
   holds it, which the walk listed too. A directory the walk skips
-  (`node_modules`, `.git`, `.putnami`, `out`, `dist`, `vendor`, dot-names for
-  the default walk) is not listed and not witnessed: no file below it can be
-  selected.
+  (`node_modules`, `.git`, `.putnami`, `out`, `dist`, `vendor`) is not listed
+  and not witnessed: no file below it can be selected. Neither is a directory
+  an exclusion excludes as a whole (`!**/.gen/**`): nothing it lists can be
+  selected by the ordinary patterns. That pruning applies to the ordinary
+  listing alone, never to the cut's witness or to an answer's basis, which
+  read what they read whatever the patterns exclude.
 - **Each absent path the selection depends on**: a Git candidate the cut lists
-  that is absent from the work tree, and a pattern's static prefix that does
-  not exist, witnessed by the stat of the nearest existing directory above it.
+  that is absent from the work tree, a pattern's static prefix or a literal
+  path that does not exist. The collection found it absent and the record
+  finds it absent again; it is witnessed by staying absent, and holds while
+  nothing exists at the path. A path the cut's witness names that does not
+  exist, such as a configuration file, is witnessed by the stat of the
+  nearest existing directory above it.
 - **For a `git:` pattern, the cut's witness** (section 3).
 - **For an input selector, the answer's witness**: the answer of the extension
   is already kept across runs, keyed by its extension's implementation
@@ -141,17 +151,23 @@ The witness of a digest is:
 
 A digest gets no record, and is collected every run as today, when any part
 of it has no witness: a pattern, a directory or a basis set that reaches a
-file or a directory through a symbolic link (a link's target can change
-outside every witnessed directory), a pattern that holds a character class or
-a `.`, `..` or empty segment, an expander with no identity, or an answer whose
-basis the extension did not declare. The record never widens the class of
+file or a directory through a symbolic link, whether the link is selected,
+listed, dangling or on the way to one of them, and a collection directory
+that resolves elsewhere through a link (a link's target can change outside
+every witnessed directory); a pattern with a glob before its last segment,
+which `filepath.Glob` follows through links; the empty pattern set; an
+expander with no identity, or an answer whose basis the extension did not
+declare. A Git candidate is read as Git lists it, a link by its text, so a
+candidate that is a link is witnessed by its own stat. The record never widens the class of
 digests on the extension's word: an answer with no basis is recollected.
 
 A run answers a recorded digest at its first lookup only after checking the
-whole witness, one stat per path. Stats are taken once per path per run and
-dropped by the run's writes as ADR 0109 drops digests: a write drops the stats
-at, under and above its paths, and a write the run cannot bound (a source
-rewriter, which drops every digest) drops them all. A recorded digest that
+whole witness, one stat per path. Stats are taken once per path per run,
+keyed by the exact path, and dropped by the run's writes as ADR 0109 drops
+digests: a write drops the stats at, under and above its paths in any
+spelling of their case, and a write the run cannot bound (a source rewriter,
+which drops every digest) drops them all. A stat taken while a write was
+dropped answers its lookup but is not kept. A recorded digest that
 holds enters the run's memo with the in-run witness of ADR 0109, rebuilt from
 its recorded files, so a write of the run moves it as it moves a collected
 one.
@@ -159,9 +175,13 @@ one.
 ### 2. The racy rule, for files and for directories
 
 Every part of a witness follows ADR 0009 §2, against the clock the run that
-records reads: a file, a directory, the index or an ignore source is recorded
-only when both of its times are older than that clock by more than two seconds,
-and only when its stat before and after the read are equal. A digest with one
+records reads when it opens the record: a file, a directory, the index or an
+ignore source is recorded only when both of its times are older than that
+clock by more than two seconds. Each stat is taken once, after the digest is
+computed. The collection read the path after the clock was read, so a change
+to it after the read, and any change within two seconds before the clock,
+leaves its times inside the margin, and the digest is not recorded; a stat
+taken before and after the read would add nothing to that. A digest with one
 part that fails is not recorded, and the next run collects it again. A run
 whose clock went back while it ran records nothing, and a record whose stamp
 lies ahead of the clock discards itself.
@@ -347,7 +367,8 @@ unstage and remove paths; switch a branch; and land some writes inside the
 racy margin. After each round it compares the digest the record answers with a
 collection made with no record and no memo. A difference is a false hit and
 fails the test. A second test checks each directory witness on the
-file systems the machine offers (tmpfs, overlayfs where it can mount one).
+file systems the machine offers to the test: its temporary directory, and
+tmpfs at `/dev/shm` where it exists.
 
 ### 6. Where the record lives and how runs share it
 
@@ -368,10 +389,11 @@ envelope and rules:
   merges into the file on disk under an exclusive lock and renames a complete
   file into place. An entry is decided when it is recorded, so a merge cannot
   make a racy entry trusted. Two runs that recorded one key keep the entry
-  with the newer clock. Entries this run found out of date are dropped, and so
+  of the run that saves last. Entries this run found out of date are dropped, and so
   is an entry no saving run recorded or confirmed in its last 32. The record
   holds at most 16,384 entries (2,169 on this repository) and 1,048,576
-  witnessed paths. A run that only confirms entries writes nothing until they
+  witnessed paths; a save that would exceed either keeps entries in key order
+  up to it. A run that only confirms entries writes nothing until they
   come halfway to being dropped, as the file index does.
 - **Release baselines.** Until the input record is on main, the baselines
   live in their own file, `.putnami/release-record`

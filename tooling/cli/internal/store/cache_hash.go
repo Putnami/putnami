@@ -1407,17 +1407,24 @@ func witnessedHashFiles(cut CandidateSource, dir string, patterns []string, expa
 		dir: collected.dir, listed: collected.facts.listed, unlisted: collected.facts.unlisted,
 		absent: collected.facts.absent,
 	}
-	record.cutWitness = collected.facts.cutWitness
-	includes, excludes := wsproto.SplitFilePatterns(patterns)
-	record.excludes = excludes
-	for _, include := range includes {
-		_, git := wsproto.GitFilePattern(include)
-		record.candidates = record.candidates || git
-		record.ordinary = record.ordinary || !git
+	if absolute, err := filepath.Abs(dir); err != nil || filepath.Clean(absolute) != collected.dir {
+		// The collection read another directory than the one the digest is
+		// keyed by, through a link: no stat of it witnesses the link.
+		record = nil
 	}
-	record.bases = collected.facts.bases
-	for _, file := range collected.files {
-		record.selected = append(record.selected, file.path)
+	if record != nil {
+		record.cutWitness = collected.facts.cutWitness
+		includes, excludes := wsproto.SplitFilePatterns(patterns)
+		record.excludes = excludes
+		for _, include := range includes {
+			_, git := wsproto.GitFilePattern(include)
+			record.candidates = record.candidates || git
+			record.ordinary = record.ordinary || !git
+		}
+		record.bases = collected.facts.bases
+		for _, file := range collected.files {
+			record.selected = append(record.selected, file.path)
+		}
 	}
 	if collected.facts.matchedLink {
 		// A write where the link leads, which may lie outside the digest's
