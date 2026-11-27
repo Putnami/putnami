@@ -33,7 +33,7 @@ func runRecorded(t *testing.T, readerRoot, path string, dirs, patterns []string)
 
 func runRecordedAs(t *testing.T, readerRoot, path, identity string, dirs, patterns []string) recordedRun {
 	t.Helper()
-	record := fileindex.OpenReleaseRecord(path, identity)
+	record := fileindex.OpenRecord(path, identity)
 	reader := NewRecordedReleaseBaselineReader(readerRoot, record)
 	before := projectReads.Load()
 	run := recordedRun{baselines: map[string]ReleaseBaseline{}}
@@ -46,7 +46,7 @@ func runRecordedAs(t *testing.T, readerRoot, path, identity string, dirs, patter
 			run.baselines[dir+"\x00"+pattern] = baseline
 		}
 	}
-	run.reads, run.hits = projectReads.Load()-before, record.Hits()
+	run.reads, run.hits = projectReads.Load()-before, record.Answered()
 	if err := record.Save(); err != nil {
 		t.Fatalf("save the record: %v", err)
 	}
@@ -72,7 +72,7 @@ func assertFresh(t *testing.T, run recordedRun, dirs, patterns []string) {
 
 func recordPath(t *testing.T) string {
 	t.Helper()
-	return filepath.Join(t.TempDir(), ".putnami", fileindex.ReleaseRecordFilename)
+	return filepath.Join(t.TempDir(), ".putnami", fileindex.RecordFilename)
 }
 
 // A recorded baseline is the baseline Git answers: over every shape of
@@ -281,7 +281,7 @@ func TestABaselineReadWhileATagMovedIsNotKept(t *testing.T) {
 	release := strings.TrimSpace(runGit(t, root, "rev-parse", "api/v0.1.0"))
 	path := recordPath(t)
 
-	record := fileindex.OpenReleaseRecord(path, testRecordIdentity)
+	record := fileindex.OpenRecord(path, testRecordIdentity)
 	reader := NewRecordedReleaseBaselineReader(root, record)
 	if _, err := reader.Read(api, apiPattern); err != nil {
 		t.Fatal(err)
@@ -310,7 +310,7 @@ func TestConcurrentReadsOfOneReader(t *testing.T) {
 	patterns := []string{apiPattern, "web/v{version}", "lib/v{version}"}
 	path := recordPath(t)
 	for round := range 2 {
-		record := fileindex.OpenReleaseRecord(path, testRecordIdentity)
+		record := fileindex.OpenRecord(path, testRecordIdentity)
 		reader := NewRecordedReleaseBaselineReader(root, record)
 		var wg sync.WaitGroup
 		results := make([]ReleaseBaseline, len(dirs)*len(patterns)*4)
@@ -334,7 +334,7 @@ func TestConcurrentReadsOfOneReader(t *testing.T) {
 		if err := record.Save(); err != nil {
 			t.Fatal(err)
 		}
-		if round == 1 && record.Hits() == 0 {
+		if round == 1 && record.Answered() == 0 {
 			t.Error("the second round answered nothing from the record")
 		}
 	}
@@ -359,7 +359,7 @@ func TestATagDeletedBeforeTheReachabilityReadIsNotKept(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := recordPath(t)
-	record := fileindex.OpenReleaseRecord(path, testRecordIdentity)
+	record := fileindex.OpenRecord(path, testRecordIdentity)
 	reader := NewRecordedReleaseBaselineReader(root, record)
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	read, err := reader.Read(api, apiPattern)

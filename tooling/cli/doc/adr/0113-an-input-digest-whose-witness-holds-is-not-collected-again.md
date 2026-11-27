@@ -436,11 +436,15 @@ envelope and rules:
   witnessed paths; a save that would exceed either keeps entries in key order
   up to it. A run that only confirms entries writes nothing until they
   come halfway to being dropped, as the file index does.
-- **Release baselines.** The baselines landed first, in their own file,
-  `.putnami/release-record` (`internal/fileindex/release_record.go`), with
-  the same envelope rules and their own lock and 16,384-entry cap. The slice
-  after this one moves them into the input record as its table
-  `release-baseline` and deletes that file's envelope.
+- **Release baselines.** The baselines landed first, in a file of their own,
+  `.putnami/release-record`, with the same envelope rules. They now live in
+  the input record as its table `release-baseline`, keyed by the project
+  directory, the tag pattern and the witness of section 4, with no witnessed
+  path: a value recorded that way (`Record.PutRechecked`) is written only
+  when its witness, taken again once per witness when the record saves,
+  still holds, and holds at most 64 KiB. They share the record's caps; this
+  repository records about 150 of them. The old file is no longer read or
+  written.
 - **What writes nothing.** `--plan`, a preview-only `--dry-run`, and a process
   that cannot read the clock read the record and write nothing.
 

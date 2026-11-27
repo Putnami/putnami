@@ -1,6 +1,7 @@
 package git
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -44,9 +45,9 @@ type ReleaseBaselineReader struct {
 
 	// record answers and keeps the baselines of the root's work tree under
 	// their witness (tooling/cli ADR 0113 §4); nil records nothing.
-	record      *fileindex.ReleaseRecord
+	record      *fileindex.Record
 	witnessOnce sync.Once
-	witness     fileindex.ReleaseWitness
+	witness     baselineWitness
 	witnessed   bool
 }
 
@@ -58,16 +59,26 @@ type onceRelease struct {
 }
 
 // NewReleaseBaselineReader returns a reader for the work tree at root that
-// answers from, and records into, the process's current release record
-// (fileindex.CurrentReleaseRecord), none outside a run.
+// answers from, and records into, the process's current input record
+// (fileindex.CurrentRecord), none outside a run.
 func NewReleaseBaselineReader(root string) *ReleaseBaselineReader {
-	return NewRecordedReleaseBaselineReader(root, fileindex.CurrentReleaseRecord())
+	return NewRecordedReleaseBaselineReader(root, fileindex.CurrentRecord())
+}
+
+// ReleaseBaselineTable is the table of the input record that holds the
+// release baselines, keyed by the project directory, the tag pattern and the
+// witness of the commits they name (tooling/cli ADR 0113 §4).
+const ReleaseBaselineTable = "release-baseline"
+
+// baselineKey is the key of dir's baseline under pattern and witness.
+func baselineKey(dir, pattern string, witness baselineWitness) string {
+	return dir + "\x00" + pattern + "\x00" + hex.EncodeToString(witness[:])
 }
 
 // NewRecordedReleaseBaselineReader returns a reader for the work tree at root
 // that answers a baseline from record when its witness holds, and records the
 // baselines it reads (tooling/cli ADR 0113 §4). A nil record records nothing.
-func NewRecordedReleaseBaselineReader(root string, record *fileindex.ReleaseRecord) *ReleaseBaselineReader {
+func NewRecordedReleaseBaselineReader(root string, record *fileindex.Record) *ReleaseBaselineReader {
 	return &ReleaseBaselineReader{root: root, releases: map[string]*onceRelease{}, record: record}
 }
 
@@ -89,7 +100,7 @@ func (r *ReleaseBaselineReader) Read(dir, tagPattern string) (ReleaseBaseline, e
 	}
 	r.witnessOnce.Do(func() { r.witness, r.witnessed = r.releaseWitness() })
 	if r.witnessed {
-		if value, ok := r.record.Lookup(dir, tagPattern, r.witness); ok {
+		if value, _, ok := r.record.Answer(ReleaseBaselineTable, baselineKey(dir, tagPattern, r.witness), r.record.Hold); ok {
 			if baseline, ok := decodeRecordedBaseline(value, tagPattern); ok {
 				return baseline, nil
 			}
@@ -104,7 +115,12 @@ func (r *ReleaseBaselineReader) Read(dir, tagPattern string) (ReleaseBaseline, e
 	}
 	// The record takes the whole witness again before it writes: a baseline
 	// read while a part of it moved is not kept.
-	r.record.Store(dir, tagPattern, r.witness, encodeRecordedBaseline(baseline), r.recheckWitness)
+	witness := r.witness
+	r.record.PutRechecked(ReleaseBaselineTable, baselineKey(dir, tagPattern, witness), encodeRecordedBaseline(baseline),
+		hex.EncodeToString(witness[:]), func() bool {
+			again, ok := r.recheckWitness()
+			return ok && again == witness
+		})
 	return baseline, nil
 }
 

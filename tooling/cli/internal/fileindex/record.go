@@ -94,9 +94,14 @@ type Record struct {
 	// or the fixed clock of OpenRecordAt.
 	now func(dir string) (int64, error)
 
-	mu         sync.Mutex
-	loaded     map[recordKey]recordEntry
-	fresh      map[recordKey]recordEntry
+	mu     sync.Mutex
+	loaded map[recordKey]recordEntry
+	fresh  map[recordKey]recordEntry
+	// rechecks holds, by witness, the check a value recorded with
+	// PutRechecked must pass again when the record saves; rechecked names
+	// the witness of each such fresh value.
+	rechecks   map[string]func() bool
+	rechecked  map[recordKey]string
 	confirmed  map[recordKey]bool
 	stale      map[recordKey]bool
 	generation uint64
@@ -426,6 +431,41 @@ func (r *Record) Put(table, k string, value []byte, parts []RecordPart) bool {
 	return true
 }
 
+// recordMaxRecheckedValue bounds one value recorded with PutRechecked.
+const recordMaxRecheckedValue = 1 << 16
+
+// PutRechecked records value in table at k with no part: a value whose
+// witness is not a set of stats but a digest the caller names in witness and
+// keys k by, such as the commits a release baseline names (tooling/cli ADR
+// 0113 §4). recheck takes that witness again: Save calls it once per witness
+// before it writes, and writes no value whose witness it does not hold, so a
+// value computed while its witness moved is not kept. A value over 64 KiB is
+// not recorded.
+func (r *Record) PutRechecked(table, k string, value []byte, witness string, recheck func() bool) {
+	r.computed.Add(1)
+	if !r.enabled() || r.readOnly || len(value) > recordMaxRecheckedValue || recheck == nil {
+		return
+	}
+	id := recordKey{table, k}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.discarded != "" {
+		return
+	}
+	if e, ok := r.loaded[id]; ok && len(e.parts) == 0 && bytes.Equal(e.value, value) {
+		r.confirmed[id] = true
+		return
+	}
+	r.fresh[id] = recordEntry{value: bytes.Clone(value)}
+	if r.rechecks == nil {
+		r.rechecks, r.rechecked = map[string]func() bool{}, map[recordKey]string{}
+	}
+	if _, ok := r.rechecks[witness]; !ok {
+		r.rechecks[witness] = recheck
+	}
+	r.rechecked[id] = witness
+}
+
 // Answered is how many values the record answered in this process.
 func (r *Record) Answered() int64 {
 	if r == nil {
@@ -458,6 +498,14 @@ func (r *Record) Save() error {
 	for k, e := range r.fresh {
 		fresh[k] = e
 	}
+	rechecked := make(map[recordKey]string, len(r.rechecked))
+	for k, witness := range r.rechecked {
+		rechecked[k] = witness
+	}
+	rechecks := make(map[string]func() bool, len(r.rechecks))
+	for witness, recheck := range r.rechecks {
+		rechecks[witness] = recheck
+	}
 	stale := make(map[recordKey]bool, len(r.stale))
 	for k := range r.stale {
 		stale[k] = true
@@ -471,6 +519,22 @@ func (r *Record) Save() error {
 		}
 	}
 	r.mu.Unlock()
+	// A value recorded with PutRechecked is written only while its witness
+	// still holds; each witness is taken again once.
+	held := map[string]bool{}
+	for k, witness := range rechecked {
+		if _, ok := fresh[k]; !ok {
+			continue
+		}
+		answer, ok := held[witness]
+		if !ok {
+			answer = rechecks[witness]()
+			held[witness] = answer
+		}
+		if !answer {
+			delete(fresh, k)
+		}
+	}
 	if len(fresh) == 0 && len(stale) == 0 && !aging && !discarded {
 		return nil
 	}
