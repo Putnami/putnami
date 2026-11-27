@@ -100,6 +100,11 @@ func globDoubleStar(dir, pattern string) ([]string, bool, []string) {
 	var matches []string
 	linked := false
 	listed := []string{searchRoot}
+	if _, err := os.Lstat(searchRoot); err != nil {
+		// The search root is absent: what the record witnesses is that it
+		// stays absent (missingPrefix marks it).
+		listed[0] = missingPrefix + searchRoot
+	}
 	_ = filepath.WalkDir(searchRoot, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -452,6 +457,11 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry,
 	return files, matchedLink, listed
 }
 
+// missingPrefix marks, in a collection's listed paths, a path it found
+// absent when it read it: the input record witnesses that it stays absent
+// (fileindex.AbsentPart). NUL cannot occur in a path.
+const missingPrefix = "\x00missing\x00"
+
 // listedGlob is filepath.Glob that also returns the paths it read: each
 // directory it listed and each path without a glob it looked up. Their
 // stats witness its selection in the input record (ADR 0113 §1). Its matches
@@ -459,11 +469,10 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string) ([]fileEntry,
 // they differ.
 func listedGlob(pattern string) (matches, read []string) {
 	if !strings.ContainsAny(pattern, globMetacharacters) {
-		read = append(read, pattern)
 		if _, err := os.Lstat(pattern); err != nil {
-			return nil, read
+			return nil, append(read, missingPrefix+pattern)
 		}
-		return []string{pattern}, read
+		return []string{pattern}, append(read, pattern)
 	}
 	parent, file := filepath.Split(pattern)
 	switch parent {
@@ -481,8 +490,13 @@ func listedGlob(pattern string) (matches, read []string) {
 		parents, read = listedGlob(parent)
 	}
 	for _, d := range parents {
+		info, err := os.Stat(d)
+		if _, missing := os.Lstat(d); missing != nil {
+			read = append(read, missingPrefix+d)
+			continue
+		}
 		read = append(read, d)
-		if info, err := os.Stat(d); err != nil || !info.IsDir() {
+		if err != nil || !info.IsDir() {
 			continue
 		}
 		entries, err := os.ReadDir(d)

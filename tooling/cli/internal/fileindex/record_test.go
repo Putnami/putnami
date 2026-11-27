@@ -255,3 +255,31 @@ func TestAReadOnlyRecordAnswersAndWritesNothing(t *testing.T) {
 		t.Fatal("a read-only record recorded")
 	}
 }
+
+func TestAnAbsentPartHoldsWhileNothingIsThere(t *testing.T) {
+	clock := time.Now().Add(time.Hour).UnixNano()
+	withRecordClock(t, &clock)
+	root, path, file := recordFixture(t)
+	missing := filepath.Join(root, "missing", "x.txt")
+	r := OpenRecord(path, "id")
+	if !r.Put("digests", "k", []byte("v"), []RecordPart{recordPartOf(t, file), AbsentPart(missing)}) {
+		t.Fatal("a value with an absent part was refused")
+	}
+	if err := r.Save(); err != nil {
+		t.Fatal(err)
+	}
+	next := OpenRecord(path, "id")
+	if _, _, ok := next.Answer("digests", "k", next.Hold); !ok {
+		t.Fatal("an absent part that stayed absent did not hold")
+	}
+	if err := os.MkdirAll(filepath.Dir(missing), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(missing, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	after := OpenRecord(path, "id")
+	if _, _, ok := after.Answer("digests", "k", after.Hold); ok {
+		t.Fatal("an absent part held once its path existed")
+	}
+}

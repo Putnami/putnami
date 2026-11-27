@@ -283,7 +283,7 @@ func (r *Record) Put(table, k string, value []byte, parts []RecordPart) bool {
 		return false
 	}
 	for _, part := range parts {
-		if !filepath.IsAbs(part.Path) || !r.Recordable(part.Stat) {
+		if !filepath.IsAbs(part.Path) || !part.Absent() && !r.Recordable(part.Stat) {
 			return false
 		}
 	}
@@ -634,12 +634,26 @@ func (d *recordDecoder) stat() Stat {
 func (r *Record) Hold(parts []RecordPart) bool {
 	for _, part := range parts {
 		st, ok := r.heldStat(part.Path)
+		if part.Absent() {
+			if ok {
+				return false
+			}
+			continue
+		}
 		if !ok || st != part.Stat {
 			return false
 		}
 	}
 	return true
 }
+
+// AbsentPart is the part of a path the computation found absent: it holds
+// while nothing exists at the path. A caller records one only for a path it
+// found absent when it read it and finds absent again when it records.
+func AbsentPart(path string) RecordPart { return RecordPart{Path: path} }
+
+// Absent reports whether the part says its path is absent (AbsentPart).
+func (p RecordPart) Absent() bool { return p.Stat == Stat{} }
 
 func (r *Record) heldStat(path string) (Stat, bool) {
 	k := comparisonPath(path)

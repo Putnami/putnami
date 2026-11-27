@@ -519,9 +519,6 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 		return
 	}
 	listed := slices.Concat(w.listed, w.cutWitness)
-	for _, rel := range w.absent {
-		listed = append(listed, filepath.Join(w.dir, filepath.FromSlash(rel)))
-	}
 	// An answer's files hold while what the extension read holds: the
 	// directories its basis lists, and the paths a content set selects,
 	// each read as the basis digest reads it, a link by its text.
@@ -600,7 +597,27 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 		}
 		return false
 	}
+	// A path the collection found absent is witnessed by staying absent: it
+	// must be absent still now, after the digest was computed.
+	absent := func(path string) bool {
+		if _, ok := fileindex.LstatAny(path); ok {
+			return false
+		}
+		add(path, fileindex.Stat{})
+		return true
+	}
+	for _, rel := range w.absent {
+		if !absent(filepath.Join(w.dir, filepath.FromSlash(rel))) {
+			return
+		}
+	}
 	for _, path := range listed {
+		if missing, ok := strings.CutPrefix(path, missingPrefix); ok {
+			if !excludedDirectory(missing) && !absent(missing) {
+				return
+			}
+			continue
+		}
 		if excludedDirectory(path) {
 			continue
 		}
