@@ -19,8 +19,10 @@ import (
 )
 
 // The worker's memory of the last run it served per worktree, and whether a
-// request could be answered from it (CLI ADR 0116 §6a). This slice decides
-// and records; it answers nothing yet: every request still runs.
+// request could be answered from it (CLI ADR 0116 §6a). The worker decides;
+// the scheduler answers each plan of a run decided answerable from the record
+// the held run's plan left (RunMemory, scheduler.HeldRuns), and runs a plan it
+// holds none for.
 
 // memorySyncTimeout bounds the sync point a decision waits for.
 const memorySyncTimeout = 2 * time.Second
@@ -29,23 +31,15 @@ const memorySyncTimeout = 2 * time.Second
 // shows it.
 const lastMemoryName = "last-memory.json"
 
-// MemoryDecision is whether the last request a worker served could have been
-// answered from memory, and why not.
-type MemoryDecision struct {
-	Time       string `json:"time"`
-	Root       string `json:"root"`
-	Answerable bool   `json:"answerable"`
-	Reason     string `json:"reason"`
-	// Kept says the run that followed is held for the next request, or why
-	// not.
-	Kept string `json:"kept"`
-}
-
 // heldRun is what a worker keeps of the last run it served in a worktree.
 type heldRun struct {
 	request string
 	seq     uint64
 	witness map[string]string
+	// plans are the records the run's plans left the scheduler to answer the
+	// next request with, in the order the run executed them; nil when one of
+	// them left none.
+	plans []any
 }
 
 var memory = struct {
@@ -55,7 +49,29 @@ var memory = struct {
 	watched map[string]bool
 	held    map[string]*heldRun
 	gitDirs map[string][]string
+	// run is the memory of the run the worker serves now.
+	run runMemory
 }{watched: map[string]bool{}, held: map[string]*heldRun{}, gitDirs: map[string][]string{}}
+
+// runMemory is what the scheduler reads and leaves during the run the worker
+// serves: the records the held run's plans left, offered to the run's plans
+// in order when the worker decided it answerable, and the records its own
+// plans leave. It is armed only for a run that may be kept.
+type runMemory struct {
+	armed bool
+	root  string
+	// offered are the held run's records; nil unless the run is answerable.
+	offered []any
+	// taken counts the plans that asked for a record.
+	taken int
+	// plans are the records the run's plans left; partial says one plan left
+	// none, or ran in another workspace, so the run holds none.
+	plans   []any
+	partial bool
+	// answered and computed count the plans answered from a record and the
+	// plans that ran.
+	answered, computed int
+}
 
 // memoryCheck is the state a decision took before the run: the journal
 // sequence after the sync point and the witnesses of what the journal does
@@ -68,10 +84,66 @@ type memoryCheck struct {
 	started time.Time
 }
 
+// RunMemory is the worker's memory as the scheduler reads it
+// (scheduler.HeldRuns): main installs it in a worker, never elsewhere.
+type RunMemory struct{}
+
+// Take returns the record the held run left for the next plan of the run in
+// root, or nil: for a run not decided answerable, past the plans the held run
+// executed, and once a plan of the run was computed, after which the held
+// records no longer describe what the run left on disk.
+func (RunMemory) Take(root string) any {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) {
+		return nil
+	}
+	i := r.taken
+	r.taken++
+	if r.computed > 0 || i >= len(r.offered) {
+		return nil
+	}
+	return r.offered[i]
+}
+
+// Keep records what a plan of the run left, and whether it was answered.
+func (RunMemory) Keep(root string, record any, answered bool) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed {
+		return
+	}
+	if record == nil || !sameRoot(r.root, root) {
+		r.partial = true
+	}
+	r.plans = append(r.plans, record)
+	if answered {
+		r.answered++
+	} else {
+		r.computed++
+	}
+}
+
+// sameRoot says whether a and b name the same worktree, through any symbolic
+// link: the engine resolves the workspace root its own way.
+func sameRoot(a, b string) bool {
+	if filepath.Clean(a) == filepath.Clean(b) {
+		return true
+	}
+	ra, errA := filepath.EvalSymlinks(a)
+	rb, errB := filepath.EvalSymlinks(b)
+	return errA == nil && errB == nil && ra == rb
+}
+
 // beforeRun decides whether req could be answered from memory, and takes the
 // state the run is held under when it qualifies. It returns nil when the
 // request names no worktree or the platform has no watcher.
 func beforeRun(req request) (*memoryCheck, MemoryDecision) {
+	memory.Lock()
+	memory.run = runMemory{}
+	memory.Unlock()
 	decision := MemoryDecision{Time: time.Now().UTC().Format(time.RFC3339)}
 	root := worktreeRoot(req.Dir)
 	decision.Root = root
@@ -118,6 +190,16 @@ func beforeRun(req request) (*memoryCheck, MemoryDecision) {
 			decision.Answerable = true
 		}
 	}
+	// The run's plans leave their records for keep, and a run decided
+	// answerable is offered the held run's: the decision and the offer read
+	// the same held run.
+	run := runMemory{armed: true, root: root}
+	if decision.Answerable {
+		run.offered = held.plans
+	}
+	memory.Lock()
+	memory.run = run
+	memory.Unlock()
 	return check, decision
 }
 
@@ -125,8 +207,17 @@ func beforeRun(req request) (*memoryCheck, MemoryDecision) {
 // task the answer could not hold, and wrote nothing in the worktree, and
 // records the decision.
 func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
+	memory.Lock()
+	run := memory.run
+	memory.run = runMemory{}
+	memory.Unlock()
+	decision.Answered = run.answered > 0 && run.computed == 0
 	if check != nil {
-		decision.Kept = keep(check, code)
+		plans := run.plans
+		if run.partial || len(plans) == 0 {
+			plans = nil
+		}
+		decision.Kept = keep(check, code, plans)
 	}
 	if dir, err := Dir(os.Getenv, false); err == nil {
 		if data, err := json.Marshal(decision); err == nil {
@@ -138,7 +229,7 @@ func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
 	}
 }
 
-func keep(check *memoryCheck, code int) string {
+func keep(check *memoryCheck, code int, plans []any) string {
 	memory.Lock()
 	delete(memory.held, check.root)
 	w := memory.watcher
@@ -156,7 +247,7 @@ func keep(check *memoryCheck, code int) string {
 		return "not kept: the run changed the worktree: " + changed
 	}
 	memory.Lock()
-	memory.held[check.root] = &heldRun{request: check.request, seq: check.seq, witness: check.witness}
+	memory.held[check.root] = &heldRun{request: check.request, seq: check.seq, witness: check.witness, plans: plans}
 	memory.Unlock()
 	return "kept"
 }

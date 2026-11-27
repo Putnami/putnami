@@ -1399,7 +1399,13 @@ At a terminal, the worker gives the run a pseudo-terminal that the command
 relays: the output, prompts, Ctrl-C and the window size behave as in a run
 in its own process. Ctrl-Z suspends the command; the run goes on and its
 output waits until the command resumes.
-`putnami machine status` shows why the last command ran in its own process.
+On Linux, a worker answers a request it served before from memory when the
+worktree, Git's state and the Putnami home's runtimes and toolchains did not
+change since: the run still plans, then records the held results in its
+session without looking a task up or restoring it, and exits as the held run
+did.
+`putnami machine status` shows why the last command ran in its own process,
+and whether the last run a worker served was answered from memory.
 `PUTNAMI_MACHINE=off` turns it off for one command and `PUTNAMI_MACHINE=on` on;
 `machine on|off` records the user's choice in `machine.json` under the
 Putnami home. The supervisor lives in `$XDG_RUNTIME_DIR/putnami` on Linux,

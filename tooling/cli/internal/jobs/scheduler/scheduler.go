@@ -509,7 +509,10 @@ func RunPlan(ctx context.Context, req RunRequest) *SchedulerResult {
 	// Direct adapters do not gain an authorization object, but they still must
 	// not leak an inherited transport to remote cache negotiation or jobs.
 	ctx = CaptureProcessCapabilities(ctx)
-	return req.scheduler().Run(ctx)
+	// A machine worker answers a plan it holds from memory, and holds what a
+	// plan that executed nothing leaves (CLI ADR 0116 §6a, held_answer.go);
+	// any other run, and every plan it cannot answer, runs as it always did.
+	return runOrAnswer(ctx, req, servedHeldRuns(), func() *SchedulerResult { return req.scheduler().Run(ctx) })
 }
 
 // scheduler builds the fully configured scheduler for the request: RunPlan's

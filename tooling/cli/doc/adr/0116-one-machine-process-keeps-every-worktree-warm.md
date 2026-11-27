@@ -518,6 +518,18 @@ and are written in full until then), and returns the held exit code. A run in it
 or on macOS gets the same exit code and the same task results from its full
 computation: memory decides nothing a witness would not.
 
+**Where it answers today.** The worker decides before the run, and the run
+still loads the workspace and plans. The scheduler answers each plan that
+holds the same jobs, in the same order and with the same dependencies, as the
+plan the held run executed at the same position, from the result that plan
+left: no prune, no key, no lookup, no restore and no task worker. The renderer
+and the session recorder see, task by task in plan order, what a local-cache
+hit makes them see (its start, its entry's events, its completion), the
+session is recorded as any run's is, and the result is the held one with the
+current times. A plan that differs, a plan the held run did not leave a record
+for, and every plan after one the run computed run as usual. `putnami machine
+status` says whether the last run a worker served was answered.
+
 ### 7. How it learns of changes
 
 **One watcher, in the supervisor**, one watch set per worktree, shared by every

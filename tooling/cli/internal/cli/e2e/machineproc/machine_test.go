@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -32,6 +33,7 @@ func TestMain(m *testing.M) {
 		case "supervise":
 			os.Exit(machineproc.Supervise())
 		case "work":
+			scheduler.ServeHeldRuns(machineproc.RunMemory{})
 			os.Exit(machineproc.Work(func(ctx context.Context, args []string) int {
 				app, err := cli.NewApp()
 				if err != nil {
@@ -395,6 +397,104 @@ func TestAnUnchangedRequestIsDecidedAnswerableFromMemory(t *testing.T) {
 	if d := decideArgs("a request with other arguments", "lint,test", "--all"); d.Answerable || !strings.Contains(d.Reason, "request differs") {
 		t.Fatalf("a request with other arguments: %+v, want unanswerable", d)
 	}
+}
+
+// TestAnUnchangedRunIsAnsweredFromMemory serves the same request through a
+// worker until the worker holds it, then once more: the scheduler answers
+// that run from the held one, records its session, and gives the tasks and
+// the exit code a run in its own process gives on the same tree. After a
+// write in the worktree, the next request runs its plan and still gives what
+// a run in its own process gives (CLI ADR 0116 §6a).
+func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("a run is answered from memory only where the platform has a watcher")
+	}
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	root := clitest.WritingCountsFixture(t, 2)
+	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\n")
+	clitest.RunGit(t, root, "add", "-A")
+	clitest.RunGit(t, root, "commit", "-m", "ignore the run's state")
+	args := []string{"lint,test,build", "--all"}
+	local := func(step string) (int, []string) {
+		t.Helper()
+		t.Setenv(machineproc.Env, "off")
+		code, out := clitest.RunGateArgs(t, root, args...)
+		if code != 0 {
+			t.Fatalf("%s: exit %d in its own process\n%s", step, code, out)
+		}
+		return code, latestTasks(t, root)
+	}
+	local("the first settling run")
+	local("the second settling run")
+	startSupervisor(t)
+	// served runs the request through the worker, and returns its exit code,
+	// the tasks of the session it recorded and the worker's decision.
+	served := func(step string) (int, []string, *machineproc.MemoryDecision) {
+		t.Helper()
+		t.Setenv(machineproc.Env, "on")
+		before := clitest.LatestSessionID(t, root)
+		code, out := clitest.RunGateArgs(t, root, args...)
+		decision := awaitMemoryDecision(t, step)
+		if clitest.LatestSessionID(t, root) == before {
+			t.Fatalf("%s: the run recorded no session\n%s", step, out)
+		}
+		return code, latestTasks(t, root), decision
+	}
+
+	if _, _, d := served("the first request"); d.Answerable || d.Answered || d.Kept != "kept" {
+		t.Fatalf("the first request: %+v, want unanswerable, computed and kept", d)
+	}
+	if _, _, d := served("the second request"); !d.Answerable || d.Kept != "kept" {
+		t.Fatalf("the second request: %+v, want answerable and kept", d)
+	}
+	code, answered, d := served("the unchanged request")
+	if !d.Answerable || !d.Answered || d.Kept != "kept" {
+		t.Fatalf("the unchanged request: %+v, want answerable, answered from memory and kept", d)
+	}
+	if code != 0 {
+		t.Fatalf("the answered run exited %d, want 0", code)
+	}
+	if len(answered) != 6 {
+		t.Fatalf("the answered run recorded %d tasks, want 6: %v", len(answered), answered)
+	}
+	localCode, own := local("a run in its own process on the same tree")
+	if localCode != code {
+		t.Errorf("exit %d in its own process, %d answered from memory", localCode, code)
+	}
+	if got, want := strings.Join(normalize(answered), "\n"), strings.Join(normalize(own), "\n"); got != want {
+		t.Errorf("tasks differ\nanswered from memory:\n%s\nin its own process:\n%s", got, want)
+	}
+
+	clitest.WriteFile(t, filepath.Join(root, "apps", "p001", "src.txt"), "p001 edited\n")
+	code, computed, d := served("after a write")
+	if d.Answerable || d.Answered || !strings.Contains(d.Reason, "the worktree changed") {
+		t.Fatalf("after a write: %+v, want unanswerable for the worktree's change, and computed", d)
+	}
+	localCode, own = local("a run in its own process after the write")
+	if localCode != code {
+		t.Errorf("after a write: exit %d in its own process, %d through the worker", localCode, code)
+	}
+	if got, want := strings.Join(normalize(computed), "\n"), strings.Join(normalize(own), "\n"); got != want {
+		t.Errorf("after a write: tasks differ\nthrough the worker:\n%s\nin its own process:\n%s", got, want)
+	}
+}
+
+// awaitMemoryDecision waits for the worker's decision on the run it just
+// served, which it records once the client has its exit, and removes it so
+// the next run's is not mistaken for it.
+func awaitMemoryDecision(t *testing.T, step string) *machineproc.MemoryDecision {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if d := machineproc.ReadLastMemory(); d != nil && d.Kept != "" {
+			_ = os.Remove(machineLastMemory(t))
+			return d
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("%s: the worker recorded no decision (last run in its own process: %+v)", step, machineproc.ReadLastLocal())
+	return nil
 }
 
 // machineLastMemory is the path of the worker's last decision.

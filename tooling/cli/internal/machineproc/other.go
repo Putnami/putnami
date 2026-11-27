@@ -38,3 +38,15 @@ type LastLocal struct {
 
 // ReadLastLocal answers nil on a platform without a machine process.
 func ReadLastLocal() *LastLocal { return nil }
+
+// ReadLastMemory answers nil on a platform without a machine process.
+func ReadLastMemory() *MemoryDecision { return nil }
+
+// RunMemory holds nothing on a platform without a machine process.
+type RunMemory struct{}
+
+// Take offers nothing.
+func (RunMemory) Take(string) any { return nil }
+
+// Keep holds nothing.
+func (RunMemory) Keep(string, any, bool) {}

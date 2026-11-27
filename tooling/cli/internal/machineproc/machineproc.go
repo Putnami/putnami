@@ -65,6 +65,21 @@ type request struct {
 	StderrTerminal bool `json:"stderrTerminal,omitempty"`
 }
 
+// MemoryDecision is whether the last request a worker served could have been
+// answered from memory, and why not.
+type MemoryDecision struct {
+	Time       string `json:"time"`
+	Root       string `json:"root"`
+	Answerable bool   `json:"answerable"`
+	Reason     string `json:"reason"`
+	// Answered says the scheduler answered every plan of the run from the
+	// records the held run left, with no lookup, key or restore.
+	Answered bool `json:"answered"`
+	// Kept says the run that followed is held for the next request, or why
+	// not.
+	Kept string `json:"kept"`
+}
+
 // Reply answers a request.
 type Reply struct {
 	Protocol int    `json:"protocol"`
