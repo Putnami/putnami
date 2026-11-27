@@ -343,7 +343,9 @@ func globInput(root, pattern string) SnapshotInput {
 	// The clock is read before the first stat: a path whose time lies within
 	// the margin of it may change again with an equal stat (ADR 0009 §2 of
 	// protocols/workspace).
-	start := time.Now()
+	// Round(0) drops the monotonic reading, so the comparisons below see a
+	// wall clock that went back.
+	start := time.Now().Round(0)
 	rootStat, rootOK := fileindex.StatPath(root)
 	trusted = trusted && rootOK
 	var walked map[string]fileindex.Stat
@@ -396,7 +398,7 @@ func globInput(root, pattern string) SnapshotInput {
 		h.Write([]byte{0})      //nolint:errcheck // hash.Hash.Write never errors
 	}
 	input.Digest = "sha256:" + hex.EncodeToString(h.Sum(nil))
-	if trusted && !time.Now().Before(start) {
+	if trusted && !time.Now().Round(0).Before(start) {
 		for dir, st := range walked {
 			witness.paths[dir] = st
 		}
