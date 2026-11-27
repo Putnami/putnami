@@ -20,7 +20,9 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/machineproc"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 func TestMain(m *testing.M) {
@@ -35,6 +37,8 @@ func TestMain(m *testing.M) {
 				if err != nil {
 					return cli.ExitError
 				}
+				workspace.ForgetProcessMemos()
+				extension.ForgetProcessMemos()
 				return app.Run(ctx, args)
 			}))
 		}
@@ -189,6 +193,10 @@ func TestARunThroughTheMachineProcessGivesTheSameKeysAndResults(t *testing.T) {
 			clitest.RunGit(t, root, "checkout", "-b", "other")
 			clitest.WriteFile(t, filepath.Join(root, "apps", "p002", "src.txt"), "p002 on another branch\n")
 			clitest.RunGit(t, root, "commit", "-am", "other")
+		}},
+		{"the ignore rules edited", func(t *testing.T) {
+			clitest.WriteFile(t, filepath.Join(root, "apps", "p001", "scratch", "notes.txt"), "notes\n")
+			clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\napps/p001/scratch\n")
 		}},
 		{"a change staged", func(t *testing.T) {
 			clitest.WriteFile(t, filepath.Join(root, "apps", "p000", "src.txt"), "p000 staged\n")
