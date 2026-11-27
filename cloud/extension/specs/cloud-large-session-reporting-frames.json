@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/large-session-reporting-frames",
+  "outcomes": [
+    "The session reporter posts a frame larger than 64 KiB only to a receiver that advertises it stores one that large, tells the engine the cap it may cut at, and falls back to 64 KiB frames without losing or repeating a frame"
+  ],
+  "nonGoals": [
+    "Several frames in flight: every frame is still acknowledged before the next one leaves",
+    "Larger frames for the log reporter, whose route is not the session receiver's",
+    "Changing the receiver, which Putnami Cloud owns; ADR 0131 lists what it must change"
+  ],
+  "requirements": [
+    {
+      "id": "large-frames-only-after-an-advertising-answer",
+      "text": [
+        "The session reporter posts a version 3 frame only when the latest decisive answer of its destination (not a 5xx, 408 or 429) advertised X-Putnami-Session-Contract: 2 and a cap at least the frame's size; an unanswered destination gets one OPTIONS first.",
+        "Otherwise, and on a 413, it answers frame_unsupported without retry, unless an earlier attempt at the frame got no decisive answer: then a retryable receiver_unavailable."
+      ]
+    },
+    {
+      "id": "acknowledgements-carry-the-cap",
+      "text": "When the engine names framing version 3 in its environment, every acknowledgement carries chunkBytes, the cap the destination's latest answer advertised or 65,536; otherwise none does."
+    },
+    {
+      "id": "unadvertised-large-acceptance-fails-closed",
+      "text": "A 200 answer to a version 3 frame that does not advertise a cap at least the frame's size is not acknowledged: the reporter answers receiver_mismatch without retry."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md",
+    "cloud/extension/doc/adr/0001-a-reporter-compresses-a-chunk-once-the-receiver-advertises-gzip.md"
+  ]
+}

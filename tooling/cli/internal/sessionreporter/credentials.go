@@ -5,8 +5,10 @@ package sessionreporter
 import (
 	"context"
 	"os"
+	"strconv"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -84,15 +86,15 @@ func (c Capability) selection(ctx context.Context) selection {
 }
 
 // providerEnv is the capability's provider environment: every capability's
-// selector and token are removed, then only this capability's own token is
-// added back. A hosted run adds none: no environment of its reporters holds a
+// selector and token, and the framing variable, are removed, then only this
+// capability's own token is added back. A hosted run adds none: no environment of its reporters holds a
 // token.
 func (c Capability) providerEnv(ctx context.Context, env []string) []string {
-	reserved := map[string]bool{}
+	reserved := map[string]bool{protocolcli.SessionReportingFramingEnv: true}
 	for _, other := range Capabilities() {
 		reserved[other.SelectorEnv], reserved[other.TokenEnv] = true, true
 	}
-	clean := make([]string, 0, len(env)+1)
+	clean := make([]string, 0, len(env)+2)
 	for _, entry := range env {
 		key, _, _ := strings.Cut(entry, "=")
 		if !reserved[key] {
@@ -101,6 +103,19 @@ func (c Capability) providerEnv(ctx context.Context, env []string) []string {
 	}
 	if token := c.selection(ctx).token; token != "" && !runcredential.Hosted() {
 		clean = append(clean, c.TokenEnv+"="+token)
+	}
+	return clean
+}
+
+// launchEnv is the environment a capability's provider starts with: its
+// providerEnv, which removes any inherited framing variable, and, for a
+// LargeFrames capability, the framing version this engine speaks. It is not a
+// credential: it says that this engine reads chunkBytes in acknowledgements
+// and sends version 3 frames (ADR 0131).
+func (c Capability) launchEnv(ctx context.Context, env []string) []string {
+	clean := c.providerEnv(ctx, env)
+	if c.LargeFrames {
+		clean = append(clean, protocolcli.SessionReportingFramingEnv+"="+strconv.Itoa(protocolcli.SessionReportingLargeFrameVersion))
 	}
 	return clean
 }

@@ -84,6 +84,11 @@ func (s *logReporterSender) deliver(ctx context.Context, chunk *protocolcli.Sess
 	if chunk.SessionID != s.sessionID {
 		return nack(chunk, ackCodeSessionMismatch, false)
 	}
+	if chunk.ProtocolVersion == protocolcli.SessionReportingLargeFrameVersion {
+		// The run-log route never agreed to frames above 64 KiB (ADR 0131),
+		// and the engine never sends the log reporter one.
+		return nack(chunk, ackCodeInvalidChunk, false)
+	}
 	if s.cfg.inspectionGuardFailed {
 		return nack(chunk, ackCodeInspectionGuard, false)
 	}

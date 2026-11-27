@@ -161,7 +161,7 @@ func (h *Holders) Start(ctx context.Context, capabilities []Capability, resolve 
 			// unavailable.
 			continue
 		}
-		launch.Env = capability.providerEnv(ctx, launch.Env)
+		launch.Env = capability.launchEnv(ctx, launch.Env)
 		p, err := startHolder(ctx, capability.holderName(provider), launch, operationTimeout)
 		switch {
 		case err == nil:

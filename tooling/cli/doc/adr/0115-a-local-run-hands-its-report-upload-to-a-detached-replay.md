@@ -3,6 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-11-27
 - **Amends**: [ADR 0033](0033-native-session-reporting.md), durable delivery
+- **Amended by**: [ADR 0131](0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md):
+  larger frames, rejected here, are negotiated with the receiver
 - **Scope**: `@putnami/cli` (`internal/sessionreporter`, `internal/engine`,
   `internal/cli`), feature `cli/native-session-reporting`
 

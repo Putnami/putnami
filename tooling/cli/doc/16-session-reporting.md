@@ -27,7 +27,8 @@ bounded pending checkpoint alongside the ordinary artifacts.
 
 The reporter is a declared subscriber of the session's event stream
 (`events.jsonl`) and never slows a task. While the graph runs it batches: an
-events chunk leaves once a full 64 KiB frame of the view is ready, or 10 seconds
+events chunk leaves once a full frame of the view is ready, 64 KiB or the larger
+cap the reporter acknowledged (see [Larger frames](#larger-frames)), or 10 seconds
 after the previous events chunk. The first events chunk waits 10 seconds from the reporter's start.
 A long run therefore sends a number of chunks bounded by its duration, not one per
 record. When the graph ends, the reporter sends the rest at once, or, for a
@@ -255,8 +256,8 @@ DAG or workspace lifecycle hooks. It refuses a changed extension on an existing
 checkpoint. The provider must also refuse a changed destination/execution binding
 behind the same extension name.
 
-Transport uses chunks of at most 64 KiB, five-second RPC deadlines and at most
-three attempts. Each reporter's finalization, and its replay, stops after thirty
+Transport uses chunks of at most 64 KiB, or of the larger cap a session
+reporter acknowledged, five-second RPC deadlines and at most three attempts. Each reporter's finalization, and its replay, stops after thirty
 seconds without an acknowledged chunk, or five minutes after it began, whichever
 comes first: a reporter that keeps acknowledging delivers its backlog and its
 final markers, and a stuck one stops at the latest thirty seconds after its
@@ -317,3 +318,18 @@ and replay of only the incomplete reporter. Placement coverage verifies that abs
 runner providers still report one local fallback with requested/actual provenance,
 while an installed runner is rejected before runtime preparation or reporting.
 This proves no hosted deployment or metadata isolation.
+
+## Larger frames
+
+The engine starts the session reporter with `PUTNAMI_SESSION_REPORTING_FRAMING=3`,
+which says that it reads a cap on each acknowledgement. A reporter whose
+receiver advertises one (`X-Putnami-Session-Contract: 2` and
+`X-Putnami-Session-Chunk-Bytes`, up to 4 MiB) names it as `chunkBytes`, and the
+engine cuts each new frame at that cap instead of 64 KiB. A frame above
+64 KiB is a version 3 frame. A receiver that advertises nothing gets the same
+64 KiB frames as before. A version 3 frame a receiver does not take, which
+it stored nothing of, is refused `frame_unsupported`, and the engine cuts it
+again at 64 KiB at the same offset and sequence; a frame an earlier attempt
+may have delivered is retried as it is. The log reporter keeps 64 KiB frames. The decision and
+what the receiver changes are in
+[ADR 0131](adr/0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md).

@@ -41,7 +41,12 @@ A data frame contains `protocolVersion: 1`, `sessionId`, `artifact`
 `offset` in decoded bytes,
 `sequence` (zero based per artifact), canonical base64 `data`, lowercase hex
 `sha256` of decoded bytes, and `final: false`. Chunks carry at most 65536
-bytes; JSONL lines contain at most 98304 bytes excluding LF. Integers are
+bytes; JSONL lines contain at most 98304 bytes excluding LF. A chunk of more
+than 65536 bytes is `protocolVersion: 3`, and only such a chunk is: it carries
+at most 4194304 bytes on a line of at most 6291456 bytes, and every other rule
+holds. The engine sends one only to a session reporter whose environment it
+gave `PUTNAMI_SESSION_REPORTING_FRAMING=3` and whose latest acknowledgement
+named a `chunkBytes` cap at least that large (ADR 0131 of the CLI). Integers are
 nonnegative JavaScript-safe integers. No arbitrary paths, URLs, credentials or
 destination metadata enter the protocol.
 
@@ -59,7 +64,14 @@ ACKs echo `protocolVersion`, `sessionId`, `artifact`, `offset`, `sequence`,
 `sha256`, and `final`, plus `ok`. `ok: true` means durable acceptance, including
 identical replay, and carries no code or true retryable flag. `ok: false`
 requires `code` (`[a-z][a-z0-9_]{0,63}`), optionally `retryable: true`. Human
-error messages are not part of the wire. Core verifies every identity field and
+error messages are not part of the wire. A session reporter started with
+`PUTNAMI_SESSION_REPORTING_FRAMING=3` adds `chunkBytes` to every ACK, between
+65536 and 4194304: the largest decoded chunk its receiver accepts now. It
+refuses a version 3 chunk its receiver does not accept with
+`frame_unsupported`, having stored nothing, unless an earlier attempt at that
+chunk got no decisive answer. The engine then sends the same offset and
+sequence again within 65536 bytes, for a chunk it cut on its first attempt
+only; otherwise the code is a plain refusal. Core verifies every identity field and
 never treats a different offset/sequence as progress.
 
 Receivers must accept identical duplicates, reject conflicting content/order,
@@ -75,7 +87,7 @@ that keeps acknowledging keeps receiving. Already canceled graphs drain for two
 seconds. The diagnostic names the limit that stopped delivery (`no chunk
 acknowledged for 30s` or `finalization reached its 5m0s cap`). Errors preserve
 the graph verdict and leave retained state for
-`putnami sessions replay --session <id>`. Checkpoint reads are bounded to 192 KiB;
+`putnami sessions replay --session <id>`. Checkpoint reads are bounded to 12 MiB;
 replay validates finalized session documents up to 16 MiB, `plan.json`
 frames end at or before 16 MiB, and `spec-verification.json` frames at or
 before 8 MiB. Retention follows

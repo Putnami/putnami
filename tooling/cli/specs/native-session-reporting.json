@@ -44,10 +44,10 @@
     {
       "id": "bounded-transport",
       "text": [
-        "Limit chunks to 64 KiB, response lines to 96 KiB, RPCs to 5 s and 3 attempts.",
+        "Limit chunks and lines to 64 and 96 KiB unless negotiated, RPCs to 5 s, 3 attempts.",
         "Live chunks wait for a full frame or 10 s (session reporter) or 2 s (log reporter).",
         "Each drain/replay stops 30 s after the last ACK or 5 min after it starts, naming the limit; cancellation caps it to 2 s, verdict unchanged.",
-        "Checkpoint reads stop at 192 KiB; replayed session.json and sent plan.json at 16 MiB.",
+        "Checkpoint reads stop at 12 MiB; replayed session.json and sent plan.json at 16 MiB.",
         "Pending records lead sessions.keep; the oldest inactive expire with a diagnostic.",
         "Active locks permit temporary excess."
       ]
@@ -86,11 +86,20 @@
         "A resent frame keeps its identity and bytes: the receiver holds each frame once.",
         "Hosted runs, CI jobs and other adapters drain before they return."
       ]
+    },
+    {
+      "id": "negotiated-frame-size",
+      "text": [
+        "The engine names framing version 3 in the session reporter's environment only, and cuts each new frame at the chunkBytes of the latest acknowledgement, 64 KiB until one names more.",
+        "A frame_unsupported refusal of a version 3 frame it cut, on its first attempt, drops it durably and cuts its offset and sequence again at 64 KiB; on a later attempt, or for a frame read from a checkpoint, it is a plain refusal.",
+        "A pending version 3 frame survives the checkpoint and replays with the same identity and bytes."
+      ]
     }
   ],
   "decisions": [
     "tooling/cli/doc/adr/0033-native-session-reporting.md",
     "tooling/cli/doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md",
-    "tooling/cli/doc/adr/0115-a-local-run-hands-its-report-upload-to-a-detached-replay.md"
+    "tooling/cli/doc/adr/0115-a-local-run-hands-its-report-upload-to-a-detached-replay.md",
+    "tooling/cli/doc/adr/0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md"
   ]
 }

@@ -153,6 +153,58 @@
       ]
     },
     {
+      "id": "cloud/large-session-reporting-frames",
+      "type": "feature",
+      "name": "Larger session frames once the receiver advertises them",
+      "outcome": "The session reporter posts a frame larger than 64 KiB only to a receiver that advertises it stores one that large, tells the engine the cap it may cut at, and falls back to 64 KiB frames without losing or repeating a frame",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "large-frames-only-after-an-advertising-answer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-large-frame-follows-an-advertising-answer",
+              "an-unanswered-destination-is-probed-once",
+              "an-unadvertised-large-frame-is-unsupported",
+              "a-413-on-a-large-frame-is-unsupported"
+            ]
+          }
+        },
+        {
+          "id": "acknowledgements-carry-the-cap",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "acks-carry-chunk-bytes-only-when-the-engine-reads-them"
+            ]
+          }
+        },
+        {
+          "id": "unadvertised-large-acceptance-fails-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-large-frame-accepted-without-advertisement-is-refused"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "cloud/telemetry-settings",
       "type": "feature",
       "name": "Telemetry settings of a workspace from the CLI",

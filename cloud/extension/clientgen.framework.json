@@ -159,11 +159,12 @@
           "path": "cloud/extension/internal/deliverycli/sessionreporter.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "8deb666e8c0ff2ce62bfd16aee4b03d2144192c5fd2b958170025942594a9b43"
+          "fingerprint": "060d45b27b3943dcaff5c55ef3e7b1545efa7f9f0e2bc009e8e79156a86b1d06"
         }
       ],
       "owner": "@putnami/cloud-extension",
       "tests": [
+        "cloud/extension/internal/deliverycli/largeframes_test.go",
         "cloud/extension/internal/deliverycli/sessionreporter_local_test.go",
         "cloud/extension/internal/deliverycli/sessionreporter_test.go"
       ],

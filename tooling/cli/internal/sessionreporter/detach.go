@@ -8,7 +8,6 @@ import (
 	"slices"
 	"sync"
 
-	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/sdk/extension/filelock"
 )
 
@@ -114,7 +113,7 @@ func lockFree(dir string, capability Capability) bool {
 // checkpointIncomplete reports whether dir holds capability's checkpoint of
 // sessionID, for provider, and that checkpoint is incomplete.
 func checkpointIncomplete(dir, sessionID string, capability Capability, provider string) bool {
-	data, err := readBounded(filepath.Join(dir, capability.StateFile), 2*protocolcli.SessionReportingLineBytes)
+	data, err := readBounded(filepath.Join(dir, capability.StateFile), checkpointBytes)
 	if err != nil {
 		return false
 	}

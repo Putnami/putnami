@@ -54,6 +54,10 @@ type Capability struct {
 	// View: its events.jsonl frames carry the trimmed view of the stream, not
 	// its raw bytes, from checkpoint version 2 on (ADR 0083).
 	View bool
+	// LargeFrames: the engine names framing version 3 in its provider's
+	// environment and cuts frames at the cap the provider acknowledges
+	// (ADR 0131).
+	LargeFrames bool
 }
 
 // SessionReporter delivers the recorded plan, the trimmed view of the event
@@ -63,7 +67,7 @@ var SessionReporter = Capability{
 	SelectorEnv: protocolcli.SessionReporterEnv, TokenEnv: protocolcli.SessionReporterTokenEnv,
 	Artifacts:     protocolcli.SessionReportingArtifacts(protocolcli.SessionReporterCommand),
 	BatchInterval: EventsBatchInterval, StateFile: StateFile, LockFile: "reporting.lock",
-	View: true,
+	View: true, LargeFrames: true,
 }
 
 // LogReporter delivers the raw event stream only.

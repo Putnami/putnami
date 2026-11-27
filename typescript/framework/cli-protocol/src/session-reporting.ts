@@ -7,6 +7,26 @@ export const SESSION_REPORTING_CHUNK_BYTES = 65_536;
 export const SESSION_REPORTING_LINE_BYTES = 98_304;
 export const SESSION_REPORTING_SCHEMA_ID = 'https://putnami.dev/schemas/putnami-session-reporting.json';
 /**
+ * Larger frames (ADR 0131). The engine names SESSION_REPORTING_LARGE_FRAME_VERSION
+ * in the session reporter's environment (SESSION_REPORTING_FRAMING_ENV); a
+ * reporter that reads it puts chunkBytes on every acknowledgement, and the
+ * engine cuts each new frame at that cap. A frame of more than
+ * SESSION_REPORTING_CHUNK_BYTES is version 3, and only such a frame is: it
+ * carries at most SESSION_REPORTING_MAX_CHUNK_BYTES on a line of at most
+ * SESSION_REPORTING_MAX_LINE_BYTES. Twins of the Go constants.
+ */
+export const SESSION_REPORTING_LARGE_FRAME_VERSION = 3;
+export const SESSION_REPORTING_MAX_CHUNK_BYTES = 4_194_304;
+export const SESSION_REPORTING_MAX_LINE_BYTES = 6_291_456;
+export const SESSION_REPORTING_FRAMING_ENV = 'PUTNAMI_SESSION_REPORTING_FRAMING';
+/** The refusal of a version 3 frame the reporter's receiver does not accept; it stored nothing. */
+export const SESSION_REPORTING_CODE_FRAME_UNSUPPORTED = 'frame_unsupported';
+
+/** The protocol version of a frame carrying n decoded bytes. Twin of SessionReportingFrameVersion. */
+export function sessionReportingFrameVersion(n: number): 1 | 3 {
+  return n > SESSION_REPORTING_CHUNK_BYTES ? SESSION_REPORTING_LARGE_FRAME_VERSION : SESSION_REPORTING_VERSION;
+}
+/**
  * Bounds plan.json on the wire: every plan.json chunk ends at or before this
  * decoded byte offset, so its final marker sits at or before it too.
  * events.jsonl and session.json have no artifact bound beyond the chunk and
@@ -63,7 +83,8 @@ export function sessionReportingArtifacts(command: string): SessionReportingArti
 }
 
 interface ReportingIdentity {
-  protocolVersion: 1;
+  /** 1, or 3 for a frame of more than SESSION_REPORTING_CHUNK_BYTES. */
+  protocolVersion: 1 | 3;
   sessionId: string;
   artifact: SessionReportingArtifact;
   offset: number;
@@ -81,6 +102,12 @@ export interface SessionReportingAck extends ReportingIdentity {
   ok: boolean;
   retryable?: boolean;
   code?: string;
+  /**
+   * The largest decoded frame the reporter's receiver accepts now, between
+   * SESSION_REPORTING_CHUNK_BYTES and SESSION_REPORTING_MAX_CHUNK_BYTES. Only
+   * a reporter whose engine named framing version 3 sends it.
+   */
+  chunkBytes?: number;
 }
 
 const identityKeys = ['protocolVersion', 'sessionId', 'artifact', 'offset', 'sequence', 'sha256', 'final'];
@@ -89,9 +116,13 @@ function whole(pattern: RegExp, value: string): boolean {
   return pattern.exec(value)?.[0] === value;
 }
 
-function parse(line: string, required: string[], optional: string[] = []): Record<string, unknown> {
-  if (new TextEncoder().encode(line).length > SESSION_REPORTING_LINE_BYTES)
-    throw new Error('reporting line exceeds limit');
+function parse(
+  line: string,
+  required: string[],
+  optional: string[] = [],
+  limit = SESSION_REPORTING_LINE_BYTES,
+): Record<string, unknown> {
+  if (new TextEncoder().encode(line).length > limit) throw new Error('reporting line exceeds limit');
   const value: unknown = JSON.parse(line);
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('invalid reporting JSON');
   const v = value as Record<string, unknown>;
@@ -101,7 +132,8 @@ function parse(line: string, required: string[], optional: string[] = []): Recor
   )
     throw new Error('invalid reporting fields');
   if (
-    v['protocolVersion'] !== 1 ||
+    (v['protocolVersion'] !== SESSION_REPORTING_VERSION &&
+      v['protocolVersion'] !== SESSION_REPORTING_LARGE_FRAME_VERSION) ||
     typeof v['sessionId'] !== 'string' ||
     !whole(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}/, v['sessionId']) ||
     typeof v['artifact'] !== 'string' ||
@@ -126,7 +158,12 @@ function parse(line: string, required: string[], optional: string[] = []): Recor
  * SESSION_REPORTING_SPEC_VERIFICATION_BYTES, is invalid.
  */
 export async function parseSessionReportingChunk(line: string): Promise<SessionReportingChunk> {
-  const v = parse(line, [...identityKeys, 'data']);
+  const v = parse(line, [...identityKeys, 'data'], [], SESSION_REPORTING_MAX_LINE_BYTES);
+  if (
+    v['protocolVersion'] !== SESSION_REPORTING_LARGE_FRAME_VERSION &&
+    new TextEncoder().encode(line).length > SESSION_REPORTING_LINE_BYTES
+  )
+    throw new Error('reporting line exceeds limit');
   if (typeof v['data'] !== 'string') throw new Error('invalid reporting data');
   let binary: string;
   try {
@@ -136,7 +173,8 @@ export async function parseSessionReportingChunk(line: string): Promise<SessionR
   }
   if (
     btoa(binary) !== v['data'] ||
-    binary.length > SESSION_REPORTING_CHUNK_BYTES ||
+    binary.length > SESSION_REPORTING_MAX_CHUNK_BYTES ||
+    v['protocolVersion'] !== sessionReportingFrameVersion(binary.length) ||
     v['final'] !== (binary.length === 0)
   )
     throw new Error('invalid reporting chunk size or final marker');
@@ -151,7 +189,14 @@ export async function parseSessionReportingChunk(line: string): Promise<SessionR
 }
 
 export function parseSessionReportingAck(line: string): SessionReportingAck {
-  const v = parse(line, [...identityKeys, 'ok'], ['retryable', 'code']);
+  const v = parse(line, [...identityKeys, 'ok'], ['retryable', 'code', 'chunkBytes']);
+  if (
+    v['chunkBytes'] !== undefined &&
+    (!Number.isSafeInteger(v['chunkBytes']) ||
+      Number(v['chunkBytes']) < SESSION_REPORTING_CHUNK_BYTES ||
+      Number(v['chunkBytes']) > SESSION_REPORTING_MAX_CHUNK_BYTES)
+  )
+    throw new Error('invalid reporting chunk cap');
   if (
     typeof v['ok'] !== 'boolean' ||
     (v['retryable'] !== undefined && typeof v['retryable'] !== 'boolean') ||

@@ -144,6 +144,22 @@
             "hosted-and-ci-runs-drain-before-they-return"
           ]
         }
+      },
+      {
+        "id": "negotiated-frame-size",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "frames-follow-the-acknowledged-cap",
+            "an-unsupported-large-frame-is-cut-again-at-64-kib",
+            "a-pending-large-frame-replays-unchanged",
+            "only-the-session-reporter-reads-the-framing-variable"
+          ]
+        }
       }
     ]
   }

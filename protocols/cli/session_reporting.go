@@ -35,6 +35,38 @@ const (
 	SessionReportingSpecVerificationBytes = 8 << 20
 )
 
+// Larger frames (ADR 0131). The engine names SessionReportingLargeFrameVersion
+// in the session reporter's environment (SessionReportingFramingEnv); a
+// reporter that reads it puts ChunkBytes, the cap its receiver advertised, on
+// every acknowledgement, and the engine cuts each new frame at that cap. A
+// frame of more than SessionReportingChunkBytes is a version 3 frame, and only
+// such a frame is: it carries at most SessionReportingMaxChunkBytes on a line
+// of at most SessionReportingMaxLineBytes, its acknowledgement echoes version
+// 3, and every other version 1 rule holds. A reporter refuses a version 3
+// frame its receiver does not accept with SessionReportingCodeFrameUnsupported,
+// having stored nothing, and the engine cuts the same offset and sequence again
+// within SessionReportingChunkBytes.
+const (
+	SessionReportingLargeFrameVersion = 3
+	SessionReportingMaxChunkBytes     = 4 << 20
+	SessionReportingMaxLineBytes      = 6 << 20
+	SessionReportingFramingEnv        = "PUTNAMI_SESSION_REPORTING_FRAMING"
+	// SessionReportingCodeFrameUnsupported is the refusal of a version 3 frame
+	// that the reporter's receiver does not accept. The receiver stored
+	// nothing of it.
+	SessionReportingCodeFrameUnsupported = "frame_unsupported"
+)
+
+// SessionReportingFrameVersion is the protocol version of a frame carrying n
+// decoded bytes: SessionReportingVersion up to SessionReportingChunkBytes,
+// SessionReportingLargeFrameVersion above.
+func SessionReportingFrameVersion(n int) int {
+	if n > SessionReportingChunkBytes {
+		return SessionReportingLargeFrameVersion
+	}
+	return SessionReportingVersion
+}
+
 // Session reporting v2 is v1 opened by a handshake that hands the reporter the
 // run credential of a hosted run (--credential-fd). The engine sends
 // initialize, which carries no credential; only after a reporter answers it
@@ -84,7 +116,9 @@ func SessionReportingArtifacts(command string) []string {
 // so it cannot collide with the last data chunk. Providers acknowledge only
 // after durably accepting the bytes, and reject conflicting bytes at an offset.
 type SessionReportingChunk struct {
-	// ProtocolVersion identifies the reporter wire contract; currently 1.
+	// ProtocolVersion identifies the reporter wire contract: 1, or 3 for a
+	// frame of more than SessionReportingChunkBytes
+	// (SessionReportingFrameVersion).
 	ProtocolVersion int `json:"protocolVersion"`
 	// SessionID is the stable identity of the original retained execution.
 	SessionID string `json:"sessionId"`
@@ -95,7 +129,8 @@ type SessionReportingChunk struct {
 	Offset int64 `json:"offset"`
 	// Sequence is the zero-based per-artifact ordinal, including the final marker.
 	Sequence int64 `json:"sequence"`
-	// Data holds at most 64 KiB of original bytes, encoded as canonical base64
+	// Data holds at most 64 KiB of original bytes at version 1, at most
+	// SessionReportingMaxChunkBytes at version 3, encoded as canonical base64
 	// in JSON. Only a final marker carries an empty byte slice.
 	Data []byte `json:"data"`
 	// SHA256 is the lowercase hexadecimal SHA-256 digest of decoded Data.
@@ -129,6 +164,12 @@ type SessionReportingAck struct {
 	// Code is required when OK is false: a lowercase machine code matching
 	// [a-z][a-z0-9_]{0,63}, never arbitrary provider output or credential material.
 	Code string `json:"code,omitempty"`
+	// ChunkBytes is the largest decoded frame the reporter's receiver accepts
+	// now, between SessionReportingChunkBytes and
+	// SessionReportingMaxChunkBytes. Only a reporter whose engine named
+	// SessionReportingLargeFrameVersion in SessionReportingFramingEnv sends it;
+	// absent, the cap is SessionReportingChunkBytes.
+	ChunkBytes int `json:"chunkBytes,omitempty"`
 }
 
 var reportingSessionID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
@@ -143,8 +184,9 @@ func SessionReportingDigest(data []byte) string {
 
 // NewSessionReportingChunk copies bytes into a frame with their computed digest.
 // Call Validate before transporting an externally constructed identity.
+// Its version follows the size of data (SessionReportingFrameVersion).
 func NewSessionReportingChunk(sessionID, artifact string, offset, sequence int64, data []byte, final bool) SessionReportingChunk {
-	return SessionReportingChunk{SessionReportingVersion, sessionID, artifact, offset, sequence, append([]byte{}, data...), SessionReportingDigest(data), final}
+	return SessionReportingChunk{SessionReportingFrameVersion(len(data)), sessionID, artifact, offset, sequence, append([]byte{}, data...), SessionReportingDigest(data), final}
 }
 
 // Validate checks the identity, byte bounds, final marker and content digest.
@@ -158,7 +200,7 @@ func (c SessionReportingChunk) Validate() error {
 	if c.Sequence < 0 || c.Sequence > 9007199254740991 {
 		return fmt.Errorf("invalid reporting sequence")
 	}
-	if len(c.Data) > SessionReportingChunkBytes || c.Final != (len(c.Data) == 0) {
+	if len(c.Data) > SessionReportingMaxChunkBytes || c.ProtocolVersion != SessionReportingFrameVersion(len(c.Data)) || c.Final != (len(c.Data) == 0) {
 		return fmt.Errorf("invalid reporting chunk size or final marker")
 	}
 	if bound, _ := reportingArtifactBound(c.Artifact); bound > 0 && c.Offset+int64(len(c.Data)) > bound {
@@ -170,7 +212,8 @@ func (c SessionReportingChunk) Validate() error {
 	return nil
 }
 
-// Ack constructs the successful acknowledgement of this exact frame.
+// Ack constructs the successful acknowledgement of this exact frame. It
+// carries no ChunkBytes.
 func (c SessionReportingChunk) Ack() SessionReportingAck {
 	return SessionReportingAck{ProtocolVersion: c.ProtocolVersion, SessionID: c.SessionID, Artifact: c.Artifact, Offset: c.Offset, Sequence: c.Sequence, SHA256: c.SHA256, Final: c.Final, OK: true}
 }
@@ -185,7 +228,7 @@ func (a SessionReportingAck) Matches(c SessionReportingChunk) bool {
 // invalid.
 func validateReportingIdentity(version int, sessionID, artifact string, offset int64, digest string) error {
 	bound, known := reportingArtifactBound(artifact)
-	if version != SessionReportingVersion || !reportingSessionID.MatchString(sessionID) || !known || offset < 0 || offset > 9007199254740991 || !reportingDigest.MatchString(digest) {
+	if version != SessionReportingVersion && version != SessionReportingLargeFrameVersion || !reportingSessionID.MatchString(sessionID) || !known || offset < 0 || offset > 9007199254740991 || !reportingDigest.MatchString(digest) {
 		return fmt.Errorf("invalid reporting identity")
 	}
 	if bound > 0 && offset > bound {
@@ -209,11 +252,16 @@ func reportingArtifactBound(artifact string) (bound int64, known bool) {
 	return 0, false
 }
 
-// ParseSessionReportingChunk strictly decodes one bounded frame and verifies bytes.
+// ParseSessionReportingChunk strictly decodes one bounded frame and verifies
+// bytes. A version 1 line is bounded by SessionReportingLineBytes, a version 3
+// one by SessionReportingMaxLineBytes.
 func ParseSessionReportingChunk(line []byte) (*SessionReportingChunk, error) {
 	var c SessionReportingChunk
-	if err := parseReporting(line, &c, "protocolVersion", "sessionId", "artifact", "offset", "sequence", "data", "sha256", "final"); err != nil {
+	if err := parseReportingLine(line, SessionReportingMaxLineBytes, &c, "protocolVersion", "sessionId", "artifact", "offset", "sequence", "data", "sha256", "final"); err != nil {
 		return nil, err
+	}
+	if c.ProtocolVersion != SessionReportingLargeFrameVersion && len(line) > SessionReportingLineBytes {
+		return nil, fmt.Errorf("reporting line exceeds limit")
 	}
 	if err := c.Validate(); err != nil {
 		return nil, err
@@ -242,6 +290,13 @@ func ParseSessionReportingAck(line []byte) (*SessionReportingAck, error) {
 	}
 	if a.OK && (a.Code != "" || a.Retryable) || !a.OK && !reportingCode.MatchString(a.Code) {
 		return nil, fmt.Errorf("invalid reporting acknowledgement status")
+	}
+	// ChunkBytes decodes an absent member and a zero one alike, so its
+	// presence is read from the line, which parseReporting decoded.
+	var members map[string]json.RawMessage
+	_ = json.Unmarshal(line, &members)
+	if _, present := members["chunkBytes"]; present && (a.ChunkBytes < SessionReportingChunkBytes || a.ChunkBytes > SessionReportingMaxChunkBytes) {
+		return nil, fmt.Errorf("invalid reporting chunk cap")
 	}
 	return &a, nil
 }
@@ -387,7 +442,12 @@ func ParseSessionReportingHandshakeResult(line []byte) (*SessionReportingHandsha
 }
 
 func parseReporting(line []byte, target any, required ...string) error {
-	if len(line) > SessionReportingLineBytes {
+	return parseReportingLine(line, SessionReportingLineBytes, target, required...)
+}
+
+// parseReportingLine is parseReporting with limit as the line bound.
+func parseReportingLine(line []byte, limit int, target any, required ...string) error {
+	if len(line) > limit {
 		return fmt.Errorf("reporting line exceeds limit")
 	}
 	var fields map[string]json.RawMessage

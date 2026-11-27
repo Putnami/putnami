@@ -248,6 +248,20 @@
           }
         },
         {
+          "id": "a-large-frame-is-negotiated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-version-3-frame-passes-its-corpus",
+              "the-typescript-twin-reads-version-3-frames"
+            ]
+          }
+        },
+        {
           "id": "the-cli-emits-conforming-documents",
           "stage": "coded",
           "evidenceKinds": [

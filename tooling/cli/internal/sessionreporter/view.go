@@ -142,21 +142,21 @@ func newView(events *sessionstream.Subscription, cursor int64) *view {
 }
 
 // available is how many view bytes past offset are ready to frame. It scans
-// only as far as one frame past offset needs.
-func (v *view) available(offset int64) (int64, error) {
-	if err := v.fill(offset + protocolcli.SessionReportingChunkBytes); err != nil {
+// only as far as one frame of size bytes past offset needs.
+func (v *view) available(offset int64, size int) (int64, error) {
+	if err := v.fill(offset + int64(size)); err != nil {
 		return 0, err
 	}
 	return v.end - offset, nil
 }
 
-// frame returns up to one chunk of view bytes at offset, and whether the view
-// is done, so that a final marker may follow its last byte.
-func (v *view) frame(offset int64) ([]byte, bool, error) {
-	if err := v.fill(offset + protocolcli.SessionReportingChunkBytes); err != nil {
+// frame returns up to size view bytes at offset, and whether the view is
+// done, so that a final marker may follow its last byte.
+func (v *view) frame(offset int64, size int) ([]byte, bool, error) {
+	if err := v.fill(offset + int64(size)); err != nil {
 		return nil, false, err
 	}
-	data, err := v.read(offset, protocolcli.SessionReportingChunkBytes)
+	data, err := v.read(offset, size)
 	return data, v.done, err
 }
 

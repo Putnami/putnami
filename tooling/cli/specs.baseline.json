@@ -288,6 +288,7 @@
     "cli/native-session-reporting#detached-delivery",
     "cli/native-session-reporting#durable-replay",
     "cli/native-session-reporting#engine-lifecycle",
+    "cli/native-session-reporting#negotiated-frame-size",
     "cli/native-session-reporting#spec-verification-record",
     "cli/native-session-reporting#trimmed-upload",
     "cli/native-session-reporting#unavailable-provider",

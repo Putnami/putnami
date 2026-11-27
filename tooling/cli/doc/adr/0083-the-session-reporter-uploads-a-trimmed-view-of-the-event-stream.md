@@ -6,6 +6,9 @@
   D-R3. It reads that the session reporter's upload keeps every event of a
   failed task, in order, and is bounded. The bound of point 8 and the shared
   records of point 6 are this ADR's detail, held by the reporter's tests
+- **Amended by**: [ADR 0131](0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md):
+  view frames are cut at the cap the reporter acknowledges, 64 KiB until one
+  names more
 - **Date**: 2026-10-28
 - **Amends**: [ADR 0033](0033-native-session-reporting.md), durable delivery
 - **Scope**: `@putnami/cli` (`internal/sessionreporter`), feature

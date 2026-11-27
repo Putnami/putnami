@@ -41,9 +41,9 @@ const (
 	// deadline so a slow receiver produces a retryable NACK instead of a
 	// silent frame the engine has to time out on.
 	sessionReporterRequestTimeout = 4 * time.Second
-	// sessionReporterLineBytes bounds one stdin frame: the protocol line cap plus
-	// the base64 expansion of a full chunk, so a canonical frame always fits.
-	sessionReporterLineBytes = protocolcli.SessionReportingLineBytes + 2*protocolcli.SessionReportingChunkBytes
+	// sessionReporterLineBytes bounds one stdin frame: the protocol's line cap
+	// of a version 3 frame, so a canonical frame of any version fits.
+	sessionReporterLineBytes = protocolcli.SessionReportingMaxLineBytes
 )
 
 // The recorded plan, plan.json, which the engine's session reporter sends
@@ -133,6 +133,7 @@ func serveSessionReporter(env map[string]string, local localSessionResolver, in 
 	if !cfg.inspectionGuardFailed {
 		cfg.local = local
 	}
+	cfg.framing = framingRequested(env)
 	return runSessionReporter(context.Background(), in, out, logw, cfg, &http.Client{Timeout: sessionReporterRequestTimeout})
 }
 
@@ -151,6 +152,10 @@ type sessionReporterConfig struct {
 	// local resolves the local mode's session. Nil leaves the local mode off,
 	// as for the log reporter.
 	local localSessionResolver
+	// framing records that the engine named framing version 3: every
+	// acknowledgement carries chunkBytes (ADR 0131). Only the session
+	// reporter reads it.
+	framing bool
 }
 
 // hosted reports whether the engine runs this reporter for a hosted run: it
@@ -333,6 +338,14 @@ type sessionReporterSender struct {
 	local         *clicore.WorkspaceContext
 	// encoder compresses a frame once its destination advertised gzip.
 	encoder chunkEncoder
+	// frameCap is the decoded cap the destination advertised (ADR 0131).
+	frameCap frameCap
+	// lastURL is the destination of the latest frame, whose cap an
+	// acknowledgement names.
+	lastURL string
+	// unsure holds the version 3 frames an attempt at which ended without a
+	// decisive answer: the receiver may hold them (admitLarge).
+	unsure map[string]bool
 }
 
 // sessionDestination is where one frame goes and the bearer it carries. local
@@ -426,6 +439,9 @@ func nack(chunk *protocolcli.SessionReportingChunk, code string, retryable bool)
 // sessionReporterPlanRetryableNacks-th retryable NACK without retry.
 func (s *sessionReporterSender) deliver(ctx context.Context, chunk *protocolcli.SessionReportingChunk) protocolcli.SessionReportingAck {
 	ack := s.post(ctx, chunk)
+	if s.cfg.framing {
+		ack.ChunkBytes = s.frameCap.ackBytes(s.lastURL)
+	}
 	if chunk.Artifact == planArtifact && !ack.OK && ack.Retryable {
 		s.planRetryableNacks++
 		if s.planRetryableNacks >= sessionReporterPlanRetryableNacks {
@@ -453,6 +469,10 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 	if !ok {
 		return nack(chunk, ackCodeInvalidChunk, false)
 	}
+	s.lastURL = dest.url
+	if code, retryable := s.admitLarge(ctx, dest, chunk); code != "" {
+		return nack(chunk, code, retryable)
+	}
 
 	status, body, compressed, failure := s.send(ctx, dest, part, chunk)
 	if failure == "" && status == http.StatusUnauthorized && dest.local != nil && dest.local.RefreshAuth != nil {
@@ -466,10 +486,25 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 		status, body, compressed, failure = s.send(ctx, dest, part, chunk)
 	}
 	if failure != "" {
+		s.markUnsure(chunk)
 		return nack(chunk, failure, failure == ackCodeReceiverUnavailable)
 	}
 
+	large := chunk.ProtocolVersion == protocolcli.SessionReportingLargeFrameVersion
+	if large && !decisiveAnswer(status) {
+		s.markUnsure(chunk)
+	}
 	switch {
+	case status == http.StatusOK && large && !s.frameCap.accepts(dest.url, len(chunk.Data)):
+		// An answer that does not advertise a cap this large comes from a
+		// receiver that may have stored the frame truncated, so it is not
+		// durable acceptance of it (ADR 0131). Not retryable, as for gzip.
+		return nack(chunk, ackCodeReceiverMismatch, false)
+	case status == http.StatusRequestEntityTooLarge && large:
+		// This instance stored nothing: the engine cuts the frame again at
+		// 64 KiB, unless an earlier attempt may have been stored elsewhere.
+		code, retryable := s.unsupported(chunk)
+		return nack(chunk, code, retryable)
 	case status == http.StatusOK && compressed && !s.encoder.accepts(dest.url):
 		// An answer that does not advertise gzip comes from a receiver that
 		// may have stored the compressed bytes as they arrived, so it is not
@@ -521,11 +556,10 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 // got no answer.
 func (s *sessionReporterSender) send(ctx context.Context, dest sessionDestination, part string, chunk *protocolcli.SessionReportingChunk) (int, []byte, bool, string) {
 	payload, coding := s.encoder.body(dest.url, chunk.Data)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, dest.url, bytes.NewReader(payload))
+	req, err := sessionRequest(ctx, http.MethodPost, dest, bytes.NewReader(payload))
 	if err != nil {
 		return 0, nil, false, ackCodeNotConfigured
 	}
-	req.Header.Set("Authorization", dest.bearer.Authorization())
 	req.Header.Set("Content-Type", "application/octet-stream")
 	setContentEncoding(req, coding)
 	req.Header.Set(sessionPartHeader, part)
@@ -538,12 +572,25 @@ func (s *sessionReporterSender) send(ctx context.Context, dest sessionDestinatio
 		// Transport failures (dial, reset, deadline) are the class worth another
 		// bounded attempt; the receiver may never have seen the bytes.
 		s.encoder.observe(dest.url, nil)
+		s.frameCap.observe(dest.url, 0, nil)
 		return 0, nil, false, ackCodeReceiverUnavailable
 	}
 	defer resp.Body.Close()
 	s.encoder.observe(dest.url, resp.Header)
+	s.frameCap.observe(dest.url, resp.StatusCode, resp.Header)
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	return resp.StatusCode, body, coding != "", ""
+}
+
+// sessionRequest is one request of method to dest under its bearer: a frame's
+// POST, or the OPTIONS probe of a destination's advertisement (ADR 0131).
+func sessionRequest(ctx context.Context, method string, dest sessionDestination, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, dest.url, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", dest.bearer.Authorization())
+	return req, nil
 }
 
 // platformShedRequest reports whether the platform refused the request before

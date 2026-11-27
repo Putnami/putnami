@@ -18,7 +18,7 @@
   ],
   "$defs": {
     "chunk": {
-      "description": "One frame of a persisted session artifact. A plan.json frame starts at or before 16777216 decoded bytes, and a spec-verification.json frame at or before 8388608; the Go and TypeScript parsers also refuse one whose offset plus decoded data length exceeds its bound.",
+      "description": "One frame of a persisted session artifact. A plan.json frame starts at or before 16777216 decoded bytes, and a spec-verification.json frame at or before 8388608; the Go and TypeScript parsers also refuse one whose offset plus decoded data length exceeds its bound. A frame of more than 65536 decoded bytes is version 3 and carries at most 4194304 (ADR 0131); every other frame is version 1. The base64 lengths below bound that rule loosely, and the Go and TypeScript parsers apply it exactly.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -33,7 +33,10 @@
       ],
       "properties": {
         "protocolVersion": {
-          "const": 1
+          "enum": [
+            1,
+            3
+          ]
         },
         "sessionId": {
           "type": "string",
@@ -60,7 +63,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "base64",
-          "maxLength": 87384
+          "maxLength": 5592408
         },
         "sha256": {
           "type": "string",
@@ -125,6 +128,29 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "protocolVersion": {
+                "const": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "maxLength": 87384
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "data": {
+                "minLength": 87384
+              }
+            }
+          }
         }
       ]
     },
@@ -143,7 +169,10 @@
       ],
       "properties": {
         "protocolVersion": {
-          "const": 1
+          "enum": [
+            1,
+            3
+          ]
         },
         "sessionId": {
           "type": "string",
@@ -183,6 +212,12 @@
         "code": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
+        },
+        "chunkBytes": {
+          "description": "The largest decoded frame the reporter's receiver accepts now. Only a reporter whose engine named framing version 3 in PUTNAMI_SESSION_REPORTING_FRAMING sends it.",
+          "type": "integer",
+          "minimum": 65536,
+          "maximum": 4194304
         }
       },
       "allOf": [

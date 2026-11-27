@@ -3,6 +3,8 @@
 - **Status**: accepted
 - **Amended by**: [ADR 0115](0115-a-local-run-hands-its-report-upload-to-a-detached-replay.md):
   a local terminal job run no longer drains its reporting before it returns
+- **Amended by**: [ADR 0131](0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md):
+  a session reporter cuts larger frames once its receiver advertises them
 - **Scope**: `tooling/cli/internal/engine`, `internal/sessionstream`,
   `internal/sessionreporter`, `protocols/cli` (session reporting v1 and v2,
   session subscribers)

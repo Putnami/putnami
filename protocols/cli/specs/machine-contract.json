@@ -137,6 +137,14 @@
       ]
     },
     {
+      "id": "a-large-frame-is-negotiated",
+      "text": [
+        "A frame of more than 64 KiB is version 3: it carries at most 4 MiB of decoded bytes on a line of at most 6 MiB, its acknowledgement echoes version 3, and every other version 1 rule holds; a frame of 64 KiB or less stays version 1.",
+        "An acknowledgement may carry chunkBytes, between 65,536 and 4 MiB: the cap the reporter's destination accepts.",
+        "The Go parsers, the TypeScript twin, the schema and the shared corpus agree on both, and on the framing variable and the frame_unsupported code."
+      ]
+    },
+    {
       "id": "the-cli-emits-conforming-documents",
       "text": [
         "The CLI's --output=json envelope, its bounded JSONL stream and its two recorded session files each pass ValidateDocument as version 2 and match a committed golden.",

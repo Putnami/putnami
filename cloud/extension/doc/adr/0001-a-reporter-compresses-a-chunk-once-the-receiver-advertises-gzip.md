@@ -1,6 +1,8 @@
 # ADR 0001 — A reporter compresses a chunk once the receiver advertises gzip
 
 - **Status**: accepted
+- **Amended by**: [ADR 0131](../../../../tooling/cli/doc/adr/0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md):
+  a receiver that advertises larger frames gets fewer requests
 - **Scope**: `@putnami/cloud` (`cloud/extension`), the `session-reporter` and
   `log-reporter` processes
 

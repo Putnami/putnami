@@ -128,6 +128,9 @@ func TestSessionReportingSchemaAndBounds(t *testing.T) {
 	}
 	for _, n := range []int{1, SessionReportingChunkBytes, SessionReportingChunkBytes + 1} {
 		chunk := NewSessionReportingChunk("session", "events.jsonl", 0, 0, bytes.Repeat([]byte("x"), n), false)
+		// The version 1 bound: a larger frame is valid only as version 3
+		// (session_reporting_frames_test.go).
+		chunk.ProtocolVersion = SessionReportingVersion
 		wire, _ := json.Marshal(chunk)
 		if n <= SessionReportingChunkBytes && len(wire) > SessionReportingLineBytes {
 			t.Fatal("maximum chunk does not fit wire bound")

@@ -23,6 +23,10 @@ import (
 
 const StateFile = "reporting.json"
 
+// checkpointBytes bounds a checkpoint read: twice the line of the largest
+// pending frame it may hold, a version 3 one (ADR 0131).
+const checkpointBytes = 2 * protocolcli.SessionReportingMaxLineBytes
+
 // FinalizationProgressDeadline ends a capability's finalization once this long
 // has passed without an acknowledged chunk of any artifact: a reporter that
 // keeps acknowledging keeps delivering, a stuck one stops.
@@ -227,6 +231,13 @@ type Run struct {
 	// plain: on a hosted run, the reporter cannot hold the run credential
 	// (Holders.Start), so its process starts without one.
 	plain bool
+	// chunkBytes is the size the next frame is cut at: 64 KiB, or the cap the
+	// latest acknowledgement of a LargeFrames capability named (ADR 0131).
+	chunkBytes int
+	// pendingCutHere records that this process cut the pending frame, rather
+	// than reading it from a checkpoint: only such a frame, refused
+	// frame_unsupported on its first attempt, is cut again (send).
+	pendingCutHere bool
 	// progressMu guards lastAck, the clock time of the latest chunk the
 	// reporter accepted, which drain reads to apply the progress deadline.
 	progressMu sync.Mutex
@@ -270,7 +281,7 @@ func startRun(ctx context.Context, capability Capability, events *sessionstream.
 		}
 		return r, fmt.Errorf("%s unavailable; retained session %s for replay", capability.Label, sessionID)
 	}
-	launch.Env = capability.providerEnv(ctx, launch.Env)
+	launch.Env = capability.launchEnv(ctx, launch.Env)
 	r.launch = launch
 	r.process, r.plain = holders.take(capability, provider)
 	go r.work()
@@ -287,9 +298,9 @@ func openRun(ctx context.Context, capability Capability, dir, sessionID, provide
 		return nil, fmt.Errorf("already active")
 	}
 	workerCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	r := &Run{capability: capability, dir: dir, lock: lock, ctx: workerCtx, graphCtx: ctx, cancel: cancel, finish: make(chan struct{}), done: make(chan struct{}), opTimeout: operationTimeout, clock: systemClock{}, batchInterval: eventsBatchInterval(ctx, capability)}
+	r := &Run{capability: capability, dir: dir, lock: lock, ctx: workerCtx, graphCtx: ctx, cancel: cancel, finish: make(chan struct{}), done: make(chan struct{}), opTimeout: operationTimeout, clock: systemClock{}, batchInterval: eventsBatchInterval(ctx, capability), chunkBytes: protocolcli.SessionReportingChunkBytes}
 	r.state = state{Version: capability.checkpointVersion(), Provider: provider, SessionID: sessionID}
-	data, err := readBounded(filepath.Join(dir, capability.StateFile), 2*protocolcli.SessionReportingLineBytes)
+	data, err := readBounded(filepath.Join(dir, capability.StateFile), checkpointBytes)
 	if err == nil {
 		// The members a checkpoint omits keep the values an earlier CLI
 		// assumed for them: a checkpoint without a version is a version 1 one.
@@ -575,6 +586,16 @@ func (r *Run) deliver() error {
 			}
 		}
 		if err := r.send(*r.state.Pending); err != nil {
+			if errors.Is(err, errFrameUnsupported) {
+				// The receiver stored nothing of the frame: drop it, durably,
+				// and cut the same offset and sequence again at 64 KiB.
+				r.chunkBytes = protocolcli.SessionReportingChunkBytes
+				r.state.Pending, r.pendingCutHere = nil, false
+				if err := r.save(); err != nil {
+					return err
+				}
+				continue
+			}
 			artifact := r.state.Pending.Artifact
 			if reason := omission(artifact, err); reason != "" {
 				if err := r.omit(artifact, reason); err != nil {
@@ -596,7 +617,7 @@ func (r *Run) deliver() error {
 			r.state.EventsRaw = max(r.state.EventsRaw, r.eventsView().acknowledged(c.Offset))
 			raw = r.state.EventsRaw
 		}
-		r.state.Pending = nil
+		r.state.Pending, r.pendingCutHere = nil, false
 		r.state.Complete = r.complete()
 		if err := r.save(); err != nil {
 			return err
@@ -688,6 +709,7 @@ func (r *Run) frame(terminal bool, lastEventsSend *time.Time) (pending, finished
 		*lastEventsSend = r.clock.Now()
 	}
 	r.state.Pending = chunk
+	r.pendingCutHere = true
 	return true, false, r.save()
 }
 
@@ -794,7 +816,7 @@ func (r *Run) lastProgress(since time.Time) time.Time {
 func (r *Run) eventsBatchWait(lastSend time.Time) time.Duration {
 	var pending int64
 	if r.viewFraming() {
-		available, err := r.eventsView().available(r.state.Events.Offset)
+		available, err := r.eventsView().available(r.state.Events.Offset, r.frameBytes())
 		if err != nil {
 			return 0
 		}
@@ -804,7 +826,7 @@ func (r *Run) eventsBatchWait(lastSend time.Time) time.Duration {
 		pending = end.Offset - r.state.Events.Offset
 	}
 	switch {
-	case pending >= protocolcli.SessionReportingChunkBytes:
+	case pending >= int64(r.frameBytes()):
 		return 0
 	case pending <= 0:
 		return r.batchInterval
@@ -845,13 +867,13 @@ func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportin
 		}
 		data, terminal = read, terminal && final
 	case planFile, specVerificationFile:
-		read, err := readDocument(r.dir, artifact, *c)
+		read, err := readDocumentFrame(r.dir, artifact, *c, r.frameBytes())
 		if err != nil {
 			return nil, err
 		}
 		data, terminal = read, true
 	default:
-		read, err := readArtifact(r.dir, artifact, c.Offset)
+		read, err := readArtifact(r.dir, artifact, c.Offset, r.frameBytes())
 		if err != nil {
 			return nil, err
 		}
@@ -869,9 +891,9 @@ func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportin
 // follow them.
 func (r *Run) readEvents(offset int64) ([]byte, bool, error) {
 	if r.viewFraming() {
-		return r.eventsView().frame(offset)
+		return r.eventsView().frame(offset, r.frameBytes())
 	}
-	read, err := r.events.Read(offset, protocolcli.SessionReportingChunkBytes)
+	read, err := r.events.Read(offset, r.frameBytes())
 	_, final := r.events.Extent()
 	return read, final, err
 }
@@ -890,6 +912,11 @@ var documentBounds = map[string]int64{
 // regular file, fails to read, or was removed or truncated after its first
 // chunk.
 func readDocument(dir, artifact string, c cursor) ([]byte, error) {
+	return readDocumentFrame(dir, artifact, c, protocolcli.SessionReportingChunkBytes)
+}
+
+// readDocumentFrame is readDocument for a frame of up to size bytes.
+func readDocumentFrame(dir, artifact string, c cursor, size int) ([]byte, error) {
 	bound := documentBounds[artifact]
 	info, err := os.Stat(filepath.Join(dir, artifact))
 	if errors.Is(err, fs.ErrNotExist) && c == (cursor{}) {
@@ -898,7 +925,7 @@ func readDocument(dir, artifact string, c cursor) ([]byte, error) {
 	if err == nil && info.Size() > bound {
 		return nil, errDocumentTooLarge
 	}
-	data, err := readArtifact(dir, artifact, c.Offset)
+	data, err := readArtifact(dir, artifact, c.Offset, size)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errDocumentUnreadable, err)
 	}
@@ -908,7 +935,8 @@ func readDocument(dir, artifact string, c cursor) ([]byte, error) {
 	return data, nil
 }
 
-func readArtifact(dir, artifact string, offset int64) ([]byte, error) {
+// readArtifact reads up to size bytes of artifact at offset.
+func readArtifact(dir, artifact string, offset int64, size int) ([]byte, error) {
 	f, err := os.Open(filepath.Join(dir, artifact))
 	if err != nil {
 		return nil, fmt.Errorf("reporting artifact unavailable: %s", artifact)
@@ -918,7 +946,7 @@ func readArtifact(dir, artifact string, offset int64) ([]byte, error) {
 	if err != nil || !info.Mode().IsRegular() || info.Size() < offset {
 		return nil, fmt.Errorf("reporting artifact changed: %s", artifact)
 	}
-	data := make([]byte, protocolcli.SessionReportingChunkBytes)
+	data := make([]byte, min(int64(size), info.Size()-offset))
 	n, err := f.ReadAt(data, offset)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("read reporting artifact: %s", artifact)
@@ -951,6 +979,10 @@ func refusal(chunk protocolcli.SessionReportingChunk, code string) string {
 // last attempt.
 var errRetryBudget = errors.New("reporter retry budget exhausted")
 
+// errFrameUnsupported is a version 3 chunk the reporter refused with
+// frame_unsupported: its receiver stored nothing of it (ADR 0131).
+var errFrameUnsupported = errors.New("reporter receiver does not accept the frame size")
+
 // errAckMismatch is an acknowledgement of another chunk than the one sent.
 var errAckMismatch = errors.New("reporter acknowledgement identity mismatch")
 
@@ -959,6 +991,11 @@ var errAckMismatch = errors.New("reporter acknowledgement identity mismatch")
 // restarts it: its first failure in transport ends the attempts.
 func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 	retryable := false
+	// recut: the frame may be cut again on frame_unsupported. Only a frame
+	// this process cut, on its first attempt, may: an earlier attempt, here
+	// or in an interrupted process, may have reached a receiver that stored
+	// it, and a sequence the receiver holds keeps its bytes.
+	recut := r.pendingCutHere
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if r.ctx.Err() != nil {
 			return errBudgetExhausted
@@ -977,9 +1014,14 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 			if !ack.Matches(chunk) {
 				return errAckMismatch
 			}
+			r.observeCap(ack)
 			if ack.OK {
 				return nil
 			}
+			if recut && !ack.Retryable && ack.Code == protocolcli.SessionReportingCodeFrameUnsupported && chunk.ProtocolVersion == protocolcli.SessionReportingLargeFrameVersion {
+				return errFrameUnsupported
+			}
+			recut = false
 			if !ack.Retryable {
 				return &chunkFailure{refused: true, reason: refusal(chunk, ack.Code)}
 			}
@@ -987,7 +1029,7 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 		} else {
 			r.process.close()
 			r.process = nil
-			retryable = false
+			retryable, recut = false, false
 			if chunk.Artifact == specVerificationFile {
 				if r.ctx.Err() != nil {
 					return errBudgetExhausted
@@ -1014,6 +1056,29 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 		return errRetryBudget
 	}
 	return &chunkFailure{reason: errRetryBudget.Error()}
+}
+
+// observeCap takes the cap of a LargeFrames capability's acknowledgement as
+// the size of its next frame: chunkBytes, at most
+// protocolcli.SessionReportingMaxChunkBytes, or 64 KiB when it names none.
+// Another capability keeps 64 KiB.
+func (r *Run) observeCap(ack *protocolcli.SessionReportingAck) {
+	if !r.capability.LargeFrames {
+		return
+	}
+	r.chunkBytes = protocolcli.SessionReportingChunkBytes
+	if ack.ChunkBytes > protocolcli.SessionReportingChunkBytes {
+		r.chunkBytes = min(ack.ChunkBytes, protocolcli.SessionReportingMaxChunkBytes)
+	}
+}
+
+// frameBytes is the size the next frame is cut at: chunkBytes, or 64 KiB
+// before any acknowledgement set it.
+func (r *Run) frameBytes() int {
+	if r.chunkBytes <= 0 {
+		return protocolcli.SessionReportingChunkBytes
+	}
+	return r.chunkBytes
 }
 
 // start starts the provider process. Without a run credential, or for a
@@ -1125,8 +1190,9 @@ func readBounded(path string, limit int64) ([]byte, error) {
 }
 
 func validateFinalizedSession(dir, sessionID string) error {
-	// This is a validation bound, not a transport allocation: every transmitted
-	// frame remains 64 KiB and the artifact itself remains the sole source.
+	// This is a validation bound, not a transport allocation: a transmitted
+	// frame stays within its cap and the artifact itself remains the sole
+	// source.
 	data, err := readBounded(filepath.Join(dir, "session.json"), 16*1024*1024)
 	if err != nil {
 		return fmt.Errorf("session has no readable finalized record")
