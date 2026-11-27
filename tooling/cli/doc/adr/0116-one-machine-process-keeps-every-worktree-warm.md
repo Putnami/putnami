@@ -584,7 +584,16 @@ discovered extensions, the selected projects, the final plan, and the flags,
 parameters and versions they resolved) when it asks the same (workspace,
 configuration, commands, parameters, flags, hooks and version snapshot) and
 nothing the decision witnessed moved since it was taken: a first-use bootstrap
-or a before-hook runs in between. It opens no file index, input record or
+or a before-hook runs in between. Its discovery read the manifests the held
+dispatch witnesses and those of the extensions it skipped, whether or not
+App.Run took the dispatch, so what it holds carries the stat of each
+extension manifest and root its discovery read, taken as it read them. The
+decision refuses a request once one of those or of the held dispatch moved;
+one that moved after the decision withdraws everything the held run offers
+the run. A run that discovered a local-source extension outside the
+workspace's own path extensions whose runtime is prepared from its inputs is
+not held: that runtime's digest reads inputs no witness covers. It opens no
+file index, input record or
 release record, which it reads nothing through and so saves nothing to,
 leaving them as a run in its own process finds them, and runs no workspace
 load, runtime synchronization, probe, selection or plan; it prints what those

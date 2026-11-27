@@ -335,6 +335,83 @@ func TestAHeldDispatchIsOfferedOnlyBeforeTheRunComputedAnything(t *testing.T) {
 	}
 }
 
+// heldRecord is a record the worker holds that carries witnesses of its own,
+// as the engine's record of an engine run does.
+type heldRecord struct {
+	witnesses map[string]string
+}
+
+func (r heldRecord) Witnesses() map[string]string { return r.witnesses }
+
+// TestAHeldRunIsRefusedOnceAnExtensionItsDiscoveryReadMoved pins the
+// witnesses a held record carries of its own (CLI ADR 0116 §6a): the stats of
+// the extension manifests and roots the held run's discovery read, which no
+// journal sees outside the worktree or in its .putnami. A request is not
+// answerable once one moved, and a run decided answerable is offered nothing
+// of the held engine run once one moved after the decision: every offer of
+// the run is withdrawn, and the decision says why.
+func TestAHeldRunIsRefusedOnceAnExtensionItsDiscoveryReadMoved(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	w, root := watchedTree(t, 0)
+	write(t, filepath.Join(root, "putnami.workspace.json"), "{}")
+	outside := t.TempDir()
+	manifest := filepath.Join(outside, "putnami.extension.json")
+	write(t, manifest, `{"name":"@test/outside"}`)
+	record := heldRecord{witnesses: map[string]string{
+		outside: Witness(outside), manifest: Witness(manifest),
+	}}
+	m := RunMemory{}
+	offer := func() runMemory {
+		return runMemory{
+			check:           &memoryCheck{},
+			offered:         []any{"answered plan"},
+			offeredRuns:     []heldEngineRun{{record: record, plan: 0}},
+			offeredDispatch: "dispatch",
+		}
+	}
+	armMemory(t, w, root, offer())
+	if offered := m.PeekRun(root); offered == nil {
+		t.Fatal("an engine run whose extensions hold was offered nothing")
+	}
+
+	req := request{Dir: root, Args: []string{"build"}}
+	syncPoint(t, w, root)
+	held := &heldRun{
+		request: requestDigest(req), seq: w.Since(root, ^uint64(0)).Seq, witness: outsideWitness(root),
+		runs: []heldEngineRun{{record: record, plan: 0}},
+	}
+	memory.Lock()
+	memory.watched[root] = true
+	memory.held[root] = held
+	memory.Unlock()
+	t.Cleanup(func() {
+		memory.Lock()
+		delete(memory.watched, root)
+		delete(memory.held, root)
+		memory.Unlock()
+	})
+	if _, d := beforeRun(req); !d.Answerable {
+		t.Fatalf("decided %+v, want answerable while the extension holds", d)
+	}
+
+	write(t, manifest, `{"name":"@test/outside","version":"2.0.0"}`)
+	want := "a file the held run's discovery read moved: " + manifest
+	if _, d := beforeRun(req); d.Answerable || d.Reason != want {
+		t.Errorf("decided %+v, want refused: %s", d, want)
+	}
+
+	armMemory(t, w, root, offer())
+	if m.TakeRun(root) != nil || m.Take(root) != nil || TakeDispatch(root) != nil {
+		t.Error("a manifest that moved after the decision left something offered")
+	}
+	memory.Lock()
+	refused := memory.run.refused
+	memory.Unlock()
+	if refused != want {
+		t.Errorf("recorded %q, want %q", refused, want)
+	}
+}
+
 // TestTheWitnessTakesThePutnamiHomesConfiguration pins that the decision
 // witnesses the global configuration every load of the workspace's
 // configuration merges, which a held dispatch skips reading.

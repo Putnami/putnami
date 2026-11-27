@@ -246,8 +246,16 @@ func (RunMemory) Reused(root, step string, held bool) {
 	}
 }
 
+// Witness is the stat of path as the decision's witnesses hold it: an engine
+// run that may be held takes it of each extension manifest and root its
+// discovery read (engine.HeldRuns).
+func (RunMemory) Witness(path string) string { return statWitness(path) }
+
 // offerRun is TakeRun, which takes the engine run's position when take is set,
-// and PeekRun, which does not.
+// and PeekRun, which does not. What the held engine run computed is offered
+// only while every file its discovery read holds the stat it was read with
+// (movedRecord); one that moved withdraws everything the held run offers the
+// run, as a moved manifest of the held dispatch does.
 func offerRun(root string, take bool) any {
 	memory.Lock()
 	r := &memory.run
@@ -270,7 +278,54 @@ func offerRun(root string, take bool) any {
 	if !stillHolds(w, check) {
 		return nil
 	}
+	if moved := movedRecord(offered); moved != "" {
+		withdraw(root, "a file the held run's discovery read moved: "+moved)
+		return nil
+	}
 	return offered
+}
+
+// witnessed is a record the worker holds that carries witnesses of its own:
+// the stats of the files it read that the worktree's journal does not see and
+// the decision's witnesses do not cover, taken as it read them (Witness). The
+// engine's record of an engine run carries those of the extension manifests
+// and roots its discovery read, and App.Run's held dispatch those of the
+// manifests its discovery read.
+type witnessed interface{ Witnesses() map[string]string }
+
+// movedRecord names the first file record read whose stat moved since, in
+// path order, or "".
+func movedRecord(record any) string {
+	w, ok := record.(witnessed)
+	if !ok {
+		return ""
+	}
+	held := w.Witnesses()
+	paths := make([]string, 0, len(held))
+	for path := range held {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		if statWitness(path) != held[path] {
+			return path
+		}
+	}
+	return ""
+}
+
+// heldMoved names the first file a record of held read whose stat moved
+// since, or "": its dispatch's, then its engine runs' in order.
+func heldMoved(held *heldRun) string {
+	if moved := movedRecord(held.dispatch); moved != "" {
+		return moved
+	}
+	for _, run := range held.runs {
+		if moved := movedRecord(run.record); moved != "" {
+			return moved
+		}
+	}
+	return ""
 }
 
 // stillHolds checks again, at a sync point, what the decision witnessed: no
@@ -319,7 +374,11 @@ func KeepDispatch(root string, record any, held bool) {
 // App.Run found that a file it read to dispatch, which no witness of the
 // decision covers, moved since the held run read it. Every engine run and
 // plan of the run computes, and the decision records why.
-func DispatchMoved(root, reason string) {
+func DispatchMoved(root, reason string) { withdraw(root, reason) }
+
+// withdraw withdraws everything the held run offers the run in root, which
+// then computes every engine run and plan, and records why.
+func withdraw(root, reason string) {
 	memory.Lock()
 	defer memory.Unlock()
 	r := &memory.run
@@ -417,6 +476,8 @@ func beforeRun(req request) (*memoryCheck, MemoryDecision) {
 			decision.Reason = "the worktree changed: " + changed
 		} else if moved := movedWitness(held.witness, check.witness); moved != "" {
 			decision.Reason = "a witness outside the worktree moved: " + moved
+		} else if moved := heldMoved(held); moved != "" {
+			decision.Reason = "a file the held run's discovery read moved: " + moved
 		} else {
 			decision.Answerable = true
 		}

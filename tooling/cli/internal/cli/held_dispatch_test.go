@@ -39,6 +39,10 @@ func TestADispatchIsHeldWithTheWitnessesOfTheManifestsItRead(t *testing.T) {
 	if len(loaded.manifests) != 1 || loaded.manifests[manifest] == "" {
 		t.Fatalf("witnessed %v, want the one manifest discovery read", loaded.manifests)
 	}
+	// The worker's decision checks the same witnesses.
+	if got := loaded.Witnesses(); len(got) != 1 || got[manifest] != loaded.manifests[manifest] {
+		t.Fatalf("the worker reads the witnesses %v, want the manifests' %v", got, loaded.manifests)
+	}
 	if moved := loaded.movedManifest(); moved != "" {
 		t.Fatalf("nothing changed: moved %q", moved)
 	}

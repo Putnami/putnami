@@ -50,6 +50,7 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 		iox.Fprintf(os.Stderr, "putnami: discover extensions: %v\n", err)
 		return nil, nil, ExitError
 	}
+	req.witnessDiscovery(discovered)
 	// Resolve placement before runtime preparation, selection, or snapshot
 	// capture. Absence follows this same local lifecycle exactly once. The
 	// EXECUTING side of a portable request never resolves placement: it is the

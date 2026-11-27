@@ -57,6 +57,9 @@ func (RunMemory) Refused(string, string) {}
 // TakeRun offers nothing.
 func (RunMemory) TakeRun(string) any { return nil }
 
+// Witness witnesses nothing.
+func (RunMemory) Witness(string) string { return "" }
+
 // KeepRun holds nothing.
 func (RunMemory) KeepRun(string, any, bool) {}
 

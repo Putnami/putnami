@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"sync"
@@ -12,6 +13,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	doctor "go.putnami.dev/protocol/doctor"
+	extensionproto "go.putnami.dev/protocol/extension"
 	features "go.putnami.dev/protocol/features"
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -60,6 +62,10 @@ type HeldRuns interface {
 	// what the held run computed (held) or computed it: "versions", the
 	// version snapshot, and "finalizers", what the finalizers did.
 	Reused(root, step string, held bool)
+	// Witness is the stat of path as the worker's witnesses hold it. A run
+	// that may be held takes it of each extension manifest and root its
+	// discovery read, as it read them.
+	Witness(path string) string
 }
 
 // versionSnapshot is the version snapshot Engine.Run would read from Git now.
@@ -129,6 +135,11 @@ type heldRun struct {
 	// captured says Engine.Run read the snapshot itself rather than take the
 	// adapter's: only such a snapshot is reused in place of reading Git.
 	captured bool
+	// witnesses are the stats of each extension manifest and root the run's
+	// discovery read, taken as it read them (witnessDiscovery). No journal
+	// sees one outside the worktree, nor a link in its .putnami to a stored
+	// one: the worker offers nothing of the held run once one moved.
+	witnesses map[string]string
 
 	run             *plannedRun
 	resolved        GlobalFlags
@@ -196,6 +207,55 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	}
 	memory.KeepRun(root, record, false)
 	return result, err
+}
+
+// Witnesses are the stats of the extension manifests and roots the run's
+// discovery read, which the worker checks before it offers the held run.
+func (h *heldRun) Witnesses() map[string]string { return h.witnesses }
+
+// witnessDiscovery takes into the hold of a run that may be held the stat of
+// each extension manifest and root discovered read, and of each skipped
+// extension's (HeldRuns.Witness), keeping the first stat of a path. A run
+// that discovered a local-source extension outside the workspace's own path
+// extensions whose runtime is prepared from its inputs is not held: the
+// runtime's digest reads those inputs, which no witness covers (CLI ADR 0116
+// §6a).
+func (req *Request) witnessDiscovery(discovered *extension.DiscoveryResult) {
+	heldRuns.Lock()
+	memory := heldRuns.memory
+	heldRuns.Unlock()
+	h := req.hold
+	if memory == nil || h == nil || h.complete || discovered == nil {
+		return
+	}
+	roots := make([]string, 0, len(discovered.Extensions)+len(discovered.Skipped))
+	for _, ext := range discovered.Extensions {
+		if ext == nil {
+			continue
+		}
+		if ext.LocalSource && ext.Runtime != nil && ext.Runtime.Prepare != nil &&
+			!extension.WorkspacePathExtension(req.WorkspaceRoot, ext) {
+			req.hold = nil
+			return
+		}
+		roots = append(roots, ext.Path)
+	}
+	for _, skipped := range discovered.Skipped {
+		roots = append(roots, skipped.Path)
+	}
+	if h.witnesses == nil {
+		h.witnesses = map[string]string{}
+	}
+	for _, root := range roots {
+		if root == "" {
+			continue
+		}
+		for _, path := range []string{filepath.Join(root, extensionproto.ManifestFilename), root} {
+			if _, ok := h.witnesses[path]; !ok {
+				h.witnesses[path] = memory.Witness(path)
+			}
+		}
+	}
 }
 
 // heldFinalizers is what the finalizers of a held run did: in a run that may

@@ -64,6 +64,11 @@ func takeHeldDispatch(wsRoot string, args []string) *heldDispatch {
 	return held
 }
 
+// Witnesses are the stats of the extension manifests discovery read: the
+// worker's decision checks them before it offers anything of the held run,
+// whether or not this App.Run takes the dispatch.
+func (h *heldDispatch) Witnesses() map[string]string { return h.manifests }
+
 // movedManifest names the first extension manifest whose witness moved since
 // discovery read it, or "".
 func (h *heldDispatch) movedManifest() string {

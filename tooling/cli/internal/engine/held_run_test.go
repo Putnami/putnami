@@ -13,6 +13,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	features "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -56,6 +57,10 @@ func (f *fakeHeldRuns) Reused(_, step string, held bool) {
 func (f *fakeHeldRuns) KeepRun(_ string, record any, skipped bool) {
 	f.keeps++
 	f.record, f.skipped = record, skipped
+}
+
+func (f *fakeHeldRuns) Witness(path string) string {
+	return "stat of " + path
 }
 
 // serveHeldRuns installs memory as the worker's for the test, which therefore
@@ -178,6 +183,56 @@ func TestAWorkerAnswersARunFromWhatTheHeldRunLoadedAndPlanned(t *testing.T) {
 		if len(result.Plan) == 1 && result.Plan[0] == held.run.planned[0] {
 			t.Errorf("%s: answered from the held plan", name)
 		}
+	}
+}
+
+// TestAHeldRunWitnessesTheExtensionsItsDiscoveryRead pins what a run that
+// may be held takes of its discovery for the worker (CLI ADR 0116 §6a): the
+// stat of each extension manifest and root discovery read, and of each
+// skipped extension's, which the worker checks before it offers the held run.
+// A run that discovered a local-source extension outside the workspace's own
+// path extensions whose runtime is prepared from its inputs is not held.
+func TestAHeldRunWitnessesTheExtensionsItsDiscoveryRead(t *testing.T) {
+	root, req := heldRunFixture(t)
+	memory := &fakeHeldRuns{}
+	serveHeldRuns(t, memory)
+	var result SessionResult
+	var err error
+	stderr := captureStderr(t, func() { result, err = New().Run(context.Background(), req, discardEvents{}) })
+	if err != nil || result.ExitCode != ExitSuccess {
+		t.Fatalf("run: exit=%d err=%v\n%s", result.ExitCode, err, stderr)
+	}
+	held, ok := memory.record.(*heldRun)
+	if !ok {
+		t.Fatalf("the run kept %v, want its hold", memory.record)
+	}
+	ext := filepath.Join(root, "extension")
+	manifest := filepath.Join(ext, extensionproto.ManifestFilename)
+	want := map[string]string{ext: memory.Witness(ext), manifest: memory.Witness(manifest)}
+	if got := held.Witnesses(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("the hold witnesses %v, want the discovered extension's manifest and root %v", got, want)
+	}
+
+	outside := t.TempDir()
+	prepared := &extension.ExtensionDescription{
+		Name: "@test/outside", Path: outside, LocalSource: true,
+		Runtime: &extensionproto.RuntimeDefinition{Executable: "bin/runtime", Prepare: &extensionproto.RuntimePrepare{Command: "make"}},
+	}
+	asked := &Request{WorkspaceRoot: root, hold: &heldRun{}}
+	asked.witnessDiscovery(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{prepared}})
+	if asked.hold != nil {
+		t.Fatal("a run that discovered a runtime prepared from sources outside the workspace kept its hold")
+	}
+	own := *prepared
+	own.Path, own.RelPath = ext, "extension"
+	asked = &Request{WorkspaceRoot: root, hold: &heldRun{}}
+	asked.witnessDiscovery(&extension.DiscoveryResult{
+		Extensions: []*extension.ExtensionDescription{&own},
+		Skipped:    []extension.SkippedExtension{{Path: outside}},
+	})
+	skipped := filepath.Join(outside, extensionproto.ManifestFilename)
+	if asked.hold == nil || asked.hold.witnesses[manifest] != memory.Witness(manifest) || asked.hold.witnesses[skipped] != memory.Witness(skipped) {
+		t.Fatalf("a workspace path extension and a skipped one left the hold %+v, want both witnessed", asked.hold)
 	}
 }
 
