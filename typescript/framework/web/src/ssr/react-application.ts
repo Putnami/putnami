@@ -568,6 +568,14 @@ export class ReactApplication {
       }
     }
 
+    // The route that holds an index page answers its submissions too, as in
+    // the generated client: React Router picks the parent of an index child
+    // unless the URL carries `?index`, and a layout declares no action.
+    const { layout, remainingPath } = this.findNearestLayout(route);
+    if (remainingPath === '' && pageNode.action) {
+      layout.action = pageNode.action;
+    }
+
     return this;
   }
 

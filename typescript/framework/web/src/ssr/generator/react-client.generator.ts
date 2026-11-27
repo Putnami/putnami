@@ -88,6 +88,7 @@ export class ReactClientGenerator {
       node.isPage = undefined;
       pageRoute._relativeGenDir = previousRelatifGenDir;
       pageRoute.loader = `pageLoaderHandler()`;
+      // The layout keeps the page's action as its own (see addPage).
       pageRoute.action = node.action;
     }
     node.element = layoutFile;
@@ -150,6 +151,13 @@ export class ReactClientGenerator {
     }
     if (fileExists(joinPath(scannedDir, getDirectoryName(pageFile), 'action.ts'))) {
       pageRoute.action = joinPath(route, 'action.ts');
+      // React Router submits to an index child only when the URL carries an
+      // empty `index` query parameter; otherwise it picks the parent, which
+      // answers 405 without an action. A layout declares no action of its own,
+      // so a post to its address has one target: its index page's action.
+      if (isIndex) {
+        layout.action = pageRoute.action;
+      }
     }
   }
 

@@ -417,6 +417,82 @@ describe('ReactApplication', () => {
       },
     );
 
+    specTest(
+      'gives a layout its index page action, as the generated client does',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'route-graph',
+        check: 'a-post-to-a-layout-address-reaches-its-index-page-action',
+      },
+      () => {
+        type Node = { path?: string; index?: boolean; action?: unknown; children?: Node[] };
+        const layoutMock = { default: () => null };
+        const pageMock = { default: () => 'Page' };
+        const actionMock = { action: actionBuilder(() => ({ ok: true })) };
+        const cases = [
+          {
+            route: '/n',
+            httpRoute: '/n',
+            pageFirst: true,
+            at: (root: Node) => root.children?.find((c) => c.path === 'n'),
+          },
+          { route: '/', httpRoute: '/', pageFirst: true, at: (root: Node) => root },
+          {
+            route: '/r/:run',
+            httpRoute: '/r/[run]',
+            pageFirst: false,
+            at: (root: Node) => root.children?.[0]?.children?.find((c) => c.path === ':run'),
+          },
+        ];
+        // As in the client test, the page-first order is covered where it nests the page.
+        for (const { route, httpRoute, pageFirst, at } of cases) {
+          for (const layoutFirst of pageFirst ? [true, false] : [true]) {
+            const httpPlugin = { get: mock(), post: mock() };
+            const subject = new ReactApplication(undefined, httpPlugin as unknown as HttpPlugin);
+            const addLayout = () => subject.reactLayout(route, { layout: layoutMock });
+            const addPage = () => subject.reactPage(route, { page: pageMock, action: actionMock });
+            if (layoutFirst) {
+              addLayout();
+              addPage();
+            } else {
+              addPage();
+              addLayout();
+            }
+
+            const layoutNode = at((subject as unknown as { reactRouter: Node[] }).reactRouter[0] as Node);
+            const indexNode = layoutNode?.children?.find((c) => c.index === true);
+            expect(indexNode?.action).toBeFunction();
+            expect(layoutNode?.action).toBe(indexNode?.action);
+            // The HTTP route answers the post at the address, whatever its query.
+            expect(httpPlugin.post.mock.calls.map(([path]) => path)).toEqual([httpRoute]);
+          }
+        }
+      },
+    );
+
+    specTest(
+      'leaves a layout without an action when its index page has none',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'route-graph',
+        check: 'a-layout-without-an-index-page-action-answers-405',
+      },
+      () => {
+        type Node = { path?: string; action?: unknown; children?: Node[] };
+        const httpPlugin = { get: mock(), post: mock() };
+        const subject = new ReactApplication(undefined, httpPlugin as unknown as HttpPlugin);
+        subject.reactLayout('/n', { layout: { default: () => null } });
+        subject.reactPage('/n', { page: { default: () => 'Page' } });
+
+        // No POST route: the HTTP plugin answers a post to the address with 405.
+        expect(httpPlugin.post).not.toHaveBeenCalled();
+        const root = (subject as unknown as { reactRouter: Node[] }).reactRouter[0] as Node;
+        const layoutNode = root.children?.find((c) => c.path === 'n');
+        expect(layoutNode?.action).toBeUndefined();
+        expect(layoutNode?.children?.[0]?.action).toBeUndefined();
+      },
+    );
+
     it('registers layout loader JSON endpoint', () => {
       const httpPluginMock = {
         get: mock(),
