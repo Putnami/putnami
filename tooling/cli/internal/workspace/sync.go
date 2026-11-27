@@ -124,6 +124,9 @@ type SyncOutcome struct {
 // cannot be read must still be repairable.
 func Synchronize(req SyncRequest) (*SyncOutcome, error) {
 	outcome, err := synchronize(req)
+	if req.Workspace != nil {
+		SaveGlobWitnesses(req.Workspace.Root, req.Policy)
+	}
 	if err != nil || outcome == nil {
 		return outcome, err
 	}

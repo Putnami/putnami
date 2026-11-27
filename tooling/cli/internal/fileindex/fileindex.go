@@ -999,3 +999,10 @@ func StatAny(path string) (Stat, bool) {
 	}
 	return statFile(info)
 }
+
+// TrustsStats reports whether a stat answers for what lies below dir: dir is
+// on a listed local file system and this platform's stat is decoded (ADR 0009
+// §3 of protocols/workspace).
+func TrustsStats(dir string) bool {
+	return statDecoded && localFilesystem(dir)
+}
