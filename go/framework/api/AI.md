@@ -77,6 +77,18 @@ body-carrying status declares the same schema (nil on a bodyless status), or
 `Body<status>` per status otherwise (ADR 0008). Connect dispatch and a raw octet
 response are refused beside several success statuses.
 
+A redirect is declared with `Response(3xx, description, nil)` and answered with
+`http.Redirect(url, status)`. An endpoint that declares one and no `Returns` or
+`ReturnsStatus` publishes its declared successes with no synthesized 200. Its
+generated Go method returns `*<Method>Result` with `Status` and `Location`, the
+answered target: the client never follows it, and Connect dispatch is refused.
+An endpoint that also declares `Returns` gets the same result type, with `Body`
+on its 2xx (ADR 0008). A unary
+route that declares a redirect advertises no Connect transport; a stream
+publishes no 3xx. Beside a raw octet
+success, a declared redirect stays documentation: the client keeps the octet
+method. 304 Not Modified is not a redirect.
+
 `omitOperations` in a client's `generatedFrom` (the `--omit` flag of
 `putnami-client-generate-go`) leaves the named operations out of the Go client
 instead of failing it; the generated doc comment and the emitter output name

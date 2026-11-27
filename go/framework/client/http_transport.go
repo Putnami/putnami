@@ -155,7 +155,7 @@ func (t *HTTPTransport) Do(ctx context.Context, req *Request) (_ *Response, retE
 	}
 
 	httpClient := t.client
-	if req.BodyStream != nil {
+	if req.BodyStream != nil || req.KeepRedirect {
 		copy := *httpClient
 		copy.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 		httpClient = &copy

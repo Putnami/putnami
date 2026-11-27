@@ -48,6 +48,41 @@ type Operation struct {
 	Successes []OperationSuccess
 }
 
+// redirectStatus reports a 3xx status an operation declares as its answer
+// instead of a body. 304 Not Modified is a conditional read's answer, not a
+// redirect.
+func redirectStatus(status int) bool {
+	return status >= 300 && status <= 399 && status != http.StatusNotModified
+}
+
+// declaresRedirect reports an operation that declares a redirect success: its
+// calls keep the 3xx rather than follow it.
+func (operation Operation) declaresRedirect() bool {
+	for _, success := range operation.Successes {
+		if redirectStatus(success.Status) {
+			return true
+		}
+	}
+	return false
+}
+
+// answered reports a response that is the operation's success: any 2xx, or a
+// redirect status the operation declares. An undeclared 3xx stays a failure.
+func (operation Operation) answered(response *Response) bool {
+	if response.IsSuccess() {
+		return true
+	}
+	if !redirectStatus(response.StatusCode) {
+		return false
+	}
+	for _, success := range operation.Successes {
+		if success.Status == response.StatusCode {
+			return true
+		}
+	}
+	return false
+}
+
 // OperationRequest is the generated request-validation subset for an
 // operation. It is separate from the provider policy extension because its
 // schema comes from the standard OpenAPI requestBody declaration.
@@ -419,12 +454,13 @@ func (client *Client) doOperation(ctx context.Context, request *Request, operati
 		request = cloneRequest(request)
 		request.MaxPayloadBytes = declaredBinaryResponseBytes(operation)
 		request.MaxRequestBytes = declaredBinaryRequestBytes(operation)
+		request.KeepRedirect = request.KeepRedirect || operation.declaresRedirect()
 		response, callErr = client.Do(ctx, request)
 		if callErr != nil {
 			closeResponseStream(response)
 			return nil, callErr
 		}
-		if response != nil && !response.IsSuccess() {
+		if response != nil && !operation.answered(response) {
 			closeResponseStream(response)
 			var schemas map[string]clientcontract.Schema
 			if client.descriptor != nil {
@@ -498,6 +534,7 @@ func (client *Client) doOperation(ctx context.Context, request *Request, operati
 	baseRequest.MaxResponseBytes = policy.maxResponseBytes
 	baseRequest.MaxPayloadBytes = declaredBinaryResponseBytes(operation)
 	baseRequest.MaxRequestBytes = declaredBinaryRequestBytes(operation)
+	baseRequest.KeepRedirect = baseRequest.KeepRedirect || operation.declaresRedirect()
 	if baseRequest.Headers == nil {
 		baseRequest.Headers = make(http.Header)
 	}
@@ -576,7 +613,7 @@ func (client *Client) doOperation(ctx context.Context, request *Request, operati
 			telemetry.InjectServiceContext(attemptCtx, attemptRequest.Headers)
 		}
 		lastResponse, lastErr = client.transport.Do(attemptCtx, attemptRequest)
-		if lastErr == nil && lastResponse != nil && lastResponse.IsSuccess() {
+		if lastErr == nil && lastResponse != nil && operation.answered(lastResponse) {
 			lastErr = validateSuccessfulResponse(lastResponse, operation.Successes, runtime.descriptor.Schemas)
 		}
 		if lastErr == nil && lastResponse != nil && lastResponse.IsSuccess() && lastResponse.BodyStream != nil {
@@ -594,14 +631,14 @@ func (client *Client) doOperation(ctx context.Context, request *Request, operati
 				if streamErr != nil && !stderrors.Is(streamErr, io.EOF) && attemptCtx.Err() == nil {
 					streamErr = errors.New(CodeClientResponse, "service response stream failed")
 				}
-				status, code := serviceAttemptOutcome(attemptCtx, lastResponse, streamErr, operation.Contract.Errors)
+				status, code := serviceAttemptOutcome(attemptCtx, lastResponse, streamErr, operation)
 				finishAttempt(ServiceAttemptResult{StatusCode: status, Code: code, AuthDuration: authDuration})
 			}
 			if runtime.registry != nil {
 				body.registry = runtime.registry
 				if err := runtime.registry.trackBinaryStream(body); err != nil {
 					if finishAttempt != nil {
-						status, code := serviceAttemptOutcome(attemptCtx, lastResponse, err, operation.Contract.Errors)
+						status, code := serviceAttemptOutcome(attemptCtx, lastResponse, err, operation)
 						finishAttempt(ServiceAttemptResult{StatusCode: status, Code: code, AuthDuration: authDuration})
 					}
 					body.finish = nil
@@ -619,7 +656,7 @@ func (client *Client) doOperation(ctx context.Context, request *Request, operati
 			return lastResponse, nil
 		}
 		if finishAttempt != nil {
-			status, code := serviceAttemptOutcome(attemptCtx, lastResponse, lastErr, operation.Contract.Errors)
+			status, code := serviceAttemptOutcome(attemptCtx, lastResponse, lastErr, operation)
 			finishAttempt(ServiceAttemptResult{StatusCode: status, Code: code, AuthDuration: authDuration})
 		}
 		closeResponseStream(lastResponse)
@@ -661,7 +698,7 @@ func (client *Client) doOperation(ctx context.Context, request *Request, operati
 		breaker.OnFailure()
 		return nil, errors.New(CodeClientResponse, "service returned no response")
 	}
-	if !lastResponse.IsSuccess() {
+	if !operation.answered(lastResponse) {
 		if breaker.isFailureStatus(lastResponse.StatusCode) {
 			breaker.OnFailure()
 		} else {
@@ -827,6 +864,11 @@ func validateSuccessfulResponse(response *Response, successes []OperationSuccess
 		}
 		return nil
 	}
+	if content == nil && redirectStatus(response.StatusCode) {
+		// A redirect that declares no body answers with its Location; the short
+		// hypertext note a server may add beside it is not part of the answer.
+		return nil
+	}
 	if content == nil || content.Schema == nil {
 		return errors.New(CodeClientResponse, "service returned an unexpected response body")
 	}
@@ -851,7 +893,8 @@ func serviceCallResult(response *Response, err error, attempts int) ServiceCallR
 	return result
 }
 
-func serviceAttemptOutcome(ctx context.Context, response *Response, err error, declared []clientcontract.DeclaredError) (int, string) {
+func serviceAttemptOutcome(ctx context.Context, response *Response, err error, operation Operation) (int, string) {
+	declared := operation.Contract.Errors
 	if err != nil {
 		status := 0
 		if response != nil {
@@ -862,7 +905,7 @@ func serviceAttemptOutcome(ctx context.Context, response *Response, err error, d
 	if response == nil {
 		return 0, string(CodeClientResponse)
 	}
-	if response.IsSuccess() {
+	if operation.answered(response) {
 		return response.StatusCode, ""
 	}
 	code := remoteCode(response.Body)

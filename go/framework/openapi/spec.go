@@ -343,6 +343,12 @@ func (c connectProjection) transportsFor(route DiscoveredRoute) []clientcontract
 	if route.BodyBinary != nil || route.ReturnsBinary != nil {
 		return nil
 	}
+	// A Connect response answers every success with HTTP 200, so a declared
+	// redirect of a unary route would reach the caller as an error: the route
+	// stays on REST. A stream operation publishes no additional response.
+	if route.StreamMode == "" && declaresRedirect(route) {
+		return nil
+	}
 	if len(c.methods) == 0 || len(c.encodings) == 0 {
 		return nil
 	}
@@ -1651,6 +1657,10 @@ func buildResponses(g *schemaGen, route DiscoveredRoute, responses map[string]Re
 	}
 	primaryKey := strconv.Itoa(primaryStatus)
 	switch {
+	case redirectWithoutPrimary(route):
+		// The endpoint declares no primary success and answers a redirect: what
+		// it declares is its whole success, so no 200 is synthesized for a
+		// client to expect a body from.
 	case route.ReturnsBinary != nil:
 		responses[primaryKey] = Response{
 			Description: primaryDescription,
@@ -1686,6 +1696,28 @@ func buildResponses(g *schemaGen, route DiscoveredRoute, responses map[string]Re
 
 	addStandardErrorResponses(g, route, responses, firstParty)
 	addExplicitThrowResponses(g, route, responses)
+}
+
+// redirectWithoutPrimary reports an endpoint that declares no primary success
+// (no Returns, ReturnsStatus or binary payload) and at least one redirect
+// through api.Endpoint().Response: its declared answers are its successes,
+// with no synthesized 200 beside them.
+func redirectWithoutPrimary(route DiscoveredRoute) bool {
+	if route.ReturnsStatus != 0 || route.Returns != nil || route.ReturnsBinary != nil {
+		return false
+	}
+	return declaresRedirect(route)
+}
+
+// declaresRedirect reports an endpoint that declares a redirect (a 3xx other
+// than 304) through api.Endpoint().Response.
+func declaresRedirect(route DiscoveredRoute) bool {
+	for _, extra := range route.AdditionalReturns {
+		if api.IsRedirectStatus(extra.Status) {
+			return true
+		}
+	}
+	return false
 }
 
 func addStandardErrorResponses(g *schemaGen, route DiscoveredRoute, responses map[string]Response, firstParty bool) {

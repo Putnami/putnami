@@ -15,7 +15,8 @@
     "Emitting OpenAPI 3.1; the generator targets OpenAPI 3.0.3",
     "Maintaining a hand-edited specification alongside the generated one",
     "Providing a transport other than HTTP today, although the endpoint definition is transport-agnostic",
-    "Promising strict compatibility between every pre-1.0 minor release"
+    "Promising strict compatibility between every pre-1.0 minor release",
+    "A TypeScript client of a redirect operation: the TypeScript client runtime refuses every redirect, and its reader generates only operations that declare a 2xx success"
   ],
   "requirements": [
     {
@@ -117,6 +118,10 @@
     {
       "id": "multiple-success-statuses",
       "text": "An operation declaring several success statuses generates a Go method returning Status, the status the provider answered, and its declared body decoded under that status's schema: one Body when every body-carrying status shares a schema, else Body<status> per status, nil on a bodyless status. Connect dispatch and a raw octet response are refused. omitOperations leaves named operations out of the Go client instead of failing it, names each in the client, and fails on an unknown name."
+    },
+    {
+      "id": "redirect-success",
+      "text": "A redirect is a 3xx but 304 declared with Response. With no Returns or ReturnsStatus, the endpoint publishes its declared successes and no synthesized 200; a unary redirecting endpoint advertises no Connect transport. The Go client accepts a declared redirect as a success, never follows it, and returns Status and Location beside any declared body; Connect dispatch is refused. Beside a raw octet success, a redirect stays documentation."
     },
     {
       "id": "opaque-json",
