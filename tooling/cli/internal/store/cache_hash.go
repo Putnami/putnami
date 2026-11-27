@@ -715,7 +715,7 @@ func gitCandidateDigest(file fileEntry, buf []byte, statsExecBit bool) []byte {
 		return h.Sum(nil)
 	}
 	mode := string(sourcebinding.FileMode(file.info.Mode(), file.indexMode, statsExecBit))
-	return indexedDigest(file.path, "git-file\x00"+mode, func() []byte {
+	return indexedDigest(file.path, gitFileVariantPrefix+mode, func() []byte {
 		input, err := os.Open(file.path)
 		if err != nil {
 			return nil
@@ -1444,7 +1444,7 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 // cut the syscall count relative to io.Copy's default chunking.
 func fileContentDigest(path string, buf []byte, scope ProjectConfigScope) []byte {
 	if isVersionStamp(path) {
-		return indexedDigest(path, "version-stamp\x00tree", func() []byte {
+		return indexedDigest(path, versionStampTreeVariant, func() []byte {
 			return versionStampDigest(path, versionStampNonTreeFields)
 		})
 	}
@@ -1457,6 +1457,14 @@ func fileContentDigest(path string, buf []byte, scope ProjectConfigScope) []byte
 		return rawContentDigest(path, buf)
 	})
 }
+
+// versionStampTreeVariant is the fileindex variant of a build stamp's digest
+// without the fields that do not describe the tree.
+const versionStampTreeVariant = "version-stamp\x00tree"
+
+// gitFileVariantPrefix opens the fileindex variant of a Git candidate's
+// digest; the file mode Git records for it follows.
+const gitFileVariantPrefix = "git-file\x00"
 
 // rawContentVariant is the fileindex variant of a file's raw SHA-256, which
 // the workspace snapshot shares.

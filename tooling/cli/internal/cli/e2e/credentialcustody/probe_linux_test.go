@@ -3,6 +3,7 @@
 package credentialcustody
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 )
 
 // The Linux-only reach a repository process of the same user has into another
@@ -144,13 +146,17 @@ func probeProcFD(role string, pid int) finding {
 		return f
 	}
 	foundSet := map[string]bool{}
+	partials := 0
 	read := 0
 	for _, entry := range entries {
 		if read >= procBound {
 			break
 		}
 		data, err := readDescriptor(procPath(pid, "fd/"+entry.Name()), procBound-read)
-		if err != nil {
+		var partial *partialCopyError
+		if errors.As(err, &partial) {
+			partials++
+		} else if err != nil {
 			continue
 		}
 		read += len(data)
@@ -160,6 +166,13 @@ func probeProcFD(role string, pid int) finding {
 	}
 	f.Found = collectFound(foundSet)
 	f.Detail = fmt.Sprintf("fds=%d read=%d", len(entries), read)
+	// A partial copy left bytes unread where a credential could lie, so the
+	// probe did not check the descriptor: the run fails on "recorded no check"
+	// rather than pass on what the copy happened to hold.
+	if partials > 0 {
+		f.Checked = false
+		f.Detail += fmt.Sprintf(" partial=%d", partials)
+	}
 	return f
 }
 
@@ -265,7 +278,9 @@ func readDescriptor(path string, limit int) ([]byte, error) {
 // peekPipe returns a copy of at most limit bytes the pipe holds, taken with
 // tee(2) into a pipe of the probe's own, so every byte stays in the pipe for
 // its reader. It waits descriptorReadWait at most for a pipe that holds
-// nothing yet, and returns io.EOF for an empty pipe no writer holds.
+// nothing yet, and returns io.EOF for an empty pipe no writer holds. A copy
+// smaller than what the pipe held within limit returns the bytes it copied
+// with a *partialCopyError.
 func peekPipe(pipe *os.File, limit int) ([]byte, error) {
 	source, err := rawFD(pipe)
 	if err != nil {
@@ -281,18 +296,21 @@ func peekPipe(pipe *os.File, limit int) ([]byte, error) {
 		_ = copyWriter.Close()
 		return nil, err
 	}
-	// tee copies no more than its target holds: the copy gets the source's
-	// capacity, so it can take everything the source holds.
-	if size, _, errno := syscall.Syscall(syscall.SYS_FCNTL, uintptr(source), fGetPipeSize, 0); errno == 0 {
-		_, _, _ = syscall.Syscall(syscall.SYS_FCNTL, uintptr(sink), fSetPipeSize, size)
-	}
+	growCopy(source, sink)
 	deadline := time.Now().Add(descriptorReadWait)
 	for {
+		held := pipeHeld(source)
 		n, err := syscall.Tee(source, sink, limit, spliceNonblock)
 		switch {
 		case n > 0:
 			_ = copyWriter.Close()
-			return io.ReadAll(io.LimitReader(copyReader, int64(limit)))
+			data, err := io.ReadAll(io.LimitReader(copyReader, int64(limit)))
+			// The pipe's reader can take bytes between the two reads of
+			// its size; the smaller one is what it surely held for tee.
+			if want := min(held, pipeHeld(source), limit); err == nil && int(n) < want {
+				return data, &partialCopyError{copied: int(n), held: want}
+			}
+			return data, err
 		case err == nil:
 			_ = copyWriter.Close()
 			return nil, io.EOF
@@ -302,6 +320,38 @@ func peekPipe(pipe *os.File, limit int) ([]byte, error) {
 		}
 		time.Sleep(descriptorPollInterval)
 	}
+}
+
+// growCopy gives the copy pipe sink the capacity of source: tee copies no more
+// than its target holds, so the copy can then take everything the source
+// holds. When the copy cannot grow (a user over fs.pipe-user-pages-soft, or a
+// source over fs.pipe-max-size), peekPipe reports the copy as partial. Tests
+// replace it to keep the copy at its default capacity.
+var growCopy = func(source, sink int) {
+	if size, _, errno := syscall.Syscall(syscall.SYS_FCNTL, uintptr(source), fGetPipeSize, 0); errno == 0 {
+		_, _, _ = syscall.Syscall(syscall.SYS_FCNTL, uintptr(sink), fSetPipeSize, size)
+	}
+}
+
+// pipeHeld is how many bytes the pipe fd holds (FIONREAD), or 0 when the
+// kernel does not say.
+func pipeHeld(fd int) int {
+	var held int32
+	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TIOCINQ, uintptr(unsafe.Pointer(&held))); errno != 0 {
+		return 0
+	}
+	return int(held)
+}
+
+// partialCopyError says that peekPipe copied fewer bytes than the pipe held
+// within its limit: the bytes past the copy, where a credential could lie,
+// were not read. peekPipe returns it with the bytes it copied.
+type partialCopyError struct {
+	copied, held int
+}
+
+func (e *partialCopyError) Error() string {
+	return fmt.Sprintf("copied %d of the %d bytes the pipe holds", e.copied, e.held)
 }
 
 // rawFD is file's descriptor, left in the mode it was opened in (os.File.Fd

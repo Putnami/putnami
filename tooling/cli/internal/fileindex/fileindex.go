@@ -254,10 +254,12 @@ func (idx *Index) confirmedAging(confirmed map[key]bool) bool {
 // that file's path and stat. It is read once when the process starts: a binary
 // replaced at its path later does not lend the process its identity. On Linux
 // the file is /proc/self/exe, the inode the process runs even once it is
-// deleted. Two builds that differ in code have different Go build IDs, so
-// they never share an index. A process whose executable cannot be read, or
-// carries no usable build ID (none, an empty one, or one a build redacted),
-// has the identity "", under which the index answers and records nothing.
+// deleted. Two builds that cmd/go made from different inputs have different
+// Go build IDs, so they never share an index, provided each build ID lies
+// within the head of the file that is searched (identityHead). A process whose
+// executable cannot be read, or carries no usable build ID in that head (none,
+// an empty one, or one a build redacted), has the identity "", under which the
+// index answers and records nothing.
 func ExecutableIdentity() string { return executableIdentity }
 
 // ReadingScheme versions how the callers of this package read files under a
@@ -332,10 +334,12 @@ var elfBuildIDNote = []byte("Go\x00\x00")
 
 // buildID is the Go build ID written in head, read from its ELF note or, with
 // none, after its text marker. It is "" when head carries none, an empty one,
-// or one that is not the action and content IDs a build writes, as a build
-// that redacted it (`-buildid=`, `-buildid=redacted`) leaves. The identity
-// relies on the build ID cmd/go assigns from the build's inputs: one set by
-// hand with -ldflags=-buildid lies outside it.
+// one without the `/` that separates the IDs a build writes, or one that
+// contains `redacted`: the checks catch a build that redacted it
+// (`-buildid=`, `-buildid=redacted`), not every ID that is not the action and
+// content IDs cmd/go writes. The identity relies on the build ID cmd/go
+// assigns from the build's inputs: one set by hand with -ldflags=-buildid
+// lies outside it.
 func buildID(head []byte) string {
 	id := elfBuildID(head)
 	if id == "" {
