@@ -169,7 +169,8 @@
       "run": [
         {
           "id": "rush-graph-check",
-          "task": "rush-graph-check-exec"
+          "task": "rush-graph-check-exec",
+          "activation": { "files": ["rush.json"] }
         }
       ]
     },

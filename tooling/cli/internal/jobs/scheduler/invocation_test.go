@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -1104,6 +1105,91 @@ func TestInvocation_PrunedRelationStillServesTheConsumersCachedResult(t *testing
 	}
 	if _, err := os.Stat(fixture.consumed); !os.IsNotExist(err) {
 		t.Error("the consumer executed instead of being served its entry")
+	}
+}
+
+// TestInvocation_PrunedConsumerWhoseEntryCannotBeServedNeverExecutes holds the
+// other side of that contract: a relation pruned on a consumer's entry that
+// then cannot be served leaves the consumer with no resource, so the consumer
+// fails with a typed error instead of executing without it.
+func TestInvocation_PrunedConsumerWhoseEntryCannotBeServedNeverExecutes(t *testing.T) {
+	t.Parallel()
+	fixture := newInvocationFixture(t, provisionBody, consumeBody)
+	fixture.consumer.Step.Task = "consume-cached"
+	fixture.consumer.JobDef.Cache = true
+	fixture.consumer.Extension.Tasks["consume-cached"] = extension.TaskDefinition{
+		Kind:    "command",
+		Command: fixture.consumer.JobDef.Command,
+		Declares: &extensionproto.TaskDeclaration{
+			Outputs: map[string]extensionproto.DeclaredOutput{
+				"report": {Kind: extensionproto.OutputKindFile, Path: "report.txt"},
+			},
+		},
+	}
+
+	storeRoot := t.TempDir()
+	cache := store.NewCacheManager(store.NewLocalStore(storeRoot))
+	planner.ResolveInvocationRelations(fixture.planned)
+	keys, err := cachekey.PrecomputeKeys(fixture.ws, fixture.planned, nil, nil, cache, cachekey.CacheBypass{})
+	if err != nil {
+		t.Fatalf("PrecomputeKeys: %v", err)
+	}
+	hash := keys[fixture.consumer.Key()]
+	if hash == "" {
+		t.Fatal("the consumer must be cacheable for this case to mean anything")
+	}
+
+	// Publish the entry a previous run would have left: a green verdict AND the
+	// declared output's bytes.
+	const restored = "coverage: 100%\n"
+	staging := t.TempDir()
+	spec := store.DeclaredEntryOutput{ID: "report", Kind: extensionproto.OutputKindFile, Path: "report.txt"}
+	stagedAt := store.TaskStagingPath(staging, spec)
+	if err := os.MkdirAll(filepath.Dir(stagedAt), 0o755); err != nil {
+		t.Fatalf("stage report: %v", err)
+	}
+	if err := os.WriteFile(stagedAt, []byte(restored), 0o644); err != nil {
+		t.Fatalf("write staged report: %v", err)
+	}
+	if _, err := cache.IngestTaskEntry(staging, store.TaskEntrySpec{
+		Key:      hash,
+		Result:   &store.EntryResult{Status: "success"},
+		Metadata: &store.EntryMetadata{Extension: "@acme/provider", Task: "test~run", Project: "proj"},
+		Outputs:  []store.DeclaredEntryOutput{spec},
+	}); err != nil {
+		t.Fatalf("publish consumer entry: %v", err)
+	}
+
+	// The entry cannot be restored: the bytes of its declared output are gone
+	// from the store, while the entry itself is still found.
+	removed := 0
+	if err := filepath.WalkDir(storeRoot, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		if data, readErr := os.ReadFile(path); readErr == nil && string(data) == restored {
+			removed++
+			return os.Remove(path)
+		}
+		return nil
+	}); err != nil || removed == 0 {
+		t.Fatalf("remove the stored output bytes: removed %d, %v", removed, err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	result := fixture.run(t, ctx, SchedulerConfig{MaxParallel: 2}, cache)
+
+	if got := result.Results[fixture.producer.Key()]; got == nil || got.Status != "skipped" {
+		t.Fatalf("producer result = %+v, want skipped by an all-hit frontier", got)
+	}
+	failed := result.Results[fixture.consumer.Key()]
+	if failed == nil || failed.Status != string(TaskStatusFailed) || failed.Error == nil ||
+		failed.Error.Code != extensionproto.FailureSensitiveSetupFailed {
+		t.Fatalf("consumer result = %+v, want a typed setup failure", failed)
+	}
+	if _, err := os.Stat(fixture.consumed); !os.IsNotExist(err) {
+		t.Error("the consumer executed without the resource its relation never provisioned")
 	}
 }
 

@@ -281,6 +281,15 @@ func (s *Scheduler) openTask(
 		cachedResult.TaskWall = time.Since(started)
 		return nil, jobDone{job: job, result: cachedResult}
 	}
+	if cause := s.invocations.unservedPrunedConsumer(job); cause != nil {
+		release()
+		s.renderer.JobStart(job)
+		return nil, jobDone{job: job, result: &JobResult{
+			Status:   string(TaskStatusFailed),
+			Error:    cause,
+			TaskWall: time.Since(started),
+		}}
+	}
 
 	// This task's own entry could not serve it. A plan-level shared node is the
 	// second place its work may already exist: another command scheduled the

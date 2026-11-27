@@ -168,7 +168,8 @@
       "run": [
         {
           "id": "nx-graph-check",
-          "task": "nx-graph-check-exec"
+          "task": "nx-graph-check-exec",
+          "activation": { "files": ["nx.json", "graph.json"] }
         }
       ]
     },

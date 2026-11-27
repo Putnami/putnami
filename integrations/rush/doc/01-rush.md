@@ -129,7 +129,8 @@ command waits for nothing.
 `putnami validate` fails with `rush.sync_stale` when a project's
 `putnami.json` no longer matches `rush.json` and the project manifests, such as
 after a dependency change that alters the edges. Run `putnami projects sync`
-and commit the result.
+and commit the result. A workspace with no `rush.json` at its root plans no such
+check: it holds no Rush graph to compare.
 
 ### Test reports
 

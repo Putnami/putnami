@@ -178,7 +178,8 @@ file imports the package, such as a shared `tsconfig` or ESLint configuration.
 Run the sync again after any change to the dependencies between packages, and
 commit the result. `putnami validate` compares each `putnami.json` with what
 the sync would write and fails with `turbo.sync_stale` when a sync would change
-one. Keep it in the CI gate.
+one. Keep it in the CI gate. A workspace with no `turbo.json` at its root plans
+no such check: it holds no Turborepo graph to compare.
 
 ## What each delegated task runs
 

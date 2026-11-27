@@ -267,6 +267,10 @@ var extensionCases = []extensionCase{
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:    true,
+		// The graph check is planned, since the root holds the tool's files,
+		// and uncached by verdict (uncachedByVerdict).
+		everyRun: []string{"counts:validate~bazel-graph-check"},
 	},
 	{
 		name:       "pants",
@@ -278,6 +282,10 @@ var extensionCases = []extensionCase{
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:    true,
+		// The graph check is planned, since the root holds the tool's files,
+		// and uncached by verdict (uncachedByVerdict).
+		everyRun: []string{"counts:validate~pants-graph-check"},
 	},
 	{
 		name:       "moon",
@@ -289,6 +297,10 @@ var extensionCases = []extensionCase{
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:    true,
+		// The graph check is planned, since the root holds the tool's files,
+		// and uncached by verdict (uncachedByVerdict).
+		everyRun: []string{"counts:validate~moon-graph-check"},
 	},
 	{
 		name:       "turbo",
@@ -300,6 +312,10 @@ var extensionCases = []extensionCase{
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:    true,
+		// The graph check is planned, since the root holds the tool's files,
+		// and uncached by verdict (uncachedByVerdict).
+		everyRun: []string{"counts:validate~turbo-graph-check"},
 	},
 	{
 		name:       "nx",
@@ -311,6 +327,10 @@ var extensionCases = []extensionCase{
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:    true,
+		// The graph check is planned, since the root holds the tool's files,
+		// and uncached by verdict (uncachedByVerdict).
+		everyRun: []string{"counts:validate~nx-graph-check"},
 	},
 	{
 		name:       "rush",
@@ -322,6 +342,29 @@ var extensionCases = []extensionCase{
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
 		cold:       "engine job 1 · git 15 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
 		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:    true,
+		// The graph check is planned, since the root holds the tool's files,
+		// and uncached by verdict (uncachedByVerdict).
+		everyRun: []string{"counts:validate~rush-graph-check"},
+	},
+	{
+		// The six delegated tools loaded in a workspace that holds none of
+		// their root files, where no tool's sync finds a graph: no graph check
+		// is planned, and the run, which has nothing to do, succeeds and starts
+		// nothing.
+		name: "delegated tools absent",
+		links: map[string]string{
+			".ext/bazel": "integrations/bazel", ".ext/pants": "integrations/pants", ".ext/nx": "integrations/nx",
+			".ext/moon": "integrations/moon", ".ext/turbo": "integrations/turbo", ".ext/rush": "integrations/rush",
+			".ext/dev": "tooling/dev",
+		},
+		toolchains: []string{"go"},
+		files:      delegatedToolsAbsentFiles,
+		setup:      [][]string{{"projects", "sync"}},
+		command:    []string{"validate", "--all", "--max-parallel", "1"},
+		cold:       "engine git 13 | engine git diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles:    true,
 	},
 }
 
