@@ -8,6 +8,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/machineproc"
 )
 
@@ -29,9 +30,10 @@ func TestADispatchIsHeldWithTheWitnessesOfTheManifestsItRead(t *testing.T) {
 	cfg := &wsproto.Config{Name: "held"}
 	extensions := []*extension.ExtensionDescription{{Name: "@test/outside", Path: outside}, nil, {Name: "@test/pathless"}}
 	args := []string{"lint,build", "--all"}
-	loaded := loadedDispatch("/ws", args, cfg, extensions, map[string]bool{"cloud": true})
+	index := fileindex.OpenReadOnly(filepath.Join(t.TempDir(), "file-index"), "")
+	loaded := loadedDispatch("/ws", args, index, cfg, extensions, map[string]bool{"cloud": true})
 	args[0] = "changed"
-	if loaded.root != "/ws" || loaded.args[0] != "lint,build" || loaded.cfg != cfg || len(loaded.extensions) != 3 || !loaded.groups["cloud"] {
+	if loaded.root != "/ws" || loaded.args[0] != "lint,build" || loaded.index != index || loaded.cfg != cfg || len(loaded.extensions) != 3 || !loaded.groups["cloud"] {
 		t.Fatalf("loaded %+v, want what App.Run loaded, with its own copy of the arguments", loaded)
 	}
 	if len(loaded.manifests) != 1 || loaded.manifests[manifest] == "" {

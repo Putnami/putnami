@@ -210,8 +210,16 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// through the workspace's file index, read-only: this process does not yet
 	// know whether its run may write. A file it reads rather than answers is
 	// recorded by the index of a run that records (engine, fileindex.Adopt).
-	if wsRoot != "" && held == nil {
-		restoreIndex := fileindex.Use(fileindex.OpenReadOnly(fileindex.Path(wsRoot), fileindex.ExecutableIdentity()))
+	// A held dispatch reuses the read-only index the held run opened, which
+	// answers a file only while its stat is the recorded one.
+	var index *fileindex.Index
+	if wsRoot != "" {
+		if held != nil && held.index != nil {
+			index = held.index
+		} else {
+			index = fileindex.OpenReadOnly(fileindex.Path(wsRoot), fileindex.ExecutableIdentity())
+		}
+		restoreIndex := fileindex.Use(index)
 		defer restoreIndex()
 		defer wsproto.UseConfigReader(fileindex.ReadFile)()
 	}
@@ -249,7 +257,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	}
 	loaded := held
 	if loaded == nil {
-		loaded = loadedDispatch(wsRoot, args, cfg, extensions, extensionGroups)
+		loaded = loadedDispatch(wsRoot, args, index, cfg, extensions, extensionGroups)
 	}
 
 	aliases, aliasWarnings := processAliases(cfg, providerMode, extensions)

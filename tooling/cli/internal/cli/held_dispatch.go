@@ -7,6 +7,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/machineproc"
 )
 
@@ -18,14 +19,20 @@ import (
 // through a read-only file index and discovers the workspace's extensions,
 // which loads the workspace. A run that may be held leaves what it loaded to
 // the worker, and the App.Run of a later run of the same request, decided
-// answerable, takes it instead of loading it: it opens no file index, loads
+// answerable, takes it instead of loading it: it reads no file index, loads
 // no configuration, materializes no lock-pinned artifact and discovers no
 // extension. A process that is no worker holds nothing.
+//
+// The read-only file index is held as it was opened, and stays installed for
+// the run as the one it would open: it records nothing, and answers a file's
+// digest only while the file's stat is the one it recorded, so an index read
+// earlier answers no less soundly than one read now; it may answer fewer.
 
 // heldDispatch is what App.Run loaded before it dispatched a job command.
 type heldDispatch struct {
 	root       string
 	args       []string
+	index      *fileindex.Index
 	cfg        *wsproto.Config
 	extensions []*extension.ExtensionDescription
 	groups     map[string]bool
@@ -70,7 +77,7 @@ func (h *heldDispatch) movedManifest() string {
 
 // loadedDispatch is what App.Run loaded for a run in wsRoot of args, with the
 // witnesses of the extension manifests discovery read, taken now.
-func loadedDispatch(wsRoot string, args []string, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, groups map[string]bool) *heldDispatch {
+func loadedDispatch(wsRoot string, args []string, index *fileindex.Index, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, groups map[string]bool) *heldDispatch {
 	manifests := make(map[string]string, len(extensions))
 	for _, ext := range extensions {
 		if ext != nil && ext.Path != "" {
@@ -78,5 +85,5 @@ func loadedDispatch(wsRoot string, args []string, cfg *wsproto.Config, extension
 			manifests[path] = machineproc.Witness(path)
 		}
 	}
-	return &heldDispatch{root: wsRoot, args: slices.Clone(args), cfg: cfg, extensions: extensions, groups: groups, manifests: manifests}
+	return &heldDispatch{root: wsRoot, args: slices.Clone(args), index: index, cfg: cfg, extensions: extensions, groups: groups, manifests: manifests}
 }
