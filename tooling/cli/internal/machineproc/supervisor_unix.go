@@ -73,13 +73,15 @@ type supervisor struct {
 	started  time.Time
 	listener *net.UnixListener
 
-	mu        sync.Mutex
-	workers   map[string]*worker
-	pids      map[int]bool // every worker process started and not yet reaped
-	lastUsed  time.Time
-	stopping  bool
-	stopped   chan struct{}
-	closeOnce sync.Once
+	mu      sync.Mutex
+	workers map[string]*worker
+	pids    map[int]bool // every worker process started and not yet reaped
+	// describeMu serializes the writes of supervisor.json.
+	describeMu sync.Mutex
+	lastUsed   time.Time
+	stopping   bool
+	stopped    chan struct{}
+	closeOnce  sync.Once
 }
 
 // Supervise runs the supervisor until it stops: idle, asked to, or replaced.
@@ -130,12 +132,20 @@ func Supervise() int {
 }
 
 func (s *supervisor) accept() {
+	wait := 5 * time.Millisecond
 	for {
 		c, err := s.listener.AcceptUnix()
 		if err != nil {
-			s.stop("listener closed")
-			return
+			if errors.Is(err, net.ErrClosed) {
+				s.stop("listener closed")
+				return
+			}
+			// A transient failure (too many open files): try again.
+			time.Sleep(wait)
+			wait = min(2*wait, time.Second)
+			continue
 		}
+		wait = 5 * time.Millisecond
 		go s.handle(c)
 	}
 }
@@ -243,6 +253,10 @@ func (s *supervisor) claim(req request) (*worker, string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.stopping {
+		_ = w.ctrl.c.Close()
+		return nil, CodeStopping
+	}
 	if other := s.workers[key]; other != nil {
 		// Another request started one meanwhile: keep that one.
 		_ = w.ctrl.c.Close()
@@ -272,7 +286,7 @@ func trustedExecutable(path string) bool {
 }
 
 func (s *supervisor) startWorker(key, build, exe string) (*worker, error) {
-	pair, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0)
+	pair, err := socketpair()
 	if err != nil {
 		return nil, err
 	}
@@ -318,11 +332,11 @@ func (s *supervisor) startWorker(key, build, exe string) (*worker, error) {
 	select {
 	case err := <-ready:
 		if err != nil {
-			s.forget(cmd)
+			s.forget(cmd, ctrl)
 			return nil, err
 		}
 	case <-time.After(readyTimeout):
-		s.forget(cmd)
+		s.forget(cmd, ctrl)
 		return nil, errors.New("worker not ready in time")
 	}
 	fmt.Fprintf(os.Stderr, "machine: worker %d started for build %s\n", cmd.Process.Pid, short(build))
@@ -481,7 +495,9 @@ func (s *supervisor) shutdown() {
 			_ = w.cmd.Process.Kill()
 		}
 	}
+	s.describeMu.Lock()
 	_ = os.Remove(filepath.Join(s.dir, descriptionName))
+	s.describeMu.Unlock()
 }
 
 func (s *supervisor) status() *Status {
@@ -505,6 +521,13 @@ func (s *supervisor) status() *Status {
 // describe writes supervisor.json, the description `putnami machine status`
 // falls back to.
 func (s *supervisor) describe() {
+	s.describeMu.Lock()
+	defer s.describeMu.Unlock()
+	select {
+	case <-s.stopped:
+		return // shutdown removes the description
+	default:
+	}
 	data, err := json.MarshalIndent(s.status(), "", "  ")
 	if err != nil {
 		return
@@ -533,7 +556,8 @@ func sameFile(path string, info os.FileInfo) bool {
 }
 
 // forget kills and reaps a worker that never became ready.
-func (s *supervisor) forget(cmd *exec.Cmd) {
+func (s *supervisor) forget(cmd *exec.Cmd, ctrl *conn) {
+	_ = ctrl.c.Close()
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
 	s.mu.Lock()

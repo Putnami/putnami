@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
 
@@ -25,6 +26,10 @@ const connectTimeout = 500 * time.Millisecond
 // lostRunExit is the exit code of a run the user interrupted and whose worker
 // then went away: an interrupted run's code.
 const lostRunExit = 130
+
+// maxLog is the size past which a starting supervisor keeps its log as
+// supervisor.log.1 and begins a new one.
+const maxLog = 4 << 20
 
 // startWanted records that this command looked for a supervisor and found
 // none: StartIfWanted then starts one when the command ends.
@@ -64,13 +69,17 @@ func Serve(ctx context.Context, args []string) (code int, served bool) {
 	if err != nil {
 		return 0, false
 	}
-	build := fileindex.BuildIdentity(exe)
+	build := fileindex.BuildIdentity(selfImage(exe))
 	if build == "" {
 		return 0, false
 	}
 	dir, err := Dir(os.Getenv, false)
 	if err != nil {
 		startWanted = true
+		return 0, false
+	}
+	if hasTerminal() {
+		recordLocal(dir, "the command has a terminal, which a worker cannot give its jobs")
 		return 0, false
 	}
 	c, err := dial(dir)
@@ -92,7 +101,7 @@ func Serve(ctx context.Context, args []string) (code int, served bool) {
 	}
 	req := request{
 		Protocol: ProtocolVersion, Op: "run", Build: build, Executable: exe,
-		Args: args, Env: env, Dir: wd, Umask: umask,
+		Args: args, Env: env, Dir: wd, Umask: umask, Fingerprint: processFingerprint(),
 	}
 	if err := c.send(req, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		recordLocal(dir, "the request could not be sent")
@@ -105,10 +114,17 @@ func Serve(ctx context.Context, args []string) (code int, served bool) {
 	return code, served
 }
 
-// await reads the worker's events until the run's exit, and forwards an
-// interrupt when ctx ends. A run the machine process refused, or whose worker
-// ended before its exit, is not served: the caller runs it itself, unless
-// the user interrupted it.
+// readyTimeout bounds the wait for the worker to take the request: a
+// supervisor that does not answer, or a worker slow to start, costs at most
+// this before the command runs in its own process.
+const clientReadyTimeout = 15 * time.Second
+
+// await reads the worker's events until the run's exit, and forwards a
+// signal when ctx ends. The run starts only once the client sent "go" after
+// the worker's Ready, so a client that stopped waiting runs the command
+// itself and the worker never does. A run the machine process refused, or
+// whose worker ended before its exit, is not served: the caller runs it
+// itself, unless the user interrupted it.
 func await(ctx context.Context, c *conn) (code int, served bool, reason string) {
 	events := make(chan event)
 	failed := make(chan error, 1)
@@ -122,11 +138,25 @@ func await(ctx context.Context, c *conn) (code int, served bool, reason string) 
 			events <- ev
 		}
 	}()
-	started, interrupted := false, false
+	ready := time.NewTimer(clientReadyTimeout)
+	defer ready.Stop()
+	readyC := ready.C
+	gone, started, interrupted := false, false, false
 	done := ctx.Done()
+	forward := func() {
+		if interrupted || !gone {
+			return
+		}
+		interrupted = true
+		kind := "terminate"
+		if abort.Source() == abort.SourceUser {
+			kind = "interrupt"
+		}
+		_ = c.send(signal{Signal: kind})
+	}
 	lost := func(why string) (int, bool, string) {
 		if interrupted {
-			return lostRunExit, true, ""
+			return lostRunExit, true, why
 		}
 		if started {
 			_, _ = os.Stderr.WriteString("putnami: the machine process ended during the run; running it again in this process\n")
@@ -135,28 +165,38 @@ func await(ctx context.Context, c *conn) (code int, served bool, reason string) 
 	}
 	for {
 		select {
+		case <-readyC:
+			return 0, false, "the machine process did not take the command in time"
 		case <-done:
 			done = nil
-			if started && !interrupted {
-				interrupted = true
-				_ = c.send(signal{Signal: "interrupt"})
+			if !gone {
+				return 0, false, "interrupted before the worker took the command"
 			}
+			forward()
 		case ev := <-events:
 			switch {
 			case ev.Refused != "":
 				return 0, false, "refused: " + ev.Refused
+			case ev.Ready && !gone:
+				readyC = nil
+				if err := c.send(signal{Signal: "go"}); err != nil {
+					return 0, false, "the go could not be sent"
+				}
+				gone = true
+				if ctx.Err() != nil {
+					forward()
+				}
 			case ev.Lost:
 				return lost("the worker ended during the run")
 			case ev.Exit != nil:
 				return *ev.Exit, true, ""
 			case ev.Started:
 				started = true
-				if ctx.Err() != nil && !interrupted {
-					interrupted = true
-					_ = c.send(signal{Signal: "interrupt"})
-				}
 			}
 		case <-failed:
+			if !gone {
+				return 0, false, "the connection closed before the worker took the command"
+			}
 			return lost("the connection closed before the run's exit")
 		}
 	}
@@ -251,7 +291,11 @@ func Start() error {
 	if err != nil {
 		return err
 	}
-	log, err := os.OpenFile(filepath.Join(dir, logName), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	logPath := filepath.Join(dir, logName)
+	if info, err := os.Stat(logPath); err == nil && info.Size() > maxLog {
+		_ = os.Rename(logPath, logPath+".1")
+	}
+	log, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}

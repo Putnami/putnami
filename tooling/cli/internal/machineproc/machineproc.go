@@ -20,10 +20,10 @@ const ProtocolVersion = 1
 // It overrides the user's setting (Setting).
 const Env = "PUTNAMI_MACHINE"
 
-// RunEnv marks a run that a worker serves. A CLI started by one of its jobs
-// sees it and runs in its own process: a nested run through the machine
-// process could wait on the run that started it.
-const RunEnv = "PUTNAMI_MACHINE_RUN"
+// inWorker is set in a worker: the commands it runs never go through the
+// machine process again. It is no environment variable, which an env-input
+// glob of a key could read (CLI ADR 0116 §8).
+var inWorker bool
 
 // jobEnv is set in the environment of every job a run starts
 // (scheduler.JobEnvironment): a CLI that sees it is a nested run.
@@ -35,6 +35,7 @@ const (
 	CodeIdentity = "machine.identity"
 	CodeBusy     = "machine.busy"
 	CodeStopping = "machine.stopping"
+	CodeContext  = "machine.context"
 )
 
 // request is what a client sends the supervisor, and the supervisor the
@@ -53,6 +54,9 @@ type request struct {
 	Env   []string `json:"env,omitempty"`
 	Dir   string   `json:"dir,omitempty"`
 	Umask int      `json:"umask,omitempty"`
+	// Fingerprint is processFingerprint of the client: a worker whose own
+	// differs refuses the run.
+	Fingerprint string `json:"fingerprint,omitempty"`
 }
 
 // Reply answers a request.
@@ -67,6 +71,10 @@ type Reply struct {
 
 // event is what a worker sends a client it serves.
 type event struct {
+	// Ready says the worker took the request and waits for the client's go:
+	// a client that waited too long runs the command itself and never sends
+	// it, so a command never runs twice.
+	Ready bool `json:"ready,omitempty"`
 	// Started says the run has begun.
 	Started bool `json:"started,omitempty"`
 	// Exit is the run's exit code, its last event.
@@ -78,7 +86,8 @@ type event struct {
 	Lost bool `json:"lost,omitempty"`
 }
 
-// signal is what a client sends the worker that serves it.
+// signal is what a client sends the worker that serves it: "go" once it
+// read Ready, then "interrupt" or "terminate" as it receives them.
 type signal struct {
 	Signal string `json:"signal"`
 }
@@ -131,9 +140,9 @@ func Decide(getenv func(string) string, setting string, defaultOn bool) Decision
 	switch {
 	case !supported():
 		return Decision{Reason: "platform"}
-	case getenv(RunEnv) != "" || getenv(jobEnv) != "":
+	case inWorker || getenv(jobEnv) != "":
 		return Decision{Reason: "nested"}
-	case truthy(getenv("CI")):
+	case inCI(getenv):
 		return Decision{Reason: "ci"}
 	}
 	switch strings.ToLower(strings.TrimSpace(getenv(Env))) {
@@ -152,6 +161,19 @@ func Decide(getenv func(string) string, setting string, defaultOn bool) Decision
 		return Decision{Reason: "default"}
 	}
 	return Decision{Use: true}
+}
+
+// CIVariables are set by CI services; those that set none of them set CI.
+var CIVariables = []string{"CI", "TF_BUILD", "JENKINS_URL", "BUILD_ID", "TEAMCITY_VERSION", "CODEBUILD_BUILD_ID", "BUILDKITE", "GITLAB_CI", "GITHUB_ACTIONS", "CIRCLECI", "BITBUCKET_BUILD_NUMBER"}
+
+// inCI reports whether the command runs in a CI service.
+func inCI(getenv func(string) string) bool {
+	for _, name := range CIVariables {
+		if truthy(getenv(name)) {
+			return true
+		}
+	}
+	return false
 }
 
 func truthy(v string) bool {

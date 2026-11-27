@@ -81,18 +81,20 @@ func latestTasks(t *testing.T, wsRoot string) []string {
 }
 
 // workerRuns is the number of runs the workers of the running supervisor
-// served.
-func workerRuns(t *testing.T) int {
+// served, once the last run's worker reported it, and the pids of the
+// workers.
+func workerRuns(t *testing.T) (int, []int) {
 	t.Helper()
 	r, err := machineproc.Query("status")
 	if err != nil {
 		t.Fatalf("machine status: %v", err)
 	}
-	runs := 0
+	runs, pids := 0, []int{}
 	for _, w := range r.Status.Workers {
 		runs += w.Runs
+		pids = append(pids, w.PID)
 	}
-	return runs
+	return runs, pids
 }
 
 func startSupervisor(t *testing.T) {
@@ -105,6 +107,18 @@ func startSupervisor(t *testing.T) {
 	t.Setenv("PUTNAMI_HOME", home)
 	t.Setenv("XDG_RUNTIME_DIR", "")
 	t.Setenv("TMPDIR", "")
+	// The test's CI does not turn the machine process off for the test, and
+	// a worker, which starts without the runtime's startup variables, serves
+	// a client that has none either.
+	for _, name := range machineproc.CIVariables {
+		t.Setenv(name, "")
+	}
+	for _, name := range []string{"GOMAXPROCS", "GOGC", "GOMEMLIMIT", "GODEBUG", "GOTRACEBACK", "TZ"} {
+		t.Setenv(name, "")
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatal(err)
+		}
+	}
 	// Registered after the Setenv calls, so it runs before they are undone
 	// and stops this test's supervisor, not the user's.
 	t.Cleanup(func() {
@@ -182,6 +196,7 @@ func TestARunThroughTheMachineProcessGivesTheSameKeysAndResults(t *testing.T) {
 		}},
 	}
 	args := []string{"lint,test,build", "--all"}
+	worker := 0
 	for _, round := range rounds {
 		round.write(t)
 		// A first run after a write can itself write files its keys read
@@ -192,13 +207,19 @@ func TestARunThroughTheMachineProcessGivesTheSameKeysAndResults(t *testing.T) {
 			t.Fatalf("%s: settling run exit %d\n%s", round.name, code, out)
 		}
 
-		before := workerRuns(t)
+		before, _ := workerRuns(t)
 		t.Setenv(machineproc.Env, "on")
 		onCode, onOut := clitest.RunGateArgs(t, root, args...)
 		on := latestTasks(t, root)
-		if served := workerRuns(t) - before; served != 1 {
-			t.Fatalf("%s: the worker served %d runs, want 1\n%s", round.name, served, onOut)
+		after, pids := workerRuns(t)
+		if served := after - before; served != 1 {
+			t.Fatalf("%s: the worker served %d runs, want 1 (last run in its own process: %+v)\n%s", round.name, served, machineproc.ReadLastLocal(), onOut)
 		}
+		// One warm worker serves every round.
+		if len(pids) != 1 || (worker != 0 && pids[0] != worker) {
+			t.Fatalf("%s: workers %v, want the one worker %d", round.name, pids, worker)
+		}
+		worker = pids[0]
 
 		t.Setenv(machineproc.Env, "off")
 		offCode, offOut := clitest.RunGateArgs(t, root, args...)

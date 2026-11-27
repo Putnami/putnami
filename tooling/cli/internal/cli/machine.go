@@ -3,7 +3,6 @@ package cli
 import (
 	"errors"
 	"os"
-	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
@@ -12,35 +11,29 @@ import (
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
-// servesThroughMachine reports whether args may run in a worker of the
-// machine process (CLI ADR 0116 §4): a command that runs the engine, not a
-// hosted run, not watch mode, not a structured command (install, config,
-// machine…), not serve, which keeps its own process, and not publish, deploy
-// or release, which a lost worker's rerun could repeat.
-func servesThroughMachine(args []string) bool {
-	if runcredential.Hosted() || len(args) == 0 {
+// servesThroughMachine reports whether a parsed invocation may run in a
+// worker of the machine process (CLI ADR 0116 §4): a job command, read after
+// its aliases resolved, that is not a hosted run, does not watch (--watch,
+// -w, or a serve workload, which watches by default), is no structured or
+// extension command, and is not publish, deploy or release, which a lost
+// worker's rerun could repeat.
+func servesThroughMachine(parsed *ParsedArgs, aliases commandAliases, extensionGroups map[string]bool) bool {
+	if runcredential.Hosted() || parsed == nil || parsed.Err != nil || len(parsed.Commands) == 0 {
 		return false
 	}
-	first := args[0]
-	if first == "" || strings.HasPrefix(first, "-") || isStructuredCommand(first) {
+	if parsed.Global.Help || parsed.Global.Version || parsed.Global.Watch {
 		return false
 	}
-	for _, verb := range strings.Split(first, ",") {
-		switch verb {
-		case "serve":
-			return false
-		case "publish", "deploy", "release":
-			// A worker that ends during a run makes its client run the
-			// command again: a command with effects outside the workspace
-			// runs in its own process, once.
-			return false
-		}
+	first := parsed.Commands[0]
+	if isStructuredCommand(first) || extensionGroups[first] {
+		return false
 	}
-	for _, arg := range args[1:] {
-		if arg == "--" {
-			break
-		}
-		if arg == "--watch" || strings.HasPrefix(arg, "--watch=") {
+	if ownsWatchFlag(watchCommands(parsed, aliases, extensionGroups), aliases.serveWorkloads) {
+		return false
+	}
+	for _, command := range parsed.Commands {
+		switch command {
+		case "serve", "publish", "deploy", "release":
 			return false
 		}
 	}

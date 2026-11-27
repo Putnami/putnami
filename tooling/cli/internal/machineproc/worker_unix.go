@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -21,6 +22,12 @@ import (
 // it with the client's arguments once it has applied the client's context.
 type RunFunc func(ctx context.Context, args []string) int
 
+// ownFingerprint and ownRuntimeEnv are the worker's, read when it starts.
+var ownFingerprint, ownRuntimeEnv string
+
+// goTimeout bounds the wait for a client's go after Ready.
+const goTimeout = 30 * time.Second
+
 // forceTimeout bounds a run after its client asked it to stop and then went
 // away: past it the worker exits, which ends the run's jobs with it.
 const forceTimeout = 30 * time.Second
@@ -30,6 +37,8 @@ const forceTimeout = 30 * time.Second
 // time, and applies the client's environment, working directory, umask and
 // standard streams to its own process for that run (CLI ADR 0116 §4).
 func Work(run RunFunc) int {
+	inWorker = true
+	ownFingerprint, ownRuntimeEnv = processFingerprint(), runtimeEnv(os.Environ())
 	f := os.NewFile(3, "machine-ctrl")
 	fc, err := net.FileConn(f)
 	_ = f.Close()
@@ -94,10 +103,29 @@ func serve(run RunFunc, req request, files []*os.File, free func()) {
 	}
 	client := &conn{c: cc}
 	defer client.c.Close() //nolint:errcheck // the run is over
+	// A worker whose process differs from the client's in what jobs inherit
+	// beyond the run's context would start them otherwise: the client runs
+	// the command itself.
+	if req.Fingerprint != ownFingerprint || runtimeEnv(req.Env) != ownRuntimeEnv {
+		release()
+		_ = client.send(event{Refused: CodeContext})
+		return
+	}
+	// The run starts on the client's go only: a client that stopped waiting
+	// runs the command itself, and this worker then never does.
+	if err := client.send(event{Ready: true}); err != nil {
+		return
+	}
+	_ = client.c.SetReadDeadline(time.Now().Add(goTimeout))
+	var start signal
+	if _, err := client.receive(&start); err != nil || start.Signal != "go" {
+		return
+	}
+	_ = client.c.SetReadDeadline(time.Time{})
 	restore, err := apply(req, files[:3])
 	if err != nil {
 		release()
-		_ = client.send(event{Refused: "machine.context"})
+		_ = client.send(event{Lost: true})
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -128,11 +156,17 @@ func listen(client *conn, cancel context.CancelFunc, finished <-chan struct{}) {
 		if _, err := client.receive(&sig); err != nil {
 			break
 		}
-		if sig.Signal == "interrupt" {
-			abort.Record(os.Interrupt)
+		switch sig.Signal {
+		case "interrupt":
+			abort.Record(syscall.SIGINT)
+			cancel()
+		case "terminate":
+			abort.Record(syscall.SIGTERM)
 			cancel()
 		}
 	}
+	// A client that went away stops the run as a termination does.
+	abort.Record(syscall.SIGTERM)
 	cancel()
 	select {
 	case <-finished:
@@ -168,7 +202,7 @@ func apply(req request, std []*os.File) (func(), error) {
 		}
 		return nil, err
 	}
-	setEnv(append(append([]string(nil), req.Env...), RunEnv+"=1"))
+	setEnv(req.Env)
 	for i, f := range std {
 		_ = unix.Dup2(int(f.Fd()), i)
 	}

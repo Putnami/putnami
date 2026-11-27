@@ -180,14 +180,6 @@ func (a *App) Run(ctx context.Context, args []string) int {
 			return exitCodeForError(err)
 		}
 	}
-	// The authoritative engine of this command is this process: the worker of
-	// its build may run it instead, warm (CLI ADR 0116). Anything the machine
-	// process does not serve runs here as before.
-	if !providerChild && servesThroughMachine(args) {
-		if code, served := machineproc.Serve(ctx, args); served {
-			return code
-		}
-	}
 	registerArtifactRoot(wsRoot)
 	recordHostHookRepository(wsRoot)
 	// Capture capability transports only after a possible pinned-CLI relaunch:
@@ -240,6 +232,14 @@ func (a *App) Run(ctx context.Context, args []string) int {
 
 	aliases, aliasWarnings := processAliases(cfg, providerMode, extensions)
 	parsed := parseArgs(args, aliases, extensionGroups)
+	// The authoritative engine of this command is this process: the worker of
+	// its build may run it instead, warm (CLI ADR 0116). Anything the machine
+	// process does not serve runs here as before.
+	if !providerChild && !providerMode && servesThroughMachine(parsed, aliases, extensionGroups) {
+		if code, served := machineproc.Serve(ctx, args); served {
+			return code
+		}
+	}
 	if providerMode && !extensionGroups[parsed.Commands[0]] {
 		iox.Fprintf(os.Stderr, "putnami: internal release-set provider command group is unavailable\n")
 		return ExitUsage
