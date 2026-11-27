@@ -884,4 +884,3 @@ func RefreshSnapshot(ws *Workspace, policy SnapshotWritePolicy) (*Snapshot, erro
 	}
 	return snapshot, nil
 }
-
