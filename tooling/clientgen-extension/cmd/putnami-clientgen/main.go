@@ -163,10 +163,12 @@ func runCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		return "FAILED", nil, errors.New("workspace client command received no workspace root")
 	}
 	report := workspaceclient.InspectCommittedFrom(ctx, ctx.WorkspaceRoot, memberPaths(ctx.WorkspaceProjects))
-	// Each phase is timed and reported (Report.Timings, one metric event per
-	// phase). The session record exposes this task as one durationMs, and the
-	// split behind that number is what decides where a slow guard spends its
-	// time.
+	// Each phase is timed and reported as one metric event per phase. The
+	// session record exposes this task as one durationMs, and the split behind
+	// that number is what decides where a slow guard spends its time. The
+	// timings stay out of the result and the summary's data: both are a
+	// function of the tree the task's key holds, so two runs of one tree
+	// return the same result.
 	for _, name := range sortedTimingNames(report.Timings) {
 		emit.Metric(workspaceclient.PhaseMetricPrefix+name, report.Timings[name], "ms")
 	}
@@ -188,7 +190,6 @@ func runCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 			"findings":          len(report.Findings),
 			"pendingTransports": len(report.PendingTransports),
 			"providers":         len(report.Providers),
-			"timings":           report.Timings,
 		})
 	if !report.Clean() {
 		return "FAILED", nil, fmt.Errorf("first-party generated client verification found %d issue(s)", len(report.Findings))

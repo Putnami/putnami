@@ -374,9 +374,10 @@ work rather than by storing the answer:
 - the expressions the scanner derives from identifier and module names are
   compiled once per process instead of once per file.
 
-The report carries `timings` — one entry per phase, also emitted as
-`clientgen.phase.<name>` metric events — so a slow guard is diagnosed from the
-record rather than estimated. Measured on this repository before the nested
+Each phase's wall time is emitted as a `clientgen.phase.<name>` metric event,
+so a slow guard is diagnosed from the session record rather than estimated.
+The result and the summary's data carry no timing, so every run of one tree
+returns the same result. Measured on this repository before the nested
 provider build and mirror render were removed (2151 indexed production
 sources, 114 inventoried callsites): the
 nested provider build was 14.9 s and the mirror render 7.8 s of a 24.2 s guard

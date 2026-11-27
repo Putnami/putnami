@@ -188,13 +188,15 @@ type Report struct {
 	// Timings is the wall time each phase of the run spent, in milliseconds,
 	// keyed by PhaseName. The session record exposes the task as one
 	// durationMs; this is the split behind it, so a slow guard is diagnosed
-	// from the report rather than estimated.
-	Timings map[string]int64 `json:"timings,omitempty"`
+	// from its metric events rather than estimated. It is never serialized:
+	// the report is the task's result, which must be a function of the tree
+	// the key holds, and a wall time differs on every run of the same tree.
+	Timings map[string]int64 `json:"-"`
 }
 
-// Phase names for Report.Timings and the matching metric events. The same
-// constant is the metric name, prefixed by PhaseMetricPrefix, so a reader of
-// the session's event log and a reader of the report see one vocabulary.
+// Phase names key Report.Timings in memory and, prefixed by
+// PhaseMetricPrefix, name the metric event each phase's wall time is emitted
+// as.
 const (
 	// PhaseInspect discovers providers and their clients and validates the
 	// inventories.
