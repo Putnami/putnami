@@ -8,7 +8,7 @@ contract.
 | Command | Activation | Steps | Cached |
 |---|---|---|---|
 | `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents, verdict policies also on the listing of the candidate cut; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
+| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents, verdict policies also on the listing of the candidate cut; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The agent attribution is keyed on the squash message and `putnami.workspace.json`. The breaking marker and the feature-coverage ratchet are never cached |
 
 Two commands rather than one, because one command carries one activation and
 these two have different subjects. A project's features and specs are a
@@ -266,8 +266,10 @@ the verdict.
   The step reads only the message: the commits of the branch never reach the
   base branch. It runs when the runner runs `validate`, so an edit of the title
   or the body is checked at the next run. A message edited in the merge dialog
-  is never checked. It is never cached (see
-  [below](#agent-attribution-validate--never-cached)). The decision is
+  is never checked. It is cached under a key that holds the message and the
+  workspace option (see
+  [below](#agent-attribution-validate--keyed-by-the-message-and-the-option)).
+  The decision is
   [ADR 0002](adr/0002-the-squash-commit-names-no-agent.md).
 
 - **`feature-coverage-validate`** — the feature-coverage gate. Every project
@@ -788,18 +790,26 @@ describes the tree, never the commit
 So the task runs every time, and costs one `git log` of the range. The `env`
 port names the variable the step reads, and keys nothing.
 
-### `agent-attribution-validate` — never cached
+### `agent-attribution-validate` — keyed by the message and the option
 
 ```json
 "inputs": {
-  "PUTNAMI_PROPOSAL_MESSAGE": { "from": "env" }
+  "PUTNAMI_PROPOSAL_MESSAGE": { "from": "env" },
+  "workspaceConfig": { "from": "workspace", "files": ["putnami.workspace.json"] }
 },
-"cache": { "enabled": false }
+"cache": { "enabled": true, "noOutput": true }
 ```
 
-The verdict reads an environment variable, and the candidate cut does not
-hold it. So the task runs every time, and reads no file. The `env` port names
-the variable the step reads, and keys nothing.
+The verdict reads two things: the message in an environment variable, and the
+policy in `options.sdd.agentAttribution`. Both are in the key. An `env` port
+is hashed into the key with the value the run reads, so a changed message
+runs the step again and an unchanged one is served from the cache. The
+`workspaceConfig` port holds the option: a changed option runs the step
+again. The key holds the whole of `putnami.workspace.json`, not only the
+`sdd` options layer, so an edit of any other member of the file runs the step
+again too. The step reads no other file and no history, so the key needs
+nothing more. The decision is
+[ADR 0002](adr/0002-the-squash-commit-names-no-agent.md).
 
 ### `feature-coverage-ratchet-validate` — never cached
 

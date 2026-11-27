@@ -116,6 +116,7 @@ tests.
 - `internal/cli/e2e/nxdelegation.TestAnNxPnpmWorkspaceImportsAndRunsItsOwnNodeTools`
 - `internal/cli/e2e/nxdelegation.TestTheWorkspaceAdoptsOnlyTheProjectsTheNxGraphLists`
 - `internal/cli/e2e/orchestration.TestATscOutputGitDoesNotIgnoreIsRefusedOnceItKeysTheBuild`
+- `internal/cli/e2e/orchestration.TestAgentAttributionIsServedFromTheCacheUnderItsMessageAndOption`
 - `internal/cli/e2e/orchestration.TestEveryExtensionBuiltHereIsCounted`
 - `internal/cli/e2e/orchestration.TestTheExtensionCounts`
 - `internal/cli/e2e/orchestration.TestThisRepositoryStartsAtItsPrecomputedKeys`

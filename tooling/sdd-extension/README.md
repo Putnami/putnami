@@ -252,7 +252,7 @@ activation:
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
 | `validate` | one project, activated by `putnami.features.json`, `features/*.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents, verdict policies also on the listing of the candidate cut; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
+| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents, verdict policies also on the listing of the candidate cut; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The agent attribution is keyed on the squash message and `putnami.workspace.json`. The breaking marker and the feature-coverage ratchet are never cached |
 
 Both are in the canonical gate:
 
@@ -329,10 +329,13 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   impacted baseline, and the candidate cut holds neither the variable nor the
   commits. Its `env` input names the variable and keys nothing. See
   [the validation jobs](doc/02-validation-jobs.md#breaking-marker-validate--never-cached).
-- `agent-attribution-validate` is never cached. It reads the proposed squash
-  message in `PUTNAMI_PROPOSAL_MESSAGE` when `options.sdd.agentAttribution` is
-  `"forbid"`, and the candidate cut does not hold the variable. See
-  [the validation jobs](doc/02-validation-jobs.md#agent-attribution-validate--never-cached).
+- `agent-attribution-validate` is cached under a key that holds the proposed
+  squash message and the workspace option it reads. It reads the message in
+  `PUTNAMI_PROPOSAL_MESSAGE` when `options.sdd.agentAttribution` is
+  `"forbid"`; its `env` input hashes the message into the key, and its
+  `workspaceConfig` input holds `putnami.workspace.json`. A changed message or
+  option runs the step again. See
+  [the validation jobs](doc/02-validation-jobs.md#agent-attribution-validate--keyed-by-the-message-and-the-option).
 - `feature-coverage-ratchet-validate` is never cached. It reads the
   feature-coverage debt list at the merge base of the run's impacted baseline
   and `HEAD`, and the candidate cut holds neither. See

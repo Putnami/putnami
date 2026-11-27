@@ -26,8 +26,8 @@ import (
 // package of the extension SDK recognizes. A path such as .claude/ or .agents/,
 // and a human co-author, stay allowed.
 //
-// The verdict reads an environment variable that the candidate cut does not
-// hold, so the task is uncached.
+// The verdict reads an environment variable and one workspace option, so the
+// task's key holds both: its env input and its workspace config input.
 
 // AgentAttributionOption is the key of options.sdd that sets the policy.
 const AgentAttributionOption = "agentAttribution"

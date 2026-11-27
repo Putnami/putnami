@@ -1,6 +1,8 @@
 # ADR 0002 — The squash commit names no agent
 
 - **Status**: accepted
+- **Amended**: 2026-11-27, §7: the step is served from the cache, under a key
+  that holds the message and the workspace option it reads
 - **Scope**: `@putnami/sdd` (`agent-attribution-validate`, a step of
   `validate-workspace`), and every workspace that sets
   `options.sdd.agentAttribution`
@@ -47,8 +49,19 @@ choice belongs to the workspace.
    agents.
 6. **The commits of the branch are not read.** They never reach the base
    branch.
-7. **The step is never served from cache.** Its verdict reads an environment
-   variable that the candidate cut does not hold.
+7. **The step is served from the cache, under a key that holds what it
+   reads.** Its verdict reads two things: the message in
+   `PUTNAMI_PROPOSAL_MESSAGE`, and the policy in `options.sdd.agentAttribution`.
+   The task declares the variable as an `env` input, which the key hashes, and
+   `putnami.workspace.json`, which holds the option. A changed message, or a
+   changed option, runs the step again; an unchanged one is served from the
+   cache. The key holds the whole workspace file, not only the `sdd` options
+   layer: the CLI narrows a project's `putnami.json` to the layers of the
+   extension that hashes it, and a workspace file has no such narrowing. Until
+   2026-11-27, the step was never served from cache, on the ground that its
+   verdict reads an environment variable the candidate cut does not hold. That
+   ground does not hold: an `env` input is part of the key, so a restored
+   answer is the answer for the message this run reads.
 
 ## Consequences
 
