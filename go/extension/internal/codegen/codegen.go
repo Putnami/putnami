@@ -92,9 +92,14 @@ func contractHasNoDurableHome(rel string, commitSchemas, deferToDescribe bool) b
 // and into the job's result payload, both of which the cache stores — is
 // project-relative and slash-separated; see go.putnami.dev/sdk/extension/
 // genresult for why, and for the one rule both language runtimes apply.
+//
+// Mode stays out of the file: a build and a serve or run generate of one
+// project write the same .gen tree, and a manifest that differs by mode alone
+// makes each restore of one rewrite the tree the other left (CLI ADR 0121).
+// Nothing reads the mode back from the file.
 type GenerateResult struct {
 	Hash    string            `json:"hash"`
-	Mode    string            `json:"mode"`
+	Mode    string            `json:"-"`
 	Exports map[string]string `json:"exports"`
 	Assets  map[string]string `json:"assets"`
 	Schemas []string          `json:"schemas"`

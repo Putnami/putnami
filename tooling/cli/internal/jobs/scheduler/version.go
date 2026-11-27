@@ -336,8 +336,8 @@ func readVersionStampDocument(path string) map[string]any {
 // preserveMatchingVersionFiles seeds version metadata before cache-key
 // computation without changing a cache-restored version.json merely because a
 // new invocation has a later build time. An all-hit run should retain the
-// metadata of the build that produced its cached artifacts; the scheduler
-// forces a refresh before the first real execution for a project.
+// metadata of the build that produced its cached artifacts. An executing
+// project keeps a matching stamp too (refreshVersionFile, ADR 0121).
 func preserveMatchingVersionFiles(
 	ws *workspace.Workspace,
 	planned []*ScheduledJob,
@@ -424,8 +424,8 @@ func generateVersionFilesAtWithSourceBindings(
 }
 
 // versionFileMatchesBuild compares every build identity field except buildTime.
-// buildTime belongs to the artifact-producing invocation, so a matching cached
-// file is intentionally preserved until this project has an actual cache miss.
+// buildTime names the invocation that first stamped this identity, so a
+// matching file is preserved, by a cache hit and by an execution alike.
 //
 // It decodes into VersionInfo, so a field the scheduler does not own is INVISIBLE
 // to it: a stamp carrying another writer's `contentHash` still matches, and is

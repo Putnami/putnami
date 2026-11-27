@@ -265,9 +265,9 @@ type Scheduler struct {
 	// machineprobe/environment.go.
 	environmentBegin machineprobe.EnvironmentSample
 
-	// versionBuildTime is shared by every real execution in this scheduler run.
-	// versionFiles tracks projects already refreshed after their first cache
-	// miss, avoiding a timestamp rewrite before each sibling step. The source
+	// versionBuildTime is the build time this run writes into a stamp whose
+	// identity it changes. versionFiles tracks projects already brought to the
+	// run's identity before their first execution (refreshVersionFile). The source
 	// binding memo shares this mutex: refreshes/restamps are its readers, while
 	// completed executions and source-visible restores invalidate entries.
 	versionBuildTime         string

@@ -223,7 +223,6 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string, hook
 	// runner so the two languages keep one manifest shape.
 	manifestData, err := json.MarshalIndent(&build.GenerateResult{
 		Hash:    genResult.Hash,
-		Mode:    genResult.Mode,
 		Exports: genresult.Relativize(projectPath, genResult.Exports),
 		Assets:  genresult.Relativize(projectPath, genResult.Assets),
 	}, "", "  ")
