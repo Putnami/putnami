@@ -601,3 +601,28 @@ func TestNewRenderer_AutoDetect_NoTTY(t *testing.T) {
 		t.Errorf("NewRenderer(auto) = %T, want *TextRenderer or *LiveRenderer", r)
 	}
 }
+
+// TestOnlyTheLiveRendererReadsTheCoverageReplay holds that a renderer that
+// shows no replayed coverage does not read it: the read scans every kept
+// session's report.
+func TestOnlyTheLiveRendererReadsTheCoverageReplay(t *testing.T) {
+	t.Setenv("K_SERVICE", "")
+	var buf bytes.Buffer
+	for _, cfg := range []Config{
+		{Output: "json", Out: &buf, Err: &buf},
+		{Output: "jsonl", Out: &buf, Err: &buf},
+		{Output: "", Quiet: true, Out: &buf, Err: &buf},
+		{Output: "", Verbose: true, Out: &buf, Err: &buf},
+		{Output: "", Out: &buf, Err: &buf},
+	} {
+		read := false
+		cfg.CoverageReplay = func() map[string]CoverageReplay {
+			read = true
+			return nil
+		}
+		r := NewRenderer(cfg)
+		if _, live := r.(*LiveRenderer); !live && read {
+			t.Errorf("NewRenderer(%+v) = %T read the coverage replay, which only the live renderer shows", cfg, r)
+		}
+	}
+}

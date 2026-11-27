@@ -27,9 +27,12 @@ type Config struct {
 	Quiet     bool
 	NoColor   bool
 	ServeMode bool // enable real-time log tailing for serve commands
-	// CoverageReplay is keyed by stable project ID. The live renderer consults
-	// it only when the current run produced no coverage for that project.
-	CoverageReplay map[string]CoverageReplay
+	// CoverageReplay returns the prior measurements, keyed by stable project
+	// ID. The live renderer consults them only when the current run produced
+	// no coverage for that project, and only the live renderer calls it: the
+	// read scans every kept session's report, which no other renderer shows.
+	// Nil means none.
+	CoverageReplay func() map[string]CoverageReplay
 	// VerbOrder is the verbs of the loaded vocabularies, in vocabulary order.
 	// The live renderer orders its command columns by it; the verbs it does
 	// not name follow in the renderer's fallback order.
@@ -165,7 +168,9 @@ func autoDetectRenderer(cfg Config) jobs.Renderer {
 	// Use live renderer when TTY supports it (no CI, not dumb terminal)
 	if ShouldUseLiveRenderer(errOut) && !cfg.NoColor {
 		r := NewLiveRenderer(out, errOut)
-		r.coverageReplay = maps.Clone(cfg.CoverageReplay)
+		if cfg.CoverageReplay != nil {
+			r.coverageReplay = maps.Clone(cfg.CoverageReplay())
+		}
 		r.serveMode = cfg.ServeMode
 		r.verbOrder = slices.Clone(cfg.VerbOrder)
 		return r

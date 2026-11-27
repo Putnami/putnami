@@ -74,8 +74,10 @@ func executionRenderer(
 		// A serve and a once workload both stream the child workload's output
 		// live; once differs only in that it is one-shot (no forced watch — see
 		// below).
-		ServeMode:      isServeMode || isRunMode,
-		CoverageReplay: sessStore.LatestValidationCoverage(replayed, nil),
+		ServeMode: isServeMode || isRunMode,
+		CoverageReplay: func() map[string]output.CoverageReplay {
+			return sessStore.LatestValidationCoverage(replayed, nil)
+		},
 		// The live view orders its command columns by the merged vocabulary.
 		VerbOrder: extension.MergeVocabulary(extensions, nil).VerbNames(),
 		ServeLog:  serveLog,
