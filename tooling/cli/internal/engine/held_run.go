@@ -51,6 +51,37 @@ type HeldRuns interface {
 	// computed, nil when it leaves nothing a later run may be answered with,
 	// and whether it was answered from what TakeRun returned.
 	KeepRun(root string, record any, skipped bool)
+	// PeekRun returns what TakeRun would return now, under the same check of
+	// what the decision witnessed, without taking the engine run's position.
+	PeekRun(root string) any
+	// Reused tells the worker whether the engine run in root took step from
+	// what the held run computed (held) or computed it: "versions", the
+	// version snapshot.
+	Reused(root, step string, held bool)
+}
+
+// versionSnapshot is the version snapshot Engine.Run would read from Git now.
+// In a machine worker, an engine run of a request the worker decided
+// answerable takes the one the held run's engine run at the same position
+// read, when that run read it itself: HEAD, the refs, the index's entries,
+// Git's configuration and the worktree it reads are what the decision
+// witnessed, and the worker checks them again before it offers it (CLI ADR
+// 0116 §6a). Anything missing, and every run outside a worker, reads Git.
+func versionSnapshot(req *Request) (*git.VersionInfo, error) {
+	heldRuns.Lock()
+	memory := heldRuns.memory
+	heldRuns.Unlock()
+	if memory == nil || req.WorkspaceRoot == "" || !req.mayHold() {
+		return captureVersionSnapshot(req.WorkspaceRoot)
+	}
+	if held, ok := memory.PeekRun(req.WorkspaceRoot).(*heldRun); ok && held.complete && held.captured &&
+		held.snapshot != nil && held.root == req.WorkspaceRoot {
+		memory.Reused(req.WorkspaceRoot, "versions", true)
+		snapshot := *held.snapshot
+		return &snapshot, nil
+	}
+	memory.Reused(req.WorkspaceRoot, "versions", false)
+	return captureVersionSnapshot(req.WorkspaceRoot)
 }
 
 // heldRuns is the memory ServeHeldRuns installed, nil outside a worker.
@@ -93,6 +124,9 @@ type heldRun struct {
 	detached     bool
 	ephemeral    bool
 	snapshot     *git.VersionInfo
+	// captured says Engine.Run read the snapshot itself rather than take the
+	// adapter's: only such a snapshot is reused in place of reading Git.
+	captured bool
 
 	run             *plannedRun
 	resolved        GlobalFlags
@@ -130,6 +164,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 			root: root, config: req.Config, commands: req.Commands, params: req.CommandParams,
 			markerParams: req.RunMarkerParams, flags: req.Global, hooks: req.Hooks,
 			detached: req.DetachedReporting, ephemeral: req.EphemeralSession, snapshot: req.VersionSnapshot,
+			captured: req.snapshotCaptured,
 		}
 	}
 	// Every engine run takes and keeps, so the worker pairs the held run's
@@ -167,10 +202,10 @@ func (req *Request) mayHold() bool {
 
 // asks says whether asked, the request of a later run, asks what h was asked:
 // the same workspace, configuration, commands, parameters, flags and hooks,
-// with the same version snapshot.
+// with the same version snapshot, read the same way.
 func (h *heldRun) asks(asked *heldRun) bool {
 	return h.root == asked.root && slices.Equal(h.commands, asked.commands) &&
-		h.detached == asked.detached && h.ephemeral == asked.ephemeral &&
+		h.detached == asked.detached && h.ephemeral == asked.ephemeral && h.captured == asked.captured &&
 		reflect.DeepEqual(h.flags, asked.flags) && reflect.DeepEqual(h.params, asked.params) &&
 		reflect.DeepEqual(h.markerParams, asked.markerParams) && reflect.DeepEqual(h.hooks, asked.hooks) &&
 		reflect.DeepEqual(h.config, asked.config) && reflect.DeepEqual(h.snapshot, asked.snapshot)

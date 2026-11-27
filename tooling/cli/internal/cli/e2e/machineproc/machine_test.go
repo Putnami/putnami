@@ -464,18 +464,19 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 		return servedArgs(step, args...)
 	}
 
-	if _, _, d := served("the first request"); d.Answerable || d.Answered || d.PlanSkipped || d.Kept != "kept" {
+	if _, _, d := served("the first request"); d.Answerable || d.Answered || d.PlanSkipped || d.VersionsHeld || d.Kept != "kept" {
 		t.Fatalf("the first request: %+v, want unanswerable, computed and kept", d)
 	}
 	// What a plan that executed computed is never held: the second request
 	// loads and plans, and only its plan is answered.
-	if _, _, d := served("the second request"); !d.Answerable || !d.Answered || d.PlanSkipped || d.Kept != "kept" {
+	if _, _, d := served("the second request"); !d.Answerable || !d.Answered || d.PlanSkipped || d.VersionsHeld || d.Kept != "kept" {
 		t.Fatalf("the second request: %+v, want answerable, planned, answered and kept", d)
 	}
 	state := stateFiles(t, root)
 	code, answered, d := served("the unchanged request")
-	if !d.Answerable || !d.Answered || !d.PlanSkipped || d.Kept != "kept" {
-		t.Fatalf("the unchanged request: %+v, want answerable, answered from memory without a plan and kept", d)
+	// It took the version snapshot the held run read, without asking Git.
+	if !d.Answerable || !d.Answered || !d.PlanSkipped || !d.VersionsHeld || d.Kept != "kept" {
+		t.Fatalf("the unchanged request: %+v, want answerable, answered from memory without a plan or Git, and kept", d)
 	}
 	if code != 0 {
 		t.Fatalf("the answered run exited %d, want 0", code)
@@ -495,7 +496,7 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 	if got, want := strings.Join(normalize(answered), "\n"), strings.Join(normalize(own), "\n"); got != want {
 		t.Errorf("tasks differ\nanswered from memory:\n%s\nin its own process:\n%s", got, want)
 	}
-	if _, again, d := served("the unchanged request again"); !d.PlanSkipped || !d.Answered ||
+	if _, again, d := served("the unchanged request again"); !d.PlanSkipped || !d.Answered || !d.VersionsHeld ||
 		strings.Join(normalize(again), "\n") != strings.Join(normalize(own), "\n") {
 		t.Fatalf("the unchanged request again: %+v, want it answered without a plan, with the tasks of a run in its own process", d)
 	}
@@ -527,7 +528,7 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 
 	clitest.WriteFile(t, filepath.Join(root, "apps", "p001", "src.txt"), "p001 edited\n")
 	code, computed, d = served("after a write")
-	if d.Answerable || d.Answered || d.PlanSkipped || !strings.Contains(d.Reason, "the worktree changed") {
+	if d.Answerable || d.Answered || d.PlanSkipped || d.VersionsHeld || !strings.Contains(d.Reason, "the worktree changed") {
 		t.Fatalf("after a write: %+v, want unanswerable for the worktree's change, planned and computed", d)
 	}
 	localCode, own = local("a run in its own process after the write")

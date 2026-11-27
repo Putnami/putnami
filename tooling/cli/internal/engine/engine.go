@@ -431,6 +431,10 @@ type Request struct {
 	// tree mutation. Nil makes the engine capture it itself at the start
 	// of Run, before hooks — which is what the terminal path did.
 	VersionSnapshot *git.VersionInfo
+	// snapshotCaptured says Run read VersionSnapshot itself, from Git or from
+	// a machine worker's held run (versionSnapshot), rather than take the
+	// adapter's.
+	snapshotCaptured bool
 	// runStart is the tree state workspace.CaptureRunStart recorded for this run: the
 	// uncommitted paths before the process wrote anything. Nil when none was
 	// recorded.
@@ -656,13 +660,14 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	// A run PUTNAMI_SOURCE_REVISION binds to a commit whose version cannot be
 	// read fails here, before any hook or job, instead of running with no
 	// version (captureVersionSnapshot explains why).
+	// A machine worker may answer it from the held run (versionSnapshot).
 	if req.VersionSnapshot == nil {
-		snapshot, err := captureVersionSnapshot(req.WorkspaceRoot)
+		snapshot, err := versionSnapshot(req)
 		if err != nil {
 			iox.Fprintf(req.ErrorOut, "putnami: %v\n", err)
 			return SessionResult{ExitCode: ExitError}, err
 		}
-		req.VersionSnapshot = snapshot
+		req.VersionSnapshot, req.snapshotCaptured = snapshot, true
 	}
 	// A command whose jobs declare side effects, such as a publish or a
 	// deploy, states which commit it ships. Where Git does not manage the

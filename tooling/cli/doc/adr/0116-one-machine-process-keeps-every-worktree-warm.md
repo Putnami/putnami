@@ -492,7 +492,14 @@ command as usual:
 3. The witnesses of what the journal does not see hold: the stats of
    `.git`'s HEAD, index, packed refs, configuration and the refs directories
    a run reads (ADR 0112), of the extension runtimes and toolchains the run
-   used under the Putnami home, and of each served task's cache entry.
+   used under the Putnami home, and of each served task's cache entry. Git's
+   status, diff and abbreviated names also read the repository's exclude and
+   attributes files, its grafts and alternates, the directory of its packs
+   (whose object count sets an abbreviation's length), and Git's
+   configuration: the system, global and repository files, those they
+   include, and the excludes and attributes files they name. Their stats are
+   witnessed too; Git lists the configuration's files once per worktree, and
+   again when one of them or HEAD moved.
 4. The platform has a watcher: on macOS, which has none (section 7), no run
    is answered from memory.
 
@@ -562,7 +569,14 @@ notices), and runs phase 4 as any run does on the held values: the finalizers,
 the session's tree, declarations and plan, its reporting and the run marker.
 Those values are held only from an engine run whose plan the scheduler
 answered from a record, so no execution touched them: a request skips them
-only after an identical one whose plan was answered. A run whose phases read
+only after an identical one whose plan was answered. The version snapshot
+(the commit, the branch and the dirty hash that the run reads from Git before
+its hooks) is held with them: an engine run that would read it takes the one
+the held run's engine run at the same position read itself, once the worker
+checked the journal and every witness of step 3 again at that point, which
+covers everything Git reads for it; the environment it reads is in the
+request. A snapshot the adapter gave, a held run that read none, and any
+check that fails read Git (`versionsHeld` says every engine run took it). A run whose phases read
 what the decision does not witness is never held this way: a bare selection,
 which reads the successful-run markers, a release set, a runner provider's
 placement and a production preflight; nor is a debug run, whose output an
@@ -595,7 +609,8 @@ records why (`a served task's cache entry moved: <task>`). A plan that
 differs, a plan the held run did not leave a record for, and every plan after
 one the run computed run as usual. `putnami machine status` says whether the
 last run a worker served was answered, whether without loading and planning
-(`planSkipped`), and why a run decided answerable was not.
+(`planSkipped`) and without reading the version snapshot from Git
+(`versionsHeld`), and why a run decided answerable was not.
 
 ### 7. How it learns of changes
 

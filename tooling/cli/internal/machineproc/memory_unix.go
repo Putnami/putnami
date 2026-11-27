@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,9 +63,12 @@ var memory = struct {
 	watched map[string]bool
 	held    map[string]*heldRun
 	gitDirs map[string][]string
+	// gitConfig is, per worktree, the files of Git's configuration a run's
+	// Git reads, listed under the stats memo holds (gitConfigFiles).
+	gitConfig map[string]*gitConfigMemo
 	// run is the memory of the run the worker serves now.
 	run runMemory
-}{watched: map[string]bool{}, held: map[string]*heldRun{}, gitDirs: map[string][]string{}}
+}{watched: map[string]bool{}, held: map[string]*heldRun{}, gitDirs: map[string][]string{}, gitConfig: map[string]*gitConfigMemo{}}
 
 // runMemory is what the scheduler reads and leaves during the run the worker
 // serves: the records the held run's plans left, offered to the run's plans
@@ -104,6 +108,21 @@ type runMemory struct {
 	// refused says why a plan the held run's record matched was not answered
 	// from it: an entry a task of the held run was served from moved since.
 	refused string
+	// reused counts, per step an engine run may take from the held run rather
+	// than compute ("versions"), the engine runs that took it and those that
+	// computed it (Reused).
+	reused map[string]*reuseCount
+}
+
+// reuseCount is how many engine runs of a run took a step from the held run,
+// and how many computed it.
+type reuseCount struct{ held, computed int }
+
+// allHeld says every engine run that reached the step took it from the held
+// run, and at least one did.
+func (r *runMemory) allHeld(step string) bool {
+	c := r.reused[step]
+	return c != nil && c.held > 0 && c.computed == 0
 }
 
 // memoryCheck is the state a decision took before the run: the journal
@@ -183,17 +202,58 @@ func (RunMemory) Refused(root, reason string) {
 // can write the worktree or move Git, and the engine then loads and plans what
 // is there (CLI ADR 0116 §6a).
 func (RunMemory) TakeRun(root string) any {
+	return offerRun(root, true)
+}
+
+// PeekRun returns what TakeRun would return for the next engine run of the
+// run in root, under the same conditions and after the same check of what the
+// decision witnessed, without taking it: the engine run that asks it before
+// its hooks, for the version snapshot the held run read, still takes once its
+// hooks ran (CLI ADR 0116 §6a).
+func (RunMemory) PeekRun(root string) any {
+	return offerRun(root, false)
+}
+
+// Reused records whether an engine run of the run in root took step from what
+// the held run computed (held) or computed it.
+func (RunMemory) Reused(root, step string, held bool) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) {
+		return
+	}
+	if r.reused == nil {
+		r.reused = map[string]*reuseCount{}
+	}
+	c := r.reused[step]
+	if c == nil {
+		c = &reuseCount{}
+		r.reused[step] = c
+	}
+	if held {
+		c.held++
+	} else {
+		c.computed++
+	}
+}
+
+// offerRun is TakeRun, which takes the engine run's position when take is set,
+// and PeekRun, which does not.
+func offerRun(root string, take bool) any {
 	memory.Lock()
 	r := &memory.run
 	if !r.armed || !sameRoot(r.root, root) {
 		memory.Unlock()
 		return nil
 	}
-	i := r.runsTaken
-	r.runsTaken++
-	r.runPlan = len(r.plans)
+	i, plan := r.runsTaken, len(r.plans)
+	if take {
+		r.runsTaken++
+		r.runPlan = plan
+	}
 	if r.check == nil || r.computed > 0 || r.planned > 0 || i >= len(r.offeredRuns) ||
-		r.offeredRuns[i].plan != r.runPlan || r.taken != r.runPlan {
+		r.offeredRuns[i].plan != plan || r.taken != plan {
 		memory.Unlock()
 		return nil
 	}
@@ -319,6 +379,7 @@ func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
 	memory.Unlock()
 	decision.Answered = run.answered > 0 && run.computed == 0
 	decision.PlanSkipped = run.skipped > 0 && run.planned == 0
+	decision.VersionsHeld = run.allHeld("versions")
 	if run.refused != "" {
 		decision.Reason = run.refused
 	}
@@ -434,10 +495,18 @@ func worktreeChanges(j Journal, root string) string {
 // refreshes the index's cached stats without changing an entry), and the
 // stats of the directories of the Putnami home that hold extension runtimes
 // and toolchains.
+//
+// The version snapshot a held run read is reused under it (CLI ADR 0116 §6a),
+// so it also takes what Git's status, diff and abbreviated names read besides
+// the worktree, the index and the refs: the repository's exclude and
+// attributes files, its grafts and alternates, the directory of its packs,
+// whose object count sets an abbreviation's length, and every file of Git's
+// configuration (gitConfigFiles).
 func outsideWitness(root string) map[string]string {
 	paths := []string{}
 	for _, dir := range gitDirs(root) {
-		for _, name := range []string{"HEAD", "config", "packed-refs", "shallow", "commondir"} {
+		for _, name := range []string{"HEAD", "config", "config.worktree", "packed-refs", "shallow", "commondir",
+			"info/exclude", "info/attributes", "info/grafts", "objects/info/alternates", "objects/pack"} {
 			paths = append(paths, filepath.Join(dir, name))
 		}
 		_ = filepath.WalkDir(filepath.Join(dir, "refs"), func(path string, d os.DirEntry, err error) error {
@@ -447,6 +516,7 @@ func outsideWitness(root string) map[string]string {
 			return nil
 		})
 	}
+	paths = append(paths, gitConfigFiles(root)...)
 	if home, err := os.UserHomeDir(); err == nil {
 		for _, name := range []string{"artifacts", "artifacts/sha256", "artifacts/cli-source", "toolchains", "tools"} {
 			paths = append(paths, filepath.Join(home, ".putnami", name))
@@ -454,11 +524,140 @@ func outsideWitness(root string) map[string]string {
 	}
 	witness := make(map[string]string, len(paths)+1)
 	for _, path := range paths {
-		sig, _ := SigOf(path) // an absent path is witnessed absent
-		witness[path] = sigString(sig)
+		witness[path] = statWitness(path)
 	}
 	witness["git index entries"] = indexEntries(root)
 	return witness
+}
+
+// statWitness is the stat of path as a witness holds it; an absent path is
+// witnessed absent.
+func statWitness(path string) string {
+	sig, _ := SigOf(path)
+	return sigString(sig)
+}
+
+// gitConfigMemo is the list gitConfigFiles made for a worktree, and the stat
+// of each file it read to make it.
+type gitConfigMemo struct {
+	sigs  map[string]string
+	paths []string
+}
+
+// gitConfigFiles names the files of Git's configuration a run's Git reads in
+// root, and the ignore and attributes files they make it read: the system,
+// global and repository configuration at their default places, the files they
+// include, the excludes and attributes files they name, and the default global
+// ones. Git lists them once per worktree; the list is made again when one of
+// the files it was made from, or HEAD, which a conditional include reads, moved
+// since. An absent file is in it, witnessed absent.
+func gitConfigFiles(root string) []string {
+	memory.Lock()
+	memo := memory.gitConfig[root]
+	memory.Unlock()
+	if memo != nil && memo.holds() {
+		return memo.paths
+	}
+	paths := defaultGitConfigFiles(root)
+	read := slices.Clone(paths)
+	for _, dir := range gitDirs(root) {
+		read = append(read, filepath.Join(dir, "HEAD"))
+	}
+	out, err := exec.Command(gitread.Executable(), "-C", root, "config", "--list", "--show-origin", "-z").Output() //nolint:gosec // fixed arguments
+	if err == nil {
+		paths = append(paths, configuredGitFiles(root, out)...)
+	} else {
+		// An unreadable configuration is witnessed by its files alone, and
+		// listed again at the next decision.
+		read = append(read, "unlisted")
+	}
+	sort.Strings(paths)
+	paths = slices.Compact(paths)
+	memo = &gitConfigMemo{sigs: map[string]string{}, paths: paths}
+	for _, path := range append(read, paths...) {
+		memo.sigs[path] = statWitness(path)
+	}
+	memory.Lock()
+	memory.gitConfig[root] = memo
+	memory.Unlock()
+	return paths
+}
+
+// holds says no file the list was made from moved since.
+func (m *gitConfigMemo) holds() bool {
+	for path, sig := range m.sigs {
+		if statWitness(path) != sig {
+			return false
+		}
+	}
+	return true
+}
+
+// defaultGitConfigFiles are the places Git reads its configuration and its
+// global ignore and attributes files from when nothing names others.
+func defaultGitConfigFiles(root string) []string {
+	paths := []string{"/etc/gitconfig"}
+	for _, name := range []string{"GIT_CONFIG_SYSTEM", "GIT_CONFIG_GLOBAL"} {
+		if v := os.Getenv(name); v != "" {
+			paths = append(paths, v)
+		}
+	}
+	xdg := os.Getenv("XDG_CONFIG_HOME")
+	if home, err := os.UserHomeDir(); err == nil {
+		paths = append(paths, filepath.Join(home, ".gitconfig"))
+		if xdg == "" {
+			xdg = filepath.Join(home, ".config")
+		}
+	}
+	if xdg != "" {
+		for _, name := range []string{"config", "ignore", "attributes"} {
+			paths = append(paths, filepath.Join(xdg, "git", name))
+		}
+	}
+	for _, dir := range gitDirs(root) {
+		paths = append(paths, filepath.Join(dir, "config"), filepath.Join(dir, "config.worktree"))
+	}
+	return paths
+}
+
+// configuredGitFiles reads Git's listing of its configuration with origins
+// (`git config --list --show-origin -z`) and names the files it read and the
+// files its entries make Git read: an included file, and the excludes and
+// attributes files.
+func configuredGitFiles(root string, listing []byte) []string {
+	var paths []string
+	fields := strings.Split(string(listing), "\x00")
+	for i := 0; i+1 < len(fields); i += 2 {
+		origin, entry := fields[i], fields[i+1]
+		from := ""
+		if file, ok := strings.CutPrefix(origin, "file:"); ok {
+			from = gitPath(root, file)
+			paths = append(paths, from)
+		}
+		key, value, _ := strings.Cut(entry, "\n")
+		key = strings.ToLower(key)
+		switch {
+		case key == "core.excludesfile" || key == "core.attributesfile":
+			paths = append(paths, gitPath(root, value))
+		case from != "" && (key == "include.path" || strings.HasPrefix(key, "includeif.") && strings.HasSuffix(key, ".path")):
+			paths = append(paths, gitPath(filepath.Dir(from), value))
+		}
+	}
+	return paths
+}
+
+// gitPath resolves a path Git's configuration names: a leading ~/ is the
+// home directory, and a relative path is relative to dir.
+func gitPath(dir, path string) string {
+	if rest, ok := strings.CutPrefix(path, "~/"); ok {
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, rest)
+		}
+	}
+	if !filepath.IsAbs(path) {
+		return filepath.Join(dir, path)
+	}
+	return filepath.Clean(path)
 }
 
 func sigString(sig FileSig) string {

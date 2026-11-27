@@ -2,8 +2,11 @@ package machineproc
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/sdk/extension/gitread"
 )
 
 // armMemory makes w the worker's watcher and arms the memory of a run in
@@ -131,5 +134,138 @@ func TestARefusedAnswerRecordsWhy(t *testing.T) {
 	d := ReadLastMemory()
 	if d == nil || !d.Answerable || d.Answered || d.Reason != "a served task's cache entry moved: /app:test" {
 		t.Fatalf("recorded %+v, want answerable, not answered, with the scheduler's first reason for this worktree", d)
+	}
+}
+
+// TestPeekRunOffersWhatTakeRunWouldWithoutTakingIt pins how an engine run
+// reads the version snapshot the held run read before its hooks (CLI ADR 0116
+// §6a): it is offered what TakeRun would offer, under the same check of what
+// the decision witnessed, and the engine run still takes its position after.
+func TestPeekRunOffersWhatTakeRunWouldWithoutTakingIt(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	w, root := watchedTree(t, 0)
+	m := RunMemory{}
+	offer := func() runMemory {
+		return runMemory{
+			check:       &memoryCheck{},
+			offered:     []any{"answered plan"},
+			offeredRuns: []heldEngineRun{{record: "first engine run", plan: 0}},
+		}
+	}
+	armMemory(t, w, root, offer())
+	for range 2 {
+		if offered := m.PeekRun(root); offered != "first engine run" {
+			t.Fatalf("peeked %v, want what the held engine run computed", offered)
+		}
+	}
+	if offered := m.TakeRun(root); offered != "first engine run" {
+		t.Fatalf("took %v after the peeks, want what the held engine run computed", offered)
+	}
+	if offered := m.PeekRun(root); offered != nil {
+		t.Fatalf("peeked %v past the held engine runs, want nothing", offered)
+	}
+
+	armMemory(t, w, root, offer())
+	write(t, filepath.Join(root, "c", "g.txt"), "written by a first-use bootstrap")
+	if offered := m.PeekRun(root); offered != nil {
+		t.Errorf("a write after the decision: peeked %v, want nothing", offered)
+	}
+	armMemory(t, w, root, runMemory{})
+	if offered := m.PeekRun(root); offered != nil {
+		t.Errorf("a run not decided answerable: peeked %v, want nothing", offered)
+	}
+}
+
+// TestADecisionSaysAStepWasHeldOnlyWhenEveryEngineRunTookIt pins the
+// decision's versionsHeld: every engine run of the run that reached the step
+// took it from the held run, and at least one did.
+func TestADecisionSaysAStepWasHeldOnlyWhenEveryEngineRunTookIt(t *testing.T) {
+	dir, err := os.MkdirTemp("", "pm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+	if _, err := Dir(os.Getenv, true); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	m := RunMemory{}
+	for name, c := range map[string]struct {
+		held, computed int
+		want           bool
+	}{
+		"every engine run took it": {2, 0, true},
+		"one computed it":          {1, 1, false},
+		"none reached it":          {0, 0, false},
+		"all computed it":          {0, 1, false},
+	} {
+		armMemory(t, nil, root, runMemory{})
+		m.Reused(t.TempDir(), "versions", false)
+		for range c.held {
+			m.Reused(root, "versions", true)
+		}
+		for range c.computed {
+			m.Reused(root, "versions", false)
+		}
+		afterRun(nil, MemoryDecision{Root: root, Answerable: true}, 0)
+		if d := ReadLastMemory(); d == nil || d.VersionsHeld != c.want {
+			t.Errorf("%s: recorded %+v, want versionsHeld %v", name, d, c.want)
+		}
+	}
+}
+
+// TestTheWitnessTakesGitsConfigurationAndWhatItNames pins what the decision
+// witnesses of Git beyond HEAD, the refs and the index, which a held version
+// snapshot depends on (CLI ADR 0116 §6a): the global configuration, a file it
+// includes, the excludes file it names, the default global ignore file, the
+// repository's own exclude file and the directory of its packs.
+func TestTheWitnessTakesGitsConfigurationAndWhatItNames(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	// Git reads an empty GIT_CONFIG_GLOBAL as no global configuration.
+	for _, name := range []string{"XDG_CONFIG_HOME", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"} {
+		t.Setenv(name, "")
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root := t.TempDir()
+	if out, err := exec.Command(gitread.Executable(), "-C", root, "init", "-q").CombinedOutput(); err != nil { //nolint:gosec // fixed arguments
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	write(t, filepath.Join(home, ".gitconfig"), "[core]\n\texcludesFile = ~/excludes\n[include]\n\tpath = extra.inc\n")
+	write(t, filepath.Join(home, "excludes"), "")
+	if err := os.MkdirAll(filepath.Join(root, ".git", "info"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	before := outsideWitness(root)
+	for _, change := range []struct {
+		name, path string
+		write      func(path string)
+	}{
+		{"the excludes file the global configuration names", filepath.Join(home, "excludes"), func(p string) { write(t, p, "*.log\n") }},
+		{"a file the global configuration includes", filepath.Join(home, "extra.inc"), func(p string) { write(t, p, "[core]\n\tabbrev = 12\n") }},
+		{"the global configuration", filepath.Join(home, ".gitconfig"), func(p string) {
+			write(t, p, "[core]\n\texcludesFile = ~/excludes\n\tabbrev = 9\n[include]\n\tpath = extra.inc\n")
+		}},
+		{"the default global ignore file", filepath.Join(home, ".config", "git", "ignore"), func(p string) {
+			if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			write(t, p, "*.tmp\n")
+		}},
+		{"the repository's exclude file", filepath.Join(root, ".git", "info", "exclude"), func(p string) { write(t, p, "scratch/\n") }},
+		{"the directory of the packs", filepath.Join(root, ".git", "objects", "pack"), func(p string) { write(t, filepath.Join(p, "pack-x.keep"), "") }},
+	} {
+		change.write(change.path)
+		after := outsideWitness(root)
+		if moved := movedWitness(before, after); moved != change.path {
+			t.Errorf("%s: moved %q, want %q", change.name, moved, change.path)
+		}
+		before = after
+	}
+	if moved := movedWitness(before, outsideWitness(root)); moved != "" {
+		t.Errorf("nothing changed: moved %q", moved)
 	}
 }

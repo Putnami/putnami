@@ -59,3 +59,9 @@ func (RunMemory) TakeRun(string) any { return nil }
 
 // KeepRun holds nothing.
 func (RunMemory) KeepRun(string, any, bool) {}
+
+// PeekRun offers nothing.
+func (RunMemory) PeekRun(string) any { return nil }
+
+// Reused records nothing.
+func (RunMemory) Reused(string, string, bool) {}

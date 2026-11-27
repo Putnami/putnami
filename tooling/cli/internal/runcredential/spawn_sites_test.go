@@ -141,6 +141,8 @@ var spawnSites = map[string]spawnSite{
 		why: "this CLI's own executable as the machine supervisor (CLI ADR 0116); a hosted run never starts it (servesThroughMachine)"},
 	"machineproc/memory_unix.go:gitDirs": {spawns: 2, verdict: noRepositoryCode,
 		why: "git rev-parse runs no hook; gitread.Executable asks /usr/bin/xcrun, a fixed program, for the git to run"},
+	"machineproc/memory_unix.go:gitConfigFiles": {spawns: 2, verdict: noRepositoryCode,
+		why: "git config --list reads configuration and runs no hook, filter or monitor; gitread.Executable asks /usr/bin/xcrun, a fixed program, for the git to run"},
 	"machineproc/memory_unix.go:indexEntries": {spawns: 2, verdict: noRepositoryCode,
 		why: "git ls-files runs no hook; gitread.Executable asks /usr/bin/xcrun, a fixed program, for the git to run"},
 	"machineproc/supervisor_unix.go:(*supervisor).startWorker": {spawns: 1, verdict: noRepositoryCode,

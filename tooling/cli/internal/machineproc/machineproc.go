@@ -79,6 +79,10 @@ type MemoryDecision struct {
 	// what the held run loaded and planned: no workspace load, runtime
 	// synchronization, probe, selection or plan (CLI ADR 0116 §6a).
 	PlanSkipped bool `json:"planSkipped"`
+	// VersionsHeld says every engine run of the request that would read the
+	// version snapshot from Git took the one the held run read instead (CLI
+	// ADR 0116 §6a).
+	VersionsHeld bool `json:"versionsHeld"`
 	// Kept says the run that followed is held for the next request, or why
 	// not.
 	Kept string `json:"kept"`

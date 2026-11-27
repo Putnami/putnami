@@ -21,14 +21,33 @@ import (
 type fakeHeldRuns struct {
 	offer   any
 	takes   int
+	peeks   int
 	keeps   int
 	record  any
 	skipped bool
+	// reused counts, per step, the engine runs that took it from the held
+	// run (true) and those that computed it (false).
+	reused map[string]map[bool]int
 }
 
 func (f *fakeHeldRuns) TakeRun(string) any {
 	f.takes++
 	return f.offer
+}
+
+func (f *fakeHeldRuns) PeekRun(string) any {
+	f.peeks++
+	return f.offer
+}
+
+func (f *fakeHeldRuns) Reused(_, step string, held bool) {
+	if f.reused == nil {
+		f.reused = map[string]map[bool]int{}
+	}
+	if f.reused[step] == nil {
+		f.reused[step] = map[bool]int{}
+	}
+	f.reused[step][held]++
 }
 
 func (f *fakeHeldRuns) KeepRun(_ string, record any, skipped bool) {
@@ -179,5 +198,85 @@ func TestAHeldRunRecordsWhatPhasesOneToThreePrint(t *testing.T) {
 	}
 	if hold.stdout.String() != "selected\n" || hold.stderr.String() != "warning\n" {
 		t.Fatalf("held stdout %q and stderr %q, want what was printed before the hold completed", hold.stdout.String(), hold.stderr.String())
+	}
+}
+
+// TestAnAnsweredRunTakesTheVersionSnapshotTheHeldRunRead pins the version
+// snapshot's part of CLI ADR 0116 §6a: in a worker, an engine run that reads
+// its version snapshot from Git leaves it with what it computed; a later run
+// the worker offers that run takes the snapshot instead of asking Git, and
+// says so. A held run whose snapshot its adapter gave, or none, and a run
+// offered nothing read Git.
+func TestAnAnsweredRunTakesTheVersionSnapshotTheHeldRunRead(t *testing.T) {
+	root, req := heldRunFixture(t)
+	initCLISelectionGitRepo(t, root)
+	memory := &fakeHeldRuns{}
+	serveHeldRuns(t, memory)
+
+	if result, err := New().Run(context.Background(), req, discardEvents{}); err != nil || result.ExitCode != ExitSuccess {
+		t.Fatalf("first run: exit=%d err=%v", result.ExitCode, err)
+	}
+	held, ok := memory.record.(*heldRun)
+	if !ok || !held.complete || !held.captured || held.snapshot == nil || held.snapshot.SHA == "" {
+		t.Fatalf("first run kept %+v, want a complete record with the snapshot it read from Git", memory.record)
+	}
+	if memory.reused["versions"][false] != 1 || memory.reused["versions"][true] != 0 {
+		t.Fatalf("first run reported %v, want its snapshot computed", memory.reused)
+	}
+
+	// A snapshot Git would never read: the answer asks what the held run
+	// asked only when it took this one.
+	marked := *held.snapshot
+	marked.SHA, marked.Branch = "held00000000", "held"
+	held.snapshot = &marked
+	memory.offer, memory.reused = held, nil
+	result, err := New().Run(context.Background(), req, discardEvents{})
+	if err != nil || result.ExitCode != ExitSuccess {
+		t.Fatalf("answered run: exit=%d err=%v", result.ExitCode, err)
+	}
+	if !memory.skipped || memory.reused["versions"][true] != 1 || memory.reused["versions"][false] != 0 {
+		t.Fatalf("answered run: skipped=%v reused=%v, want it answered with the held snapshot", memory.skipped, memory.reused)
+	}
+	if again, ok := memory.record.(*heldRun); !ok || again.snapshot.SHA != "held00000000" || !again.captured {
+		t.Fatalf("answered run kept %+v, want the held record, with its snapshot", memory.record)
+	}
+
+	for name, offer := range map[string]func() any{
+		"nothing offered": func() any { return nil },
+		"a snapshot its adapter gave": func() any {
+			h := *held
+			h.captured = false
+			return &h
+		},
+		"no snapshot": func() any {
+			h := *held
+			h.snapshot = nil
+			return &h
+		},
+		"another workspace": func() any {
+			h := *held
+			h.root = t.TempDir()
+			return &h
+		},
+	} {
+		memory.offer, memory.reused = offer(), nil
+		if result, err := New().Run(context.Background(), req, discardEvents{}); err != nil || result.ExitCode != ExitSuccess {
+			t.Fatalf("%s: exit=%d err=%v", name, result.ExitCode, err)
+		}
+		if memory.reused["versions"][true] != 0 || memory.reused["versions"][false] != 1 || memory.skipped {
+			t.Errorf("%s: skipped=%v reused=%v, want the snapshot read from Git and the run computed", name, memory.skipped, memory.reused)
+		}
+	}
+
+	// A snapshot the adapter gives is not Engine.Run's to read.
+	given := req
+	given.VersionSnapshot = &marked
+	memory.offer, memory.reused = nil, nil
+	peeks := memory.peeks
+	if result, err := New().Run(context.Background(), given, discardEvents{}); err != nil || result.ExitCode != ExitSuccess {
+		t.Fatalf("given snapshot: exit=%d err=%v", result.ExitCode, err)
+	}
+	if memory.peeks != peeks || len(memory.reused) != 0 {
+		t.Errorf("given snapshot: peeked %d times and reported %v, want neither", memory.peeks-peeks, memory.reused)
 	}
 }
