@@ -346,7 +346,7 @@ func globInput(root, pattern string) SnapshotInput {
 	// Round(0) drops the monotonic reading, so the comparisons below see a
 	// wall clock that went back.
 	start := time.Now().Round(0)
-	rootStat, rootOK := fileindex.StatPath(root)
+	rootStat, rootOK := fileindex.LstatAny(root)
 	trusted = trusted && rootOK
 	var walked map[string]fileindex.Stat
 	var matches []string
@@ -377,14 +377,14 @@ func globInput(root, pattern string) SnapshotInput {
 		if linkInfo, err := os.Lstat(absolute); err != nil || linkInfo.Mode()&os.ModeSymlink != 0 {
 			trusted = false // a link's stat does not answer for its target
 		}
-		before, statOK := fileindex.StatPath(absolute)
+		before, statOK := fileindex.LstatAny(absolute)
 		digest, digestErr := fileContentDigest(absolute)
 		if digestErr != nil {
 			trusted = false
 			continue
 		}
 		if trusted {
-			after, afterOK := fileindex.StatPath(absolute)
+			after, afterOK := fileindex.LstatAny(absolute)
 			if !statOK || !afterOK || after != before || before.Dev != rootStat.Dev {
 				// A file that moved while read, or that lies on another
 				// file system than the workspace's, is not held.
@@ -434,7 +434,7 @@ type globWitness struct {
 // holds reports whether every path still has its recorded stat.
 func (w *globWitness) holds() bool {
 	for path, recorded := range w.paths {
-		if now, ok := fileindex.StatPath(path); !ok || now != recorded {
+		if now, ok := fileindex.LstatAny(path); !ok || now != recorded {
 			return false
 		}
 	}
@@ -577,7 +577,7 @@ func workspaceGlobMatchesWitnessed(root, pattern string, dev uint64) ([]string, 
 			held = false
 			return
 		}
-		st, ok := fileindex.StatPath(dir)
+		st, ok := fileindex.LstatAny(dir)
 		if !ok || st.Dev != dev {
 			held = false
 			return
@@ -593,7 +593,7 @@ func workspaceGlobMatchesWitnessed(root, pattern string, dev uint64) ([]string, 
 		return matches, nil
 	}
 	for dir, before := range dirs {
-		if after, ok := fileindex.StatPath(dir); !ok || after != before {
+		if after, ok := fileindex.LstatAny(dir); !ok || after != before {
 			return matches, nil
 		}
 	}

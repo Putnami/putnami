@@ -1005,18 +1005,6 @@ func BuildIdentity(path string) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-// StatPath returns the stat the index compares for whatever is at path, a
-// directory included, without following a final link; ok is false for a
-// missing path and on a platform whose stat this package does not decode.
-func StatPath(path string) (Stat, bool) { return LstatAny(path) }
-
-// TrustsStats reports whether a stat answers for what lies below dir: dir is
-// on a listed local file system and this platform's stat is decoded (ADR 0009
-// §3 of protocols/workspace).
-func TrustsStats(dir string) bool {
-	return statDecoded && localFilesystem(dir)
-}
-
 // LstatAny returns the stat of whatever is at path, a directory or a link
 // included, without following a link; ok is false for a missing path and on
 // a platform whose stat this package does not decode.
@@ -1037,4 +1025,11 @@ func StatAny(path string) (Stat, bool) {
 		return Stat{}, false
 	}
 	return statFile(info)
+}
+
+// TrustsStats reports whether a stat answers for what lies below dir: dir is
+// on a listed local file system and this platform's stat is decoded (ADR 0009
+// §3 of protocols/workspace).
+func TrustsStats(dir string) bool {
+	return statDecoded && localFilesystem(dir)
 }

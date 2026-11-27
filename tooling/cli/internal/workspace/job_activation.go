@@ -149,7 +149,7 @@ type activationWitness struct {
 
 func (w *activationWitness) holds() bool {
 	for path, recorded := range w.paths {
-		if now, ok := fileindex.StatPath(path); !ok || now != recorded {
+		if now, ok := fileindex.LstatAny(path); !ok || now != recorded {
 			return false
 		}
 	}
@@ -186,7 +186,7 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 	// Round(0) drops the monotonic reading, so the comparisons below see a
 	// wall clock that went back.
 	start := time.Now().Round(0)
-	rootStat, rootOK := fileindex.StatPath(root)
+	rootStat, rootOK := fileindex.LstatAny(root)
 	trusted := rootOK && fileindex.TrustsStats(root)
 	walked := map[string]fileindex.Stat{}
 	found, match := false, ""
@@ -207,7 +207,7 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 				return filepath.SkipDir
 			}
 			if trusted {
-				if st, ok := fileindex.StatPath(path); ok && st.Dev == rootStat.Dev {
+				if st, ok := fileindex.LstatAny(path); ok && st.Dev == rootStat.Dev {
 					walked[path] = st
 				} else {
 					trusted = false
@@ -233,7 +233,7 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 		// The match holds while it and the directories down to it hold;
 		// the directories the walk listed before reaching them do not
 		// matter.
-		st, ok := fileindex.StatPath(match)
+		st, ok := fileindex.LstatAny(match)
 		if !ok || st.Dev != rootStat.Dev {
 			activationWitnesses.Delete(key)
 			return found
@@ -256,7 +256,7 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 	// A directory whose stat moved during the walk leaves the answer
 	// unheld.
 	for path, before := range w.paths {
-		if after, ok := fileindex.StatPath(path); !ok || after != before {
+		if after, ok := fileindex.LstatAny(path); !ok || after != before {
 			activationWitnesses.Delete(key)
 			return found
 		}
