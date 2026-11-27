@@ -232,7 +232,6 @@ func TestLoadGenerateResult_ValidFile(t *testing.T) {
 	// into another checkout; loadGenerateResult hands callers absolute ones back.
 	genResult := build.GenerateResult{
 		Hash: "abc123",
-		Mode: "build",
 		Exports: map[string]string{
 			"version-info": ".gen/version.json",
 		},
@@ -246,9 +245,6 @@ func TestLoadGenerateResult_ValidFile(t *testing.T) {
 	result := loadGenerateResult(dir)
 	if result.Hash != "abc123" {
 		t.Errorf("hash = %q, want abc123", result.Hash)
-	}
-	if result.Mode != "build" {
-		t.Errorf("mode = %q, want build", result.Mode)
 	}
 	if want := filepath.Join(dir, ".gen", "version.json"); result.Exports["version-info"] != want {
 		t.Errorf("exports[version-info] = %q, want %q", result.Exports["version-info"], want)
@@ -2003,6 +1999,43 @@ func TestDoGenerate_WithMode(t *testing.T) {
 	}
 	if result.Mode != "serve" {
 		t.Errorf("expected mode 'serve', got %q", result.Mode)
+	}
+}
+
+// TestDoGenerate_ManifestDoesNotRecordTheMode holds that the build and the test
+// generate of one project write the same .gen/generate-result.json. Both tasks
+// declare that .gen tree as their output, so a manifest that differs by mode
+// alone makes each restore of one rewrite the tree the other left.
+func TestDoGenerate_ManifestDoesNotRecordTheMode(t *testing.T) {
+	mockBunResolution(t)
+	mockAllExec(t, successExec)
+
+	manifests := map[string]string{}
+	for _, mode := range []string{"build", "test"} {
+		ctx, dir := makeTestCtx(t)
+		ctx.Params = pctx.Params{"mode": json.RawMessage(`"` + mode + `"`)}
+		projectPath := filepath.Join(dir, "project")
+		os.MkdirAll(filepath.Join(projectPath, "src"), 0755)
+		os.WriteFile(filepath.Join(projectPath, "src", "index.ts"), []byte("const x = 1;"), 0644)
+
+		result, err := doGenerate(ctx, jsonl.New(), projectPath, nil)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", mode, err)
+		}
+		if result.Mode != mode {
+			t.Errorf("%s: in-memory mode = %q", mode, result.Mode)
+		}
+		data, err := os.ReadFile(filepath.Join(projectPath, ".gen", "generate-result.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), `"mode"`) {
+			t.Errorf("%s: generate-result.json records the mode:\n%s", mode, data)
+		}
+		manifests[mode] = string(data)
+	}
+	if manifests["build"] != manifests["test"] {
+		t.Errorf("the build and test generate wrote different manifests:\nbuild: %s\ntest: %s", manifests["build"], manifests["test"])
 	}
 }
 

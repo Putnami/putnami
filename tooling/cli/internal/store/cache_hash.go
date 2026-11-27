@@ -1528,7 +1528,7 @@ var versionStampInvocationFields = []string{versionStampFieldBuildTime}
 
 // versionStampNonTreeFields are every top-level stamp field a file-pattern input
 // leaves out of its digest, because none of them describes the tree:
-//   - buildTime changes with each invocation that executes a job.
+//   - buildTime names the invocation that first stamped the identity.
 //   - sha, suffix, version, branch and isDirty name the commit.
 //   - image, image_digest and publish name a publication of that commit. A
 //     publish merges them into the stamp, and the scheduler carries them into
@@ -1538,6 +1538,24 @@ var versionStampNonTreeFields = []string{
 	"sha", "suffix", "version", "branch", "isDirty",
 	"image", "image_digest", "publish",
 }
+
+// VersionStampRestampedFields are the stamp fields the scheduler owns and
+// writes again after a restore that replaces the project's stamp: its whole
+// half of the document, the commit identity, the build time and the
+// capability inventory, whose source bindings move with the project's files
+// while a key that does not read them stays put. A restore whose destination
+// holds the entry's stamp but for them is held (destinationFileDigest): the
+// re-stamp settles them either way, and the fields other writers merged are
+// still compared. The scheduler's versionStampOwnedFields must name the same
+// set (TestVersionStampOwnedFieldsMatchVersionInfo).
+var VersionStampRestampedFields = []string{
+	versionStampFieldBuildTime, "sha", "suffix", "version", "branch", "isDirty",
+	"name", "capabilityRoot", "capabilityPackages",
+}
+
+// versionStampRestampedVariant is the fileindex variant of a build stamp's
+// digest without VersionStampRestampedFields.
+const versionStampRestampedVariant = "version-stamp\x00restamped"
 
 // isVersionStamp reports whether path is a project's .gen/version.json — the
 // build stamp the CLI writes for every planned project before jobs run.

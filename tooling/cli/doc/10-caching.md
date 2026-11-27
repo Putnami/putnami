@@ -2007,10 +2007,23 @@ this build's identity.
 The stamp is also the one file the emptying of an executing task's `.gen`
 leaves in place (see
 [Task-owned entries](#task-owned-entries-declared-outputs)). The scheduler
-writes it once per project and session, before the first task of that project
-executes, so a second task of the session that owns `.gen` still finds it. The
-emptying keeps the whole document, so the fields other writers merged into it
-survive, as they survive a re-stamp.
+brings it to the run's identity once per project and session, before the first
+task of that project executes, so a second task of the session that owns `.gen`
+still finds it. The emptying keeps the whole document, so the fields other
+writers merged into it survive, as they survive a re-stamp.
+
+That write, too, is skipped when every identity field already matches: an
+executing task keeps the stamp's bytes, `buildTime` included, as a cache hit
+does (ADR 0121). A task that runs on every run of an unchanged workspace
+therefore rewrites no stamp. `buildTime` names the invocation that first
+stamped the identity; its readers, a workload's `/version` answer and the
+TypeScript `getBuildInfo()`, take it as information.
+
+A restore also holds a project's `.gen` whose stamp, `<project>/.gen/version.json`,
+differs from the entry's only in the fields the scheduler owns (`buildTime`,
+the commit fields, `name`, `capabilityRoot`, `capabilityPackages`): the
+re-stamp writes this run's values over them anyway, so an entry reused
+across commits rewrites nothing. The fields other writers merged are compared.
 
 ### Watch Mode
 

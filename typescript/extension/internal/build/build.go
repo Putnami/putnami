@@ -18,9 +18,15 @@ import (
 )
 
 // GenerateResult holds the output of the generate phase.
+//
+// Mode is the command mode the phase ran in (build, test or serve). It stays
+// out of .gen/generate-result.json: the build and test generate tasks of a
+// project declare the same .gen output, and a mode in that file made their
+// cache entries differ by it alone, so each restore of one rewrote the tree
+// the other left (CLI ADR 0121). Nothing reads the mode back from the file.
 type GenerateResult struct {
 	Hash    string            `json:"hash"`
-	Mode    string            `json:"mode"`
+	Mode    string            `json:"-"`
 	Exports map[string]string `json:"exports"`
 	Assets  map[string]string `json:"assets"`
 }

@@ -122,6 +122,77 @@ func TestPreserveMatchingVersionFilesKeepsCachedBuildTime(t *testing.T) {
 	}
 }
 
+// TestRefreshVersionFileWritesOnlyAChangedIdentity holds that the first task of
+// a project that executes leaves a stamp whose identity matches the run's
+// byte for byte, its build time included, and writes this run's identity and
+// build time over a stamp whose identity differs (ADR 0121). A task that
+// executes on every run of an unchanged workspace therefore writes no stamp.
+func TestRefreshVersionFileWritesOnlyAChangedIdentity(t *testing.T) {
+	t.Parallel()
+	wsRoot := t.TempDir()
+	projPath := "services/auth"
+	if err := os.MkdirAll(filepath.Join(wsRoot, projPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ws := &workspace.Workspace{Name: "ws", Root: wsRoot}
+	job := &ScheduledJob{
+		Project:   &workspace.Project{Name: "auth", Path: projPath},
+		Extension: &extension.ExtensionDescription{Name: "ext"},
+		JobDef:    &extension.JobDefinition{Name: "validate~features"},
+	}
+	version := rootLineVersions(&cachekey.JobContextVersion{SHA: "b49fb6f", Branch: "main", Suffix: "b49fb6f"})
+	moved := rootLineVersions(&cachekey.JobContextVersion{SHA: "c50ac7a", Branch: "main", Suffix: "c50ac7a"})
+	oldBuildTime := "2026-07-20T10:00:00Z"
+	newBuildTime := "2026-07-20T12:00:00Z"
+	path := filepath.Join(wsRoot, projPath, ".gen", "version.json")
+	session := func(versions cachekey.RunVersions) *Scheduler {
+		s := &Scheduler{
+			ws: ws, versionFiles: make(map[string]bool), versionBuildTime: newBuildTime,
+			capabilitySourceBindings: newCapabilitySourceBindingMemo(),
+			cacheStats:               &cachekey.CacheStats{},
+		}
+		s.cfg.VersionInfo = versions
+		return s
+	}
+
+	generateVersionFilesAt(ws, []*ScheduledJob{job}, version, oldBuildTime, false)
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session(version).refreshVersionFile(job)
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(before, after) || !after.ModTime().Equal(before.ModTime()) {
+		t.Fatal("an execution rewrote a stamp whose identity matches the run's")
+	}
+	var got VersionInfo
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.BuildTime != oldBuildTime {
+		t.Fatalf("BuildTime = %q, want the matching stamp's %q", got.BuildTime, oldBuildTime)
+	}
+
+	session(moved).refreshVersionFile(job)
+	data, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.SHA != "c50ac7a" || got.BuildTime != newBuildTime {
+		t.Fatalf("stamp = sha %q buildTime %q, want this run's identity c50ac7a and build time %q", got.SHA, got.BuildTime, newBuildTime)
+	}
+}
+
 func TestGenerateVersionFiles_UsesTheProjectsLineVersion(t *testing.T) {
 	t.Parallel()
 	wsRoot := t.TempDir()
@@ -414,6 +485,15 @@ func TestVersionStampOwnedFieldsMatchVersionInfo(t *testing.T) {
 	}
 	if !reflect.DeepEqual(fromStruct, versionStampOwnedFields) {
 		t.Fatalf("versionStampOwnedFields = %v, want the VersionInfo JSON names %v", versionStampOwnedFields, fromStruct)
+	}
+	// A restore holds a project stamp that differs in these fields alone, because
+	// the re-stamp after it writes every one of them (ADR 0121).
+	restamped := make(map[string]bool, len(store.VersionStampRestampedFields))
+	for _, name := range store.VersionStampRestampedFields {
+		restamped[name] = true
+	}
+	if !reflect.DeepEqual(restamped, versionStampOwnedFields) {
+		t.Fatalf("store.VersionStampRestampedFields = %v, want the fields the scheduler owns %v", restamped, versionStampOwnedFields)
 	}
 }
 
