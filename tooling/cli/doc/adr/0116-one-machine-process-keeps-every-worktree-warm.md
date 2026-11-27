@@ -294,11 +294,9 @@ none other. A client runs in its own process when:
   watches (`--watch`, `-w`, or a serve workload, which watches by default),
   or it is `publish`, `deploy` or `release`, which a rerun after a crash
   could repeat;
-- the client has a controlling terminal: a worker has none to give its jobs,
-  so a prompt that opens `/dev/tty`, the terminal's Ctrl-C and Ctrl-Z and its
-  size would not reach them. Commands without a terminal (agents, scripts,
-  editors' tasks) go through the worker; a person's terminal runs in its own
-  process;
+- the client has a controlling terminal but its input or output is
+  redirected: its jobs could reach that terminal only through `/dev/tty`,
+  which a worker cannot give them;
 - the worker's process differs from the client's in what a job inherits
   beyond the run's context: user and groups, resource limits, priority,
   control group, or the variables the Go runtime and the time package read
@@ -317,6 +315,29 @@ command only on the client's go. A client that has no Ready within 15 seconds
 runs the command itself, so a command never runs twice. The client forwards
 an interrupt or a termination as such, and a worker whose client went away
 stops the run as a termination does.
+
+**A command at a person's terminal.** When the client's input and output
+are a terminal, the worker opens a pseudo-terminal for the run, makes it the
+controlling terminal of its session (each worker is a session leader with
+none) with its own process group in the foreground, and puts its slave on
+the run's standard streams. It passes the master to the client, which gives
+it its terminal's settings and size, puts its own terminal in raw mode and
+relays bytes both ways, and on SIGWINCH sets the new size on the master. The
+run therefore meets the terminal as it would in its own process: the
+renderer and its terminal detection are the same, a job's prompt reads
+`/dev/tty` and turns echo off on it, Ctrl-C and Ctrl-\ reach the run's
+foreground group through the pseudo-terminal's line discipline, and the
+worker stops the run with the CLI's two-signal policy. Suspend is disabled
+on the pseudo-terminal: the client sees the suspend key, gives its terminal
+back and stops itself, as a command in its own process would stop; the run
+goes on meanwhile, its jobs keep running and their output waits in the
+pseudo-terminal until the shell resumes the client, which takes raw mode
+and the size again. No job command has to run in its own process for a
+prompt: an extension's own commands (`cloud login`…) and the structured
+commands, which prompt in the CLI itself, never go through a worker. A
+SIGTERM to the client is forwarded as a termination. A test drives a real
+pseudo-terminal: the rendering, a resize during the run that its jobs read
+on `/dev/tty`, and Ctrl-C during the run.
 
 **What a run inside a worker does.** The same code as a run in its own
 process, with held values in place of what the run would compute, each under
