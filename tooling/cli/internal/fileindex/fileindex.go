@@ -977,3 +977,21 @@ var onLocalFilesystem = func(dir string) bool {
 		dir = parent
 	}
 }
+
+// StatPath returns the stat the index compares for whatever is at path, a
+// directory included, without following a final link; ok is false for a
+// missing path and on a platform whose stat this package does not decode.
+func StatPath(path string) (Stat, bool) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return Stat{}, false
+	}
+	return statOf(info)
+}
+
+// TrustsStats reports whether a stat answers for what lies below dir: dir is
+// on a listed local file system and this platform's stat is decoded (ADR 0009
+// §3 of protocols/workspace).
+func TrustsStats(dir string) bool {
+	return statDecoded && localFilesystem(dir)
+}

@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -323,8 +324,29 @@ func digestInput(root, rel string) SnapshotInput {
 // is identical across checkouts of one commit.
 func globInput(root, pattern string) SnapshotInput {
 	input := SnapshotInput{Path: filepath.ToSlash(pattern), Kind: inputKindGlob}
-
-	matches := workspaceGlobMatches(root, pattern)
+	recursive := strings.Contains(filepath.ToSlash(pattern), "**")
+	memoKey := root + "\x00" + filepath.ToSlash(pattern)
+	var ignored string
+	if recursive {
+		ignored = ignoredFingerprint(root)
+		loadGlobWitnesses(root)
+		useGlobWitness(root, filepath.ToSlash(pattern))
+		if held, ok := globWitnesses.Load(memoKey); ok {
+			if w, typed := held.(*globWitness); typed && w.ignored == ignored && w.holds() {
+				input.Digest = w.digest
+				return input
+			}
+		}
+	}
+	witness := &globWitness{ignored: ignored, paths: map[string]fileindex.Stat{}}
+	trusted := recursive && fileindex.TrustsStats(root)
+	var walked map[string]fileindex.Stat
+	var matches []string
+	if trusted {
+		matches, walked = workspaceGlobMatchesWitnessed(root, pattern)
+	} else {
+		matches = workspaceGlobMatches(root, pattern)
+	}
 	rels := make([]string, 0, len(matches))
 	for _, match := range matches {
 		rel, relErr := filepath.Rel(root, match)
@@ -340,11 +362,24 @@ func globInput(root, pattern string) SnapshotInput {
 		absolute := filepath.Join(root, filepath.FromSlash(rel))
 		info, statErr := os.Stat(absolute)
 		if statErr != nil || info.IsDir() {
+			trusted = false // a path the witness cannot hold
 			continue
 		}
+		if linkInfo, err := os.Lstat(absolute); err != nil || linkInfo.Mode()&os.ModeSymlink != 0 {
+			trusted = false // a link's stat does not answer for its target
+		}
+		before, statOK := fileindex.StatPath(absolute)
 		digest, digestErr := fileContentDigest(absolute)
 		if digestErr != nil {
+			trusted = false
 			continue
+		}
+		if trusted {
+			after, afterOK := fileindex.StatPath(absolute)
+			if !statOK || !afterOK || after != before {
+				trusted = false
+			}
+			witness.paths[absolute] = before
 		}
 		h.Write([]byte(rel))    //nolint:errcheck // hash.Hash.Write never errors
 		h.Write([]byte{0})      //nolint:errcheck // hash.Hash.Write never errors
@@ -352,7 +387,72 @@ func globInput(root, pattern string) SnapshotInput {
 		h.Write([]byte{0})      //nolint:errcheck // hash.Hash.Write never errors
 	}
 	input.Digest = "sha256:" + hex.EncodeToString(h.Sum(nil))
+	if trusted {
+		for dir, st := range walked {
+			witness.paths[dir] = st
+		}
+		witness.digest = input.Digest
+		if witness.settled(time.Now()) {
+			globWitnesses.Store(memoKey, witness)
+			markGlobWitnessesDirty(root)
+		} else {
+			globWitnesses.Delete(memoKey)
+		}
+	}
 	return input
+}
+
+// globWitnesses holds, for the life of the process, each recursive glob
+// input's digest with its witness: the directories its walk listed and the
+// files it read, by their stats (CLI ADR 0116 §6, the directory rule of ADR
+// 0113 §2). A machine worker answers an unchanged probe from it with a stat
+// per path instead of a walk and a digest per file; a stat that differs
+// collects the input again.
+var globWitnesses sync.Map // root NUL pattern → *globWitness
+
+// globWalks counts the witnessed walks, for tests.
+var globWalks atomic.Int64
+
+type globWitness struct {
+	// ignored is the git-ignored set the walk skipped: another one walks
+	// otherwise.
+	ignored string
+	digest  string
+	paths   map[string]fileindex.Stat
+}
+
+// holds reports whether every path still has its recorded stat.
+func (w *globWitness) holds() bool {
+	for path, recorded := range w.paths {
+		if now, ok := fileindex.StatPath(path); !ok || now != recorded {
+			return false
+		}
+	}
+	return true
+}
+
+// settled reports whether every recorded time lies more than the file
+// index's margin before now: a path written within it could change again
+// with an equal stat (ADR 0009 §2 of protocols/workspace).
+func (w *globWitness) settled(now time.Time) bool {
+	limit := now.Add(-fileindex.Margin).UnixNano()
+	for _, st := range w.paths {
+		if st.ModNano >= limit || st.ChangeNano >= limit {
+			return false
+		}
+	}
+	return true
+}
+
+// ignoredFingerprint is the git-ignored set of root, as a comparable string.
+func ignoredFingerprint(root string) string {
+	dirs := ignoredWalkDirs(root)
+	keys := make([]string, 0, len(dirs))
+	for dir := range dirs {
+		keys = append(keys, dir)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, "\x00")
 }
 
 // workspaceGlobMatches expands one workspace-relative metadata-input pattern.
@@ -360,6 +460,12 @@ func globInput(root, pattern string) SnapshotInput {
 // recursive pattern walks only from the literal prefix before its first glob
 // segment, so `project/**/*.go` never scans an unrelated sibling project.
 func workspaceGlobMatches(root, pattern string) []string {
+	return workspaceGlobMatchesObserving(root, pattern, nil)
+}
+
+// workspaceGlobMatchesObserving is workspaceGlobMatches that calls observeDir,
+// when set, with every directory a recursive walk lists, before it lists it.
+func workspaceGlobMatchesObserving(root, pattern string, observeDir func(string)) []string {
 	pattern = filepath.ToSlash(pattern)
 	if !strings.Contains(pattern, "**") {
 		matches, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(pattern)))
@@ -401,6 +507,9 @@ func workspaceGlobMatches(root, pattern string) []string {
 			if rel, err := filepath.Rel(root, candidate); err == nil && ignored[filepath.ToSlash(rel)] {
 				return fs.SkipDir
 			}
+			if observeDir != nil {
+				observeDir(candidate)
+			}
 			return nil
 		}
 		rel, err := filepath.Rel(root, candidate)
@@ -413,6 +522,27 @@ func workspaceGlobMatches(root, pattern string) []string {
 		return nil
 	})
 	return matches
+}
+
+// workspaceGlobMatchesWitnessed is workspaceGlobMatches for a recursive
+// pattern that also returns the stat of every directory its walk listed,
+// taken before the listing; a directory whose stat moved during the walk is
+// left out, which leaves the witness short and unrecorded.
+func workspaceGlobMatchesWitnessed(root, pattern string) ([]string, map[string]fileindex.Stat) {
+	dirs := map[string]fileindex.Stat{}
+	observeDir := func(dir string) {
+		if st, ok := fileindex.StatPath(dir); ok {
+			dirs[dir] = st
+		}
+	}
+	globWalks.Add(1)
+	matches := workspaceGlobMatchesObserving(root, pattern, observeDir)
+	for dir, before := range dirs {
+		if after, ok := fileindex.StatPath(dir); !ok || after != before {
+			return matches, nil
+		}
+	}
+	return matches, dirs
 }
 
 // ignoredWalkDirsCache memoizes one root's fully-ignored directory set. The
@@ -700,4 +830,14 @@ func RefreshSnapshot(ws *Workspace, policy SnapshotWritePolicy) (*Snapshot, erro
 		return snapshot, err
 	}
 	return snapshot, nil
+}
+
+// ForgetProcessMemos drops what this package memoizes for the life of the
+// process. A CLI process serves one run; a machine worker serves many, and
+// a run must not read what an earlier one saw (CLI ADR 0116 §8).
+func ForgetProcessMemos() {
+	ignoredWalkDirsCache.Range(func(key, _ any) bool {
+		ignoredWalkDirsCache.Delete(key)
+		return true
+	})
 }
