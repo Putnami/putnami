@@ -80,7 +80,9 @@ func TestARecordedValueIsAnsweredWhileItsPartsHold(t *testing.T) {
 		t.Fatal("a table answered a recordKey another table recorded")
 	}
 
-	if err := os.WriteFile(recordFile, []byte("b"), 0o644); err != nil {
+	// Another size: a rewrite within one tick of a coarse file system clock
+	// keeps the times, which the margin covers outside this test's clock.
+	if err := os.WriteFile(recordFile, []byte("moved"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, ok := OpenRecord(path, "id").Answer("digests", "k", recordHoldsNow); ok {
