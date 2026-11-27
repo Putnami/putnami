@@ -1,0 +1,183 @@
+package engine
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
+	"testing"
+
+	extensionproto "go.putnami.dev/protocol/extension"
+	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/workspace"
+	"go.putnami.dev/tooling/cli/internal/workspace_state"
+)
+
+// fakeHeldRuns is a machine worker's memory as the engine reads it: it offers
+// offer to every engine run and records what each one keeps.
+type fakeHeldRuns struct {
+	offer   any
+	takes   int
+	keeps   int
+	record  any
+	skipped bool
+}
+
+func (f *fakeHeldRuns) TakeRun(string) any {
+	f.takes++
+	return f.offer
+}
+
+func (f *fakeHeldRuns) KeepRun(_ string, record any, skipped bool) {
+	f.keeps++
+	f.record, f.skipped = record, skipped
+}
+
+// serveHeldRuns installs memory as the worker's for the test, which therefore
+// never runs in parallel.
+func serveHeldRuns(t *testing.T, memory HeldRuns) {
+	t.Helper()
+	ServeHeldRuns(memory)
+	t.Cleanup(func() { ServeHeldRuns(nil) })
+}
+
+// heldRunFixture is a workspace with one project, app, whose build runs a
+// cached task, and the request of `build --all` over it.
+func heldRunFixture(t *testing.T) (string, Request) {
+	t.Helper()
+	root := t.TempDir()
+	write := func(path, data string) {
+		t.Helper()
+		path = filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("putnami.workspace.json", `{"name":"held-run","includes":["app","extension"]}`)
+	write("app/putnami.json", `{"name":"app","extensions":["/extension"]}`)
+	write("app/src.txt", "app\n")
+	write("extension/putnami.json", `{"name":"@test/held"}`)
+	enabled := true
+	manifest, err := json.Marshal(extensionproto.Manifest{
+		Name: "@test/held", Version: "1.0.0", CLIContract: 11,
+		Commands: map[string]extensionproto.CommandDefinition{
+			"build": {ActivationFiles: []string{"src.txt"}, Run: []extensionproto.PipelineStep{{ID: "build", Task: "build"}}},
+		},
+		Tasks: map[string]extensionproto.TaskDefinition{
+			"build": {
+				Kind: "command", Command: fixtureproc.Write(t, filepath.Join(t.TempDir(), "build"), fixtureproc.Program{}),
+				Reads:    []extensionproto.ResourceRef{{ID: extensionproto.ResourceIDSources}},
+				Cache:    &extensionproto.TaskCachePolicy{Enabled: &enabled, Deterministic: true, NoOutput: true},
+				Declares: &extensionproto.TaskDeclaration{},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	write("extension/putnami.extension.json", string(manifest))
+	workspace.InvalidateLoadCache(root)
+	return root, Request{
+		WorkspaceRoot: root, Config: wsproto.Load(root), Commands: []string{"build"},
+		Global: GlobalFlags{All: true, Projects: "*"}, Stdout: io.Discard,
+	}
+}
+
+// TestAWorkerAnswersARunFromWhatTheHeldRunLoadedAndPlanned pins the engine's
+// side of CLI ADR 0116 §6a: in a worker, a run leaves what its phases 1 to 3
+// computed; a later run of the same request offered it takes it instead of
+// loading and planning, records its session as any run does, and leaves it
+// again; a run of another request, or of a shape that cannot be held, loads
+// and plans what is on disk and leaves nothing.
+func TestAWorkerAnswersARunFromWhatTheHeldRunLoadedAndPlanned(t *testing.T) {
+	root, req := heldRunFixture(t)
+	memory := &fakeHeldRuns{}
+	serveHeldRuns(t, memory)
+
+	var result SessionResult
+	var err error
+	stderr := captureStderr(t, func() { result, err = New().Run(context.Background(), req, discardEvents{}) })
+	if err != nil || result.ExitCode != ExitSuccess {
+		t.Fatalf("first run: exit=%d err=%v\n%s", result.ExitCode, err, stderr)
+	}
+	held, ok := memory.record.(*heldRun)
+	if memory.takes != 1 || memory.keeps != 1 || memory.skipped || !ok || !held.complete || len(held.run.planned) != 1 {
+		t.Fatalf("first run left %+v, want one take and one kept record of its one-job plan", memory)
+	}
+	first := workspace_state.NewSessionStore(root).LatestID()
+
+	// The project no longer uses the extension: a run that loads and plans
+	// plans nothing. The worker's journal would refuse to offer the held run
+	// now; this memory offers it anyway, which only the absence of a load and
+	// a plan can answer with the held job.
+	if err := os.WriteFile(filepath.Join(root, "app", "putnami.json"), []byte(`{"name":"app"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	workspace.InvalidateLoadCache(root)
+	memory.offer = held
+	result, err = New().Run(context.Background(), req, discardEvents{})
+	if err != nil || result.ExitCode != ExitSuccess {
+		t.Fatalf("answered run: exit=%d err=%v", result.ExitCode, err)
+	}
+	if len(result.Plan) != 1 || result.Plan[0] != held.run.planned[0] {
+		t.Fatalf("answered run planned %v, want the held plan", result.Plan)
+	}
+	if !memory.skipped || memory.record != held {
+		t.Fatalf("answered run kept %+v, want the held record again, answered", memory)
+	}
+	if phases := result.Session.Orchestration.Phases; len(phases) != 0 {
+		t.Fatalf("answered run timed the engine phases %v, want none: it loaded and planned nothing", phases)
+	}
+	if latest := workspace_state.NewSessionStore(root).LatestID(); latest == first || latest == "" {
+		t.Fatalf("answered run recorded no session of its own (latest %q, first %q)", latest, first)
+	}
+
+	for name, shape := range map[string]func(*Request){
+		"another request":     func(r *Request) { r.Global.Verbose = true },
+		"a project selection": func(r *Request) { r.Global.All, r.Global.Projects = false, "app" },
+		"a run with --plan":   func(r *Request) { r.Global.Plan = true },
+		"a run without cache": func(r *Request) { r.Global.NoCache = true },
+		"a debug run":         func(r *Request) { r.Global.Debug = true },
+		"a remote run":        func(r *Request) { r.Global.Where = "remote" },
+	} {
+		asked := req
+		shape(&asked)
+		memory.record, memory.skipped = "untouched", true
+		result, _ := New().Run(context.Background(), asked, discardEvents{})
+		if memory.skipped || memory.record != nil {
+			t.Errorf("%s: kept %+v, want it computed and nothing kept", name, memory)
+		}
+		if len(result.Plan) == 1 && result.Plan[0] == held.run.planned[0] {
+			t.Errorf("%s: answered from the held plan", name)
+		}
+	}
+}
+
+// TestAHeldRunRecordsWhatPhasesOneToThreePrint pins the notices an answer
+// prints again: a hold records what is written through it until it is
+// complete, on stdout and stderr apart, and no hold records nothing.
+func TestAHeldRunRecordsWhatPhasesOneToThreePrint(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	var none *heldRun
+	if w := none.notices(&out, false); w != io.Writer(&out) {
+		t.Fatal("no hold wrapped the writer")
+	}
+	hold := &heldRun{}
+	_, _ = io.WriteString(hold.notices(&out, false), "selected\n")
+	_, _ = io.WriteString(hold.notices(&out, true), "warning\n")
+	hold.complete = true
+	_, _ = io.WriteString(hold.notices(&out, false), "executed\n")
+	if out.String() != "selected\nwarning\nexecuted\n" {
+		t.Fatalf("written %q, want every notice", out.String())
+	}
+	if hold.stdout.String() != "selected\n" || hold.stderr.String() != "warning\n" {
+		t.Fatalf("held stdout %q and stderr %q, want what was printed before the hold completed", hold.stdout.String(), hold.stderr.String())
+	}
+}

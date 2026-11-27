@@ -266,14 +266,17 @@ func reportProbeDiagnostics(req *Request, ws *workspace.Workspace, outcome *work
 	if req.Global.Quiet {
 		return
 	}
+	// A worker that holds the run prints them again when it answers a later
+	// identical run without probing (Request.hold).
+	out := req.hold.notices(os.Stderr, true)
 	for _, d := range outcome.Diagnostics {
 		if d.Severity == diag.Error {
 			continue // errors are only produced with a failure, handled above
 		}
-		iox.Fprintf(os.Stderr, "putnami: warning: %s\n", d.String())
+		iox.Fprintf(out, "putnami: warning: %s\n", d.String())
 	}
 	for _, warning := range workspace.NameDivergences(ws) {
-		iox.Fprintf(os.Stderr, "putnami: warning: %s\n", warning)
+		iox.Fprintf(out, "putnami: warning: %s\n", warning)
 	}
 	if req.Global.Debug {
 		iox.Fprintf(os.Stderr, "[debug] workspace probe: fresh=%v probed=%v reason=%q changed=%d\n",

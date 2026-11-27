@@ -87,12 +87,13 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "engine",
 		prefix: "internal/engine/",
-		files:  24,
-		funcs:  189,
+		files:  25,
+		funcs:  198,
 		why: "internal/engine: run assembly. Its functions are the run's stages (workspace probe, " +
 			"selection, planning, scheduling, finalization) and the seams where a run attaches " +
 			"what only the engine sees: the run report, the workspace map, the spec gate, the " +
-			"publication ancestry, the hosted run's credential and the portable runner's request. " +
+			"publication ancestry, the hosted run's credential, the portable runner's request " +
+			"and the machine worker's held run. " +
 			"The growth this pin stops is a caller's policy arriving here as a flag or a mode. " +
 			"Raise it only for a stage or an attachment that no adapter can own, and name it in " +
 			"the commit message.",

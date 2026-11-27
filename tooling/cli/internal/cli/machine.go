@@ -83,6 +83,9 @@ func machineStatus(output string) error {
 		if m.Answered {
 			answer = "yes, answered from memory"
 		}
+		if m.Answered && m.PlanSkipped {
+			answer = "yes, answered from memory without loading or planning"
+		}
 		iox.Fprintf(os.Stdout, "  Last worker run answerable from memory: %s; %s (%s)\n", answer, m.Kept, m.Root)
 	}
 	if !result.Running {

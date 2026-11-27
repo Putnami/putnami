@@ -1401,11 +1401,14 @@ in its own process. Ctrl-Z suspends the command; the run goes on and its
 output waits until the command resumes.
 On Linux, a worker answers a request it served before from memory when the
 worktree, Git's state and the Putnami home's runtimes and toolchains did not
-change since: the run still plans, then records the held results in its
-session without looking a task up or restoring it, and exits as the held run
-did.
+change since: the run records the held results in its session without
+looking a task up or restoring it, and exits as the held run did. Once the
+worker holds such an answer, the next identical request does not load the
+workspace or plan either; a bare command, which selects its projects from the
+last successful run, and a `--debug` run still do.
 `putnami machine status` shows why the last command ran in its own process,
-and whether the last run a worker served was answered from memory.
+and whether the last run a worker served was answered from memory, and
+without loading and planning.
 `PUTNAMI_MACHINE=off` turns it off for one command and `PUTNAMI_MACHINE=on` on;
 `machine on|off` records the user's choice in `machine.json` under the
 Putnami home. The supervisor lives in `$XDG_RUNTIME_DIR/putnami` on Linux,

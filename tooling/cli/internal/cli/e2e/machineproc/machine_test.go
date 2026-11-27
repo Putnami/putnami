@@ -7,6 +7,7 @@ package machineproc_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -20,6 +21,7 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machineproc"
@@ -33,6 +35,7 @@ func TestMain(m *testing.M) {
 		case "supervise":
 			os.Exit(machineproc.Supervise())
 		case "work":
+			engine.ServeHeldRuns(machineproc.RunMemory{})
 			scheduler.ServeHeldRuns(machineproc.RunMemory{})
 			os.Exit(machineproc.Work(func(ctx context.Context, args []string) int {
 				app, err := cli.NewApp()
@@ -400,11 +403,14 @@ func TestAnUnchangedRequestIsDecidedAnswerableFromMemory(t *testing.T) {
 }
 
 // TestAnUnchangedRunIsAnsweredFromMemory serves the same request through a
-// worker until the worker holds it, then once more: the scheduler answers
-// that run from the held one, records its session, and gives the tasks and
-// the exit code a run in its own process gives on the same tree. After a
-// write in the worktree, the next request runs its plan and still gives what
-// a run in its own process gives (CLI ADR 0116 §6a).
+// worker until the worker holds it, then once more: the engine answers that
+// run from what the held run loaded and planned, without loading or planning,
+// and writes none of the state files a load and a plan maintain; the
+// scheduler answers its plan from the held one; the run records its session
+// and gives the tasks and the exit code a run in its own process gives on the
+// same tree. After a write in the worktree, and for a request with other
+// arguments, the next request loads, plans and runs its plan, and still gives
+// what a run in its own process gives (CLI ADR 0116 §6a).
 func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("a run is answered from memory only where the platform has a watcher")
@@ -416,7 +422,7 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 	clitest.RunGit(t, root, "add", "-A")
 	clitest.RunGit(t, root, "commit", "-m", "ignore the run's state")
 	args := []string{"lint,test,build", "--all"}
-	local := func(step string) (int, []string) {
+	localArgs := func(step string, args ...string) (int, []string) {
 		t.Helper()
 		t.Setenv(machineproc.Env, "off")
 		code, out := clitest.RunGateArgs(t, root, args...)
@@ -425,12 +431,16 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 		}
 		return code, latestTasks(t, root)
 	}
+	local := func(step string) (int, []string) {
+		t.Helper()
+		return localArgs(step, args...)
+	}
 	local("the first settling run")
 	local("the second settling run")
 	startSupervisor(t)
-	// served runs the request through the worker, and returns its exit code,
-	// the tasks of the session it recorded and the worker's decision.
-	served := func(step string) (int, []string, *machineproc.MemoryDecision) {
+	// servedArgs runs a request through the worker, and returns its exit
+	// code, the tasks of the session it recorded and the worker's decision.
+	servedArgs := func(step string, args ...string) (int, []string, *machineproc.MemoryDecision) {
 		t.Helper()
 		t.Setenv(machineproc.Env, "on")
 		before := clitest.LatestSessionID(t, root)
@@ -441,22 +451,34 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 		}
 		return code, latestTasks(t, root), decision
 	}
+	served := func(step string) (int, []string, *machineproc.MemoryDecision) {
+		t.Helper()
+		return servedArgs(step, args...)
+	}
 
-	if _, _, d := served("the first request"); d.Answerable || d.Answered || d.Kept != "kept" {
+	if _, _, d := served("the first request"); d.Answerable || d.Answered || d.PlanSkipped || d.Kept != "kept" {
 		t.Fatalf("the first request: %+v, want unanswerable, computed and kept", d)
 	}
-	if _, _, d := served("the second request"); !d.Answerable || d.Kept != "kept" {
-		t.Fatalf("the second request: %+v, want answerable and kept", d)
+	// What a plan that executed computed is never held: the second request
+	// loads and plans, and only its plan is answered.
+	if _, _, d := served("the second request"); !d.Answerable || !d.Answered || d.PlanSkipped || d.Kept != "kept" {
+		t.Fatalf("the second request: %+v, want answerable, planned, answered and kept", d)
 	}
+	state := stateFiles(t, root)
 	code, answered, d := served("the unchanged request")
-	if !d.Answerable || !d.Answered || d.Kept != "kept" {
-		t.Fatalf("the unchanged request: %+v, want answerable, answered from memory and kept", d)
+	if !d.Answerable || !d.Answered || !d.PlanSkipped || d.Kept != "kept" {
+		t.Fatalf("the unchanged request: %+v, want answerable, answered from memory without a plan and kept", d)
 	}
 	if code != 0 {
 		t.Fatalf("the answered run exited %d, want 0", code)
 	}
 	if len(answered) != 6 {
 		t.Fatalf("the answered run recorded %d tasks, want 6: %v", len(answered), answered)
+	}
+	// It read nothing through the file index, the input record or the
+	// workspace snapshot, and so wrote none of them.
+	if after := stateFiles(t, root); after != state {
+		t.Errorf("the answered run changed the state files a load and a plan maintain:\nbefore %s\nafter  %s", state, after)
 	}
 	localCode, own := local("a run in its own process on the same tree")
 	if localCode != code {
@@ -465,11 +487,15 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 	if got, want := strings.Join(normalize(answered), "\n"), strings.Join(normalize(own), "\n"); got != want {
 		t.Errorf("tasks differ\nanswered from memory:\n%s\nin its own process:\n%s", got, want)
 	}
+	if _, again, d := served("the unchanged request again"); !d.PlanSkipped || !d.Answered ||
+		strings.Join(normalize(again), "\n") != strings.Join(normalize(own), "\n") {
+		t.Fatalf("the unchanged request again: %+v, want it answered without a plan, with the tasks of a run in its own process", d)
+	}
 
 	clitest.WriteFile(t, filepath.Join(root, "apps", "p001", "src.txt"), "p001 edited\n")
 	code, computed, d := served("after a write")
-	if d.Answerable || d.Answered || !strings.Contains(d.Reason, "the worktree changed") {
-		t.Fatalf("after a write: %+v, want unanswerable for the worktree's change, and computed", d)
+	if d.Answerable || d.Answered || d.PlanSkipped || !strings.Contains(d.Reason, "the worktree changed") {
+		t.Fatalf("after a write: %+v, want unanswerable for the worktree's change, planned and computed", d)
 	}
 	localCode, own = local("a run in its own process after the write")
 	if localCode != code {
@@ -478,6 +504,47 @@ func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
 	if got, want := strings.Join(normalize(computed), "\n"), strings.Join(normalize(own), "\n"); got != want {
 		t.Errorf("after a write: tasks differ\nthrough the worker:\n%s\nin its own process:\n%s", got, want)
 	}
+
+	// The run after the write executed its tasks, so the worker holds none:
+	// the next request computes, and is held.
+	if _, _, d := served("the request that settles the write"); d.Answerable || d.Answered || d.PlanSkipped || d.Kept != "kept" {
+		t.Fatalf("the request that settles the write: %+v, want unanswerable, computed and kept", d)
+	}
+	// A request that selects other projects and runs other commands is not
+	// answered from the held one.
+	other := []string{"lint,test", "--projects", "p000"}
+	code, computed, d = servedArgs("a request with other arguments", other...)
+	if d.Answerable || d.Answered || d.PlanSkipped || !strings.Contains(d.Reason, "request differs") {
+		t.Fatalf("a request with other arguments: %+v, want unanswerable for the request, planned and computed", d)
+	}
+	localCode, own = localArgs("a run in its own process with the other arguments", other...)
+	if localCode != code {
+		t.Errorf("with other arguments: exit %d in its own process, %d through the worker", localCode, code)
+	}
+	if got, want := strings.Join(normalize(computed), "\n"), strings.Join(normalize(own), "\n"); got != want || len(own) != 2 {
+		t.Errorf("with other arguments: tasks differ, or are not the 2 asked\nthrough the worker:\n%s\nin its own process:\n%s", got, want)
+	}
+}
+
+// stateFiles describes the state files a run's load and plan maintain in the
+// worktree: the file index, the input record and the workspace snapshot, each
+// by its size and digest, or as absent.
+func stateFiles(t *testing.T, root string) string {
+	t.Helper()
+	var out []string
+	for _, name := range []string{"file-index", "input-record", "workspace-index.json"} {
+		data, err := os.ReadFile(filepath.Join(root, ".putnami", name))
+		switch {
+		case os.IsNotExist(err):
+			out = append(out, name+" absent")
+		case err != nil:
+			t.Fatal(err)
+		default:
+			sum := sha256.Sum256(data)
+			out = append(out, fmt.Sprintf("%s %d %x", name, len(data), sum[:8]))
+		}
+	}
+	return strings.Join(out, ", ")
 }
 
 // awaitMemoryDecision waits for the worker's decision on the run it just

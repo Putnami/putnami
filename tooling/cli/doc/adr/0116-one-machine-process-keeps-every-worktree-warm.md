@@ -518,17 +518,37 @@ and are written in full until then), and returns the held exit code. A run in it
 or on macOS gets the same exit code and the same task results from its full
 computation: memory decides nothing a witness would not.
 
-**Where it answers today.** The worker decides before the run, and the run
-still loads the workspace and plans. The scheduler answers each plan that
-holds the same jobs, in the same order and with the same dependencies, as the
-plan the held run executed at the same position, from the result that plan
-left: no prune, no key, no lookup, no restore and no task worker. The renderer
-and the session recorder see, task by task in plan order, what a local-cache
-hit makes them see (its start, its entry's events, its completion), the
-session is recorded as any run's is, and the result is the held one with the
-current times. A plan that differs, a plan the held run did not leave a record
-for, and every plan after one the run computed run as usual. `putnami machine
-status` says whether the last run a worker served was answered.
+**Where it answers today.** The worker decides before the run. The engine then
+skips loading and planning: an engine run takes what the held run's engine run
+at the same position computed before phase 4 (the loaded workspace, the
+discovered extensions, the selected projects, the final plan, and the flags,
+parameters and versions they resolved) when it asks the same (workspace,
+configuration, commands, parameters, flags, hooks and version snapshot) and
+nothing the decision witnessed moved since it was taken: a first-use bootstrap
+or a before-hook runs in between. It opens no file index, input record or
+release record, which it reads nothing through and so saves nothing to,
+leaving them as a run in its own process finds them, and runs no workspace
+load, runtime synchronization, probe, selection or plan; it prints what those
+printed (the workspace's warnings, the probe's diagnostics, the selection's
+notices), and runs phase 4 as any run does on the held values: the finalizers,
+the session's tree, declarations and plan, its reporting and the run marker.
+Those values are held only from an engine run whose plan the scheduler
+answered from a record, so no execution touched them: a request skips them
+only after an identical one whose plan was answered. A run whose phases read
+what the decision does not witness is never held this way: a bare selection,
+which reads the successful-run markers, a release set, a runner provider's
+placement and a production preflight; nor is a debug run, whose output an
+answer would not print. The scheduler answers each plan that holds the same
+jobs, in the same order and with the same dependencies, as the plan the held
+run executed at the same position, from the result that plan left: no prune,
+no key, no lookup, no restore and no task worker. The renderer and the session
+recorder see, task by task in plan order, what a local-cache hit makes them
+see (its start, its entry's events, its completion), the session is recorded
+as any run's is, and the result is the held one with the current times. A plan
+that differs, a plan the held run did not leave a record for, and every plan
+after one the run computed run as usual. `putnami machine status` says whether
+the last run a worker served was answered, and whether without loading and
+planning (`planSkipped`).
 
 ### 7. How it learns of changes
 

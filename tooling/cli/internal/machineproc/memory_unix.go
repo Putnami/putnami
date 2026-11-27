@@ -20,9 +20,11 @@ import (
 
 // The worker's memory of the last run it served per worktree, and whether a
 // request could be answered from it (CLI ADR 0116 §6a). The worker decides;
-// the scheduler answers each plan of a run decided answerable from the record
-// the held run's plan left (RunMemory, scheduler.HeldRuns), and runs a plan it
-// holds none for.
+// the engine answers each of its runs of a request decided answerable from
+// what the held run's engine run at the same position loaded and planned
+// (RunMemory, engine.HeldRuns), and the scheduler each plan from the record
+// the held run's plan left (scheduler.HeldRuns). Either one computes what it
+// holds nothing for.
 
 // memorySyncTimeout bounds the sync point a decision waits for.
 const memorySyncTimeout = 2 * time.Second
@@ -40,6 +42,17 @@ type heldRun struct {
 	// next request with, in the order the run executed them; nil when one of
 	// them left none.
 	plans []any
+	// runs are what the run's engine runs computed before they executed, in
+	// order; nil when one of them left nothing or plans is nil.
+	runs []heldEngineRun
+}
+
+// heldEngineRun is what an engine run computed before it executed: its
+// workspace, extensions, selection and plan (engine.HeldRuns), and the
+// position of the plan it handed the scheduler, whose record answers it.
+type heldEngineRun struct {
+	record any
+	plan   int
 }
 
 var memory = struct {
@@ -69,8 +82,25 @@ type runMemory struct {
 	plans   []any
 	partial bool
 	// answered and computed count the plans answered from a record and the
-	// plans that ran.
+	// plans that ran; planAnswered says it of each plan, in order.
 	answered, computed int
+	planAnswered       []bool
+	// check is the state the decision took, which an engine run takes again
+	// before it skips loading and planning; nil unless the run is answerable.
+	check *memoryCheck
+	// offeredRuns are what the held run's engine runs computed; nil unless
+	// the run is answerable.
+	offeredRuns []heldEngineRun
+	// runsTaken counts the engine runs that asked, and runPlan is the
+	// position of the plan the current one hands the scheduler.
+	runsTaken, runPlan int
+	// runs are what the run's engine runs computed; runsPartial says one of
+	// them left nothing, or its plan was not answered from a record.
+	runs        []heldEngineRun
+	runsPartial bool
+	// skipped and planned count the engine runs answered from what the held
+	// run computed and those that loaded and planned.
+	skipped, planned int
 }
 
 // memoryCheck is the state a decision took before the run: the journal
@@ -84,8 +114,9 @@ type memoryCheck struct {
 	started time.Time
 }
 
-// RunMemory is the worker's memory as the scheduler reads it
-// (scheduler.HeldRuns): main installs it in a worker, never elsewhere.
+// RunMemory is the worker's memory as the engine and the scheduler read it
+// (engine.HeldRuns, scheduler.HeldRuns): main installs it in a worker, never
+// elsewhere.
 type RunMemory struct{}
 
 // Take returns the record the held run left for the next plan of the run in
@@ -119,11 +150,71 @@ func (RunMemory) Keep(root string, record any, answered bool) {
 		r.partial = true
 	}
 	r.plans = append(r.plans, record)
+	r.planAnswered = append(r.planAnswered, answered)
 	if answered {
 		r.answered++
 	} else {
 		r.computed++
 	}
+}
+
+// TakeRun returns what the held run's engine run at the same position
+// computed before it executed, for the next engine run of the run in root, or
+// nil: for a run not decided answerable, past the engine runs the held run
+// made, when the plan this one would hand the scheduler is not the one whose
+// record the held run paired with it, once anything of the run was computed,
+// and when anything the decision witnessed moved since it was taken. What ran
+// in this process before the engine, a first-use bootstrap or a before-hook,
+// can write the worktree or move Git, and the engine then loads and plans what
+// is there (CLI ADR 0116 §6a).
+func (RunMemory) TakeRun(root string) any {
+	memory.Lock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) {
+		memory.Unlock()
+		return nil
+	}
+	i := r.runsTaken
+	r.runsTaken++
+	r.runPlan = len(r.plans)
+	if r.check == nil || r.computed > 0 || r.planned > 0 || i >= len(r.offeredRuns) ||
+		r.offeredRuns[i].plan != r.runPlan || r.taken != r.runPlan {
+		memory.Unlock()
+		return nil
+	}
+	offered, check, w := r.offeredRuns[i].record, r.check, memory.watcher
+	memory.Unlock()
+	if w == nil || w.Sync(check.root, memorySyncTimeout) != nil ||
+		worktreeChanges(w.Since(check.root, check.seq), check.root) != "" ||
+		movedWitness(check.witness, outsideWitness(check.root)) != "" {
+		return nil
+	}
+	return offered
+}
+
+// KeepRun records what an engine run of the run computed before it executed,
+// and whether it was answered from what TakeRun returned. It is held only when
+// the engine run handed the scheduler one plan and the scheduler answered it
+// from the held run's record: a value whose plan executed is not held, so what
+// a later run reuses was never touched by an execution.
+func (RunMemory) KeepRun(root string, record any, skipped bool) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed {
+		return
+	}
+	if skipped {
+		r.skipped++
+	} else {
+		r.planned++
+	}
+	p := r.runPlan
+	if record == nil || !sameRoot(r.root, root) || len(r.plans) != p+1 || r.plans[p] == nil || !r.planAnswered[p] {
+		r.runsPartial = true
+		return
+	}
+	r.runs = append(r.runs, heldEngineRun{record: record, plan: p})
 }
 
 // sameRoot says whether a and b name the same worktree, through any symbolic
@@ -190,12 +281,12 @@ func beforeRun(req request) (*memoryCheck, MemoryDecision) {
 			decision.Answerable = true
 		}
 	}
-	// The run's plans leave their records for keep, and a run decided
-	// answerable is offered the held run's: the decision and the offer read
-	// the same held run.
+	// The run's plans and engine runs leave their records for keep, and a run
+	// decided answerable is offered the held run's: the decision and the offer
+	// read the same held run.
 	run := runMemory{armed: true, root: root}
 	if decision.Answerable {
-		run.offered = held.plans
+		run.offered, run.offeredRuns, run.check = held.plans, held.runs, check
 	}
 	memory.Lock()
 	memory.run = run
@@ -212,12 +303,18 @@ func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
 	memory.run = runMemory{}
 	memory.Unlock()
 	decision.Answered = run.answered > 0 && run.computed == 0
+	decision.PlanSkipped = run.skipped > 0 && run.planned == 0
 	if check != nil {
-		plans := run.plans
+		plans, runs := run.plans, run.runs
 		if run.partial || len(plans) == 0 {
 			plans = nil
 		}
-		decision.Kept = keep(check, code, plans)
+		// What an engine run computed answers only with the record of the plan
+		// it handed the scheduler.
+		if plans == nil || run.runsPartial || len(runs) == 0 {
+			runs = nil
+		}
+		decision.Kept = keep(check, code, plans, runs)
 	}
 	if dir, err := Dir(os.Getenv, false); err == nil {
 		if data, err := json.Marshal(decision); err == nil {
@@ -229,7 +326,7 @@ func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
 	}
 }
 
-func keep(check *memoryCheck, code int, plans []any) string {
+func keep(check *memoryCheck, code int, plans []any, runs []heldEngineRun) string {
 	memory.Lock()
 	delete(memory.held, check.root)
 	w := memory.watcher
@@ -247,7 +344,7 @@ func keep(check *memoryCheck, code int, plans []any) string {
 		return "not kept: the run changed the worktree: " + changed
 	}
 	memory.Lock()
-	memory.held[check.root] = &heldRun{request: check.request, seq: check.seq, witness: check.witness, plans: plans}
+	memory.held[check.root] = &heldRun{request: check.request, seq: check.seq, witness: check.witness, plans: plans, runs: runs}
 	memory.Unlock()
 	return "kept"
 }

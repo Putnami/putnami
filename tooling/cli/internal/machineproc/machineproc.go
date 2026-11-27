@@ -75,6 +75,10 @@ type MemoryDecision struct {
 	// Answered says the scheduler answered every plan of the run from the
 	// records the held run left, with no lookup, key or restore.
 	Answered bool `json:"answered"`
+	// PlanSkipped says the engine answered every run of the request from
+	// what the held run loaded and planned: no workspace load, runtime
+	// synchronization, probe, selection or plan (CLI ADR 0116 §6a).
+	PlanSkipped bool `json:"planSkipped"`
 	// Kept says the run that followed is held for the next request, or why
 	// not.
 	Kept string `json:"kept"`

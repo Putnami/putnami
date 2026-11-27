@@ -50,3 +50,9 @@ func (RunMemory) Take(string) any { return nil }
 
 // Keep holds nothing.
 func (RunMemory) Keep(string, any, bool) {}
+
+// TakeRun offers nothing.
+func (RunMemory) TakeRun(string) any { return nil }
+
+// KeepRun holds nothing.
+func (RunMemory) KeepRun(string, any, bool) {}

@@ -437,7 +437,7 @@ type Request struct {
 	runStart []string
 	// selectionCtx is the run's context while selection runs, so the runtime
 	// comparison of an impacted selection stops with the run (ADR 0103). Nil
-	// outside Engine.run.
+	// outside Engine.lifecycle.
 	selectionCtx context.Context
 	// versions is resolved during serial planning and then read by execution
 	// and evidence recovery. Each run, including a watch iteration, owns it.
@@ -474,6 +474,14 @@ type Request struct {
 	// UNEXPORTED for the same reason preparation is: the watch session sets it,
 	// and nothing an adapter can set replaces it.
 	latestWarnings *atomic.Pointer[workspace.WarningReport]
+	// hold is what this run leaves the machine worker it runs in to hold: armed
+	// before phase 1 when a later identical run could be answered from what
+	// phases 1 to 3 compute, then completed or dropped at phase 4 (held_run.go,
+	// CLI ADR 0116 §6a). Nil outside a worker.
+	//
+	// UNEXPORTED for the same reason preparation is: the engine arms it, and
+	// nothing an adapter can set replaces it.
+	hold *heldRun
 	// Stdout receives the notices the ENGINE itself prints on the human stdout
 	// stream: "No impacted projects found", "No projects matched", "No jobs
 	// matched", the --plan table, the auto-selection line, and a blocked
@@ -519,10 +527,13 @@ type PlanExtensionSelection struct {
 // resolves a default stdout, so an adapter that supplies one cannot be bypassed
 // by a stage that reaches for os.Stdout directly.
 func (r *Request) stdout() io.Writer {
-	if r.Stdout != nil {
-		return r.Stdout
+	out := r.Stdout
+	if out == nil {
+		out = os.Stdout
 	}
-	return os.Stdout
+	// What phases 1 to 3 print here, a worker prints again when it answers a
+	// later identical run without them (Request.hold).
+	return r.hold.notices(out, false)
 }
 
 // runMarkerParams returns the params that key persisted successful-run state.
@@ -742,8 +753,10 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	return result, runErr
 }
 
-// run is the lifecycle proper, between the before and after hooks.
-func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (SessionResult, error) {
+// lifecycle is the run proper, between the before and after hooks: phases
+// 1 to 3 compute what phase 4 executes. A machine worker may answer a run
+// without it (run).
+func (e *Engine) lifecycle(ctx context.Context, req *Request, sink EventSink) (SessionResult, error) {
 	// Each phase below records its wall on the run's orchestration report.
 	clock := req.orchestration
 	phaseStarted := time.Now()
@@ -1099,24 +1112,54 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
 	}
 
+	clock.Phase(protocolcli.OrchestrationPhasePlan, phaseStarted)
+
+	// Phase 4: execute what phases 1 to 3 computed. A machine worker holds it,
+	// to answer a later identical run without them (CLI ADR 0116 §6a,
+	// held_run.go).
+	computed := &plannedRun{
+		ws: ws, discovered: discovered, extensions: planningExtensions, projects: selectedProjects, planned: planned,
+		releaseSet: releaseSetRun, options: releaseSetOptions, unpublished: unpublished, unannounced: unannounced,
+	}
+	req.holdPlanned(computed)
+	return e.executePlanned(ctx, req, computed, cacheManager, sink), nil
+}
+
+// plannedRun is what phases 1 to 3 of a run computed, and phase 4 executes:
+// the loaded workspace, the discovered extensions and those the run plans
+// against, the selected projects, the final plan, the release set and its
+// options, and what the publication guard found. A machine worker holds it
+// (heldRun).
+type plannedRun struct {
+	ws          *workspace.Workspace
+	discovered  *extension.DiscoveryResult
+	extensions  []*extension.ExtensionDescription
+	projects    []*workspace.Project
+	planned     []*scheduler.ScheduledJob
+	releaseSet  *publication.ReleaseSetRun
+	options     publication.ReleaseSetOptions
+	unpublished []unservedProject
+	unannounced []string
+}
+
+// executePlanned is phase 4: it observes the run, attaches the session's
+// finalizers, executes the plan and applies the publication guard.
+func (e *Engine) executePlanned(ctx context.Context, req *Request, run *plannedRun, cacheManager *store.CacheManager, sink EventSink) SessionResult {
 	// Observe the run after the plan is complete: the plan-dependent counts do
 	// not exist before this point, which is why earlier exits are unobserved.
 	notifyRunPlanned(ctx, req.Observer, func() RunPlan {
 		return RunPlan{
 			Commands:  req.Commands,
-			Declarers: extension.PublicDeclarers(req.Commands, discovered.Extensions),
-			Projects:  len(selectedProjects),
-			Jobs:      len(planned),
+			Declarers: extension.PublicDeclarers(req.Commands, run.discovered.Extensions),
+			Projects:  len(run.projects),
+			Jobs:      len(run.planned),
 		}
 	})
 
-	clock.Phase(protocolcli.OrchestrationPhasePlan, phaseStarted)
-
-	// Phase 4: execute.
-	fatalUnpublished := len(unpublished) > 0 && !req.previewsOnly()
+	fatalUnpublished := len(run.unpublished) > 0 && !req.previewsOnly()
 	var finalizers []func(map[string]*scheduler.JobResult)
 	if fatalUnpublished {
-		finalizers = append(finalizers, unpublishedFailure(unpublished, unannounced, discovered.Skipped))
+		finalizers = append(finalizers, unpublishedFailure(run.unpublished, run.unannounced, run.discovered.Skipped))
 	}
 	req.specGate = &specGateOutcome{}
 	// The gate's cache-recovery source reuses THIS run's cache manager, so the
@@ -1125,26 +1168,26 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// miss it asks the remote cache the session executes with, under the run's
 	// context. The gate attaches when the session names a command of the
 	// verification kind in any discovered extension.
-	if gate := specGateFinalizer(req, ws, planned,
-		scheduler.CommandsOfKind(discovered.Extensions, extension.CommandKindVerification),
-		runObservationRecovery(ctx, req, ws, planningExtensions, cacheManager),
-		&projectionProducerPlan{req: req, ws: ws, projects: selectedProjects, extensions: discovered.Extensions, skipped: discovered.Skipped},
+	if gate := specGateFinalizer(req, run.ws, run.planned,
+		scheduler.CommandsOfKind(run.discovered.Extensions, extension.CommandKindVerification),
+		runObservationRecovery(ctx, req, run.ws, run.extensions, cacheManager),
+		&projectionProducerPlan{req: req, ws: run.ws, projects: run.projects, extensions: run.discovered.Extensions, skipped: run.discovered.Skipped},
 		req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)
 	}
-	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, req, releaseSetRun, releaseSetOptions.Publishes, finalizers)
+	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, req, run.releaseSet, run.options.Publishes, finalizers)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
-		return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
+		return SessionResult{ExitCode: ExitError, Plan: run.planned, Projects: run.projects}
 	}
 	defer closeOutboxes()
-	result := e.execute(ctx, req, ws, selectedProjects, discovered, planned, cacheManager, sink, finalizers...)
-	result.Plan, result.Projects = planned, selectedProjects
-	if len(unpublished) > 0 {
-		reportUnpublishedProjects(unpublished, unannounced, discovered.Skipped, req.Global, fatalUnpublished)
-		result.ExitCode = publicationGuardExitCode(result.ExitCode, unpublished, fatalUnpublished)
+	result := e.execute(ctx, req, run.ws, run.projects, run.discovered, run.planned, cacheManager, sink, finalizers...)
+	result.Plan, result.Projects = run.planned, run.projects
+	if len(run.unpublished) > 0 {
+		reportUnpublishedProjects(run.unpublished, run.unannounced, run.discovered.Skipped, req.Global, fatalUnpublished)
+		result.ExitCode = publicationGuardExitCode(result.ExitCode, run.unpublished, fatalUnpublished)
 	}
-	return result, nil
+	return result
 }
 
 // releaseSetExecution prepares the release set's part of the execution. It

@@ -291,7 +291,7 @@ func (e *Engine) executeSession(
 			executionRenderer(req, sessStore, extensions, sink, isServeMode, isRunMode), isServeMode)
 	}
 
-	// The cache manager arrives from Engine.run, which builds it before
+	// The cache manager arrives from Engine.lifecycle, which builds it before
 	// planning so this execution and a release-set publish's selection keys
 	// share one memoized file-hash pass. It is built even under --no-cache:
 	// the memo is not a cache of RESULTS.
