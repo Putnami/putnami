@@ -1370,6 +1370,35 @@ notice has been shown on the same machine. `telemetry off` is an explicit
 opt-out and deletes the local buffer and device ID. See
 [12-profiling-and-telemetry.md](12-profiling-and-telemetry.md).
 
+### `machine`
+
+Show, stop, or turn off the machine process: one supervisor per machine and
+user, and behind it one engine worker per CLI executable in use. A run that a
+worker serves is the same run as one in its own process, with the same keys,
+results and exit code; the worker only keeps the process warm. See
+[ADR 0116](adr/0116-one-machine-process-keeps-every-worktree-warm.md).
+
+```bash
+putnami machine status              # The supervisor, its workers and why runs do or do not use it
+putnami machine stop                # Stop the supervisor and its workers once no run is active
+putnami machine off                 # Run every command in its own process, and stop the machine process
+putnami machine on                  # Let runs go through the machine process again
+```
+
+The machine process is on by default on Linux and macOS. A run that finds no
+supervisor runs in its own process and starts one, detached, when it ends; the
+next run goes through the worker of its executable. A run always runs in its
+own process in CI (`CI` set), in a hosted run (`--credential-fd`), when a job
+of a run starts it, in watch mode and for `serve`, and whenever the
+supervisor or the worker refuses or fails before the run starts.
+`PUTNAMI_MACHINE=off` turns it off for one command and `PUTNAMI_MACHINE=on` on;
+`machine on|off` records the user's choice in `machine.json` under the
+Putnami home. The supervisor lives in `$XDG_RUNTIME_DIR/putnami` on Linux,
+`$TMPDIR/putnami-<uid>` on macOS, else `~/.putnami/machine`, a directory only
+the user can open; it accepts only connections from its own user. A worker
+stops after an hour with no run, the supervisor after three hours with no
+worker.
+
 ### `completion`
 
 Generate shell completion scripts.

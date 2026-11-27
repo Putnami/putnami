@@ -35,6 +35,7 @@ package fileindex
 import (
 	"bytes"
 	"crypto/sha256"
+	"debug/buildinfo"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -976,4 +977,30 @@ var onLocalFilesystem = func(dir string) bool {
 		}
 		dir = parent
 	}
+}
+
+// BuildIdentity is the identity of the build of the Go executable at path,
+// whatever its path and stat: the SHA-256 of its build information and its
+// Go build ID, in hex. It is "" when the file cannot be read or carries no
+// usable build ID. Two files of one build have one identity; a CLI and a
+// machine worker compare it (CLI ADR 0116).
+func BuildIdentity(path string) string {
+	head, err := readHead(path)
+	if err != nil {
+		return ""
+	}
+	id := buildID(head)
+	if id == "" {
+		return ""
+	}
+	info, err := buildinfo.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	h := sha256.New()
+	for _, field := range []string{info.String(), id} {
+		_ = binary.Write(h, binary.LittleEndian, uint64(len(field)))
+		h.Write([]byte(field)) //nolint:errcheck // hash.Hash.Write never errors
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
 }

@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/githooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/launch"
+	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -47,8 +48,38 @@ var shutdownNotices io.Writer = os.Stderr
 const gcPercent = 200
 
 func main() {
+	// The client sends the environment as the process started: the CLI takes
+	// variables out of it as it runs (CLI ADR 0116 §4).
+	machineproc.SaveProcessContext()
 	applyGCTarget(os.Getenv)
-	os.Exit(runMain())
+	if code, ok := runMachine(os.Args[1:]); ok {
+		os.Exit(code)
+	}
+	code := runMain()
+	machineproc.StartIfWanted()
+	os.Exit(code)
+}
+
+// runMachine runs the machine process's own commands: `__machine supervise`
+// and `__machine work`, which a CLI starts, never a person.
+func runMachine(args []string) (int, bool) {
+	if len(args) != 2 || args[0] != "__machine" {
+		return 0, false
+	}
+	switch args[1] {
+	case "supervise":
+		return machineproc.Supervise(), true
+	case "work":
+		return machineproc.Work(func(ctx context.Context, args []string) int {
+			app, err := cli.NewApp()
+			if err != nil {
+				iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+				return cli.ExitError
+			}
+			return app.Run(ctx, args)
+		}), true
+	}
+	return 0, false
 }
 
 // applyGCTarget sets gcPercent unless GOGC is set, which then decides as it

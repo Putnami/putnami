@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/launch"
+	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/runnerprovider"
@@ -177,6 +178,14 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		if err := launch.Relaunch(ctx, wsRoot, args, boot.launchBootstrap(), sessionreporter.Captured(ctx)...); err != nil {
 			printCommandError(os.Stderr, err)
 			return exitCodeForError(err)
+		}
+	}
+	// The authoritative engine of this command is this process: the worker of
+	// its build may run it instead, warm (CLI ADR 0116). Anything the machine
+	// process does not serve runs here as before.
+	if !providerChild && servesThroughMachine(args) {
+		if code, served := machineproc.Serve(ctx, args); served {
+			return code
 		}
 	}
 	registerArtifactRoot(wsRoot)

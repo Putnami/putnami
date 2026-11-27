@@ -14,6 +14,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
+	"go.putnami.dev/tooling/cli/internal/machineproc"
 )
 
 // Counts is what one run of the real CLI started, read from its
@@ -109,6 +110,8 @@ func UnsetHostRunEnvironment(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// No test run reaches the user's machine process (CLI ADR 0116).
+	t.Setenv(machineproc.Env, "off")
 }
 
 // RunCounts drives one invocation of the real CLI in the workspace at wsRoot

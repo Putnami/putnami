@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
@@ -420,6 +421,8 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)
+	// No test run reaches the user's machine process (CLI ADR 0116).
+	_ = os.Setenv(machineproc.Env, "off")
 	// No test starts the host's CLI to resolve a registry credential.
 	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
 	fixtureproc.QuietRaceExit()

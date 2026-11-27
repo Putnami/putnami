@@ -581,6 +581,31 @@
       "positionals": []
     },
     {
+      "path": "machine",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "machine off",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "machine on",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "machine status",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "machine stop",
+      "flags": [],
+      "positionals": []
+    },
+    {
       "path": "migrate",
       "flags": [],
       "positionals": []

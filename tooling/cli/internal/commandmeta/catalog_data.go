@@ -1142,6 +1142,58 @@ var catalog = []Command{
 
 	// ── Other ────────────────────────────────────────────────────────────
 	{
+		Path:       "machine",
+		Kind:       KindStructured,
+		Category:   "Other",
+		Label:      "machine status|stop|on|off",
+		Summary:    "Show, stop or turn off the machine process",
+		DefaultSub: "status",
+		Workspace: WorkspaceNeed{
+			Note: "cmdMachine talks to the user's machine process and writes the user's setting, not the workspace",
+		},
+	},
+	{
+		Path:             "machine status",
+		Kind:             KindStructured,
+		Description:      "Show the machine process: its supervisor, its workers and their builds",
+		Usage:            "putnami machine status [--output <format>]",
+		Related:          []string{"machine stop", "machine off"},
+		StructuredOutput: true,
+		Workspace: WorkspaceNeed{
+			Note: "cmdMachine asks the user's supervisor, not the workspace",
+		},
+	},
+	{
+		Path:        "machine stop",
+		Kind:        KindStructured,
+		Description: "Stop the machine process and every worker once no run is active",
+		Usage:       "putnami machine stop",
+		Related:     []string{"machine status", "machine off"},
+		Workspace: WorkspaceNeed{
+			Note: "cmdMachine asks the user's supervisor, not the workspace",
+		},
+	},
+	{
+		Path:        "machine on",
+		Kind:        KindStructured,
+		Description: "Let runs go through the machine process",
+		Usage:       "putnami machine on",
+		Related:     []string{"machine off", "machine status"},
+		Workspace: WorkspaceNeed{
+			Note: "cmdMachine writes the user's setting, not the workspace",
+		},
+	},
+	{
+		Path:        "machine off",
+		Kind:        KindStructured,
+		Description: "Run every command in its own process and stop the machine process",
+		Usage:       "putnami machine off",
+		Related:     []string{"machine on", "machine status"},
+		Workspace: WorkspaceNeed{
+			Note: "cmdMachine writes the user's setting, not the workspace",
+		},
+	},
+	{
 		Path:       "telemetry",
 		Kind:       KindStructured,
 		Category:   "Other",

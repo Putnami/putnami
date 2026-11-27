@@ -30,6 +30,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -56,6 +57,7 @@ func init() {
 	registerCommand("completion", cmdCompletion)
 	registerCommand("install", cmdInstall)
 	registerCommand("telemetry", cmdTelemetry)
+	registerCommand("machine", cmdMachine)
 	registerCommand("help", cmdHelp)
 	registerCommand("upgrade", cmdUpgrade)
 	registerCommand("pin", cmdPin)
@@ -853,6 +855,30 @@ func cmdInstall(env *CommandEnv) error {
 		return err
 	}
 	return lifecycle.Install(env.Ctx, env.WsRoot, env.Cfg, env.Args, lifecycleEnv(env))
+}
+
+// cmdMachine shows, stops and turns the user's machine process on or off.
+func cmdMachine(env *CommandEnv) error {
+	switch env.Sub {
+	case "status", "":
+		return machineStatus(env.OutputFormat)
+	case "stop":
+		return machineStop()
+	case "on":
+		if err := machineproc.WriteSetting(os.Getenv, machineproc.SettingOn); err != nil {
+			return err
+		}
+		iox.Fprintln(os.Stdout, "  Machine process on: runs may go through it.")
+		return nil
+	case "off":
+		if err := machineproc.WriteSetting(os.Getenv, machineproc.SettingOff); err != nil {
+			return err
+		}
+		iox.Fprintln(os.Stdout, "  Machine process off: every command runs in its own process.")
+		return machineStop()
+	default:
+		return usageErrorf("unknown subcommand: machine %s\n  Available: status, stop, on, off", env.Sub)
+	}
 }
 
 func cmdTelemetry(env *CommandEnv) error {

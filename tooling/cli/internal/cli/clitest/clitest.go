@@ -37,6 +37,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
+	"go.putnami.dev/tooling/cli/internal/machineproc"
 )
 
 // PortableTaskDeadlineMs is the budget of a fixture task that portable
@@ -55,6 +56,8 @@ const PortableTaskDeadlineMs = scheduler.DefaultTimeoutMs
 // same for the package the e2e tests were carved out of.
 func Main(m *testing.M) int {
 	AnswerRegistryTokenSeam()
+	// No test run reaches the user's machine process (CLI ADR 0116).
+	_ = os.Setenv(machineproc.Env, "off")
 	_ = os.Unsetenv(extension.PrivatePutRegistryURLEnv)
 	// No test starts the host's CLI to resolve a registry credential.
 	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
