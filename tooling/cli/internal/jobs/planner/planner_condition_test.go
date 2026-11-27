@@ -106,10 +106,11 @@ func TestPlan_GoLibraryCompileUsesInvocationAndProjectFacts(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("build~compile planned = %t, want %t; keys=%v", got, tt.want, planKeySet(planned))
 			}
-			// Infra survives compile pruning and keeps a valid dependency set;
-			// Plan's DAG validator has already rejected any dangling edge.
-			if !planKeySet(planned)["/subject:build~infra"] {
-				t.Error("build~infra disappeared with compile pruning")
+			// Infra survives compile pruning for a workload and keeps a valid
+			// dependency set; Plan's DAG validator has already rejected any
+			// dangling edge. A library gives infra no work (CLI ADR 0132).
+			if got, want := planKeySet(planned)["/subject:build~infra"], tt.typ != "library"; got != want {
+				t.Errorf("build~infra planned = %t, want %t", got, want)
 			}
 		})
 	}

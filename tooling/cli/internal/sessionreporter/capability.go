@@ -58,6 +58,11 @@ type Capability struct {
 	// environment and cuts frames at the cap the provider acknowledges
 	// (ADR 0131).
 	LargeFrames bool
+	// Packages: the engine names framing version 4 in its provider's
+	// environment, and the session switches to packages at the first
+	// acknowledgement that offers them before any events.jsonl or
+	// session.json frame left (ADR 0135).
+	Packages bool
 }
 
 // SessionReporter delivers the recorded plan, the trimmed view of the event
@@ -67,7 +72,7 @@ var SessionReporter = Capability{
 	SelectorEnv: protocolcli.SessionReporterEnv, TokenEnv: protocolcli.SessionReporterTokenEnv,
 	Artifacts:     protocolcli.SessionReportingArtifacts(protocolcli.SessionReporterCommand),
 	BatchInterval: EventsBatchInterval, StateFile: StateFile, LockFile: "reporting.lock",
-	View: true, LargeFrames: true,
+	View: true, LargeFrames: true, Packages: true,
 }
 
 // LogReporter delivers the raw event stream only.
@@ -97,9 +102,15 @@ func (c Capability) sends(artifact string) bool {
 // raw bytes; viewCheckpointVersion, for a View capability only, from the view,
 // and records beside the view cursor the raw offset the subscription
 // acknowledges. A CLI that predates the view refuses version 2.
+// packagesCheckpointVersion, for a Packages capability only, is a session that
+// switched to packages (ADR 0135): it frames no events.jsonl, session.json or
+// spec-verification.json, records the packages acknowledged and the raw offset
+// the subscription acknowledges, and a CLI that predates packages refuses it
+// rather than frame a stream its receiver holds as packages.
 const (
-	rawCheckpointVersion  = 1
-	viewCheckpointVersion = 2
+	rawCheckpointVersion      = 1
+	viewCheckpointVersion     = 2
+	packagesCheckpointVersion = 3
 )
 
 // checkpointVersion is the version of a new checkpoint of the capability.

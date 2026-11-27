@@ -30,33 +30,14 @@ import (
 	"os"
 	"slices"
 
-	"go.putnami.dev/go/extension/internal/codegen"
 	"go.putnami.dev/go/extension/internal/gocacheprog"
-
-	// Blank-imported visitors register themselves with the codegen package.
-	// Add a new generator by introducing a sibling subpackage and listing it
-	// here — no other plumbing is required.
-	_ "go.putnami.dev/go/extension/internal/codegen/openapi"
-	"go.putnami.dev/go/extension/internal/jobs/apicheck"
-	"go.putnami.dev/go/extension/internal/jobs/build"
 	"go.putnami.dev/go/extension/internal/jobs/cachepolicy"
-	"go.putnami.dev/go/extension/internal/jobs/configextract"
-	"go.putnami.dev/go/extension/internal/jobs/configmerge"
 	"go.putnami.dev/go/extension/internal/jobs/depsedit"
 	"go.putnami.dev/go/extension/internal/jobs/depsupgrade"
-	"go.putnami.dev/go/extension/internal/jobs/lint"
-	"go.putnami.dev/go/extension/internal/jobs/pkg"
 	"go.putnami.dev/go/extension/internal/jobs/projectsetup"
-	"go.putnami.dev/go/extension/internal/jobs/publish"
-	"go.putnami.dev/go/extension/internal/jobs/run"
-	"go.putnami.dev/go/extension/internal/jobs/serve"
-	"go.putnami.dev/go/extension/internal/jobs/test"
 	"go.putnami.dev/go/extension/internal/jobs/workspaceinstall"
 	"go.putnami.dev/go/extension/internal/toolchain"
 	"go.putnami.dev/sdk/extension/cli"
-	"go.putnami.dev/sdk/extension/dbtestenv"
-	"go.putnami.dev/sdk/extension/docslinks"
-	"go.putnami.dev/sdk/extension/infraagg"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 )
 
@@ -64,37 +45,22 @@ import (
 // module origin over the network is wrapped so the user's registry credential is
 // refreshed first — see withRegistryCredential for why the table is the right
 // place for that.
+//
+// The table is the union of two halves, each in a file of its own: the
+// codegen jobs (handlers_codegen.go) and every other job
+// (handlers_general.go). bin/prepare builds the runtime's two executables
+// from this one package: compiled/putnami-go with the putnami_runtime_main tag,
+// which leaves the codegen half out, and the codegen entry
+// compiled/putnami-go-codegen with the putnami_runtime_codegen tag, which
+// leaves the other half out. A task keys on the bytes of the executable it
+// runs (runtime.compiledInputs), so an edit of the codegen half re-keys
+// build-generate and build-describe alone, and an edit of the other half
+// leaves them alone. An untagged build, the one tests and linters see, holds
+// both halves.
 func commandHandlers() map[string]cli.JobFunc {
-	handlers := map[string]cli.JobFunc{
-		"build":          build.Run,
-		"build-generate": codegen.Run,
-		"build-describe": codegen.RunDescribe,
-		// Infra aggregation is the SDK's shared task body. Go passes no runtime compatibility hook: a Go workload serves
-		// whatever the platform defaults to, so it constrains nothing.
-		"build-infra": infraagg.Job(infraagg.Options{}),
-		// The deployment declaration is the same aggregate in canonical bytes,
-		// under the same hook as build-infra so the two never disagree.
-		"package-deployment": infraagg.DeploymentJob(infraagg.Options{}),
-		// The documentation link check is the SDK's shared task body too, so a
-		// broken link fails lint the same way in every language.
-		"lint-docs": docslinks.Job(),
-		// The database test environment is the SDK's shared task body: policy,
-		// closure discovery, the Postgres container and the invocation-scoped
-		// sensitive binding are identical for every language, so three copies of
-		// them would drift.
-		"test-env-up":    dbtestenv.UpJob(),
-		"test-env-down":  dbtestenv.DownJob(),
-		"test":           test.Run,
-		"test-race":      test.RunRace,
-		"lint":           lint.Run,
-		"validate-api":   apicheck.Run,
-		"serve":          serve.Run,
-		"run":            run.Run,
-		"package":        pkg.Run,
-		"publish":        publish.Run,
-		"config-extract": configextract.Run,
-		"config-merge":   configmerge.Run,
-		"workspace-sync": runWorkspaceSync,
+	handlers := generalHandlers()
+	for name, job := range codegenHandlers() {
+		handlers[name] = job
 	}
 	wrapped := make(map[string]cli.JobFunc, len(handlers))
 	for name, job := range handlers {

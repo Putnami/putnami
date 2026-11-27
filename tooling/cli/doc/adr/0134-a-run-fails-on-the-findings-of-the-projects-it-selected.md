@@ -9,7 +9,7 @@
   `internal/jobs/cachekey`, `internal/jobs/remotecache`,
   `internal/jobs/scheduler`), `protocols/evidence` (the evidence fragment,
   kind `finding`), `protocols/extension` and `protocols/cli` (the task member
-  `selection` and contract 28)
+  `selection` and contract 31)
 - **Implements**: part of ADR 0006 of `protocols/evidence` (evidence is
   fragments that tasks emit and a collector streams): the `finding` fragment
   and a first, local verdict over fragments
@@ -79,7 +79,7 @@ flowchart LR
    verdict. The diagnostics carry the producers' rule names as codes, which
    are not codes of the CLI.
 6. **A task that reads no selection says so.** A task declares
-   `selection: none` (`protocols/extension`, contract 28 of `protocols/cli`)
+   `selection: none` (`protocols/extension`, contract 31 of `protocols/cli`)
    when what it does is the same whichever projects the run selected. The CLI
    then hands it no `selection` and no `selectedProjects` in its job context,
    so no `PUTNAMI_SELECTED_*` variable and no selection template variable,

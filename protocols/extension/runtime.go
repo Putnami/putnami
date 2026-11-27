@@ -128,7 +128,33 @@ type RuntimeDefinition struct {
 	// Absent means the executable ships ready to run in each platform archive
 	// and the CLI never builds anything.
 	Prepare *RuntimePrepare `json:"prepare,omitempty"`
+	// Entries names further executables the runtime provides beside
+	// Executable, by entry name. A task that names an entry in
+	// TaskDefinition.RuntimeEntry runs that executable wherever its command or
+	// arguments say {extensionRuntime}. Each path follows the rules of
+	// Executable and resolves against the same root. Names are lowercase
+	// letters, digits and hyphens, starting with a letter, at most 32 bytes.
+	Entries map[string]RuntimeEntry `json:"entries,omitempty"`
+	// CompiledInputs lists prepare inputs, spelled exactly as in
+	// Prepare.Inputs, whose content reaches a task only through the
+	// executables prepare builds from them. With it, a task's implementation
+	// identity is the bytes of the executable it runs plus every other prepare
+	// input, instead of every prepare input: an edit that changes one entry's
+	// executable re-keys that entry's tasks only, and an edit that builds the
+	// same bytes re-keys none. A file a task reads at run time, from
+	// {extensionRoot} or elsewhere, is not compiled and must not be listed.
+	CompiledInputs []string `json:"compiledInputs,omitempty"`
 }
+
+// RuntimeEntry is one further executable of a runtime (RuntimeDefinition.Entries).
+type RuntimeEntry struct {
+	// Executable is the entry's path, under the rules of
+	// RuntimeDefinition.Executable and relative to the same root.
+	Executable string `json:"executable"`
+}
+
+// MaxRuntimeEntries bounds RuntimeDefinition.Entries.
+const MaxRuntimeEntries = 16
 
 // RuntimePrepare is the workspace-independent build of an extension runtime.
 //
@@ -180,11 +206,11 @@ func ValidateRuntime(m *Manifest) []diag.Diagnostic {
 	if m == nil {
 		return nil
 	}
+	diags := validateRuntimeEntries(m)
 	if m.Runtime == nil {
-		return validateRuntimeToolchains(m)
+		return append(diags, validateRuntimeToolchains(m)...)
 	}
 	runtime := m.Runtime
-	var diags []diag.Diagnostic
 
 	if strings.TrimSpace(runtime.Executable) == "" {
 		diags = append(diags, diag.Errorf("required-field", "runtime.executable",
@@ -195,6 +221,10 @@ func ValidateRuntime(m *Manifest) []diag.Diagnostic {
 	}
 
 	if runtime.Prepare == nil {
+		if len(runtime.CompiledInputs) > 0 {
+			diags = append(diags, diag.Errorf("invalid-value", "runtime.compiledInputs",
+				"compiled inputs need runtime.prepare: a runtime that ships ready to run is identified by its version"))
+		}
 		diags = append(diags, validateRuntimeToolchains(m)...)
 		diags = append(diags, validateRuntimeInputSelectors(runtime.InputSelectors)...)
 		return diags
@@ -243,8 +273,110 @@ func ValidateRuntime(m *Manifest) []diag.Diagnostic {
 
 	diags = append(diags, validateRuntimeToolchains(m)...)
 	diags = append(diags, validateRuntimeInputSelectors(runtime.InputSelectors)...)
+	diags = append(diags, validateCompiledInputs(runtime, seen)...)
 
 	return diags
+}
+
+// validateCompiledInputs checks runtime.compiledInputs against the prepare
+// inputs whose normalized forms are declared. Each must name one of them, once.
+func validateCompiledInputs(runtime *RuntimeDefinition, declared map[string]bool) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	seen := make(map[string]bool, len(runtime.CompiledInputs))
+	for i, input := range runtime.CompiledInputs {
+		field := fmt.Sprintf("runtime.compiledInputs[%d]", i)
+		normalized, err := NormalizeInputPattern(input)
+		if err != nil {
+			diags = append(diags, diag.Errorf("invalid-runtime-path", field,
+				"invalid compiled input %q: %v", input, err))
+			continue
+		}
+		if !declared[normalized] {
+			diags = append(diags, diag.Errorf("invalid-value", field,
+				"compiled input %q is not one of runtime.prepare.inputs; a compiled input names a prepare input whose content reaches tasks only through the executables", input))
+		}
+		if seen[normalized] {
+			diags = append(diags, diag.Errorf("duplicate-value", field,
+				"compiled input %q is declared more than once", input))
+		}
+		seen[normalized] = true
+	}
+	return diags
+}
+
+// validateRuntimeEntries checks runtime.entries and every task's runtimeEntry.
+// A runtime without entries leaves every task without one.
+func validateRuntimeEntries(m *Manifest) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	var entries map[string]RuntimeEntry
+	if m.Runtime != nil {
+		entries = m.Runtime.Entries
+	}
+	if len(entries) > MaxRuntimeEntries {
+		diags = append(diags, diag.Errorf("invalid-value", "runtime.entries",
+			"runtime declares %d entries; at most %d are allowed", len(entries), MaxRuntimeEntries))
+	}
+	names := make([]string, 0, len(entries))
+	for name := range entries {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	paths := map[string]string{}
+	if m.Runtime != nil {
+		if main, err := NormalizeRelativePath(m.Runtime.Executable); err == nil {
+			paths[main] = "runtime.executable"
+		}
+	}
+	for _, name := range names {
+		field := "runtime.entries." + name
+		if !IsRuntimeEntryName(name) {
+			diags = append(diags, diag.Errorf("invalid-value", field,
+				"runtime entry name %q must be lowercase letters, digits and hyphens, start with a letter and be at most 32 bytes", name))
+		}
+		executable := entries[name].Executable
+		normalized, err := NormalizeRelativePath(executable)
+		if strings.TrimSpace(executable) == "" || err != nil {
+			diags = append(diags, diag.Errorf("invalid-runtime-path", field+".executable",
+				"invalid runtime entry executable %q", executable))
+			continue
+		}
+		if other, taken := paths[normalized]; taken {
+			diags = append(diags, diag.Errorf("duplicate-value", field+".executable",
+				"runtime entry executable %q is already %s", executable, other))
+			continue
+		}
+		paths[normalized] = field
+	}
+	taskNames := make([]string, 0, len(m.Tasks))
+	for name := range m.Tasks {
+		taskNames = append(taskNames, name)
+	}
+	sort.Strings(taskNames)
+	for _, name := range taskNames {
+		entry := m.Tasks[name].RuntimeEntry
+		if entry == "" {
+			continue
+		}
+		if _, ok := entries[entry]; !ok {
+			diags = append(diags, diag.Errorf("unknown-reference", "tasks."+name+".runtimeEntry",
+				"task %q names runtime entry %q, which runtime.entries does not declare", name, entry))
+		}
+	}
+	return diags
+}
+
+// IsRuntimeEntryName reports whether name is a valid runtime entry name.
+func IsRuntimeEntryName(name string) bool {
+	if name == "" || len(name) > 32 || name[0] < 'a' || name[0] > 'z' {
+		return false
+	}
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-') {
+			return false
+		}
+	}
+	return true
 }
 
 // validatePrepareCommand accepts exactly a bare PATH-resolved program name or
@@ -405,6 +537,13 @@ func NormalizeRuntime(m *Manifest) {
 	if normalized, err := NormalizeRelativePath(m.Runtime.Executable); err == nil {
 		m.Runtime.Executable = normalized
 	}
+	for name, entry := range m.Runtime.Entries {
+		if normalized, err := NormalizeRelativePath(entry.Executable); err == nil {
+			entry.Executable = normalized
+			m.Runtime.Entries[name] = entry
+		}
+	}
+	m.Runtime.CompiledInputs = normalizePatternList(m.Runtime.CompiledInputs)
 	m.Runtime.RunToolchains = normalizeReferenceList(m.Runtime.RunToolchains)
 	m.Runtime.Resolves = normalizeReferenceList(m.Runtime.Resolves)
 	m.Runtime.InputSelectors = normalizeReferenceList(m.Runtime.InputSelectors)

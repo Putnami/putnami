@@ -338,8 +338,12 @@
               "prompt-host-hooks-below-contract-25-do-not-load",
               "emptied-file-outputs-require-contract-27",
               "emptied-file-outputs-below-contract-27-do-not-load",
-              "selection-free-tasks-require-contract-28",
-              "selection-free-tasks-below-contract-28-do-not-load"
+              "context-activation-requires-contract-28",
+              "context-activation-below-contract-28-does-not-load",
+              "runtime-entries-require-contract-29",
+              "runtime-entries-below-contract-29-do-not-load",
+              "selection-free-tasks-require-contract-31",
+              "selection-free-tasks-below-contract-31-do-not-load"
             ]
           }
         },

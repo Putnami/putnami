@@ -108,6 +108,7 @@ test('session reporter schema field sets and byte bounds', async () => {
     code: 'unavailable',
     retryable: true,
     chunkBytes: SESSION_REPORTING_CHUNK_BYTES,
+    packages: true,
   };
   const requiredChunk: Required<SessionReportingChunk> = chunk;
   expect(Object.keys(requiredChunk).sort()).toEqual(Object.keys(schema.$defs.chunk.properties).sort());

@@ -7,6 +7,10 @@
   (`.putnami/workspace-index.json`) and the input hashes of cache keys
 - **Amended**: 2026-11-25, decision 7: the index keeps the bytes of the
   configuration files a run parses
+- **Amended**: 2026-11-27, rejected alternative "A background program that
+  watches the tree": one supervisor per machine and user, shared by every
+  worktree, is decided by `@putnami/cli`
+  [ADR 0116](../../../../tooling/cli/doc/adr/0116-one-machine-process-keeps-every-worktree-warm.md)
 
 ## Context
 
@@ -166,6 +170,12 @@ files.
   or to a cloud session, which start from nothing. With the index, what an unchanged run
   still pays for its files is one stat per input: 18 to 23 ms for every
   tracked file of this repository, the most a watcher could save.
+  Amended on 2026-11-27: this rejected one program per worktree. One
+  supervisor per machine and user, shared by every worktree, with an engine
+  worker per CLI build, is decided by `@putnami/cli` ADR 0116 (decision
+  `a-machine-process-serves-every-worktree`): it holds far more than the stats
+  (the loaded workspace, the plan, the Git reader's state), a run without it
+  is a run as before, and CI never depends on it.
 - **Reading every file again (the rule this ADR replaces).** See the
   measurement above.
 - **Size and modification time alone.** A modification time set back by a

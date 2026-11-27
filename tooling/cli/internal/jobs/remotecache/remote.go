@@ -49,7 +49,9 @@ type RemoteCache struct {
 
 	// keys maps a job key to its precomputed cache key (from Negotiate), only
 	// for a job whose key no planned write can move (cachekey.PlanKeyMovement),
-	// and only when negotiation started a provider that serves the run; localHits
+	// and only when negotiation decided that movement for a provider that
+	// serves the run: it decides none when no key is left to prefetch, and
+	// keys is then nil; localHits
 	// records keys already present locally before negotiation. Neither
 	// addresses a restore or an upload: both use the key the scheduler computes
 	// when the job starts.
@@ -380,6 +382,16 @@ func (r *RemoteCache) Negotiate(
 	start := time.Now().Add(-started)
 	sess, ok := r.ensureProvider(ctx, ws, cm)
 	if !ok {
+		return
+	}
+	if len(providerKeys) == 0 {
+		// No declared-capture key is left to prefetch (every one is a local
+		// hit), and the provider serves the jobs that execute here. The key movement
+		// would only tell which files a later miss's result-only restore may
+		// skip: without it every serialization edge counts, as when no
+		// provider serves, so such a restore restores files it might have
+		// skipped, never fewer. No key is recorded as one no write can move.
+		r.dependedOn = dependedOnJobs(planned, nil)
 		return
 	}
 	// The key movement is decided once the provider serves the run, from the

@@ -39,6 +39,9 @@ func dependentsWorkspace(t *testing.T) (*workspace.Workspace, []*workspace.Proje
 	writeProjectFile(t, root, "consumer", "go.mod",
 		"module example.com/consumer\n\ngo 1.25\n\nrequire example.com/clients/auth v0.0.0\n")
 	writeProjectFile(t, root, "consumer", "main.go", "package main\n\nfunc main() {}\n")
+	// A config gives the consumer's config-merge work, so the plan holds a
+	// consumer step that only the generator's readByDependents orders.
+	writeProjectFile(t, root, "consumer", "conf/.env.yaml", "port: 3000\n")
 	client := &workspace.Project{
 		ID: dependentsClient, Name: "auth", Path: "clients/auth", Type: "library",
 		Extensions: []string{"@putnami/go"},

@@ -123,9 +123,16 @@ func ExpandPipelineWithOptions(
 		return nil, fmt.Errorf("extension '%s' has pipeline command '%s' but no tasks", ext.Name, commandName)
 	}
 
+	// `if` and dead-code elimination read the manifest's own topology: an
+	// inactive step is idle, not unwanted, so the steps it would have waited
+	// for stay as live as they were. A step that only an inactive step reaches
+	// keeps the work it does for the project (a tidy, a describe), and the plan
+	// differs from the scheduled-and-skipped one only by the idle steps.
+	excluded := computeExcludedSteps(steps, commandParams, opts.PlanContext)
+
 	// Plan-time activation pruning. Steps whose project-aware activation gate is
-	// unmet are spliced out before `if`/dead-code handling so their dependents
-	// reconnect to the pruned step's dependencies (see spliceInactiveSteps).
+	// unmet are spliced out so their dependents reconnect to the pruned step's
+	// dependencies (see spliceInactiveSteps).
 	if opts.StepActive != nil {
 		var inactive map[string]bool
 		for _, step := range steps {
@@ -140,8 +147,6 @@ func ExpandPipelineWithOptions(
 			steps = spliceInactiveSteps(steps, inactive)
 		}
 	}
-
-	excluded := computeExcludedSteps(steps, commandParams, opts.PlanContext)
 
 	var expanded []ExpandedStep
 	for _, step := range steps {
@@ -224,6 +229,7 @@ func ExpandPipelineWithOptions(
 			Cwd:                      task.Cwd,
 			Env:                      task.Env,
 			Toolchains:               runtimeToolchainRefs(ext.Runtime, task.Toolchains),
+			RuntimeEntry:             task.RuntimeEntry,
 			TimeoutMs:                timeoutMs,
 			DependsOn:                dependsOn,
 			CommandDependsOn:         commandDef.CommandDependsOn,

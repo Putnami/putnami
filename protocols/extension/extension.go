@@ -436,6 +436,18 @@ type StepActivation struct {
 	// step is never planned there. It is the vocabulary of
 	// protocolcli.ChangedFilesContract.
 	ChangedFiles []string `json:"changedFiles,omitempty"`
+	// ProjectTypes lists project types; the step is active only if the
+	// project's declared type is one of them. The empty string stands for a
+	// project that declares no type. Empty means no type gate.
+	ProjectTypes []string `json:"projectTypes,omitempty"`
+	// AnyOf lists alternative gates; the step is active only if at least one
+	// of them holds, in addition to every other condition of this gate. A
+	// step whose work has several independent sources (an import, a committed
+	// file it reconciles, an output it clears) names each one here. An
+	// alternative declares no ChangedFiles: the step binds the files its
+	// top-level gate selects, so validation refuses one inside anyOf. Empty
+	// means no alternative is required.
+	AnyOf []StepActivation `json:"anyOf,omitempty"`
 }
 
 // InputBindingFromContext is the `from` of an input binding that reads a
@@ -459,7 +471,12 @@ type TaskDefinition struct {
 	Env         map[string]string `json:"env,omitempty"`
 	// Toolchains adds lock-resolved runtime requirements for this task. Names
 	// reference RuntimeDefinition.Toolchains and are resolved before execution.
-	Toolchains      []string                  `json:"toolchains,omitempty"`
+	Toolchains []string `json:"toolchains,omitempty"`
+	// RuntimeEntry names the runtime entry (RuntimeDefinition.Entries) this
+	// task runs: {extensionRuntime} in its command and arguments expands to
+	// that entry's executable instead of the runtime's Executable. Empty runs
+	// the runtime's Executable.
+	RuntimeEntry    string                    `json:"runtimeEntry,omitempty"`
 	Output          string                    `json:"output,omitempty"`
 	TimeoutMs       int                       `json:"timeoutMs,omitempty"`
 	InputSchemaRef  string                    `json:"inputSchemaRef,omitempty"`

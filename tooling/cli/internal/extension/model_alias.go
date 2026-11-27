@@ -73,6 +73,9 @@ type ManifestHooks = model.ManifestHooks
 type HookDefinition = model.HookDefinition
 type HookCacheConfig = model.HookCacheConfig
 type RuntimeDefinition = model.RuntimeDefinition
+
+// RuntimeEntry is one further executable of a runtime.
+type RuntimeEntry = model.RuntimeEntry
 type RuntimePrepare = model.RuntimePrepare
 
 // WorkspaceAdapter is the manifest's `workspace` section.

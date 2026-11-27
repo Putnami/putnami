@@ -363,9 +363,13 @@ func TestPackagedRuntimeAnswersWithTheStampedManifestVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The manifest declares a codegen runtime entry, so the archive carries
+	// its executable too, declared as the project does.
 	ws := newUnstampedWorkspace(t, string(published), `{
 		"name": "@putnami/go",
-		"options": {"@putnami/go": {"entrypoint": "."}}
+		"options": {"@putnami/go": {"entrypoint": ".", "executables": [
+			{"name": "putnami-go-codegen", "package": ".", "tags": ["putnami_runtime_codegen"]}
+		]}}
 	}`, "first\n")
 	const version = "0.3.1-20261004094924-a389c95"
 	host := runtime.GOOS + "/" + runtime.GOARCH
@@ -380,6 +384,17 @@ func TestPackagedRuntimeAnswersWithTheStampedManifestVersion(t *testing.T) {
 	binary, err := os.ReadFile(self)
 	if err != nil {
 		t.Fatal(err)
+	}
+	targets, err := releaseTargets(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range targets {
+		entry := filepath.Join(ctx.OutputPath, "bin", target.Suffix, pkgmeta.ExecutableName(target.GOOS, "putnami-go-codegen"))
+		mustWrite(t, entry, string(binary))
+		if err := os.Chmod(entry, 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	installed := t.TempDir()
 	extractArchive(t, packageArchives(t, ctx, "putnami-go", binary), installed)

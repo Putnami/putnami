@@ -60,9 +60,11 @@ func serveLogReporter(env map[string]string, in io.Reader, out, logw io.Writer) 
 }
 
 // runLogReporter serves frames until stdin closes, like runSessionReporter.
+// It has no package sender: the run-log route stores no packages (ADR 0135),
+// so every put and manifest line is refused invalid_chunk.
 func runLogReporter(ctx context.Context, in io.Reader, out, logw io.Writer, cfg sessionReporterConfig, client *http.Client) error {
 	sender := &logReporterSender{cfg: &cfg, client: client}
-	return serveReportingFrames(ctx, in, out, logw, protocolcli.LogReporterCommand, &cfg, sender.deliver)
+	return serveReportingFrames(ctx, in, out, logw, protocolcli.LogReporterCommand, &cfg, sender.deliver, nil)
 }
 
 type logReporterSender struct {

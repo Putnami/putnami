@@ -203,9 +203,23 @@ one of three ways:
 
 | Extension | Key carries |
 |-----------|-------------|
-| Workspace-local, with a prepared runtime | The prepared-runtime digest (see [Artifact Store](#artifact-store-binaries)) |
+| Workspace-local, with a prepared runtime | The prepared-runtime digest (see [Artifact Store](#artifact-store-binaries)), or, when the runtime declares `compiledInputs`, the runtime entry digest below |
 | Installed: lock-pinned or per-worktree install | The content digest of the installed tree, without version metadata |
 | Workspace-local without a prepared runtime, or local outside the workspace | The extension version |
+
+A runtime that declares `compiledInputs` (protocol: runtime entries and
+compiled inputs) keys each task on what that task runs: the runtime
+declaration, every prepare input that is not compiled, and the SHA-256 of the
+executable the task runs, its `runtimeEntry` or the main executable. The main
+executable is folded too when a lifecycle hook of the extension runs it. An
+edit of compiled sources re-keys only the tasks whose executable it changes,
+and an edit that builds the same bytes, such as a comment that moves no line,
+re-keys none; a comment that shifts lines changes the bytes. The Go extension
+runs `build-generate` and `build-describe` from a codegen entry, so an edit of
+its code generator re-keys them, and the tasks that fold their keys through a
+dependency edge, but leaves tidy, config merge, lint and the API check alone. A key
+computed before the runtime is synchronized keys on the prepared-runtime
+digest. See [ADR 0133](adr/0133-a-task-keys-on-the-runtime-entry-it-runs.md).
 
 When the key carries a digest, it does not carry the version, so two builds of
 an extension that differ only in the version they stamp share their entries.
@@ -1604,7 +1618,10 @@ rebuild that no provider serves yet starts none and decides no movement either;
 should a later miss start one, that provider counts every serialization edge as a reader of files,
 so it may restore files it could have skipped, never fewer. A provider that
 serves the run is negotiated with as before, from the keys and the key
-movement it computes for the plan.
+movement it computes for the plan. When no declared-capture key is left to
+prefetch, every one being a local hit, a provider that serves the run decides no
+key movement either: it counts every serialization edge, the same answer for a
+later miss.
 
 ### Scoping the bypass to some projects
 

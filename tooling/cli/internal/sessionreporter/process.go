@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -116,6 +117,81 @@ func (p *process) roundTrip(ctx context.Context, line []byte) ([]byte, error) {
 		<-result
 		return nil, fmt.Errorf("reporter operation timed out")
 	}
+}
+
+// pipeline is a reporter process in package mode (ADR 0135): several lines
+// are outstanding at once. Lines leave whole, one at a time under writeMu, and
+// a single reader hands every line the reporter writes back, a result of
+// some earlier line, to results in the order it wrote them. The worker matches
+// a result to its line by address. A process leaves call and roundTrip behind
+// once it is pipelined: the reader owns its stdout.
+type pipeline struct {
+	process *process
+	writeMu sync.Mutex
+	results chan *protocolcli.SessionReportingResult
+	// closed is closed once the reader stopped: the reporter closed its pipe
+	// or exited, or wrote a line that is not a valid result.
+	closed chan struct{}
+	stop   chan struct{}
+	once   sync.Once
+}
+
+// pipelined starts the reader of p's results. capacity is how many results
+// the reader holds before the worker takes them: at least the lines that may
+// be outstanding, so a reporter that answers them all never waits on the
+// worker.
+func (p *process) pipelined(capacity int) *pipeline {
+	pl := &pipeline{process: p, results: make(chan *protocolcli.SessionReportingResult, capacity), closed: make(chan struct{}), stop: make(chan struct{})}
+	go pl.read()
+	return pl
+}
+
+func (pl *pipeline) read() {
+	defer close(pl.closed)
+	scanner := pl.process.scanner
+	for scanner.Scan() {
+		result, err := protocolcli.ParseSessionReportingResult(scanner.Bytes())
+		if err != nil {
+			return
+		}
+		select {
+		case pl.results <- result:
+		case <-pl.stop:
+			return
+		}
+	}
+}
+
+// write sends one line, bounded by ctx. A write that ctx ends closes both
+// pipes, as roundTrip does: the process then serves no other line. Its errors
+// are core-owned.
+func (pl *pipeline) write(ctx context.Context, line []byte) error {
+	pl.writeMu.Lock()
+	defer pl.writeMu.Unlock()
+	written := make(chan error, 1)
+	go func() {
+		_, err := pl.process.stdin.Write(append(line, '\n'))
+		written <- err
+	}()
+	select {
+	case err := <-written:
+		if err != nil {
+			return fmt.Errorf("reporter pipe write failed")
+		}
+		return nil
+	case <-ctx.Done():
+		_ = pl.process.stdin.Close()
+		_ = pl.process.stdout.Close()
+		<-written
+		return fmt.Errorf("reporter operation timed out")
+	}
+}
+
+// close stops the reader and closes the process.
+func (pl *pipeline) close() {
+	pl.once.Do(func() { close(pl.stop) })
+	pl.process.close()
+	<-pl.closed
 }
 
 func (p *process) close() {

@@ -262,6 +262,31 @@ func TestDiscoverExtensionsDetailed_SkipWarningDedupedPerProcess(t *testing.T) {
 	}
 }
 
+// A machine worker forgets the warnings discovery printed before each run
+// (ForgetProcessMemos): each of its runs warns of a skipped extension, as a
+// run in its own process does (CLI ADR 0116 §4).
+func TestDiscoverExtensionsDetailed_AWorkerRunWarnsAgain(t *testing.T) {
+	dir := t.TempDir()
+	writeExtensionManifest(t, filepath.Join(dir, "ext"), "{not json")
+
+	var buf strings.Builder
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	defer slog.SetDefault(prev)
+
+	for run := 1; run <= 2; run++ {
+		ForgetProcessMemos()
+		for range 2 {
+			if _, err := DiscoverExtensionsDetailed(dir, &wsproto.Config{}, []string{"ext"}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := strings.Count(buf.String(), "extension skipped"); got != run {
+			t.Fatalf("after run %d the skip warning was emitted %d times, want once per run:\n%s", run, got, buf.String())
+		}
+	}
+}
+
 // TestResolveReservedProvider_AbsentStaysSilent pins the ordinary answer for a
 // capability nobody installed: absence is (nil, nil), never an error, so the
 // caller decides whether to degrade silently or say so once.

@@ -153,6 +153,13 @@ func createExtensionArchives(ctx *pctx.Context, emit *jsonl.Emitter, packageName
 		if runtimeExecutable != "" {
 			baseExecutables = []string{runtimeExecutable}
 		}
+		entries, err := validateStagedRuntimeEntries(baseStageDir, "")
+		if err != nil {
+			emit.Diagnostic("error", err.Error(), "", 0)
+			emit.PhaseEnd("package-archives", "failed")
+			return false
+		}
+		baseExecutables = appendMissing(baseExecutables, entries...)
 	}
 
 	// Stage pre-built binaries from the cross-compile step and create archives.
@@ -379,6 +386,11 @@ func packagePlatform(run *platformPackaging, p platform.Target) error {
 			if runtimeExecutable != "" {
 				executables = append(executables, runtimeExecutable)
 			}
+			entries, err := validateStagedRuntimeEntries(stageDir, p.GOOS)
+			if err != nil {
+				return err
+			}
+			executables = appendMissing(executables, entries...)
 		}
 	}
 	if p.GOOS == "windows" {

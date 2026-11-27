@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -345,15 +346,20 @@ func TestClientBoundsTimeoutAndNeverLeaksProviderStderr(t *testing.T) {
 	tempDir := t.TempDir()
 	observation := filepath.Join(tempDir, "observed")
 	client := fakeProviderClient(t, tempDir, observation)
+	// The provider sleeps far longer than the timeout. A call that waited for
+	// it would take the whole sleep, so returning in half of it proves the
+	// timeout bounds the wait, whatever the machine's load adds to starting
+	// and stopping the process.
+	const providerSleep = 30 * time.Second
 	client.Timeout = 20 * time.Millisecond
-	client.Env = append(fakeEnv(t, testResolveResponse(t), observation), "FAKE_SLEEP=1")
+	client.Env = append(fakeEnv(t, testResolveResponse(t), observation), "FAKE_SLEEP="+strconv.Itoa(int(providerSleep/time.Second)))
 	started := time.Now()
 	_, err := client.Resolve(context.Background(), testResolveRequest())
 	if !errors.Is(err, ErrProviderTimeout) {
 		t.Fatalf("timeout error = %v", err)
 	}
-	if elapsed := time.Since(started); elapsed > 500*time.Millisecond {
-		t.Fatalf("provider timeout returned after %s, want a bounded subprocess wait", elapsed)
+	if elapsed := time.Since(started); elapsed >= providerSleep/2 {
+		t.Fatalf("provider timeout returned after %s, want it well before the provider's %s sleep ends", elapsed, providerSleep)
 	}
 
 	// Restore the ordinary fixture bound after the intentionally tiny timeout.

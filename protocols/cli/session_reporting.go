@@ -170,6 +170,11 @@ type SessionReportingAck struct {
 	// SessionReportingLargeFrameVersion in SessionReportingFramingEnv sends it;
 	// absent, the cap is SessionReportingChunkBytes.
 	ChunkBytes int `json:"chunkBytes,omitempty"`
+	// Packages says that the reporter's destination accepts packages
+	// (ADR 0135): the engine may send SessionReportingPut lines from now on.
+	// Only a reporter whose engine named SessionReportingPackagesVersion in
+	// SessionReportingFramingEnv sends it, and only true.
+	Packages bool `json:"packages,omitempty"`
 }
 
 var reportingSessionID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
@@ -297,6 +302,9 @@ func ParseSessionReportingAck(line []byte) (*SessionReportingAck, error) {
 	_ = json.Unmarshal(line, &members)
 	if _, present := members["chunkBytes"]; present && (a.ChunkBytes < SessionReportingChunkBytes || a.ChunkBytes > SessionReportingMaxChunkBytes) {
 		return nil, fmt.Errorf("invalid reporting chunk cap")
+	}
+	if _, present := members["packages"]; present && !a.Packages {
+		return nil, fmt.Errorf("invalid reporting packages member")
 	}
 	return &a, nil
 }

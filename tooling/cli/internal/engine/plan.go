@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/output"
+	internalworkspace "go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // buildPlan creates the execution plan from commands, projects, and extensions.
@@ -103,6 +104,13 @@ func buildPlan(
 		iox.Fprintf(os.Stderr, "putnami: plan: %v\n", err)
 		return nil, ExitError
 	}
+	// The plan's step activation answers are kept with their witnesses for
+	// the next run, as the probe's are (CLI ADR 0132); a `--plan` or a
+	// preview-only `--dry-run` records none.
+	internalworkspace.SaveActivationWitnesses(ws.Root, internalworkspace.SnapshotWritePolicy{
+		Plan:   req.Global.Plan,
+		DryRun: req.previewsOnly(),
+	})
 	// The plan records its own warnings on the workspace, such as shared
 	// executions it had to drop. The run reports them with the warnings of its
 	// load, on the same stream and in the same envelope member.

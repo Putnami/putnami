@@ -84,6 +84,7 @@
     "cloud/ingest-token#signs-in-outside-a-workspace",
     "cloud/large-session-reporting-frames#acknowledgements-carry-the-cap",
     "cloud/large-session-reporting-frames#large-frames-only-after-an-advertising-answer",
+    "cloud/large-session-reporting-frames#packages-go-in-parallel",
     "cloud/large-session-reporting-frames#unadvertised-large-acceptance-fails-closed",
     "cloud/local-session-reporting#hosted-credential-wins",
     "cloud/local-session-reporting#local-session-fails-closed",

@@ -537,6 +537,12 @@ to build it from:
 }
 ```
 
+An entry may also name `tags`, build tags added to that program's build only.
+The Go extension builds its codegen runtime entry this way, from its own
+runtime package with the `putnami_runtime_codegen` tag. An extension archive
+must carry the executable of every `runtime.entries` entry its manifest
+declares, or packaging fails.
+
 To obtain a tool binary for a platform other than the machine you are on — for
 example when assembling a `linux/amd64` image from a Mac — materialize the
 archive for that platform and read it out of `compiled/tools/`:

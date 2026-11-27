@@ -108,6 +108,11 @@ export interface SessionReportingAck extends ReportingIdentity {
    * a reporter whose engine named framing version 3 sends it.
    */
   chunkBytes?: number;
+  /**
+   * The reporter's destination accepts packages (ADR 0135). Only a reporter
+   * whose engine named framing version 4 sends it, and only true.
+   */
+  packages?: true;
 }
 
 const identityKeys = ['protocolVersion', 'sessionId', 'artifact', 'offset', 'sequence', 'sha256', 'final'];
@@ -189,7 +194,8 @@ export async function parseSessionReportingChunk(line: string): Promise<SessionR
 }
 
 export function parseSessionReportingAck(line: string): SessionReportingAck {
-  const v = parse(line, [...identityKeys, 'ok'], ['retryable', 'code', 'chunkBytes']);
+  const v = parse(line, [...identityKeys, 'ok'], ['retryable', 'code', 'chunkBytes', 'packages']);
+  if (v['packages'] !== undefined && v['packages'] !== true) throw new Error('invalid reporting packages member');
   if (
     v['chunkBytes'] !== undefined &&
     (!Number.isSafeInteger(v['chunkBytes']) ||

@@ -35,7 +35,11 @@ var namespaceOwnershipCache sync.Map // workspace root → *OptionOwnership
 // registry name resolves to an installed copy whose location is a machine-local
 // fact, so it contributes nothing and its namespaces stay in every key, which
 // is the same fail-closed default an undeclared namespace gets.
-func ResolveOptionOwnership(workspaceRoot string, references []string) *OptionOwnership {
+//
+// The answer is read once per workspace root and process: references is
+// called only for that first read, so a caller that derives them from every
+// project pays for it once, not on each cache key that asks.
+func ResolveOptionOwnership(workspaceRoot string, references func() []string) *OptionOwnership {
 	if cached, ok := namespaceOwnershipCache.Load(workspaceRoot); ok {
 		if owned, typed := cached.(*OptionOwnership); typed {
 			return owned
@@ -45,8 +49,9 @@ func ResolveOptionOwnership(workspaceRoot string, references []string) *OptionOw
 		Namespaces: map[string][]string{},
 		Commands:   map[string]bool{},
 	}
-	seen := make(map[string]bool, len(references))
-	for _, ref := range references {
+	refs := references()
+	seen := make(map[string]bool, len(refs))
+	for _, ref := range refs {
 		if !strings.HasPrefix(ref, "/") || seen[ref] {
 			continue
 		}
@@ -112,4 +117,16 @@ func readManifestNoDiagnostics(dir string) *extproto.Manifest {
 	}
 	manifest, _ := extproto.ParseManifest(data)
 	return manifest
+}
+
+// ForgetProcessMemos drops the option ownership this package memoizes for the
+// life of the process: a machine worker serves many runs, and a manifest can
+// change between two (CLI ADR 0116 §8). It drops the discovery warnings it
+// printed too, so each run warns as a run in its own process does.
+func ForgetProcessMemos() {
+	namespaceOwnershipCache.Range(func(key, _ any) bool {
+		namespaceOwnershipCache.Delete(key)
+		return true
+	})
+	warnedOnce.Clear()
 }

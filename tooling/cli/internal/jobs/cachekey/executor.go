@@ -463,7 +463,7 @@ func JobConfigScope(ws *workspace.Workspace, job *jobmodel.ScheduledJob) store.P
 	}
 	scope := store.ProjectConfigScope{ExtensionLayers: layers}
 	if ws != nil {
-		ownership := extension.ResolveOptionOwnership(ws.Root, workspaceExtensionReferences(ws))
+		ownership := extension.ResolveOptionOwnership(ws.Root, func() []string { return workspaceExtensionReferences(ws) })
 		for _, namespace := range ownership.ForeignNamespaces(job.Extension.Name) {
 			// A command this extension provides is merged into its resolved
 			// parameters under that name, so the block is its input whether or

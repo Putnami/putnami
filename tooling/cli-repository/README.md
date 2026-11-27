@@ -195,8 +195,12 @@ tests.
 - `internal/jobs/cachekey.TestTypeScriptLintCheckOnlyCacheKeyIgnoresGeneratedFiles`
 - `internal/jobs/planner.TestAConsumerOnlySelectionPlansTheGenerationOfItsClosureClients`
 - `internal/jobs/planner.TestAContractEditMovesTheKeysOfTheConsumerJobs`
+- `internal/jobs/planner.TestADroppedStepSplicesItsDependents`
 - `internal/jobs/planner.TestAGoSiteProjectPlansTheGoBuildBesideTheSiteContentGenerateStep`
 - `internal/jobs/planner.TestAPlainSiteContentProjectPlansValidateAndPackage`
+- `internal/jobs/planner.TestAPlanHoldsOnlyTheStepsTheProjectContextGivesWork`
+- `internal/jobs/planner.TestAStepThatGainsWorkIsPlannedInTheNextRun`
+- `internal/jobs/planner.TestAnIdleLibraryStillCarriesItsSourcesToItsDependents`
 - `internal/jobs/planner.TestBuildPlansNoCloudJobForAProjectThatUsesNoCloudFeature`
 - `internal/jobs/planner.TestCLIValidationLintStaysOffTheTestCriticalChain`
 - `internal/jobs/planner.TestClientgenKeyIgnoresTheDescribeOwnedTrees`

@@ -10,19 +10,19 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
-// A reader before rung 28 refuses the member and would key a selection-free
+// A reader before rung 31 refuses the member and would key a selection-free
 // task on the run's selection. A manifest with a task that declares
-// selection none therefore needs rung 28, and a lower stamp is refused.
+// selection none therefore needs rung 31, and a lower stamp is refused.
 func TestASelectionFreeTaskRequiresItsContract(t *testing.T) {
-	spectest.Proves(t, "extension/manifest-contract", "later-rungs-raise-the-contract-floor", "selection-free-tasks-require-contract-28")
-	spectest.Proves(t, "extension/manifest-contract", "later-rungs-raise-the-contract-floor", "selection-free-tasks-below-contract-28-do-not-load")
-	manifest := []byte(`{"name":"@test/sdd","cliContract":27,"commands":{"validate-workspace":{"activation":"workspace-once","run":[{"id":"features","task":"features"}]}},"tasks":{"features":{"kind":"command","command":"echo","selection":"none"}}}`)
+	spectest.Proves(t, "extension/manifest-contract", "later-rungs-raise-the-contract-floor", "selection-free-tasks-require-contract-31")
+	spectest.Proves(t, "extension/manifest-contract", "later-rungs-raise-the-contract-floor", "selection-free-tasks-below-contract-31-do-not-load")
+	manifest := []byte(`{"name":"@test/sdd","cliContract":30,"commands":{"validate-workspace":{"activation":"workspace-once","run":[{"id":"features","task":"features"}]}},"tasks":{"features":{"kind":"command","command":"echo","selection":"none"}}}`)
 	if _, err := NegotiateManifest("sdd.json", manifest); err == nil {
-		t.Fatal("contract-27 stamp accepted a selection-free task")
+		t.Fatal("contract-30 stamp accepted a selection-free task")
 	}
-	m, err := NegotiateManifest("sdd.json", []byte(strings.Replace(string(manifest), `"cliContract":27`, `"cliContract":28`, 1)))
+	m, err := NegotiateManifest("sdd.json", []byte(strings.Replace(string(manifest), `"cliContract":30`, `"cliContract":31`, 1)))
 	if err != nil {
-		t.Fatalf("contract-28 stamp refused: %v", err)
+		t.Fatalf("contract-31 stamp refused: %v", err)
 	}
 	if !m.Tasks["features"].ReadsNoSelection() {
 		t.Fatal("selection none did not parse")

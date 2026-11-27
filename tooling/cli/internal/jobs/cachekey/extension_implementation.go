@@ -46,7 +46,9 @@ const implementationRecordLockWait = 2 * time.Second
 // extension version.
 //
 //   - A workspace-local extension with a declared prepared runtime yields its
-//     runtime input digest, the value synchronization computed.
+//     runtime input digest, the value synchronization computed, or, when the
+//     runtime declares compiledInputs, the digest of the runtime entry the task
+//     runs (runtimeEntryDigest).
 //   - Any other local source yields "": a local extension without a prepared
 //     runtime, or one outside the workspace, keeps its version as its
 //     identity.
@@ -74,6 +76,12 @@ func extensionImplementationDigest(
 	}
 	if job.Extension.Runtime == nil || job.Extension.Runtime.Prepare == nil {
 		return "", nil
+	}
+	if len(job.Extension.Runtime.CompiledInputs) > 0 {
+		digest, ok, err := runtimeEntryDigest(job, cache)
+		if err != nil || ok {
+			return digest, err
+		}
 	}
 	if job.Extension.RuntimeDigest != "" {
 		return job.Extension.RuntimeDigest, nil

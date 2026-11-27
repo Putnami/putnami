@@ -405,9 +405,10 @@ func TestNegotiateDoesNotSpawnTheProviderForAFullyWarmRun(t *testing.T) {
 }
 
 // A provider started before negotiation (a hosted run, a run-marker lookup)
-// that serves the run gets its key movement decided, as before, even when
-// every planned job is a local hit.
-func TestNegotiateDecidesTheMovementForAProviderAlreadyServing(t *testing.T) {
+// that serves the run, when every planned job is a local hit, has nothing to
+// prefetch: the negotiation decides no key movement and records no key, and
+// every serialization edge counts for a later miss (ADR 0096).
+func TestNegotiateDecidesNoMovementWhenEveryKeyIsALocalHit(t *testing.T) {
 	f := newObjectCacheFixture(t, nil, true, false)
 	if cold := f.run(t, SchedulerConfig{MaxParallel: 1}); !cold.Success {
 		t.Fatalf("cold run failed: %+v", cold.Results)
@@ -418,8 +419,11 @@ func TestNegotiateDecidesTheMovementForAProviderAlreadyServing(t *testing.T) {
 		t.Fatal(err)
 	}
 	warmRemote.Negotiate(context.Background(), f.ws, f.planned, nil, nil, f.cache, cachekey.CacheBypass{})
-	if warmRemote.Keys == nil {
-		t.Fatal("a provider serving the run before negotiation got no key movement decided")
+	if warmRemote.Keys != nil {
+		t.Fatalf("a negotiation with nothing to prefetch recorded keys %v", warmRemote.Keys)
+	}
+	if len(warmRemote.LocalHits) != len(f.planned) {
+		t.Fatalf("local hits = %v for %d planned jobs; the test needs a fully warm plan", warmRemote.LocalHits, len(f.planned))
 	}
 }
 

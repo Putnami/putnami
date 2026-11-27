@@ -45,10 +45,22 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
-//	28: ADDITIVE — a task that declares `selection: none`. From 28 on, the
+//	31: ADDITIVE — a task that declares `selection: none`. From 31 on, the
 //	   CLI hands such a task no `selection` and no `selectedProjects` in its
 //	   job context and keys it on no selected project, so one cache entry
-//	   serves every selection. A reader below 28 refuses the member, so a
+//	   serves every selection. A reader below 31 refuses the member, so a
+//	   manifest that declares one is stamped 31 from every origin.
+//	30: reserved for a change in flight; no meaning lands here yet.
+//	29: ADDITIVE — runtime `entries` and `compiledInputs`, and a task that
+//	   names a `runtimeEntry`. From 29 on, a task runs its entry where its
+//	   command says {extensionRuntime}, and a workspace-local runtime that
+//	   declares compiled inputs keys each task on the executable it runs. A
+//	   reader below 29 would run the main executable, so a manifest that
+//	   declares one is stamped 29 from every origin.
+//	28: ADDITIVE — a step activation that declares `projectTypes` or
+//	   `anyOf`. From 28 on, the planner plans the step only where the
+//	   project's type is listed, or one alternative holds, and keeps each
+//	   answer under the witnesses of what it read. A reader below 28 refuses the members, so a
 //	   manifest that declares one is stamped 28 from every origin.
 //	27: ADDITIVE — a task's file output that declares `emptied`. From 27 on,
 //	   the CLI removes the file before the task executes and on a restore of
@@ -387,11 +399,26 @@ const ToolchainProbeSelfContract = 26
 // the run that produced the entry left none, so it refuses the stamp instead.
 const EmptiedFileOutputContract = 27
 
+// ContextActivationContract is required by a manifest whose step activation
+// declares projectTypes or anyOf. A reader at this contract plans the step
+// only where the project's type or one of the alternatives gives it work. An older reader refuses the members, so the
+// manifest is stamped 28 from every origin.
+const ContextActivationContract = 28
+
+// RuntimeEntriesContract is required by a manifest whose runtime declares
+// entries or compiled inputs, or whose task names a runtime entry. A reader at
+// this contract runs a task's runtime entry where its command says
+// {extensionRuntime}, and keys the task on the executable it runs. An older
+// reader would run the runtime's main executable for that task, which need not
+// serve it, so it refuses the stamp instead.
+const RuntimeEntriesContract = 29
+
 // SelectionFreeTaskContract is required by a manifest whose task declares
 // `selection: none`. A reader at this contract hands the task no run
 // selection and keys it on no selected project. An older reader refuses the
-// member, so it refuses the stamp instead.
-const SelectionFreeTaskContract = 28
+// member, so it refuses the stamp instead. Rung 30 is reserved for a change in
+// flight, so this rung is 31.
+const SelectionFreeTaskContract = 31
 
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or

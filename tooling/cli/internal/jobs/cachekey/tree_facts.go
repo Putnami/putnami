@@ -831,12 +831,17 @@ func (r *cutRead) under(directories []string) (files []protocoljob.CandidateFile
 // encodedFiles is the workspace's cut of the read as a listing file holds it, and
 // the digest of those bytes, encoded once. found is false outside every
 // repository.
+//
+// The workspace's cut is every file of the read, so it is encoded from the
+// read's own list, once: a key that asks again copies nothing.
 func (r *cutRead) encodedFiles() (data []byte, digest string, found bool, err error) {
-	files, found, err := r.under([]string{"."})
-	if err != nil || !found {
-		return nil, "", found, err
+	if putnamigit.OutsideRepository(r.err) {
+		return nil, "", false, nil
 	}
-	r.encodeOnce.Do(func() { r.encoded, r.encodedDigest, r.encodeErr = protocoljob.EncodeCandidateFiles(files) })
+	if r.err != nil {
+		return nil, "", false, r.err
+	}
+	r.encodeOnce.Do(func() { r.encoded, r.encodedDigest, r.encodeErr = protocoljob.EncodeCandidateFiles(r.files) })
 	return r.encoded, r.encodedDigest, true, r.encodeErr
 }
 

@@ -134,6 +134,10 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.RuntimeEntriesContract:
+			reason = " for its runtime entries"
+		case required == protocolcli.ContextActivationContract:
+			reason = " for a step activation on the project's type or on alternatives"
 		case required == protocolcli.EmptiedFileOutputContract:
 			reason = " for an emptied file output"
 		case required == protocolcli.PromptHostHooksContract:

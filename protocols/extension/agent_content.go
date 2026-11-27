@@ -99,8 +99,10 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: EmptiedFileOutputContract for a file output that declares
-// emptied, PromptHostHooksContract for a host hook at UserPromptSubmit or
+// the manifest: RuntimeEntriesContract for runtime entries, compiled inputs or
+// a task that names a runtime entry, ContextActivationContract for a step
+// activation that declares projectTypes or anyOf, EmptiedFileOutputContract for a file
+// output that declares emptied, PromptHostHooksContract for a host hook at UserPromptSubmit or
 // one that declares async, ProviderMembersContract for a provider operation
 // that declares members, DependencyClosureContract for a command that depends on a
 // command across its project's dependency closure, BuildGraphEdgesContract for
@@ -249,7 +251,53 @@ func RequiredLoadContract(m *Manifest) int {
 	if DeclaresEmptiedFileOutput(m) {
 		required = max(required, protocolcli.EmptiedFileOutputContract)
 	}
+	// A task runs its runtime entry only through a reader that expands
+	// {extensionRuntime} to it, whatever origin the manifest loads from.
+	if DeclaresRuntimeEntries(m) {
+		required = max(required, protocolcli.RuntimeEntriesContract)
+	}
+	// A gate on the project's sources, its type or alternatives plans the
+	// step only in a reader that evaluates it, whatever origin the manifest
+	// loads from.
+	if DeclaresContextActivation(m) {
+		required = max(required, protocolcli.ContextActivationContract)
+	}
 	return required
+}
+
+// DeclaresRuntimeEntries reports whether the manifest uses the vocabulary of
+// protocolcli.RuntimeEntriesContract: runtime entries, compiled inputs, or a
+// task that names a runtime entry.
+func DeclaresRuntimeEntries(m *Manifest) bool {
+	if m == nil {
+		return false
+	}
+	if m.Runtime != nil && (len(m.Runtime.Entries) > 0 || len(m.Runtime.CompiledInputs) > 0) {
+		return true
+	}
+	for _, task := range m.Tasks {
+		if task.RuntimeEntry != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// DeclaresContextActivation reports whether a step activation of the manifest
+// declares projectTypes or anyOf: the vocabulary of
+// protocolcli.ContextActivationContract.
+func DeclaresContextActivation(m *Manifest) bool {
+	if m == nil {
+		return false
+	}
+	for _, command := range m.Commands {
+		for _, step := range command.Run {
+			if step.Activation != nil && (len(step.Activation.ProjectTypes) > 0 || len(step.Activation.AnyOf) > 0) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // DeclaresEmptiedFileOutput reports whether a task of the manifest declares a

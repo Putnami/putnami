@@ -26,7 +26,7 @@ func TestResolveOptionOwnership(t *testing.T) {
 	write("sdd", `{"name":"@putnami/sdd","optionNamespaces":["sdd","publish","shared"],"commands":{"validate":{"description":"v"}}}`)
 	write("go", `{"name":"@putnami/go","optionNamespaces":["shared"],"commands":{"build":{"description":"b"},"publish":{"description":"p"}}}`)
 
-	ownership := ResolveOptionOwnership(root, []string{"/sdd", "/go", "@putnami/registry-only", "/missing"})
+	ownership := ResolveOptionOwnership(root, func() []string { return []string{"/sdd", "/go", "@putnami/registry-only", "/missing"} })
 
 	foreign := ownership.ForeignNamespaces("@putnami/go")
 	if !slices.Contains(foreign, "sdd") {

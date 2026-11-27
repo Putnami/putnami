@@ -201,6 +201,21 @@
               "a-large-frame-accepted-without-advertisement-is-refused"
             ]
           }
+        },
+        {
+          "id": "packages-go-in-parallel",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "acks-offer-packages-only-to-a-package-engine-and-receiver",
+              "puts-go-concurrently-and-answer-by-address",
+              "a-manifest-posts-last"
+            ]
+          }
         }
       ]
     },
