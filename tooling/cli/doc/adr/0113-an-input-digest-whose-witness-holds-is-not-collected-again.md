@@ -181,7 +181,7 @@ one.
 **A sample of the answers is collected again.** Each run collects again a
 random sample of the digests the record answers: each answer with a
 probability of 16 over the entries the record loaded, and at least 1 %, so
-about 28 of this repository's 2,800 answers. A sampled answer that differs
+about 25 of this repository's 2,480 answers. A sampled answer that differs
 from its collection shows a witness the record should not have trusted, in a
 class no test foresaw: the run uses the collected digest, discards the whole
 record for the rest of the run, which then collects every digest, saves an
@@ -189,7 +189,7 @@ empty record, and reports one warning (`cache.input_record_discarded`) that
 names the digest, its directory and its patterns, in its output and in its
 result. An unknown false-hit class becomes a miss within the run that samples
 it, and every run after it starts from an empty record. The sample costs about
-1 % of what the record saves (measured in Consequences).
+25 collections a run, 1 % of the collections the record saves.
 
 ### 2. The racy rule, for files and for directories
 
@@ -489,36 +489,39 @@ record creates no entry and moves no key.
 ## Consequences
 
 Measured on 2026-11-27 with the protocol above, on the same 4-core container,
-on a full clone with its 36 tags, the input digests of sections 1 to 3
-against main `299343dc` (which already reads the Git index in-process, ADR
-0112), medians of three unchanged runs after a priming run:
+on a full clone with its 36 tags, the input digests of sections 1 to 3 with
+the sample of section 1, against main `13d56d86` (which already reads the Git
+index in-process, ADR 0112, and records the release baselines, section 4),
+medians of three unchanged runs after a priming run:
 
 | Measure | Main | Input record |
 |---|---|---|
-| Wall | 36.3 s | 31.1 s |
-| Engine CPU | 49.3 s | 35.7 s |
-| Run CPU (`runMs`) | 52.8 s | 39.4 s |
-| Key time summed | 20.9 s | 9.0 s |
-| Longest ready wait | 12.6 s | 10.9 s |
-| Input digests answered / collected | 0 / every one | 2,838 / 319 |
+| Wall | 22.2 s | 19.2 s |
+| Engine CPU | 27.3 s | 22.5 s |
+| Run CPU (`runMs`) | 30.1 s | 25.3 s |
+| Key time summed | 7.2 s | 8.7 s |
+| Longest ready wait | 4.8 s | 5.2 s |
+| Input digests answered / collected | 0 / every one | 2,486 / 158 |
 
-Engine Git calls stay at 513 on this clone: the per-project release-baseline
-reads, which section 4's record removes, separately. The digests still
-collected are those of output directories restores rewrite on every run (a
-project's `.gen`, where a digest keys on files there) and the ones a link
-or a basis with no answer identity leaves unrecorded.
+Engine Git calls stay at 58: the section 4 record already removed the
+per-project release-baseline reads. The key time summed is the wall time
+tasks spend in their key step, waits included, not CPU: it rises by 1.5 s
+while the engine's CPU falls by 4.8 s and the wall by 3.0 s; where those
+waits come from is not measured here. The digests still collected are those of output directories restores
+rewrite on every run (a project's `.gen`, where a digest keys on files
+there), the sample, and the ones a link or a basis with no answer identity
+leaves unrecorded.
 
 The witness costs a stat of every witnessed path, 28 ms for the whole tree,
 and the record is a few megabytes; a synthetic record of this repository's
 shape (15,755 distinct paths with their stats, references of 2,169 entries)
 decodes in 4 ms.
 
-- The longest ready wait goes from 12.6 s to 10.9 s, not under 5 s. On
-  an unchanged run it is set by how fast four workers drain 2,239 cache hits,
-  and with the digests free each hit still pays its restore (3.7 s of engine
-  CPU), its session record sanitizing (3.5 s), the remote negotiation (3.0 s)
-  and the collector's work on them (2.9 s): the per-task fixed costs of
-  an unchanged run, which are separate work. The owner moved the < 5 s
+- The longest ready wait stays near 5 s (4.8 s to 5.2 s). On an unchanged
+  run it is set by how fast four workers drain 2,245 cache hits, and with the
+  digests free each hit still pays its restore, its session record and the
+  collector's work on it: the per-task fixed costs of an unchanged run,
+  which are separate work. The owner moved the < 5 s
   ready-wait criterion to the per-task fixed-cost work on 2026-11-27. This
   decision is done when no input digest is collected while its witness holds,
   the randomized write tests find no false hit, and the gain is measured on
