@@ -10,7 +10,7 @@
   collected again" (proposed), whose section 7 is the interface this process
   answers to; ADR 0112 (the engine's own Git reader); ADR 0115 (the detached
   report upload, which the supervisor may later own)
-- **Scope**: `@putnami/cli` (a new `internal/machine` package: the supervisor,
+- **Scope**: `@putnami/cli` (a new `internal/machineproc` package: the supervisor,
   its socket, its watcher, its admission and its protocols, and the engine
   worker and what it holds; `internal/cli`: the client;
   `internal/engine` and the packages it calls: the run's process context
@@ -184,7 +184,11 @@ A **worker** is started by the supervisor, never by a client: the client's
 request names its executable's path and identity; the supervisor reads that
 file's identity again, starts it as `putnami __machine work` with one end of
 a socket pair as its only channel, and refuses a file whose identity differs
-from the one claimed. Two requests of one build share one worker.
+from the one claimed. A worker serves one executable file: two requests of
+one build from the same file share one worker, and two files of one build get
+two, since a source workspace pins the file its engine runs from, not the
+build (found by the first implementation: two `putnamiw` blobs of identical
+content were served by one worker, and the workspace refused the other's run).
 
 **Stop.** A worker stops after 1 hour with no run, when the supervisor evicts
 it for memory, when its executable's path no longer names the file it started
@@ -249,28 +253,34 @@ client exits with. A client that loses the connection mid-run reports it and
 exits as an interrupted run does today; a worker cancels a run whose client
 disconnected, as an interrupt does.
 
-The engine therefore takes its process context as a value: environment,
-working directory, standard streams, home directory, clock and signal source.
-No package the engine reaches reads `os.Environ`, `os.Getenv`, `os.Getwd`,
-`os.Stdout` or the process's signals; the entry point reads them once and
-passes them in. A static check over the engine's import graph keeps it so;
-today 123 such reads sit in 64 files. Global memos that outlive a run today
-(the workspace load memo, the file index in use, the toolchain probe
-answers) become fields of the worker's held state or of the run.
+**A worker serves one run at a time, in its own process context.** For the
+run, it sets the client's environment, working directory and umask on its
+process and puts the client's descriptors on its standard streams (`dup2`),
+then restores its own. The engine reads its context from the process as it
+does today, so a run in a worker and a run in its own process read the same
+values. A second run for a busy worker runs in its own process. Measured with
+a throwaway build that ran four unchanged runs of this repository in one
+process: each gave the same results as a first run (section 15). Taking the
+context as a value instead (123 reads of the environment, the working
+directory or the standard streams in 64 files of the engine) is needed only
+for one worker to serve concurrent runs, and waits for a measurement that
+shows concurrent runs of one build to be worth it. Memos that outlive a run
+(the workspace load memo, the toolchain probe answers) are reset by the run
+as today, or held under section 8's rule.
 
 **Which runs go through it.** Every run a worker can serve the same way, and
 none other. A client runs in its own process when:
 
 - the machine process is turned off (section 12), or the client is in CI
   (`CI` set), or it is a hosted run (`--credential-fd`, ADR 0055), or a nested
-  run (a `putnami` started by a job of a run, which carries
-  `PUTNAMI_MACHINE_RUN`): a nested run through the machine process could wait
-  on the run that started it;
+  run (a `putnami` started by a job of a run, which carries `PUTNAMI_JOB_NAME`,
+  or by a worker's run, which carries `PUTNAMI_MACHINE_RUN`): a nested run
+  through the machine process could wait on the run that started it;
 - the command is not a run of the engine (`config`, `machine`, `cache gc`,
   `install`, `--version`…), or it is `watch` or `serve`, which keep their own
   process;
-- a run of the same worktree is active in the worker (the second runs in its
-  own process, with today's locks);
+- a run is active in the worker of its build (the second runs in its own
+  process, with today's locks);
 - the supervisor or the worker refuses it: stopping, outdated (section 3),
   over budget (section 10), or the identity check failed.
 
@@ -450,7 +460,7 @@ computed again. Hence:
 - no key, entry address, record format or protocol value changes, and nothing
   the machine process holds is written as a value another run trusts.
 
-**A comparison test checks it.** A test of `internal/machine` starts a
+**A comparison test checks it.** A test of `internal/cli/e2e/machineproc` starts a
 supervisor on a Git fixture and runs the same commands through it and in
 their own process (`PUTNAMI_MACHINE=off`), after each round of the randomized
 writes of ADR 0113 §5 and a branch switch, a stage, a configuration edit and
@@ -526,12 +536,13 @@ prototype measures a worker's held memory per worktree (section 15).
 - **On by default on Linux and macOS in 0.6** (the owner's decision of
   2026-11-27). Always off in CI (`CI` set), in hosted runs and in nested runs.
   Windows has no machine process (decision `windows-support-is-suspended`).
-- **Setting**: `machine.process` in the global configuration
-  (`~/.putnami/config.json`): `on` or `off`. A workspace's configuration may
-  say `off` for its own runs, never `on`.
+- **Setting**: `putnami machine on|off` records the user's choice in
+  `machine.json` under the Putnami home, as `putnami telemetry on|off` does
+  for telemetry: the switch is the user's, for every workspace.
 - **Kill switch**: `PUTNAMI_MACHINE=off` turns it off for one command, the
-  setting for the user, `putnami machine stop` stops the supervisor and every
-  worker at once. A user who turns it off loses no result: every run runs in
+  setting for the user (`putnami machine off` also stops the running
+  supervisor), `putnami machine stop` stops the supervisor and every worker
+  once no run is active. A user who turns it off loses no result: every run runs in
   its own process as today.
 - **Commands**: `putnami machine status` (the supervisor, its protocol
   versions, its workers and their builds, worktrees, held memory, watches,
@@ -542,7 +553,7 @@ there: the FSEvents sync point and its coalescing, the descriptor and signal
 hand-off, `getpeereid`, and the memory figures. What bounds the risk: every
 FSEvents doubt is a break that costs stats, never a stale key (section 7);
 the self-check turns stat skipping off on its first mismatch; the comparison
-test runs on the macOS runner of the CLI's own tests; and the kill switch
+test runs on that Mac with the first measurement; and the kill switch
 above leaves runs exactly as they are today. The first macOS measurement of
 the protocol of section 15 is a task of the implementation, before 0.6 is
 released.
@@ -639,6 +650,33 @@ fraction of a second. `./putnamiw` adds 151 to 169 ms of its own. The
 prototype reports each part; a target it cannot reach is reported with the
 part that holds it.
 
+**Measured: what a warm process holds today.** On 2026-11-27, a throwaway
+build ran the CLI's `run` four times in one process (full clone with tags,
+signed out, the unchanged command above), so runs two to four found the
+process warm with every memo the code keeps today:
+
+| Runs two to four in one process | Wall each | Summed key time |
+|---|---|---|
+| Today's memos only | 27.0 s, 27.4 s, 27.8 s (the first: 27.7 s) | 14.1 to 15.3 s |
+| Plus the run's input-digest memo kept across runs, with no witness | 25.2 s, 25.6 s, 26.4 s | 11.8 to 14.9 s |
+
+Every phase is as long in a warm process as in a new one (workspace-load 57
+to 102 ms, runtime-sync 209 to 363 ms, probe 773 to 972 ms, plan 1.7 to
+1.9 s, 512 Git calls): no memo of today's code survives a run with a value
+the next run uses. Keeping the digests with no witness saves 1.5 to 2.5 s, a
+bound, since the run's own writes still drop many of them. A warm process
+therefore saves what it holds under section 8's rule, not what it is: the
+held record of ADR 0113, the plan and the Git reader's state, then the
+per-run constant left once the uncached-task and per-task fixed-cost work
+have landed.
+
+**Order of the implementation.** First, the supervisor, the worker per
+executable, the client, `putnami machine` and the comparison test of
+section 8: a run through a worker gives the same results, with no held state
+beyond today's. Then, once ADR 0113's record has landed, the watcher of
+section 7 and the held state of section 6, measured on this protocol at each
+step. Then the admission of section 5 and the memory budget of section 10.
+
 ## Consequences
 
 - An unchanged run through a worker makes no Git call, starts no process of
@@ -647,8 +685,9 @@ part that holds it.
   each admitting the whole machine.
 - A new worktree starts with its build's runtime and toolchain answers warm
   when a worker of that build lives, and its own state cold.
-- The engine takes its process context as a value: a refactor of the 64 files
-  that read the environment, and a static check that keeps it so.
+- A worker applies a run's context to its own process and serves one run at
+  a time; serving concurrent runs of one build would take the context as a
+  value, a refactor of the 64 files that read it.
 - Two protocols are kept stable across builds, by addition only.
 - A worker can outlive its build's last run by an hour and the supervisor its
   last worker by three, within the memory budget; `putnami machine status` and
