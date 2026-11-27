@@ -416,14 +416,27 @@ stat per output.
 
 The fixpoint holds only as far as the writers have an entry at their
 precomputed key, and on this repository it collapses today on 488 jobs that
-have none. Some are absent by construction: a source-bound task's entry
-address binds the project's source binding, which `CacheEntryPresent` does
-not compute; with ADR 0112's in-process reader it can, at no Git call. Each
-other one must be classified before the gain is claimed. This record creates
-no entry. The expected gain, the 48 job processes, is therefore conditional:
-the implementation classifies the 488, makes prune ask the fixpoint, and
-measures what it settles. If a class has no entry for a reason this record
-cannot change, the gain is reported as what remains.
+have none. Counted by task name on an unchanged `--all`: `lint~docs` 150,
+`validate~features` 123, `test~describe` and `build~describe` 35 each,
+`build~compile` 27, `build~generate` 25, `test~generate` 23, `test~test` 4,
+`build~infra` 3, and one each of 13 other tasks. Every one of them uses
+declared capture and was served from the local cache in the same run. So
+either the key it computed at its start differs from its precomputed key, or
+`CacheEntryPresent` cannot address its entry:
+
+- the `describe` and `generate` steps are source-bound, and their entry
+  address binds the project's source binding, which `CacheEntryPresent` does
+  not compute. With ADR 0112's in-process reader it can, at no Git call;
+- for the others, no cause is traced yet. A precomputed key that differs from
+  the key computed at the start is a divergence of its own: prune and the
+  remote negotiation both read the precomputed keys.
+
+This record creates no entry and moves no key, so the expected gain, the 48
+job processes, is conditional. The implementation first adds a test that
+compares, on a fixture plan, each job's precomputed key with the key it
+computes at its start, traces each class it finds, and then makes prune ask
+the fixpoint and measures what it settles. A class this record cannot change
+is reported as what remains.
 
 ## Consequences
 
