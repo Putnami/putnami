@@ -53,14 +53,12 @@ export class ReactApplicationGenerator {
     const relativeGenDir = options?.relativeGenDir ?? this.relativeGenDir;
     const scannedDir = options?.scannedDir ?? this.scannedDir;
     const layoutDir = getDirectoryName(layoutFile);
-    // Import the layout eagerly (like error/not-found pages) so its server-side
-    // middleware — e.g. `layout().secure(...)` — is registered with the
-    // ReactApplication at registration time. Child routes read the layout
-    // middleware map eagerly when they register, and generate.ts emits every
-    // layout before any page; a lazily-imported layout would only populate that
-    // map on first SSR render, shipping protected child pages/loaders/actions
-    // with no server-side enforcement (a silent auth bypass). The client bundle
-    // keeps layouts lazy via the separate ReactClientGenerator.
+    // Import the layout eagerly (like error/not-found pages), so its
+    // server-side middleware — e.g. `layout().secure(...)` — is registered with
+    // the ReactApplication before any request. Each route below it resolves
+    // that middleware at its first request, whatever the order in which they
+    // register. The client bundle keeps layouts lazy via the separate
+    // ReactClientGenerator.
     const eagerLayout = this.generator.addImportModule(joinPath(relativeGenDir, layoutFile));
     let lazyLoader = 'undefined';
     if (fileExists(joinPath(scannedDir, layoutDir, 'layout.loader.ts'))) {

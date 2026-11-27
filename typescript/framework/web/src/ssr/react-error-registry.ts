@@ -12,7 +12,6 @@ import type {
 } from './module.types';
 import type { ReactModuleCache } from './react-module-cache';
 import { normalizeRoute } from './route-cache.utils';
-import { composeMiddleware } from './route-middleware.utils';
 import { resolveErrorOrDefinition, resolveNotFoundOrDefinition } from './route-module.utils';
 import type { ReactPageOptions } from './route-registration.utils';
 
@@ -33,7 +32,6 @@ export class ReactErrorRegistry {
   constructor(
     private readonly cache: ReactModuleCache,
     private readonly findNearestLayout: FindNearestLayout,
-    private readonly collectLayoutMiddleware: (route: string) => HttpMiddleware[] | undefined,
     private readonly registerPage: (route: string, options: ReactPageOptions) => void,
   ) {}
 
@@ -117,17 +115,14 @@ export class ReactErrorRegistry {
     } else {
       const { element: notFoundElement, notFoundDef } = resolveNotFoundOrDefinition(options.notFound as NotFoundModule);
 
-      // Compose layout + not-found middleware.
-      const layoutMw = this.collectLayoutMiddleware(route);
-      const notFoundMw =
-        notFoundDef?.middleware && notFoundDef.middleware.length > 0 ? [...notFoundDef.middleware] : undefined;
-      const middleware = composeMiddleware(layoutMw, notFoundMw);
-
       // Register as a catch-all page route — pass the component as a ReactNode.
+      // The page composes its ancestor layouts' middleware with the not-found
+      // page's own at the first request.
       this.registerPage(`${route}*`, {
         page: notFoundElement as ReactNode,
         statusCode: 404,
-        notFoundMiddleware: middleware,
+        notFoundMiddleware:
+          notFoundDef?.middleware && notFoundDef.middleware.length > 0 ? [...notFoundDef.middleware] : undefined,
       });
 
       // Also set an errorElement on the layout so a child loader's 404 Response

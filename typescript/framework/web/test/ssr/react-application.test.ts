@@ -1142,6 +1142,108 @@ describe('ReactApplication', () => {
     });
   });
 
+  describe('a secured layout registered after its descendants', () => {
+    // Generation registers each scan root in turn, so a descendant from an
+    // earlier scan root registers before the secured layout of a later one.
+    const securedLayout = () => ({
+      layout: {
+        default: layout()
+          .secure({ roles: ['admin'] })
+          .render(() => null),
+      },
+    });
+    const descendants: {
+      name: string;
+      register: (subject: ReactApplication) => void;
+      method: 'get' | 'post';
+      route: string;
+      url: string;
+    }[] = [
+      {
+        name: 'a child layout loader endpoint',
+        register: (subject) =>
+          subject.reactLayout('/admin/reports', {
+            layout: { default: () => null },
+            loader: async () => ({ default: loaderBuilder(() => ({ section: 'reports' })) }),
+          }),
+        method: 'get',
+        route: '/admin/reports-layout.json',
+        url: 'http://localhost/admin/reports-layout.json',
+      },
+      {
+        name: 'an eager page',
+        register: (subject) =>
+          subject.reactPage('/admin/settings', { page: { default: page().render(() => 'secret content') } }),
+        method: 'get',
+        route: '/admin/settings',
+        url: 'http://localhost/admin/settings',
+      },
+      {
+        name: 'an eager page loader endpoint',
+        register: (subject) =>
+          subject.reactPage('/admin/data', {
+            page: { default: page().render(() => null) },
+            loader: { loader: loaderBuilder(() => ({ secret: true })) },
+          }),
+        method: 'get',
+        route: '/admin/data.json',
+        url: 'http://localhost/admin/data.json',
+      },
+      {
+        name: 'an eager page action endpoint',
+        register: (subject) =>
+          subject.reactPage('/admin/save', {
+            page: { default: page().render(() => null) },
+            action: { action: actionBuilder(() => ({ saved: true })) },
+          }),
+        method: 'post',
+        route: '/admin/save',
+        url: 'http://localhost/admin/save',
+      },
+      {
+        name: 'a not-found catch-all',
+        register: (subject) =>
+          subject.reactNotFound('/admin', { notFound: { default: notFound().render(() => 'missing admin page') } }),
+        method: 'get',
+        route: '/admin*',
+        url: 'http://localhost/admin/missing',
+      },
+    ];
+
+    for (const { name, register, method, route, url } of descendants) {
+      specTest(
+        `answers 401 to ${name} without credentials, in both registration orders`,
+        {
+          feature: 'typescript/web-application-delivery',
+          requirement: 'security-propagation',
+          check: 'a-layout-secures-its-descendants-whatever-the-registration-order',
+        },
+        async () => {
+          for (const layoutFirst of [true, false]) {
+            const httpPlugin = { get: mock(), post: mock() };
+            const subject = new ReactApplication(undefined, httpPlugin as unknown as HttpPlugin);
+            if (layoutFirst) {
+              subject.reactLayout('/admin', securedLayout());
+              register(subject);
+            } else {
+              register(subject);
+              subject.reactLayout('/admin', securedLayout());
+            }
+
+            const call = httpPlugin[method].mock.calls.find((c: unknown[]) => c[0] === route);
+            expect(call).toBeDefined();
+            const ctx = createHttpContext(url, method === 'post' ? { method: 'POST' } : {});
+            const response = await runInContext(ctx, async () => call?.[1](ctx));
+            expect({ layoutFirst, status: (response as { status?: number }).status }).toEqual({
+              layoutFirst,
+              status: 401,
+            });
+          }
+        },
+      );
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // LAZY secured layouts — production routes layouts EAGERLY (the SSR generator
   // always emits `addImportModule(...)` for layouts before any page), so these

@@ -131,7 +131,6 @@ export class ReactApplication {
     this.errors = new ReactErrorRegistry(
       this.cache,
       (route) => this.findNearestLayout(route),
-      (route) => this.middlewareResolver.collectLayoutMiddleware(route),
       (route, options) => {
         this.reactPage(route, options);
       },
@@ -361,8 +360,8 @@ export class ReactApplication {
       });
       node.element = React.createElement(React.Suspense, { fallback: null }, React.createElement(LazyLayoutComponent));
     } else {
-      // Eager layout: the generator uses this path so security middleware is
-      // known synchronously and route registration can fail closed.
+      // Eager layout: the generator uses this path, so its middleware is known
+      // before any request reaches a route below it.
       const { element: layoutElement, layoutDef } = resolveLayoutOrDefinition(options.layout as LayoutModule);
       if (layoutElement) {
         node.element = layoutElement;
@@ -373,11 +372,9 @@ export class ReactApplication {
     }
 
     if (options.loader) {
-      // When the layout (or any ancestor) is lazy, its `.secure()` chain is only
-      // knowable at request time, so pass a resolver thunk instead of an array.
-      const middleware: MiddlewareSource = this.middlewareResolver.hasLazyLayoutAncestor(route)
-        ? () => this.middlewareResolver.resolveLayoutMiddleware(route)
-        : this.middlewareResolver.collectLayoutMiddleware(route);
+      // The ancestor chain resolves at the first request, after every layout
+      // registered, so an ancestor that registers later still secures it.
+      const middleware: MiddlewareSource = () => this.middlewareResolver.resolveLayoutMiddleware(route);
       for (const prefix of this.localePrefixes(route)) {
         registerRouteLoader({
           httpPlugin: this.httpPlugin,
@@ -420,11 +417,6 @@ export class ReactApplication {
     const isLazyLoader = typeof options.loader === 'function';
     const isLazyAction = typeof options.action === 'function';
 
-    // A lazy ancestor layout's `.secure()` is only knowable once its module
-    // loads, so every handler under it must resolve its middleware at request
-    // time rather than from the still-empty eager map. This is a fail-closed
-    // security boundary, not a rendering optimization.
-    const deferLayoutMiddleware = this.middlewareResolver.hasLazyLayoutAncestor(route);
     // Async resolver for this route's full middleware (ancestor layout chain,
     // loading lazy layouts, composed with the page's own middleware).
     const composePageMiddleware: MiddlewareResolver = (r, pageDef, nfMw) =>
@@ -434,8 +426,8 @@ export class ReactApplication {
     // Default to 200; the renderer overrides it on first request.
     let statusCode = options.statusCode ?? 200;
     // The route's composed page middleware (layout chain + the page's own),
-    // shared by the page renderer, loader, and action. An array on the eager
-    // fast path; a thunk when a lazy layout forces request-time resolution.
+    // shared by the page renderer, loader, and action, resolved at the first
+    // request so a layout that registers after this page still wraps it.
     let pageMiddleware: MiddlewareSource;
 
     if (isLazyPage) {
@@ -477,9 +469,9 @@ export class ReactApplication {
       // Eager page: used by eager not-found registration and direct/manual routes.
       const { page: pageElement, pageDef } = resolvePageOrDefinition(options.page as ReactNode | PageModule);
       statusCode = pageDef?.statusCode ?? options.statusCode ?? 200;
-      pageMiddleware = deferLayoutMiddleware
-        ? () => this.middlewareResolver.resolvePageMiddleware(route, pageDef, notFoundMiddleware)
-        : this.middlewareResolver.resolvePageMiddlewareSync(route, pageDef, notFoundMiddleware);
+      // Resolved at the first request, after every layout registered: an
+      // ancestor layout that registers after this page still secures it.
+      pageMiddleware = () => this.middlewareResolver.resolvePageMiddleware(route, pageDef, notFoundMiddleware);
 
       if (pageElement) {
         pageNode.element = pageElement;

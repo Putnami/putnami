@@ -52,6 +52,9 @@ src/app/
         └── page.tsx          # page().secure({...}).render(...) → Gets: Auth → Secure → render
 ```
 
+A layout's middleware wraps every page, layout loader, page loader, action and
+not-found page below it, even when they come from another scan root.
+
 ### Role-Based Access Control
 
 ```tsx

@@ -301,6 +301,7 @@
             "kind": "acceptance",
             "checks": [
               "a-declared-stack-composes-in-order",
+              "a-layout-secures-its-descendants-whatever-the-registration-order",
               "a-loader-is-wrapped-by-its-declared-security-middleware",
               "a-route-outside-the-declaring-subtree-is-unwrapped",
               "an-action-is-wrapped-by-its-declared-security-middleware",
