@@ -113,7 +113,7 @@ What this leaves, by what holds it today:
 
 ## Decision
 
-### 1. A supervisor per machine and user, an engine worker per CLI build
+### 1. A supervisor per machine and user, an engine worker per CLI build and worktree
 
 The machine process is two kinds of process:
 
@@ -123,16 +123,38 @@ The machine process is two kinds of process:
   shared store and its collection, the file watching of every worktree
   (section 7), the toolchains under the Putnami home, and, once its own
   record lands, the extension worker pool (section 6).
-- **One engine worker per CLI build in use.** It owns what depends on the
-  build's code: the loaded workspace of each worktree it serves, the kept
-  digests and witnesses of ADR 0113, the Git reader's state, the plans and
-  the keys, and it runs the engine for its runs. A client is only ever served
-  by the worker of its own build, so a CLI of another build never uses it.
+- **One engine worker per CLI build and worktree in use.** It owns what
+  depends on the build's code: the loaded workspace of the worktree it
+  serves, the kept digests and witnesses of ADR 0113, the Git reader's state,
+  the plans and the keys, and it runs the engine for its runs. A client is
+  only ever served by a worker of its own build, so a CLI of another build
+  never uses it.
+
+**Amended 2026-11-27, by the owner: worktrees run in parallel.** A worker
+runs one engine run at a time, so one worker per build made a second
+worktree's concurrent request wait or run in its own process: measured on
+two worktrees of this repository running the same unchanged request at once,
+one was answered from memory in 1.7 s while the other was refused every
+round and ran in its own process in 5.1 to 5.6 s. The supervisor therefore
+keeps a worker per build and worktree, routes a request to the worker of its
+worktree, and starts one when there is none, within the memory budget of
+section 10: before it starts one, it stops idle workers, least recently
+used first, while the workers' held memory and one more worker's would pass
+the budget. Two requests of one worktree share its files and its held
+state, so they take turns: the second waits for the worktree's worker
+rather than run in its own process. What the worktrees have in common is
+computed once where it is keyed by content: the store and its in-flight
+claims (a task key already executing for one run is awaited by the other),
+the toolchains, the probe and activation witnesses persisted per program,
+and, once its record lands, the extension pool. The supervisor stays the
+single admission point that shares the machine's CPU fairly between the
+concurrent runs (section 5).
 
 ```
  client (any build) ──unix socket──▶ supervisor (one per user)
                                       │ admission, watching, store, pool
-                                      ├── worker, build A: worktrees 1, 2
+                                      ├── worker, build A: worktree 1
+                                      ├── worker, build A: worktree 2
                                       └── worker, build B: worktree 3
 ```
 
@@ -143,8 +165,8 @@ a worker on the first request of its build and evicts one by idle time
 (section 2) and by its memory budget (section 10). An evicted worker costs
 its next run a cold start, which is a run as today.
 
-**Identities.** A worker is keyed by its build identity and its executable's
-path. The build identity (`fileindex.BuildIdentity`) is the SHA-256 of the
+**Identities.** A worker is keyed by its build identity, its executable's
+path and the root of the worktree it serves. The build identity (`fileindex.BuildIdentity`) is the SHA-256 of the
 executable's build information and Go build ID, the parts of the file
 index's program identity (ADR 0009 §4 of `protocols/workspace`) that do not
 depend on where the file lies. A client reads it from the image it runs
