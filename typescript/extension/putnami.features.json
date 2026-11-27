@@ -428,6 +428,19 @@
           }
         },
         {
+          "id": "generated-client-runtime-edge",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-generated-client-imports-the-runtime-its-generator-writes"
+            ]
+          }
+        },
+        {
           "id": "workspace-install-lists-the-members",
           "stage": "coded",
           "evidenceKinds": [

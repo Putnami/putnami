@@ -518,6 +518,19 @@
           }
         },
         {
+          "id": "generated-client-runtime-edges",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-generated-client-imports-the-runtime-its-generator-writes"
+            ]
+          }
+        },
+        {
           "id": "probe-purity",
           "stage": "coded",
           "evidenceKinds": [

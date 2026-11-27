@@ -60,6 +60,10 @@
       ]
     },
     {
+      "id": "generated-client-runtime-edges",
+      "text": "A generated client module, one whose putnami.json names a generatedFrom of language go or that commits clientgen.json, attributes each require of a module the Go client generator imports in every client it writes to an import, whether or not the client is generated yet; its other requires are judged by what its sources import."
+    },
+    {
       "id": "replace-closure",
       "text": [
         "Workspace sync appends only the missing transitive workspace replaces, after existing content, never rewriting bytes it did not add;",
