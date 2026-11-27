@@ -588,6 +588,7 @@ producer starts.
 2. Check if the task-owned entry exists under `blobs/`, at the address the key and the entry format give (see [Task-owned entries](#task-owned-entries-declared-outputs)).
 3. Read `result.json` to restore the job result (status, data, error, and compact summary events).
 4. Materialize each declared output from the entry's `files/` to its real location. A destination that already holds the output (the same files, bytes, permission bits and directories, outside the subtrees it cedes) is left untouched: its bytes are compared with the manifest's digests through the file index, so an unchanged run neither reads the entry's files nor rewrites the output, and the output keeps the stat the index recorded ([ADR 0108](adr/0108-a-cache-hit-reads-its-entry-and-writes-only-what-differs.md)).
+   Only the outputs the restore wrote, or found holding the output but changed since the run began to read the tree, are then invalidated: the memoized input digests, the run's candidate cut and the source bindings they can move. The stamp is invalidated too when the restore's re-stamp rewrote it. A restore where nothing counts invalidates nothing; one that failed invalidates every recorded output ([ADR 0119](adr/0119-a-restore-invalidates-only-what-it-wrote.md)).
 5. Skip subprocess execution.
 
 The skipped task process does not make the hit free: the CLI still computes
@@ -625,7 +626,7 @@ hashing remain owned by the capabilities protocol. Gitlink worktree checks
 retain their separately counted `rev-parse` processes.
 
 This snapshot is run-local and invalidated with the source-binding memo after
-real task execution and around source-visible output restores. A new file,
+real task execution and after a restore that wrote a source-visible output. A new file,
 index update or changed ignore rule is therefore enumerated on the next
 binding miss. Restoring project `.gen` outputs keeps the snapshot and bindings:
 those bytes are excluded from source-v1. Workspace-rooted restores invalidate

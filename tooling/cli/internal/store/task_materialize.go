@@ -85,8 +85,8 @@ var pathExchange = exchangePaths
 var errKeptConflict = errors.New("the restored entry holds bytes at a ceded path")
 
 // MaterializeTaskOutput places one of an entry's recorded outputs at dest and
-// reports whether dest now holds it: true when it wrote the output, and when
-// dest already held it and was left untouched (ADR 0108).
+// reports whether it wrote dest: false when dest already held the output and
+// was left untouched (ADR 0108).
 //
 // An output recorded TaskOutputEmpty returns (false, nil) WITHOUT touching dest.
 // That is the binding invariant of the explicit empty state: an empty output is
@@ -134,6 +134,15 @@ var errKeptConflict = errors.New("the restored entry holds bytes at a ceded path
 // cross filesystems. A swap from stagingRoot that still fails with EXDEV (two
 // mounts of one filesystem) is restaged beside dest and published again.
 func (s *LocalStore) MaterializeTaskOutput(entry *TaskEntry, id, dest, stagingRoot string, keep ...string) (bool, error) {
+	return s.materializeTaskOutput(entry, id, dest, stagingRoot, 0, keep)
+}
+
+// materializeTaskOutput is MaterializeTaskOutput. A dest it leaves untouched
+// is also reported as written when quietBefore is not zero and something in
+// dest changed at or after it, in Unix nanoseconds, or when the platform
+// gives no change time: some process may have written those bytes after a
+// read of this run, which the caller then invalidates as a write (ADR 0119).
+func (s *LocalStore) materializeTaskOutput(entry *TaskEntry, id, dest, stagingRoot string, quietBefore int64, keep []string) (bool, error) {
 	if entry == nil {
 		return false, fmt.Errorf("materialize %q: nil entry", id)
 	}
@@ -153,11 +162,12 @@ func (s *LocalStore) MaterializeTaskOutput(entry *TaskEntry, id, dest, stagingRo
 
 	src := filepath.Join(entry.FilesDir, id)
 	modes := manifestModes(entry.Manifest)
-	if keepHeldDestinations && destinationHolds(entry.Manifest, out.Kind, src, dest, id, keep) {
+	changes := heldChanges{quietBefore: quietBefore}
+	if keepHeldDestinations && destinationHolds(entry.Manifest, out.Kind, src, dest, id, keep, &changes) {
 		// dest already holds what the restore would write: the same files,
 		// bytes, modes and directories. Leaving it untouched keeps its stat,
 		// so the file index answers its digests on the next run.
-		return true, nil
+		return changes.recent, nil
 	}
 	switch out.Kind {
 	case proto.OutputKindFile:
@@ -805,7 +815,10 @@ func randomSuffix() string {
 // (protocols/workspace ADR 0009). src is walked for its directories and
 // stated, never read. A file the manifest does not list, a link or any other
 // kind of file, on either side, answers false, and the restore writes.
-func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep []string) bool {
+//
+// changes records whether a path it stated in dest changed recently
+// (heldChanges).
+func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep []string, changes *heldChanges) bool {
 	if manifest == nil {
 		return false
 	}
@@ -820,7 +833,8 @@ func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep
 		payload, err := os.Lstat(src)
 		file, ok := files[id]
 		return err == nil && payload.Mode().IsRegular() && ok &&
-			destinationFileStats(dest, file) && destinationFileDigest(dest, file)
+			destinationFileStats(dest, file, changes) && destinationFileDigest(dest, file) &&
+			destinationFileStats(dest, file, changes)
 	case proto.OutputKindDirectory:
 	default:
 		return false
@@ -870,9 +884,10 @@ func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep
 			if err != nil || !held.IsDir() || !sameModeBits(held.Mode(), info.Mode().Perm()) {
 				return errNotHeld
 			}
+			changes.note(held)
 		case info.Mode().IsRegular():
 			file, ok := files[prefix+rel]
-			if !ok || !destinationFileStats(target, file) {
+			if !ok || !destinationFileStats(target, file, changes) {
 				return errNotHeld
 			}
 			digests = append(digests, digestCheck{path: target, file: file})
@@ -914,8 +929,33 @@ func destinationHolds(manifest *cache.Manifest, kind, src, dest, id string, keep
 		if !destinationFileDigest(check.path, check.file) {
 			return false
 		}
+		// A write between the first stat and the digest is seen here.
+		if changes.quietBefore != 0 {
+			info, err := os.Lstat(check.path)
+			if err != nil {
+				return false
+			}
+			changes.note(info)
+		}
 	}
 	return true
+}
+
+// heldChanges answers whether a destination destinationHolds found holding
+// the output changed at or after quietBefore: recent is set when a path it
+// stated there has a change time at or after it, or no change time. A zero
+// quietBefore asks nothing.
+type heldChanges struct {
+	quietBefore int64
+	recent      bool
+}
+
+func (c *heldChanges) note(info os.FileInfo) {
+	if c.quietBefore == 0 || c.recent {
+		return
+	}
+	ctime, _, _, _, ok := fileChangeTime(info)
+	c.recent = !ok || ctime >= c.quietBefore
 }
 
 // keepHeldDestinations leaves a destination that already holds the restored
@@ -934,11 +974,12 @@ func sameModeBits(mode, perm os.FileMode) bool {
 
 // destinationFileStats reports whether the file at path is a regular file with
 // file's permission bits, and its size when the manifest records one.
-func destinationFileStats(path string, file cache.FileEntry) bool {
+func destinationFileStats(path string, file cache.FileEntry, changes *heldChanges) bool {
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || !sameModeBits(info.Mode(), os.FileMode(file.Mode).Perm()) {
 		return false
 	}
+	changes.note(info)
 	return file.Size == 0 || info.Size() == file.Size
 }
 

@@ -573,29 +573,33 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 		}
 		return nil
 	}
-	s.invalidateCapabilitySourceBindingsForRestore(job, entry)
 	// The drift reference is the destination as it stands BEFORE the swap: the
 	// committed bytes this checkout holds, which the recorded tree is about to
 	// replace (task_drift.go).
 	drift := s.snapshotRestoredDrift(job, entry)
-	// A restore rewrites every recorded output, so the memoized input digests
-	// those paths can move are dropped once it ended, whether or not it
-	// completed (cachekey/key_movement.go).
-	restored := cachekey.RestoredOutputPaths(s.outputRoots(), job, entry)
-	if err := s.materializeDeclaredOutputs(job, entry); err != nil {
+	// A restore that fails may have rewritten any recorded output, so the
+	// memoized input digests every one of those paths can move are dropped
+	// (cachekey/key_movement.go). One that completes drops only those of the
+	// outputs it wrote: an output the destination already held kept every byte
+	// and stat, so no digest of it moved (ADR 0119).
+	written, err := s.materializeDeclaredOutputs(job, entry)
+	if err != nil {
 		s.invalidateCapabilitySourceBindingsForRestore(job, entry)
-		s.invalidateWritten(restored)
+		s.invalidateWritten(cachekey.RestoredOutputPaths(s.outputRoots(), job, entry))
 		slog.Warn("declared restore failed; executing task",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		return nil
 	}
-	s.invalidateCapabilitySourceBindingsForRestore(job, entry)
+	s.invalidateCapabilitySourceBindingsForWritten(job, entry, written)
 	// A restore that replaced the project's .gen subtree also replaced the build
 	// stamp inside it with the PRODUCING run's bytes. Put this run's identity back
 	// before the hit is published, so no same-run consumer and no later
 	// package/publish/deploy reader can observe the older revision.
-	s.restampRestoredVersionStamp(job, entry)
-	s.invalidateWritten(restored)
+	invalidated := cachekey.WrittenOutputPaths(s.outputRoots(), job, entry, written)
+	if stamp := s.restampRestoredVersionStamp(job, entry); stamp != "" {
+		invalidated = append(invalidated, stamp)
+	}
+	s.invalidateWritten(invalidated)
 	// A provider may legitimately omit ActionResult.Events when it does not
 	// advertise the optional action-events capability, and entries written before
 	// that capability carry none. Recover the reserved artifacts whose exact
@@ -637,10 +641,16 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 // So is an output that declares emptied and holds a Git-tracked file, which
 // the restore refuses before it writes anything (refuseTrackedEmptiedOutputs):
 // the execution that follows refuses it too, and the task fails.
-func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.TaskEntry) error {
+//
+// It returns the IDs of the outputs it wrote: every output it emptied, every
+// one the store wrote, and, when it detached the command's output directory
+// from a link, every output under it. An output whose destination already
+// held it is not among them (ADR 0108, ADR 0119).
+func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.TaskEntry) (map[string]bool, error) {
 	if err := s.refuseTrackedEmptiedOutputs(job); err != nil {
-		return err
+		return nil, err
 	}
+	written := make(map[string]bool, len(entry.Outputs))
 	roots := s.outputRoots()
 	// A restore stages under the workspace scratch root that declared capture
 	// stages under, so a restore adds nothing to a destination's parent but the
@@ -661,29 +671,42 @@ func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.T
 	// The detach comes before every write the restore makes, an emptying
 	// included, so no rename reaches through a link into a store blob.
 	if needsCommandOutput {
-		if err := s.ensureCommandOutputWritable(job); err != nil {
-			return err
+		detached, err := s.detachCommandOutput(job)
+		if err != nil {
+			return written, err
+		}
+		if detached {
+			for _, output := range entry.Outputs {
+				if output.Root == extension.OutputRootCommandOutput {
+					written[output.ID] = true
+				}
+			}
 		}
 	}
 
 	for _, output := range entry.Outputs {
 		if declared, empties := emptied[output.ID]; empties {
+			written[output.ID] = true
 			if err := s.emptyDeclaredOutput(job, declared); err != nil {
-				return err
+				return written, err
 			}
 			continue
 		}
 		base, ok := roots.OutputRoot(job, output.Root)
 		if !ok {
-			return fmt.Errorf("recorded output %q has unknown root %q", output.ID, output.Root)
+			return written, fmt.Errorf("recorded output %q has unknown root %q", output.ID, output.Root)
 		}
 		dest := filepath.Join(base, filepath.FromSlash(output.Path))
 		keep := cededSubpathsOf(job, output)
-		if _, err := s.cache.MaterializeTaskOutput(entry, output.ID, dest, stagingRoot, keep...); err != nil {
-			return err
+		wrote, err := s.cache.MaterializeTaskOutput(entry, output.ID, dest, stagingRoot, keep...)
+		if err != nil {
+			return written, err
+		}
+		if wrote {
+			written[output.ID] = true
 		}
 	}
-	return nil
+	return written, nil
 }
 
 // cededSubpathsOf returns the subpaths a recorded directory output cedes or
@@ -766,21 +789,32 @@ func restoreReplacesVersionStamp(entry *store.TaskEntry) bool {
 // session would mutate the store blob it points at; MaterializeDirSymlink
 // atomically detaches it while preserving the sibling outputs it contains.
 func (s *Scheduler) ensureCommandOutputWritable(job *ScheduledJob) error {
+	_, err := s.detachCommandOutput(job)
+	return err
+}
+
+// detachCommandOutput is ensureCommandOutputWritable, also reporting whether
+// the directory was a link it replaced: a restore then counts every output
+// under it as written (materializeDeclaredOutputs).
+func (s *Scheduler) detachCommandOutput(job *ScheduledJob) (bool, error) {
 	state := s.stateForCommandOutput(job)
 	state.mu.Lock()
 	defer state.mu.Unlock()
 
 	commandDir := cachekey.CommandOutputDir(s.ws.Root, state.project, state.command)
-	if !state.materialized {
-		if err := store.MaterializeDirSymlink(commandDir); err != nil {
-			return err
-		}
-		if err := os.MkdirAll(commandDir, 0o755); err != nil {
-			return err
-		}
-		state.materialized = true
+	if state.materialized {
+		return false, nil
 	}
-	return nil
+	info, err := os.Lstat(commandDir)
+	linked := err == nil && info.Mode()&os.ModeSymlink != 0
+	if err := store.MaterializeDirSymlink(commandDir); err != nil {
+		return linked, err
+	}
+	if err := os.MkdirAll(commandDir, 0o755); err != nil {
+		return linked, err
+	}
+	state.materialized = true
+	return linked, nil
 }
 
 func commandOutputKey(job *ScheduledJob) string {
