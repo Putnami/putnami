@@ -1,6 +1,9 @@
 # ADR 0011 — Release governance: an owner bound to the license, exceptions that expire, and a contributor path proved by execution
 
 - **Status**: accepted
+- **Amended**: 2026-11-26, §4 and Consequences: the credential-free gate runs
+  nightly, on demand and before a release; pull requests keep the squash
+  commit checks
 - **Scope**: the workspace-root governance record (`GOVERNANCE.md`, `RELEASING.md`, `SECURITY.md`, `CONTRIBUTING.md`), `@putnami/cli` (`tooling/cli`, `tooling/cli-document-set`, `tooling/repository-checks`) as the home of the gates, `protocols/support`
 
 ## Context
@@ -83,7 +86,13 @@ command, because a contributor cannot tell one apart from the gate.
 
 `.github/workflows/contributor-ci.yml` runs the same documented commands with
 no secret, because a fork's pull request cannot reach Putnami Cloud CI. It is
-corroboration, not the definition, and it stays a non-required check.
+corroboration, not the definition, and it stays a non-required check. It runs
+every night on `main`, on demand, and as a step of the release checklist, not
+on every pull request: what it proves changes rarely, and it took a median of
+about 7 minutes and up to 39 per pull request head, a wait that outlasted Putnami CI on 36 of 79
+heads measured on 2026-11-25 and 26. A failed nightly run opens an issue. A
+pull request keeps only the squash commit checks of `validate-workspace`,
+which need the squash message only a pull request has.
 
 ### 5. Governance completeness is gated, and the gate states its own limit
 
@@ -102,7 +111,9 @@ approval.
 ## Consequences
 
 - The documented contributor path runs on every CLI test run, without
-  credentials, so it cannot rot silently.
+  credentials, so it cannot rot silently. The whole credential-free gate runs
+  nightly and before a release instead: a pull request can break it, and the
+  next nightly run names the break within a day, before any release ships it.
 - A new support status costs a documentation row: `protocols/support` pins its
   promotion table against the code's status vocabulary.
 - A rule with no register cannot be waived cheaply, which pushes work toward

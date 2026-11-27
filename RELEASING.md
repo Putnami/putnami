@@ -82,7 +82,12 @@ satisfied is either fixed or waived through the
 4. **The contributor path works with no Putnami Cloud credentials.** The neutral
    path in [CONTRIBUTING.md](CONTRIBUTING.md#contributor-ci-without-putnami-cloud-credentials)
    is executed by the repository's own tests with every credential removed and
-   every remote endpoint refusing requests.
+   every remote endpoint refusing requests, and the credential-free gate is
+   green on the release commit: a run of
+   [`.github/workflows/contributor-ci.yml`](.github/workflows/contributor-ci.yml)
+   on demand (`workflow_dispatch`, scope `all`) or its nightly run on that
+   commit. Pull requests do not run that gate, so this run is the one that
+   proves a fresh clone without an account works for this release.
 5. **The public-cut gate is green,** and neither of its registers grew.
 6. **Release notes exist,** naming every breaking change, its migration, the
    security fixes that are now public, and any exception this release carries.

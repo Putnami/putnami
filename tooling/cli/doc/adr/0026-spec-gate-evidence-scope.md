@@ -10,6 +10,8 @@
   within a time bound, and fetches it into the local store only.
 - **Amended**: 2026-10-23, §5: a narrowed run with no cache to read warns on
   every unresolved check, and this repository's contributor CI is such a run.
+- **Amended**: 2026-11-26, §5: contributor CI is such a run only on demand
+  with scope `impacted`; its nightly run selects every project
 - **Amended**: 2026-10-27, §2, by
   [ADR 0095](0095-a-feature-authority-project-attests-for-the-spec-owner.md): a
   project whose `featureAuthority.owner` names a feature the owner declares is
@@ -115,8 +117,10 @@ unconsulted set is empty and the gate keeps full strength. A narrowed run with
 no cache to read, under `--no-cache` or with an empty store and the remote
 cache off, warns on every unresolved check.
 
-This repository's contributor CI is such a run: it starts from an empty store
-and turns the remote cache off. A task scope keeps a project's criteria jobs
+A run on demand of this repository's contributor CI with scope `impacted` is
+such a run: it starts from an empty store and turns the remote cache off. Its
+nightly run and its default run on demand select every project, so they are
+not narrowed. A task scope keeps a project's criteria jobs
 and drops the tests it does not name
 ([ADR 0044](0044-selection-is-task-level.md) §5). So when a change reaches a
 project only for its criteria jobs, contributor CI runs none of that
