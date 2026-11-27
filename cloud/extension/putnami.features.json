@@ -1269,6 +1269,19 @@
           }
         },
         {
+          "id": "rebase-regenerates-generated-files",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agent-content-rebase-regenerates-generated-files"
+            ]
+          }
+        },
+        {
           "id": "routine-build-attaches-from-its-branch",
           "stage": "coded",
           "evidenceKinds": [

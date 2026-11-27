@@ -768,9 +768,9 @@ func TestSourceBoundExecutionThatMovesItsBindingSettlesAtTheBindingItLeaves(t *t
 	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
 	ws, planned := sourceBoundRunFixture(t, describeLog, compileLog)
 	projectRoot := filepath.Join(ws.Root, "app")
-	sidecar := filepath.Join(projectRoot, "schema", "http-routes.json")
+	sidecar := filepath.Join(projectRoot, "schema", "openapi.json")
 	writeTestFile(t, sidecar, "stale routes\n")
-	useConvergingDescribe(t, planned[0], describeLog, "printf 'converged routes\\n' > schema/http-routes.json\n")
+	useConvergingDescribe(t, planned[0], describeLog, "printf 'converged routes\\n' > schema/openapi.json\n")
 	cache := sharedRuntimeCache(t)
 	before := projectTreeBinding(t, ws)
 
@@ -805,7 +805,7 @@ func TestSourceBoundExecutionThatMovesItsBindingSettlesAtTheBindingItLeaves(t *t
 	if got := readVersionStamp(t, projectRoot).CapabilityPackages[0].SourceBinding; got != settled {
 		t.Fatalf("the stamp names %q, the tree the run left is %q", got, settled)
 	}
-	if written := filepath.ToSlash(filepath.Join("app", "schema", "http-routes.json")); !slices.Contains(describe.VerificationWrites, written) {
+	if written := filepath.ToSlash(filepath.Join("app", "schema", "openapi.json")); !slices.Contains(describe.VerificationWrites, written) {
 		t.Fatalf("the settled result's writes %v miss %s, which only the first execution wrote", describe.VerificationWrites, written)
 	}
 	keys := []string{describe.CacheKey, compile.CacheKey}
@@ -850,7 +850,7 @@ func TestSourceBoundExecutionSettlesAtMostOnce(t *testing.T) {
 	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
 	ws, planned := sourceBoundRunFixture(t, describeLog, compileLog)
 	projectRoot := filepath.Join(ws.Root, "app")
-	useConvergingDescribe(t, planned[0], describeLog, "printf 'run\\n' >> schema/http-routes.json\n")
+	useConvergingDescribe(t, planned[0], describeLog, "printf 'run\\n' >> schema/openapi.json\n")
 	cache := sharedRuntimeCache(t)
 
 	result := runSharedScheduler(t.Context(), ws, planned, SchedulerConfig{MaxParallel: 1}, cache)
@@ -883,8 +883,8 @@ func TestSourceBoundExecutionWithoutTheCacheSettlesToo(t *testing.T) {
 	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
 	ws, planned := sourceBoundRunFixture(t, describeLog, compileLog)
 	projectRoot := filepath.Join(ws.Root, "app")
-	writeTestFile(t, filepath.Join(projectRoot, "schema", "http-routes.json"), "stale routes\n")
-	useConvergingDescribe(t, planned[0], describeLog, "printf 'converged routes\\n' > schema/http-routes.json\n")
+	writeTestFile(t, filepath.Join(projectRoot, "schema", "openapi.json"), "stale routes\n")
+	useConvergingDescribe(t, planned[0], describeLog, "printf 'converged routes\\n' > schema/openapi.json\n")
 	cache := sharedRuntimeCache(t)
 
 	run := func(name string, describeRuns int) {

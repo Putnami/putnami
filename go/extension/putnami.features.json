@@ -726,6 +726,20 @@
           }
         },
         {
+          "id": "committed-route-inventory-drift",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-describe-http-routes-output-declares-fail-on-drift",
+              "an-uncommitted-route-inventory-is-removed"
+            ]
+          }
+        },
+        {
           "id": "grpc-inventory-checked-before-promotion",
           "stage": "coded",
           "evidenceKinds": [

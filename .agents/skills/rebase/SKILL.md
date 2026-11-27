@@ -34,7 +34,11 @@ and the pull request waits for its rebase.
 
 Run git with hooks off and no repository configuration acting: prefix every
 call with `git -c core.hooksPath=/dev/null -c commit.gpgsign=false`. Install
-nothing, and build, test or run nothing from the repository: the gate does.
+nothing, and test or run nothing from the repository: the gate does. The one
+exception is a conflicted generated file: you build its project, the build
+that `routine-build` also runs in this routine, as
+[Regenerating a generated file](#regenerating-a-generated-file) says. Build
+nothing else.
 
 1. Fetch both commits and start from the base:
 
@@ -58,8 +62,10 @@ nothing, and build, test or run nothing from the repository: the gate does.
      --diff-filter=U`. Give each the base's side: `git checkout HEAD -- <path>`,
      or `git rm -q -f -- <path>` when the base has no such file. Commit what is
      staged with C's message and `Putnami-Rebase-Of: C`. Then resolve each
-     conflicted file by the rules below, `git add` only those files, and commit
-     them as `fix: resolve the rebase conflict of <C's subject>`, with a short
+     conflicted source file by the rules below and `git add` it, then
+     regenerate each conflicted generated file by building its project and
+     `git add` it, and commit the conflicted files
+     as `fix: resolve the rebase conflict of <C's subject>`, with a short
      paragraph on what you decided and the trailer `Putnami-Conflict-Fix-Of: C`
      as its last paragraph. When nothing was staged before the resolution,
      skip the first commit: the fix then stands for C.
@@ -92,7 +98,15 @@ nothing, and build, test or run nothing from the repository: the gate does.
 
 ## Resolving a conflict
 
-Each conflicted file holds the base's version with the commit's other changes
+A conflicted file is generated when a build writes it from the project's
+sources: a contract the project commits under `schema/`, such as
+`schema/http-routes.json` or `schema/openapi.json`, its
+`infra/requirements.json`, or a generated client.
+Never merge a generated file by hand, even when the conflict is one line such
+as a digest: the merged bytes match neither side's sources. Regenerate it as
+the next section says. Every other conflicted file is a source file.
+
+Each conflicted source file holds the base's version with the commit's other changes
 applied. `git show --format= C -- <path>` is the commit's own change to it.
 
 - Bring the commit's intent into the file, on top of the base's version. Keep
@@ -104,6 +118,34 @@ applied. `git show --format= C -- <path>` is the commit's own change to it.
 - When the commit's change no longer applies because the base removed or
   rewrote what it touched, keep the base's version and say so in the summary.
 - Touch no other file.
+
+## Regenerating a generated file
+
+Resolve the conflicted source files of `C` first and `git add` each one: the
+generated file is a function of them, and the cleanup below drops every
+unstaged change. Then, from the workspace root, find the project of each
+conflicted generated file, and build each such project once:
+
+```bash
+PUTNAMI_CLI=putnami
+if [ -x ./putnamiw ]; then PUTNAMI_CLI=./putnamiw; fi
+"$PUTNAMI_CLI" projects owner <path>
+"$PUTNAMI_CLI" build --projects <project>
+```
+
+The build writes the files from the replayed sources. A build that fails only
+with `generated-output-drift` has rewritten the files it names: the failure
+says the bytes on disk were stale, and the worktree holds the regenerated
+ones. A CLI that cannot start is `capability_missing`. Any other failure is
+`command_failed`: report it, and never fall back to
+merging a file by hand. A file the build leaves absent, or that still holds a
+conflict marker, is `conflict_unresolved`. A file the build leaves equal to
+the base's side was already current: stage it as it stands.
+
+`git add` the conflicted generated files only, then drop everything else the
+build changed: `git restore --worktree -- .` and `git clean -fdq`. The staged
+resolution survives both. Name each regenerated file and its project in the
+summary.
 
 ## Set up the routine
 

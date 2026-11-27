@@ -642,6 +642,14 @@ Catch-alls, wildcards, and other patterns that cannot be represented safely by
 v1 fail the build with an `http_routes.unsupported_pattern` diagnostic instead
 of widening the public edge route.
 
+`build-describe` is the one writer of the committed inventory, and it fails on
+drift: when the inventory a build writes, or a cache hit restores, differs from
+the committed `schema/http-routes.json`, the build fails with
+`generated-output-drift`. The worktree then holds the regenerated inventory:
+commit it. A stale inventory never lands silently. When two pull requests that
+each change a route conflict on the file, rebuild the project rather than
+merging the file by hand.
+
 ## gRPC service inventory
 
 An app that composes a `go.putnami.dev/grpc` surface emits

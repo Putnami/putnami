@@ -1887,7 +1887,7 @@ func TestCollectArtifactsRemovesCommittedFeatureEvidenceItDidNotWrite(t *testing
 // committed sidecars stay.
 func TestCollectArtifactsRemovesCommittedGRPCInventoryItDidNotWrite(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "single-schema-committer", "committed-grpc-inventory-is-only-what-the-run-wrote")
-	const routes = `{"protocol":"putnami.http-routes.v1","routes":[]}` + "\n"
+	const routes = `{"protocol":"putnami.capabilities.v1"}` + "\n"
 	stale := string(grpcInventory(t, "old.v1.Gone"))
 	fresh := string(grpcInventory(t))
 	for _, test := range []struct {
@@ -1911,7 +1911,7 @@ func TestCollectArtifactsRemovesCommittedGRPCInventoryItDidNotWrite(t *testing.T
 				}
 			}
 			committed := filepath.Join(committedDir, "grpc-services.json")
-			otherSidecar := filepath.Join(committedDir, "http-routes.json")
+			otherSidecar := filepath.Join(committedDir, "capabilities.json")
 			for path, body := range map[string]string{committed: stale, otherSidecar: routes} {
 				if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 					t.Fatal(err)
@@ -1935,7 +1935,61 @@ func TestCollectArtifactsRemovesCommittedGRPCInventoryItDidNotWrite(t *testing.T
 				t.Fatalf("committed inventory = %q (err %v), want %q", got, err, test.want)
 			}
 			if body, err := os.ReadFile(otherSidecar); err != nil || string(body) != routes {
-				t.Fatalf("committed route inventory = %q (err %v), want it left as it was", body, err)
+				t.Fatalf("committed capability manifest = %q (err %v), want it left as it was", body, err)
+			}
+		})
+	}
+}
+
+// TestCollectArtifactsRemovesAnUncommittedRouteInventory pins the other half
+// of the route inventory's drift policy: build-describe declares
+// schema/http-routes.json as an output, so a run that commits no inventory
+// removes a copy an earlier run left. Its entry then records the file absent,
+// and a hit never restores an inventory the run did not write.
+func TestCollectArtifactsRemovesAnUncommittedRouteInventory(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "committed-route-inventory-drift", "an-uncommitted-route-inventory-is-removed")
+	const stale = `{"protocol":"putnami.http-routes.v1","routes":[{"method":"GET","path":"/gone"}]}` + "\n"
+	const fresh = `{"protocol":"putnami.http-routes.v1","routes":[]}` + "\n"
+	for _, test := range []struct {
+		name        string
+		writeRoutes bool
+		commit      bool
+		want        string // "" means the committed copy is absent
+	}{
+		{name: "fresh inventory is committed verbatim", writeRoutes: true, commit: true, want: fresh},
+		{name: "no HTTP surface this run", writeRoutes: false, commit: true},
+		{name: "schemas not committed", writeRoutes: true, commit: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			projectPath := t.TempDir()
+			genDir := filepath.Join(projectPath, ".gen")
+			genSchemaDir := filepath.Join(genDir, "schema")
+			committedDir := filepath.Join(projectPath, "schema")
+			for _, dir := range []string{genSchemaDir, committedDir} {
+				if err := os.MkdirAll(dir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			committed := filepath.Join(committedDir, "http-routes.json")
+			if err := os.WriteFile(committed, []byte(stale), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			snap := snapshotSchemaDir(genSchemaDir)
+			if test.writeRoutes {
+				if err := os.WriteFile(filepath.Join(genSchemaDir, "http-routes.json"), []byte(fresh), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if _, err := collectArtifacts(projectPath, genDir, test.commit, snap, nil); err != nil {
+				t.Fatalf("collectArtifacts: %v", err)
+			}
+			got, err := os.ReadFile(committed)
+			switch {
+			case test.want == "" && !errors.Is(err, os.ErrNotExist):
+				t.Fatalf("committed inventory = %q (err %v), want it removed", got, err)
+			case test.want != "" && (err != nil || string(got) != test.want):
+				t.Fatalf("committed inventory = %q (err %v), want %q", got, err, test.want)
 			}
 		})
 	}
