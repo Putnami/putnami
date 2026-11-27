@@ -414,11 +414,11 @@ envelope and rules:
   witnessed paths; a save that would exceed either keeps entries in key order
   up to it. A run that only confirms entries writes nothing until they
   come halfway to being dropped, as the file index does.
-- **Release baselines.** Until the input record is on main, the baselines
-  live in their own file, `.putnami/release-record`
-  (`internal/fileindex/release_record.go`), with the same envelope rules and
-  their own lock and 16,384-entry cap; they move into the input record as a
-  table afterwards.
+- **Release baselines.** The baselines landed first, in their own file,
+  `.putnami/release-record` (`internal/fileindex/release_record.go`), with
+  the same envelope rules and their own lock and 16,384-entry cap. The slice
+  after this one moves them into the input record as its table
+  `release-baseline` and deletes that file's envelope.
 - **What writes nothing.** `--plan`, a preview-only `--dry-run`, and a process
   that cannot read the clock read the record and write nothing.
 
