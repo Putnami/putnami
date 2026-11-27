@@ -36,12 +36,16 @@ records:
 - the full source commit and confirmation that the build tree was clean;
 - the release version and candidate channel;
 - the exact Putnami CLI version that ran the package and publish plan;
-- the builder identity: the external release-execution run and its actor when
-  that plane is configured, or the named human release owner for a manual run;
+- the builder identity: the run that executed the package and publish plan and
+  its actor, or the named human release owner for a manual run. The
+  `release-smoke` run proves the published channel and builds nothing, so it is
+  never the builder;
 - every target artifact's operating system, architecture, resolved version, and
   authoritative SHA-256; and
-- the four target-specific smoke results, on macOS and Linux, and the release
-  owner's approval. While Windows support is suspended, the release has no
+- the six smoke results of the candidate's `release-smoke` run (the release
+  smoke on the four macOS and Linux targets, the first-use smoke on two Linux
+  targets), with the channel, the ref and the commit that run resolved, that
+  run's URL, and the release owner's approval. While Windows support is suspended, the release has no
   `windows/amd64` target.
 
 The builder is the identity that executed the approved package plan, not the
@@ -113,7 +117,8 @@ publishes, tags, or pushes.
 - [`scripts/smoke-check-release.sh`](../scripts/smoke-check-release.sh) checks
   the candidate response, installer verification, target binary, and resolved
   version before promotion. With `SMOKE_RUN_COMMAND`, it also runs the
-  installer's run form against the published command map.
+  installer's run form against the published command map; the `release-smoke`
+  workflow sets none until the release owner names the command.
 - [Installing the CLI](22-installing-the-cli.md) documents the user-visible
   trust boundary and refusals.
 - [Releasing Putnami](../../../RELEASING.md) requires this provenance record in

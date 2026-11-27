@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "release-smoke-runs-in-its-own-public-repository",
+  "statement": "the release install tests run from a secret-free workflow of the public repository Putnami/release-smoke, at the Putnami/putnami commit it resolves from the ref it is given; this repository holds no workflow for them",
+  "settled": "2026-11-26",
+  "settledBy": "fdumay",
+  "adr": "tooling/cli/doc/adr/0012-install-trust-and-release-smoke.md",
+  "reviewOnly": true
+}
