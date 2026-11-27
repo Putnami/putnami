@@ -12,8 +12,11 @@ import (
 	"strings"
 
 	"go.putnami.dev/sdk/extension/linetag"
-	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
+
+// releaseWitness is the digest of what names the commits a release baseline
+// is read from (ReleaseBaselineReader.releaseWitness): the record keys a baseline by it.
+type baselineWitness [sha256.Size]byte
 
 // historyRewriters are the variables under which Git reads a commit's history
 // other than as its objects name it: replace refs and grafts. With one set, no
@@ -37,7 +40,7 @@ var historyRewriters = []string{"GIT_REPLACE_REF_BASE", "GIT_NO_REPLACE_OBJECTS"
 // The tags and the repository state are the reader's one read, which the
 // baselines it reads are read from; the other parts are read when it is
 // called.
-func (r *ReleaseBaselineReader) releaseWitness() (fileindex.ReleaseWitness, bool) {
+func (r *ReleaseBaselineReader) releaseWitness() (baselineWitness, bool) {
 	r.tagsReadOnce.Do(r.openTags)
 	return witnessOf(r.root, r.resolved, r.inside, r.shallow, r.prefix, r.tags)
 }
@@ -46,54 +49,54 @@ func (r *ReleaseBaselineReader) releaseWitness() (fileindex.ReleaseWitness, bool
 // and the tags included, from reads of its own: the record calls it before it
 // writes the baselines read under the reader's witness, so a baseline read
 // while a part moved is not kept.
-func (r *ReleaseBaselineReader) recheckWitness() (fileindex.ReleaseWitness, bool) {
+func (r *ReleaseBaselineReader) recheckWitness() (baselineWitness, bool) {
 	resolved, err := filepath.EvalSymlinks(r.root)
 	if err != nil {
-		return fileindex.ReleaseWitness{}, false
+		return baselineWitness{}, false
 	}
 	output, _, err := dirReleaseReads{}.state(r.root)
 	if err != nil {
-		return fileindex.ReleaseWitness{}, false
+		return baselineWitness{}, false
 	}
 	lines := strings.Split(strings.TrimSuffix(output, "\n"), "\n")
 	if len(lines) != 3 {
-		return fileindex.ReleaseWitness{}, false
+		return baselineWitness{}, false
 	}
 	return witnessOf(r.root, resolved, lines[0], lines[1], strings.TrimSuffix(lines[2], "/"), linetag.Open(r.root))
 }
 
 // witnessOf computes the witness of the repository at root from its state
 // and its tags.
-func witnessOf(root, resolved, inside, shallow, prefix string, tagReads *linetag.Tags) (fileindex.ReleaseWitness, bool) {
+func witnessOf(root, resolved, inside, shallow, prefix string, tagReads *linetag.Tags) (baselineWitness, bool) {
 	if resolved == "" || inside != "true" || shallow != "false" {
-		return fileindex.ReleaseWitness{}, false
+		return baselineWitness{}, false
 	}
 	for _, name := range historyRewriters {
 		if _, set := os.LookupEnv(name); set {
-			return fileindex.ReleaseWitness{}, false
+			return baselineWitness{}, false
 		}
 	}
 	top, err := workTreeRootInProcess(root)
 	if err != nil {
-		return fileindex.ReleaseWitness{}, false
+		return baselineWitness{}, false
 	}
 	repo, err := openLocal(top)
 	if err != nil {
-		return fileindex.ReleaseWitness{}, false
+		return baselineWitness{}, false
 	}
 	if rewritesHistory(repo.commonDir) {
-		return fileindex.ReleaseWitness{}, false
+		return baselineWitness{}, false
 	}
 	head, tags, err := tagReads.Snapshot()
 	if err != nil || head == "" {
-		return fileindex.ReleaseWitness{}, false
+		return baselineWitness{}, false
 	}
 	// The tags HEAD reaches are a read of their own, which LastRelease
 	// decides from: a tag deleted or moved between the snapshot and it shows
 	// here, and the witness taken again at save differs.
 	merged, err := tagReads.Merged()
 	if err != nil {
-		return fileindex.ReleaseWitness{}, false
+		return baselineWitness{}, false
 	}
 
 	hash := sha256.New()
@@ -121,7 +124,7 @@ func witnessOf(root, resolved, inside, shallow, prefix string, tagReads *linetag
 			part("env", variable)
 		}
 	}
-	var witness fileindex.ReleaseWitness
+	var witness baselineWitness
 	copy(witness[:], hash.Sum(nil))
 	return witness, true
 }

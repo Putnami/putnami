@@ -506,3 +506,50 @@ func TestLinkHopsNamesEachLinkTheResolutionMeets(t *testing.T) {
 		t.Error("a link to itself resolved")
 	}
 }
+
+// A value recorded with PutRechecked is written only while its witness holds
+// again when the record saves, and each witness is taken again once.
+func TestARecheckedValueIsWrittenOnlyWhileItsWitnessHolds(t *testing.T) {
+	clock := time.Now().Add(time.Hour).UnixNano()
+	withRecordClock(t, &clock)
+	_, path, _ := recordFixture(t)
+	r := OpenRecord(path, "id")
+	calls := 0
+	moved := func() bool { calls++; return false }
+	held := func() bool { return true }
+	r.PutRechecked("release", "a", []byte("a"), "w1", moved)
+	r.PutRechecked("release", "b", []byte("b"), "w1", moved)
+	r.PutRechecked("release", "c", []byte("c"), "w2", held)
+	r.PutRechecked("release", "big", make([]byte, recordMaxRecheckedValue+1), "w2", held)
+	if err := r.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Errorf("the recheck of one witness ran %d times, want once", calls)
+	}
+	loaded := OpenRecord(path, "id")
+	for _, k := range []string{"a", "b", "big"} {
+		if _, _, ok := loaded.Answer("release", k, loaded.Hold); ok {
+			t.Errorf("%s was written although its witness did not hold or it is over the bound", k)
+		}
+	}
+	if value, parts, ok := loaded.Answer("release", "c", loaded.Hold); !ok || string(value) != "c" || len(parts) != 0 {
+		t.Fatalf("Answer(c) = %q, %v, %v; want the value whose witness held, with no part", value, parts, ok)
+	}
+	// The same value recorded again only confirms it: nothing to write.
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded.PutRechecked("release", "c", []byte("c"), "w2", func() bool { t.Error("a confirmed value was rechecked"); return true })
+	if err := loaded.Save(); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Error("a run that only confirmed a rechecked value wrote the record")
+	}
+}

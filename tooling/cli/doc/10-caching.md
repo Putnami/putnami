@@ -138,8 +138,8 @@ What does not depend on the project, the repository's state, HEAD and its
 tags, is read once per run for every project its work tree holds
 ([ADR 0110](adr/0110-a-run-reads-the-release-state-of-its-repository-once.md)).
 
-A run records each tagged or untagged baseline it reads in
-`.putnami/release-record`, keyed by the project directory, the tag pattern and
+A run records each tagged or untagged baseline it reads in the input record's
+`release-baseline` table, keyed by the project directory, the tag pattern and
 the witness of the commits the baseline names: HEAD's commit, every tag with
 the object it peels to, the tags HEAD reaches, the repository state (a full clone, the work tree's
 prefix), the absence of replace refs, grafts and reftables, Git's whole
