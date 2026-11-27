@@ -303,8 +303,12 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 	// A digest the input record holds is answered when its witness holds,
 	// without collecting it (ADR 0113).
 	record := fileindex.CurrentRecord()
-	if record != nil && recordablePatterns(patterns) {
-		if hash, witness, ok := recordedInputDigest(record, key, dir, patterns); ok {
+	recorded, recordable := "", false
+	if record != nil {
+		recorded, recordable = recordKey(key, patterns)
+	}
+	if recordable {
+		if hash, witness, ok := recordedInputDigest(record, recorded, dir, patterns); ok {
 			cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns), witness)
 			return hash, nil
 		}
@@ -313,8 +317,8 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 	if err != nil {
 		return "", err
 	}
-	if record != nil && recordablePatterns(patterns) {
-		recordInputDigest(record, key, hash, witness)
+	if recordable {
+		recordInputDigest(record, recorded, hash, witness)
 	}
 
 	if witness != nil && witness.unmemoized {

@@ -53,6 +53,9 @@ type selectionWitness struct {
 	// looked up besides the files it selected (collectionFacts.listed): with
 	// the selected files, what the input record witnesses (ADR 0113).
 	listed []string
+	// cutWitness holds the paths whose stats witness the cut the candidates
+	// were listed from, when the reader read it in-process (ADR 0113 §3).
+	cutWitness []string
 	// unmemoized marks a digest no memo keeps: an ordinary pattern matched a
 	// symbolic link, whose target a write can create or change anywhere.
 	unmemoized bool
@@ -118,6 +121,7 @@ func newSelectionWitness(dir string, patterns []string, files []fileEntry, facts
 	}
 	if candidates && facts.cut != nil {
 		w.cut = cutFingerprint(*facts.cut)
+		w.cutWitness = facts.cut.Witness
 	}
 	w.absent = facts.absent
 	w.listed = facts.listed
@@ -433,18 +437,36 @@ func globDoubleStarReaches(rel, prefix string) bool {
 // (lookupFileHash), each with its witness (tooling/cli ADR 0113 §1).
 const InputDigestTable = "input-digest"
 
-// recordablePatterns reports whether a digest of patterns may be answered
-// from the input record: an ordinary pattern set, with no input selector and
-// no Git candidate pattern, whose witness this store takes alone. Whether a
-// collected digest is recorded is decided again from its witness
+// recordKey is the input record's key of a digest of patterns, and false
+// when the record may not answer it: a pattern set with an input selector,
+// or none. A digest that reads Git candidates is keyed by the environment
+// that selects the repository, its index and its configuration too: their
+// values decide the cut as much as the files do (ADR 0113 §3). Whether a
+// collected digest is recorded is decided from its witness
 // (recordInputDigest).
-func recordablePatterns(patterns []string) bool {
+func recordKey(key string, patterns []string) (string, bool) {
+	git := false
 	for _, pattern := range patterns {
-		if _, git := wsproto.GitFilePattern(strings.TrimPrefix(pattern, "!")); git || extensionproto.NamesInputSelector(pattern) {
-			return false
+		if extensionproto.NamesInputSelector(pattern) {
+			return "", false
 		}
+		_, candidate := wsproto.GitFilePattern(strings.TrimPrefix(pattern, "!"))
+		git = git || candidate
 	}
-	return len(patterns) > 0
+	if len(patterns) == 0 {
+		return "", false
+	}
+	if git {
+		environment := []string{"HOME=" + os.Getenv("HOME"), "XDG_CONFIG_HOME=" + os.Getenv("XDG_CONFIG_HOME")}
+		for _, variable := range os.Environ() {
+			if strings.HasPrefix(variable, "GIT_") {
+				environment = append(environment, variable)
+			}
+		}
+		slices.Sort(environment)
+		key += "\x00" + strings.Join(environment, "\x00")
+	}
+	return key, true
 }
 
 // recordedInputDigest answers the digest the input record holds at key when
@@ -476,20 +498,34 @@ func recordedInputDigest(record *fileindex.Record, key, dir string, patterns []s
 // candidates is not offered; the record refuses one with a part written
 // within the margin of its clock.
 func recordInputDigest(record *fileindex.Record, key, hash string, witness *selectionWitness) {
-	if witness == nil || witness.unmemoized || witness.candidates || !witness.prepare() {
+	if witness == nil || witness.unmemoized {
 		return
 	}
-	parts := make([]fileindex.RecordPart, 0, len(witness.selected)+len(witness.listed))
+	// A digest of Git candidates alone reads each one as Git lists it, a
+	// link included, so its links take no witness of their own; any other
+	// digest reads through no link (prepare).
+	gitOnly := witness.candidates && !slices.ContainsFunc(witness.includes, func(include string) bool {
+		_, git := wsproto.GitFilePattern(include)
+		return !git
+	})
+	if witness.candidates && witness.cutWitness == nil || !gitOnly && !witness.prepare() {
+		return
+	}
+	listed := slices.Concat(witness.listed, witness.cutWitness)
+	for _, rel := range witness.absent {
+		listed = append(listed, filepath.Join(witness.dir, filepath.FromSlash(rel)))
+	}
+	parts := make([]fileindex.RecordPart, 0, len(witness.selected)+len(listed))
 	seen := make(map[string]bool, cap(parts))
 	for _, path := range witness.selected {
 		st, ok := fileindex.LstatAny(path)
-		if !ok || st.Mode&modeTypeMask != modeRegular {
+		if !ok || st.Mode&modeTypeMask != modeRegular && !(gitOnly && st.Mode&modeTypeMask == modeSymlink) {
 			return
 		}
 		seen[path] = true
 		parts = append(parts, fileindex.RecordPart{Path: path, Stat: st})
 	}
-	for _, path := range witness.listed {
+	for _, path := range listed {
 		// A missing path is witnessed by the nearest directory above it that
 		// exists: its listing shows the path stays missing.
 		existing := filepath.Clean(path)
@@ -515,4 +551,5 @@ func recordInputDigest(record *fileindex.Record, key, hash string, witness *sele
 const (
 	modeTypeMask = 0o170000
 	modeRegular  = 0o100000
+	modeSymlink  = 0o120000
 )

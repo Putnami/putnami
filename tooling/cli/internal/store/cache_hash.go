@@ -662,6 +662,9 @@ type CandidateCut struct {
 	Paths    []string
 	Modes    map[string]string
 	Unmerged map[string]bool
+	// Witness holds the absolute paths whose stats witness the listing when
+	// it was read in-process, nil when Git listed it (ADR 0113 §3).
+	Witness []string
 }
 
 // CandidateSource answers the candidate cut of dir from a read the run

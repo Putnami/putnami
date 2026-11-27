@@ -76,6 +76,7 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "p")
 	writeRecordTree(t, project, map[string]string{"src/a.go": "a", "README.md": "r", "x.json": "{}"})
+	runGit(t, project, "init", "-q")
 	cases := []struct {
 		name     string
 		patterns []string
@@ -87,7 +88,7 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 		{"an exclusion", []string{"**/*", "!README.md"}, true},
 		{"a missing prefix", []string{"missing/**"}, true},
 		{"the empty pattern set (the default walk)", nil, false},
-		{"a Git candidate pattern (ADR 0113 §3: after the in-process reader)", []string{"git:**"}, false},
+		{"Git candidates Git listed (ADR 0113 §3: its fallback)", []string{"git:**"}, false},
 		{"an input selector (ADR 0113 §1: after its basis witness)", []string{"go:sources"}, false},
 		{"a glob before the last segment", []string{"*/a.go"}, false},
 		{"a character class", []string{"[sx]*.json"}, false},
@@ -99,13 +100,13 @@ func TestEachWayToCollectFilesIsRecordedOrNot(t *testing.T) {
 				t.Skip("this platform or filesystem keeps no input record")
 			}
 			recorded := false
-			if recordablePatterns(c.patterns) {
+			if key, ok := recordKey("k", c.patterns); ok {
 				hash, witness, err := witnessedHashFiles(nil, project, c.patterns, nil, ProjectConfigScope{})
 				if err != nil {
 					t.Fatal(err)
 				}
-				recordInputDigest(record, "k", hash, witness)
-				_, _, recorded = record.Answer(InputDigestTable, "k", record.Hold)
+				recordInputDigest(record, key, hash, witness)
+				_, _, recorded = record.Answer(InputDigestTable, key, record.Hold)
 			}
 			if recorded != c.recorded {
 				t.Fatalf("recorded = %v, want %v", recorded, c.recorded)

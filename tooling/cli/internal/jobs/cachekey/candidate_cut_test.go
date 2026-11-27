@@ -105,7 +105,7 @@ func TestAWriteOfTheRunReadsTheCutAgain(t *testing.T) {
 	ws := treeFactsWorkspace(root)
 	var reads atomic.Int32
 	saved := candidateFiles
-	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, error) { reads.Add(1); return saved(dir) }
+	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, []string, error) { reads.Add(1); return saved(dir) }
 	t.Cleanup(func() { candidateFiles = saved })
 	job := cutJob(ws.ProjectByID("/app"), extension.TaskCacheKey{Files: []string{"main.go"},
 		Runtime: []string{extproto.RuntimeInputCandidateFiles}})
@@ -149,7 +149,7 @@ func TestAWriteUnderAPutnamiDirectoryGitListsReadsTheCutAgain(t *testing.T) {
 	writeFileAt(t, filepath.Join(root, ".putnami", "cache.json"), "{}\n")
 	var reads atomic.Int32
 	saved := candidateFiles
-	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, error) { reads.Add(1); return saved(dir) }
+	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, []string, error) { reads.Add(1); return saved(dir) }
 	t.Cleanup(func() { candidateFiles = saved })
 	facts := NewTreeFacts(root)
 	facts.currentCut()
@@ -173,7 +173,7 @@ func TestAWriteReadsTheCutAgainOnlyForTheKeysItReaches(t *testing.T) {
 	ws := treeFactsWorkspace(root)
 	var reads, asks atomic.Int32
 	savedFiles, savedIgnores := candidateFiles, ignoresDirectories
-	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, error) { reads.Add(1); return savedFiles(dir) }
+	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, []string, error) { reads.Add(1); return savedFiles(dir) }
 	ignoresDirectories = func(root string, rels []string) (map[string]bool, error) {
 		asks.Add(1)
 		return savedIgnores(root, rels)
@@ -305,7 +305,7 @@ func TestAWriteUnderAnIgnoredOutputLeavesTheCutAsItIs(t *testing.T) {
 	treeKeyedGit(t, root, "add", "-f", filepath.Join("lib", "gen", "pinned.txt"))
 	var reads, asks atomic.Int32
 	savedFiles, savedIgnores := candidateFiles, ignoresDirectories
-	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, error) { reads.Add(1); return savedFiles(dir) }
+	candidateFiles = func(dir string) ([]protocoljob.CandidateFile, []string, error) { reads.Add(1); return savedFiles(dir) }
 	ignoresDirectories = func(root string, rels []string) (map[string]bool, error) {
 		asks.Add(1)
 		return savedIgnores(root, rels)

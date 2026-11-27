@@ -96,8 +96,11 @@ type cutRead struct {
 	err   error
 	// stamp is the stamp of the index file taken before the read, and
 	// stamped whether one could be taken (putnamigit.ReadIndexStamp).
-	stamp      putnamigit.IndexStamp
-	stamped    bool
+	stamp   putnamigit.IndexStamp
+	stamped bool
+	// witness holds the paths whose stats witness the listing, when the
+	// reader read it in-process (putnamigit.CandidateFilesWitnessed).
+	witness    []string
 	sourceOnce sync.Once
 	source     store.CandidateCut
 
@@ -159,7 +162,7 @@ var (
 	trackedPaths       = putnamigit.TrackedPaths
 	ignoredDirectories = putnamigit.IgnoredDirectories
 	writeFilesAtCommit = putnamigit.WriteFilesAtCommit
-	candidateFiles     = putnamigit.CandidateFiles
+	candidateFiles     = putnamigit.CandidateFilesWitnessed
 	ignoresDirectories = putnamigit.IgnoresDirectories
 	readChangeHistory  = putnamigit.ReadChangeHistory
 )
@@ -351,7 +354,7 @@ func (t *TreeFacts) readCut() {
 	t.cutSeq++
 	read := &cutRead{seq: t.cutSeq}
 	read.stamp, read.stamped = putnamigit.ReadIndexStamp(t.root)
-	read.files, read.err = candidateFiles(t.root)
+	read.files, read.witness, read.err = candidateFiles(t.root)
 	t.cut, t.pending = read, nil
 }
 
@@ -786,7 +789,7 @@ func (t *TreeFacts) CandidateSource() store.CandidateSource {
 			return store.CandidateCut{}, false
 		}
 		read.sourceOnce.Do(func() {
-			cut := store.CandidateCut{Paths: make([]string, 0, len(read.files)), Modes: map[string]string{}, Unmerged: map[string]bool{}}
+			cut := store.CandidateCut{Paths: make([]string, 0, len(read.files)), Modes: map[string]string{}, Unmerged: map[string]bool{}, Witness: read.witness}
 			for _, file := range read.files {
 				cut.Paths = append(cut.Paths, file.Path)
 				switch file.Mode {

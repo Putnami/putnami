@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"go.putnami.dev/tooling/cli/internal/fileindex"
+	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
 
 // The input record's digests (tooling/cli ADR 0113). These tests set the
@@ -285,5 +287,148 @@ func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// git runs git in dir, skipping the test where git cannot run.
+func runGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false"}, args...)...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Skipf("git %v: %v %s", args, err, out)
+	}
+}
+
+// inProcessCut is a candidate source that reads the cut of root in-process
+// with its witness, as the run's tree facts do.
+func inProcessCut(t *testing.T, root string) CandidateSource {
+	t.Helper()
+	files, witness, err := gitutil.CandidateFilesWitnessed(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cut := CandidateCut{Modes: map[string]string{}, Unmerged: map[string]bool{}, Witness: witness}
+	for _, file := range files {
+		cut.Paths = append(cut.Paths, file.Path)
+		switch file.Mode {
+		case "untracked":
+		case "unmerged":
+			cut.Unmerged[file.Path] = true
+		default:
+			cut.Modes[file.Path] = file.Mode
+		}
+	}
+	return func(dir string) (CandidateCut, bool) { return cut, filepath.Clean(dir) == filepath.Clean(root) }
+}
+
+var gitRecordPatternSets = [][]string{
+	{"git:**"},
+	{"git:**/*.go"},
+	{"git:**", "!git:**/*.txt"},
+}
+
+// TestTheInputRecordServesNoFalseHitOfGitCandidates is the randomized test of
+// digests of Git candidates read in-process: it stages, unstages and removes
+// paths, rewrites ignore rules and the index, and writes the work tree between
+// runs (ADR 0113 §3).
+func TestTheInputRecordServesNoFalseHitOfGitCandidates(t *testing.T) {
+	answered := int64(0)
+	for seed := int64(1); seed <= 6; seed++ {
+		t.Run(fmt.Sprint("seed", seed), func(t *testing.T) {
+			rng := rand.New(rand.NewSource(seed)) //nolint:gosec // a reproducible test sequence
+			root := t.TempDir()
+			writeRecordTree(t, root, map[string]string{
+				"a/x.go": "package a", "a/n.txt": "n", "b/y.go": "package b", ".gitignore": ".putnami/\nignored/\n*.log\n",
+				"ignored/z.go": "package z", "c/d/w.go": "package w", "top.txt": "t",
+			})
+			runGit(t, root, "init", "-q")
+			runGit(t, root, "add", "-A")
+			runGit(t, root, "commit", "-q", "-m", "init")
+			// The reader keeps a configuration read more than a second after
+			// its files were written, and only a kept one gives a witness.
+			time.Sleep(1100 * time.Millisecond)
+			for round := range 20 {
+				record := useRecordAt(t, root)
+				cm := NewCacheManager(nil)
+				source := inProcessCut(t, root)
+				cm.SetCandidateSource(source)
+				for _, patterns := range gitRecordPatternSets {
+					// A nested repository is an error of the collection, with
+					// or without the record: both must fail alike.
+					got, gotErr := cm.HashFiles(root, patterns, nil, ProjectConfigScope{})
+					want, wantErr := hashFilesWith(inProcessCut(t, root), root, patterns, nil, ProjectConfigScope{})
+					if (gotErr == nil) != (wantErr == nil) {
+						t.Fatalf("round %d, patterns %v: the run answered %s, %v; a fresh collection %s, %v", round, patterns, got, gotErr, want, wantErr)
+					}
+					if got != want {
+						t.Fatalf("round %d, patterns %v: the run read %s, a fresh collection %s (a false hit)\ntree:\n%s",
+							round, patterns, got, want, listTree(t, root))
+					}
+				}
+				answered += record.Answered()
+				if err := record.Save(); err != nil {
+					t.Fatal(err)
+				}
+				time.Sleep(15 * time.Millisecond)
+				for range 1 + rng.Intn(2) {
+					mutateGitTree(t, rng, root)
+				}
+			}
+		})
+	}
+	if answered == 0 {
+		t.Fatal("the record answered no digest of Git candidates: the test exercises nothing")
+	}
+}
+
+// mutateGitTree makes one random change to the repository at root.
+func mutateGitTree(t *testing.T, rng *rand.Rand, root string) {
+	t.Helper()
+	dirs := []string{"a", "b", "c/d", "ignored", "e"}
+	dir := dirs[rng.Intn(len(dirs))]
+	name := fmt.Sprintf("f%d.%s", rng.Intn(3), []string{"go", "txt", "log"}[rng.Intn(3)])
+	path := filepath.Join(root, dir, name)
+	switch rng.Intn(11) {
+	case 0: // an untracked file
+		writeRecordTree(t, root, map[string]string{dir + "/" + name: "new"})
+	case 1: // stage everything
+		runGit(t, root, "add", "-A")
+	case 2: // remove a tracked path from the index only
+		runGit(t, root, "rm", "-q", "--cached", "-r", "--ignore-unmatch", dir)
+	case 3: // delete from the work tree
+		_ = os.RemoveAll(path)
+	case 4: // ignore a directory, or stop ignoring them
+		// The workspace's .putnami, where the record lives, stays ignored, as
+		// a workspace ignores it.
+		rules := []string{".putnami/\nignored/\n*.log\n", ".putnami/\nignored/\n*.log\nb/\n", ".putnami/\n*.log\n", ".putnami/\n"}
+		writeRecordTree(t, root, map[string]string{".gitignore": rules[rng.Intn(len(rules))]})
+	case 5: // a nested .gitignore
+		writeRecordTree(t, root, map[string]string{dir + "/.gitignore": "*.go\n"})
+	case 6: // the repository's own excludes
+		writeRecordTree(t, root, map[string]string{".git/info/exclude": []string{"*.txt\n", ""}[rng.Intn(2)]})
+	case 7: // a nested repository
+		nested := filepath.Join(root, "e", "nested")
+		writeRecordTree(t, nested, map[string]string{"n.go": "package n"})
+		runGit(t, nested, "init", "-q")
+		runGit(t, nested, "add", "-A")
+		runGit(t, nested, "commit", "-q", "--allow-empty", "-m", "nested")
+	case 8: // commit
+		runGit(t, root, "add", "-A")
+		runGit(t, root, "commit", "-q", "--allow-empty", "-m", "c")
+	case 9: // same size, modification time set back
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+			content, _ := os.ReadFile(path)
+			if len(content) > 0 {
+				content[0] ^= 0x01
+			}
+			must(t, os.WriteFile(path, content, info.Mode()))
+			must(t, os.Chtimes(path, info.ModTime(), info.ModTime()))
+		}
+	default: // the exec bit, which the index records
+		if _, err := os.Stat(path); err == nil {
+			must(t, os.Chmod(path, 0o755))
+			runGit(t, root, "add", "-A")
+		}
 	}
 }
