@@ -3,6 +3,9 @@ package store
 import (
 	"context"
 	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -70,6 +73,34 @@ var processStart = time.Now()
 // changed at or after it counts as written (MaterializeTaskOutput).
 func (cm *CacheManager) SetTreeReadsSince(since time.Time) {
 	cm.readsSince.Store(since.UnixNano())
+}
+
+// AbsentBeforeTreeReads reports whether dest is absent, and was already
+// absent when this manager's run began to read the tree: the closest
+// directory above it that exists has not changed since (SetTreeReadsSince).
+// Removing dest, or a directory above it, changes the directory that held it,
+// so an absence another session made after a read this run memoized reports
+// false, as do a link above dest and a platform that gives no change time
+// (ADR 0119).
+func (cm *CacheManager) AbsentBeforeTreeReads(dest string) bool {
+	if _, err := os.Lstat(dest); !errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	for dir := filepath.Dir(dest); ; dir = filepath.Dir(dir) {
+		info, err := os.Lstat(dir)
+		if err == nil {
+			// A removal through a link changes the directory it leads to, not
+			// the link: a link above dest proves nothing.
+			if info.Mode()&os.ModeSymlink != 0 {
+				return false
+			}
+			ctime, _, _, _, ok := fileChangeTime(info)
+			return ok && ctime < cm.quietBefore()
+		}
+		if !errors.Is(err, fs.ErrNotExist) || filepath.Dir(dir) == dir {
+			return false
+		}
+	}
 }
 
 func (cm *CacheManager) quietBefore() int64 {

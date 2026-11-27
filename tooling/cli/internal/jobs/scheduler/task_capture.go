@@ -212,7 +212,7 @@ func (s *Scheduler) emptyOwnedOutputs(job *ScheduledJob) error {
 		return err
 	}
 	for _, declared := range cachekey.EmptiedOutputDeclarations(job) {
-		if err := s.emptyDeclaredOutput(job, declared); err != nil {
+		if _, err := s.emptyDeclaredOutput(job, declared); err != nil {
 			return err
 		}
 	}
@@ -224,29 +224,39 @@ func (s *Scheduler) emptyOwnedOutputs(job *ScheduledJob) error {
 // execution calls it, and so does a restore that empties an output, so the
 // two remove the same entries. The caller holds the locks and has detached the
 // command-output directory, as emptyOwnedOutputs states.
-func (s *Scheduler) emptyDeclaredOutput(job *ScheduledJob, declared cachekey.EmptiedOutputDeclaration) error {
+//
+// It reports whether the emptying counts as a write of the destination: it
+// does not when the destination was absent before the run began to read the
+// tree, which it leaves absent (ADR 0119).
+func (s *Scheduler) emptyDeclaredOutput(job *ScheduledJob, declared cachekey.EmptiedOutputDeclaration) (bool, error) {
 	roots := s.outputRoots()
 	if roots.Root == "" {
 		// Without a workspace root an output path would resolve against the
 		// working directory, which is nobody's declared output.
-		return fmt.Errorf("no workspace root to resolve declared outputs against")
+		return false, fmt.Errorf("no workspace root to resolve declared outputs against")
 	}
 	root := declared.Output.EffectiveRoot()
 	base, ok := roots.OutputRoot(job, root)
 	if !ok {
-		return fmt.Errorf("declared output %q has unknown root %q", declared.ID, root)
+		return false, fmt.Errorf("declared output %q has unknown root %q", declared.ID, root)
 	}
 	dest := filepath.Join(base, filepath.FromSlash(declared.Rel))
+	// A destination that existed is written by its emptying. One that did
+	// not is judged once the emptying is done, so a directory another writer
+	// created meanwhile counts too.
+	_, statErr := os.Lstat(dest)
+	existed := !errors.Is(statErr, fs.ErrNotExist)
+	written := func() bool { return existed || s.cache == nil || !s.cache.AbsentBeforeTreeReads(dest) }
 	if declared.Output.Kind == extension.OutputKindFile {
 		if err := removeFileOutput(dest); err != nil {
-			return fmt.Errorf("declared output %q: %w", declared.ID, err)
+			return true, fmt.Errorf("declared output %q: %w", declared.ID, err)
 		}
-		return nil
+		return written(), nil
 	}
 	if err := emptyTaskOutput(dest, store.ResolveScratchRoot(roots.Root), emptyingKeep(declared)...); err != nil {
-		return fmt.Errorf("declared output %q: %w", declared.ID, err)
+		return true, fmt.Errorf("declared output %q: %w", declared.ID, err)
 	}
-	return nil
+	return written(), nil
 }
 
 // removeFileOutput removes the emptied file output at dest (ADR 0107). An
@@ -642,10 +652,12 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 // the restore refuses before it writes anything (refuseTrackedEmptiedOutputs):
 // the execution that follows refuses it too, and the task fails.
 //
-// It returns the IDs of the outputs it wrote: every output it emptied, every
+// It returns the IDs of the outputs it wrote: every output it emptied whose
+// destination was not absent since before the run's reads of the tree, every
 // one the store wrote, and, when it detached the command's output directory
-// from a link, every output under it. An output whose destination already
-// held it is not among them (ADR 0108, ADR 0119).
+// from a link or created it, every output under it. An output whose
+// destination already held it, or already lacked it, is not among them (ADR
+// 0108, ADR 0119).
 func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.TaskEntry) (map[string]bool, error) {
 	if err := s.refuseTrackedEmptiedOutputs(job); err != nil {
 		return nil, err
@@ -686,8 +698,13 @@ func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.T
 
 	for _, output := range entry.Outputs {
 		if declared, empties := emptied[output.ID]; empties {
-			written[output.ID] = true
-			if err := s.emptyDeclaredOutput(job, declared); err != nil {
+			// An output whose destination was already absent stays absent:
+			// the restore wrote nothing there (ADR 0119).
+			present, err := s.emptyDeclaredOutput(job, declared)
+			if present {
+				written[output.ID] = true
+			}
+			if err != nil {
 				return written, err
 			}
 			continue
@@ -794,8 +811,8 @@ func (s *Scheduler) ensureCommandOutputWritable(job *ScheduledJob) error {
 }
 
 // detachCommandOutput is ensureCommandOutputWritable, also reporting whether
-// the directory was a link it replaced: a restore then counts every output
-// under it as written (materializeDeclaredOutputs).
+// the directory was a link it replaced, or absent and created: a restore then
+// counts every output under it as written (materializeDeclaredOutputs).
 func (s *Scheduler) detachCommandOutput(job *ScheduledJob) (bool, error) {
 	state := s.stateForCommandOutput(job)
 	state.mu.Lock()
@@ -806,7 +823,9 @@ func (s *Scheduler) detachCommandOutput(job *ScheduledJob) (bool, error) {
 		return false, nil
 	}
 	info, err := os.Lstat(commandDir)
-	linked := err == nil && info.Mode()&os.ModeSymlink != 0
+	// A directory this call creates is a write too: a read of the run may
+	// have found it absent (materializeDeclaredOutputs).
+	linked := (err == nil && info.Mode()&os.ModeSymlink != 0) || errors.Is(err, fs.ErrNotExist)
 	if err := store.MaterializeDirSymlink(commandDir); err != nil {
 		return linked, err
 	}

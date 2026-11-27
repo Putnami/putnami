@@ -44,15 +44,22 @@ which 1.7 s in `invalidateWritten`, 1.0 s materializing, 0.6 s re-stamping and
    worktree may have written those bytes after a read this run memoized, and
    the restore then drops that read as it would drop its own write.
 2. **A completed restore invalidates the outputs that count as written, and
-   only them.** An output also counts as written when the restore emptied it,
-   or when the restore detached the command's output directory from a link,
-   which counts every output under that directory. The memoized digests, the
-   run's candidate cut and the memoized source bindings are invalidated for
-   those outputs alone, and for the build stamp when the restore's re-stamp
-   rewrote it; a restore where none counts invalidates nothing. A
-   destination left as it stood, unchanged since the run began to read the
-   tree, holds the bytes every read of this run saw, so no digest, cut or
-   binding read of it moved.
+   only them.** An output also counts as written when the restore emptied it
+   (below), or when the restore detached the command's output directory
+   from a link or created it, which counts every output under that
+   directory. The memoized digests, the run's candidate cut and the memoized
+   source bindings are invalidated for those outputs alone, and for the build
+   stamp when the restore's re-stamp rewrote it; a restore where none counts
+   invalidates nothing. A destination left as it stood, unchanged since the
+   run began to read the tree, holds the bytes every read of this run saw, so
+   no digest, cut or binding read of it moved. An emptied output whose
+   destination is absent before and after the emptying is judged the same
+   way: it counts as written unless the closest directory above it that
+   exists is no link and has not changed since the start of the run's reads
+   of the tree, where the absence predates every read of the run, which the
+   restore leaves as it stands. Counting every
+   emptied output as written made an unchanged run of this repository read
+   the Git cut 18 more times (amended 2026-11-27).
 3. **A failed restore invalidates every recorded output**, as before: it may
    have written any of them.
 4. **The bindings are invalidated once, after the materialization.** A binding
