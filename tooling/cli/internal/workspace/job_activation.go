@@ -3,9 +3,14 @@ package workspace
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 )
@@ -123,12 +128,64 @@ func matchDoubleStarGlob(root, pattern string, projectRoots map[string]bool) boo
 		}
 	}
 
-	found := false
+	return matchUnderWitness(root, searchRoot, suffix, projectRoots)
+}
+
+// activationWitnesses holds, for the life of the process, each recursive
+// activation match with its witness (CLI ADR 0116 §6): a found match by the
+// stats of the matching file and of the directories down to it, a missing one
+// by the stats of every directory its walk listed. A machine worker answers
+// an unchanged plan's matches with a stat per path instead of a walk; a stat
+// that differs walks again.
+var activationWitnesses sync.Map // searchRoot NUL suffix NUL root NUL project roots → *activationWitness
+
+// activationWalks counts the walks matchUnderWitness made, for tests.
+var activationWalks atomic.Int64
+
+type activationWitness struct {
+	found bool
+	paths map[string]fileindex.Stat
+}
+
+func (w *activationWitness) holds() bool {
+	for path, recorded := range w.paths {
+		if now, ok := fileindex.StatPath(path); !ok || now != recorded {
+			return false
+		}
+	}
+	return true
+}
+
+// settled reports whether every recorded time lies more than the file
+// index's margin before now (ADR 0009 §2 of protocols/workspace).
+func (w *activationWitness) settled(now time.Time) bool {
+	limit := now.Add(-fileindex.Margin).UnixNano()
+	for _, st := range w.paths {
+		if st.ModNano >= limit || st.ChangeNano >= limit {
+			return false
+		}
+	}
+	return true
+}
+
+// matchUnderWitness walks searchRoot, below root, for a file whose name
+// matches suffix, entering no excluded directory and no other project's root.
+// The answer is held under its witness when the file system's stats answer
+// for the tree.
+func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]bool) bool {
+	key := searchRoot + "\x00" + suffix + "\x00" + root + "\x00" + nestedRootsKey(root, projectRoots)
+	if held, ok := activationWitnesses.Load(key); ok {
+		if w, typed := held.(*activationWitness); typed && w.holds() {
+			return w.found
+		}
+	}
+	trusted := fileindex.TrustsStats(searchRoot)
+	walked := map[string]fileindex.Stat{}
+	found, match := false, ""
+	activationWalks.Add(1)
 	_ = filepath.WalkDir(searchRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil || found {
-			if found {
-				return filepath.SkipAll
-			}
+		if err != nil {
+			trusted = false // an unreadable member the witness cannot hold
 			return nil
 		}
 		if d.IsDir() {
@@ -141,15 +198,74 @@ func matchDoubleStarGlob(root, pattern string, projectRoots map[string]bool) boo
 			if ProjectWalkExcludedDirs[d.Name()] {
 				return filepath.SkipDir
 			}
+			if trusted {
+				if st, ok := fileindex.StatPath(path); ok {
+					walked[path] = st
+				} else {
+					trusted = false
+				}
+			}
 			return nil
 		}
 		// Match the filename against the suffix pattern
-		matched, _ := filepath.Match(suffix, d.Name())
-		if matched {
-			found = true
+		if matched, _ := filepath.Match(suffix, d.Name()); matched {
+			found, match = true, path
 			return filepath.SkipAll
 		}
 		return nil
 	})
+	if !trusted {
+		activationWitnesses.Delete(key)
+		return found
+	}
+	w := &activationWitness{found: found, paths: map[string]fileindex.Stat{}}
+	if found {
+		// The match holds while it and the directories down to it hold;
+		// the directories the walk listed before reaching them do not
+		// matter.
+		st, ok := fileindex.StatPath(match)
+		if !ok {
+			return found
+		}
+		w.paths[match] = st
+		for dir := filepath.Dir(match); ; dir = filepath.Dir(dir) {
+			before, listed := walked[dir]
+			if !listed {
+				return found
+			}
+			w.paths[dir] = before
+			if dir == searchRoot {
+				break
+			}
+		}
+	} else {
+		w.paths = walked
+	}
+	// A directory whose stat moved during the walk leaves the answer
+	// unheld.
+	for path, before := range w.paths {
+		if after, ok := fileindex.StatPath(path); !ok || after != before {
+			activationWitnesses.Delete(key)
+			return found
+		}
+	}
+	if w.settled(time.Now()) {
+		activationWitnesses.Store(key, w)
+	} else {
+		activationWitnesses.Delete(key)
+	}
 	return found
+}
+
+// nestedRootsKey is the set of project roots below root, which a walk under
+// root skips, as a comparable string.
+func nestedRootsKey(root string, projectRoots map[string]bool) string {
+	var nested []string
+	for dir := range projectRoots {
+		if strings.HasPrefix(dir, root+string(filepath.Separator)) {
+			nested = append(nested, dir)
+		}
+	}
+	sort.Strings(nested)
+	return strings.Join(nested, "\x01")
 }

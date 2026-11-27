@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -34,5 +36,62 @@ func TestMayPlanJob(t *testing.T) {
 		if got := MayPlanJob(tc.project, tc.job, tc.hasFiles); got != tc.want {
 			t.Errorf("%s: MayPlanJob = %v, want %v", tc.name, got, tc.want)
 		}
+	}
+}
+
+// TestARecursiveActivationMatchIsAnsweredByItsWitnessUntilAPathMoves holds a
+// found and a missing match under their witnesses: an unchanged tree answers
+// without a walk, and each change below answers what a fresh walk answers.
+func TestARecursiveActivationMatchIsAnsweredByItsWitnessUntilAPathMoves(t *testing.T) {
+	root := settledTree(t)
+	nested := filepath.Join(root, "c")
+	roots := map[string]bool{root: true, nested: true}
+	ask := func(pattern string) bool { return HasActivationFiles(root, []string{pattern}, roots) }
+	if !ask("**/*.go") || ask("**/*.ts") {
+		t.Fatal("the first walk answered wrong")
+	}
+	walks := activationWalks.Load()
+	if !ask("**/*.go") || ask("**/*.ts") {
+		t.Fatal("a held answer differs from the walk's")
+	}
+	if activationWalks.Load() != walks {
+		t.Fatal("an unchanged tree was walked again despite holding witnesses")
+	}
+
+	fresh := func(pattern string) bool {
+		activationWitnesses.Range(func(key, _ any) bool {
+			activationWitnesses.Delete(key)
+			return true
+		})
+		return ask(pattern)
+	}
+	for _, change := range []struct {
+		name    string
+		pattern string
+		write   func()
+	}{
+		{"a matching file created deep down", "**/*.ts", func() {
+			_ = os.MkdirAll(filepath.Join(root, "a", "b", "d"), 0o755)
+			_ = os.WriteFile(filepath.Join(root, "a", "b", "d", "w.ts"), []byte("w"), 0o644)
+		}},
+		{"the only match removed", "**/*.ts", func() {
+			_ = os.Remove(filepath.Join(root, "a", "b", "d", "w.ts"))
+		}},
+		{"a match renamed away", "**/*.go", func() {
+			for _, file := range []string{"a/x.go", "a/b/y.go"} {
+				_ = os.Rename(filepath.Join(root, file), filepath.Join(root, file+".txt"))
+			}
+		}},
+		{"a match under a nested project only", "**/*.go", func() {}},
+	} {
+		ask(change.pattern) // hold the answer before the change
+		change.write()
+		got := ask(change.pattern)
+		if want := fresh(change.pattern); got != want {
+			t.Errorf("%s: the held answer %v differs from a fresh walk's %v", change.name, got, want)
+		}
+	}
+	if ask("**/*.go") {
+		t.Error("a match under a nested project's root counted for the outer project")
 	}
 }
