@@ -27,6 +27,10 @@
           "last_message": {
             "type": "string"
           },
+          "last_prompt": {
+            "description": "The last request the person sent the session, once a sync carried one.",
+            "type": "string"
+          },
           "last_sync_at": {
             "format": "date-time",
             "type": "string"
@@ -2766,6 +2770,10 @@
           },
           "last_message": {
             "description": "The agent's last message, at most 4096 characters, sent on stop. Absent keeps the stored one.",
+            "type": "string"
+          },
+          "last_prompt": {
+            "description": "The last request the person sent the session, at most 4096 characters. Absent or empty keeps the stored one; each request replaces the one before.",
             "type": "string"
           },
           "missed_syncs": {

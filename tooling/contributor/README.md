@@ -184,8 +184,8 @@ a request takes no claim, since recording it twice changes nothing:
   sends it once, and again to a mission the session moves to. An empty request sends nothing, and a message the hook
   delivered is not taken for the person's request
   ([collaboration ADR 0013](../../protocols/collaboration/doc/adr/0013-a-sync-carries-the-persons-last-request.md)).
-  The CLI sends it only to a missions provider that declares the member;
-  `@putnami/cloud` does not yet. A Codex session sends none.
+  The CLI sends it only to a missions provider that declares the member, as
+  `@putnami/cloud` does. A Codex session sends none.
 
 A session reports to `branch:<branch>` until `putnami agent attach --issue <n>`
 makes `issue-<n>` the mission of the checkout's branch. Each Stop and each

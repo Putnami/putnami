@@ -97,6 +97,8 @@ type agencyRefusal struct {
 	status  int
 	reason  string
 	current string
+	// field and problem are the member and the rule an invalid request broke.
+	field, problem string
 }
 
 // agencyRefusalOf reads the answer a call failed with; ok is false when no
@@ -117,6 +119,7 @@ func agencyRefusalOf(err error) (agencyRefusal, bool) {
 		if details.Current != nil {
 			found.current = *details.Current
 		}
+		found.field, found.problem = value(details.Field), value(details.Problem)
 	}
 	return found, true
 }
@@ -168,6 +171,12 @@ func agencyFailure(err error, operation, reconcile, conflict string) *collab.Fai
 		failure := collab.Fail(collab.OutcomeUnavailable, reasonAgencyRateLimit, "Putnami Agency is rate limiting this caller; try again shortly")
 		failure.Error.Retryable = true
 		return failure
+	}
+	// The member a refusal names reaches the caller, so a sync refused for a
+	// declared member can go once without it (collaboration ADR 0013).
+	if answer.field != "" {
+		return collab.Fail(collab.OutcomeInvalid, reason(collab.ReasonRequestInvalid), "Putnami Agency refused the %s as invalid: %s: %s",
+			operation, answer.field, answer.problem)
 	}
 	return collab.Fail(collab.OutcomeInvalid, reason(collab.ReasonRequestInvalid), "Putnami Agency refused the %s as invalid", operation)
 }

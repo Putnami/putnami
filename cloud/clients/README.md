@@ -56,7 +56,10 @@ Two schemas come from the putnami-cloud repository instead of the package, and
 `agency/workloads/agency-api/schema/openapi.json` at commit
 `e5de36e8d8249a8c54f45fddb5195fe255cb713e` of `main`,
 which serves the memory, missions (v1 and v2 runs), build start and audit
-attestation routes `@putnami/cloud` calls. `config-api/schema/openapi.json` is a
+attestation routes `@putnami/cloud` calls, plus one member written by hand:
+`last_prompt` on `SessionSyncBody` and `AgentSession`, with the descriptions
+agency-api's `main` gives them since it stores the person's last request. The
+next refresh replaces the whole file and drops this note. `config-api/schema/openapi.json` is a
 byte-for-byte copy of `config/workloads/config-api/schema/openapi.json` at
 commit `bdecdb94ef12611b2440bc9513a0562543b479e6` of `main`, which carries the
 agent trigger and organization model credential routes of

@@ -1163,7 +1163,8 @@
             "kind": "acceptance",
             "checks": [
               "agency-missions-routes",
-              "agency-sync-forwards-the-session-url"
+              "agency-sync-forwards-the-session-url",
+              "agency-sync-forwards-the-last-prompt"
             ]
           }
         },

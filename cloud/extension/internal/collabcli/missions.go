@@ -200,9 +200,9 @@ func missionsRuns(ctx context.Context, _ collab.Call, agency agencyCall, in *col
 }
 
 // syncBody is the route's body for a sync. The session id in the path is the
-// engine, a colon and the host's id. A stage, a usage or a report of missed
-// syncs the sync does not carry is left out, so the route keeps the one it
-// holds.
+// engine, a colon and the host's id. A stage, a usage, a report of missed
+// syncs or a person's request the sync does not carry is left out, so the
+// route keeps the one it holds.
 func syncBody(in collab.MissionsSyncInput) (agencyapiclient.SessionSyncBody, bool) {
 	observed, err := time.Parse(time.RFC3339Nano, in.ObservedAt)
 	if err != nil {
@@ -213,7 +213,7 @@ func syncBody(in collab.MissionsSyncInput) (agencyapiclient.SessionSyncBody, boo
 	body := agencyapiclient.SessionSyncBody{
 		Mission: missionName(in.Mission), Engine: &engine, Event: &event, State: &state, ObservedAt: &observed,
 		Model: optional(in.Model), Branch: optional(in.Branch), LastMessage: optional(in.LastMessage),
-		Error: optional(cutBytes(in.Error, maxErrorBytes)),
+		LastPrompt: optional(in.LastPrompt), Error: optional(cutBytes(in.Error, maxErrorBytes)),
 	}
 	if in.WaitUntil != "" {
 		waitUntil, err := time.Parse(time.RFC3339Nano, in.WaitUntil)

@@ -15,7 +15,7 @@
       "id": "declares-memory-and-missions",
       "text": [
         "The @putnami/cloud manifest declares version 1 of the memory contract, with context, mission and checkpoint, and versions 1 and 2 of the missions contract, with sync, ask, reply and status, and in version 2 start, report and runs, each run by its own runtime with the provider argument.",
-        "checkpoint declares atomic preconditions; sync declares the missedSyncs and sessionUrl members, and status the missedSyncs member."
+        "checkpoint declares atomic preconditions; sync declares the lastPrompt, missedSyncs and sessionUrl members, and status the missedSyncs member."
       ]
     },
     {
@@ -30,7 +30,7 @@
       "id": "missions-calls-agency-api",
       "text": [
         "missions.sync, ask, reply and status, in versions 1 and 2, each send one request to agency-api: the session sync route, the decisions route, the message reply route and the missions status route under /v1/workspaces/{workspace}/agency/, and answer the contract's result.",
-        "missions.sync forwards a sessionUrl as session_url, an empty one included, and sends no session_url when the sync carries none."
+        "missions.sync forwards a sessionUrl as session_url, an empty one included, and a lastPrompt as last_prompt; it sends neither when the sync carries none, nor an empty last_prompt."
       ]
     },
     {
@@ -40,7 +40,7 @@
     {
       "id": "refusals-keep-their-outcome",
       "text": [
-        "agency-api's refusals keep their outcome: 401 is denied and names putnami cloud login, 403 denied, 404 not_found, 409 a conflict with the reason and current revision agency-api names, 429 a retryable unavailable, and any other 4xx invalid.",
+        "agency-api's refusals keep their outcome: 401 is denied and names putnami cloud login, 403 denied, 404 not_found, 409 a conflict with the reason and current revision agency-api names, 429 a retryable unavailable, and any other 4xx invalid, its message naming the member and the rule agency-api's refusal names.",
         "A binding whose settings carry any member is invalid, and a workspace with no Cloud link answers unavailable and names putnami cloud setup."
       ]
     },
