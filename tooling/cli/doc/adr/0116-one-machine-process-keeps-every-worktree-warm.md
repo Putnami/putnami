@@ -670,6 +670,26 @@ held record of ADR 0113, the plan and the Git reader's state, then the
 per-run constant left once the uncached-task and per-task fixed-cost work
 have landed.
 
+**Measured: the first slice.** On 2026-11-27, the supervisor, the worker
+per executable and the client, with no held state beyond today's, on this
+protocol (full clone with tags, signed out; medians of three, or each run):
+
+| Scenario | Through a worker | In its own process |
+|---|---|---|
+| Unchanged | 24.0 s (23.4 to 24.6) | 23.7 s (22.5 to 24.4) |
+| Small change, alternating which goes first | 106.4 s, 101.6 s | 101.8 s, 102.1 s |
+| Second worktree, first run and second run | 42.9 s, 28.3 s | 40.1 s, 24.6 s |
+| Engine Git calls, unchanged | 512 | 514 |
+| Resident peak of the process the user started | 21 to 23 MiB (the client) | 609 to 632 MiB |
+
+The worker peaks at 645 MiB during a run and keeps 66 MiB resident, 28 MiB of
+heap in use, between runs; the supervisor keeps 20 MiB. A run through a
+worker costs what it costs in its own process, as the in-process measurement
+above predicted: the slice changes where the engine runs, not what it
+computes. A small change measured once with the worker first took 138.4 s
+against 109.9 s: the first run after a pause also rebuilt Go's own cache, and
+the alternating pairs above show no difference.
+
 **Order of the implementation.** First, the supervisor, the worker per
 executable, the client, `putnami machine` and the comparison test of
 section 8: a run through a worker gives the same results, with no held state
