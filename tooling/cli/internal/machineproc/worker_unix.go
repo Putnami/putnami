@@ -179,6 +179,7 @@ func serve(run RunFunc, req request, files []*os.File, free func()) {
 	}
 	finished := make(chan struct{})
 	go listen(client, stop, finished)
+	check, decision := beforeRun(req)
 	code := run(ctx, req.Args)
 	close(finished)
 	stop.done()
@@ -188,6 +189,9 @@ func serve(run RunFunc, req request, files []*os.File, free func()) {
 	}
 	release()
 	_ = client.send(event{Exit: &code})
+	// What the run leaves to hold is decided once the client has its exit:
+	// the decision costs the client nothing (CLI ADR 0116 §6a).
+	afterRun(check, decision, code)
 	// A run leaves garbage; give the memory back so an idle worker keeps
 	// about its held state (CLI ADR 0116 §10).
 	debug.FreeOSMemory()

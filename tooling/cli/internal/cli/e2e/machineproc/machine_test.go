@@ -326,3 +326,83 @@ func TestARunWhoseWorkerEndsRunsAgainInItsOwnProcess(t *testing.T) {
 		}
 	}
 }
+
+// TestAnUnchangedRequestIsDecidedAnswerableFromMemory serves the same request
+// through a worker after a settled run: once the worker holds a run of the
+// unchanged worktree, the next one is answerable from memory; a write in the
+// worktree, or a commit, which the worktree's journal does not see, makes it
+// unanswerable (CLI ADR 0116 §6a).
+func TestAnUnchangedRequestIsDecidedAnswerableFromMemory(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("a run is answered from memory only where the platform has a watcher")
+	}
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	root := clitest.WritingCountsFixture(t, 2)
+	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\n")
+	clitest.RunGit(t, root, "add", "-A")
+	clitest.RunGit(t, root, "commit", "-m", "ignore the run's state")
+	args := []string{"lint,test,build", "--all"}
+	t.Setenv(machineproc.Env, "off")
+	for range 2 {
+		if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
+			t.Fatalf("settling run exit %d\n%s", code, out)
+		}
+	}
+	startSupervisor(t)
+	t.Setenv(machineproc.Env, "on")
+	decideArgs := func(step string, args ...string) *machineproc.MemoryDecision {
+		t.Helper()
+		if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
+			t.Fatalf("%s: exit %d\n%s", step, code, out)
+		}
+		// The worker records its decision once the client has its exit.
+		deadline := time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			if d := machineproc.ReadLastMemory(); d != nil && d.Kept != "" {
+				_ = os.Remove(machineLastMemory(t))
+				return d
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		t.Fatalf("%s: the worker recorded no decision (last run in its own process: %+v)", step, machineproc.ReadLastLocal())
+		return nil
+	}
+	decide := func(step string) *machineproc.MemoryDecision {
+		t.Helper()
+		return decideArgs(step, args...)
+	}
+
+	if d := decide("the first request"); d.Answerable || d.Kept != "kept" {
+		t.Fatalf("the first request: %+v, want unanswerable and kept", d)
+	}
+	if d := decide("the unchanged request"); !d.Answerable || d.Kept != "kept" {
+		t.Fatalf("the unchanged request: %+v, want answerable and kept", d)
+	}
+	clitest.WriteFile(t, filepath.Join(root, "apps", "p001", "src.txt"), "p001 edited\n")
+	if d := decide("after a write"); d.Answerable || !strings.Contains(d.Reason, "the worktree changed") {
+		t.Fatalf("after a write: %+v, want unanswerable for the worktree's change", d)
+	}
+	decide("the run that settles the write")
+	if d := decide("the unchanged request again"); !d.Answerable {
+		t.Fatalf("the unchanged request again: %+v, want answerable", d)
+	}
+	clitest.RunGit(t, root, "commit", "--allow-empty", "-m", "empty")
+	if d := decide("after a commit"); d.Answerable || !strings.Contains(d.Reason, "outside the worktree") {
+		t.Fatalf("after a commit: %+v, want unanswerable for Git's witness", d)
+	}
+	decide("the run that holds the commit")
+	if d := decideArgs("a request with other arguments", "lint,test", "--all"); d.Answerable || !strings.Contains(d.Reason, "request differs") {
+		t.Fatalf("a request with other arguments: %+v, want unanswerable", d)
+	}
+}
+
+// machineLastMemory is the path of the worker's last decision.
+func machineLastMemory(t *testing.T) string {
+	t.Helper()
+	dir, err := machineproc.Dir(os.Getenv, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(dir, "last-memory.json")
+}

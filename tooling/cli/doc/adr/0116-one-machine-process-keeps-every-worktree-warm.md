@@ -439,6 +439,54 @@ binary (today they are cleared at every run start).
   reporter's token for that upload only, in memory, until it ends or fails.
   Without the machine process, ADR 0115 applies as it stands.
 
+### 6a. An unchanged run is answered from memory
+
+Decided by the owner on 2026-11-27, in the performance epic's targets: the
+target of an unchanged run is zero waste, the way Bazel's and Pants's servers
+answer one (0.86 to 0.91 s on the scale bench). Measured on this repository
+once ADR 0113's record and the probe and activation witnesses had landed, an
+unchanged `lint,test,build,validate --all --enforce-coverage` takes 12.1 s
+with or without a worker, of which plan is 1.9 s, the execute setup 1.2 s,
+prune and key precompute 2.85 s, the 2,221 tasks 2.15 s, and the finalizers
+2.0 s. Holding each of those values separately under its witness (the table
+above) still computes all of them; this section skips them.
+
+**What a worker keeps, per worktree and request.** After a run it served
+that ended with every task served from the cache or skipped, the worker keeps
+the run's answer: its exit code, its session result, the outputs it left on
+disk, and the journal sequence read at its sync point before the run began.
+The request is the argument vector, the working directory, the digest of the
+environment and process context (section 4) and the CLI build.
+
+**When it answers from memory.** A later request answers from memory when
+all of these hold, checked in this order and the first that fails runs the
+command as usual:
+
+1. The request equals the held one.
+2. The worktree's journal, read after a sync point, is empty since the held
+   sequence: no file of the worktree was written, created, removed or
+   renamed, and no subtree broke (an overflow, a directory it could not
+   watch, a moved directory, the watcher's self-check, a restart).
+3. The witnesses of what the journal does not see hold: the stats of
+   `.git`'s HEAD, index, packed refs, configuration and the refs directories
+   a run reads (ADR 0112), of the extension runtimes and toolchains the run
+   used under the Putnami home, and of each served task's cache entry.
+4. The platform has a watcher: on macOS, which has none (section 7), no run
+   is answered from memory.
+
+A run that executed a task, or wrote a file of the worktree, is not kept.
+Once setup tasks run only when a task needs them, an unchanged run executes
+no setup task; a task that still runs
+on every run makes its request ineligible until that task has a key.
+
+**What the answer writes.** No plan, no stat beyond step 3, no key, no
+restore, no replay. The worker renders the held result with the current
+times, writes the session the contract requires (its records will reference
+the held session's task records once the per-task report packages allow it,
+and are written in full until then), and returns the held exit code. A run in its own process, in CI
+or on macOS gets the same exit code and the same task results from its full
+computation: memory decides nothing a witness would not.
+
 ### 7. How it learns of changes
 
 **One watcher, in the supervisor**, one watch set per worktree, shared by every

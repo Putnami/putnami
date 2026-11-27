@@ -50,12 +50,15 @@ type machineStatusResult struct {
 	// LastLocal is why the last command meant for the machine process ran in
 	// its own process.
 	LastLocal *machineproc.LastLocal `json:"lastLocal,omitempty"`
+	// LastMemory is whether the last run a worker served could have been
+	// answered from memory, and whether it is held for the next one.
+	LastMemory *machineproc.MemoryDecision `json:"lastMemory,omitempty"`
 }
 
 func machineStatus(output string) error {
 	setting := machineproc.ReadSetting(os.Getenv)
 	decision := machineproc.Decide(os.Getenv, setting, machineproc.DefaultOn)
-	result := machineStatusResult{Use: decision.Use, Reason: decision.Reason, Setting: setting, LastLocal: machineproc.ReadLastLocal()}
+	result := machineStatusResult{Use: decision.Use, Reason: decision.Reason, Setting: setting, LastLocal: machineproc.ReadLastLocal(), LastMemory: machineproc.ReadLastMemory()}
 	if r, err := machineproc.Query("status"); err == nil && r.OK {
 		result.Running, result.Machine = true, r.Status
 	}
@@ -71,6 +74,13 @@ func machineStatus(output string) error {
 	}
 	if last := result.LastLocal; last != nil {
 		iox.Fprintf(os.Stdout, "  Last run in its own process: %s, %s (%s)\n", last.Time, last.Reason, last.Dir)
+	}
+	if m := result.LastMemory; m != nil {
+		answer := "no, " + m.Reason
+		if m.Answerable {
+			answer = "yes"
+		}
+		iox.Fprintf(os.Stdout, "  Last worker run answerable from memory: %s; %s (%s)\n", answer, m.Kept, m.Root)
 	}
 	if !result.Running {
 		iox.Fprintln(os.Stdout, "  Supervisor: not running")
