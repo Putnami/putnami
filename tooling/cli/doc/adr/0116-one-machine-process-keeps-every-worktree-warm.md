@@ -566,8 +566,12 @@ manifests no witness covers (one the configuration names outside the
 worktree, a link in the worktree's state to a stored one), so the held load
 carries the stat of every manifest it read, taken when discovery read it; one
 that moved withdraws everything the held run offers the run, which then loads
-and plans what is on disk (`dispatchHeld` says App.Run took it). The engine
-then skips loading and planning: an engine run takes what the held run's engine run
+and plans what is on disk (`dispatchHeld` says App.Run took it). The
+read-only file index is held as the held run opened it and installed for the
+run, since phase 4 still reads digests through it (the cache provider's
+extension runtime among them): it records nothing and answers a file only
+while its stat is the recorded one, so an index read earlier answers no less
+soundly than one read now. The engine then skips loading and planning: an engine run takes what the held run's engine run
 at the same position computed before phase 4 (the loaded workspace, the
 discovered extensions, the selected projects, the final plan, and the flags,
 parameters and versions they resolved) when it asks the same (workspace,
