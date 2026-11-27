@@ -59,12 +59,12 @@ func TestAdditiveContractsAreOrdered(t *testing.T) {
 		PromptHostHooksContract != ProviderMembersContract+1 ||
 		ToolchainProbeSelfContract != PromptHostHooksContract+1 ||
 		EmptiedFileOutputContract != ToolchainProbeSelfContract+1 ||
-		ContextActivationContract != EmptiedFileOutputContract+1 || LatestContract != ContextActivationContract {
-		t.Fatalf("additive contract ladder = base %d, agent %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, command kinds %d, publish channels %d, provisioned toolchain %d, input selectors %d, default positionals %d, changed files %d, host hooks %d, step dependency %d, providers %d, user-scope skills %d, build-graph edges %d, dependency closure %d, command layer inputs %d, provider members %d, prompt host hooks %d, toolchain probe self %d, emptied file outputs %d, context activation %d, latest %d",
+		ContextActivationContract != EmptiedFileOutputContract+1 || RuntimeEntriesContract != ContextActivationContract+1 || LatestContract != RuntimeEntriesContract {
+		t.Fatalf("additive contract ladder = base %d, agent %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, command kinds %d, publish channels %d, provisioned toolchain %d, input selectors %d, default positionals %d, changed files %d, host hooks %d, step dependency %d, providers %d, user-scope skills %d, build-graph edges %d, dependency closure %d, command layer inputs %d, provider members %d, prompt host hooks %d, toolchain probe self %d, emptied file outputs %d, context activation %d, runtime entries %d, latest %d",
 			CurrentContract, AgentContentContract, ReleaseBaselineInputContract,
 			ExtensionDependenciesContract, VerbVocabularyContract, SourceBoundCacheContract, CommandKindContract,
 			PublishChannelsContract, ProvisionedToolchainContract, InputSelectorsContract, DefaultPositionalsContract,
-			ChangedFilesContract, HostHooksContract, StepDependencyContract, ProviderContract, UserScopeSkillsContract, BuildGraphEdgesContract, DependencyClosureContract, CommandLayerInputsContract, ProviderMembersContract, PromptHostHooksContract, ToolchainProbeSelfContract, EmptiedFileOutputContract, ContextActivationContract, LatestContract)
+			ChangedFilesContract, HostHooksContract, StepDependencyContract, ProviderContract, UserScopeSkillsContract, BuildGraphEdgesContract, DependencyClosureContract, CommandLayerInputsContract, ProviderMembersContract, PromptHostHooksContract, ToolchainProbeSelfContract, EmptiedFileOutputContract, ContextActivationContract, RuntimeEntriesContract, LatestContract)
 	}
 	// Rung 7 names two meanings that one CLI release added together.
 	if GitInputModeContract != ReleaseBaselineInputContract {

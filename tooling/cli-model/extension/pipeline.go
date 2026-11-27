@@ -229,6 +229,7 @@ func ExpandPipelineWithOptions(
 			Cwd:                      task.Cwd,
 			Env:                      task.Env,
 			Toolchains:               runtimeToolchainRefs(ext.Runtime, task.Toolchains),
+			RuntimeEntry:             task.RuntimeEntry,
 			TimeoutMs:                timeoutMs,
 			DependsOn:                dependsOn,
 			CommandDependsOn:         commandDef.CommandDependsOn,

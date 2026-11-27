@@ -339,7 +339,9 @@
               "emptied-file-outputs-require-contract-27",
               "emptied-file-outputs-below-contract-27-do-not-load",
               "context-activation-requires-contract-28",
-              "context-activation-below-contract-28-does-not-load"
+              "context-activation-below-contract-28-does-not-load",
+              "runtime-entries-require-contract-29",
+              "runtime-entries-below-contract-29-do-not-load"
             ]
           }
         },

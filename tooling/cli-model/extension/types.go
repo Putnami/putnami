@@ -163,6 +163,9 @@ type HookCacheConfig = proto.HookCacheConfig
 // executable and how to obtain it.
 type RuntimeDefinition = proto.RuntimeDefinition
 
+// RuntimeEntry is the protocol's further executable of a runtime.
+type RuntimeEntry = proto.RuntimeEntry
+
 // RuntimePrepare is the protocol's workspace-independent build of an extension
 // runtime.
 type RuntimePrepare = proto.RuntimePrepare
@@ -338,19 +341,23 @@ type RuntimeToolchainResolution struct {
 
 // JobDefinition is the resolved definition of a schedulable job.
 type JobDefinition struct {
-	ExtensionName    string
-	ExtensionPath    string // workspace-relative path of the extension project, or of the project a pinned build replaces (e.g., "typescript/extension")
-	Name             string // display name (e.g., build or build~transpile)
-	InternalName     string // scheduler/DAG name when namespacing is required
-	CommandName      string // base command name for expanded/namespaced jobs
-	StepID           string // pipeline step id for expanded steps
-	Visibility       string // "public" or "internal"; empty means public for older manifests
-	Kind             string
-	Command          string
-	Args             []string
-	Cwd              string
-	Env              map[string]string
-	Toolchains       []string
+	ExtensionName string
+	ExtensionPath string // workspace-relative path of the extension project, or of the project a pinned build replaces (e.g., "typescript/extension")
+	Name          string // display name (e.g., build or build~transpile)
+	InternalName  string // scheduler/DAG name when namespacing is required
+	CommandName   string // base command name for expanded/namespaced jobs
+	StepID        string // pipeline step id for expanded steps
+	Visibility    string // "public" or "internal"; empty means public for older manifests
+	Kind          string
+	Command       string
+	Args          []string
+	Cwd           string
+	Env           map[string]string
+	Toolchains    []string
+	// RuntimeEntry is the runtime entry the task runs (manifest
+	// runtimeEntry): {extensionRuntime} expands to that entry's executable.
+	// Empty runs the runtime's main executable.
+	RuntimeEntry     string
 	TimeoutMs        int
 	DependsOn        []string
 	CommandDependsOn []string // command-level deps (e.g., ["build"] and ["build~describe"] same-project, ["!build"] session barrier, ["^client-generate"] dependency closure)

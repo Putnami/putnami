@@ -790,7 +790,11 @@
             "an-installed-tree-digest-follows-the-implementation",
             "a-version-only-build-keeps-the-key",
             "a-store-record-is-trusted-only-inside-the-store",
-            "a-toolchain-pin-still-moves-the-key"
+            "a-toolchain-pin-still-moves-the-key",
+            "a-changed-entry-executable-re-keys-its-tasks",
+            "an-entry-another-edit-leaves-unchanged-keeps-its-keys",
+            "an-uncompiled-runtime-input-re-keys-every-task",
+            "a-task-runs-its-runtime-entry"
           ]
         }
       },

@@ -82,6 +82,7 @@ func Resolve(manifest *Manifest, extPath string) *ExtensionDescription {
 				job.Cwd = task.Cwd
 				job.Env = task.Env
 				job.Toolchains = runtimeToolchainRefs(manifest.Runtime, task.Toolchains)
+				job.RuntimeEntry = task.RuntimeEntry
 				job.TimeoutMs = task.TimeoutMs
 				job.ContractDigest = proto.TaskContractDigest(task)
 				job.Writes = task.Writes

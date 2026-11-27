@@ -670,7 +670,20 @@ func resolvedExtensionRuntime(job *ScheduledJob) (string, error) {
 			"extension %q runtime was not resolved during workspace synchronization",
 			job.Extension.Name)
 	}
-	return job.Extension.RuntimeExecutable, nil
+	if job.JobDef == nil || job.JobDef.RuntimeEntry == "" {
+		return job.Extension.RuntimeExecutable, nil
+	}
+	// A task that names a runtime entry runs that entry's executable, which
+	// prepare wrote beside the main one.
+	executable, err := cachekey.RuntimeEntryExecutable(job.Extension, job.JobDef.RuntimeEntry)
+	if err == nil {
+		err = validateRuntimeExecutable(executable)
+	}
+	if err != nil {
+		return "", runtimeFailure(extensionproto.FailureRuntimeExecutableMissing,
+			"extension %q runtime entry %q is unavailable: %v", job.Extension.Name, job.JobDef.RuntimeEntry, err)
+	}
+	return executable, nil
 }
 
 func extensionName(job *ScheduledJob) string {

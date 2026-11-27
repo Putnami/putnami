@@ -45,6 +45,12 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	29: ADDITIVE — runtime `entries` and `compiledInputs`, and a task that
+//	   names a `runtimeEntry`. From 29 on, a task runs its entry where its
+//	   command says {extensionRuntime}, and a workspace-local runtime that
+//	   declares compiled inputs keys each task on the executable it runs. A
+//	   reader below 29 would run the main executable, so a manifest that
+//	   declares one is stamped 29 from every origin.
 //	28: ADDITIVE — a step activation that declares `projectTypes` or
 //	   `anyOf`. From 28 on, the planner plans the step only where the
 //	   project's type is listed, or one alternative holds, and keeps each
@@ -393,7 +399,15 @@ const EmptiedFileOutputContract = 27
 // manifest is stamped 28 from every origin.
 const ContextActivationContract = 28
 
+// RuntimeEntriesContract is required by a manifest whose runtime declares
+// entries or compiled inputs, or whose task names a runtime entry. A reader at
+// this contract runs a task's runtime entry where its command says
+// {extensionRuntime}, and keys the task on the executable it runs. An older
+// reader would run the runtime's main executable for that task, which need not
+// serve it, so it refuses the stamp instead.
+const RuntimeEntriesContract = 29
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = ContextActivationContract
+const LatestContract = RuntimeEntriesContract

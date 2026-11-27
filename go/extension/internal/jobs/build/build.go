@@ -411,7 +411,7 @@ func runCrossCompile(ctx *pctx.Context, emit *jsonl.Emitter, goBinary, entrypoin
 		}
 	}
 	for _, e := range executables {
-		targets = append(targets, compileTarget{pkg: e.Package, binaryPath: e.Name})
+		targets = append(targets, compileTarget{pkg: e.Package, binaryPath: e.Name, tags: e.Tags})
 	}
 
 	platformBinaries := make(map[string][]string)
@@ -471,7 +471,7 @@ func runCrossCompile(ctx *pctx.Context, emit *jsonl.Emitter, goBinary, entrypoin
 				}()
 
 				buildArgs := []string{"build", "-o", tmpPath}
-				buildArgs = append(buildArgs, commonFlags...)
+				buildArgs = append(buildArgs, withTargetTags(commonFlags, t.tags)...)
 				buildArgs = append(buildArgs, t.pkg)
 
 				emit.Log("debug", fmt.Sprintf("Building %s for %s/%s...", t.pkg, p.GOOS, p.GOARCH))
@@ -672,8 +672,39 @@ func platformNames(platforms []platform.Target) []string {
 
 // compileTarget describes a Go package to compile and its output binary path.
 type compileTarget struct {
-	pkg        string // Go package path (e.g., "./cmd/build", ".")
-	binaryPath string // output binary path (without platform prefix for cross-compile)
+	pkg        string   // Go package path (e.g., "./cmd/build", ".")
+	binaryPath string   // output binary path (without platform prefix for cross-compile)
+	tags       []string // build tags of this target only (a declared executable's tags)
+}
+
+// withTargetTags returns flags with tags added to its build tags: appended to
+// the value of a -tags flag flags already holds, or as a -tags flag of their
+// own. flags is not modified.
+func withTargetTags(flags, tags []string) []string {
+	out := append([]string(nil), flags...)
+	if len(tags) == 0 {
+		return out
+	}
+	extra := strings.Join(tags, ",")
+	for i, flag := range out {
+		switch {
+		case (flag == "-tags" || flag == "--tags") && i+1 < len(out):
+			out[i+1] = joinTags(out[i+1], extra)
+			return out
+		case strings.HasPrefix(flag, "-tags=") || strings.HasPrefix(flag, "--tags="):
+			name, value, _ := strings.Cut(flag, "=")
+			out[i] = name + "=" + joinTags(value, extra)
+			return out
+		}
+	}
+	return append(out, "-tags", extra)
+}
+
+func joinTags(existing, extra string) string {
+	if strings.TrimSpace(existing) == "" {
+		return extra
+	}
+	return existing + "," + extra
 }
 
 // resolveCompileTargets determines which Go packages to compile and their output binary paths.

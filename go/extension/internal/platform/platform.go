@@ -464,6 +464,10 @@ func ReadGoEntrypoint(projectRoot string) string {
 type Executable struct {
 	Name    string `json:"name"`
 	Package string `json:"package"`
+	// Tags are build tags added to this program's build only, such as the tag
+	// that compiles one runtime entry of an extension out of the runtime's
+	// own package.
+	Tags []string `json:"tags,omitempty"`
 }
 
 // ReadGoExecutables reads `options["@putnami/go"].executables` from the
@@ -507,6 +511,11 @@ func ReadGoExecutables(projectRoot string) ([]Executable, error) {
 		}
 		if seen[e.Name] {
 			return nil, fmt.Errorf(`options["@putnami/go"].executables: %q is declared twice`, e.Name)
+		}
+		for _, tag := range e.Tags {
+			if tag == "" || strings.ContainsAny(tag, ", \t") {
+				return nil, fmt.Errorf(`options["@putnami/go"].executables: %q declares an invalid build tag %q`, e.Name, tag)
+			}
 		}
 		seen[e.Name] = true
 	}

@@ -280,7 +280,7 @@ func buildJobContext(
 		Extension: JobContextExtension{
 			Name:        job.Extension.Name,
 			Root:        cachekey.JobExtensionRoot(ws, job),
-			RuntimePath: job.Extension.RuntimeExecutable,
+			RuntimePath: jobRuntimePath(job),
 			// The machine-global directory THIS extension owns.
 			CacheRoot: extensionproto.MachineCacheRoot(job.Extension.Name, ws.Root),
 		},
@@ -618,4 +618,15 @@ func addCamelCaseKeys(params map[string]any) {
 	for name, value := range projected {
 		params[name] = value
 	}
+}
+
+// jobRuntimePath is the runtime executable job runs: its runtime entry's when
+// its task names one, the main executable otherwise.
+func jobRuntimePath(job *ScheduledJob) string {
+	if job.JobDef != nil && job.JobDef.RuntimeEntry != "" {
+		if path, err := cachekey.RuntimeEntryExecutable(job.Extension, job.JobDef.RuntimeEntry); err == nil {
+			return path
+		}
+	}
+	return job.Extension.RuntimeExecutable
 }

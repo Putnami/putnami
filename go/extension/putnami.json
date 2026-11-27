@@ -15,7 +15,14 @@
   "options": {
     "@putnami/go": {
       "entrypoint": "./cmd/putnami-go",
-      "buildvcs": false
+      "buildvcs": false,
+      "executables": [
+        {
+          "name": "putnami-go-codegen",
+          "package": "./cmd/putnami-go",
+          "tags": ["putnami_runtime_codegen"]
+        }
+      ]
     },
     "package": {
       "archives": true

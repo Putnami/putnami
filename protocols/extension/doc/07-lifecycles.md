@@ -95,6 +95,46 @@ digest = H(prepare declaration ‖ inputs content ‖ platform ‖ extension ide
 Preparation runs **once per digest** during workspace synchronization, under an
 inter-process lock, and publishes atomically.
 
+### Runtime entries and compiled inputs
+
+A runtime may provide further executables beside `executable`, by entry name,
+and a task may run one of them:
+
+```json
+{
+  "runtime": {
+    "executable": "compiled/example",
+    "entries": { "codegen": { "executable": "compiled/example-codegen" } },
+    "compiledInputs": ["cmd/**", "internal/**"],
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": ["--output", "{runtimeOutput}"],
+      "inputs": ["bin/prepare", "cmd/**", "config/**", "internal/**"]
+    }
+  },
+  "tasks": {
+    "generate": { "kind": "command", "command": "{extensionRuntime}", "args": ["generate"], "runtimeEntry": "codegen" }
+  }
+}
+```
+
+- An entry's `executable` follows the rules of `runtime.executable` and
+  resolves against the same root. Prepare writes it; a published archive ships
+  it. At most 16 entries, named by lowercase letters, digits and hyphens.
+- A task that names an entry in `runtimeEntry` runs it wherever its command or
+  arguments say `{extensionRuntime}`, and its job context names it as its
+  runtime. A task that names none runs `executable`.
+- `compiledInputs` lists prepare inputs, spelled as in `prepare.inputs`, whose
+  content reaches a task only through the executables prepare builds from
+  them. With it, a task of a workspace-local runtime keys on the bytes of the
+  executable it runs and on every other prepare input, instead of on every
+  prepare input: an edit re-keys only the tasks whose executable it changes,
+  and an edit that builds the same bytes re-keys none. A file a task reads at
+  run time is not compiled and must not be listed. It requires `prepare`.
+
+Any of the three requires CLI contract 29. See the CLI's
+[ADR 0133](../../../tooling/cli/doc/adr/0133-a-task-keys-on-the-runtime-entry-it-runs.md).
+
 ### Lock-resolved toolchains
 
 A mutable runtime can declare the executables used to prepare it and to run

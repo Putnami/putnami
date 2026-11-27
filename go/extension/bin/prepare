@@ -28,8 +28,9 @@ else
 fi
 mkdir -p "$output/compiled"
 tmp="$output/compiled/putnami-go.tmp.$$"
+tmp_codegen="$output/compiled/putnami-go-codegen.tmp.$$"
 modroot="$output/modfile.tmp.$$"
-trap 'rm -f "$tmp"; rm -rf "$modroot"' EXIT INT TERM
+trap 'rm -f "$tmp" "$tmp_codegen"; rm -rf "$modroot"' EXIT INT TERM
 
 nl='
 '
@@ -188,9 +189,15 @@ EOF
   fi
   complete_replaces "$modroot/go.mod"
 
-  "$go_binary" build -o "$tmp" -modfile="$modroot/go.mod" ./cmd/putnami-go
+  # One package, two executables (runtime.entries): the main runtime without
+  # the codegen jobs, and the codegen entry with nothing but them. A task keys
+  # on the bytes of the executable it runs (runtime.compiledInputs), so an
+  # edit of one half re-keys only the tasks of that half.
+  "$go_binary" build -o "$tmp" -tags putnami_runtime_main -ldflags=-buildid= -modfile="$modroot/go.mod" ./cmd/putnami-go
+  "$go_binary" build -o "$tmp_codegen" -tags putnami_runtime_codegen -ldflags=-buildid= -modfile="$modroot/go.mod" ./cmd/putnami-go
 )
-chmod +x "$tmp"
+chmod +x "$tmp" "$tmp_codegen"
 mv "$tmp" "$output/compiled/putnami-go"
+mv "$tmp_codegen" "$output/compiled/putnami-go-codegen"
 rm -rf "$modroot"
 trap - EXIT INT TERM

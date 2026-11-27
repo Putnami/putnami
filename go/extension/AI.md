@@ -240,7 +240,8 @@ with the other.
 
 Adding a new AST-only generator is a sibling subpackage in
 `go/extension/internal/codegen/<name>/` plus a blank import in
-`cmd/putnami-go/main.go`. The visitor implements `codegen.Visitor`:
+`cmd/putnami-go/handlers_codegen.go`, the half of the dispatch table the
+codegen runtime entry runs. The visitor implements `codegen.Visitor`:
 
 ```go
 import "go.putnami.dev/sdk/extension/codegen"

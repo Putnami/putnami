@@ -471,7 +471,12 @@ type TaskDefinition struct {
 	Env         map[string]string `json:"env,omitempty"`
 	// Toolchains adds lock-resolved runtime requirements for this task. Names
 	// reference RuntimeDefinition.Toolchains and are resolved before execution.
-	Toolchains      []string                  `json:"toolchains,omitempty"`
+	Toolchains []string `json:"toolchains,omitempty"`
+	// RuntimeEntry names the runtime entry (RuntimeDefinition.Entries) this
+	// task runs: {extensionRuntime} in its command and arguments expands to
+	// that entry's executable instead of the runtime's Executable. Empty runs
+	// the runtime's Executable.
+	RuntimeEntry    string                    `json:"runtimeEntry,omitempty"`
 	Output          string                    `json:"output,omitempty"`
 	TimeoutMs       int                       `json:"timeoutMs,omitempty"`
 	InputSchemaRef  string                    `json:"inputSchemaRef,omitempty"`

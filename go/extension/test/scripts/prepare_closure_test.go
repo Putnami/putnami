@@ -17,8 +17,11 @@ import (
 var preparedRuntimes = []struct {
 	extension string
 	command   string
+	// entries are the further executables prepare builds beside command, the
+	// runtime entries its manifest declares.
+	entries []string
 }{
-	{extension: "go", command: "putnami-go"},
+	{extension: "go", command: "putnami-go", entries: []string{"putnami-go-codegen"}},
 	{extension: "python", command: "putnami-python"},
 	{extension: "typescript", command: "putnami-ts"},
 }
@@ -165,7 +168,11 @@ func TestPrepareBuildsAModuleTheReplaceClosureProvides(t *testing.T) {
 				if out, err := runPrepare(t, test.extension, moduleDir, output); err != nil {
 					t.Fatalf("prepare failed: %v\n%s", err, out)
 				}
-				if got, want := outputEntries(t, output), []string{"compiled", "compiled/" + test.command}; strings.Join(got, ",") != strings.Join(want, ",") {
+				want := []string{"compiled", "compiled/" + test.command}
+				for _, entry := range test.entries {
+					want = append(want, "compiled/"+entry)
+				}
+				if got := outputEntries(t, output); strings.Join(got, ",") != strings.Join(want, ",") {
 					t.Errorf("output holds %v, want %v", got, want)
 				}
 				runtimePath := filepath.Join(output, "compiled", test.command)
