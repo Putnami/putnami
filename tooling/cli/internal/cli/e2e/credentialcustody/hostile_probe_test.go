@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -350,7 +351,8 @@ func runEngine(t *testing.T, self, wsRoot, cleanHome string, hosted bool, extraE
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start engine: %v", err)
 	}
-	err := waitEngine(cmd, engineDeadline)
+	deadline, hasDeadline := t.Deadline()
+	err := waitEngine(cmd, runBound(deadline, hasDeadline, time.Now(), engineDeadline))
 	code := 0
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -455,7 +457,9 @@ func TestHostileHookAndTaskFindNothingOnAHostedRun(t *testing.T) {
 			case !ok:
 				t.Errorf("%s: probe %q did not run", role, probe)
 			case !f.Checked:
-				t.Errorf("%s: probe %q recorded no check (detail %q)", role, probe, f.Detail)
+				// A probe that could not check its whole target can still
+				// have found a secret in what it read: the message names it.
+				t.Errorf("%s: probe %q recorded no check (found %v, detail %q)", role, probe, f.Found, f.Detail)
 			case len(f.Found) > 0:
 				if rootExempt && platform[probe] {
 					t.Logf("%s: probe %q read the engine as root (found %v); root is outside the same-user threat model", role, probe, f.Found)

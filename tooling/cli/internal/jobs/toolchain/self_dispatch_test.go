@@ -13,7 +13,7 @@ import (
 	"time"
 
 	extensionproto "go.putnami.dev/protocol/extension"
-	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -100,6 +100,7 @@ func realTool(t *testing.T, name string) string {
 }
 
 func TestAPassthroughDispatcherIsNotRecorded(t *testing.T) {
+	repotest.Require(t)
 	// A compiled dispatcher execs its target with its own argv unchanged. The
 	// self of the first-party manifests reads the file the kernel runs, so it
 	// names the target, and the dispatcher's answer is never recorded.
@@ -148,6 +149,7 @@ func TestAPassthroughDispatcherIsNotRecorded(t *testing.T) {
 }
 
 func TestACwdSelectedVersionThatDiffersDuringTheCheckIsNotRecorded(t *testing.T) {
+	repotest.Require(t)
 	t.Cleanup(probeAnswers.Clear)
 	// A binary that names itself but answers a version its working directory
 	// selects, as go without GOTOOLCHAIN=local under a go.mod: the version
@@ -197,8 +199,6 @@ func TestACwdSelectedVersionThatDiffersDuringTheCheckIsNotRecorded(t *testing.T)
 	if answers, _ := probeRecords(t, storeRoot); answers != 0 {
 		t.Fatalf("a cwd-selected dispatch recorded %d answers", answers)
 	}
-	spectest.Proves(t, "cli/job-planning-execution", "unchanged-planning-reads-records",
-		"a-dispatcher-whose-target-changes-is-probed-again")
 }
 
 func TestAShimAnswersTheWorkspacePin(t *testing.T) {
@@ -238,6 +238,7 @@ case "$1" in version) echo 1.2.3 ;; *) echo /global ;; esac
 }
 
 func TestACheckOfAMovedBinaryRecordsNothing(t *testing.T) {
+	repotest.Require(t)
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -264,6 +265,7 @@ func TestACheckOfAMovedBinaryRecordsNothing(t *testing.T) {
 }
 
 func TestARelativeSelfAnswerNamesNoFile(t *testing.T) {
+	repotest.Require(t)
 	t.Cleanup(probeAnswers.Clear)
 	// A relative answer is no name of the executable, even when it would
 	// resolve to it from some directory.

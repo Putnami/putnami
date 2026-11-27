@@ -9,7 +9,6 @@ import (
 	"hash"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -20,8 +19,6 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
-	"go.putnami.dev/sdk/extension/gitread"
-	"go.putnami.dev/sdk/extension/procstat"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 	"go.putnami.dev/tooling/cli/internal/fileindex"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
@@ -587,13 +584,11 @@ func collectGitFilesWith(cut CandidateSource, dir string, includes, excludes []s
 		root, paths = dir, read.Paths
 		index = gitutil.IndexModes{Modes: read.Modes, Unmerged: read.Unmerged}
 	} else {
-		cmd := exec.Command(gitread.Executable(), "rev-parse", "--show-toplevel")
-		cmd.Dir = dir
-		out, err := procstat.Output(cmd, procstat.Git)
+		var err error
+		root, err = gitutil.WorkTreeRoot(dir)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("resolve Git input repository: %w", err)
 		}
-		root = strings.TrimSuffix(string(out), "\n")
 		prefixes := gitInputPrefixes(root, dir, includes)
 		paths, err = candidatePaths(root, prefixes...)
 		if err != nil {
@@ -715,7 +710,7 @@ func gitCandidateDigest(file fileEntry, buf []byte, statsExecBit bool) []byte {
 		return h.Sum(nil)
 	}
 	mode := string(sourcebinding.FileMode(file.info.Mode(), file.indexMode, statsExecBit))
-	return indexedDigest(file.path, "git-file\x00"+mode, func() []byte {
+	return indexedDigest(file.path, gitFileVariantPrefix+mode, func() []byte {
 		input, err := os.Open(file.path)
 		if err != nil {
 			return nil
@@ -1444,7 +1439,7 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 // cut the syscall count relative to io.Copy's default chunking.
 func fileContentDigest(path string, buf []byte, scope ProjectConfigScope) []byte {
 	if isVersionStamp(path) {
-		return indexedDigest(path, "version-stamp\x00tree", func() []byte {
+		return indexedDigest(path, versionStampTreeVariant, func() []byte {
 			return versionStampDigest(path, versionStampNonTreeFields)
 		})
 	}
@@ -1457,6 +1452,14 @@ func fileContentDigest(path string, buf []byte, scope ProjectConfigScope) []byte
 		return rawContentDigest(path, buf)
 	})
 }
+
+// versionStampTreeVariant is the fileindex variant of a build stamp's digest
+// without the fields that do not describe the tree.
+const versionStampTreeVariant = "version-stamp\x00tree"
+
+// gitFileVariantPrefix opens the fileindex variant of a Git candidate's
+// digest; the file mode Git records for it follows.
+const gitFileVariantPrefix = "git-file\x00"
 
 // rawContentVariant is the fileindex variant of a file's raw SHA-256, which
 // the workspace snapshot shares.

@@ -29,6 +29,7 @@
     "go/api-contracts#optional-fields",
     "go/api-contracts#producer-attribution",
     "go/api-contracts#provider-owned-websocket-wires",
+    "go/api-contracts#redirect-success",
     "go/api-contracts#shared-contract-source",
     "go/api-contracts#single-declaration",
     "go/api-contracts#spec-disclosure",

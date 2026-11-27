@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "a-no-cache-gate-reports-its-load-and-does-not-bound-it",
+  "statement": "a no-cache gate reports its one-minute load in run.orchestration.capacity and does not bound it: a task with no history keeps the first-cold rule, granted the whole capacity and charged one CPU",
+  "settled": "2026-11-27",
+  "settledBy": "fdumay",
+  "adr": "doc/adr/0100-admission-charges-the-cpu-it-grants.md",
+  "reviewOnly": true
+}

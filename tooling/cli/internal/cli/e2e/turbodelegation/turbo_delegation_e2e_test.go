@@ -16,6 +16,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func TestMain(m *testing.M) {
@@ -262,6 +263,7 @@ func readProject(t *testing.T, root, dir string) (doc struct {
 }
 
 func TestAChangeToOneTurboPackageRunsItAndItsDependentsThroughTurbo(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, feature, "turbo-delegate-impact", "a-change-to-one-turbo-package-runs-it-and-its-dependents-through-turbo-uncached")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
@@ -332,6 +334,7 @@ func TestAChangeToOneTurboPackageRunsItAndItsDependentsThroughTurbo(t *testing.T
 }
 
 func TestAnImportedTurborepoMovesOnlyTheTasksTypeScriptRunsAndListsTheOthers(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, feature, "turbo-import-graph", "an-imported-turborepo-maps-typescript-packages-and-lists-unmapped-tasks")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
@@ -402,6 +405,7 @@ func TestAnImportedTurborepoMovesOnlyTheTasksTypeScriptRunsAndListsTheOthers(t *
 // not list, such as a test fixture, becomes no project: neither init --from
 // turbo nor projects sync adds it.
 func TestTheWorkspaceAdoptsOnlyThePackagesThePnpmWorkspaceLists(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "only-listed-members-become-projects", "a-directory-the-tool-does-not-list-becomes-no-project")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")

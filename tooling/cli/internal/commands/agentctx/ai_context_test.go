@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // constraintsPath is the human-maintained rules file the guidance block names.
@@ -74,6 +75,7 @@ func TestWriteAgentEntrypointsCreatesOnlyTheEntrypoints(t *testing.T) {
 // generated entrypoints and CI declaration.
 func repositoryRootForAIContext(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
@@ -131,6 +133,7 @@ func TestWriteAgentEntrypointsNeverWritesTheConstraintsFile(t *testing.T) {
 // local proof for a reachable workload. The sentence that forbade a
 // public qualification command predates the command and must not come back.
 func TestConstraintsNameQualifyAsLocalProof(t *testing.T) {
+	repotest.Require(t)
 	data, err := os.ReadFile(filepath.Join(repositoryRootForAIContext(t), constraintsPath))
 	if err != nil {
 		t.Fatalf("read constraints: %v", err)

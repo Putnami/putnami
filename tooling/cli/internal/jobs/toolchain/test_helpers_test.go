@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.putnami.dev/tooling/cli/internal/jobs/procdeadline"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // writeExecutable writes a fixture program a test then starts directly.
@@ -42,6 +43,7 @@ func writeExecutable(t *testing.T, path, contents string) {
 // first-party extension manifests.
 func findJobsRepoRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)

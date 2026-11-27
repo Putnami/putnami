@@ -4,12 +4,15 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	stderrors "errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -256,29 +259,89 @@ func TestGCSBackend_Get_Hit(t *testing.T) {
 	}
 }
 
+// deadlineRecorder records, for each request it forwards, the deadline the
+// request's context carries and the time the request reached the transport.
+type deadlineRecorder struct {
+	next http.RoundTripper
+
+	mu       sync.Mutex
+	seen     []time.Time
+	deadline []time.Time
+	bounded  []bool
+}
+
+func (r *deadlineRecorder) RoundTrip(req *http.Request) (*http.Response, error) {
+	deadline, ok := req.Context().Deadline()
+	r.mu.Lock()
+	r.seen = append(r.seen, time.Now())
+	r.deadline = append(r.deadline, deadline)
+	r.bounded = append(r.bounded, ok)
+	r.mu.Unlock()
+	return r.next.RoundTrip(req)
+}
+
+// The metadata request of Get carries a deadline no later than RequestTimeout
+// after it reaches the transport, and that deadline alone ends it: the server
+// never answers, and the caller's context outlives the call. No assertion
+// compares an elapsed time with a margin, so a loaded machine cannot fail it.
 func TestGCSBackend_Get_MetadataUsesRequestTimeout(t *testing.T) {
 	spectest.Proves(t, "go/object-storage", "deadlines-and-streams", "gcs-get-metadata-honors-request-timeout")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		time.Sleep(200 * time.Millisecond)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"name":"slow","size":"1"}`)
+	const callerBudget = 10 * time.Second
+	release := make(chan struct{})
+	var mediaRequested atomic.Bool
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("alt") == "media" {
+			mediaRequested.Store(true)
+		}
+		// A request that lost its deadline is answered after callerBudget,
+		// so the test fails on the error check instead of hanging.
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		case <-time.After(callerBudget):
+		}
 	}))
 	defer srv.Close()
+	defer close(release)
 
+	const requestTimeout = 50 * time.Millisecond
+	recorder := &deadlineRecorder{next: newStorageHTTPClient().Transport}
 	b := &GCSBackend{
-		httpClient:     newStorageHTTPClient(),
+		httpClient:     &http.Client{Transport: recorder},
 		endpoint:       srv.URL,
 		tokens:         staticTokenSource(""),
-		requestTimeout: 50 * time.Millisecond,
+		requestTimeout: requestTimeout,
 	}
 
-	started := time.Now()
-	_, err := b.Get(context.Background(), "bucket", "slow")
+	// The caller's context ends long after any plausible scheduling delay, so
+	// only the request timeout can end the call in time; the test fails, not
+	// hangs, if that bound is lost.
+	callerCtx, cancel := context.WithTimeout(context.Background(), callerBudget)
+	defer cancel()
+	_, err := b.Get(callerCtx, "bucket", "slow")
 	if err == nil {
 		t.Fatal("expected Get to fail when the metadata request exceeds RequestTimeout")
 	}
-	if elapsed := time.Since(started); elapsed > 150*time.Millisecond {
-		t.Fatalf("metadata request was not bounded by RequestTimeout; elapsed %s", elapsed)
+	if callerCtx.Err() != nil {
+		t.Fatalf("the caller's context ended before Get returned: %v", err)
+	}
+	if !stderrors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Get error = %v, want one caused by the request deadline", err)
+	}
+	if mediaRequested.Load() {
+		t.Fatal("Get reached the media request; the metadata request should have failed first")
+	}
+
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	if len(recorder.seen) != 1 {
+		t.Fatalf("requests sent = %d, want the metadata request only", len(recorder.seen))
+	}
+	if !recorder.bounded[0] {
+		t.Fatal("the metadata request carried no deadline")
+	}
+	if remaining := recorder.deadline[0].Sub(recorder.seen[0]); remaining > requestTimeout {
+		t.Fatalf("the metadata request's deadline is %s after it was sent, want at most RequestTimeout (%s)", remaining, requestTimeout)
 	}
 }
 

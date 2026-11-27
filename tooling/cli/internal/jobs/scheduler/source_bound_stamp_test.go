@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -155,6 +156,7 @@ func secondSourceBoundDescribe(describeJob *ScheduledJob, command string) *Sched
 // so neither rewrites the stamp while the other executes or captures. Each
 // entry is stored at the binding the evidence names.
 func TestSourceBoundTasksOfOneProjectTakeTurns(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, sourceBoundFeature, sourceBoundStampRequirement, "the-source-bound-tasks-of-one-project-take-turns")
 	requireShell(t)
 	logs := t.TempDir()
@@ -246,7 +248,7 @@ func TestRestoreOfPathsTheBindingExcludesKeepsTheBinding(t *testing.T) {
 // computes the project's binding once: the first hit restores only paths the
 // binding excludes, so the second lookup reads the memo.
 func TestWarmSourceBoundHitsComputeTheBindingOnce(t *testing.T) {
-	spectest.Proves(t, sourceBoundFeature, sourceBoundStampRequirement, "a-restore-of-paths-the-binding-excludes-keeps-the-binding")
+	repotest.Require(t)
 	requireShell(t)
 	logs := t.TempDir()
 	describeLog := filepath.Join(logs, "describe")

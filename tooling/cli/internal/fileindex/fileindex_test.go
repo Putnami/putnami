@@ -842,6 +842,42 @@ func TestTheBuildIDIsReadFromTheELFNoteOrTheTextMarker(t *testing.T) {
 	}
 }
 
+// note is an ELF note header in order, then the padded name "Go" and desc.
+func note(order binary.ByteOrder, nameSize, typ uint32, desc string) []byte {
+	var b bytes.Buffer
+	_ = binary.Write(&b, order, []uint32{nameSize, uint32(len(desc)), typ})
+	b.WriteString("Go\x00\x00")
+	b.WriteString(desc)
+	b.WriteString("\x00\x00")
+	return b.Bytes()
+}
+
+// A note named "Go" whose type or name size is not the build ID note's is
+// passed over, and the build ID is read from the note after it.
+func TestOnlyTheBuildIDNoteIsRead(t *testing.T) {
+	for name, decoy := range map[string][]byte{
+		"another note type": note(binary.LittleEndian, 4, 3, "x1/y1/z1/w1"),
+		"another name size": note(binary.LittleEndian, 5, 4, "x2/y2/z2/w2"),
+	} {
+		h := append([]byte("\x7fELF padding"), decoy...)
+		h = append(h, note(binary.LittleEndian, 4, 4, "a/b/c/d")...)
+		if got := buildID(h); got != "a/b/c/d" {
+			t.Errorf("with a note of %s first, the build ID = %q, want the build ID note's a/b/c/d", name, got)
+		}
+	}
+}
+
+// A big-endian ELF executable (s390x) writes its note header big-endian, which
+// the reading does not decode, and the Go linker writes no text marker into an
+// ELF file: it has no build ID, and so uses no index (protocols/workspace ADR
+// 0009, Consequences).
+func TestABigEndianELFNoteIsNotDecoded(t *testing.T) {
+	h := append([]byte("\x7fELF padding"), note(binary.BigEndian, 4, 4, "a/b/c/d")...)
+	if got := buildID(h); got != "" {
+		t.Fatalf("the build ID of a big-endian note = %q, want none", got)
+	}
+}
+
 func TestTheIdentityHoldsTheBuildIDAndTheReadingScheme(t *testing.T) {
 	requireStat(t)
 	info, err := os.Stat(t.TempDir())
@@ -1008,11 +1044,14 @@ func TestTheIndexHoldsAtMostMaxEntries(t *testing.T) {
 	}
 }
 
-// TestACoarseKernelClockKeepsTheRule holds the rule on a status-change clock
-// of 10 ms ticks, which kernels without fine-grained timestamps keep: a file
-// recorded once it is more than Margin old, then rewritten with the same size
-// and its modification time set back, is read again.
-func TestACoarseKernelClockKeepsTheRule(t *testing.T) {
+// TestACoarseKernelClockStillSeesTheStatusChange holds that the status-change
+// time is compared on a clock of 10 ms ticks, which kernels without
+// fine-grained timestamps keep: a file recorded once it is more than Margin
+// old, then rewritten with the same size and its modification time set back,
+// is read again because its status-change time moved. It does not prove the
+// rule that keeps a recently changed file out of the index: the file it
+// rewrites is recorded long after its change.
+func TestACoarseKernelClockStillSeesTheStatusChange(t *testing.T) {
 	f := newFixture(t)
 	tick := int64(10 * time.Millisecond)
 	previous := statFile

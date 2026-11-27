@@ -24,7 +24,10 @@
     },
     {
       "id": "route-graph",
-      "text": "Generation maps page, layout, loader, action, error, not-found, dynamic segment, route group, and prefixed scan-root files into one deterministic nested route graph with matching server and client route identifiers."
+      "text": [
+        "Generation maps page, layout, loader, action, error, not-found, dynamic segment, route group, and prefixed scan-root files into one deterministic nested route graph with matching server and client route identifiers;",
+        "a layout declares no action, so a submission to a layout's own address, with or without the `index` query parameter, reaches the action of its index page, whichever of the two files registers first, and a layout whose index page has no action answers 405."
+      ]
     },
     {
       "id": "navigation-scroll",

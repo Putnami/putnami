@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/sdk/extension/gittest"
+	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // repository returns a repository on branch main with one commit.
@@ -285,6 +286,25 @@ func TestVersionReadsOnlyAReleaseTagOfTheLine(t *testing.T) {
 	}
 }
 
+func TestCompareVersionsOrdersReleasesNumerically(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		a, b string
+		sign int
+	}{
+		{"1.2.3", "1.2.3", 0},
+		{"0.9.0", "0.10.0", -1},
+		{"2.0.0", "1.99.99", 1},
+		{"1.2.10", "1.2.9", 1},
+		{"99999999999999999999.0.0", "99999999999999999998.0.0", 1},
+	} {
+		got := CompareVersions(c.a, c.b)
+		if (got < 0 && c.sign >= 0) || (got > 0 && c.sign <= 0) || (got == 0 && c.sign != 0) {
+			t.Errorf("CompareVersions(%s, %s) = %d, want the sign %d", c.a, c.b, got, c.sign)
+		}
+	}
+}
+
 func TestAnUnusablePatternIsAnError(t *testing.T) {
 	t.Parallel()
 	dir := repository(t)
@@ -349,5 +369,42 @@ func TestGitTraceDoesNotChangeTheReading(t *testing.T) {
 	git(t, dir, "tag", "ts/v0.1.0")
 	if release, ok, err := LastRelease(dir, "ts/v{version}"); err != nil || !ok || release.Tag != "ts/v0.1.0" {
 		t.Fatalf("LastRelease under GIT_TRACE = %+v/%v/%v, want ts/v0.1.0", release, ok, err)
+	}
+}
+
+// One Tags answers each line as LastRelease answers it alone, an unreadable
+// tag of another line and a line without a tag included, and asks git four
+// times between the lines: HEAD, the tag names, their objects and the tags
+// HEAD reaches. The test is not parallel, so the ledger counts its calls
+// alone.
+func TestTagsAnswerEveryLineWithFourGitCalls(t *testing.T) {
+	dir := repository(t)
+	git(t, dir, "tag", "ts/v0.1.0")
+	commit(t, dir, "second")
+	git(t, dir, "tag", "ts/v0.2.0")
+	git(t, dir, "tag", "go/v1.0.0")
+	git(t, dir, "tag", "-a", "py/v0.3.0", "-m", "release")
+	removeObject(t, dir, git(t, dir, "rev-parse", "refs/tags/py/v0.3.0"))
+	patterns := []string{"ts/v{version}", "go/v{version}", "rust/v{version}", "py/v{version}", "not a pattern"}
+	type answer struct {
+		release Release
+		ok      bool
+		err     string
+	}
+	alone := map[string]answer{}
+	for _, pattern := range patterns {
+		release, ok, err := LastRelease(dir, pattern)
+		alone[pattern] = answer{release, ok, fmt.Sprint(err)}
+	}
+	before := procstat.Take().Of(procstat.Git).Starts
+	tags := Open(dir)
+	for _, pattern := range patterns {
+		release, ok, err := tags.LastRelease(pattern)
+		if got := (answer{release, ok, fmt.Sprint(err)}); got != alone[pattern] {
+			t.Errorf("%s: Tags %+v, alone %+v", pattern, got, alone[pattern])
+		}
+	}
+	if calls := procstat.Take().Of(procstat.Git).Starts - before; calls != 4 {
+		t.Errorf("git calls = %d, want 4 for every line", calls)
 	}
 }

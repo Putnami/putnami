@@ -348,8 +348,8 @@ type ownerRow struct {
 	// it.
 	excludes string
 	// drift is the declaration's drift policy (protocols/extension ADR 0004).
-	// No output of this manifest carries one: the extension writes no
-	// committed file it is the first writer of in a session.
+	// Only the committed route inventory carries one: build-describe is its
+	// one writer and the first writer of it in a session.
 	drift string
 	// emptied asks the engine to empty an optional directory output before its
 	// task executes and on a restore of an entry that records it empty
@@ -412,6 +412,11 @@ func (r ownerRow) String() string {
 //     directory, because other frameworks' evidence files may share the
 //     directory. A hit then restores the evidence of the binding its store
 //     key binds (cache.sourceBound, CLI ADR 0069).
+//   - The committed `schema/http-routes.json` has ONE writer too, build-describe:
+//     only an app's describe binary produces a route inventory, and
+//     build-generate never commits one. Describe is therefore its first writer
+//     in a session and declares `drift: fail` (protocols/extension ADR 0004), so
+//     a stale committed inventory fails the build instead of being rewritten.
 //   - build-describe's `.gen/schema` is the only optional project output that
 //     declares `emptied`. No committed file lives in it. The engine empties it
 //     before describe executes and on a restore of an entry that records it
@@ -431,6 +436,7 @@ func (r ownerRow) String() string {
 // TestTheArchivePackagerOwnsTheArchivePublicationManifest pins the one that
 // stopped being one.
 func TestDeclaredOutputOwnerTable(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "committed-route-inventory-drift", "the-describe-http-routes-output-declares-fail-on-drift")
 	m := loadExtensionManifest(t)
 
 	want := []ownerRow{
@@ -441,6 +447,10 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		// binding, and a describe hit must restore the evidence its store
 		// key binds. No drift: the file moves with every binding move.
 		{task: "build-describe", id: "featureEvidence", kind: "file", root: "project", path: "schema/feature-evidence/go-framework.json", optionalEmpty: true},
+		// The committed route inventory. Only an app's describe binary writes
+		// it, so describe is its first writer in a session and polices its
+		// drift: a stale committed copy fails the build.
+		{task: "build-describe", id: "httpRoutes", kind: "file", root: "project", path: "schema/http-routes.json", optionalEmpty: true, drift: "fail"},
 		{task: "build-describe", id: "migrationBundle", kind: "directory", root: "project", path: ".gen/migration-bundle", optionalEmpty: true},
 		{task: "build-describe", id: "migrations", kind: "file", root: "project", path: ".gen/migrations.json", optionalEmpty: true},
 		{task: "build-describe", id: "schema", kind: "directory", root: "project", path: ".gen/schema", optionalEmpty: true, emptied: true},
@@ -1216,9 +1226,9 @@ const committedFeatureEvidence = "schema/feature-evidence/go-framework.json"
 // declared owner (config-extract-exec), and the two pipeline writers must keep
 // their hands off the declaration.
 //
-// The committed feature evidence is the one schema file a pipeline writer
-// does claim: build-describe is its only writer for every project kind, and a
-// describe hit has to restore the evidence of the binding its store key binds.
+// The committed feature evidence and route inventory are the schema files a
+// pipeline writer does claim: build-describe is the only writer of each for
+// every project kind, and a describe hit has to restore what its run wrote.
 func TestCommittedSidecarsAreDeliberatelyUnclaimed(t *testing.T) {
 	m := loadExtensionManifest(t)
 
@@ -1245,9 +1255,11 @@ func TestCommittedSidecarsAreDeliberatelyUnclaimed(t *testing.T) {
 			t.Fatalf("manifest task %q is missing", name)
 		}
 		for id, output := range task.Declares.Outputs {
-			if name == "build-describe" && id == "featureEvidence" && output.Path == committedFeatureEvidence {
-				// The committed evidence has one writer, describe, and is
-				// declared on purpose (TestDeclaredOutputOwnerTable).
+			if name == "build-describe" && (id == "featureEvidence" && output.Path == committedFeatureEvidence ||
+				id == "httpRoutes" && output.Path == "schema/http-routes.json") {
+				// The committed evidence and route inventory each have one
+				// writer, describe, and are declared on purpose
+				// (TestDeclaredOutputOwnerTable).
 				continue
 			}
 			if strings.HasPrefix(output.Path, "schema/") {

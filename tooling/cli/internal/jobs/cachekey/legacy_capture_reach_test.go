@@ -9,6 +9,7 @@ import (
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -28,6 +29,7 @@ var firstPartyExtensionManifests = []struct{ name, path string }{
 }
 
 func TestFirstPartyCaptureReachability(t *testing.T) {
+	repotest.Require(t)
 	jobs := firstPartyScheduledJobs(t)
 	if len(jobs) == 0 {
 		t.Fatal("no first-party jobs were derived; the ratchet would be vacuously green")
@@ -151,6 +153,7 @@ func firstPartyJobName(job *jobmodel.ScheduledJob) string {
 // packaged-source test run stays green.
 func findJobsRepoRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)

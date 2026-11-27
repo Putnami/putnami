@@ -48,7 +48,12 @@ type Request struct {
 	// StreamResponse transfers ownership of a successful response body to the
 	// caller. Non-success responses retain the ordinary bounded read.
 	StreamResponse bool
-	Query          map[string]string
+	// KeepRedirect hands a 3xx answer back to the caller instead of following
+	// it. A generated client sets it on an operation that declares a redirect
+	// success, whose status and Location are the answer. A custom Transport
+	// that follows redirects must honor it; HTTPTransport does.
+	KeepRedirect bool
+	Query        map[string]string
 	// QueryValues preserves repeated parameters emitted from array-valued
 	// OpenAPI query parameters. It is merged after Query.
 	QueryValues url.Values

@@ -103,7 +103,12 @@ must not decide it. The context is the other way a fact reaches a job.
    member. That reading resolves the line's last release again, by the tag's
    name: a tag moved between the key's read and the job's stores a verdict of
    the new commit under the key of the old one, as every job that reads Git
-   for its baseline does.
+   for its baseline does. A path under an extracted project directory that
+   holds `\` or `:` at the tag, in any of its parts, is such a failure: on
+   Windows the first is a separator and the second names a drive or a
+   stream, so the extraction is refused on every platform and the line's
+   jobs read Git. That is an accepted cost for names this repository does
+   not use. A Windows reserved device name is refused on Windows only.
 7. **The member is additive.** `tree` is an optional v2 member (ADR 0001). The
    SDK accessor answers from it when present and falls back to Git when it is
    absent, except for the release baseline, whose reader keeps its own Git

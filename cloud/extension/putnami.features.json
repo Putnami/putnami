@@ -1163,7 +1163,8 @@
             "kind": "acceptance",
             "checks": [
               "agency-missions-routes",
-              "agency-sync-forwards-the-session-url"
+              "agency-sync-forwards-the-session-url",
+              "agency-sync-forwards-the-last-prompt"
             ]
           }
         },
@@ -1265,6 +1266,19 @@
             "kind": "acceptance",
             "checks": [
               "agent-content-names-agency-commands"
+            ]
+          }
+        },
+        {
+          "id": "rebase-regenerates-generated-files",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agent-content-rebase-regenerates-generated-files"
             ]
           }
         },

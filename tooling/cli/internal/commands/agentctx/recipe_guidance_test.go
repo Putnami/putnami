@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The recipe line names the recipe of each language extension the workspace
@@ -97,6 +98,7 @@ func writeRecipeWorkspace(t *testing.T, dir, name string) {
 // Each recipe the line names is a page of this repository's documentation,
 // which the documentation examples of the language check.
 func TestEveryLinkedRecipeIsAPublishedPage(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-service-recipe", "every-linked-recipe-is-a-published-page")
 	root := repositoryRootForAIContext(t)
 	for _, recipe := range serviceRecipes {

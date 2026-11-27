@@ -163,8 +163,9 @@ declares a breaking change, with `!` before the colon or a `BREAKING CHANGE:`
 footer, the squash commit must declare it too: add `!` to the PR title, or a
 `BREAKING CHANGE:` footer to the PR description. Otherwise `validate` fails on
 the pull request and names the commit. If the change breaks nothing, reword the
-commit instead. Contributor CI (without credentials) runs this check at each
-push, so a title you edit after your last push is checked at the next one.
+commit instead. The squash commit checks of Contributor CI (without
+credentials) run this check at each push and each edit of the title, the body
+or the base branch.
 
 ## Contributor CI Without Putnami Cloud Credentials
 
@@ -247,17 +248,24 @@ packaged, published, or released by that run. Preview the exact DAG with
 `putnami deploy --all --plan`; it must plan without overlapping outputs.
 
 Beside it, [`.github/workflows/contributor-ci.yml`](.github/workflows/contributor-ci.yml)
-runs the documented contributor path on every pull request that is not a
-draft, on a GitHub-hosted runner that reads no secret and empties every Putnami
-credential variable before starting. It complements Putnami CI — the merge decision rests on Putnami CI;
-a red Contributor CI (without credentials) check means the credential-free path
-broke and is worth fixing on its own. It is scoped by `--impacted`, so a documentation-only pull request
-selects zero projects and passes having run nothing; the job summary prints the
-selected project and job counts so that case is visible. It runs when a pull
-request opens, reopens, receives a push, leaves draft, or changes its base
-branch. A title or body edit runs nothing.
+runs the documented contributor path every night on `main`, on demand
+(`workflow_dispatch`), and before every release
+([RELEASING.md](RELEASING.md#release-checklist)), on a GitHub-hosted runner
+that reads no secret and empties every Putnami credential variable before
+starting. It complements Putnami CI — the merge decision rests on Putnami CI;
+a red Contributor CI (without credentials) run means the credential-free path
+broke and is worth fixing on its own. The nightly run and the default run on
+demand gate every project (`--all`). A failed nightly run opens an issue, and
+the next green one closes it.
 
-The job publishes one service container: a `postgres:17-alpine` on port 6432,
+It does not run on pull requests: what it proves changes rarely, and it took a
+median of about 7 minutes and up to 39 per pull request head. A pull request that is not a draft
+runs only its squash commit checks, `validate-workspace` with the squash
+message: the breaking marker and the agent attribution above. They run when a
+pull request opens, reopens, receives a push, leaves draft, or has its title,
+body or base branch edited.
+
+The gate publishes one service container: a `postgres:17-alpine` on port 6432,
 pulled from this repository's GitHub Container Registry (GHCR) with the run's
 own `GITHUB_TOKEN`, which GitHub mints for each run and which is not a
 repository secret. Public registries cap anonymous pulls per IP address, and

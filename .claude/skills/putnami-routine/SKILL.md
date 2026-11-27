@@ -46,7 +46,8 @@ API trigger stays. Set exactly:
 | Schedule | none: Putnami fires it through its API trigger |
 
 The allowed tools and the connector are the widest the allowlisted skills
-need: the rebase skill runs git, jq and curl through `Bash`, and reads files;
+need: the rebase skill runs git, jq and curl through `Bash`, reads files, and
+builds the project of a conflicted generated file with the workspace's CLI;
 the routine-build skill edits the repository, runs the build skill's reviewer
 as a separate agent, and signs the CLI in through the Putnami connector to
 publish its pull request. Only routine-build uses the connector: the rebase

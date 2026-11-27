@@ -195,8 +195,18 @@ files.
 - Trust in the index is trust in the machine: a process that sets a file's
   times and inode back, by changing the system clock, is outside the rule, as
   it is for git.
-- Two risks git shares remain. A write through a memory mapping updates the
+- Risks git shares remain. A write through a memory mapping updates the
   file's times at the kernel's next page fault or `msync`, not at the write,
   so a mapping written after the read can show the old stat for a while. A
   filesystem mounted `lazytime` keeps exact times in memory, but after a crash
   the times on disk can be older than the content.
+- A single long in-place `write(2)` is a third such risk: the kernel sets
+  the file's times when the write starts, so one that started more than two
+  seconds before the run, keeps the file's size and is still copying while
+  the run reads the file leaves a stat that matches the partial content the
+  run records, until a later write moves the file's times again. Git has the
+  same window.
+- A big-endian ELF executable (s390x, ppc64, mips, mips64) writes its build
+  ID note header big-endian, which the identity does not decode, and the Go
+  linker writes no build ID text marker into an ELF file: such a CLI has no
+  identity and runs without the index, reading every file as before.

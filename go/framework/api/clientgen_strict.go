@@ -1360,6 +1360,13 @@ func (generator *strictClientGen) refuseUnprojectableConnect(method MethodIR, di
 			"api: operation %s dispatches on %s and declares %d success statuses; a Connect response carries one success status",
 			method.OperationID, dispatched.Protocol, len(method.Successes))
 	}
+	if declaresRedirect(method) {
+		// Connect answers every successful call with HTTP 200, so neither the
+		// redirect status nor its Location reaches the caller.
+		return errors.Newf(CodeClientGenUnsupportedSemantic,
+			"api: operation %s dispatches on %s and declares a redirect success; a Connect response carries no redirect",
+			method.OperationID, dispatched.Protocol)
+	}
 	for _, parameter := range method.Parameters {
 		if parameter.Location == "query" && parameter.Schema.Type == "array" {
 			return errors.Newf(CodeClientGenUnsupportedSemantic,

@@ -93,6 +93,19 @@
             "already-current-release-carries-mirror-intent"
           ]
         }
+      },
+      {
+        "id": "mirror-intent-copies-released-versions-only",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "prerelease-member-withholds-mirror-intent"
+          ]
+        }
       }
     ]
   }

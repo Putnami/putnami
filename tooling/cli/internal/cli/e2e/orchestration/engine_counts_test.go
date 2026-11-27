@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 )
 
@@ -40,8 +41,8 @@ func TestTheEngineCounts(t *testing.T) {
 		name         string
 		got, ceiling int64
 	}{
-		{"engine git calls on 6 tasks", total(cold.EngineGit), 16},
-		{"engine git calls on 15 tasks", total(coldLarge.EngineGit), 16},
+		{"engine git calls on 6 tasks", total(cold.EngineGit), 15},
+		{"engine git calls on 15 tasks", total(coldLarge.EngineGit), 15},
 		{"engine git calls added by 9 more jobs", total(coldLarge.EngineGit) - total(cold.EngineGit), 0},
 		{"job processes on 15 selected tasks", coldLarge.Engine["job"], int64(coldLarge.Tasks)},
 	} {
@@ -49,10 +50,12 @@ func TestTheEngineCounts(t *testing.T) {
 			t.Errorf("%s = %d, above its ceiling %d\n%s", check.name, check.got, check.ceiling, countsHint)
 		}
 	}
+	// The candidate listings are read in-process; the one config call reads
+	// Git's configuration for them (tooling/cli ADR 0112).
 	holdCeiling(t, "a run of 15 trivial tasks", coldLarge.Ledger(),
-		"engine job 15 · git 16 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none")
+		"engine job 15 · git 15 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none")
 	holdCeiling(t, "a run of the unchanged workspace, every task in the cache", unchanged.Ledger(),
-		"engine git 16 | engine git diff 1 · for-each-ref 1 · ls-files 3 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none")
+		"engine git 15 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none")
 	holdCeiling(t, "planning the unchanged workspace", plan.Ledger(),
 		"engine git 10 | engine git diff 1 · for-each-ref 1 · rev-parse 4 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none")
 }
@@ -71,14 +74,21 @@ func total(counts map[string]int64) int64 {
 // candidates are listed once, by its first task, whatever the tasks after it
 // wrote. The run asks Git once whether .putnami is excluded, and reads the
 // workspace's cut once to see that it lists nothing below it (tooling/cli ADR
-// 0106).
+// 0106). The listings are read in-process (ADR 0112), and counted so.
 func TestAWriteUnderAnIgnoredPutnamiListsNoCandidateAgain(t *testing.T) {
 	clitest.RequireShell(t)
 	clitest.UnsetHostRunEnvironment(t)
 	hometest.Temp(t)
 	root := clitest.WritingCountsFixture(t, 3)
 	clitest.ForgetTaskHistory(t, root)
+	reads := putnamigit.InProcessCutReads()
 	cold := clitest.RunCounts(t, root, "lint,test,build", "--all", "--max-parallel", "1", "--no-cache")
+	// The listings are read in-process (tooling/cli ADR 0112): one per
+	// project's candidates, one of the workspace's cut, one of the source
+	// binding snapshot, whatever the tasks wrote under .putnami.
+	if reads = putnamigit.InProcessCutReads() - reads; reads > 5 {
+		t.Errorf("in-process reads of the cut = %d, above its ceiling 5\n%s", reads, countsHint)
+	}
 	holdCeiling(t, "a run of 9 tasks that write under the ignored .putnami", cold.Ledger(),
-		"engine job 9 · git 26 | engine git check-ignore 1 · for-each-ref 1 · ls-files 10 · rev-parse 9 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none")
+		"engine job 9 · git 15 | engine git check-ignore 1 · config 1 · for-each-ref 1 · ls-files 1 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none")
 }

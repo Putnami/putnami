@@ -120,8 +120,8 @@ itself fails only when the host cannot read the directory (`-32603`). Both
 `projects` and `diagnostics` are `[]` when empty.
 
 `version.lines` reports the workspace's version lines as the core computes
-them. The `putnami version get` and `putnami version tag` commands of
-`@putnami/dev` read them. The params
+them. The `putnami version get`, `putnami version notes` and
+`putnami version tag` commands of `@putnami/dev` read them. The params
 object is required; `{}` asks for every line, sorted by scope path. A `scope`
 names one line by its scope path, as the `--scope` flag of
 `putnami version get` does: leading and trailing slashes are ignored, and an

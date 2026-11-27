@@ -31,10 +31,11 @@ const cliProjectDir = cliModuleDir
 // the whole-tree checks of @putnami/repository-checks read it too
 // (CONTRIBUTING.md): each project's key must cover what its own gates read,
 // whatever another project declares. The other files are read by the
-// whole-tree checks alone. A file a test of @putnami/cli also reads
+// whole-tree checks alone. A file a test of the CLI also reads
 // (putnami.workspace.json, putnami.ci.json, putnami.support.json, the
 // first-use smoke script, the agent-artifact trees) is absent here on purpose:
-// it is honestly declared twice, because two readers exist.
+// @putnami/cli-repository, which runs those tests, declares it too, because two
+// readers exist.
 var documentsOwnedRepositoryFiles = map[string]string{
 	".github/PULL_REQUEST_TEMPLATE.md": repositoryChecksProjectDir,
 	".gitignore":                       repositoryChecksProjectDir,

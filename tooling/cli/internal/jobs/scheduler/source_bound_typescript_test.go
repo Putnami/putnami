@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -182,6 +183,7 @@ func executionsByProject(t *testing.T, logPath string) map[string]int {
 // and both transpiles stay served from the cache. The next run at the same
 // tree hits, and a revert hits the earlier entry and gets its evidence back.
 func TestTypeScriptGenerateEditOutsideItsKeyExecutesAtTheNewBinding(t *testing.T) {
+	repotest.Require(t)
 	requireShell(t)
 	logs := t.TempDir()
 	generateLog, shapeLog, transpileLog := filepath.Join(logs, "generate"), filepath.Join(logs, "shape"), filepath.Join(logs, "transpile")

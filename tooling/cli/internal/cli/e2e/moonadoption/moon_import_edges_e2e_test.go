@@ -9,6 +9,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // A project whose tasks all move to @putnami/typescript no longer names
@@ -17,6 +18,7 @@ import (
 // edges to its graph without claiming the project, so deps prune leaves them
 // alone and the next sync finds nothing to write back.
 func TestAnEdgeTheMoonSyncWritesIsNoPhantom(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "moon-import-keeps-the-edges-the-sync-writes", "an-edge-the-moon-sync-writes-is-no-phantom")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")

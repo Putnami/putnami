@@ -14,6 +14,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -243,6 +244,7 @@ func requireSiteContentReaders(t *testing.T, fixture siteContentPlan, command st
 // section is generated has no section landing page to activate package:
 // site-content.json activates it, so its site-content step is planned.
 func TestTheStepsThatReadAGeneratedSiteContentSectionWaitForItsGenerateStep(t *testing.T) {
+	repotest.Require(t)
 	for _, shape := range siteContentGeneratedFixtures {
 		t.Run(shape.name, func(t *testing.T) {
 			fixture := siteContentWorkspace(t, shape)
@@ -268,6 +270,7 @@ func TestTheStepsThatReadAGeneratedSiteContentSectionWaitForItsGenerateStep(t *t
 // validate and package as before: their build prerequisite plans the generate
 // step, which does nothing for it, so the prerequisite is never empty.
 func TestAPlainSiteContentProjectPlansValidateAndPackage(t *testing.T) {
+	repotest.Require(t)
 	fixture := siteContentWorkspace(t, siteContentFixture{committed: true, ignoreGen: true})
 	for _, command := range []string{"validate", "package"} {
 		t.Run(command, func(t *testing.T) {
@@ -281,6 +284,7 @@ func TestAPlainSiteContentProjectPlansValidateAndPackage(t *testing.T) {
 // so the two declared outputs do not overlap, with or without a generated
 // section.
 func TestAGoSiteProjectPlansTheGoBuildBesideTheSiteContentGenerateStep(t *testing.T) {
+	repotest.Require(t)
 	for _, shape := range []siteContentFixture{
 		{name: "without site-content.json", committed: true, ignoreGen: true, goProject: true},
 		{name: "with site-content.json", committed: true, declared: true, ignoreGen: true, goProject: true},
@@ -305,6 +309,7 @@ func TestAGoSiteProjectPlansTheGoBuildBesideTheSiteContentGenerateStep(t *testin
 // build command activates on putnami.json, and each of its steps keeps its
 // own condition.
 func TestBuildPlansNoCloudJobForAProjectThatUsesNoCloudFeature(t *testing.T) {
+	repotest.Require(t)
 	cloud := loadShippedExtension(t, "cloud/extension", "@putnami/cloud")
 	goExtension := loadShippedExtension(t, "go/extension", "@putnami/go")
 	root := t.TempDir()
@@ -341,6 +346,7 @@ func TestBuildPlansNoCloudJobForAProjectThatUsesNoCloudFeature(t *testing.T) {
 // key pass and the validation step's start. That holds in a work tree that
 // does not ignore .gen too, where the generated files are Git candidates.
 func TestTheGeneratedSiteContentValidationKeyFoldsTheGenerateKey(t *testing.T) {
+	repotest.Require(t)
 	for _, shape := range siteContentGeneratedFixtures {
 		t.Run(shape.name, func(t *testing.T) {
 			fixture := siteContentWorkspace(t, shape)
@@ -375,6 +381,7 @@ func TestTheGeneratedSiteContentValidationKeyFoldsTheGenerateKey(t *testing.T) {
 // project whose only section is generated, and in a work tree that does not
 // ignore .gen.
 func TestTheGeneratedSiteContentSelectionFingerprintFollowsTheGeneratorInputs(t *testing.T) {
+	repotest.Require(t)
 	for _, shape := range siteContentGeneratedFixtures {
 		t.Run(shape.name, func(t *testing.T) {
 			assertSiteContentFingerprintFollowsTheGeneratorInputs(t, shape)

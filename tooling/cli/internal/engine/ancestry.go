@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	runner "go.putnami.dev/protocol/runner"
-	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
@@ -107,14 +106,14 @@ func captureAncestrySnapshot(root string, limit int) *AncestrySnapshot {
 	snapshot := &AncestrySnapshot{root: filepath.Clean(root)}
 	revision, set, err := git.BoundSourceRevision(root)
 	if err == nil && !set {
-		revision, err = gitread.HeadSHA(root)
+		revision, err = git.HeadSHA(root)
 	}
 	if err != nil {
 		snapshot.err = fmt.Errorf("read the ancestry: read the bound commit: %w", err)
 		return snapshot
 	}
 	snapshot.sourceRevision = strings.ToLower(strings.TrimSpace(revision))
-	if snapshot.shallow, err = gitread.IsShallow(root); err != nil {
+	if snapshot.shallow, err = git.IsShallow(root); err != nil {
 		snapshot.err = fmt.Errorf("read the ancestry of %s: %w", snapshot.sourceRevision, err)
 		return snapshot
 	}

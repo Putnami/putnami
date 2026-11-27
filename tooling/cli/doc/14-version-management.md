@@ -2,7 +2,7 @@
 
 Putnami derives release versions from git and separates them from publishing. A version is never declared in a configuration file: the core computes it, `version get` prints it, `version tag` records it, and `publish` stamps every member with the version of the line its project belongs to.
 
-`putnami version get` and `putnami version tag` are commands of `@putnami/dev`, which every language extension depends on. They ask the core for the versions over the host RPC channel, so they need an interactive launch: a terminal or a CI step, not a hosted run. See [the `@putnami/dev` version commands](../../dev/README.md#the-version-commands).
+`putnami version get`, `putnami version notes` and `putnami version tag` are commands of `@putnami/dev`, which every language extension depends on. They ask the core for the versions over the host RPC channel, so they need an interactive launch: a terminal or a CI step, not a hosted run. See [the `@putnami/dev` version commands](../../dev/README.md#the-version-commands).
 
 ## Version lines
 
@@ -41,9 +41,9 @@ Before 1.0, a minor is the release that may need a migration, and nothing else: 
 
 The bump reads the support status that the root [`putnami.support.json`](../../../protocols/support/README.md) gives the projects a commit touches inside the line. When the catalog exists, it is the authority: a commit counts as stable only when a file it changes inside the line belongs to a project the catalog lists as `stable`, or to a project the catalog does not list that a stable project depends on, directly or through other unlisted projects, because that code ships inside the stable product. A `preview` or `experimental` project, any other unlisted project, and a file no project owns promise no compatibility, so a commit that touches only those advances a patch at most. A workspace with no catalog reads every commit as stable. The files are read only for the commits whose type could move the line past a patch.
 
-The dependencies are today's: a commit from before a dependency was added is read with the graph of the current tree. A Go dependency is known only from the recorded workspace view, so when a catalog exists, `version get` and `version tag` first bring that view up to date with the tree, the way a build does. When the refresh fails, `version get` answers from the recorded view and prints a warning, and `version tag` refuses to release; with no recorded view, both refuse.
+The dependencies are today's: a commit from before a dependency was added is read with the graph of the current tree. A Go dependency is known only from the recorded workspace view, so when a catalog exists, `version get`, `version notes` and `version tag` first bring that view up to date with the tree, the way a build does. When the refresh fails, `version get` answers from the recorded view and prints a warning, and `version notes` and `version tag` refuse to release; with no recorded view, all three refuse.
 
-`version get` and `version tag` refuse a catalog they cannot parse. A build stamps its pre-release versions with the stable reading instead, and prints the catalog error with `--debug`.
+`version get`, `version notes` and `version tag` refuse a catalog they cannot parse. A build stamps its pre-release versions with the stable reading instead, and prints the catalog error with `--debug`.
 
 A breaking change outside the stable projects still needs its migration in the release notes.
 
@@ -62,12 +62,33 @@ putnami version get                   # one line per version line: "<line> <vers
 ```bash
 putnami version tag --scope typescript --dry-run   # print the proposed tag and changelog
 putnami version tag --scope typescript --yes       # release commit, then the annotated tag
-putnami version tag --scope typescript --yes --push
 ```
 
 `version tag` refuses a dirty tree and a HEAD that is already tagged for that line. It computes the next version from the same commits, renders the line's changelog into `<line scope dir>/CHANGELOG.md` (the root line writes `CHANGELOG.md`), commits that as `chore(release): <line> <version>`, then puts the annotated tag **on that commit** — so the changelog is inside the release, not one commit behind it. The rendered notes become the tag message. They carry no tracker reference: `#<number>`, `<owner>/<repository>#<number>` and the word before them, such as `issue`, are removed from each commit subject. After such a word the `#` is optional. A one-digit number is a reference only inside brackets that hold nothing else. The section goes under the title of the changelog and its introduction; a missing file is created with its title. An explicit tag name overrides the computed one; `--scope` is required when the workspace declares more than one line.
 
-Pushing the tag is what triggers the cohort publication: a publish on a tagged commit republishes every member of that line at the tag's version and creates an immutable channel named after the tag (see [Commands](03-commands.md#publish-to-a-release-set-channel)).
+Publish on the tagged commit first, then push the tag by name once the publish succeeds. Do not rely on a pushed tag to publish. `version tag --push` pushes `HEAD` and the tag before any publish, so leave it out.
+
+```bash
+git push origin HEAD                  # the release commit, without its tag
+putnami publish --scope typescript    # on the tagged commit, with a clean tree
+git push origin ts/v0.3.0             # once the publish succeeds: the tag alone
+```
+
+When your default branch refuses a direct push, merge the changelog through a pull request, tag the merged commit by hand, then publish on it and push only the tag.
+
+The publish republishes every member of that line at the tag's version and creates an immutable channel named after the tag (see [Commands](03-commands.md#publish-to-a-release-set-channel)). `--scope` is required when `HEAD` carries the tags of several lines: it names the line whose tag names the channel.
+
+### Notes of several lines: `version notes`
+
+```bash
+git switch -c release/0.6.0
+putnami version notes go@0.6.0 typescript@0.6.0 --dry-run   # print the notes of both lines
+putnami version notes go@0.6.0 typescript@0.6.0 --yes       # one commit, no tag, no push
+```
+
+`version notes` prepares a release that several lines take together. It writes the notes of each `<line>@<version>` into that line's `CHANGELOG.md`, with the rules of `version tag`, and makes one commit on the current branch. `/` names the root line. Without `--dry-run`, it refuses a dirty tree, a detached `HEAD` and the default branch, because the notes go through a pull request; `--dry-run` prints the notes there. Every run refuses an unknown line, a version that is not `MAJOR.MINOR.PATCH` or not above the line's last release, a version that is already tagged, and a version the changelog already has a section for.
+
+Then it names the other files that the commits of the lines' last release tags modified, such as a dated introduction or a recorded release plan, and writes none of them. Update on the branch the ones the release needs. Each section heading carries the day the notes were written: correct it on the branch when the release merges on a later day. The notes list the commits the branch holds: when the default branch moves before the merge, drop the notes commit, rebase, and run `version notes` again. After the merge, tag the merge commit with git: `version tag` would write the section a second time.
 
 ### Seeding a line
 
@@ -247,8 +268,9 @@ an unset one.
 The CLI reads both variables once and hands every job the resulting version
 through its job context. Job processes do not inherit them, so a test suite or
 a nested `putnami` run that a job starts describes its own checkout.
-`putnami version tag` refuses to run while `PUTNAMI_SOURCE_REVISION` names a
-commit other than `HEAD`: the tag it creates names the checked-out commit.
+`putnami version tag` and `putnami version notes` refuse to run while
+`PUTNAMI_SOURCE_REVISION` names a commit other than `HEAD`: the tag and the notes
+they write describe the checked-out commit.
 
 A run that may publish also reads that commit's ancestry when the process
 starts, before the first-use bootstrap, an install or the first hook runs

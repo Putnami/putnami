@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 const initLanguageFeature = "cli/init-a-language"
@@ -28,6 +29,7 @@ const initLanguagesIndexComment = "Generated from the workspace adapter of every
 // this file that holds putnami.workspace.json.
 func initRepositoryRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
@@ -76,6 +78,7 @@ func repositoryExtensionDirs(t *testing.T, root string) map[string]string {
 // of every extension the root declares by path and fails when the committed
 // file differs. PUTNAMI_UPDATE_INIT_LANGUAGES=1 rewrites the file.
 func TestInitLanguagesFollowTheExtensionManifests(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, initLanguageFeature, "languages-come-from-the-extensions", "the-language-index-follows-the-extension-manifests")
 	root := initRepositoryRoot(t)
 	index := initLanguageIndex{Comment: initLanguagesIndexComment}
@@ -137,6 +140,7 @@ func initThisFile(t *testing.T) string {
 // Each starter names a language of the index, the language's extension, and
 // a template that sits next to that extension and names it.
 func TestInitStartersNameTheirExtension(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, initLanguageFeature, "languages-come-from-the-extensions", "each-starter-template-names-its-extension")
 	root := initRepositoryRoot(t)
 	dirs := repositoryExtensionDirs(t, root)

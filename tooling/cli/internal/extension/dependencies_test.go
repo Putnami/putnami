@@ -19,6 +19,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -580,6 +581,7 @@ func copyFirstPartyProject(t *testing.T, repoRoot, ws, rel string) {
 // order, with their aliases, related commands and default traits. The core
 // declares none of them, so the table below is the whole expectation.
 func TestTheShippedDevExtensionSatisfiesALanguageDependencyByPath(t *testing.T) {
+	repotest.Require(t)
 	f := newGraphFixture(t)
 	repoRoot := findRepoRoot(t)
 	goExtension, dev := filepath.Join("go", "extension"), filepath.Join("tooling", "dev")
@@ -603,7 +605,7 @@ func TestTheShippedDevExtensionSatisfiesALanguageDependencyByPath(t *testing.T) 
 	if len(result.Dependencies) != 0 || len(result.MissingDependencies()) != 0 || skipFor(result, "@putnami/dev") != nil {
 		t.Fatalf("the path declaration did not satisfy the dependency: dependencies %+v, skipped %v", result.Dependencies, result.Skipped)
 	}
-	if jobs := slices.Sorted(maps.Keys(loaded.Jobs)); !slices.Equal(jobs, []string{"compose-up", "qualify-run", "version-get", "version-tag"}) {
+	if jobs := slices.Sorted(maps.Keys(loaded.Jobs)); !slices.Equal(jobs, []string{"compose-up", "qualify-run", "version-get", "version-notes", "version-tag"}) {
 		t.Errorf("@putnami/dev declares jobs %v, want only the version, compose and qualify commands: a vocabulary runs no verb", jobs)
 	}
 

@@ -1,4 +1,9 @@
-import { useActionData as _useActionData } from 'react-router';
+import { useContext } from 'react';
+import {
+  useActionData as _useActionData,
+  UNSAFE_DataRouterStateContext as DataRouterStateContext,
+  UNSAFE_RouteContext as RouteContext,
+} from 'react-router';
 
 /**
  * Discriminated union for action responses.
@@ -43,6 +48,23 @@ export type ActionResult<TSuccess = unknown> =
  *   return <form>...</form>;
  * }
  * ```
+ *
+ * In an index page, it also returns the result of a post to its layout's
+ * address: a layout declares no action, so the router runs the page's action
+ * on the layout route when the form's address carries no `?index`, and stores
+ * the result there.
  */
-export const useActionData = <R = unknown>(): ActionResult<R> | undefined =>
-  _useActionData() as ActionResult<R> | undefined;
+export const useActionData = <R = unknown>(): ActionResult<R> | undefined => {
+  const own = _useActionData();
+  const state = useContext(DataRouterStateContext);
+  const matches = useContext(RouteContext)?.matches ?? [];
+  if (own !== undefined) {
+    return own as ActionResult<R>;
+  }
+  const route = matches.at(-1)?.route;
+  const parent = matches.at(-2)?.route;
+  if (!route?.index || !parent?.id) {
+    return undefined;
+  }
+  return state?.actionData?.[parent.id] as ActionResult<R> | undefined;
+};

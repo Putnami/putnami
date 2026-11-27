@@ -15,6 +15,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	sdkagentartifact "go.putnami.dev/sdk/extension/agentartifact"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // generatedAgentTrees are the host directories this repository's own agent
@@ -28,6 +29,7 @@ var generatedAgentTrees = []string{".agents/skills", ".claude/skills", ".claude/
 // same builder the packager publishes with and fails when a committed file
 // differs, is missing, or is no longer produced by any opted-in extension.
 func TestLocalAgentContentMatchesCommittedRoot(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/contributor-workflows", "one-contributor-extension", "the-repository-runs-the-content-it-distributes")
 	root := driftRepositoryRoot(t)
 	cfg := wsproto.Load(root)
@@ -95,6 +97,7 @@ func TestLocalAgentContentMatchesCommittedRoot(t *testing.T) {
 
 func driftRepositoryRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")

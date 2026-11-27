@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // First-party conformance for the runtime-event stream version.
@@ -40,6 +42,7 @@ var firstPartyBinDirs = []string{
 var legacyEventVersion = regexp.MustCompile(`"v"\s*:\s*1\b`)
 
 func TestFirstPartyShellJobsStampRuntimeEventsV2(t *testing.T) {
+	repotest.Require(t)
 	repoRoot := findRepoRoot(t)
 
 	scanned := 0

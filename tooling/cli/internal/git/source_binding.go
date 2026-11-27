@@ -18,8 +18,10 @@ import (
 const hostStatsExecBit = sourcebinding.HostStatsExecBit
 
 // SourceBindingMetrics reports the physical child-process cost of computing a
-// source binding. Enumeration requires two git ls-files calls per snapshot;
-// gitlinks add the rev-parse calls needed to identify their visible worktree.
+// source binding. Enumeration reads the index and the work tree in-process,
+// with at most one git config call, or makes two git ls-files calls per
+// snapshot where the in-process reader steps aside; gitlinks add the rev-parse
+// calls needed to identify their visible worktree.
 type SourceBindingMetrics struct {
 	SpawnedProcesses int
 }
@@ -62,7 +64,9 @@ type sourceBindingIndexEntry struct {
 }
 
 // ReadSourceBindingSnapshot enumerates the repository once, using the same Git
-// tracked/untracked semantics as an individual project lookup. Stage validation
+// tracked/untracked semantics as an individual project lookup. It reads the
+// index and the untracked files in-process when the repository's state is one
+// the reader supports (tooling/cli ADR 0112), and asks Git otherwise. Stage validation
 // remains project-local: a conflict in an unrelated project cannot poison every
 // binding merely because the enumeration is shared.
 func ReadSourceBindingSnapshot(repoRoot string) (*SourceBindingSnapshot, SourceBindingMetrics, error) {
@@ -71,6 +75,20 @@ func ReadSourceBindingSnapshot(repoRoot string) (*SourceBindingSnapshot, SourceB
 	if err != nil {
 		return nil, metrics, fmt.Errorf("resolve repository root: %w", err)
 	}
+	snapshot, spawned, err := sourceBindingSnapshotInProcess(repoRoot)
+	metrics.SpawnedProcesses += spawned
+	if !inProcessUnsupported(err) {
+		return snapshot, metrics, err
+	}
+	fromGit, gitMetrics, err := sourceBindingSnapshotFromGit(repoRoot)
+	metrics.SpawnedProcesses += gitMetrics.SpawnedProcesses
+	return fromGit, metrics, err
+}
+
+// sourceBindingSnapshotFromGit is the snapshot Git lists, in two ls-files
+// calls.
+func sourceBindingSnapshotFromGit(repoRoot string) (*SourceBindingSnapshot, SourceBindingMetrics, error) {
+	metrics := SourceBindingMetrics{}
 	metrics.SpawnedProcesses++
 	tracked, err := gitread.Run(repoRoot, "ls-files", "--stage", "-z")
 	if err != nil {
@@ -90,6 +108,29 @@ func ReadSourceBindingSnapshot(repoRoot string) (*SourceBindingSnapshot, SourceB
 		snapshot.tracked = append(snapshot.tracked, sourceBindingIndexEntry{mode, objectID, stage, repoPath})
 	}
 	return snapshot, metrics, nil
+}
+
+// sourceBindingSnapshotInProcess is the snapshot read in-process: the
+// entries ls-files --stage lists, and the untracked paths ls-files --others
+// lists, a nested repository with a trailing slash, and the git processes
+// the read started: one when it read Git's configuration.
+func sourceBindingSnapshotInProcess(repoRoot string) (*SourceBindingSnapshot, int, error) {
+	repo, err := openLocal(repoRoot)
+	if repo == nil {
+		return nil, spawnedBy(err), err
+	}
+	cut, err := repo.readCut()
+	if err != nil {
+		return nil, repo.Spawned, err
+	}
+	snapshot := &SourceBindingSnapshot{repoRoot: repoRoot, untracked: make([]string, 0, len(cut.Untracked))}
+	for _, entry := range cut.Index.Entries {
+		snapshot.tracked = append(snapshot.tracked, sourceBindingIndexEntry{entry.ModeString(), entry.Object, entry.StageString(), entry.Path})
+	}
+	for _, untracked := range cut.Untracked {
+		snapshot.untracked = append(snapshot.untracked, untracked.Listed())
+	}
+	return snapshot, repo.Spawned, nil
 }
 
 // ProjectSourceBindingMeasured derives one project binding from the shared file

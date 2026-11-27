@@ -152,7 +152,8 @@
       "run": [
         {
           "id": "bazel-graph-check",
-          "task": "bazel-graph-check-exec"
+          "task": "bazel-graph-check-exec",
+          "activation": { "files": ["MODULE.bazel", "WORKSPACE", "WORKSPACE.bazel"] }
         }
       ]
     },

@@ -119,6 +119,10 @@
       "text": "An operation declaring several success statuses generates a Go method returning Status, the status the provider answered, and its declared body decoded under that status's schema: one Body when every body-carrying status shares a schema, else Body<status> per status, nil on a bodyless status. Connect dispatch and a raw octet response are refused. omitOperations leaves named operations out of the Go client instead of failing it, names each in the client, and fails on an unknown name."
     },
     {
+      "id": "redirect-success",
+      "text": "A redirect is a 3xx but 304 declared with Response. With no Returns or ReturnsStatus, the endpoint publishes its declared successes and no synthesized 200; a unary redirecting endpoint advertises no Connect transport. The Go client accepts a declared redirect as a success, never follows it, and returns Status and Location beside any declared body, and so does the TypeScript client generated from the same contract; Connect dispatch is refused. Beside a raw octet success, a redirect stays documentation."
+    },
+    {
       "id": "opaque-json",
       "text": "json.RawMessage and any publish {\"x-putnami-json\": \"any\"}; a string-keyed map of either publishes {\"type\": \"object\", \"additionalProperties\": true}; the body validator accepts null for them. The error envelope declares details the same way, so no error response has an empty schema. A route carrying opaque JSON is left out of the protobuf descriptor. The Go client holds these values as json.RawMessage, keeps null apart from absent, carries bytes unchanged, and refuses an opaque parameter or Connect dispatch."
     },

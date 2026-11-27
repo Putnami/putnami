@@ -9,6 +9,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // languageExtension writes at dir a local stand-in for a language extension
@@ -39,6 +40,7 @@ func languageExtension(t *testing.T, root, dir, name, log string) {
 }
 
 func TestInitFromMoonInImportModeMapsTheProjectsAndPassesLintTestBuild(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "moon-import-runs-the-language-extensions", "init-from-moon-in-import-mode-maps-the-projects-and-passes-lint-test-build")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")

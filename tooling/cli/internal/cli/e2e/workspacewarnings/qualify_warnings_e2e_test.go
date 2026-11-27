@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
-	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 const qualifySHA = "3cc91b658a1e0f7d2c4b9e8f6a5d3c2b1a0f9e8d"
@@ -22,7 +22,7 @@ const qualifySHA = "3cc91b658a1e0f7d2c4b9e8f6a5d3c2b1a0f9e8d"
 // silent. Both run in @putnami/dev, which reads the warnings from its job
 // context.
 func TestADevCommandEnvelopeCarriesTheWarningsOfItsOwnLoad(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-discovery-selection", "project-inventory", "a-command-reports-the-warnings-of-its-own-load-once")
+	repotest.Require(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
 	t.Setenv("DO_NOT_TRACK", "1")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

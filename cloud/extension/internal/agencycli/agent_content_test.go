@@ -143,6 +143,46 @@ func TestTheAgentContentNamesOnlyAgencyCommands(t *testing.T) {
 	requireAll("skills/audit/scripts/config.sh", `.options["@putnami/cloud"].audit`)
 }
 
+// TestRebaseRegeneratesGeneratedFiles pins how the rebase skill resolves a
+// conflicted generated file: by building its project from the replayed
+// sources, never by merging the bytes by hand.
+func TestRebaseRegeneratesGeneratedFiles(t *testing.T) {
+	spectest.Proves(t, agentContentFeature, "rebase-regenerates-generated-files", "agent-content-rebase-regenerates-generated-files")
+
+	text := strings.Join(strings.Fields(agentContentFiles(t)["skills/rebase/SKILL.md"]), " ")
+	for _, want := range []string{
+		"Never merge a generated file by hand",
+		"Resolve the conflicted source files of `C` first",
+		`"$PUTNAMI_CLI" build --projects <project>`,
+		"A build that fails only with `generated-output-drift` has rewritten the files it names",
+		"Any other failure is `command_failed`",
+		"A file the build leaves absent, or that still holds a conflict marker, is `conflict_unresolved`",
+		"`git add` the conflicted generated files only",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("skills/rebase/SKILL.md lacks %q", want)
+		}
+	}
+
+	// The resolved sources are staged before the build and the cleanup, or
+	// the cleanup drops them and the fix commits a file regenerated from
+	// sources it does not hold.
+	order := []string{
+		"Resolve the conflicted source files of `C` first and `git add` each one",
+		`"$PUTNAMI_CLI" build --projects <project>`,
+		"`git add` the conflicted generated files only",
+		"`git restore --worktree -- .` and `git clean -fdq`",
+	}
+	at := -1
+	for _, step := range order {
+		next := strings.Index(text, step)
+		if next <= at {
+			t.Errorf("skills/rebase/SKILL.md does not run %q after the steps before it", step)
+		}
+		at = next
+	}
+}
+
 // TestRoutineBuildAttachesFromItsBranch pins where routine-build attaches the
 // session: on the branch the build pushes, which it checks out first, never on
 // a detached HEAD, where the binding would name the detached state only.

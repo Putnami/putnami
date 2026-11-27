@@ -584,8 +584,10 @@ func TestSchedulerCapabilitySourceBindingsMemoizedAcrossFullyCachedRestamps(t *t
 	if total != projectCount {
 		t.Fatalf("ProjectSourceBinding calls = %d, want %d", total, projectCount)
 	}
-	if got := scheduler.cacheStats.Snapshot().LocalSpawnedProcesses; got != 2 {
-		t.Fatalf("reported source-binding processes = %d, want 2 repository-wide ls-files calls", got)
+	// One repository-wide enumeration, read in-process: at most the git
+	// config call of its first read.
+	if got := scheduler.cacheStats.Snapshot().LocalSpawnedProcesses; got > 1 {
+		t.Fatalf("reported source-binding processes = %d, want at most the one git config call", got)
 	}
 }
 
@@ -659,7 +661,7 @@ func TestSchedulerCapabilitySourceBindingSnapshotInvalidatedAroundRestore(t *tes
 			scheduler := &Scheduler{ws: ws, capabilitySourceBindings: newCapabilitySourceBindingMemo()}
 			memo := scheduler.capabilitySourceBindings
 			before, spawned := memo.sourceBinding(ws.Root, projectRoot)
-			if before.err != nil || spawned != 2 {
+			if before.err != nil || spawned > 1 {
 				t.Fatalf("seed: %+v, processes=%d", before, spawned)
 			}
 			job := &ScheduledJob{Project: project}
@@ -668,10 +670,15 @@ func TestSchedulerCapabilitySourceBindingSnapshotInvalidatedAroundRestore(t *tes
 				Path: ".", State: store.TaskOutputPresent,
 			}}}
 			scheduler.invalidateCapabilitySourceBindingsForRestore(job, entry)
+			// The enumeration is read in-process, so the processes no longer
+			// tell a new enumeration: the memo must hold no snapshot.
+			if memo.snapshots[filepath.Clean(ws.Root)] != nil {
+				t.Fatal("the pre-write invalidation kept the repository enumeration")
+			}
 			// A stamp can be computed between the pre-write invalidation and the
 			// actual restore. The post-write invalidation must discard that snapshot
 			// too, including its old untracked set and ignore decisions.
-			if during, spawned := memo.sourceBinding(ws.Root, projectRoot); during.err != nil || during.binding != before.binding || spawned != 2 {
+			if during, spawned := memo.sourceBinding(ws.Root, projectRoot); during.err != nil || during.binding != before.binding || spawned > 1 {
 				t.Fatalf("during restore: %+v, processes=%d", during, spawned)
 			}
 			writeFileAt(t, filepath.Join(projectRoot, "new.go"), "package newfile\n")
@@ -680,9 +687,12 @@ func TestSchedulerCapabilitySourceBindingSnapshotInvalidatedAroundRestore(t *tes
 			// the untracked listing would also be incorrect.
 			runVersionsGit(t, ws.Root, "add", "-f", "proj/source.go")
 			scheduler.invalidateCapabilitySourceBindingsForRestore(job, entry)
+			if memo.snapshots[filepath.Clean(ws.Root)] != nil {
+				t.Fatal("the post-write invalidation kept the repository enumeration")
+			}
 			after, spawned := memo.sourceBinding(ws.Root, projectRoot)
 			want, _, err := putnamigit.ProjectSourceBindingMeasured(ws.Root, projectRoot)
-			if after.err != nil || err != nil || after.binding != want || after.binding == before.binding || spawned != 2 {
+			if after.err != nil || err != nil || after.binding != want || after.binding == before.binding || spawned > 1 {
 				t.Fatalf("after restore: %+v, want=%s err=%v processes=%d", after, want, err, spawned)
 			}
 			// The refreshed repository enumeration is reused for another root.
@@ -854,8 +864,8 @@ func TestCapabilityPackageStamps_InsideARepositoryCarryTheSourceBinding(t *testi
 			t.Errorf("stamp for %s = %+v, want the binding %s", stamp.Package, stamp, want)
 		}
 	}
-	if spawned != 2 {
-		t.Fatalf("git processes = %d, want the 2 of one repository enumeration", spawned)
+	if spawned > 1 {
+		t.Fatalf("git processes = %d, want at most the git config call of one repository enumeration", spawned)
 	}
 }
 

@@ -117,6 +117,7 @@ use (
 	./tooling/cli
 	./tooling/cli-document-set
 	./tooling/cli-documents
+	./tooling/cli-repository
 	./tooling/cli-model
 	./tooling/clientgen-extension
 	./tooling/contributor

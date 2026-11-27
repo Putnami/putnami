@@ -2,7 +2,9 @@
 
 - **Status**: accepted, superseded in part by
   [ADR 0003](0003-the-dev-executable-serves-compose-and-qualify.md): §1, the
-  manifest's CLI contract 11; decision D-018 retired on 2026-11-26; this ADR
+  manifest's CLI contract 11; extended by
+  [ADR 0004](0004-version-notes-writes-every-line-in-one-commit.md), which adds
+  the `notes` subcommand to §1; decision D-018 retired on 2026-11-26; this ADR
   remains the record
 - **Amended**: 2026-11-26: decision D-010 is rewritten and absorbs D-018. It
   reads that the core CLI computes a tree's version before any cache key and

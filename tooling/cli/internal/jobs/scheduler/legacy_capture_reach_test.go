@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // findJobsRepoRoot locates the workspace root so the inventory can read the REAL
@@ -11,6 +13,7 @@ import (
 // packaged-source test run stays green.
 func findJobsRepoRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)

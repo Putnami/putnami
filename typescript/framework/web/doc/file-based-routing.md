@@ -213,6 +213,13 @@ export default action()
   });
 ```
 
+A layout has no action of its own. When a directory holds `layout.tsx`, `page.tsx`
+and `action.ts`, a post to the directory's address reaches the page's action,
+from a plain form, a `<Form>` or a `<fetcher.Form>`, with or without `?index`.
+After a `<Form>` post, `useActionData()` in the page returns the result; after a
+`<fetcher.Form>` post, `fetcher.data` holds it. Without `action.ts`, the post
+answers 405.
+
 ### Error Boundaries (`error.tsx`)
 
 Error boundaries catch errors in their route subtree. Errors bubble up to the nearest error boundary. The `error()` builder declares the error component and optional middleware in a single file.

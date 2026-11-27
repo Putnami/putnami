@@ -20,6 +20,7 @@ import (
 	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The acceptance of moving `putnami version get` and `putnami version tag`
@@ -114,6 +115,7 @@ func devVersionCases() []devVersionCase {
 // same arguments, the same exit code, stdout, stderr and repository the
 // core's built-in commands produced, with the documented substitutions.
 func TestDevVersionCommandsMatchTheRecordedCore(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	runtimePath := devVersionRuntime(t)
 	for _, tc := range devVersionCases() {

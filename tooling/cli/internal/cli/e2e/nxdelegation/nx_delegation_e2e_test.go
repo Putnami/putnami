@@ -17,6 +17,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func TestMain(m *testing.M) {
@@ -267,6 +268,7 @@ func commit(t *testing.T, root, message string) string {
 }
 
 func TestAChangeToOneNxProjectRunsItAndItsDependentsThroughNx(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "nx-impact-runs-through-nx", "a-change-to-one-nx-project-runs-it-and-its-dependents-through-nx-uncached")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
@@ -391,6 +393,7 @@ func TestAChangeToOneNxProjectRunsItAndItsDependentsThroughNx(t *testing.T) {
 // not list, such as a test fixture, becomes no project: neither init --from
 // nx nor projects sync adds it.
 func TestTheWorkspaceAdoptsOnlyTheProjectsTheNxGraphLists(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "only-listed-members-become-projects", "a-directory-the-tool-does-not-list-becomes-no-project")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")

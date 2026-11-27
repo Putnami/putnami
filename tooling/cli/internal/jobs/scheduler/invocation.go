@@ -51,6 +51,7 @@
 package scheduler
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -59,6 +60,8 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
+
+	extensionproto "go.putnami.dev/protocol/extension"
 )
 
 // invocationRelation is one `finalizes` relation resolved onto plan nodes.
@@ -204,6 +207,29 @@ func (rt *invocationRuntime) relationFor(job *ScheduledJob) *invocationRelation 
 		return nil
 	}
 	return rt.participants[job.Key()]
+}
+
+// unservedPrunedConsumer returns the typed error of a consumer of a pruned
+// relation whose stored entry could not be served: the relation provisioned
+// nothing, so the consumer fails with this error and does not execute. It
+// returns nil for every other job.
+func (rt *invocationRuntime) unservedPrunedConsumer(job *ScheduledJob) *JobError {
+	if rt == nil || job == nil {
+		return nil
+	}
+	rel := rt.byConsumer[job.Key()]
+	if rel == nil {
+		return nil
+	}
+	rel.mu.Lock()
+	pruned := rel.pruned
+	rel.mu.Unlock()
+	if !pruned {
+		return nil
+	}
+	return &JobError{Code: extensionproto.FailureSensitiveSetupFailed, Message: fmt.Sprintf(
+		"blocked: %s was not provisioned because this task's cached entry was found, and the entry could not be served; run again, and if this repeats, the stored entry is damaged: run putnami cache clean",
+		rel.Producer.Key())}
 }
 
 // isPruned reports whether the job is the PRODUCER or the FINALIZER of a

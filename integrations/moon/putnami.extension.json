@@ -189,7 +189,8 @@
       "run": [
         {
           "id": "moon-graph-check",
-          "task": "moon-graph-check-exec"
+          "task": "moon-graph-check-exec",
+          "activation": { "files": [".moon/workspace.yml", "moon-graph.json"] }
         }
       ]
     },

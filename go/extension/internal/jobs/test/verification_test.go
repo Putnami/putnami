@@ -68,7 +68,7 @@ func TestAttachBatchVerificationKeepsPerProjectAttribution(t *testing.T) {
 			workspace: workspace,
 		}
 		result := batchProjectResult{ProjectID: project.ref.ID}
-		attachBatchVerification(&result, fragments, project)
+		attachBatchVerification(specreport.NewAttribution(), &result, fragments, project)
 
 		if len(result.Artifacts) != 1 || result.Artifacts[0].ID != featureproto.VerificationReportArtifactID {
 			t.Fatalf("%s artifacts = %+v", member.root, result.Artifacts)
@@ -104,10 +104,10 @@ func TestFragmentOwnedByAnyMember(t *testing.T) {
 		}
 	}
 	member := &batchProject{fullPath: filepath.Join(workspace, "alpha")}
-	if !fragmentOwnedByAnyMember(spectest.Fragment{File: ownedPath}, []*batchProject{member}) {
+	if !fragmentOwnedByAnyMember(specreport.NewAttribution(), spectest.Fragment{File: ownedPath}, []*batchProject{member}) {
 		t.Error("an owned fragment was reported orphaned")
 	}
-	if fragmentOwnedByAnyMember(spectest.Fragment{File: orphanPath}, []*batchProject{member}) {
+	if fragmentOwnedByAnyMember(specreport.NewAttribution(), spectest.Fragment{File: orphanPath}, []*batchProject{member}) {
 		t.Error("an orphaned fragment was claimed")
 	}
 }

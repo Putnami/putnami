@@ -3,13 +3,11 @@ package git
 import (
 	"bytes"
 	"fmt"
-	"os/exec"
 	"slices"
 	"sort"
 	"strings"
 
 	"go.putnami.dev/sdk/extension/gitread"
-	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // CandidatePaths lists the current cut: tracked paths plus non-ignored new
@@ -19,14 +17,53 @@ import (
 //
 // With prefixes, it lists only the candidates at or below one of them: each is
 // a slash path relative to root, matched literally, as a file or a directory.
+//
+// The listing is read in-process (inprocess_*.go) when the repository's state is
+// one the reader supports, and from Git otherwise (tooling/cli ADR 0112).
 func CandidatePaths(root string, prefixes ...string) ([]string, error) {
-	args := append([]string{"ls-files", "-z", "--cached", "--others", "--exclude-standard"}, literalPathspecs(prefixes)...)
-	cmd := exec.Command(gitread.Executable(), args...)
-	cmd.Dir = root
-	data, err := procstat.Output(cmd, procstat.Git)
-	if err != nil {
-		return nil, fmt.Errorf("git ls-files: %w", err)
+	if paths, err := candidatePathsInProcess(root, prefixes); !inProcessUnsupported(err) {
+		return paths, err
 	}
+	return CandidatePathsFromGit(root, prefixes...)
+}
+
+// candidatePathsInProcess is CandidatePaths read in-process: the index's
+// paths and the untracked ones, a nested repository as its directory with a
+// trailing slash, as ls-files lists it.
+func candidatePathsInProcess(root string, prefixes []string) ([]string, error) {
+	repo, err := openLocal(root)
+	if err != nil {
+		return nil, err
+	}
+	cut, err := repo.readCut(prefixes...)
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(cut.Index.Entries)+len(cut.Untracked))
+	for _, entry := range cut.Index.Entries {
+		paths = append(paths, entry.Path)
+	}
+	for _, untracked := range cut.Untracked {
+		paths = append(paths, untracked.Listed())
+	}
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	sort.Strings(paths)
+	return slices.Compact(paths), nil
+}
+
+// CandidatePathsFromGit is CandidatePaths read from Git alone, with the
+// environment of every Git read of the cut (gitread.RepositoryEnvironment):
+// the in-process reader reads the configuration Git reads there, so a bound
+// listing is the same whichever of the two answers (tooling/cli ADR 0112).
+func CandidatePathsFromGit(root string, prefixes ...string) ([]string, error) {
+	args := append([]string{"ls-files", "-z", "--cached", "--others", "--exclude-standard"}, literalPathspecs(prefixes)...)
+	stdout, stderr, err := gitread.RunCapture(root, args...)
+	if err != nil {
+		return nil, fmt.Errorf("git ls-files: %w: %s", err, strings.TrimSpace(stderr))
+	}
+	data := []byte(stdout)
 	if len(data) == 0 {
 		return nil, nil
 	}
@@ -111,8 +148,41 @@ type IndexModes struct {
 // two answers a binding gives: on a host that does not store the executable
 // bit, a tracked file takes its bit from the index mode, and an unmerged path
 // is refused (ADR 0063). With prefixes, it reads only the entries at or below
-// one of them, as CandidatePaths lists them.
+// one of them, as CandidatePaths lists them. It reads the index in-process
+// when it can, as CandidatePaths does.
 func ReadIndexModes(root string, prefixes ...string) (IndexModes, error) {
+	if index, err := indexModesInProcess(root, prefixes); !inProcessUnsupported(err) {
+		return index, err
+	}
+	return ReadIndexModesFromGit(root, prefixes...)
+}
+
+// indexModesInProcess is ReadIndexModes read in-process.
+func indexModesInProcess(root string, prefixes []string) (IndexModes, error) {
+	repo, err := openLocal(root)
+	if err != nil {
+		return IndexModes{}, err
+	}
+	entries, err := repo.index()
+	if err != nil {
+		return IndexModes{}, err
+	}
+	index := IndexModes{Modes: map[string]string{}, Unmerged: map[string]bool{}}
+	for _, entry := range entries.Entries {
+		if len(prefixes) > 0 && !underPrefixes(entry.Path, prefixes) {
+			continue
+		}
+		if entry.Stage != 0 {
+			index.Unmerged[entry.Path] = true
+			continue
+		}
+		index.Modes[entry.Path] = entry.ModeString()
+	}
+	return index, nil
+}
+
+// ReadIndexModesFromGit is ReadIndexModes read from Git alone.
+func ReadIndexModesFromGit(root string, prefixes ...string) (IndexModes, error) {
 	output, err := gitread.Run(root, append([]string{"ls-files", "--stage", "-z"}, literalPathspecs(prefixes)...)...)
 	if err != nil {
 		return IndexModes{}, fmt.Errorf("read the index modes: %w", err)
@@ -130,4 +200,25 @@ func ReadIndexModes(root string, prefixes ...string) (IndexModes, error) {
 		index.Modes[path] = mode
 	}
 	return index, nil
+}
+
+// WorkTreeRoot is what `git rev-parse --show-toplevel` answers in dir: the
+// root of the work tree that holds it. It is read in-process when the
+// repository's layout is one the reader supports (tooling/cli ADR 0112), and
+// from Git otherwise.
+func WorkTreeRoot(dir string) (string, error) {
+	if root, err := workTreeRootInProcess(dir); !inProcessUnsupported(err) {
+		return root, err
+	}
+	return WorkTreeRootFromGit(dir)
+}
+
+// WorkTreeRootFromGit is WorkTreeRoot read from Git alone, with the
+// environment of the in-process reader (gitread.RepositoryEnvironment).
+func WorkTreeRootFromGit(dir string) (string, error) {
+	out, stderr, err := gitread.RunCapture(dir, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr))
+	}
+	return strings.TrimSuffix(out, "\n"), nil
 }

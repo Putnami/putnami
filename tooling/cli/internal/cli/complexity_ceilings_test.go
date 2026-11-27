@@ -127,7 +127,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:         "invocation",
 		prefix:       "internal/jobs/scheduler/invocation",
 		files:        5,
-		funcs:        55,
+		funcs:        56,
 		perFileFuncs: 16,
 		why: "internal/jobs/scheduler/invocation*.go: the run-time half of the invocation-scoped " +
 			"lifecycle. Pruning a `finalizes` relation the planner resolved, the private scratch " +

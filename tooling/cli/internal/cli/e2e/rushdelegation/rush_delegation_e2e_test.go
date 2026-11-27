@@ -16,6 +16,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func TestMain(m *testing.M) {
@@ -207,8 +208,8 @@ func commit(t *testing.T, root, message string) string {
 }
 
 func TestAChangeToOneRushProjectRunsRushBuildOnItAndItsDependents(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "rush-impact-runs-through-rush", "a-change-to-one-rush-project-runs-rush-build-on-it-and-its-dependents-uncached")
-	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "init-rerun-shows-a-diff", "init-from-rerun-previews-and-writes-only-with-apply")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
@@ -297,6 +298,7 @@ func TestAChangeToOneRushProjectRunsRushBuildOnItAndItsDependents(t *testing.T) 
 // fixture, becomes no project: neither init --from rush nor projects sync
 // adds it.
 func TestTheWorkspaceAdoptsOnlyTheProjectsRushLists(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "only-listed-members-become-projects", "a-directory-the-tool-does-not-list-becomes-no-project")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")

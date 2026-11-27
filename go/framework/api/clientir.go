@@ -1308,7 +1308,7 @@ func operationToMethod(path, httpMethod string, op oaOperation, pathParameters [
 		if len(successes) == 0 && op.ParsedClient.Stream != clientcontract.StreamClient &&
 			op.ParsedClient.Stream != clientcontract.StreamBidirectional {
 			return MethodIR{}, errors.Newf(CodeClientGenConfig,
-				"api: strict first-party operation %s %s declares no 2xx success response", httpMethod, path)
+				"api: strict first-party operation %s %s declares no 2xx or redirect success response", httpMethod, path)
 		}
 		if (op.ParsedClient.Stream == clientcontract.StreamClient || op.ParsedClient.Stream == clientcontract.StreamBidirectional) &&
 			!hasResponseStatus(op.Responses, "101") {
@@ -1461,14 +1461,24 @@ func neutralRequest(request *oaRequestBody, strict bool) (*RequestIR, error) {
 	return &RequestIR{Required: request.Required, Content: content}, nil
 }
 
+// IsRedirectStatus reports a 3xx status an operation declares as its answer
+// instead of a body: the client hands its Location back rather than following
+// it. 304 Not Modified is a conditional read's answer, not a redirect.
+func IsRedirectStatus(status int) bool {
+	return status >= 300 && status <= 399 && status != 304
+}
+
 func neutralSuccesses(responses map[string]oaResponse, strict bool) ([]SuccessIR, error) {
 	statuses := make([]int, 0, len(responses))
 	byStatus := make(map[int]oaResponse, len(responses))
 	for status, response := range responses {
-		if len(status) != 3 || status[0] != '2' || !isDigit(status[1]) || !isDigit(status[2]) {
+		if len(status) != 3 || (status[0] != '2' && status[0] != '3') || !isDigit(status[1]) || !isDigit(status[2]) {
 			continue
 		}
 		value := int(status[0]-'0')*100 + int(status[1]-'0')*10 + int(status[2]-'0')
+		if value/100 == 3 && !IsRedirectStatus(value) {
+			continue
+		}
 		statuses = append(statuses, value)
 		byStatus[value] = response
 	}
@@ -1502,7 +1512,32 @@ func neutralSuccesses(responses map[string]oaResponse, strict bool) ([]SuccessIR
 			Headers:     headers,
 		})
 	}
-	return out, nil
+	return withoutRedirectsBesideOctets(out), nil
+}
+
+// withoutRedirectsBesideOctets leaves a declared redirect out of the
+// successes of an operation whose success is raw octets: the octets travel on
+// exactly one success status, so the redirect stays documentation and the
+// client keeps treating it as it did before redirects were successes.
+func withoutRedirectsBesideOctets(successes []SuccessIR) []SuccessIR {
+	octets := false
+	for _, success := range successes {
+		for _, content := range success.Content {
+			if content.IsBinary() {
+				octets = true
+			}
+		}
+	}
+	if !octets {
+		return successes
+	}
+	kept := successes[:0]
+	for _, success := range successes {
+		if !IsRedirectStatus(success.Status) {
+			kept = append(kept, success)
+		}
+	}
+	return kept
 }
 
 func neutralContent(content map[string]oaMediaType, strict bool) ([]ContentIR, error) {

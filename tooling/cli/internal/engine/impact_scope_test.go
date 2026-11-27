@@ -24,6 +24,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/output"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -856,12 +857,11 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 // is covered without an edit here, and the vocabulary pass runs over them all
 // as discovery runs it over a workspace's extensions.
 func TestNarrowToTaskScopes_KeepsWhatEveryFirstPartyCommandKept(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
-	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-task-scope-keeps-every-job-that-declares-side-effects")
-	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-criteria-job-is-kept-when-the-scope-names-a-task-of-a-kind")
-	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-scope-of-tasks-without-a-kind-keeps-no-criteria-job")
 	keptByName := map[string]bool{"publish": true, "deploy": true, "validate": true, "validate-workspace": true}
 	keptWithoutAKind := map[string]bool{"publish": true, "deploy": true}
+	repotest.Reads(t)
 	repoRoot := filepath.Join(engineModuleRoot(t), "..", "..")
 	project := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
 	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{project})

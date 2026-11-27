@@ -15,6 +15,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -262,6 +263,7 @@ func TestCacheTaskNameUsesManifestTaskName(t *testing.T) {
 // scheduling the project is unsafe if an entry from the previous workspace
 // graph can still be restored.
 func TestGoWorkspaceModuleFilesMoveRealTaskCacheKey(t *testing.T) {
+	repotest.Require(t)
 	repoRoot := findJobsRepoRoot(t)
 	goExtension := extension.LoadExtensionFromDir(filepath.Join(repoRoot, "go", "extension"), "/go/extension")
 	if goExtension == nil {

@@ -408,15 +408,12 @@ func TestAFailedFullRestoreNeverFallsBackToTheResultOnlyEntry(t *testing.T) {
 		t.Fatalf("the store does not hold both entries: full %+v (err=%v)", entry, err)
 	}
 	// Outputs restore in id order, so removing the last one's payload fails the
-	// restore after the earlier outputs were swapped in.
+	// restore after the earlier outputs were handled. The lock file the
+	// previous run restored still holds its bytes, but a destination is kept
+	// only when the entry's payload for it is there, so the restore reads the
+	// missing payload and fails.
 	if err := os.Remove(filepath.Join(entry.FilesDir, "lock")); err != nil {
 		t.Fatalf("break the full entry: %v", err)
-	}
-	// A destination that already holds its output is left as it is, without
-	// reading the entry: the restored lock file must differ for the restore
-	// to read the broken payload.
-	if err := os.WriteFile(filepath.Join(consumer.ws.Root, "bun.lock"), []byte("edited\n"), 0o644); err != nil {
-		t.Fatalf("edit the restored lock file: %v", err)
 	}
 
 	resultOnlyRestores := func() int {

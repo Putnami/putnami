@@ -11,6 +11,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // First-party conformance for the exact-match contract loader.
@@ -98,6 +99,7 @@ var firstPartyExtensionManifests = []string{
 // is an extension that vanishes: `putnami build` in a consumer workspace loses
 // the commands it provides, with a skip record most users never look at.
 func TestFirstPartyManifestsLoadUnderTheCurrentContract(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "extension/manifest-contract", "every-first-party-manifest-conforms", "first-party-manifests-load-under-the-current-contract")
 	repoRoot := findRepoRoot(t)
 	manifests := discoverFirstPartyManifests(t, repoRoot)
@@ -153,6 +155,7 @@ func TestFirstPartyManifestsLoadUnderTheCurrentContract(t *testing.T) {
 // The gate itself lives in the packagers (they are the ones that write the
 // stamp); what is asserted here is the input they will be given.
 func TestFirstPartyManifestsPassThePublishGate(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "extension/manifest-contract", "every-first-party-manifest-conforms", "first-party-manifests-pass-the-publish-gate")
 	repoRoot := findRepoRoot(t)
 
@@ -182,6 +185,7 @@ func TestFirstPartyManifestsPassThePublishGate(t *testing.T) {
 // exact paths, one owner per output, honest effects. A first-party violation
 // would surface in a consumer's plan, far from the extension that caused it.
 func TestFirstPartyDeclaredTasksConform(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "extension/manifest-contract", "every-first-party-manifest-conforms", "first-party-task-declarations-conform")
 	repoRoot := findRepoRoot(t)
 
@@ -223,6 +227,7 @@ func containsString(values []string, want string) bool {
 // tests that use it when the pure spec left for cli/model.
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 
 	dir, err := os.Getwd()
 	if err != nil {

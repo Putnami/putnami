@@ -60,7 +60,9 @@ export loses the extension and its Bazel edges. Without the export and without
 Run the sync again after a `BUILD` change that alters the dependencies
 between packages, and commit the result. `putnami validate` compares each
 `putnami.json` with the export and fails with `bazel.sync_stale` when a sync
-would change one. Keep it in the CI gate.
+would change one. Keep it in the CI gate. A workspace with no `MODULE.bazel`,
+`WORKSPACE` or `WORKSPACE.bazel` at its root plans no such check: it holds no
+Bazel graph to compare.
 
 While `bazel-graph.json` lies at the root, the sync and `putnami validate`
 read it and never run `bazel query`, so a stale export hides a new edge. Do

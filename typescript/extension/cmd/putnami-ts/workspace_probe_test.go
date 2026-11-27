@@ -349,6 +349,49 @@ func TestProbe_CreditsTheImportsOfTheGeneratedServeEntry(t *testing.T) {
 	}
 }
 
+// A generated client imports @putnami/client, and its src/ is built, not
+// committed: a fresh checkout has nothing for the scan to read. The probe
+// credits that import from the generatedFrom its putnami.json names, so a fresh
+// checkout and a populated one attribute the same edge. Any other dependency of
+// the client is still judged by its sources, and a package that names no
+// provider, or a provider in another language, gets no credit.
+func TestProbe_CreditsTheRuntimeOfAGeneratedClient(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "generated-client-runtime-edge", "a-generated-client-imports-the-runtime-its-generator-writes")
+	root := t.TempDir()
+	writeProbeFile(t, filepath.Join(root, "package.json"),
+		`{"name":"repo","private":true,"workspaces":["client","plain","other","runtime","extra"]}`)
+	for _, name := range []string{"client", "plain", "other"} {
+		writeProbeFile(t, filepath.Join(root, name, "package.json"), `{
+		  "name": "@acme/`+name+`",
+		  "main": "src/index.ts",
+		  "dependencies": {"@putnami/client": "workspace:*", "@acme/extra": "workspace:*"}
+		}`)
+	}
+	writeProbeFile(t, filepath.Join(root, "client", "putnami.json"),
+		`{"name":"@acme/client","generatedFrom":{"service":"catalog.items","language":"ts"}}`)
+	writeProbeFile(t, filepath.Join(root, "other", "putnami.json"),
+		`{"name":"@acme/other","generatedFrom":{"service":"catalog.items","language":"go"}}`)
+	writeProbeFile(t, filepath.Join(root, "runtime", "package.json"), `{"name":"@putnami/client"}`)
+	writeProbeFile(t, filepath.Join(root, "extra", "package.json"), `{"name":"@acme/extra"}`)
+
+	result := probeAll(t, root, "client", "plain", "other", "runtime", "extra")
+	for _, tc := range []struct {
+		project, dependency string
+		want                wsproto.DependencySource
+	}{
+		{"client", "runtime", wsproto.DependencySourcePackageJSON},
+		{"client", "extra", wsproto.DependencySourceDeclared},
+		{"plain", "runtime", wsproto.DependencySourceDeclared},
+		{"plain", "extra", wsproto.DependencySourceDeclared},
+		{"other", "runtime", wsproto.DependencySourceDeclared},
+	} {
+		project := projectAt(t, result, tc.project)
+		if got := project.DependencySources[tc.dependency]; got != tc.want {
+			t.Errorf("%s: dependencySources[%s] = %q, want %q", tc.project, tc.dependency, got, tc.want)
+		}
+	}
+}
+
 func TestProbe_CarriesThePutnamiSection(t *testing.T) {
 	root := probeFixture(t)
 	core := projectAt(t, probeAll(t, root, "libs/core"), "libs/core")

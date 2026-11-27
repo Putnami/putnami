@@ -19,7 +19,7 @@ func ResolveAutoSelection(ws *Workspace, commands []string, lastBuild LastBuildL
 	if ws == nil {
 		return AutoSelection{}, fmt.Errorf("workspace is nil")
 	}
-	branch, err := gitread.CurrentBranch(ws.Root)
+	branch, err := git.CurrentBranch(ws.Root)
 	if err != nil {
 		if gitread.Unmanaged(ws.Root) != nil {
 			return AutoSelection{

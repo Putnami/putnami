@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The no-dead-protocol invariant, made checkable for the one
@@ -59,6 +60,7 @@ var traitsReadThroughTraits = map[string]bool{
 // field the protocol only reads back to itself is still not a field any
 // consumer honors.
 func TestCommandTraits_EveryFieldHasANonTestReadSite(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	root := workspaceRoot(t)
 	production, _ := goSources(t, root)
@@ -210,6 +212,7 @@ func readsATraitsValue(operand ast.Expr) bool {
 // CLI and miss a consumer in another module.
 func workspaceRoot(t *testing.T) string {
 	t.Helper()
+	repotest.Reads(t)
 	dir := moduleRoot(t)
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "putnami.workspace.json")); err == nil {

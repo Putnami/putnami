@@ -394,6 +394,8 @@ func executeBatchGroup(
 
 	emitSkippedWithoutTestDatabase(emit, transcripts...)
 
+	// The group's tests have ended: one attribution resolves its paths once.
+	attribution := specreport.NewAttribution()
 	var fragments []spectest.Fragment
 	if fragmentsDir != "" {
 		var fragmentWarnings []string
@@ -402,7 +404,7 @@ func executeBatchGroup(
 			emit.Diagnostic("warning", warning, "", 0)
 		}
 		for _, fragment := range fragments {
-			if !fragmentOwnedByAnyMember(fragment, group.projects) {
+			if !fragmentOwnedByAnyMember(attribution, fragment, group.projects) {
 				emit.Diagnostic("warning", fmt.Sprintf(
 					"spec observation (%s, %s, %s) dropped: declaration %s belongs to no batched project",
 					fragment.Feature, fragment.Requirement, fragment.Check, fragment.File), "", 0)
@@ -420,9 +422,9 @@ func executeBatchGroup(
 			failed[project.ref.ID],
 			unattributedFailures[project.ref.ID],
 			invocationTimedOut[project.ref.ID],
-			specreport.ObservingTests(fragments, project.fullPath),
+			attribution.ObservingTests(fragments, project.fullPath),
 		)
-		attachBatchVerification(&result, fragments, project)
+		attachBatchVerification(attribution, &result, fragments, project)
 		results = append(results, result)
 	}
 	return results
@@ -432,8 +434,8 @@ func executeBatchGroup(
 // report artifact, keeping per-project attribution under batching exactly as
 // a solo run produces it. Reporting problems become warning diagnostics and
 // never change the member's test verdict.
-func attachBatchVerification(result *batchProjectResult, fragments []spectest.Fragment, project *batchProject) {
-	report, _, warnings := specreport.ProjectReport(fragments, project.fullPath)
+func attachBatchVerification(attribution *specreport.Attribution, result *batchProjectResult, fragments []spectest.Fragment, project *batchProject) {
+	report, _, warnings := attribution.ProjectReport(fragments, project.fullPath)
 	for _, warning := range warnings {
 		result.Diagnostics = append(result.Diagnostics, parse.ToolDiagnostic{
 			Category: "SPEC_VERIFICATION", Severity: "warning", Description: warning,
@@ -460,9 +462,9 @@ func attachBatchVerification(result *batchProjectResult, fragments []spectest.Fr
 // fragmentOwnedByAnyMember reports whether one fragment's declaration file
 // lives inside any batched project, so an orphaned observation is surfaced
 // instead of silently vanishing between members.
-func fragmentOwnedByAnyMember(fragment spectest.Fragment, projects []*batchProject) bool {
+func fragmentOwnedByAnyMember(attribution *specreport.Attribution, fragment spectest.Fragment, projects []*batchProject) bool {
 	for _, project := range projects {
-		if specreport.OwnedBy(fragment, project.fullPath) {
+		if attribution.OwnedBy(fragment, project.fullPath) {
 			return true
 		}
 	}
@@ -654,6 +656,9 @@ func splitBatchTestOutput(
 	var unattributed []string
 	attributedFailure := false
 	owners := packageOwners(projects)
+	// One builder per project: appending to the map's string copied each
+	// project's whole transcript again for every line it received.
+	builders := make(map[string]*strings.Builder, len(projects))
 	// The subprocess output is already in memory, so split it directly instead
 	// of imposing bufio.Scanner's 64 KiB token limit. A successful test may log a
 	// large JSON value on one line; dropping that line here would discard its
@@ -671,11 +676,20 @@ func splitBatchTestOutput(
 			unattributed = append(unattributed, line)
 			continue
 		}
-		outputs[projectID] += line + "\n"
+		builder := builders[projectID]
+		if builder == nil {
+			builder = &strings.Builder{}
+			builders[projectID] = builder
+		}
+		builder.WriteString(line)
+		builder.WriteByte('\n')
 		if event.Action == "fail" {
 			failed[projectID] = true
 			attributedFailure = true
 		}
+	}
+	for projectID, builder := range builders {
+		outputs[projectID] = builder.String()
 	}
 
 	unattributedFailure := ""

@@ -122,6 +122,7 @@ func UnsetHostRunEnvironment(t *testing.T) {
 // first.
 func RunCounts(t *testing.T, wsRoot string, args ...string) Counts {
 	t.Helper()
+	antedateGitState(t, wsRoot)
 	code, out := RunGateArgs(t, wsRoot, append(args, "--output=json")...)
 	if code != 0 {
 		t.Fatalf("putnami %s exit %d:\n%s", strings.Join(args, " "), code, out)
@@ -183,6 +184,7 @@ func ForgetTaskHistory(t *testing.T, wsRoot string) {
 // not measured.
 func PlanCounts(t *testing.T, wsRoot string, args ...string) Counts {
 	t.Helper()
+	antedateGitState(t, wsRoot)
 	engine, jobs := procstat.Take(), procstat.TakeReported()
 	code, out := RunGateArgs(t, wsRoot, append(args, "--dry-run")...)
 	if code != 0 {
@@ -204,6 +206,21 @@ func PlanCounts(t *testing.T, wsRoot string, args ...string) Counts {
 		counts.JobsGit[subcommand] = calls - jobs.Git[subcommand]
 	}
 	return counts
+}
+
+// antedateGitState dates the repository's configuration and HEAD at wsRoot an
+// hour back, as a clone's are when a run starts. A process keeps a reading of
+// Git's configuration only when its files changed no less than a second
+// before (tooling/cli ADR 0112); a fixture built a moment before its run
+// would read it again at each in-process read of the cut.
+func antedateGitState(t *testing.T, wsRoot string) {
+	t.Helper()
+	past := time.Now().Add(-time.Hour)
+	for _, file := range []string{"config", "HEAD"} {
+		if err := os.Chtimes(filepath.Join(wsRoot, ".git", file), past, past); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
 }
 
 // ParseCounts reads the counts of the --output=json document in out.

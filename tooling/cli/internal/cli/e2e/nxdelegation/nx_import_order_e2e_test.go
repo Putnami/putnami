@@ -12,6 +12,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // taskEnd is what the latest session of the workspace at root recorded at the
@@ -54,6 +55,7 @@ func taskEnd(t *testing.T, root, key string) (digest, reuse string) {
 // pricing's sources moves its key, though that build stores no Putnami cache
 // entry.
 func TestAnImportedNxTestWaitsForTheNxBuildAndFoldsItsKey(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "nx-import-keeps-the-build-order", "an-imported-nx-test-waits-for-the-nx-build-and-folds-its-key")
 	clitest.RequireShell(t)
 	if _, err := exec.LookPath("bun"); err != nil {

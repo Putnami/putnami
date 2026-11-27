@@ -34,17 +34,20 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/procstat"
 )
 
 // Paths lists the candidate paths under root, slash-separated, relative to
 // root, sorted and without duplicates: tracked paths plus untracked paths no
 // ignore rule excludes. It runs the command the CLI enumerates a `git:` input
-// with, so a task and its key list one set. A listed path may be absent from
+// with, in the same environment (gitread.RepositoryEnvironment), so a task
+// and its key list one set. A listed path may be absent from
 // the disk (an unstaged deletion); Open drops it, as the key does.
 func Paths(root string) ([]string, error) {
 	cmd := exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
 	cmd.Dir = root
+	cmd.Env = gitread.RepositoryEnvironment(os.Environ())
 	data, err := procstat.Output(cmd, procstat.Git)
 	if err != nil {
 		return nil, fmt.Errorf("git ls-files: %w", err)
@@ -92,6 +95,7 @@ type indexModes struct {
 func readIndexModes(root string) (indexModes, error) {
 	cmd := exec.Command("git", "ls-files", "-z", "--stage")
 	cmd.Dir = root
+	cmd.Env = gitread.RepositoryEnvironment(os.Environ())
 	data, err := procstat.Output(cmd, procstat.Git)
 	if err != nil {
 		return indexModes{}, fmt.Errorf("git ls-files --stage: %w", err)
@@ -189,6 +193,7 @@ func Open(root string) (*Tree, error) {
 func insideWorkTree(dir string) bool {
 	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
 	cmd.Dir = dir
+	cmd.Env = gitread.RepositoryEnvironment(os.Environ())
 	out, err := procstat.Output(cmd, procstat.Git)
 	return err == nil && strings.TrimSpace(string(out)) == "true"
 }

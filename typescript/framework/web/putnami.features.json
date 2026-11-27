@@ -212,11 +212,13 @@
             "kind": "acceptance",
             "checks": [
               "a-bracketed-dynamic-segment-becomes-a-router-param",
+              "a-layout-without-an-index-page-action-answers-405",
               "a-loader-endpoint-is-registered-when-declared",
               "a-nested-layout-produces-nested-nodes",
               "a-nested-page-id-is-derived-deterministically",
               "a-page-nests-inside-a-layout-whose-parent-path-has-none",
               "a-page-registers-under-its-route-id",
+              "a-post-to-a-layout-address-reaches-its-index-page-action",
               "a-route-group-is-filtered-out-of-the-path",
               "a-scan-root-prefix-is-inferred-and-normalized",
               "an-action-endpoint-is-registered-when-declared",

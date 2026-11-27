@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // composeDocument is the part of a compose start or exit document this test
@@ -42,6 +43,7 @@ type composeDocument struct {
 // its serve run, and a signal still ends the composition with exit 0 and a
 // clean exit document.
 func TestComposeRestartsAWatchedTargetWithItsServeEnvironment(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	requireFixtureTools(t)
 	cli := fixtureproc.CLI(t)

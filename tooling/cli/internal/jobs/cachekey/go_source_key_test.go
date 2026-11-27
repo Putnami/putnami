@@ -7,6 +7,7 @@ import (
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -114,6 +115,7 @@ func (f *goSourceKeyFixture) keys(t *testing.T) (libKey, appKey string) {
 // they are. A non-test edit must move both: under go.work the dependent
 // compiles the dependency's sources, so its verdict is a function of them.
 func TestGoDescribeKeyIgnoresADependencyTestFile(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
 	baseLib, baseApp := fixture.keys(t)
@@ -145,6 +147,7 @@ func TestGoDescribeKeyIgnoresADependencyTestFile(t *testing.T) {
 // describe: a test-only edit must leave a compile key where it is, in this
 // project and in a dependency alike.
 func TestGoCompileKeyIgnoresTestFiles(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	fixture := newGoSourceKeyFixture(t, "build-compile", "build~compile", false)
 	_, baseApp := fixture.keys(t)
@@ -166,6 +169,7 @@ func TestGoCompileKeyIgnoresTestFiles(t *testing.T) {
 // one that runs them. A test-exec key that ignored a `_test.go` edit would serve
 // the previous verdict for a test the run never executed.
 func TestGoTestKeyReadsTestFiles(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	fixture := newGoSourceKeyFixture(t, "test-exec", "test~test", false)
 	_, baseApp := fixture.keys(t)
@@ -186,6 +190,7 @@ func TestGoTestKeyReadsTestFiles(t *testing.T) {
 // hashing it whole made a deploy option of another extension re-run this
 // project's build and test, and every dependent behind `^describe`.
 func TestGoBuildKeyIgnoresAnotherExtensionsOptions(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
 	config := filepath.Join(fixture.appDir, "putnami.json")
@@ -217,6 +222,7 @@ func TestGoBuildKeyIgnoresAnotherExtensionsOptions(t *testing.T) {
 // option block neither project's Go tasks read must stop at the file it lives
 // in.
 func TestGoBuildKeyIgnoresADependencyForeignOptions(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
 	config := filepath.Join(fixture.libDir, "putnami.json")
@@ -243,6 +249,7 @@ func TestGoBuildKeyIgnoresADependencyForeignOptions(t *testing.T) {
 // exclude the tree, so it cannot move the key the run computed before
 // describe ran.
 func TestGoSourceKeyIgnoresGoFilesUnderTheGeneratedTree(t *testing.T) {
+	repotest.Require(t)
 	for _, task := range []struct{ name, job string }{{"build-compile", "build~compile"}, {"test-exec", "test~test"}} {
 		t.Run(task.name, func(t *testing.T) {
 			fixture := newGoSourceKeyFixture(t, task.name, task.job, false)

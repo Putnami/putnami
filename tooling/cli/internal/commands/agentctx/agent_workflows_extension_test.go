@@ -17,6 +17,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/agentartifacts"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func writePathFile(t *testing.T, dir, rel, content string) {
@@ -164,6 +165,7 @@ func TestLegacyEntriesFailClearly(t *testing.T) {
 // The first-party successors the legacy refusal names are exactly what the
 // contributor extension's manifest supersedes, so the two cannot drift apart.
 func TestFirstPartySuccessorsMatchTheContributorManifest(t *testing.T) {
+	repotest.Require(t)
 	manifest, err := extproto.LoadManifest(filepath.Join(driftRepositoryRoot(t), "tooling", "contributor", "putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)

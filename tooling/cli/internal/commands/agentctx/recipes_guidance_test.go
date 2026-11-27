@@ -9,6 +9,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 const seededGoRecipes = `{
@@ -147,6 +148,7 @@ func TestContextGenerateCarriesTheRecipeIndexToTheHostCopy(t *testing.T) {
 // this repository: the build skill's committed reference is exactly what
 // `putnami context generate` renders from the committed indexes.
 func TestCommittedRecipeReferenceMatchesTheSampleIndexes(t *testing.T) {
+	repotest.Require(t)
 	root := driftRepositoryRoot(t)
 	want := renderRecipeReference(root)
 	if want == "" {

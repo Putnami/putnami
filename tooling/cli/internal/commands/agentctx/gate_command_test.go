@@ -15,6 +15,7 @@ import (
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gittest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // writeCIDocument writes a minimal valid version 3 document declaring the given
@@ -551,6 +552,7 @@ func TestRepositoryGuidanceBytesUsesTheRightSourceOfTruth(t *testing.T) {
 // lint, test and build) and the committed guidance stop agreeing in either
 // direction.
 func TestGeneratedGuidanceMatchesRepositoryCIDocument(t *testing.T) {
+	repotest.Require(t)
 	root := repositoryRootForAIContext(t)
 	gate := gateTasksForWorkspace(root)
 	if gate == defaultGate() {

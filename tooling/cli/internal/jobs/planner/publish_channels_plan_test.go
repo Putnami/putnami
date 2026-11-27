@@ -9,6 +9,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -16,6 +17,7 @@ import (
 // real Go manifest. The project declares only the go channel, so the docker
 // step is not planned, and the package jobs publish requires declare none.
 func TestPlan_APublishJobExposesItsTasksPublishChannels(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "publish-tasks-declare-their-channels", "a-planned-job-exposes-its-tasks-publish-channels")
 	ext := loadGoPlannerExtension(t)

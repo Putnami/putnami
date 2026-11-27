@@ -60,6 +60,10 @@
       ]
     },
     {
+      "id": "generated-client-runtime-edges",
+      "text": "A generated client module, one whose putnami.json names a generatedFrom of language go or that commits clientgen.json, attributes each require of a module the Go client generator imports in every client it writes to an import, whether or not the client is generated yet; its other requires are judged by what its sources import."
+    },
+    {
       "id": "replace-closure",
       "text": [
         "Workspace sync appends only the missing transitive workspace replaces, after existing content, never rewriting bytes it did not add;",
@@ -136,6 +140,13 @@
     {
       "id": "single-schema-committer",
       "text": "Each committed generated contract has exactly one committer for a given run: when describe will run, generate defers the committed sidecar instead of writing a partial one, only changed files are committed, the committed feature evidence and gRPC service inventory hold only what a successful run wrote while a failed run leaves them as they were, and formatting-only publication of an unmerged framework OpenAPI document preserves its bytes and hash."
+    },
+    {
+      "id": "committed-route-inventory-drift",
+      "text": [
+        "Describe is the one writer of an app's committed schema/http-routes.json and fails on its drift: when the inventory a build writes or a cache hit restores differs from the committed bytes, the build fails with generated-output-drift and the worktree holds the regenerated file.",
+        "A successful describe that commits no inventory removes a copy an earlier run left; a failed one leaves it as it was."
+      ]
     },
     {
       "id": "grpc-inventory-checked-before-promotion",

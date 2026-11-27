@@ -40,6 +40,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/layout"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The workspace a publication e2e fixture publishes from, and the members it
@@ -518,8 +519,10 @@ func buildExtensionRuntimes(t *testing.T, store string) (tsRuntime, goRuntime st
 	}
 	tsRuntime = filepath.Join(store, "extensions", "typescript@"+e2eRuntimeVersion, "compiled", "putnami-ts")
 	goRuntime = filepath.Join(store, "extensions", "go@"+e2eRuntimeVersion, "compiled", "putnami-go")
+	testDeadline, hasDeadline := t.Deadline()
+	bound := runBound(testDeadline, hasDeadline, time.Now(), runtimeBuildDeadline)
 	build := func(source, pkg, output string) error {
-		ctx, cancel := context.WithTimeout(context.Background(), runtimeBuildDeadline)
+		ctx, cancel := context.WithTimeout(context.Background(), bound)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, goBinary, "build", "-o", output, "-ldflags", "-X main.runtimeVersion="+e2eRuntimeVersion, pkg)
 		cmd.Dir = filepath.Join(root, source)
@@ -527,7 +530,7 @@ func buildExtensionRuntimes(t *testing.T, store string) (tsRuntime, goRuntime st
 		cmd.WaitDelay = engineDumpGrace
 		if out, err := cmd.CombinedOutput(); err != nil {
 			if ctx.Err() != nil {
-				return fmt.Errorf("build %s: not built within %s: %w\n%s", source, runtimeBuildDeadline, err, out)
+				return fmt.Errorf("build %s: not built within %s: %w\n%s", source, bound, err, out)
 			}
 			return fmt.Errorf("build %s: %w\n%s", source, err, out)
 		}
@@ -984,9 +987,9 @@ func failureLines(output string) string {
 // ancestor of the commit is refused at open and nothing is uploaded; a release
 // whose members the registries do not store is refused, and no channel moves.
 func TestReleaseSetE2EPublicationV1UploadsThroughTheProviderAndReleasesForwardOnly(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "real-extension-jobs-pack-and-the-session-uploads")
-	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "the-engine-asks-no-publish-credential")
 	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "real-extensions-open-once-and-release-forward-only")
 	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "a-local-and-a-hosted-run-open-the-same-plan")
 	fx := writePublicationE2EFixture(t)

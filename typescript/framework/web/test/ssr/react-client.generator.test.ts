@@ -1,4 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
+import { createMemoryRouter, type RouteObject } from 'react-router';
 
 const realUtils = { ...(await import('@putnami/utils')) };
 const mockAppend = mock();
@@ -55,6 +57,59 @@ mock.module('@putnami/utils', () => ({
 }));
 
 const { ReactClientGenerator } = await import('../../src/ssr/generator/react-client.generator');
+
+type Generator = InstanceType<typeof ReactClientGenerator>;
+
+/** Addresses the generated `actionHandler` was posted to. */
+const posted: string[] = [];
+
+/**
+ * Evaluate the routes a generator writes, with the route components left out
+ * and `actionHandler` recording the address it was posted to.
+ */
+function generatedRoutes(generator: Generator): RouteObject[] {
+  mockAppend.mockReset();
+  generator.write();
+  const source = mockAppend.mock.calls
+    .map(([line]) => String(line))
+    .filter((line) => !/^\s*(lazy|hydrateFallbackElement|errorElement):/.test(line))
+    .filter((line) => !line.startsWith('hydratePage('))
+    .join('\n');
+  const code = new Bun.Transpiler({ loader: 'ts' }).transformSync(`${source}\nreturn routes;`);
+  const actionHandler = async ({ request }: { request: Request }) => {
+    posted.push(new URL(request.url).pathname);
+    return { ok: true };
+  };
+  return new Function('actionHandler', 'pageLoaderHandler', 'layoutLoaderHandler', code)(
+    actionHandler,
+    () => () => null,
+    () => () => null,
+  ) as RouteObject[];
+}
+
+/**
+ * Submit a fetcher post through the routes, as `useFetcher().submit` does,
+ * and answer the address the action saw, or the status of the error.
+ */
+async function submit(routes: RouteObject[], href: string): Promise<{ posted?: string; status?: number }> {
+  posted.length = 0;
+  const router = createMemoryRouter(routes, { initialEntries: [href.split('?')[0] ?? '/'] });
+  await router.initialize();
+  const settled = new Promise<void>((resolve) => {
+    const unsubscribe = router.subscribe((state) => {
+      if (state.fetchers.get('submit')?.state === 'idle' || Object.keys(state.errors ?? {}).length > 0) {
+        unsubscribe();
+        resolve();
+      }
+    });
+  });
+  const leaf = router.state.matches.at(-1)?.route.id ?? 'root';
+  await router.fetch('submit', leaf, href, { formMethod: 'post', formData: new FormData() });
+  await settled;
+  const error = Object.values(router.state.errors ?? {})[0] as { status?: number } | undefined;
+  router.dispose();
+  return { posted: posted[0], status: error?.status };
+}
 
 describe('ReactClientGenerator', () => {
   afterAll(() => {
@@ -212,5 +267,85 @@ describe('ReactClientGenerator', () => {
     expect(lines.some((line) => line.includes("lazy: () => import('../../../src/app/not-found')"))).toBe(true);
     expect(lines.some((line) => line.includes("path: 'blog/:slug'"))).toBe(true);
     expect(lines.filter((line) => line.includes('\\'))).toEqual([]);
+  });
+
+  describe('a layout that shares its address with a page', () => {
+    // Each directory holds layout.tsx, page.tsx and action.ts, and `href` is
+    // the address a form in the page posts to. Generation adds a scan root's
+    // layouts before its pages, so a page comes first only from another scan
+    // root. At a multi-segment address that order does not nest the page under
+    // the layout at all, so the page-first order is covered where it does.
+    const directories = [
+      { name: 'a plain directory', dir: 'n/', href: '/n', pageFirst: true },
+      { name: 'the root directory', dir: '', href: '/', pageFirst: true },
+      { name: 'a parameter directory', dir: 'r/[run]/', href: '/r/42', pageFirst: false },
+    ];
+    const orders = [
+      {
+        name: 'the layout first',
+        add: (g: Generator, dir: string) => (g.addLayout(`${dir}layout.tsx`), g.addPage(`${dir}page.tsx`)),
+      },
+      {
+        name: 'the page first',
+        add: (g: Generator, dir: string) => (g.addPage(`${dir}page.tsx`), g.addLayout(`${dir}layout.tsx`)),
+      },
+    ];
+
+    for (const { name, dir, href, pageFirst } of directories) {
+      for (const order of pageFirst ? orders : orders.slice(0, 1)) {
+        specTest(
+          `routes a post to ${name} to its page action, with ${order.name}`,
+          {
+            feature: 'typescript/web-application-delivery',
+            requirement: 'route-graph',
+            check: 'a-post-to-a-layout-address-reaches-its-index-page-action',
+          },
+          async () => {
+            mockFileExists.mockImplementation((path: string) => path.endsWith(`/scanned/${dir}action.ts`));
+            const generator = new ReactClientGenerator('/client.tsx', './src/app', '/scanned');
+            order.add(generator, dir);
+
+            const routes = generatedRoutes(generator);
+            expect(await submit(routes, href)).toEqual({ posted: href, status: undefined });
+            expect(await submit(routes, `${href}?index`)).toEqual({ posted: href, status: undefined });
+          },
+        );
+      }
+
+      specTest(
+        `answers 405 to a post to ${name} whose page has no action`,
+        {
+          feature: 'typescript/web-application-delivery',
+          requirement: 'route-graph',
+          check: 'a-layout-without-an-index-page-action-answers-405',
+        },
+        async () => {
+          for (const order of pageFirst ? orders : orders.slice(0, 1)) {
+            const generator = new ReactClientGenerator('/client.tsx', './src/app', '/scanned');
+            order.add(generator, dir);
+
+            const routes = generatedRoutes(generator);
+            expect(await submit(routes, href)).toEqual({ posted: undefined, status: 405 });
+            expect(await submit(routes, `${href}?index`)).toEqual({ posted: undefined, status: 405 });
+          }
+        },
+      );
+    }
+
+    it('gives the layout its index page action in both registration orders, and no other page action', () => {
+      mockFileExists.mockImplementation((path: string) => path.endsWith('/action.ts'));
+      for (const order of orders) {
+        const generator = new ReactClientGenerator('/client.tsx', './src/app', '/scanned');
+        order.add(generator, 'n/');
+        generator.addPage('n/settings/page.tsx');
+
+        const layout = generator.root.children?.find((child) => child.path === 'n');
+        const index = layout?.children?.find((child) => child.index === true);
+        const settings = layout?.children?.find((child) => child.path === 'settings');
+        expect(layout?.action).toBe('/n/action.ts');
+        expect(index?.action).toBe('/n/action.ts');
+        expect(settings?.action).toBe('/n/settings/action.ts');
+      }
+    });
   });
 });

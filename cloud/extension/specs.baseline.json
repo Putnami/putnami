@@ -21,6 +21,7 @@
     "cloud/agency-providers#refusals-keep-their-outcome",
     "cloud/agency-providers#signed-in-session-wins",
     "cloud/agent-content#names-only-agency-commands",
+    "cloud/agent-content#rebase-regenerates-generated-files",
     "cloud/agent-content#routine-build-attaches-from-its-branch",
     "cloud/agent-content#ships-the-agency-skills-and-workers",
     "cloud/agent-session#a-delegated-session-mints-no-registry-token",

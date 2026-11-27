@@ -11,6 +11,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -18,6 +19,7 @@ import (
 // first-party manifest. A synthetic condition here could stay green while the
 // shipped Go extension drifted back to an unconditional compile.
 func TestPlan_GoLibraryCompileUsesInvocationAndProjectFacts(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	ext := loadGoPlannerExtension(t)
 
@@ -118,6 +120,7 @@ func TestPlan_GoLibraryCompileUsesInvocationAndProjectFacts(t *testing.T) {
 // the project's .gen tree alone, never as a dependency whose key it folds or
 // whose files it reads (ADR 0082).
 func TestPlan_GoInfraOnlyOrdersAfterCompile(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	ext := loadGoPlannerExtension(t)
 	ws, planned := planGoProjectIn(t, ext, "application", []string{"build"}, "")
@@ -145,6 +148,7 @@ func TestPlan_GoInfraOnlyOrdersAfterCompile(t *testing.T) {
 }
 
 func TestPlan_PlannerConditionCommandSetIsOrderIndependent(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	ext := loadGoPlannerExtension(t)
 	first := planKeySet(planGoProject(t, ext, "library", []string{"lint", "test", "build"}, ""))
@@ -296,6 +300,7 @@ func findStep(planned []*jobmodel.ScheduledJob, extensionName, command, step str
 // step and plans no docker or cross-compile step, the routed packager owns bin
 // and docker alone, and Go's docker upload waits for that packager's step.
 func TestPlan_GoPackageYieldsTheImageToTheRoutedPackager(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	goExt := loadGoPlannerExtension(t)
 	routed := `{"publish":["docker","deployment"],"options":{"@putnami/go:publish":{` +
@@ -344,6 +349,7 @@ func TestPlan_GoPackageYieldsTheImageToTheRoutedPackager(t *testing.T) {
 // names @putnami/go, every channel mix plans the same jobs and edges as the
 // docker step gated on its channel alone.
 func TestPlan_GoPackageWithoutARoutedImageIsUnchanged(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	goExt := loadGoPlannerExtension(t)
 	channelOnly := loadGoPlannerExtension(t)

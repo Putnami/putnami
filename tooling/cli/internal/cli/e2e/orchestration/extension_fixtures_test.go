@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The fixtures of the extensions whose cases follow the language cases: each
@@ -110,6 +112,16 @@ var rushFiles = integrationFiles("rush", map[string]string{
 	"libs/lib/package.json": `{"name": "lib", "version": "1.0.0", "scripts": {"build": "true"}}` + "\n",
 })
 
+// delegatedToolsAbsentFiles is a workspace that loads the six delegated tools
+// and holds none of their root files, with one project none of them serves:
+// their graph checks are its only validate jobs.
+var delegatedToolsAbsentFiles = map[string]string{
+	".gitignore": ".putnami\nnode_modules\n",
+	"putnami.workspace.json": `{"name": "counts", "extensions": ["/.ext/bazel", "/.ext/pants", "/.ext/nx", "/.ext/moon",` +
+		` "/.ext/turbo", "/.ext/rush", "/.ext/dev"], "includes": ["lib"]}` + "\n",
+	"lib/putnami.json": `{"name": "lib"}` + "\n",
+}
+
 // skippedExtensions are the extensions built here that hold no count, each
 // with the reason. An extension of this repository is either the subject of
 // an extension case or listed here (TestEveryExtensionBuiltHereIsCounted).
@@ -159,6 +171,7 @@ var skippedExtensions = map[string]string{
 // reason it holds no count, and when a case or a reason names an extension
 // this repository no longer builds.
 func TestEveryExtensionBuiltHereIsCounted(t *testing.T) {
+	repotest.Require(t)
 	built := map[string]bool{}
 	err := filepath.WalkDir(repoRoot, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {

@@ -13,6 +13,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // localHits reads the local cache hits a run's summary reports.
@@ -27,6 +28,7 @@ func localHits(t *testing.T, out string) int {
 }
 
 func TestADelegatedTurborepoImportsPricingAndPassesLintTestBuild(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, feature, "delegate-import-runs-one-project-on-putnami", "a-delegated-turborepo-imports-pricing-and-passes-lint-test-build")
 	clitest.RequireShell(t)
 	if _, err := exec.LookPath("bun"); err != nil {
@@ -155,6 +157,7 @@ func TestADelegatedTurborepoImportsPricingAndPassesLintTestBuild(t *testing.T) {
 }
 
 func TestAnImportThatMovesNoTaskLeavesTheLockfileAsItWas(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, feature, "init-installs-only-what-moves", "an-import-that-moves-no-task-leaves-the-lockfile-as-it-was")
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")

@@ -172,7 +172,8 @@
       "run": [
         {
           "id": "turbo-graph-check",
-          "task": "turbo-graph-check-exec"
+          "task": "turbo-graph-check-exec",
+          "activation": { "files": ["turbo.json"] }
         }
       ]
     },

@@ -98,10 +98,17 @@ export class HttpTransport implements Transport {
       }
     }
 
-    init.redirect = 'error';
+    // A redirect is followed by nobody: an operation that declares one keeps
+    // the 3xx as its answer, and any other call refuses every redirect.
+    const keepsRedirect = request.successes?.some((entry) => isRedirectStatus(entry.status)) ?? false;
+    init.redirect = keepsRedirect ? 'manual' : 'error';
     const response = await fetch(url, init).catch((error: unknown) => {
       throw markTransportFailure(error);
     });
+    if (response.type === 'opaqueredirect') {
+      // A browser hides a redirect it did not follow: no status, no Location.
+      throw new ClientResponseContractError('the runtime cannot read a redirect answer in this environment');
+    }
 
     let data: T | undefined;
     const contentType = response.headers.get('Content-Type') ?? '';
@@ -248,6 +255,14 @@ function resolveReadCap(request: ClientRequest, status: number, fallback: number
   return cap;
 }
 
+/**
+ * A 3xx an operation answers with instead of a body. 304 Not Modified is a
+ * conditional read's answer, not a redirect.
+ */
+export function isRedirectStatus(status: number): boolean {
+  return status >= 300 && status <= 399 && status !== 304;
+}
+
 /** A raw octet representation is exactly `{ type: "string", format: "binary" }`. */
 function isBinaryContent(content: { schema?: ClientSchema }): boolean {
   return content.schema?.type === 'string' && content.schema.format === 'binary';
@@ -308,6 +323,11 @@ function decodeDeclaredSuccess<T>(
   success: NonNullable<ClientRequest['successes']>[number],
   request: ClientRequest,
 ): { data: T | undefined; successBody?: Uint8Array } {
+  if (success.content.length === 0 && isRedirectStatus(success.status)) {
+    // A redirect that declares no body answers with its Location; the short
+    // hypertext note a server may add beside it is not part of the answer.
+    return { data: undefined, successBody: new Uint8Array(0) };
+  }
   if (success.content.length === 0) {
     if (bytes.length > 0)
       throw new ClientResponseContractError('provider returned a body for a declared empty response');

@@ -126,6 +126,10 @@
       "text": "An operation that declares a 304 generates a conditional read: an ifNoneMatch call option sent as If-None-Match, and a status-discriminated result where 200 carries the body and the response headers and 304 carries no data, never an error. A 304 with a body, outside a unary GET over rest-json, beside raw octets, a response cache or a declared If-None-Match parameter fails generation. An operation without a 304 is unchanged."
     },
     {
+      "id": "redirect-success",
+      "text": "A unary operation declaring a 3xx but 304 generates a status-discriminated result whose redirects carry the answered Location beside headers and any body, even as its only success. The runtime never follows a redirect: it answers a declared one, drops the note on a bodyless one, gives an empty Location when none was sent, as Go does, and refuses an undeclared one. A redirect beside raw octets or on a stream stays documentation; on Connect it fails generation."
+    },
+    {
       "id": "streamed-binary-payloads",
       "text": "An explicit raw HTTP stream generates a required request contentType with a BinarySource and returns a readable body with its status and full concrete Content-Type. The runtime does not buffer or JSON-decode it, returns before EOF, and retains cancellation through body consumption. Uploads cannot be replayed by ordinary retries or forwarded-user credential refresh. A streamed operation cannot declare a response cache. Declared auth, errors and unary HTTP transport stay in force."
     },

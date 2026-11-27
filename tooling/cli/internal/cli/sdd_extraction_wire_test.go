@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // The wire-only requirement moved here with the parity recording (decision 8
@@ -16,6 +17,7 @@ import (
 // the extension cannot assert what it does not depend on without creating
 // exactly the dependency the rule forbids.
 func TestSDDExtensionSpeaksOnlyTheWire(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	root := filepath.Join("..", "..", "..", "sdd-extension")
 

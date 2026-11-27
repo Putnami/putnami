@@ -120,19 +120,25 @@ func ReadFragments(directory string) ([]spectest.Fragment, []string) {
 // first provenance in (path, symbol) order is kept. Conflicting verdicts are
 // surfaced as a warning; agreeing multiplicity is not, because it is normal.
 func ProjectReport(fragments []spectest.Fragment, projectRoot string) (*features.VerificationReport, []spectest.Fragment, []string) {
+	return NewAttribution().ProjectReport(fragments, projectRoot)
+}
+
+// ProjectReport is the package's ProjectReport, resolving paths through a's
+// cache.
+func (a *Attribution) ProjectReport(fragments []spectest.Fragment, projectRoot string) (*features.VerificationReport, []spectest.Fragment, []string) {
 	var warnings []string
 	var foreign []spectest.Fragment
 	report := &features.VerificationReport{ProtocolVersion: features.VerificationReportProtocolVersion}
 
 	var order []string
 	grouped := make(map[string][]features.VerificationObservation)
-	cleanRoot, rootErr := canonicalPath(projectRoot)
+	cleanRoot, rootErr := a.canonicalPath(projectRoot)
 	if rootErr != nil {
 		warnings = append(warnings, fmt.Sprintf("reporting project root cannot be resolved: %v", rootErr))
 		return nil, append(foreign, fragments...), warnings
 	}
 	for _, fragment := range fragments {
-		cleanFile, err := canonicalPath(fragment.File)
+		cleanFile, err := a.canonicalPath(fragment.File)
 		if err != nil {
 			foreign = append(foreign, fragment)
 			continue
@@ -356,17 +362,43 @@ func provenanceLess(a, b features.ObservationProvenance) bool {
 	return a.Symbol < b.Symbol
 }
 
+// Attribution attributes fragments to projects, and resolves each path once
+// for the life of the value: one attribution pass asks the same project roots
+// and declaration files once per fragment and per member. Use one per pass
+// over reports that are complete, never across a run of test code, which may
+// move the links it resolved. A failure is not kept. Its zero value is ready
+// to use. It is not safe for concurrent use.
+type Attribution struct {
+	resolved map[string]string
+}
+
+// NewAttribution returns an Attribution with nothing resolved yet.
+func NewAttribution() *Attribution {
+	return &Attribution{resolved: map[string]string{}}
+}
+
 // canonicalPath resolves both lexical and filesystem aliases before project
 // attribution. macOS exposes temporary directories through both /var and
 // /private/var, and workspaces may themselves be symlinked; those aliases
 // must not discard valid evidence. Resolving the declaration path also makes
 // a symlink inside a project that escapes outside it fail closed.
-func canonicalPath(path string) (string, error) {
+func (a *Attribution) canonicalPath(path string) (string, error) {
 	absolute, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
 		return "", err
 	}
-	return filepath.EvalSymlinks(absolute)
+	if resolved, ok := a.resolved[absolute]; ok {
+		return resolved, nil
+	}
+	resolved, err := filepath.EvalSymlinks(absolute)
+	if err != nil {
+		return "", err
+	}
+	if a.resolved == nil {
+		a.resolved = map[string]string{}
+	}
+	a.resolved[absolute] = resolved
+	return resolved, nil
 }
 
 // OwnedBy reports whether one fragment's declaration file lives inside the
@@ -375,11 +407,16 @@ func canonicalPath(path string) (string, error) {
 // letting it silently vanish between members. An unresolvable path is not
 // owned: attribution never guesses.
 func OwnedBy(fragment spectest.Fragment, projectRoot string) bool {
-	root, err := canonicalPath(projectRoot)
+	return NewAttribution().OwnedBy(fragment, projectRoot)
+}
+
+// OwnedBy is the package's OwnedBy, resolving paths through a's cache.
+func (a *Attribution) OwnedBy(fragment spectest.Fragment, projectRoot string) bool {
+	root, err := a.canonicalPath(projectRoot)
 	if err != nil {
 		return false
 	}
-	file, err := canonicalPath(fragment.File)
+	file, err := a.canonicalPath(fragment.File)
 	if err != nil {
 		return false
 	}
@@ -420,14 +457,20 @@ func EmitReport(emit *jsonl.Emitter, report *features.VerificationReport, outDir
 // each, in (path, symbol) order. It keeps every observing test, where the
 // report keeps one per check.
 func ObservingTests(fragments []spectest.Fragment, projectRoot string) []features.ObservationProvenance {
-	root, err := canonicalPath(projectRoot)
+	return NewAttribution().ObservingTests(fragments, projectRoot)
+}
+
+// ObservingTests is the package's ObservingTests, resolving paths through
+// a's cache.
+func (a *Attribution) ObservingTests(fragments []spectest.Fragment, projectRoot string) []features.ObservationProvenance {
+	root, err := a.canonicalPath(projectRoot)
 	if err != nil {
 		return nil
 	}
 	seen := make(map[features.ObservationProvenance]bool)
 	var observing []features.ObservationProvenance
 	for _, fragment := range fragments {
-		file, err := canonicalPath(fragment.File)
+		file, err := a.canonicalPath(fragment.File)
 		if err != nil {
 			continue
 		}

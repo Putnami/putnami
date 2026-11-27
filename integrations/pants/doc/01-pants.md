@@ -69,7 +69,8 @@ Run the sync again after any change to the dependencies between packages, and
 commit the result. An `import` is such a change: Pants infers the edge from it
 with no change to a `BUILD` file. `putnami validate` compares each
 `putnami.json` with the export and fails with `pants.sync_stale` when a sync
-would change one. Keep it in the CI gate.
+would change one. Keep it in the CI gate. A workspace with no `pants.toml` at
+its root plans no such check: it holds no Pants graph to compare.
 
 ## How Putnami judges the edges
 

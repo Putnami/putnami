@@ -215,7 +215,8 @@ project runs `@putnami/moon` even when its `putnami.json` named
 `putnami validate` fails with `moon.sync_stale` when a sync would change a
 `putnami.json`, in both modes: moon infers edges from manifests and task
 inputs, and a task's command decides where it runs, so an edit can change
-them.
+them. A workspace with neither `.moon/workspace.yml` nor `moon-graph.json` at
+its root plans no such check: it holds no moon graph to compare.
 
 ## Reports
 

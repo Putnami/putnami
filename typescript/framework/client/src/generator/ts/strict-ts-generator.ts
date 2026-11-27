@@ -237,6 +237,9 @@ function validateConnectTransport(method: MethodIR, transport: ClientTransportCo
  *    key than it left under.
  */
 function validateConnectSemantics(method: MethodIR, spec: SpecIR): void {
+  if (method.client?.stream === 'unary' && method.successes?.some((success) => isRedirectStatus(success.status))) {
+    throw unsupported(method, 'a declared redirect on a connect transport, which answers every success with HTTP 200');
+  }
   if (method.client?.stream === 'unary' && (method.successes?.length ?? 0) > 1) {
     throw unsupported(method, 'a connect transport with more than one declared success status');
   }
@@ -392,7 +395,7 @@ function methodTypes(method: MethodIR, spec: SpecIR): string[] {
       const content = responseContent(method, success, spec);
       const separator = index === successes.length - 1 ? ';' : '';
       lines.push(
-        `  | { status: ${success.status}; data: ${content.schema ? schemaType(content.schema, spec, `${method.operationId}.${success.status}`) : 'void'}; headers: Headers }${separator}`,
+        `  | { status: ${success.status}; data: ${content.schema ? schemaType(content.schema, spec, `${method.operationId}.${success.status}`) : 'void'}; headers: Headers${isRedirectStatus(success.status) ? '; location: string' : ''} }${separator}`,
       );
     }
     lines.push('');
@@ -1105,8 +1108,21 @@ function validateConditionalRead(method: MethodIR): void {
     throw unsupported(method, 'a declared 304 on a transport other than rest-json');
 }
 
+/**
+ * A result carries its status whenever the method can answer more than one, or
+ * declared headers, or a redirect, whose answer is its status and Location.
+ */
 function requiresResultEnvelope(successes: SuccessIR[]): boolean {
-  return successes.length !== 1 || Boolean(successes[0]?.headers?.length);
+  return (
+    successes.length !== 1 ||
+    Boolean(successes[0]?.headers?.length) ||
+    successes.some((success) => isRedirectStatus(success.status))
+  );
+}
+
+/** A 3xx an operation answers with instead of a body; 304 is a conditional read's answer. */
+function isRedirectStatus(status: number): boolean {
+  return status >= 300 && status <= 399 && status !== 304;
 }
 
 function collectReferencedType(schema: ClientSchema | undefined, target: Set<string>): void {

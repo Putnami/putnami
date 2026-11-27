@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1136,5 +1137,84 @@ func TestProbe_ReportsNoAttributionWithoutAFullSourceScan(t *testing.T) {
 		if sources := projectAt(t, result, path).DependencySources; sources != nil {
 			t.Errorf("%s dependencySources = %#v, want none: its sources were not all read", path, sources)
 		}
+	}
+}
+
+// A generated client imports the runtime modules the Go client generator writes
+// into every client, and that file is built, not committed: a fresh checkout has
+// nothing for the scan to read. The probe credits those requires from the
+// committed declarations — `generatedFrom` in putnami.json, or a committed
+// clientgen.json — so a fresh checkout and a populated one attribute the same
+// edges. A require the generator does not write is still a declaration, and a
+// module that is no generated client is still judged by its sources alone.
+func TestProbe_CreditsTheRuntimeOfAGeneratedClient(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "generated-client-runtime-edges", "a-generated-client-imports-the-runtime-its-generator-writes")
+	root := t.TempDir()
+	modules := []string{"app", "client", "inject", "extra"}
+	clients := []string{"from", "module", "plain", "other", "null"}
+	var uses []string
+	for _, name := range modules {
+		dir := "go/framework/" + name
+		uses = append(uses, "./"+dir)
+		writeProbeFile(t, filepath.Join(root, filepath.FromSlash(dir), "go.mod"),
+			"module go.putnami.dev/"+name+"\n\ngo 1.25\n")
+	}
+	var requires, replaces strings.Builder
+	for _, name := range modules {
+		fmt.Fprintf(&requires, "\tgo.putnami.dev/%s v0.0.1\n", name)
+		fmt.Fprintf(&replaces, "replace go.putnami.dev/%s => ../../go/framework/%s\n", name, name)
+	}
+	for _, client := range clients {
+		dir := "clients/" + client
+		uses = append(uses, "./"+dir)
+		writeProbeFile(t, filepath.Join(root, "clients", client, "go.mod"),
+			"module example.com/clients/"+client+"\n\ngo 1.25\n\nrequire (\n"+requires.String()+")\n\n"+replaces.String())
+	}
+	writeProbeFile(t, filepath.Join(root, "go.work"), "go 1.25\n\nuse (\n\t"+strings.Join(uses, "\n\t")+"\n)\n")
+	writeProbeFile(t, filepath.Join(root, "clients", "from", "putnami.json"),
+		`{"name":"example.com/clients/from","generatedFrom":{"service":"catalog.items","language":"go"}}`)
+	writeProbeFile(t, filepath.Join(root, "clients", "other", "putnami.json"),
+		`{"name":"example.com/clients/other","generatedFrom":{"service":"catalog.items","language":"ts"}}`)
+	writeProbeFile(t, filepath.Join(root, "clients", "null", "putnami.json"),
+		`{"name":"example.com/clients/null","generatedFrom":null}`)
+	writeProbeFile(t, filepath.Join(root, "clients", "module", "clientgen.json"),
+		`{"targets":["go"],"go":{"output":"go","packageName":"moduleclient"}}`)
+
+	paths := make([]string, 0, len(modules)+len(clients))
+	for _, name := range modules {
+		paths = append(paths, "go/framework/"+name)
+	}
+	for _, client := range clients {
+		paths = append(paths, "clients/"+client)
+	}
+	result := probeAll(t, root, paths...)
+	for _, tc := range []struct {
+		client, module string
+		want           wsproto.DependencySource
+	}{
+		{"from", "app", wsproto.DependencySourceGoModule},
+		{"from", "client", wsproto.DependencySourceGoModule},
+		{"from", "inject", wsproto.DependencySourceGoModule},
+		{"from", "extra", wsproto.DependencySourceDeclared},
+		{"module", "app", wsproto.DependencySourceGoModule},
+		{"module", "client", wsproto.DependencySourceGoModule},
+		{"module", "inject", wsproto.DependencySourceGoModule},
+		{"module", "extra", wsproto.DependencySourceDeclared},
+		{"plain", "app", wsproto.DependencySourceDeclared},
+		{"plain", "inject", wsproto.DependencySourceDeclared},
+		{"other", "client", wsproto.DependencySourceDeclared},
+		{"null", "client", wsproto.DependencySourceDeclared},
+	} {
+		project := projectAt(t, result, "clients/"+tc.client)
+		if got := project.DependencySources["go/framework/"+tc.module]; got != tc.want {
+			t.Errorf("%s: dependencySources[go/framework/%s] = %q, want %q", tc.client, tc.module, got, tc.want)
+		}
+	}
+	module := projectAt(t, result, "clients/module")
+	if !slices.Contains(module.WatchedFiles, "clients/module/clientgen.json") {
+		t.Errorf("watchedFiles = %v, want clientgen.json: adding or removing it changes the answer", module.WatchedFiles)
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Errorf("diagnostics = %v, want none: a credited require is required", result.Diagnostics)
 	}
 }

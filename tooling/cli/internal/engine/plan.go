@@ -166,7 +166,10 @@ func buildPlan(
 		if !machineOutputRequested(req) {
 			iox.Fprintln(req.stdout(), "  No jobs matched. Nothing to do.")
 		}
-		if req.Global.Impacted {
+		// A workspace-once job matched and every one of its steps is inactive:
+		// the run has nothing to do, which is not a selection that matched
+		// nothing.
+		if req.Global.Impacted || planner.ServesWorkspaceOnce(req.Commands, extensions, disabledJobs, disabledExts) {
 			return nil, ExitSuccess
 		}
 		// Same contract as the empty-selection guard in selection.go: the stdout

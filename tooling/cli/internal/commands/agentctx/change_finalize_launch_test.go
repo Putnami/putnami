@@ -16,6 +16,7 @@ import (
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gittest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // recordFinalizeEnv names the putnami binary a recording run takes the
@@ -38,6 +39,7 @@ const recordFinalizeEnv = "PUTNAMI_CLI_RECORD_PROPOSALS_FINALIZE"
 // which putnami refuses itself, the store's timestamps and random identity,
 // and the run's own paths in the message are not compared. A run that pushes nothing writes no record.
 func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
+	repotest.Require(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("the harness launcher requires bash")
 	}
@@ -245,6 +247,7 @@ func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 }
 
 func TestFinalizeTwinIsTheSameOnAForeignMachine(t *testing.T) {
+	repotest.Require(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("the harness launcher requires bash")
 	}

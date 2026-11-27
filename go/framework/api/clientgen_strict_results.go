@@ -12,7 +12,9 @@ import (
 	clientcontract "go.putnami.dev/protocol/clientcontract"
 )
 
-// Result emission for an operation that declares more than one success status.
+// Result emission for an operation that declares more than one success status,
+// or a redirect (a 3xx success), whose result also carries the answered
+// Location: the client hands a redirect back rather than following it.
 //
 // Such an operation answers "created or existing" (200/201), "done or
 // accepted" (200/202) or "a body or nothing" (200/204): the status is part of
@@ -36,6 +38,11 @@ import (
 type successResult struct {
 	typeName string
 	fields   []successResultField
+	// location is true when a declared success is a redirect: the result then
+	// carries the Location the provider answered.
+	location bool
+	// redirects are the declared redirect statuses, in order.
+	redirects []int
 }
 
 // successResultField is one body field of a result, and the statuses whose
@@ -51,9 +58,21 @@ type successResultField struct {
 }
 
 // returnsSuccessResult reports an operation whose method returns a result
-// type rather than a bare body.
+// type rather than a bare body: several success statuses, or a redirect, whose
+// status and Location are the answer.
 func returnsSuccessResult(method MethodIR) bool {
-	return method.Client != nil && method.Client.Stream == clientcontract.StreamUnary && len(method.Successes) > 1
+	return method.Client != nil && method.Client.Stream == clientcontract.StreamUnary &&
+		(len(method.Successes) > 1 || declaresRedirect(method))
+}
+
+// declaresRedirect reports an operation that declares a 3xx success.
+func declaresRedirect(method MethodIR) bool {
+	for _, success := range method.Successes {
+		if IsRedirectStatus(success.Status) {
+			return true
+		}
+	}
+	return false
 }
 
 // successResultName is the result type of the method named methodName.
@@ -100,7 +119,8 @@ func (generator *strictClientGen) declareSuccessResult(methodName string, method
 	if err != nil {
 		return nil, errors.Newf(CodeClientGenConfig, "api: operation %s: %v", method.OperationID, err)
 	}
-	result := &successResult{typeName: successResultName(methodName)}
+	result := &successResult{typeName: successResultName(methodName), redirects: redirectStatuses(statuses)}
+	result.location = len(result.redirects) > 0
 	switch {
 	case len(bodies) == 0:
 		// No status carries a body ("created or replaced", 201/204): the
@@ -131,6 +151,10 @@ func (generator *strictClientGen) declareSuccessResult(methodName string, method
 	}
 	fmt.Fprintf(&definition, "type %s struct {\n", result.typeName)
 	definition.WriteString("\t// Status is the declared success status the provider answered.\n\tStatus int\n")
+	if result.location {
+		fmt.Fprintf(&definition, "\t// Location is the target of a %s redirect, as the provider answered it.\n", statusList(result.redirects))
+		definition.WriteString("\t// The client does not follow it. It is empty on any other status.\n\tLocation string\n")
+	}
 	for _, field := range result.fields {
 		if len(field.statuses) == len(statuses) {
 			fmt.Fprintf(&definition, "\t// %s is the answered body.", field.name)
@@ -203,6 +227,13 @@ func (generator *strictClientGen) emitSuccessResultDispatch(output *strings.Buil
 		output.WriteString("\tif err != nil { return nil, err }\n")
 	}
 	fmt.Fprintf(output, "\tresult := &%s{Status: response.StatusCode}\n", result.typeName)
+	if result.location {
+		cases := make([]string, 0, len(result.redirects))
+		for _, status := range result.redirects {
+			cases = append(cases, strconv.Itoa(status))
+		}
+		fmt.Fprintf(output, "\tswitch response.StatusCode {\n\tcase %s:\n\t\tresult.Location = response.Headers.Get(\"Location\")\n\t}\n", strings.Join(cases, ", "))
+	}
 	if len(result.fields) > 0 {
 		output.WriteString("\tswitch response.StatusCode {\n")
 		for _, field := range result.fields {
@@ -222,6 +253,17 @@ func (generator *strictClientGen) emitSuccessResultDispatch(output *strings.Buil
 		output.WriteString("\t}\n")
 	}
 	output.WriteString("\treturn result, nil\n")
+}
+
+// redirectStatuses keeps the redirect statuses of statuses, in order.
+func redirectStatuses(statuses []int) []int {
+	var out []int
+	for _, status := range statuses {
+		if IsRedirectStatus(status) {
+			out = append(out, status)
+		}
+	}
+	return out
 }
 
 // statusList renders statuses as prose: "200", "200 or 201", "200, 202 or 204".

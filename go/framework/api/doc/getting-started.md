@@ -186,6 +186,19 @@ api.Endpoint("GET", "/users/{id}").
     Handle(getUser)
 ```
 
+A route that answers with a redirect declares that 3xx and no `Returns`:
+
+```go
+api.Endpoint("GET", "/artifacts/{id}").
+    Response(302, "The artifact's location", nil). // the only success
+    Handle(func(ctx *http.EndpointContext) *http.Response {
+        return http.Redirect("https://blobs.example/a1", 302)
+    })
+```
+
+The OpenAPI then declares the 302 alone, with no 200, and the generated Go
+client returns the answered `Status` and `Location` without following it.
+
 ## Dependency injection
 
 Resolve container singletons or scoped services into the handler with `.Inject`,

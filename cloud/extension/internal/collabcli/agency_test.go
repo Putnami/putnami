@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -90,16 +91,22 @@ func (s *agencyStandIn) received() []agencyRequest {
 // refuse answers route with status, the first-party error envelope and the
 // agency-api refusal details.
 func (s *agencyStandIn) refuse(route string, status int, code, reason, current string) {
+	details := map[string]string{}
+	if reason != "" {
+		details["reason"] = reason
+	}
+	if current != "" {
+		details["current"] = current
+	}
+	s.refuseWith(route, status, code, details)
+}
+
+// refuseWith answers route with status, the first-party error envelope and
+// the given refusal details.
+func (s *agencyStandIn) refuseWith(route string, status int, code string, details map[string]string) {
 	s.refusals["/v1/workspaces/"+workspaceID+"/agency/"+route] = func(w http.ResponseWriter) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
-		details := map[string]string{}
-		if reason != "" {
-			details["reason"] = reason
-		}
-		if current != "" {
-			details["current"] = current
-		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"code": code, "error": http.StatusText(status), "message": "refused", "details": details})
 	}
 }
@@ -226,18 +233,10 @@ func TestTheManifestOffersMemoryAndMissions(t *testing.T) {
 			t.Errorf("%s v%d %s has a handler and is not declared", key.Contract, key.Version, key.Operation)
 		}
 	}
-	// agency-api's sync route takes no last_prompt yet, so sync declares
-	// every mission member but lastPrompt, and the CLI drops that one.
-	var syncMembers []string
-	for _, member := range collab.MissionMembers {
-		if member != collab.MissionMemberLastPrompt {
-			syncMembers = append(syncMembers, member)
-		}
-	}
 	for _, version := range []int{1, 2} {
 		missions, _ := offer.Operations(collab.ContractMissions, version)
-		if got := missions[collab.OperationSync].Members(); !slices.Equal(got, syncMembers) {
-			t.Errorf("missions v%d sync declares %v, want %v", version, got, syncMembers)
+		if got := missions[collab.OperationSync].Members(); !slices.Equal(got, collab.MissionMembers) {
+			t.Errorf("missions v%d sync declares %v, want %v", version, got, collab.MissionMembers)
 		}
 		if got := missions[collab.OperationStatus].Members(); !slices.Equal(got, collab.MissionStatusMembers) {
 			t.Errorf("missions v%d status declares %v, want %v", version, got, collab.MissionStatusMembers)
@@ -366,6 +365,44 @@ func TestTheSyncForwardsTheSessionURL(t *testing.T) {
 	}
 }
 
+// TestTheSyncForwardsTheLastPrompt sends a sync's lastPrompt as last_prompt,
+// and no last_prompt for a sync that carries none or an empty one, so the
+// route keeps the request it holds.
+func TestTheSyncForwardsTheLastPrompt(t *testing.T) {
+	spectest.Proves(t, agencyFeature, "missions-calls-agency-api", "agency-sync-forwards-the-last-prompt")
+	sync := missionsV1Operations[0].arguments
+	cases := []struct {
+		name, arguments string
+		want            any
+	}{
+		{"a request", strings.Replace(sync, `"event"`, `"lastPrompt":"Fix the build.\nThen push.","event"`, 1), "Fix the build.\nThen push."},
+		{"an empty request", strings.Replace(sync, `"event"`, `"lastPrompt":"","event"`, 1), nil},
+		{"no request", sync, nil},
+	}
+	for _, version := range []int{1, 2} {
+		for _, tc := range cases {
+			t.Run(fmt.Sprintf("v%d %s", version, tc.name), func(t *testing.T) {
+				standIn := newAgencyStandIn(t)
+				h, _ := agencyHarness(t, standIn, true)
+				raw, response := h.callVersion(t, collab.ContractMissions, version, collab.OperationSync, tc.arguments)
+				if response.Outcome != collab.OutcomeOK {
+					t.Fatalf("sync answered %s", raw)
+				}
+				got, sent := standIn.received()[0].body["last_prompt"]
+				if tc.want == nil {
+					if sent {
+						t.Fatalf("a sync without a request sent last_prompt %v", got)
+					}
+					return
+				}
+				if !sent || got != tc.want {
+					t.Fatalf("last_prompt = %v (sent %v), want %q", got, sent, tc.want)
+				}
+			})
+		}
+	}
+}
+
 // TestMissionsRunsCallAgencyAPI sends start, report and runs of version 2 to
 // their agency-api routes with the contract's document, and answers the run.
 func TestMissionsRunsCallAgencyAPI(t *testing.T) {
@@ -432,6 +469,17 @@ func TestAgencyRefusalsKeepTheirOutcome(t *testing.T) {
 		if c.status == http.StatusUnauthorized && !strings.Contains(response.Error.Message, "putnami cloud login") {
 			t.Errorf("a rejected credential does not name putnami cloud login: %s", response.Error.Message)
 		}
+	}
+
+	// An invalid refusal names the member and the rule, so the session hook
+	// can tell a sync refused for its lastPrompt.
+	invalid := newAgencyStandIn(t)
+	invalid.refuseWith(missionsV1Operations[0].route, http.StatusBadRequest, declaredCode[http.StatusBadRequest],
+		map[string]string{"reason": "invalid", "field": "last_prompt", "problem": "too_long"})
+	invalidHarness, _ := agencyHarness(t, invalid, true)
+	_, refused := invalidHarness.callVersion(t, collab.ContractMissions, 1, collab.OperationSync, missionsV1Operations[0].arguments)
+	if refused.Outcome != collab.OutcomeInvalid || refused.Error == nil || !strings.Contains(refused.Error.Message, "last_prompt: too_long") {
+		t.Errorf("a sync refused for last_prompt answered %s %+v, want invalid naming last_prompt", refused.Outcome, refused.Error)
 	}
 
 	standIn := newAgencyStandIn(t)

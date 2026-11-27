@@ -25,7 +25,43 @@ import (
 // untracked one "untracked". Paths are relative to root, in slash form, sorted
 // and unique; a path deleted from the work tree is listed. Outside every
 // repository the error is an *gitread.UnmanagedError.
+//
+// The cut is read in-process (inprocess_*.go) when the repository's state is one
+// the reader supports, and from Git otherwise (tooling/cli ADR 0112).
 func CandidateFiles(root string) ([]protocoljob.CandidateFile, error) {
+	if files, err := candidateFilesInProcess(root); !inProcessUnsupported(err) {
+		return files, err
+	}
+	return CandidateFilesFromGit(root)
+}
+
+// candidateFilesInProcess reads the cut of the work tree at root in-process;
+// its error is unsupported (inProcessUnsupported) when Git must read it.
+func candidateFilesInProcess(root string) ([]protocoljob.CandidateFile, error) {
+	repo, err := openLocal(root)
+	if err != nil {
+		return nil, err
+	}
+	cut, err := repo.readCut()
+	if err != nil {
+		return nil, err
+	}
+	files := make([]protocoljob.CandidateFile, 0, len(cut.Index.Entries)+len(cut.Untracked))
+	for _, entry := range cut.Index.Entries {
+		mode := fmt.Sprintf("%06o", entry.Mode)
+		if entry.Stage != 0 {
+			mode = protocoljob.CandidateModeUnmerged
+		}
+		files = append(files, protocoljob.CandidateFile{Path: entry.Path, Mode: mode})
+	}
+	for _, untracked := range cut.Untracked {
+		files = append(files, protocoljob.CandidateFile{Path: untracked.Path, Mode: protocoljob.CandidateModeUntracked})
+	}
+	return sortedCut(files, root)
+}
+
+// CandidateFilesFromGit is CandidateFiles read from Git alone.
+func CandidateFilesFromGit(root string) ([]protocoljob.CandidateFile, error) {
 	output, stderr, err := gitread.RunCapture(root, "ls-files", "-z", "-t", "--stage", "--others", "--exclude-standard")
 	if err != nil {
 		if unmanaged := gitread.Unmanaged(root); unmanaged != nil {
@@ -52,11 +88,19 @@ func CandidateFiles(root string) ([]protocoljob.CandidateFile, error) {
 		}
 		// Git lists an untracked nested repository as its directory with a
 		// trailing slash; the cut names the directory.
-		path := strings.TrimSuffix(listed, "/")
+		files = append(files, protocoljob.CandidateFile{Path: strings.TrimSuffix(listed, "/"), Mode: mode})
+	}
+	return sortedCut(files, root)
+}
+
+// sortedCut checks that every path of files is a clean path inside root,
+// sorts them by path and keeps the first entry of each path.
+func sortedCut(files []protocoljob.CandidateFile, root string) ([]protocoljob.CandidateFile, error) {
+	for _, file := range files {
+		path := file.Path
 		if path == "" || path == "." || pathpkg.Clean(path) != path || strings.HasPrefix(path, "../") {
-			return nil, fmt.Errorf("git ls-files listed %q, which is not a clean path inside %s", listed, root)
+			return nil, fmt.Errorf("git ls-files listed %q, which is not a clean path inside %s", path, root)
 		}
-		files = append(files, protocoljob.CandidateFile{Path: path, Mode: mode})
 	}
 	slices.SortStableFunc(files, func(a, b protocoljob.CandidateFile) int { return strings.Compare(a.Path, b.Path) })
 	// An unmerged path is listed once per stage, and the first entry of a path

@@ -71,6 +71,19 @@
           }
         },
         {
+          "id": "explain-states-one-tag-request",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cloud-explain-states-the-implicit-tag-request"
+            ]
+          }
+        },
+        {
           "id": "branch-globs-are-slash-aware",
           "stage": "coded",
           "evidenceKinds": [

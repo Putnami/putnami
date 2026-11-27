@@ -34,6 +34,7 @@
     "cli/canonical-workspace-guidance#onboarding-path",
     "cli/canonical-workspace-guidance#support-maturity-separation",
     "cli/channels#archives-follow-the-put-projection",
+    "cli/channels#mirror-intent-copies-released-versions-only",
     "cli/channels#mirror-intent-follows-the-release",
     "cli/channels#project-declares-its-distribution-visibility",
     "cli/channels#protected-channels",

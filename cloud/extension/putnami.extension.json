@@ -3590,9 +3590,10 @@
       "timeoutMs": 120000,
       "operations": {
         "sync": {
-          "description": "Publish an agent session's state and plan to its mission in the linked Putnami workspace, then read the mission's plan, open decisions and the owner's waiting messages: one call to the workspace's agency-api sync route, with the bearer of the person's own putnami cloud login. A sync observed before the session's last one changes nothing. Each reply it carries is recorded or refused on its own, and the syncs the session reports it missed replace the stored report. A session web address it carries replaces the stored one, and an empty one clears it.",
+          "description": "Publish an agent session's state and plan to its mission in the linked Putnami workspace, then read the mission's plan, open decisions and the owner's waiting messages: one call to the workspace's agency-api sync route, with the bearer of the person's own putnami cloud login. A sync observed before the session's last one changes nothing. Each reply it carries is recorded or refused on its own, and the syncs the session reports it missed replace the stored report. A session web address it carries replaces the stored one, and an empty one clears it; the person's last request it carries replaces the stored one.",
           "openWorld": true,
           "members": [
+            "lastPrompt",
             "missedSyncs",
             "sessionUrl"
           ]

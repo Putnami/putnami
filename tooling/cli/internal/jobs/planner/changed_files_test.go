@@ -12,6 +12,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -246,9 +247,8 @@ func TestResolveInvocationRelations_TrimsTheFrontierToPlannedConsumers(t *testin
 // at run time, and test, the prerequisite only the race step depends on,
 // stays planned under every flag.
 func TestGoManifestPlansTheRaceStepOnTheTouchedProject(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", changedFilesRequirement,
-		"a-change-gated-step-is-planned-only-for-a-project-that-owns-a-matching-changed-file")
 	ext := loadGoPlannerExtension(t)
 	root := t.TempDir()
 	projects := make([]*workspace.Project, 0, 2)
@@ -315,6 +315,7 @@ func TestGoManifestPlansTheRaceStepOnTheTouchedProject(t *testing.T) {
 // test~test-race, so the step runs under the CLI test step's deadline rather
 // than the Go manifest's default.
 func TestTheCLIProjectTunesItsRaceStepDeadline(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	config, diags := wsproto.LoadProjectConfigWithDiagnostics(filepath.Join(findJobsRepoRoot(t), "tooling", "cli"))
 	if len(diags) > 0 {

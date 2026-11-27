@@ -11,6 +11,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -129,6 +130,7 @@ func goWithoutClosureDependencies(goExtension *extension.ExtensionDescription) *
 // client-generate across the dependency closure, which orders them too, so the
 // fixture strips that dependency to keep the race.
 func TestPlan_DependentsWaitForTheGeneratedClientWriter(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "dependents-wait-for-an-output-they-read",
 		"every-dependent-job-waits-for-the-generated-client-writer")
 	goExtension := goWithoutClosureDependencies(loadGoPlannerExtension(t))

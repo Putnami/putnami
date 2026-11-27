@@ -9,6 +9,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -211,6 +212,7 @@ func sortedJobKeys(planned []*jobmodel.ScheduledJob) []string {
 // the jobs that compile the client do: a Go module tidy check, which CI plans
 // in place of tidy, reads no client.
 func TestAConsumerOnlySelectionPlansTheGenerationOfItsClosureClients(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "a-consumer-keys-on-the-generation-of-its-clients",
 		"a-consumer-only-selection-plans-the-generation-of-its-closure-clients")
 	root := writeClosureWorkspace(t)
@@ -265,6 +267,7 @@ func consumerKeys(t *testing.T, ws *workspace.Workspace, planned []*jobmodel.Sch
 // verdict stored against the previous client is not served. An edit to the
 // provider's implementation that leaves the contract alone keeps every key.
 func TestAContractEditMovesTheKeysOfTheConsumerJobs(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "a-consumer-keys-on-the-generation-of-its-clients",
 		"a-contract-edit-moves-the-keys-of-the-consumer-jobs")
 	exts := closureExtensions(t)

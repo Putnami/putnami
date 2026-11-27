@@ -48,6 +48,14 @@
       ]
     },
     {
+      "id": "explain-states-one-tag-request",
+      "text": [
+        "For a tag that no tags rule matches, a command that explains the event states one publish request: when the commit carries no other line's tag, the immutable channel the tag encodes to and a publish of every member with --all, its authorization unresolved.",
+        "It states that a publish without --scope is refused under several lines' tags, and so is a tag that encodes to no portable channel.",
+        "The commands keep --impacted, and publish stays empty in the structured explanation."
+      ]
+    },
+    {
       "id": "branch-globs-are-slash-aware",
       "text": [
         "A branch glob matches a branch name without a refs/ prefix: * stays inside one segment, ** spans segments, and a literal matches only itself.",

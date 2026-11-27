@@ -271,6 +271,30 @@ Generation fails for a 304 that declares a body, on anything but a unary
 response cache, and beside a declared `If-None-Match` header parameter. An
 operation that declares no 304 is generated as before.
 
+### Redirects
+
+A unary operation whose contract declares a redirect, a 3xx other than 304,
+returns a result discriminated by status, even when the redirect is its only
+success, as a Go route declared with `Response(302, ...)` and no `Returns`
+publishes it. A redirect variant carries `location`, the `Location` the
+provider answered, as sent and so possibly relative, or empty when it sent
+none, beside its `headers` and any declared body. The client never follows it:
+the target is the caller's to open.
+
+```ts
+const answer = await artifacts.getArtifacts_id({ path: { id: 'a1' } });
+if (answer.status === 302) {
+  await fetch(new URL(answer.location, artifactsUrl));
+}
+```
+
+The runtime fetches such an operation with `redirect: 'manual'` and refuses a
+redirect status the operation does not declare and, in a browser, which hides
+the redirect it did not follow, every redirect. Every other operation still refuses every redirect. A redirect
+beside a raw octet success, or on a stream, stays documentation; generation
+fails for a redirect dispatched on Connect, which answers every success with
+HTTP 200. The rule is the Go client's, ADR 0008 of `go.putnami.dev/api`.
+
 ### Embedded Proto Metadata
 
 For proto-generated clients, the field metadata is embedded directly in the client file. This enables zero-config binary encoding without any runtime configuration:

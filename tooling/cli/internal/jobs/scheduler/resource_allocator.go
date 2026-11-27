@@ -456,8 +456,8 @@ func usableMemoryBytes(capacity uint64) uint64 {
 // with no measured wall time, is charged whole: the lift's cores come from the
 // work admission holds back. A task with none is charged one CPU, scaled by
 // its configured weight: charging a cold task more than it fills left CPUs
-// idle on a fresh checkout, as measured before every tool a job starts honored
-// its grant.
+// idle and lengthened a no-cache gate, as ADR 0100's amendment of 2026-11-27
+// measured.
 func planChargeMilli(job *ScheduledJob, recommendation cpuRecommendation, ceiling, totalCPU int) int {
 	if !recommendation.fromHistory {
 		return bootstrapCPUCharge(job, totalCPU) * milliCPU

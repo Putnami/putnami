@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -559,6 +560,7 @@ func sourceBoundEvidenceBinding(t *testing.T, projectRoot string) string {
 // task that folds it, never move, and the dependent is served from its key on
 // every run.
 func TestSourceBoundTestOnlyEditStoresBesideTheFirstEntryAndKeepsEveryKey(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "a-test-only-edit-stores-beside-the-first-entry-and-keeps-every-key")
 	requireShell(t)
 	logs := t.TempDir()
@@ -658,6 +660,7 @@ func TestSourceBoundTestOnlyEditStoresBesideTheFirstEntryAndKeepsEveryKey(t *tes
 // at the binding of the rewritten tree: its evidence and its entry name that
 // binding, so the next run at the same tree hits.
 func TestSourceBoundExecutionAfterAnInRunRewriteReadsTheCurrentBinding(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "an-execution-after-an-in-run-rewrite-reads-the-current-binding")
 	requireShell(t)
 	logs := t.TempDir()
@@ -758,15 +761,16 @@ func projectTreeBinding(t *testing.T, ws *workspace.Workspace) string {
 // describe. The settled result keeps the writes of the first execution, and no
 // key moves.
 func TestSourceBoundExecutionThatMovesItsBindingSettlesAtTheBindingItLeaves(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, sourceBoundFeature, sourceBoundSettleRequirement, "an-execution-that-moves-its-binding-settles-at-the-binding-it-leaves")
 	requireShell(t)
 	logs := t.TempDir()
 	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
 	ws, planned := sourceBoundRunFixture(t, describeLog, compileLog)
 	projectRoot := filepath.Join(ws.Root, "app")
-	sidecar := filepath.Join(projectRoot, "schema", "http-routes.json")
+	sidecar := filepath.Join(projectRoot, "schema", "openapi.json")
 	writeTestFile(t, sidecar, "stale routes\n")
-	useConvergingDescribe(t, planned[0], describeLog, "printf 'converged routes\\n' > schema/http-routes.json\n")
+	useConvergingDescribe(t, planned[0], describeLog, "printf 'converged routes\\n' > schema/openapi.json\n")
 	cache := sharedRuntimeCache(t)
 	before := projectTreeBinding(t, ws)
 
@@ -801,7 +805,7 @@ func TestSourceBoundExecutionThatMovesItsBindingSettlesAtTheBindingItLeaves(t *t
 	if got := readVersionStamp(t, projectRoot).CapabilityPackages[0].SourceBinding; got != settled {
 		t.Fatalf("the stamp names %q, the tree the run left is %q", got, settled)
 	}
-	if written := filepath.ToSlash(filepath.Join("app", "schema", "http-routes.json")); !slices.Contains(describe.VerificationWrites, written) {
+	if written := filepath.ToSlash(filepath.Join("app", "schema", "openapi.json")); !slices.Contains(describe.VerificationWrites, written) {
 		t.Fatalf("the settled result's writes %v miss %s, which only the first execution wrote", describe.VerificationWrites, written)
 	}
 	keys := []string{describe.CacheKey, compile.CacheKey}
@@ -839,13 +843,14 @@ func TestSourceBoundExecutionThatMovesItsBindingSettlesAtTheBindingItLeaves(t *t
 // further. Its entry is stored at the binding its last execution was stamped
 // with, which is the binding its outputs embed.
 func TestSourceBoundExecutionSettlesAtMostOnce(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, sourceBoundFeature, sourceBoundSettleRequirement, "a-task-that-keeps-moving-its-binding-executes-at-most-once-more")
 	requireShell(t)
 	logs := t.TempDir()
 	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
 	ws, planned := sourceBoundRunFixture(t, describeLog, compileLog)
 	projectRoot := filepath.Join(ws.Root, "app")
-	useConvergingDescribe(t, planned[0], describeLog, "printf 'run\\n' >> schema/http-routes.json\n")
+	useConvergingDescribe(t, planned[0], describeLog, "printf 'run\\n' >> schema/openapi.json\n")
 	cache := sharedRuntimeCache(t)
 
 	result := runSharedScheduler(t.Context(), ws, planned, SchedulerConfig{MaxParallel: 1}, cache)
@@ -871,14 +876,15 @@ func TestSourceBoundExecutionSettlesAtMostOnce(t *testing.T) {
 // tree it leaves whether or not an entry is stored. An execution that moves
 // nothing executes once.
 func TestSourceBoundExecutionWithoutTheCacheSettlesToo(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, sourceBoundFeature, sourceBoundSettleRequirement, "a-run-without-the-cache-settles-too")
 	requireShell(t)
 	logs := t.TempDir()
 	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
 	ws, planned := sourceBoundRunFixture(t, describeLog, compileLog)
 	projectRoot := filepath.Join(ws.Root, "app")
-	writeTestFile(t, filepath.Join(projectRoot, "schema", "http-routes.json"), "stale routes\n")
-	useConvergingDescribe(t, planned[0], describeLog, "printf 'converged routes\\n' > schema/http-routes.json\n")
+	writeTestFile(t, filepath.Join(projectRoot, "schema", "openapi.json"), "stale routes\n")
+	useConvergingDescribe(t, planned[0], describeLog, "printf 'converged routes\\n' > schema/openapi.json\n")
 	cache := sharedRuntimeCache(t)
 
 	run := func(name string, describeRuns int) {

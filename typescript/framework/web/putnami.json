@@ -21,7 +21,12 @@
       }
     },
     "test": {
-      "filePatterns": ["../../../protocols/i18n/fixtures/**", "../../../protocols/i18n/schemas/**"]
+      "filePatterns": [
+        "../../../protocols/i18n/fixtures/**",
+        "../../../protocols/i18n/schemas/**",
+        "../../../protocols/http-routes/putnami.features.json",
+        "../../../protocols/http-routes/specs/**"
+      ]
     },
     "agent-artifact": {
       "forbiddenContent": ["password", "access token", "api key", "github.com"],

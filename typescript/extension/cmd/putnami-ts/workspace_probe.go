@@ -243,7 +243,7 @@ func probeProjectFor(root, candidate string, manifest *probeManifest, document *
 	} else {
 		project.Dependencies = resolveDependencyPaths(candidate, declaredDeps, byName)
 	}
-	importedDeps := resolveDependencyPaths(candidate, importedWorkspacePackages(root, candidate, linked, generatedPackageImports(manifest), byName), byName)
+	importedDeps := resolveDependencyPaths(candidate, importedWorkspacePackages(root, candidate, linked, generatedPackageImports(manifest, document), byName), byName)
 	project.DependencySources = tsDependencySources(project.Dependencies, importedDeps)
 	project.Extensions = workspaceProtocolDeps(manifest.DevDependencies)
 	project.Metadata = probeMetadataFor(candidate, manifest, document, byName, workspaceRepository)
@@ -270,7 +270,10 @@ func candidatePathFor(candidate, name string) string {
 // Core owns that file. The publication intent, name and registry namespace read
 // here determine the exact native coordinate this provider declares.
 type probeDocument struct {
-	Name       string                     `json:"name"`
+	Name          string `json:"name"`
+	GeneratedFrom *struct {
+		Language string `json:"language"`
+	} `json:"generatedFrom"`
 	Publish    []string                   `json:"publish"`
 	Registries map[string]json.RawMessage `json:"registries"`
 	Options    struct {
@@ -430,10 +433,15 @@ func importedWorkspacePackages(root, candidate string, linked, generated []strin
 	return imported
 }
 
+// generatedClientRuntime is the package the TypeScript client generator
+// imports in every client it writes (@putnami/client's emitter).
+const generatedClientRuntime = "@putnami/client"
+
 // generatedPackageImports names the packages the project's generated sources
-// import. The scan cannot see them: it skips .gen so that a cold clone and a
-// warm checkout agree about one commit. The answer is derived from the
-// manifest instead, from the rule the build follows.
+// import. The scan cannot see them: it skips .gen, and a generated client's
+// src/ is built, not committed, so that a cold clone and a warm checkout agree
+// about one commit. The answer is derived from the committed declarations
+// instead, from the rule the build follows.
 //
 // A project that lists build.BundledServeHookPackage among its dependencies or
 // devDependencies runs that package's preBuild hook, and the build writes a
@@ -441,15 +449,30 @@ func importedWorkspacePackages(root, candidate string, linked, generated []strin
 // in the safe direction: a project whose hook reports no capability manifest,
 // or that has no entry file, gets no serve entry, and keeps an edge the
 // manifest already states.
-func generatedPackageImports(manifest *probeManifest) []string {
+//
+// A project whose putnami.json names its provider in a generatedFrom of
+// language ts is a client
+// the client generator writes, and that client imports generatedClientRuntime
+// whether or not it is present yet.
+func generatedPackageImports(manifest *probeManifest, document *probeDocument) []string {
+	var imports []string
 	hook := build.BundledServeHookPackage
-	if _, ok := manifest.Dependencies[hook]; ok {
-		return build.BundledServeImports()
+	_, inDependencies := manifest.Dependencies[hook]
+	_, inDevDependencies := manifest.DevDependencies[hook]
+	if inDependencies || inDevDependencies {
+		imports = append(imports, build.BundledServeImports()...)
 	}
-	if _, ok := manifest.DevDependencies[hook]; ok {
-		return build.BundledServeImports()
+	if document.generatesClient() && !slices.Contains(imports, generatedClientRuntime) {
+		imports = append(imports, generatedClientRuntime)
 	}
-	return nil
+	return imports
+}
+
+// generatesClient reports whether the project's putnami.json names its provider
+// in a generatedFrom of language ts, the only one the generator writes a
+// TypeScript client for.
+func (d *probeDocument) generatesClient() bool {
+	return d != nil && d.GeneratedFrom != nil && d.GeneratedFrom.Language == "ts"
 }
 
 // packageDirOf is the absolute directory of a probed candidate.

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // TestAnNxPnpmWorkspaceImportsAndRunsItsOwnNodeTools drives the run a Node
@@ -21,6 +22,7 @@ import (
 // PUTNAMI_NODE_IMPORT_E2E=1, so it proves no spec requirement: an enforced
 // requirement must be verified by every gate run.
 func TestAnNxPnpmWorkspaceImportsAndRunsItsOwnNodeTools(t *testing.T) {
+	repotest.Require(t)
 	clitest.RequireShell(t)
 	pnpm := clitest.RequirePnpm(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")

@@ -166,7 +166,8 @@
       "run": [
         {
           "id": "pants-graph-check",
-          "task": "pants-graph-check-exec"
+          "task": "pants-graph-check-exec",
+          "activation": { "files": ["pants.toml"] }
         }
       ]
     },

@@ -9,6 +9,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func writeContractFile(t *testing.T, root, rel, body string) {
@@ -145,6 +146,7 @@ func TestResolveContractBindings_IgnoresTheBuiltTree(t *testing.T) {
 // have it — a Go client of a TypeScript provider, a TypeScript client of a Go
 // provider — and neither language's module graph can express it.
 func TestCheckedInGeneratedClientsCarryAContractEdge(t *testing.T) {
+	repotest.Require(t)
 	ws := loadCheckedInWorkspace(t)
 
 	want := map[string]string{

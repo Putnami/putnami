@@ -16,6 +16,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -185,6 +186,7 @@ func TestUnpublishedProjects_ADependentJobServesTheChannelsItsTaskDeclares(t *te
 func cloudPublishPlan(t *testing.T, withCloud bool, channels ...string) (*workspace.Project, []*jobs.ScheduledJob) {
 	t.Helper()
 	cli := &workspace.Project{ID: guardID, Name: guardName, Path: "tooling/cli", Publish: channels, Config: &wsproto.ProjectConfig{}}
+	repotest.Reads(t)
 	root := filepath.Join(engineModuleRoot(t), "..", "..")
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "putnami"}, []*workspace.Project{cli})
 	ws.Graph = workspace.BuildGraph(ws.Projects)
@@ -207,6 +209,7 @@ func cloudPublishPlan(t *testing.T, withCloud bool, channels ...string) (*worksp
 // configuration, migration and deployment uploads for the project, and their
 // tasks declare no channel, so a docker channel stays unserved beside it.
 func TestUnpublishedProjects_CloudArchivePublishIsTheProjectsOwnJob(t *testing.T) {
+	repotest.Require(t)
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "publish-run-checks-declared-channels", "cloud-archive-publication-serves-the-declaring-project")
 

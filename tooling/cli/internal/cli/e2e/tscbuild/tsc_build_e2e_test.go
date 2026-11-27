@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 func TestMain(m *testing.M) {
@@ -132,6 +133,7 @@ func jobLine(out, project, job string) string {
 // the acceptance of a tsc build: lib and app build with tsc, app after lib;
 // once lib's outDir is deleted, the next build restores it from the cache.
 func TestATscLibraryBuildsBeforeItsDependentAndItsOutDirRestoresFromTheCache(t *testing.T) {
+	repotest.Require(t)
 	clitest.RequireShell(t)
 	for _, tool := range []string{"bun", "git"} {
 		if _, err := exec.LookPath(tool); err != nil {

@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -283,6 +284,9 @@ func goProbeProjectFor(
 		_, scopeFiles := wsproto.LoadScopeChainWithSources(root, filepath.Join(root, filepath.FromSlash(c.path)))
 		watched = append(watched, scopeFiles...)
 	}
+	if c.modFile != "" {
+		watched = append(watched, goCandidateFile(c.path, goClientGenConfigFile))
+	}
 	scan := goModuleImportScan(root, c, byModule)
 	unrequired := goUnrequiredImports(root, c, byModule, scan)
 	dependencies := goDependencyPaths(c, byModule, byDir, unrequired)
@@ -302,7 +306,7 @@ func goProbeProjectFor(
 		// Type and therefore which build pipeline is planned.
 		WatchedFiles:      watched,
 		Dependencies:      dependencies,
-		DependencySources: goDependencySources(c, dependencies, byModule, scan),
+		DependencySources: goDependencySources(c, dependencies, byModule, scan, goGeneratedClientImports(root, c)),
 		Metadata:          goReleaseSetMetadata(root, c, byModule, workspace),
 	}, goUnrequiredImportDiagnostics(c, byModule, unrequired)
 }
@@ -372,10 +376,15 @@ func goReleaseSetMetadata(
 
 // goProjectConfigPathFor is the repo-relative putnami.json of a candidate.
 func goProjectConfigPathFor(candidate string) string {
+	return goCandidateFile(candidate, goProjectConfigFile)
+}
+
+// goCandidateFile is the repo-relative path of one file at a candidate's root.
+func goCandidateFile(candidate, name string) string {
 	if candidate == "" || candidate == wsproto.ProbeRootPath {
-		return goProjectConfigFile
+		return name
 	}
-	return path.Join(candidate, goProjectConfigFile)
+	return path.Join(candidate, name)
 }
 
 // goProjectDocument is the slice of a project document the probe reads: whether
@@ -636,6 +645,52 @@ func goDependencyPaths(c *goCandidate, byModule map[string]*goCandidate, byDir m
 	return paths
 }
 
+// goClientGenConfigFile is the committed configuration of a module that
+// generates its own in-module Go client (tooling/clientgen-extension, the
+// `client-generate-module` task).
+const goClientGenConfigFile = "clientgen.json"
+
+// goGeneratedClientRuntime is the set of workspace modules the Go client
+// generator imports in every client it writes: go.putnami.dev/api's
+// generateStrictClient starts its import set with exactly these three.
+var goGeneratedClientRuntime = []string{"go.putnami.dev/app", "go.putnami.dev/client", "go.putnami.dev/inject"}
+
+// goGeneratedClientImports names the modules the generated client of this
+// module imports, or nil for a module the client generator does not write
+// into. The scan cannot see that client: it is built, not committed, so a
+// fresh checkout has no file to read and a populated one has a file the
+// build wrote. The answer is derived from the committed declarations
+// instead, from the rule the generator follows, so a fresh checkout and a
+// populated one attribute a require go.mod states the same way.
+//
+// The generator writes into a module whose putnami.json names its provider in
+// a `generatedFrom` of language go, and into a module that commits
+// clientgen.json. Every other
+// require of such a module is still judged by the scan.
+func goGeneratedClientImports(root string, c *goCandidate) []string {
+	if c.modFile == "" {
+		return nil
+	}
+	if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(goCandidateFile(c.path, goClientGenConfigFile)))); err == nil && info.Mode().IsRegular() {
+		return slices.Clone(goGeneratedClientRuntime)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(goProjectConfigPathFor(c.path))))
+	if err != nil {
+		return nil
+	}
+	var document struct {
+		GeneratedFrom *struct {
+			Language string `json:"language"`
+		} `json:"generatedFrom"`
+	}
+	// The generator writes a Go client only for a generatedFrom whose language
+	// is go; a null or other-language generatedFrom gets no credit.
+	if json.Unmarshal(raw, &document) != nil || document.GeneratedFrom == nil || document.GeneratedFrom.Language != "go" {
+		return nil
+	}
+	return slices.Clone(goGeneratedClientRuntime)
+}
+
 // goModuleImportScan reads which modules the candidate's sources import, among
 // the workspace's modules and the modules its go.mod requires, so a module
 // nested under another one answers for its own packages wherever it lives. An
@@ -752,8 +807,12 @@ func goReplaceTarget(fromDir, toDir string) string {
 // map, which states that its sources import no workspace module. Only a module
 // whose sources were all read can state that: an authored image project has no
 // sources and an incomplete scan has no answer, so both report no map.
+//
+// generated names the modules a generated client of this module imports
+// (goGeneratedClientImports): a direct require of one of them is `go-module`
+// whether or not the generated file is present yet.
 func goDependencySources(c *goCandidate, dependencies []string, byModule map[string]*goCandidate,
-	scan moduleImportScan) map[string]wsproto.DependencySource {
+	scan moduleImportScan, generated []string) map[string]wsproto.DependencySource {
 	if len(dependencies) == 0 {
 		if c.modFile == "" || !scan.complete {
 			return nil
@@ -775,7 +834,7 @@ func goDependencySources(c *goCandidate, dependencies []string, byModule map[str
 		// `// indirect` requirement is the module graph's own need rather than
 		// this module's declaration, and `go mod tidy` puts it back. An
 		// unrequired import is not a direct require either, and the scan read it.
-		if !known || !direct[module] || scan.importsModule(module) {
+		if !known || !direct[module] || scan.importsModule(module) || slices.Contains(generated, module) {
 			sources[dependency] = wsproto.DependencySourceGoModule
 			continue
 		}

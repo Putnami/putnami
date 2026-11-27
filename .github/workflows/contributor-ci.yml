@@ -10,64 +10,132 @@
 # store and a reachable private cache, so "it passes there" says nothing about a
 # fresh clone on a stranger's machine.
 #
-# The job reads no secret. It reaches public endpoints anonymously: go.dev for
+# What it proves changes rarely, and on a pull request it took a median of
+# about 7 minutes and up to 39 per head, so it does not run on pull requests: it runs every night on
+# main, on demand, and before a release (RELEASING.md). A failed nightly run
+# opens an issue, and the next green one closes it. A pull request runs only
+# the squash checks: the squash commit keeps the breaking marker the commits of
+# the change declare, and names no agent. See the "squash" job.
+#
+# The jobs read no secret. They reach public endpoints anonymously: go.dev for
 # the Go toolchain, github.com for the uv release putnami.lock.json pins when
 # the runner's uv is another release, putnami.dev for the CLI's extensions,
 # the public npm registry for TypeScript dependencies, and npm.putnami.dev for
 # the @putnami/cloud version that sites/putnami.dev pins, which it serves
 # without an account. The one exception is this repository's GitHub Container
-# Registry (GHCR), which it reads with the run's own GITHUB_TOKEN: GitHub mints
-# that token for each run, and it is not a repository secret.
-#
-# On a pull request the gate also checks that the squash commit keeps the
-# breaking marker the commits of the change declare, and that it names no
-# agent. See the "Run the gate" step.
+# Registry (GHCR), which the gate reads with the run's own GITHUB_TOKEN: GitHub
+# mints that token for each run, and it is not a repository secret.
 name: Contributor CI (without credentials)
 
 # A draft pull request runs nothing: every proposal opens as a draft when work
-# starts, and its checkpoints need no gate. Marking it ready runs the job.
-#
-# `edited` is listed for one edit only: a change of the base branch. A new base
-# changes what the pull request proposes, so the head needs a new gate result.
-# A stacked pull request retargeted to main after its parent merges otherwise
-# has no result and cannot merge. A title or body edit runs nothing: the job's
-# `if` skips it, and the concurrency group below keeps it from cancelling a run.
+# starts, and its checkpoints need no check. Marking it ready runs the squash
+# checks. `edited` runs them again: a new title or body is a new squash
+# message, and a new base is a new range of commits.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, edited]
+  schedule:
+    # Every night at 03:17 UTC, on the default branch.
+    - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
       scope:
         description: Which projects to gate
         type: choice
-        default: impacted
+        default: all
         options:
-          - impacted
           - all
+          - impacted
 
 permissions:
   contents: read
   # Pull the Postgres service image from this repository's GHCR mirror.
   packages: read
 
-# A title or body edit starts a workflow run whose job is skipped. That run takes
-# a group of its own, so it never cancels the gate running for the same ref.
+# A new push or edit of a pull request cancels its previous squash checks. A
+# nightly run and a run on demand on the same branch keep groups of their own.
 concurrency:
-  group: contributor-ci-${{ (github.event.action == 'edited' && !github.event.changes.base) && format('edit-{0}', github.run_id) || github.ref }}
+  group: contributor-ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # The squash checks of a pull request: `validate-workspace` compares the
+  # squash commit message with the commits of the change. It fails when a
+  # commit declares a breaking change the message drops, and when the message
+  # names an agent. It runs the workspace checks alone, no project job, so it
+  # ends well before Putnami CI and never lengthens the merge wait.
+  squash:
+    name: squash commit checks
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.state == 'open' &&
+      !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PUTNAMI_CLOUD_TOKEN: ''
+      PUTNAMI_CACHE_URL: ''
+      PUTNAMI_CACHE_TOKEN: ''
+      PUTNAMI_TOKEN: ''
+      CONFIG_SERVER_URL: ''
+      CONFIG_SERVER_TOKEN: ''
+      DO_NOT_TRACK: '1'
+    steps:
+      # Both checks read every commit since the merge base with the target
+      # branch, and refuse a shallow clone that could hide one.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - uses: astral-sh/setup-uv@v6
+      # The gate job saves these caches; this job only reads them.
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.putnami/cache/go
+            ~/.putnami/toolchains
+            ~/.putnami/artifacts
+            ~/.bun/install/cache
+            ~/.putnami/tools/go
+          key: putnami-${{ runner.os }}-${{ hashFiles('putnami.lock.json', 'go.work.sum', 'bun.lock', 'go/extension/tools/versions.json') }}
+          restore-keys: |
+            putnami-${{ runner.os }}-
+      - name: Install the workspace
+        run: ./putnamiw install
+      - name: Turn the remote cache off
+        run: |
+          echo '{"enabled": false}' > .putnami/cache.json
+      # This repository squashes with the pull request title and body, so the
+      # message is the title, a blank line and the body. Title and body are
+      # untrusted text, so they reach the script through env and never through
+      # an expression inside it. The target branch is named rather than
+      # resolved, so a pull request onto another branch reads its own range.
+      - name: Check the squash commit message
+        env:
+          PROPOSAL_TITLE: ${{ github.event.pull_request.title }}
+          PROPOSAL_BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          PUTNAMI_PROPOSAL_MESSAGE=$(printf '%s\n\n%s' "$PROPOSAL_TITLE" "$PROPOSAL_BODY")
+          export PUTNAMI_PROPOSAL_MESSAGE
+          ./putnamiw validate-workspace --impacted --impacted-strict --baseline "origin/$BASE_REF"
+
+  # The full credential-free gate: nightly, on demand and before a release.
   gate:
     name: lint,test,build,validate without credentials
-    if: >-
-      github.event_name != 'pull_request' ||
-      (!github.event.pull_request.draft &&
-      (github.event.action != 'edited' || github.event.changes.base))
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    # A wide change fans out across the whole workspace (a CLI edit reaches ~79
-    # projects), so this is a ceiling that fails loudly, not an expected
-    # duration. Putnami CI remains the gate that has to cover everything.
-    timeout-minutes: 60
+    # The nightly run gates the whole workspace, so this is a ceiling that
+    # fails loudly, not an expected duration. Putnami CI remains the gate that
+    # has to cover every change.
+    timeout-minutes: 90
 
     services:
       # This is the one piece of infrastructure the job provides, and the reason
@@ -195,19 +263,15 @@ jobs:
           restore-keys: |
             putnami-${{ runner.os }}-
 
+      # The nightly run gates every project. A run on demand gates every
+      # project too unless it asks for the projects its branch changed.
       - name: Resolve the gate scope
         env:
-          SCOPE: ${{ inputs.scope || 'impacted' }}
-          BASE_REF: ${{ github.base_ref }}
+          SCOPE: ${{ inputs.scope || 'all' }}
         run: |
           set -euo pipefail
           if [ "$SCOPE" = all ]; then
             args='--all'
-          elif [ -n "$BASE_REF" ]; then
-            # Name the target branch rather than letting the CLI resolve a
-            # trunk: a PR onto a release or epic branch would otherwise be
-            # measured against main and gate the wrong change set.
-            args="--impacted --impacted-strict --baseline origin/$BASE_REF"
           else
             args='--impacted --impacted-strict'
           fi
@@ -276,28 +340,9 @@ jobs:
       # is what keeps that safe: an unset GATE_ARGS aborts here instead of
       # quietly falling through to the CLI's own default project selection,
       # which would gate a different set than the one just reported above.
-      #
-      # On a pull request, PUTNAMI_PROPOSAL_MESSAGE carries the squash commit
-      # message: the breaking-marker step of `validate-workspace` fails when a
-      # commit of the change declares a breaking change that the message drops,
-      # and the agent-attribution step fails when the message names an agent.
-      # This repository squashes with the pull request title and body, so the
-      # message is the title, a blank line and the body. Title and body are
-      # untrusted text, so they reach the script through env and never through
-      # an expression inside it. The job does not run when only the title or
-      # the body is edited, so such an edit is checked at the next push or
-      # base change.
       - name: Run the gate
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          PROPOSAL_TITLE: ${{ github.event.pull_request.title }}
-          PROPOSAL_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = pull_request ]; then
-            PUTNAMI_PROPOSAL_MESSAGE=$(printf '%s\n\n%s' "$PROPOSAL_TITLE" "$PROPOSAL_BODY")
-            export PUTNAMI_PROPOSAL_MESSAGE
-          fi
           ./putnamiw lint,test,build,validate $GATE_ARGS --enforce-coverage
 
       # A gate that changed or created a file ran over bytes nobody committed:
@@ -332,3 +377,39 @@ jobs:
             ~/.bun/install/cache
             ~/.putnami/tools/go
           key: ${{ steps.dependency-cache.outputs.cache-primary-key }}
+
+  # A nightly failure must not stay silent: it opens an issue, or comments on
+  # the one still open, and the next green nightly run closes it.
+  report:
+    name: report the nightly gate
+    needs: gate
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open, update or close the nightly issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RESULT: ${{ needs.gate.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+          TITLE: The nightly credential-free gate fails on main
+        run: |
+          set -euo pipefail
+          number=$(gh api "repos/$REPOSITORY/issues?state=open&creator=github-actions%5Bbot%5D&per_page=100" |
+            jq -r --arg title "$TITLE" 'map(select(.title == $title and (has("pull_request") | not)))[0].number // empty')
+          if [ "$RESULT" = success ]; then
+            if [ -n "$number" ]; then
+              gh api "repos/$REPOSITORY/issues/$number/comments" -f body="The nightly gate passed on \`$SHA\`: $RUN_URL" > /dev/null
+              gh api -X PATCH "repos/$REPOSITORY/issues/$number" -f state=closed -f state_reason=completed > /dev/null
+            fi
+            exit 0
+          fi
+          body=$(printf 'The credential-free gate ended `%s` on `main` at `%s`: %s\n\nRun it again from the Actions tab (Contributor CI, scope `all`) once fixed; the next green nightly run closes this issue.' "$RESULT" "$SHA" "$RUN_URL")
+          if [ -n "$number" ]; then
+            gh api "repos/$REPOSITORY/issues/$number/comments" -f body="$body" > /dev/null
+          else
+            gh api "repos/$REPOSITORY/issues" -f title="$TITLE" -f body="$body" > /dev/null
+          fi

@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/sdk/extension/gittest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -112,6 +113,7 @@ func headOf(t *testing.T, root string) string {
 // the same, and no commit: a pull request and its squash merge share the key,
 // and each input of the verdict moves it.
 func TestTheAPICheckKeysOnTheReleaseBaselineNotTheCommit(t *testing.T) {
+	repotest.Require(t)
 	spectest.Proves(t, "cli/job-planning-execution", "release-baseline-cache-key",
 		"a-release-baseline-keys-on-the-line-tag-and-the-breaking-marker")
 	if _, err := exec.LookPath("git"); err != nil {

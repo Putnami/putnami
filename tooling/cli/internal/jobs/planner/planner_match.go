@@ -257,6 +257,20 @@ type UnusedExtension struct {
 	Projects []*workspace.Project
 }
 
+// ServesWorkspaceOnce reports whether a workspace-once job of extensions serves
+// one of commands. Such a job matches the workspace whatever its projects, so a
+// plan that holds none of its steps planned it and found every step inactive.
+func ServesWorkspaceOnce(commands []string, extensions []*extension.ExtensionDescription, disabledJobs, disabledExtensions []string) bool {
+	jobMap := extension.BuildJobMap(extensions)
+	disabledJobSet, disabledExtSet := toSet(disabledJobs), toSet(disabledExtensions)
+	for _, command := range commands {
+		if len(matchWorkspaceOnceJobs(command, jobMap, disabledJobSet, disabledExtSet)) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // UnusedExtensions explains an empty plan whose commands a loaded extension
 // does declare: a project plans the jobs of an extension only once it uses
 // that extension (workspace.UsesJobExtension), which for most projects means

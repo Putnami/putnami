@@ -13,6 +13,7 @@ import (
 
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/sdk/extension/gittest"
+	"go.putnami.dev/tooling/cli/internal/repotest"
 )
 
 // commitVerifyFixture turns root into a repository that holds its files, in
@@ -56,6 +57,7 @@ func TestVerifyFixtureIsTheSameOnAForeignMachine(t *testing.T) {
 // starts in the workspace root whatever directory the user runs putnami from,
 // and its exit code is the command's.
 func TestChangeVerifyThroughPutnamiRunsTheContributorExecutable(t *testing.T) {
+	repotest.Require(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("the harness launcher requires bash")
 	}

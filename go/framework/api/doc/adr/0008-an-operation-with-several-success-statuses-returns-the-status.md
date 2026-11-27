@@ -45,6 +45,13 @@ declare fails. The omission lives in the committed manifest because the
 workspace guard judges committed bytes alone. An omitted operation stays
 required in workspace coverage and is never counted as covered.
 
+**5. A declared redirect is an answered status too.** A 3xx other than 304
+that the operation declares is a success: the method returns the result type
+even when it is the only success, with `Location` set from the answered
+header, and the runtime never follows it. Beside a raw octet success, a
+declared redirect stays documentation and is not a success, so the octet
+method is kept.
+
 ## Consequences
 
 - Changing one body-carrying status's schema moves the Go result from `Body` to

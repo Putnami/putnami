@@ -95,3 +95,10 @@ it. A destination whose permission bits or tree differ is replaced, as
 before. A tool that compares the times of its outputs with its inputs, rather
 than their bytes, may see an output older than an input whose bytes changed
 back; it rebuilds, which costs time and never a wrong output.
+
+The comparison of decision 1 covers the bytes, the permission bits and the
+kinds of file, and nothing else a restore used to replace: a destination
+with another owner, other extended attributes, or one that shares its inode
+with another path through a hard link is kept as it is, where a restore
+used to write a new file. Its bytes are always the entry's; the owner, the
+attributes and the link are not parts of an output the store records.

@@ -445,6 +445,22 @@
           }
         },
         {
+          "id": "redirect-success",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-redirecting-endpoint-declares-its-3xx-alone",
+              "a-redirect-operation-returns-the-answered-status-and-location",
+              "the-emitted-go-client-answers-a-declared-redirect-without-following-it-through-the-real-runtime",
+              "the-emitted-typescript-client-answers-a-declared-redirect-without-following-it-through-the-real-runtime"
+            ]
+          }
+        },
+        {
           "id": "opaque-json",
           "stage": "coded",
           "evidenceKinds": [

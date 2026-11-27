@@ -979,8 +979,8 @@ func (s schemaSnapshot) content(path string) ([]byte, bool) {
 // removed producer) are ignored, so describe never resurrects them into the
 // tracked tree.
 //
-// The committed feature evidence and the gRPC service inventory are the only
-// tracked files it removes: when this run did not commit one, the copy an
+// The committed feature evidence, the gRPC service inventory and the HTTP
+// route inventory are the only tracked files it removes: when this run did not commit one, the copy an
 // earlier run left goes (removeUncommittedDescribeOutputs).
 //
 // It does not validate the gRPC service inventory: runDescribe refuses an
@@ -1115,6 +1115,7 @@ const grpcServicesSchemaRelPath = "schema/grpc-services.json"
 var describeOnlyCommittedRelPaths = []string{
 	committedFeatureEvidenceRelPath,
 	grpcServicesSchemaRelPath,
+	httpRoutesSchemaRelPath,
 }
 
 // removeUncommittedDescribeOutputs removes each describe-only committed file
@@ -1132,6 +1133,10 @@ var describeOnlyCommittedRelPaths = []string{
 // The gRPC service inventory is read at the exact commit. An absent file leaves
 // the facts unavailable, while a copy an earlier run left would list services
 // the current app does not declare.
+//
+// The HTTP route inventory is a declared output too, with drift: fail. A copy
+// an earlier run left would be stored in this run's entry and restored by
+// every later hit, listing routes the current app does not serve.
 func removeUncommittedDescribeOutputs(projectPath string, artifacts []string) error {
 	committed := make(map[string]bool, len(artifacts))
 	for _, artifact := range artifacts {
