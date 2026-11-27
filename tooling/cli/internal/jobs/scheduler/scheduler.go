@@ -287,6 +287,9 @@ type Scheduler struct {
 	// that keeps a sensitive artifact's path and bytes off every published
 	// surface. Nil for every plan with no finalizer.
 	invocations *invocationRuntime
+	// keyTrace records each job's precomputed key beside the key it computes
+	// at its start, while a test traces keys (TraceKeys); nil otherwise.
+	keyTrace *keyTrace
 
 	// metrics records per-job ready/start timing so Run can report ready wait
 	// and the critical path. Initialized per Run.
@@ -673,10 +676,12 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 	// Negotiate the finalizes relations' consumer frontiers BEFORE any producer
 	// can materialize a resource: an all-hit frontier prunes the producer and
 	// its finalizer together.
-	s.invocations.prune(
+	pruneStarted := time.Now()
+	precomputed := s.invocations.prune(
 		s.ws, s.planned, s.commandParams, s.cfg.VersionInfo,
 		s.cache, s.bypass, s.cacheStats,
 	)
+	s.keyTrace = s.startKeyTrace(precomputed, time.Since(pruneStarted))
 }
 
 // Run executes all planned jobs respecting the dependency DAG.
@@ -1129,6 +1134,7 @@ func (s *Scheduler) finalizeRun(
 ) *SchedulerResult {
 	// Mark any remaining planned jobs as canceled (if aborted).
 	s.synthesizeCanceledResults(results, mu)
+	s.keyTrace.finish()
 
 	if s.cfg.FinalizeResults != nil {
 		s.cfg.FinalizeResults(results)

@@ -126,12 +126,8 @@ func (r *RemoteCache) sourceBoundHitsLocally(job *jobmodel.ScheduledJob, hash st
 	if r.sourceBoundEntryKey == nil {
 		return false
 	}
-	entryKey, ok := r.sourceBoundEntryKey(job, hash)
-	if !ok {
-		return false
-	}
-	entry, err := cm.LookupTaskEntry(entryKey)
-	return err == nil && entry != nil
+	present, err := cachekey.CacheEntryPresentAt(cm, job, hash, r.sourceBoundEntryKey)
+	return err == nil && present
 }
 
 // RecordSetup attributes the pre-run provider resolution time to this run's cache

@@ -294,7 +294,7 @@ fi
 // processes depends on the host's workers and no count holds it.
 func CountsFixture(t *testing.T, projects int, batchable bool) string {
 	t.Helper()
-	return countsFixture(t, projects, batchable, false)
+	return countsFixture(t, projects, batchable, false, false)
 }
 
 // WritingCountsFixture is CountsFixture whose tasks write: each keys on the
@@ -305,10 +305,19 @@ func CountsFixture(t *testing.T, projects int, batchable bool) string {
 // of a run are those of a run whose tasks write nothing.
 func WritingCountsFixture(t *testing.T, projects int) string {
 	t.Helper()
-	return countsFixture(t, projects, false, true)
+	return countsFixture(t, projects, false, true, false)
 }
 
-func countsFixture(t *testing.T, projects int, batchable, writes bool) string {
+// SourceBoundCountsFixture is CountsFixture whose tasks declare
+// cache.sourceBound: each entry is stored and looked up at its cache key
+// bound to its project's source binding. The workspace's .gitignore excludes
+// the build stamp the binding is written to.
+func SourceBoundCountsFixture(t *testing.T, projects int) string {
+	t.Helper()
+	return countsFixture(t, projects, false, false, true)
+}
+
+func countsFixture(t *testing.T, projects int, batchable, writes, sourceBound bool) string {
 	t.Helper()
 	root := t.TempDir()
 	includes := []string{"extension"}
@@ -348,6 +357,11 @@ func countsFixture(t *testing.T, projects int, batchable, writes bool) string {
 			}}
 			tasks[command] = task
 		}
+		if sourceBound {
+			task := tasks[command]
+			task.Cache.SourceBound = true
+			tasks[command] = task
+		}
 		if batchable {
 			task := tasks[command]
 			task.Args = []string{"{extensionRoot}/batch.sh"}
@@ -365,8 +379,11 @@ func countsFixture(t *testing.T, projects int, batchable, writes bool) string {
 	}
 	WriteFile(t, filepath.Join(root, "extension", "putnami.extension.json"), string(data))
 	WriteFile(t, filepath.Join(root, "extension", "batch.sh"), countsBatchScript)
-	if writes {
+	switch {
+	case writes:
 		WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n")
+	case sourceBound:
+		WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\n")
 	}
 	InitGitRepo(t, root)
 	return root
