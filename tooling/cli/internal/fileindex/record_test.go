@@ -439,3 +439,68 @@ func TestASaveKeepsTheRecordWithinItsCaps(t *testing.T) {
 		t.Fatalf("the record holds %d entries past its cap of 3", len(disk.entries))
 	}
 }
+
+func TestADiscardIsReportedOnceAndANegativeRateSamplesNothing(t *testing.T) {
+	clock := time.Now().Add(time.Hour).UnixNano()
+	withRecordClock(t, &clock)
+	_, path, _ := recordFixture(t)
+	r := OpenRecord(path, "id")
+	r.SetSampleRate(-1)
+	for range 100 {
+		if r.Sample() {
+			t.Fatal("a negative rate sampled an answer")
+		}
+	}
+	var reasons []string
+	r.OnDiscard(func(reason string) { reasons = append(reasons, reason) })
+	r.Discard("first")
+	r.Discard("second")
+	if len(reasons) != 1 || reasons[0] != "first" || r.Discarded() != "first" {
+		t.Fatalf("reported %q, discarded %q: want the first reason, once", reasons, r.Discarded())
+	}
+}
+
+func TestLinkHopsNamesEachLinkTheResolutionMeets(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range []string{"real/sub", "other"} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for link, target := range map[string]string{"a": "real", "real/up": "../other", "chain": "a"} {
+		if err := os.Symlink(target, filepath.Join(root, link)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cases := []struct {
+		dir  string
+		hops []string
+		ok   bool
+	}{
+		{"real/sub", nil, true},
+		{"a/sub", []string{"a"}, true},
+		{"chain/sub", []string{"chain", "a"}, true},
+		{"a/up", []string{"a", "real/up"}, true},
+		{"a/missing", nil, false},
+	}
+	for _, c := range cases {
+		hops, ok := LinkHops(filepath.Join(root, c.dir))
+		var want []string
+		for _, hop := range c.hops {
+			want = append(want, filepath.Join(root, hop))
+		}
+		if ok != c.ok || fmt.Sprint(hops) != fmt.Sprint(want) {
+			t.Errorf("LinkHops(%s) = %v, %v; want %v, %v", c.dir, hops, ok, want, c.ok)
+		}
+	}
+	loop := filepath.Join(root, "loop")
+	if err := os.Symlink("loop", loop); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := LinkHops(loop); ok {
+		t.Error("a link to itself resolved")
+	}
+}

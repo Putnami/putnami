@@ -160,7 +160,9 @@ link on the way to a witnessed path, a system one above the workspace or a
 linked project directory included, does not prevent the record: each link
 the resolution of a witnessed directory meets is witnessed by its own lstat,
 which pointing it elsewhere moves, and every path below it is stated through
-it. Three paths are read by a link's text rather than through it, and a link
+it. A link's lstat is trusted on any file system section 2 lists, outside
+the margin, even when it is not the record's device, such as macOS's system
+links on the System volume. Three paths are read by a link's text rather than through it, and a link
 there is its own witness: a Git candidate of a digest of Git candidates
 alone, as Git lists it; a path an answer's basis content set selects, as the
 basis digest reads it; and a link the nearest existing directory above a
@@ -173,7 +175,10 @@ keyed by the exact path, and dropped by the run's writes as ADR 0109 drops
 digests: a write drops the stats at, under and above its paths in any
 spelling of their case, and a write the run cannot bound (a source rewriter,
 which drops every digest) drops them all. A stat taken while a write was
-dropped answers its lookup but is not kept. A recorded digest that
+dropped answers its lookup but is not kept. The parts of a digest whose
+witness has a link are stated again at every check and never kept: a write
+the run names by the physical path does not reach a stat kept under the
+linked spelling. A recorded digest that
 holds enters the run's memo with the in-run witness of ADR 0109, rebuilt from
 its recorded files, so a write of the run moves it as it moves a collected
 one.
@@ -181,15 +186,24 @@ one.
 **A sample of the answers is collected again.** Each run collects again a
 random sample of the digests the record answers: each answer with a
 probability of 16 over the entries the record loaded, and at least 1 %, so
-about 25 of this repository's 2,480 answers. A sampled answer that differs
-from its collection shows a witness the record should not have trusted, in a
-class no test foresaw: the run uses the collected digest, discards the whole
-record for the rest of the run, which then collects every digest, saves an
-empty record, and reports one warning (`cache.input_record_discarded`) that
-names the digest, its directory and its patterns, in its output and in its
-result. An unknown false-hit class becomes a miss within the run that samples
-it, and every run after it starts from an empty record. The sample costs about
-25 collections a run, 1 % of the collections the record saves.
+about 25 of this repository's 2,480 answers, and every answer of a record of
+16 entries or fewer. A sampled answer that differs from its collection, or
+whose collection now fails, shows a witness the record should not have
+trusted, in a class no test foresaw, unless a write of the run came between
+the answer and the collection: the run uses the collection (or returns its
+error), discards the whole record and every digest the run memoized, so it
+collects every digest again for the rest of the run, saves an empty record,
+and reports one warning (`cache.input_record_discarded`) that names the
+digest, its directory and its patterns, when it happens, so the run's output
+and its result carry it. Keys the run computed before the discard are not
+computed again. An unknown class of selection or listing witness that fails
+becomes a miss within the run that samples it, and every run after it starts
+from an empty record. The sample does not check the file witness: its
+collection reads file contents through the file index, which answers by the
+same stat (ADR 0009). The sample costs about 25 collections a run, 1 % of the
+collections the record saves on this repository, and at most 16 a run on a
+smaller one. The tests that assert no false hit turn the sample off, so a
+false hit fails them instead of being corrected.
 
 ### 2. The racy rule, for files and for directories
 

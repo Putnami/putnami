@@ -108,6 +108,7 @@ type Record struct {
 	// is not.
 	sampleRate float64
 	discarded  string
+	onDiscard  func(reason string)
 
 	// stats holds the stats the run took to check witnesses (Hold): one stat
 	// per path per run, dropped by the run's writes (Forget). under maps a
@@ -238,6 +239,9 @@ func (r *Record) Sample() bool {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.sampleRate < 0 {
+		return false
+	}
 	if r.sampleRate == 0 {
 		r.sampleRate = minimumSampleRate
 		if n := len(r.loaded); n > 0 && float64(minimumSamples)/float64(n) > r.sampleRate {
@@ -247,8 +251,8 @@ func (r *Record) Sample() bool {
 	return rand.Float64() < r.sampleRate //nolint:gosec // a sample, not a secret
 }
 
-// SetSampleRate sets the share of answers Sample checks; a test checks every
-// one with 1.
+// SetSampleRate sets the share of answers Sample checks: 1 checks every one,
+// a negative rate none, and 0 restores the default.
 func (r *Record) SetSampleRate(rate float64) {
 	r.mu.Lock()
 	r.sampleRate = rate
@@ -264,11 +268,40 @@ func (r *Record) Discard(reason string) {
 		return
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.discarded == "" {
+	first := r.discarded == ""
+	if first {
 		r.discarded = reason
 	}
 	r.loaded, r.fresh, r.confirmed, r.stale = map[recordKey]recordEntry{}, map[recordKey]recordEntry{}, map[recordKey]bool{}, map[recordKey]bool{}
+	notify := r.onDiscard
+	r.mu.Unlock()
+	if first && notify != nil {
+		notify(reason)
+	}
+}
+
+// OnDiscard makes notify be called once, with its reason, when the record is
+// discarded, from the goroutine that discards it: the run reports it while it
+// renders. A nil r does nothing.
+func (r *Record) OnDiscard(notify func(reason string)) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	r.onDiscard = notify
+	r.mu.Unlock()
+}
+
+// Forgets counts the writes the run forgot so far (Forget, ForgetAll): a
+// caller that compares an answer with a collection taken later tells a write
+// of the run between the two from a witness that failed.
+func (r *Record) Forgets() uint64 {
+	if r == nil {
+		return 0
+	}
+	r.statsMu.Lock()
+	defer r.statsMu.Unlock()
+	return r.forgets
 }
 
 // Discarded returns the reason the record was discarded, "" when it was not.
@@ -361,7 +394,7 @@ func (r *Record) Put(table, k string, value []byte, parts []RecordPart) bool {
 		return false
 	}
 	for _, part := range parts {
-		if !filepath.IsAbs(part.Path) || !part.Absent() && !r.Recordable(part.Stat) {
+		if !filepath.IsAbs(part.Path) || !part.Absent() && !r.Recordable(part.Stat) && !r.recordableLink(part) {
 			return false
 		}
 	}
@@ -749,8 +782,18 @@ func (d *recordDecoder) stat() Stat {
 // Hold reports whether every part's path has, now, the stat recorded with
 // it. It takes each path's stat once per run, until Forget drops it.
 func (r *Record) Hold(parts []RecordPart) bool {
+	// A run's write named by its physical path does not reach a stat held
+	// under a path spelled through a link: the parts of a value read through
+	// one are stated again at every check, and none is held.
+	stat := r.heldStat
 	for _, part := range parts {
-		st, ok := r.heldStat(part.Path)
+		if part.Stat.Mode&linkModeMask == linkMode {
+			stat = func(path string) (Stat, bool) { return recordLstat(filepath.Clean(path)) }
+			break
+		}
+	}
+	for _, part := range parts {
+		st, ok := stat(part.Path)
 		if part.Absent() {
 			if ok {
 				return false
@@ -762,6 +805,25 @@ func (r *Record) Hold(parts []RecordPart) bool {
 		}
 	}
 	return true
+}
+
+// linkModeMask and linkMode are the file-type bits of a stat's mode and those
+// of a symbolic link, as the platform's stat decodes them.
+const (
+	linkModeMask = 0o170000
+	linkMode     = 0o120000
+)
+
+// recordableLink reports whether part, the lstat of a link a computation met
+// on the way to what it read, may be recorded on another device than the
+// record's: a link's own stat moves when it is replaced or retargeted, so it
+// is enough on a trusted local file system, outside the margin.
+func (r *Record) recordableLink(part RecordPart) bool {
+	if part.Stat.Mode&linkModeMask != linkMode || !r.enabled() || r.readOnly || !recordLocal(filepath.Dir(part.Path)) {
+		return false
+	}
+	limit := r.clock - int64(Margin)
+	return part.Stat.ModNano < limit && part.Stat.ChangeNano < limit
 }
 
 // AbsentPart is the part of a path the computation found absent: it holds

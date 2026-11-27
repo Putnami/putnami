@@ -23,6 +23,10 @@ import (
 func useRecordAt(t *testing.T, root string) *fileindex.Record {
 	t.Helper()
 	record := fileindex.OpenRecordAt(fileindex.RecordPath(root), "test", time.Now().Add(time.Hour).UnixNano())
+	// The sample would collect and correct every answer of a record this
+	// small: off, a false hit fails the test that meets it. The tests of the
+	// sample turn it on.
+	record.SetSampleRate(-1)
 	restore := fileindex.UseRecord(record)
 	t.Cleanup(restore)
 	if fileindex.CurrentRecord() == nil {

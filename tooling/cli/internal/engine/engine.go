@@ -773,6 +773,15 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		} else {
 			record = fileindex.OpenRecord(fileindex.RecordPath(req.WorkspaceRoot), fileindex.RecordIdentity())
 		}
+		// A record whose sampled answer differed from a collection is
+		// discarded: the run says so once, while it renders, and its result
+		// carries it.
+		record.OnDiscard(func(reason string) {
+			req.workspaceWarnings.Add(workspace.Warning{
+				Code:    "cache.input_record_discarded",
+				Message: reason + "; the input record is discarded and every input digest is collected (tooling/cli ADR 0113)",
+			})
+		})
 		restoreRecord := fileindex.UseRecord(record)
 		defer func() {
 			restoreRecord()
@@ -787,14 +796,6 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 			}
 			if err := record.Save(); err != nil && req.Global.Debug {
 				iox.Fprintf(os.Stderr, "[debug] input record: %v\n", err)
-			}
-			// A record whose sampled answer differed from a collection is
-			// discarded: the run says so, once, and its result carries it.
-			if reason := record.Discarded(); reason != "" {
-				req.workspaceWarnings.Add(workspace.Warning{
-					Code:    "cache.input_record_discarded",
-					Message: reason + "; the input record is discarded and every input digest is collected (tooling/cli ADR 0113)",
-				})
 			}
 		}()
 		// The release baselines a run read are answered to the next run while

@@ -3,6 +3,7 @@ package workspace
 import (
 	"io"
 	"slices"
+	"sync"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -15,7 +16,10 @@ import (
 // reads the workspace reports its warnings through a WarningReport, so the same
 // state reads the same on every surface.
 type WarningReport struct {
-	w        io.Writer
+	w io.Writer
+	// mu guards reported: a run may add a warning from a worker while it
+	// renders (Add).
+	mu       sync.Mutex
 	reported []Warning
 }
 
@@ -57,6 +61,8 @@ func (r *WarningReport) Add(warning Warning) {
 // add keeps warning unless the report already holds it, and reports whether it
 // kept it.
 func (r *WarningReport) add(warning Warning) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if slices.Contains(r.reported, warning) {
 		return false
 	}
@@ -69,7 +75,9 @@ func (r *WarningReport) Warnings() []Warning {
 	if r == nil {
 		return nil
 	}
-	return r.reported
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.reported)
 }
 
 // Envelope returns every reported warning in its result envelope shape, in

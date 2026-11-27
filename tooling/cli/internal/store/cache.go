@@ -335,15 +335,28 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 		recorded, recordable = recordKey(key, patterns, expander)
 	}
 	if recordable {
+		forgets := record.Forgets()
 		if hash, witness, memoize, ok := recordedInputDigest(record, recorded, dir, patterns); ok {
 			// A sample of the answers is collected again (ADR 0113 §1): one
-			// that differs shows a witness the record should not have
-			// trusted, and the record is discarded for good.
-			sampled := record.Sample()
-			if sampled {
-				if collected, _, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope); err == nil && collected != hash {
-					record.Discard(fmt.Sprintf("the input record answered %s for %s %s, which a collection gives as %s",
-						hash, dir, strings.Join(patterns, ","), collected))
+			// that differs, or that no longer collects, shows a witness the
+			// record should not have trusted, unless a write of the run came
+			// between the two. The record is then discarded for good, with
+			// every digest this run memoized: the run collects them again.
+			if record.Sample() {
+				collected, _, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope)
+				if (err != nil || collected != hash) && record.Forgets() == forgets {
+					reason := fmt.Sprintf("the input record answered %s for %s %s, which a collection gives as %s", hash, dir, strings.Join(patterns, ","), collected)
+					if err != nil {
+						reason = fmt.Sprintf("the input record answered %s for %s %s, which no longer collects (%v)", hash, dir, strings.Join(patterns, ","), err)
+					}
+					record.Discard(reason)
+					cm.InvalidateFileHashes()
+				}
+				if err != nil {
+					return "", err
+				}
+				if collected != hash {
+					hash, memoize = collected, false
 				}
 			}
 			if record.Discarded() == "" {
