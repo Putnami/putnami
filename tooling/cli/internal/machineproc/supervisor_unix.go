@@ -20,6 +20,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"go.putnami.dev/tooling/cli/internal/fileindex"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 )
 
 // Idle bounds (CLI ADR 0116 §2).
@@ -28,6 +29,10 @@ const (
 	supervisorIdle = 3 * time.Hour
 	readyTimeout   = 10 * time.Second
 	idleCheck      = time.Minute
+	// queueTimeout bounds the wait of a request for its worktree's busy
+	// worker, within the client's own wait for the worker to take it.
+	queueTimeout = 12 * time.Second
+	queuePoll    = 50 * time.Millisecond
 )
 
 // supervisorEnv is the environment of a supervisor and the workers it starts:
@@ -222,27 +227,47 @@ func (s *supervisor) route(c *conn, req request, files []*os.File) {
 	s.mu.Unlock()
 }
 
-// claim returns the idle worker of req's build, starting it when none runs,
-// and marks it busy; or nil and the refusal's code.
+// claim returns the idle worker of req's build and worktree, starting it when
+// none runs, and marks it busy; or nil and the refusal's code. A request for a
+// worktree whose worker is busy waits for it, up to queueTimeout: two runs of
+// one worktree share its files and its held state, so they take turns, while
+// two worktrees each have a worker of their own and progress at once (CLI ADR
+// 0116 §1).
 func (s *supervisor) claim(req request) (*worker, string) {
 	// A worker serves one executable file: two files of one build can stand
 	// for different engines (a source workspace pins the file, not the build).
-	key := req.Build + "\x00" + req.Executable
-	s.mu.Lock()
-	if s.stopping {
-		s.mu.Unlock()
-		return nil, CodeStopping
+	// It serves one worktree, which its held state is of.
+	worktree := worktreeRoot(req.Dir)
+	if worktree == "" {
+		worktree = req.Dir
 	}
-	if w := s.workers[key]; w != nil {
-		if w.busy {
+	key := req.Build + "\x00" + req.Executable + "\x00" + worktree
+	deadline := time.Now().Add(queueTimeout)
+	s.mu.Lock()
+	for {
+		if s.stopping {
+			s.mu.Unlock()
+			return nil, CodeStopping
+		}
+		w := s.workers[key]
+		if w == nil {
+			break
+		}
+		if !w.busy {
+			w.busy = true
+			s.mu.Unlock()
+			return w, ""
+		}
+		if time.Now().After(deadline) {
 			s.mu.Unlock()
 			return nil, CodeBusy
 		}
-		w.busy = true
 		s.mu.Unlock()
-		return w, ""
+		time.Sleep(queuePoll)
+		s.mu.Lock()
 	}
 	s.mu.Unlock()
+	s.evictBeyondBudget()
 	if !trustedExecutable(req.Executable) || fileindex.BuildIdentity(req.Executable) != req.Build {
 		return nil, CodeIdentity
 	}
@@ -577,4 +602,48 @@ func (s *supervisor) workerPIDs() map[int]bool {
 		pids[pid] = true
 	}
 	return pids
+}
+
+// evictBeyondBudget stops idle workers, least recently used first, while the
+// workers' held memory together, with one more worker's, is past the
+// machine process's budget (CLI ADR 0116 §10). A worker that is running is
+// never stopped: the budget bounds what is held between runs.
+func (s *supervisor) evictBeyondBudget() {
+	budget := memoryBudget()
+	s.mu.Lock()
+	var held uint64
+	var idle []*worker
+	for _, w := range s.workers {
+		held += max(w.heldBytes, workerFloorBytes)
+		if !w.busy {
+			idle = append(idle, w)
+		}
+	}
+	sort.Slice(idle, func(i, j int) bool { return idle[i].lastUsed.Before(idle[j].lastUsed) })
+	var stop []*worker
+	for _, w := range idle {
+		if held+workerFloorBytes <= budget {
+			break
+		}
+		held -= max(w.heldBytes, workerFloorBytes)
+		stop = append(stop, w)
+	}
+	s.mu.Unlock()
+	for _, w := range stop {
+		_ = w.ctrl.c.Close() // the worker exits when its channel closes
+	}
+}
+
+// workerFloorBytes is what a worker is counted at before its first report:
+// about what an idle worker holds once it served a run.
+const workerFloorBytes = 96 << 20
+
+// memoryBudget is the machine process's budget: 1 GiB, or an eighth of the
+// machine's memory if that is less.
+func memoryBudget() uint64 {
+	budget := uint64(1 << 30)
+	if total := machineprobe.TotalMemoryBytes() / 8; total > 0 && total < budget {
+		budget = total
+	}
+	return budget
 }

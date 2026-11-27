@@ -623,3 +623,63 @@ func machineLastMemory(t *testing.T) string {
 	}
 	return filepath.Join(dir, "last-memory.json")
 }
+
+// TestEachWorktreeIsServedByAWorkerOfItsOwn serves two worktrees in turn:
+// each gets a worker of its own, which serves it again on its next request,
+// so the two can progress at once instead of one refusing the other (CLI ADR
+// 0116 §1).
+func TestEachWorktreeIsServedByAWorkerOfItsOwn(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("the machine process runs on Linux and macOS only")
+	}
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	roots := []string{clitest.WritingCountsFixture(t, 1), clitest.WritingCountsFixture(t, 1)}
+	startSupervisor(t)
+	t.Setenv(machineproc.Env, "on")
+	// runsByWorker is each worker's count of served runs, by pid.
+	runsByWorker := func() map[int]int {
+		t.Helper()
+		workerRuns(t) // waits for the last run's worker to report it
+		r, err := machineproc.Query("status")
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[int]int{}
+		for _, w := range r.Status.Workers {
+			out[w.PID] = w.Runs
+		}
+		return out
+	}
+	serve := func(root string) int {
+		t.Helper()
+		before := runsByWorker()
+		if code, out := clitest.RunGateArgs(t, root, "lint", "--all"); code != 0 {
+			t.Fatalf("%s: exit %d\n%s", root, code, out)
+		}
+		after := runsByWorker()
+		servedBy := 0
+		for pid, runs := range after {
+			if runs > before[pid] {
+				if servedBy != 0 {
+					t.Fatalf("%s: two workers served one request: %v then %v", root, before, after)
+				}
+				servedBy = pid
+			}
+		}
+		if servedBy == 0 {
+			t.Fatalf("%s: no worker served the request (last run in its own process: %+v)", root, machineproc.ReadLastLocal())
+		}
+		return servedBy
+	}
+	first := []int{serve(roots[0]), serve(roots[1])}
+	if first[0] == first[1] {
+		t.Fatalf("two worktrees were served by one worker %d, want a worker each", first[0])
+	}
+	if again := serve(roots[0]); again != first[0] {
+		t.Errorf("the first worktree was served again by worker %d, want its own %d", again, first[0])
+	}
+	if again := serve(roots[1]); again != first[1] {
+		t.Errorf("the second worktree was served again by worker %d, want its own %d", again, first[1])
+	}
+}
