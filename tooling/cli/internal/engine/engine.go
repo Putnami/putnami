@@ -764,15 +764,40 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		index.Adopt(fileindex.Current())
 		restoreIndex := fileindex.Use(index)
 		restoreConfigReader := wsproto.UseConfigReader(fileindex.ReadFile)
+		// The input digests of cache keys are answered from the workspace's
+		// input record while their witnesses hold (tooling/cli ADR 0113), under
+		// the same rule: a run that only plans reads it and writes nothing.
+		var record *fileindex.Record
+		if req.Global.Plan || req.previewsOnly() {
+			record = fileindex.OpenRecordReadOnly(fileindex.RecordPath(req.WorkspaceRoot), fileindex.RecordIdentity(), time.Now().UnixNano())
+		} else {
+			record = fileindex.OpenRecord(fileindex.RecordPath(req.WorkspaceRoot), fileindex.RecordIdentity())
+		}
+		// A record whose sampled answer differed from a collection is
+		// discarded: the run's result carries it from then on, and the run
+		// writes it once, after it rendered.
+		record.OnDiscard(func(reason string) {
+			req.workspaceWarnings.Keep(workspace.Warning{
+				Code:    "cache.input_record_discarded",
+				Message: reason + "; the input record is discarded and every input digest is collected (tooling/cli ADR 0113)",
+			})
+		})
+		restoreRecord := fileindex.UseRecord(record)
 		defer func() {
+			restoreRecord()
 			restoreConfigReader()
 			restoreIndex()
 			if req.Global.Debug {
 				iox.Fprintf(os.Stderr, "[debug] file index: %d digests answered, %d files read\n", index.Hits(), index.Reads())
+				iox.Fprintf(os.Stderr, "[debug] input record: %d values answered, %d computed\n", record.Answered(), record.Computed())
 			}
 			if err := index.Save(); err != nil && req.Global.Debug {
 				iox.Fprintf(os.Stderr, "[debug] file index: %v\n", err)
 			}
+			if err := record.Save(); err != nil && req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] input record: %v\n", err)
+			}
+			req.workspaceWarnings.Flush()
 		}()
 		// The release baselines a run read are answered to the next run while
 		// the commits they name hold (tooling/cli ADR 0113 §4), under the same

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	pathpkg "path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -35,6 +36,72 @@ func CandidateFiles(root string) ([]protocoljob.CandidateFile, error) {
 	return CandidateFilesFromGit(root)
 }
 
+// CandidateFilesWitnessed is CandidateFiles with the paths whose stats witness
+// the listing (tooling/cli ADR 0113 §3), when the reader read it in-process:
+// the index, each directory the untracked walk read, each untracked nested
+// repository it listed, each ignore file it read or could have read, and the
+// files Git's configuration was read from. The witness is nil when Git listed
+// the cut, and when the configuration is a reading the reader takes again each
+// time: the stats would not say the listing is unchanged.
+func CandidateFilesWitnessed(root string) ([]protocoljob.CandidateFile, []string, error) {
+	repo, err := openLocal(root)
+	if err == nil {
+		var cut *localCut
+		if cut, err = repo.readCut(); err == nil {
+			files, sortErr := cutFiles(cut, root)
+			return files, repo.cutWitness(cut), sortErr
+		}
+	}
+	if !inProcessUnsupported(err) {
+		return nil, nil, err
+	}
+	files, err := CandidateFilesFromGit(root)
+	return files, nil, err
+}
+
+// cutWitness is the witness of a cut the reader read in repo (CandidateFilesWitnessed).
+func (r *localRepo) cutWitness(cut *localCut) []string {
+	config, kept := configCache.Load(r.root + "\x00" + os.Getenv("HOME") + "\x00" + os.Getenv("XDG_CONFIG_HOME"))
+	cached, ok := config.(*cachedConfig)
+	if !kept || !ok || cached.config != r.config {
+		return nil
+	}
+	// The .git entry and the commondir file name the repository a linked
+	// worktree reads; the index moves whenever Git writes it.
+	witness := []string{filepath.Join(r.gitDir, "index"), filepath.Join(r.commonDir, "info", "exclude")}
+	if r.linked {
+		witness = append(witness, filepath.Join(r.gitDir, "commondir"))
+	}
+	// A .git file names the repository of a linked worktree; a .git
+	// directory is witnessed by the root's listing, which the walk read,
+	// and its own stat moves with every lock Git takes in it.
+	if info, err := os.Lstat(filepath.Join(r.root, ".git")); err == nil && !info.IsDir() {
+		witness = append(witness, filepath.Join(r.root, ".git"))
+	}
+	if excludes, err := r.config.excludesFile(); err == nil && excludes != "" {
+		witness = append(witness, excludes)
+	}
+	// A configuration file that does not exist is not read; Git reads one
+	// under the git directory only where the configuration names it, so its
+	// absence there is witnessed by the configuration, not by the git
+	// directory's stat, which every lock Git takes moves.
+	for _, file := range cached.files {
+		if _, err := os.Lstat(file); err != nil && (strings.HasPrefix(file, r.gitDir+string(filepath.Separator)) || strings.HasPrefix(file, r.commonDir+string(filepath.Separator))) {
+			continue
+		}
+		witness = append(witness, file)
+	}
+	for _, dir := range cut.Directories {
+		witness = append(witness, filepath.Join(r.root, filepath.FromSlash(dir)))
+	}
+	for _, untracked := range cut.Untracked {
+		if untracked.Repository {
+			witness = append(witness, filepath.Join(r.root, filepath.FromSlash(untracked.Path)))
+		}
+	}
+	return append(witness, cut.RuleFiles...)
+}
+
 // candidateFilesInProcess reads the cut of the work tree at root in-process;
 // its error is unsupported (inProcessUnsupported) when Git must read it.
 func candidateFilesInProcess(root string) ([]protocoljob.CandidateFile, error) {
@@ -46,6 +113,11 @@ func candidateFilesInProcess(root string) ([]protocoljob.CandidateFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	return cutFiles(cut, root)
+}
+
+// cutFiles is the listing of a cut the reader read, as CandidateFiles lists it.
+func cutFiles(cut *localCut, root string) ([]protocoljob.CandidateFile, error) {
 	files := make([]protocoljob.CandidateFile, 0, len(cut.Index.Entries)+len(cut.Untracked))
 	for _, entry := range cut.Index.Entries {
 		mode := fmt.Sprintf("%06o", entry.Mode)

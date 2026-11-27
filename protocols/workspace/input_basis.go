@@ -74,10 +74,37 @@ func InputBasisDigestFrom(root string, basis InputBasis, fileDigest FileContentD
 	return hashInputBasisRecords(records), nil
 }
 
+// InputBasisPaths returns what the digest of basis under root reads: the
+// directories its walk lists, root first, and the paths whose content a
+// content set selects. A reader that keeps a digest across runs witnesses it
+// by their stats: a path a listing set selects is named by the directory that
+// holds it. It reads no file's bytes.
+func InputBasisPaths(root string, basis InputBasis) (directories, content []string, err error) {
+	noDigest := func(string) ([]byte, error) { return make([]byte, sha256.Size), nil }
+	_, _, err = walkInputBasisVisiting(root, basis, true, noDigest, func(abs string, listed, selected bool) {
+		if listed {
+			directories = append(directories, abs)
+		}
+		if selected {
+			content = append(content, abs)
+		}
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return directories, content, nil
+}
+
 // walkInputBasis returns the records of the tree under root that basis
 // selects, and the number of paths it visited. With prune false it walks the
 // whole tree, which yields the same records.
 func walkInputBasis(root string, basis InputBasis, prune bool, fileDigest FileContentDigest) ([]string, int, error) {
+	return walkInputBasisVisiting(root, basis, prune, fileDigest, nil)
+}
+
+// walkInputBasisVisiting is walkInputBasis that tells visit, when set, of
+// each directory it lists and each path a content set selects.
+func walkInputBasisVisiting(root string, basis InputBasis, prune bool, fileDigest FileContentDigest, visit func(abs string, listed, selected bool)) ([]string, int, error) {
 	if diags := validateInputBasis("basis", basis); diag.HasErrors(diags) {
 		return nil, 0, fmt.Errorf("input basis rejected: %s", formatProbeDiagnostics(diags))
 	}
@@ -95,6 +122,9 @@ func walkInputBasis(root string, basis InputBasis, prune bool, fileDigest FileCo
 	content, listing := splitBasisSets(basis.Content), splitBasisSets(basis.Listing)
 	var records []string
 	visited := 0
+	if visit != nil {
+		visit(root, true, false)
+	}
 	err = filepath.WalkDir(root, func(abs string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -110,6 +140,9 @@ func walkInputBasis(root string, basis InputBasis, prune bool, fileDigest FileCo
 		rel = filepath.ToSlash(rel)
 		kind := inputBasisKind(entry.Type())
 		if selectsAny(content, rel) {
+			if visit != nil {
+				visit(abs, false, true)
+			}
 			payload, err := inputBasisContentPayload(abs, kind, fileDigest)
 			if err != nil {
 				return err
@@ -127,6 +160,9 @@ func walkInputBasis(root string, basis InputBasis, prune bool, fileDigest FileCo
 		}
 		if prune && entry.IsDir() && !mayReachAtOrBelow(content, rel) && !mayReachAtOrBelow(listing, rel) {
 			return filepath.SkipDir
+		}
+		if visit != nil && entry.IsDir() {
+			visit(abs, true, false)
 		}
 		return nil
 	})

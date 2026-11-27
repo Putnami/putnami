@@ -475,3 +475,30 @@ func TestInputBasisDigestFromTakesTheCallersFileDigests(t *testing.T) {
 		t.Fatal("a caller's error digested without an error")
 	}
 }
+
+func TestInputBasisPathsNamesWhatTheDigestReads(t *testing.T) {
+	root := t.TempDir()
+	for rel, content := range map[string]string{
+		"go.mod": "module m", "a/x.go": "package a", "a/b/y.go": "package b", "skip/z.txt": "z",
+	} {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	basis := InputBasis{Content: [][]string{{"go.mod"}}, Listing: [][]string{{"a/**/*.go"}}}
+	directories, content, err := InputBasisPaths(root, basis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantDirs := []string{root, filepath.Join(root, "a"), filepath.Join(root, "a", "b")}
+	if !slices.Equal(directories, wantDirs) {
+		t.Errorf("directories = %v, want %v (the walk lists them and prunes skip)", directories, wantDirs)
+	}
+	if want := []string{filepath.Join(root, "go.mod")}; !slices.Equal(content, want) {
+		t.Errorf("content = %v, want %v", content, want)
+	}
+}

@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"reflect"
+	"strings"
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -55,4 +56,39 @@ func TestWarningReportQuietWritesNothingAndKeepsEveryWarning(t *testing.T) {
 	if none.Warnings() != nil || none.Envelope() != nil {
 		t.Fatal("a nil report kept a warning")
 	}
+}
+
+func TestAWarningAddedAfterTheLoadIsWrittenAndKeptOnce(t *testing.T) {
+	var out strings.Builder
+	report := NewWarningReport(&out)
+	warning := Warning{Code: "cache.input_record_discarded", Message: "discarded"}
+	report.Add(warning)
+	report.Add(warning)
+	if got := report.Warnings(); len(got) != 1 || got[0] != warning {
+		t.Fatalf("warnings = %v, want the one added", got)
+	}
+	if strings.Count(out.String(), "putnami: warning: discarded") != 1 {
+		t.Fatalf("output = %q, want the warning once", out.String())
+	}
+	var none *WarningReport
+	none.Add(warning)
+}
+
+func TestAKeptWarningIsCarriedAtOnceAndWrittenOnFlush(t *testing.T) {
+	var out strings.Builder
+	report := NewWarningReport(&out)
+	warning := Warning{Code: "cache.input_record_discarded", Message: "discarded"}
+	report.Keep(warning)
+	report.Keep(warning)
+	if got := report.Warnings(); len(got) != 1 || got[0] != warning || out.Len() != 0 {
+		t.Fatalf("warnings = %v, output %q: want the warning kept and nothing written", got, out.String())
+	}
+	report.Flush()
+	report.Flush()
+	if strings.Count(out.String(), "putnami: warning: discarded") != 1 {
+		t.Fatalf("output = %q, want the warning once", out.String())
+	}
+	var none *WarningReport
+	none.Keep(warning)
+	none.Flush()
 }

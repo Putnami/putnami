@@ -21,7 +21,7 @@ func TestTheCutCarriesTheIndexModeIntoTheDigest(t *testing.T) {
 		cut := func(string) (CandidateCut, bool) {
 			return CandidateCut{Paths: []string{"run.sh"}, Modes: map[string]string{"run.sh": mode}, Unmerged: map[string]bool{}}, true
 		}
-		files, _, _, err := collectGitFilesWith(cut, dir, []string{"git:**"}, nil)
+		files, _, _, _, err := collectGitFilesWith(cut, dir, []string{"git:**"}, nil)
 		if err != nil || len(files) != 1 || files[0].indexMode != mode {
 			t.Fatalf("listing = %+v, %v: want run.sh with mode %s", files, err, mode)
 		}
