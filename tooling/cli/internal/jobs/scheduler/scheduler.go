@@ -72,6 +72,11 @@ type SchedulerConfig struct {
 	CacheVerification bool
 	VersionInfo       cachekey.RunVersions
 	FinalizeResults   func(results map[string]*JobResult)
+	// FinalizeAnswered runs in place of FinalizeResults when a machine
+	// worker answers the plan from the record the held run's plan left: it
+	// replays what the held run's finalizers did. Nil, or a plan that runs,
+	// runs FinalizeResults (CLI ADR 0116 §6a).
+	FinalizeAnswered func(results map[string]*JobResult)
 	// SessionID is the id of the session this run records, or "" for a run that
 	// records none (every lifecycle run). The scheduler exports it into each
 	// task subprocess as protocolcli.ParentSessionEnv so a CLI a task spawns can

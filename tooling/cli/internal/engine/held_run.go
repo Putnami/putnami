@@ -8,9 +8,11 @@ import (
 	"reflect"
 	"slices"
 	"sync"
+	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	doctor "go.putnami.dev/protocol/doctor"
+	features "go.putnami.dev/protocol/features"
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -56,7 +58,7 @@ type HeldRuns interface {
 	PeekRun(root string) any
 	// Reused tells the worker whether the engine run in root took step from
 	// what the held run computed (held) or computed it: "versions", the
-	// version snapshot.
+	// version snapshot, and "finalizers", what the finalizers did.
 	Reused(root, step string, held bool)
 }
 
@@ -136,6 +138,9 @@ type heldRun struct {
 	noCacheProjects map[string]bool
 	versions        cachekey.RunVersions
 	versionsErr     error
+	// finalizers is what phase 4's finalizers did, which an answer replays,
+	// or nil when it cannot (holdFinalizers).
+	finalizers *heldFinalizers
 	// stdout and stderr are what phases 1 to 3 printed that the answer prints
 	// again: the engine's human notices, the probe's diagnostics and the
 	// impacted selection's fallback explanation.
@@ -175,6 +180,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		if err == nil && result.ExitCode == ExitSuccess {
 			record = held
 		}
+		memory.Reused(root, "finalizers", req.finalizersReplayed)
 		memory.KeepRun(root, record, true)
 		return result, err
 	}
@@ -185,8 +191,63 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		record = req.hold
 	}
 	req.hold = nil
+	if asked != nil {
+		memory.Reused(root, "finalizers", false)
+	}
 	memory.KeepRun(root, record, false)
 	return result, err
+}
+
+// heldFinalizers is what the finalizers of a held run did: in a run that may
+// be held, the spec gate is the only finalizer (holdPlanned drops a run with
+// a publication guard, a release set or a publish), and gate says it was
+// attached, with the record it collected (nil when it had nothing to
+// evaluate). Its warnings and sanctions are functions of that record and the
+// results, which an answer holds equal.
+type heldFinalizers struct {
+	gate   bool
+	record *features.SpecVerificationRecord
+}
+
+// holdFinalizers is what a run that may be held holds of what its finalizers
+// did, or nil when an answer could not replay it: a finalizer other than the
+// spec gate, a gate whose collection failed or never ran, one whose verdicts
+// read the clock (a rolling window goes stale with time), and one whose
+// recovery read a cache entry, which the store or the remote cache answered
+// and no witness of the decision covers. Everything else the gate read is
+// the held run's workspace, plan and results (CLI ADR 0116 §6a).
+func holdFinalizers(onlyGate, gate bool, outcome *specGateOutcome, recovery *cachedObservationRecovery) *heldFinalizers {
+	switch {
+	case !onlyGate:
+		return nil
+	case !gate:
+		return &heldFinalizers{}
+	case outcome == nil || !outcome.collected || outcome.clock || (recovery != nil && recovery.plans.Load() > 0):
+		return nil
+	}
+	return &heldFinalizers{gate: true, record: outcome.record}
+}
+
+// replay is what an answered run's finalizers do when the scheduler answers
+// its plan from the held record: the spec gate's held record, with this
+// run's time, its warnings and sanctions applied to the answered results as
+// the gate applied them, and the record written beside the session as any
+// gate's is.
+func (h *heldFinalizers) replay(req *Request) func(map[string]*scheduler.JobResult) {
+	return func(results map[string]*scheduler.JobResult) {
+		req.finalizersReplayed = true
+		if !h.gate {
+			return
+		}
+		var record *features.SpecVerificationRecord
+		if h.record != nil {
+			copied := *h.record
+			copied.GeneratedAt = time.Now().UTC().Format(time.RFC3339)
+			record = &copied
+		}
+		req.specGate.record, req.specGate.collected = record, true
+		sanctionSpecGate(record, results)
+	}
 }
 
 // mayHold says whether a run of req's shape may be held at all: one that
@@ -273,6 +334,7 @@ func (e *Engine) answerHeld(ctx context.Context, req *Request, held *heldRun, si
 	req.Global, req.CommandParams = held.resolved, held.renamed
 	req.selection, req.selectionEvidence, req.noCacheProjects = held.selection, held.evidence, held.noCacheProjects
 	req.versions, req.versionsErr = held.versions, held.versionsErr
+	req.heldFinalizers = held.finalizers
 	// The answer prepares nothing before phase 4, and what phase 4 prepares
 	// it reports. Its input selectors resolve under this run's context.
 	req.preparation, req.synchronizedExtensions = &scheduler.PreparationReport{}, run.extensions

@@ -435,6 +435,14 @@ type Request struct {
 	// a machine worker's held run (versionSnapshot), rather than take the
 	// adapter's.
 	snapshotCaptured bool
+	// heldFinalizers is what the held run's finalizers did, for a run a
+	// machine worker answers from it (answerHeld); answeredFinalizers replays
+	// it when the scheduler answers the plan from the held record
+	// (scheduler.SchedulerConfig.FinalizeAnswered), and finalizersReplayed
+	// says it did (CLI ADR 0116 §6a).
+	heldFinalizers     *heldFinalizers
+	answeredFinalizers func(map[string]*scheduler.JobResult)
+	finalizersReplayed bool
 	// runStart is the tree state workspace.CaptureRunStart recorded for this run: the
 	// uncommitted paths before the process wrote anything. Nil when none was
 	// recorded.
@@ -1174,11 +1182,13 @@ func (e *Engine) executePlanned(ctx context.Context, req *Request, run *plannedR
 	// miss it asks the remote cache the session executes with, under the run's
 	// context. The gate attaches when the session names a command of the
 	// verification kind in any discovered extension.
-	if gate := specGateFinalizer(req, run.ws, run.planned,
+	recovery := runObservationRecovery(ctx, req, run.ws, run.extensions, cacheManager, run.planned, run.projects)
+	gate := specGateFinalizer(req, run.ws, run.planned,
 		scheduler.CommandsOfKind(run.discovered.Extensions, extension.CommandKindVerification),
-		runObservationRecovery(ctx, req, run.ws, run.extensions, cacheManager, run.planned, run.projects),
+		recovery,
 		&projectionProducerPlan{req: req, ws: run.ws, projects: run.projects, extensions: run.discovered.Extensions, skipped: run.discovered.Skipped},
-		req.specGate); gate != nil {
+		req.specGate)
+	if gate != nil {
 		finalizers = append(finalizers, gate)
 	}
 	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, req, run.releaseSet, run.options.Publishes, finalizers)
@@ -1187,7 +1197,25 @@ func (e *Engine) executePlanned(ctx context.Context, req *Request, run *plannedR
 		return SessionResult{ExitCode: ExitError, Plan: run.planned, Projects: run.projects}
 	}
 	defer closeOutboxes()
+	// In a machine worker, what the finalizers did is held with what phases 1
+	// to 3 computed, and an answered run whose plan the scheduler answers
+	// replays it rather than run them, when the spec gate is the only one
+	// (CLI ADR 0116 §6a).
+	attached := 0
+	for _, finalize := range finalizers {
+		if finalize != nil {
+			attached++
+		}
+	}
+	onlyGate := attached == 0 || (attached == 1 && gate != nil)
+	req.answeredFinalizers = nil
+	if held := req.heldFinalizers; held != nil && onlyGate && held.gate == (gate != nil) {
+		req.answeredFinalizers = held.replay(req)
+	}
 	result := e.execute(ctx, req, run.ws, run.projects, run.discovered, run.planned, cacheManager, sink, finalizers...)
+	if h := req.hold; h != nil && h.complete {
+		h.finalizers = holdFinalizers(onlyGate, gate != nil, req.specGate, recovery)
+	}
 	result.Plan, result.Projects = run.planned, run.projects
 	if len(run.unpublished) > 0 {
 		reportUnpublishedProjects(run.unpublished, run.unannounced, run.discovered.Skipped, req.Global, fatalUnpublished)

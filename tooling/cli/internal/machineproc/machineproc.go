@@ -83,6 +83,10 @@ type MemoryDecision struct {
 	// version snapshot from Git took the one the held run read instead (CLI
 	// ADR 0116 §6a).
 	VersionsHeld bool `json:"versionsHeld"`
+	// FinalizersHeld says every engine run of the request that reached its
+	// finalizers replayed what the held run's did, the spec gate's record
+	// included, instead of running them (CLI ADR 0116 §6a).
+	FinalizersHeld bool `json:"finalizersHeld"`
 	// Kept says the run that followed is held for the next request, or why
 	// not.
 	Kept string `json:"kept"`

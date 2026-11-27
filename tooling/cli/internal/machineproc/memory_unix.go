@@ -109,8 +109,8 @@ type runMemory struct {
 	// from it: an entry a task of the held run was served from moved since.
 	refused string
 	// reused counts, per step an engine run may take from the held run rather
-	// than compute ("versions"), the engine runs that took it and those that
-	// computed it (Reused).
+	// than compute ("versions", "finalizers"), the engine runs that took it
+	// and those that computed it (Reused).
 	reused map[string]*reuseCount
 }
 
@@ -380,6 +380,7 @@ func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
 	decision.Answered = run.answered > 0 && run.computed == 0
 	decision.PlanSkipped = run.skipped > 0 && run.planned == 0
 	decision.VersionsHeld = run.allHeld("versions")
+	decision.FinalizersHeld = run.allHeld("finalizers")
 	if run.refused != "" {
 		decision.Reason = run.refused
 	}

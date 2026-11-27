@@ -7,11 +7,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
+	features "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -276,7 +279,59 @@ func TestAnAnsweredRunTakesTheVersionSnapshotTheHeldRunRead(t *testing.T) {
 	if result, err := New().Run(context.Background(), given, discardEvents{}); err != nil || result.ExitCode != ExitSuccess {
 		t.Fatalf("given snapshot: exit=%d err=%v", result.ExitCode, err)
 	}
-	if memory.peeks != peeks || len(memory.reused) != 0 {
+	if memory.peeks != peeks || len(memory.reused["versions"]) != 0 {
 		t.Errorf("given snapshot: peeked %d times and reported %v, want neither", memory.peeks-peeks, memory.reused)
+	}
+}
+
+// TestAnAnsweredRunReplaysWhatTheHeldRunsFinalizersDid pins what an answer
+// holds of phase 4's finalizers (CLI ADR 0116 §6a): the spec gate alone, or
+// none, and a gate only when its verdicts are a function of what the decision
+// witnessed; and what the replay does: the held record with the answer's
+// time, written beside the session, and its warnings and sanctions applied to
+// the answered results as the gate applied them.
+func TestAnAnsweredRunReplaysWhatTheHeldRunsFinalizersDid(t *testing.T) {
+	record := &features.SpecVerificationRecord{GeneratedAt: "2020-01-01T00:00:00Z",
+		Groups: []features.SpecVerificationGroup{{Project: "/app", Feature: "app/f", Blocked: true}}}
+	collected := &specGateOutcome{record: record, collected: true}
+	recovered := &cachedObservationRecovery{}
+	recovered.plans.Add(1)
+	for name, c := range map[string]struct {
+		held *heldFinalizers
+		want *heldFinalizers
+	}{
+		"no finalizer":                   {holdFinalizers(true, false, nil, nil), &heldFinalizers{}},
+		"the gate":                       {holdFinalizers(true, true, collected, &cachedObservationRecovery{}), &heldFinalizers{gate: true, record: record}},
+		"another finalizer":              {holdFinalizers(false, true, collected, nil), nil},
+		"a gate that collected nothing":  {holdFinalizers(true, true, &specGateOutcome{}, nil), nil},
+		"a gate that read the clock":     {holdFinalizers(true, true, &specGateOutcome{record: record, collected: true, clock: true}, nil), nil},
+		"a gate that recovered an entry": {holdFinalizers(true, true, collected, recovered), nil},
+	} {
+		if !reflect.DeepEqual(c.held, c.want) {
+			t.Errorf("%s: held %+v, want %+v", name, c.held, c.want)
+		}
+	}
+
+	req := &Request{specGate: &specGateOutcome{}}
+	results := map[string]*scheduler.JobResult{"/app:test": {Status: "success"}}
+	(&heldFinalizers{gate: true, record: record}).replay(req)(results)
+	replayed := req.specGate.record
+	if !req.finalizersReplayed || replayed == nil || replayed == record || replayed.GeneratedAt == record.GeneratedAt ||
+		record.GeneratedAt != "2020-01-01T00:00:00Z" || !reflect.DeepEqual(replayed.Groups, record.Groups) {
+		t.Fatalf("replayed %+v (replayed %v), want a copy of the held record at this run's time", replayed, req.finalizersReplayed)
+	}
+	if sanction := results["/app:"+specGateResultTask]; sanction == nil || sanction.Status != "failed" {
+		t.Errorf("results %v, want the held gate's sanction of /app", results)
+	}
+
+	failed := map[string]*scheduler.JobResult{"/app:test": {Status: "failed"}}
+	(&heldFinalizers{gate: true, record: record}).replay(&Request{specGate: &specGateOutcome{}})(failed)
+	if len(failed) != 1 {
+		t.Errorf("a failed run's results %v, want no sanction added", failed)
+	}
+	none := &Request{specGate: &specGateOutcome{}}
+	(&heldFinalizers{}).replay(none)(results)
+	if !none.finalizersReplayed || none.specGate.record != nil {
+		t.Errorf("no finalizer held: replayed %v, record %+v, want replayed and no record", none.finalizersReplayed, none.specGate.record)
 	}
 }

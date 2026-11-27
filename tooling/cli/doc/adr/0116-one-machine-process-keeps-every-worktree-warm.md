@@ -576,7 +576,22 @@ the held run's engine run at the same position read itself, once the worker
 checked the journal and every witness of step 3 again at that point, which
 covers everything Git reads for it; the environment it reads is in the
 request. A snapshot the adapter gave, a held run that read none, and any
-check that fails read Git (`versionsHeld` says every engine run took it). A run whose phases read
+check that fails read Git (`versionsHeld` says every engine run took it).
+What phase 4's finalizers did is held with them, and replayed by a run whose
+plan the scheduler answers from the held record, instead of running them.
+In a run that may be held the spec gate is the only finalizer (a publication
+guard, a release set and a publish keep a run from being held), and it is
+held only when its record is a function of what the answer holds: its
+collection read the held run's workspace, plan and results, and no clock
+and no cache entry. A gate whose verdicts read the clock (a threshold over a
+rolling window, which goes stale with time) or whose recovery read a cache
+entry of a project the run did not plan (from the store or the remote
+cache, which no witness covers) is not held, and an answer runs it as any
+run does; so does a gate whose collection failed. The replay writes the held
+record with this run's time beside the session, as any gate's is, prints its
+warnings and applies its sanctions to the answered results as the gate
+applied them (`finalizersHeld`). A plan the scheduler runs, refused at the
+answer, runs the finalizers. A run whose phases read
 what the decision does not witness is never held this way: a bare selection,
 which reads the successful-run markers, a release set, a runner provider's
 placement and a production preflight; nor is a debug run, whose output an
@@ -609,8 +624,9 @@ records why (`a served task's cache entry moved: <task>`). A plan that
 differs, a plan the held run did not leave a record for, and every plan after
 one the run computed run as usual. `putnami machine status` says whether the
 last run a worker served was answered, whether without loading and planning
-(`planSkipped`) and without reading the version snapshot from Git
-(`versionsHeld`), and why a run decided answerable was not.
+(`planSkipped`), without reading the version snapshot from Git
+(`versionsHeld`) and without running the finalizers (`finalizersHeld`), and
+why a run decided answerable was not.
 
 ### 7. How it learns of changes
 

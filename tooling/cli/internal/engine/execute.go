@@ -338,6 +338,7 @@ func (e *Engine) executeSession(
 		Orchestration: req.orchestration,
 	}
 	attachResultFinalizers(&schedCfg, resultFinalizers)
+	schedCfg.FinalizeAnswered = req.answeredFinalizers
 
 	// Normal (non-watch) execution
 	var session *workspace_state.Session

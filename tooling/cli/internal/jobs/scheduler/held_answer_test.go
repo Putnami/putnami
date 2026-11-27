@@ -356,6 +356,32 @@ func TestAFinalizerThatAmendsAnAnsweredRunDecidesItsVerdict(t *testing.T) {
 	}
 }
 
+// TestAnAnsweredPlanReplaysTheHeldFinalizers pins the scheduler's part of
+// replaying what the held run's finalizers did (CLI ADR 0116 §6a): a plan
+// answered from the held record runs FinalizeAnswered in place of
+// FinalizeResults, and one without it runs FinalizeResults as before.
+func TestAnAnsweredPlanReplaysTheHeldFinalizers(t *testing.T) {
+	t.Parallel()
+	root := heldTestStore(t)
+	kept := heldTestPlan()
+	held := holdRecord(heldTestRequest(t, root, kept, &mockRenderer{}, nil), servedResult(t, root, kept))
+	for name, replays := range map[string]bool{"held finalizers": true, "none held": false} {
+		var ran, replayed int
+		req := heldTestRequest(t, root, heldTestPlan(), &mockRenderer{}, nil)
+		req.Config.FinalizeResults = func(map[string]*JobResult) { ran++ }
+		if replays {
+			req.Config.FinalizeAnswered = func(map[string]*JobResult) { replayed++ }
+		}
+		result, record, _ := answerHeld(context.Background(), req, held)
+		if result == nil || record == nil || !result.Success {
+			t.Fatalf("%s: an equal plan was not answered and held again", name)
+		}
+		if replays && (ran != 0 || replayed != 1) || !replays && ran != 1 {
+			t.Errorf("%s: finalizers ran %d times and were replayed %d times", name, ran, replayed)
+		}
+	}
+}
+
 // fakeHeldRuns is a worker's memory that offers one record and remembers
 // what it was handed.
 type fakeHeldRuns struct {

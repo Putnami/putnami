@@ -39,6 +39,10 @@ import (
 // collection pass.
 type specGateOutcome struct {
 	record *features.SpecVerificationRecord
+	// collected says the finalizer collected record, and clock that its
+	// verdicts read the instant of the evaluation (specgate.Reads): a machine
+	// worker holds a gate only when collected and not clock (CLI ADR 0116 §6a).
+	collected, clock bool
 }
 
 // resultsSucceeded reports whether every result the session produced reached a
@@ -98,7 +102,7 @@ func specGateFinalizer(req *Request, ws *workspace.Workspace, planned []*schedul
 		return nil
 	}
 	return func(results map[string]*scheduler.JobResult) {
-		record, err := specgate.Collect(ws, planned, results, time.Now(), recovery, producers)
+		record, reads, err := specgate.CollectReads(ws, planned, results, time.Now(), recovery, producers)
 		if err != nil {
 			// A collection the workspace's own config makes impossible was
 			// refused before jobs ran; anything left is an internal fault, and a
@@ -106,37 +110,45 @@ func specGateFinalizer(req *Request, ws *workspace.Workspace, planned []*schedul
 			iox.Fprintf(os.Stderr, "putnami: spec verification did not run: %v\n", err)
 			return
 		}
-		outcome.record = record
-		// A session whose work already failed or was cut short keeps its own
-		// verdict: available observations are still collected and persisted,
-		// but no secondary "missing report" failure is added on top — the
-		// original incomplete execution is authoritative.
-		//
-		// The WARNINGS are silenced by the same guard, and that is not
-		// symmetry for its own sake. Both of them describe the run's evidence
-		// SCOPE, and a truncated run has no scope worth describing: when a
-		// canceled `test~test` never reports, every requirement it attests
-		// reads as never observed, and the exhausted-scope message then tells
-		// a reader "no test proves this yet — add a spectest.Proves call" for
-		// requirements whose tests exist and simply did not run. That is worse
-		// than silence: it is confident, wrong, and it sends someone to write
-		// a duplicate attestation. The failing job is already on screen and is
-		// the fact that explains the absence.
-		if !resultsSucceeded(results) {
-			return
-		}
-		reportSpecGateWarnings(record)
-		for projectID, sanction := range specgate.Sanctions(record) {
-			// The coded diagnostic reaches the machine records (session.json
-			// run.failures, report.json); the terminal keeps printing the
-			// error message alone.
-			results[projectID+":"+specGateResultTask] = &scheduler.JobResult{
-				Status: "failed",
-				Error:  &scheduler.JobError{Message: sanction.Message},
-				Canonical: &scheduler.TaskResult{Diagnostics: []scheduler.TaskDiagnostic{{
-					Severity: "error", Code: sanction.Code, Message: sanction.Message,
-				}}},
-			}
+		outcome.record, outcome.collected, outcome.clock = record, true, reads.Clock
+		sanctionSpecGate(record, results)
+	}
+}
+
+// sanctionSpecGate applies what the gate collected to the session's results:
+// it prints the gate's warnings and adds one failed synthetic result per
+// project whose enforce-mode requirements did not all resolve verified. An
+// answered run replays a held gate through it (heldFinalizers.replay).
+func sanctionSpecGate(record *features.SpecVerificationRecord, results map[string]*scheduler.JobResult) {
+	// A session whose work already failed or was cut short keeps its own
+	// verdict: available observations are still collected and persisted,
+	// but no secondary "missing report" failure is added on top — the
+	// original incomplete execution is authoritative.
+	//
+	// The WARNINGS are silenced by the same guard, and that is not
+	// symmetry for its own sake. Both of them describe the run's evidence
+	// SCOPE, and a truncated run has no scope worth describing: when a
+	// canceled `test~test` never reports, every requirement it attests
+	// reads as never observed, and the exhausted-scope message then tells
+	// a reader "no test proves this yet — add a spectest.Proves call" for
+	// requirements whose tests exist and simply did not run. That is worse
+	// than silence: it is confident, wrong, and it sends someone to write
+	// a duplicate attestation. The failing job is already on screen and is
+	// the fact that explains the absence.
+	if !resultsSucceeded(results) {
+		return
+	}
+	reportSpecGateWarnings(record)
+	for projectID, sanction := range specgate.Sanctions(record) {
+		// The coded diagnostic reaches the machine records (session.json
+		// run.failures, report.json); the terminal keeps printing the
+		// error message alone.
+		results[projectID+":"+specGateResultTask] = &scheduler.JobResult{
+			Status: "failed",
+			Error:  &scheduler.JobError{Message: sanction.Message},
+			Canonical: &scheduler.TaskResult{Diagnostics: []scheduler.TaskDiagnostic{{
+				Severity: "error", Code: sanction.Code, Message: sanction.Message,
+			}}},
 		}
 	}
 }

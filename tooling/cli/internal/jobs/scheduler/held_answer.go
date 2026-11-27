@@ -256,8 +256,14 @@ func answerHeld(ctx context.Context, req RunRequest, offered any) (*SchedulerRes
 		s.emitSessionJobEnd(job, result)
 	}
 	answered := maps.Clone(results)
-	if s.cfg.FinalizeResults != nil {
-		s.cfg.FinalizeResults(results)
+	// What the held run's finalizers did is replayed when the engine holds
+	// it; otherwise they run on the answered results (CLI ADR 0116 §6a).
+	finalize := s.cfg.FinalizeResults
+	if s.cfg.FinalizeAnswered != nil {
+		finalize = s.cfg.FinalizeAnswered
+	}
+	if finalize != nil {
+		finalize(results)
 	}
 	outcome := held.result.Outcome
 	outcome.Duration = time.Since(start)

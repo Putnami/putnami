@@ -55,8 +55,25 @@ const maxArtifactBytes = 16 << 20
 // then such a session records nothing.
 func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[string]*jobs.JobResult,
 	at time.Time, recovery ObservationRecovery, producers ProjectionProducers) (*features.SpecVerificationRecord, error) {
+	record, _, err := CollectReads(ws, planned, results, at, recovery, producers)
+	return record, err
+}
+
+// Reads is what a collection's verdicts read besides the session's results,
+// the workspace and the recovery: Clock says one depends on the instant of
+// the evaluation, because a group it evaluated holds a threshold check over a
+// rolling window, whose observation goes stale with time. A machine worker
+// replays a held gate only when it reads no clock (CLI ADR 0116 §6a).
+type Reads struct {
+	Clock bool
+}
+
+// CollectReads is Collect, and says what the verdicts read (Reads).
+func CollectReads(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[string]*jobs.JobResult,
+	at time.Time, recovery ObservationRecovery, producers ProjectionProducers) (*features.SpecVerificationRecord, Reads, error) {
+	var reads Reads
 	if ws == nil {
-		return nil, fmt.Errorf("spec gate collection requires a loaded workspace")
+		return nil, reads, fmt.Errorf("spec gate collection requires a loaded workspace")
 	}
 	record := &features.SpecVerificationRecord{
 		ProtocolVersion: features.SpecVerificationRecordProtocolVersion,
@@ -103,7 +120,7 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 
 		mode, source, err := EffectiveMode(features.VerificationDomainSpecs, ws, ws.ProjectByID(projectID))
 		if err != nil {
-			return nil, err
+			return nil, reads, err
 		}
 		if projection == nil {
 			group := features.SpecVerificationGroup{
@@ -123,6 +140,7 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 		}
 		scope := &scopeOf{ws: ws, projectID: projectID, owned: owned}
 		for _, criteria := range projection.Groups {
+			reads.Clock = reads.Clock || (mode != features.VerificationModeOff && readsClock(criteria))
 			record.Groups = append(record.Groups, evaluateGroup(projectID, criteria, mode, source,
 				observationsByFeature[criteria.Feature], reportsByFeature, at, evidence, owned, scope))
 		}
@@ -133,10 +151,23 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 	// requirement. Otherwise there is no record, which the persistence seam
 	// contracts as "the gate did not run".
 	if !projected && len(record.Diagnostics) == 0 && !producersAnswered(planned, results, producers) {
-		return nil, nil
+		return nil, reads, nil
 	}
 	sortRecord(record)
-	return record, nil
+	return record, reads, nil
+}
+
+// readsClock says whether a group's verdicts depend on the instant of the
+// evaluation: a threshold check over a rolling window is stale once its
+// observation is older than the criterion's freshness bound
+// (features.EvaluateSpecRequirements).
+func readsClock(criteria features.SpecCriteriaGroup) bool {
+	for _, requirement := range criteria.Requirements {
+		if v := requirement.Verification; v != nil && v.Window != nil && v.Window.Kind == features.WindowKindRolling {
+			return true
+		}
+	}
+	return false
 }
 
 // evaluateGroup joins one spec's criteria with the session's observations, and
