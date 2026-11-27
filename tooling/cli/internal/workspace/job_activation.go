@@ -183,7 +183,9 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 	// The clock is read before the first stat (ADR 0009 §2 of
 	// protocols/workspace); the walk's paths are held only on the root's
 	// device, which TrustsStats vouches for.
-	start := time.Now()
+	// Round(0) drops the monotonic reading, so the comparisons below see a
+	// wall clock that went back.
+	start := time.Now().Round(0)
 	rootStat, rootOK := fileindex.StatPath(root)
 	trusted := rootOK && fileindex.TrustsStats(root)
 	walked := map[string]fileindex.Stat{}
@@ -222,7 +224,7 @@ func matchUnderWitness(root, searchRoot, suffix string, projectRoots map[string]
 	})
 	// A walk that did not list its search root (a missing prefix, or one
 	// that is not a directory) has nothing to hold its answer by.
-	if _, listed := walked[searchRoot]; !trusted || !listed || time.Now().Before(start) {
+	if _, listed := walked[searchRoot]; !trusted || !listed || time.Now().Round(0).Before(start) {
 		activationWitnesses.Delete(key)
 		return found
 	}
