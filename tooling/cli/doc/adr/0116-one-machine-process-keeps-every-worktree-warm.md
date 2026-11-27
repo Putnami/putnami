@@ -474,10 +474,41 @@ command as usual:
 4. The platform has a watcher: on macOS, which has none (section 7), no run
    is answered from memory.
 
-A run that executed a task, or wrote a file of the worktree, is not kept.
-Once setup tasks run only when a task needs them, an unchanged run executes
-no setup task; a task that still runs
-on every run makes its request ineligible until that task has a key.
+A run that wrote a file of the worktree is not kept, nor one that executed a
+task, with one exception. A task is uncached for a reason, and the held
+answer may stand in for its execution only where that reason is a state the
+answer's witnesses cover. An executed task is held when all of these hold:
+
+- its declared inputs are environment variables, `changeHistory` and
+  workspace files, each of which the request digest, the Git witnesses or
+  the worktree's journal covers;
+- what keeps it out of the cache is the change-history contract
+  (`protocols/job` ADR 0003: a task that declares `changeHistory` is refused
+  with its cache enabled, since a key names no commit, CLI ADR 0059), and it
+  declares no other reason;
+- every read it makes falls inside the request, the Git witnesses and the
+  worktree.
+
+Any other uncached task keeps the run from being held: a test environment's
+setup reads Docker, which no witness covers. Once setup tasks run only when
+a task needs them, an unchanged run executes none.
+
+The worked case is the three `@putnami/sdd` validation steps an unchanged
+`validate` runs. `breaking-marker-validate` and
+`feature-coverage-ratchet-validate` declare `changeHistory` and the
+proposal message's variable; the history is the range from the baseline to
+HEAD, which the refs, HEAD and index witnesses cover, and the variable is in
+the request digest. Reversing CLI ADR 0059 to key them would buy 0.1 s of
+the 12 s run; the held answer covers them under witnesses it takes anyway.
+`agent-attribution-validate` declares only the variable and is uncached by
+its own decision (`@putnami/sdd` ADR 0002), not by the contract, so it does
+not qualify until that decision changes. Two reads of these steps fall
+outside their declared inputs: `agent-attribution-validate` and the ratchet
+read the workspace's `options` from their job context, and
+`breaking-marker-validate` and the ratchet read Git themselves when the CLI
+delivers no history. The workspace configuration is in the journal's
+worktree and Git is witnessed, so the held answer stays sound; the day these
+steps get a key, those reads must become declared inputs.
 
 **What the answer writes.** No plan, no stat beyond step 3, no key, no
 restore, no replay. The worker renders the held result with the current
