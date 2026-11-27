@@ -51,9 +51,10 @@ func TestTreeFixturesRoundTrip(t *testing.T) {
 }
 
 // TestValidate_TreeIsVersion2Only pins that a version 1 document refuses the
-// tree member, an empty one included.
+// tree member, an empty one included: only a version 2 document carries tree
+// facts.
 func TestValidate_TreeIsVersion2Only(t *testing.T) {
-	spectest.Proves(t, "job/execution-context", "version-1-stays-frozen", "a-version-1-document-refuses-the-version-2-members")
+	spectest.Proves(t, "job/execution-context", "tree-facts-are-answers", "a-version-1-document-refuses-the-tree")
 	v1 := &Context{WorkspaceRoot: "/ws", OutputPath: "/o", CacheRoot: "/c",
 		Project: Project{Name: "p"}, Extension: Extension{Name: "e"}, Job: Job{Name: "j"},
 		Tree: &Tree{Directory: ".", TrackedFiles: []string{}}}

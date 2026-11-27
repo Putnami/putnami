@@ -304,7 +304,7 @@ func installedTsc(projectPath, workspaceRoot string) (string, bool) {
 // files in that repository's index, which the context's cut does not read;
 // it, and a context without the cut, an older CLI's, are checked with Git
 // (gitCheckTscOutputs), which checks nothing outside a work tree or without a
-// git program.
+// git program. Both compare paths as the project's volume does (pathKey).
 func CheckTscOutputs(workspaceRoot, projectPath string, plan *TscPlan, ctx *job.Context) error {
 	if err := outputsStayInProject(projectPath, plan); err != nil {
 		return err
@@ -317,11 +317,12 @@ func CheckTscOutputs(workspaceRoot, projectPath string, plan *TscPlan, ctx *job.
 		return gitCheckTscOutputs(projectPath, plan)
 	}
 	rel := slashRel(projectPath, plan.Config)
+	key := pathKey(projectPath)
 	for _, output := range plan.Outputs() {
 		path := slashRel(projectPath, output)
 		var untracked string
 		for _, file := range cut {
-			if strings.HasPrefix(path, file.Path+"/") {
+			if strings.HasPrefix(key(path), key(file.Path)+"/") {
 				// The cut lists a symbolic link, a submodule or a nested
 				// repository as one entry and nothing below it: what Git
 				// tracks through it is unknown, and emptying the output would
@@ -331,7 +332,7 @@ func CheckTscOutputs(workspaceRoot, projectPath string, plan *TscPlan, ctx *job.
 				}
 				return tscErrorf(CodeTscOutputIgnored, rel, "%s is an output of tsc below %s, which Git does not ignore and lists as one entry, a symbolic link or a nested repository: building empties the output through it, so move the output out of it", path, file.Path)
 			}
-			if file.Path != path && !strings.HasPrefix(file.Path, path+"/") {
+			if key(file.Path) != key(path) && !strings.HasPrefix(key(file.Path), key(path)+"/") {
 				continue
 			}
 			if file.Mode != job.CandidateModeUntracked {
@@ -365,11 +366,12 @@ func gitCheckTscOutputs(projectPath string, plan *TscPlan) error {
 	}
 	rel := slashRel(projectPath, plan.Config)
 	outputs := plan.Outputs()
+	key := pathKey(projectPath)
 	var probes []string
 	var trackedErr error
 	for i, output := range outputs {
 		path := slashRel(projectPath, output)
-		if first, ok := firstTracked(tracked, path); ok {
+		if first, ok := firstTracked(tracked, path, key); ok {
 			trackedErr = tscErrorf(CodeTscOutputTracked, rel, "%s is an output of tsc, and Git tracks %s in it: building empties it, so move the committed files out of it or stop tracking them", path, first)
 			break
 		}
@@ -430,14 +432,87 @@ func outputsStayInProject(projectPath string, plan *TscPlan) error {
 }
 
 // firstTracked returns the first tracked path, in the listing's order, that
-// is path or lies below it.
-func firstTracked(tracked []string, path string) (string, bool) {
+// is path or lies below it, both compared through key.
+func firstTracked(tracked []string, path string, key func(string) string) (string, bool) {
+	path = key(path)
 	for _, file := range tracked {
-		if file == path || strings.HasPrefix(file, path+"/") {
+		if folded := key(file); folded == path || strings.HasPrefix(folded, path+"/") {
 			return file, true
 		}
 	}
 	return "", false
+}
+
+// pathKey returns how the outputs check compares the paths of the project at
+// projectPath: as spelled, or with ASCII letters folded to lower case when the
+// file system that holds the project ignores case, so an outDir spelled Dist
+// holds the dist/ files the cut or the index lists, as Git's core.ignoreCase
+// compares them.
+func pathKey(projectPath string) func(string) string {
+	if !foldsCase(projectPath) {
+		return func(path string) string { return path }
+	}
+	return asciiLower
+}
+
+// foldsCase reports whether the file system finds a name of dir with its
+// ASCII letters in the other case: it looks up the first entry of dir whose
+// name holds a letter, as the outputs are looked up in dir, under the swapped
+// name and compares the two files. A dir with no such entry is probed through
+// itself, or its nearest ancestor whose name holds a letter. Tests replace it.
+var foldsCase = func(dir string) bool {
+	if entries, err := os.ReadDir(dir); err == nil {
+		for _, entry := range entries {
+			name := entry.Name()
+			if swapped := asciiSwapCase(name); swapped != name {
+				return sameFile(filepath.Join(dir, name), filepath.Join(dir, swapped))
+			}
+		}
+	}
+	for {
+		parent, base := filepath.Dir(dir), filepath.Base(dir)
+		if parent == dir {
+			return false
+		}
+		if swapped := asciiSwapCase(base); swapped != base {
+			return sameFile(dir, filepath.Join(parent, swapped))
+		}
+		dir = parent
+	}
+}
+
+// sameFile reports whether the paths a and b name one file.
+func sameFile(a, b string) bool {
+	first, err := os.Lstat(a)
+	if err != nil {
+		return false
+	}
+	second, err := os.Lstat(b)
+	return err == nil && os.SameFile(first, second)
+}
+
+// asciiLower lowers the ASCII letters of s and keeps every other byte, as Git
+// folds a path under core.ignoreCase.
+func asciiLower(s string) string {
+	return strings.Map(func(r rune) rune {
+		if 'A' <= r && r <= 'Z' {
+			return r + 'a' - 'A'
+		}
+		return r
+	}, s)
+}
+
+// asciiSwapCase swaps the case of the ASCII letters of s.
+func asciiSwapCase(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case 'A' <= r && r <= 'Z':
+			return r + 'a' - 'A'
+		case 'a' <= r && r <= 'z':
+			return r - 'a' + 'A'
+		}
+		return r
+	}, s)
 }
 
 // ignoredProbes asks Git, in one call, which probes its ignore rules match,
