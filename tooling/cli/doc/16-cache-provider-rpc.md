@@ -210,7 +210,14 @@ in `full`.
 
 **Readiness.** `ready: false` is the unconfigured default: core closes the
 session at once, so the idle provider process stops, and the run builds
-locally with no notice.
+locally with no notice. A provider that already knows at `initialize` that it
+cannot reach its cache, such as `@putnami/cloud` signed out, whose token
+command fails, answers `ready: false` too, after printing its own line: core
+then decides no key movement for it, and keys nothing when the plan shows a job
+that executes locally whatever its key, since it starts the provider before
+any key then. A provider that awaits a
+hosted run's credential (it echoed `run-credential`) reports `ready` as it will
+be once authenticated.
 
 ## Result-only restore
 

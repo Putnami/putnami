@@ -420,3 +420,72 @@ func testBoundedFinalLine(t *testing.T) []byte {
 	}
 	return append(line, '\n')
 }
+
+// machineOutputPatternMatches pairs each credential pattern, in the order of
+// machineOutputTokenPatterns, with matches of it: a pattern added there fails
+// TestPlainMachineOutputStringNeverHidesACredential until it gets its own.
+var machineOutputPatternMatches = [][]string{
+	{"AKIA" + "ABCDEFGHIJKLMNOP", "ASIA" + "ABCDEFGHIJKLMNOP"},
+	{"ghp_" + strings.Repeat("a", 36), "gho_" + strings.Repeat("b", 36), "ghu_" + strings.Repeat("c", 36), "ghs_" + strings.Repeat("d", 36), "ghr_" + strings.Repeat("e", 36)},
+	{"github_pat_" + strings.Repeat("c", 22)},
+	{"glpat-" + strings.Repeat("d", 20) + ".x1"},
+	{"AIza" + strings.Repeat("e", 35)},
+	{"xoxb-1234567890", "xoxa-1234567890", "xoxp-1234567890", "xoxr-1234567890", "xoxs-1234567890"},
+	{"sk_live_" + strings.Repeat("f", 16), "sk_test_" + strings.Repeat("g", 16)},
+}
+
+func TestPlainMachineOutputStringNeverHidesACredential(t *testing.T) {
+	if len(machineOutputPatternMatches) != len(machineOutputTokenPatterns) {
+		t.Fatalf("%d credential patterns, %d with matches: give the new pattern its matches and its prefix",
+			len(machineOutputTokenPatterns), len(machineOutputPatternMatches))
+	}
+	for i, pattern := range machineOutputTokenPatterns {
+		for _, match := range machineOutputPatternMatches[i] {
+			for _, text := range []string{match, "before " + match + " after"} {
+				if !pattern.MatchString(text) {
+					t.Fatalf("pattern %s does not match %q", pattern, text)
+				}
+				if IsPlainMachineOutputString([]byte(text)) {
+					t.Errorf("%q matches %s but is plain", text, pattern)
+				}
+			}
+		}
+	}
+	header := "-----BEGIN " + "OPENSSH PRIVATE KEY-----"
+	if !machineOutputPrivateKeyHeader.MatchString(header) || IsPlainMachineOutputString([]byte(header)) {
+		t.Errorf("private key header %q is plain", header)
+	}
+	for _, text := range []string{"", "/cloud/clients/agency-api:build~@putnami/go~generate", "2026-11-27T07:14:54.123Z", "high though gh_ xox sk_ AKI"} {
+		if !IsPlainMachineOutputString([]byte(text)) {
+			t.Errorf("%q is not plain", text)
+		}
+		if SanitizeMachineOutputString(text) != text {
+			t.Errorf("plain %q is rewritten", text)
+		}
+	}
+	for _, text := range []string{"tab\there", "esc\x1b[0m", "del\x7f", "é", "\xff"} {
+		if IsPlainMachineOutputString([]byte(text)) {
+			t.Errorf("%q is plain", text)
+		}
+	}
+}
+
+func TestMachineOutputMemberRedactionAgreesWithSanitizing(t *testing.T) {
+	names := []string{"token", "Access-Token", "api_key", "client.secret", "Authorization", "SECRET", "credentials",
+		"proxy-authorization", "set_cookie", "PrivateKey", "secret_key", "type", "message", "tokens", "x-token",
+		"t.o.k.e.n", "é-token", "\xfftoken", "", strings.Repeat("_", 40) + "token", strings.Repeat("a", 40)}
+	if machineOutputLongestSensitiveMember > machineOutputSensitiveMemberBuffer {
+		t.Fatalf("a sensitive name of %d bytes does not fit the %d-byte buffer", machineOutputLongestSensitiveMember, machineOutputSensitiveMemberBuffer)
+	}
+	for name := range machineOutputSensitiveMembers {
+		names = append(names, name, strings.ToUpper(name), "_"+name+".", name+"x")
+	}
+	for _, name := range names {
+		sanitized, _ := SanitizeMachineOutputValue(map[string]any{name: "value"}).(map[string]any)
+		want, _ := sanitized[name].(string)
+		replacement, redacted := MachineOutputMemberRedaction([]byte(name))
+		if redacted != (want != "value") || (redacted && replacement != want) {
+			t.Errorf("member %q: redaction (%q, %v), sanitizing wrote %q", name, replacement, redacted, want)
+		}
+	}
+}

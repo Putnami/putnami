@@ -1005,6 +1005,11 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 			}
 		}
 	}
+	// A stop or a finalization limit that canceled the last attempt keeps the
+	// frame pending for a replay: it is no answer of the reporter's.
+	if r.ctx.Err() != nil {
+		return errBudgetExhausted
+	}
 	if retryable {
 		return errRetryBudget
 	}

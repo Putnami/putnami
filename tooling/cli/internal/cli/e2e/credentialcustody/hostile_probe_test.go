@@ -64,6 +64,19 @@ type finding struct {
 	Found   []string          `json:"found,omitempty"`
 	Detail  string            `json:"detail,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
+	// Partial counts the descriptors the probe copied only in part; a probe
+	// with one records no check (probeProcFD).
+	Partial int `json:"partial,omitempty"`
+}
+
+// readByRoot reports whether probe is a Linux probe of the engine run by root.
+// Root defeats PR_SET_DUMPABLE by design (CAP_SYS_PTRACE reads any process of
+// its user), so such a probe may read the engine, find a credential in it, or
+// copy one of its pipes only in part when the copy cannot grow (a container
+// that drops CAP_SYS_RESOURCE). The ADR's threat model is a same-user non-root
+// process: the assertions log these outcomes instead of failing on them.
+func readByRoot(probe string) bool {
+	return runtime.GOOS == "linux" && os.Geteuid() == 0 && slices.Contains(platformSearchProbes(), probe)
 }
 
 // scanBytes returns which of the three secrets appear in data.
@@ -438,17 +451,10 @@ func TestHostileHookAndTaskFindNothingOnAHostedRun(t *testing.T) {
 		t.Fatalf("hosted build exit=%d, want 0 (hook and task must run to completion)\n%s", code, output)
 	}
 
-	// Root defeats PR_SET_DUMPABLE by design — CAP_SYS_PTRACE reads any process
-	// of its user — so the ADR's threat model is a same-user NON-root process.
-	// Under root the /proc and ptrace probes may read the engine, exactly as
-	// procguard_linux_test.go exempts them; the environment and file probes must
-	// still find nothing, because the credential is genuinely nowhere on disk or
-	// in a child's environment.
-	rootExempt := runtime.GOOS == "linux" && os.Geteuid() == 0
-	platform := map[string]bool{}
-	for _, probe := range platformSearchProbes() {
-		platform[probe] = true
-	}
+	// Under root the /proc and ptrace probes may read the engine (readByRoot),
+	// exactly as procguard_linux_test.go exempts them; the environment and file
+	// probes must still find nothing, because the credential is genuinely
+	// nowhere on disk or in a child's environment.
 	for role, report := range map[string]string{"hook": fx.hookReport, "task": fx.taskReport} {
 		findings := readFindings(t, report)
 		for _, probe := range searchProbes() {
@@ -456,12 +462,14 @@ func TestHostileHookAndTaskFindNothingOnAHostedRun(t *testing.T) {
 			switch {
 			case !ok:
 				t.Errorf("%s: probe %q did not run", role, probe)
+			case !f.Checked && f.Partial > 0 && readByRoot(probe):
+				t.Logf("%s: probe %q copied %d descriptors of the engine in part as root (found %v); root is outside the same-user threat model", role, probe, f.Partial, f.Found)
 			case !f.Checked:
 				// A probe that could not check its whole target can still
 				// have found a secret in what it read: the message names it.
 				t.Errorf("%s: probe %q recorded no check (found %v, detail %q)", role, probe, f.Found, f.Detail)
 			case len(f.Found) > 0:
-				if rootExempt && platform[probe] {
+				if readByRoot(probe) {
 					t.Logf("%s: probe %q read the engine as root (found %v); root is outside the same-user threat model", role, probe, f.Found)
 					continue
 				}

@@ -51,7 +51,7 @@ reactPage(
 - `options.loader` - Optional loader module (eager or lazy)
 - `options.action` - Optional action module (eager or lazy)
 - `options.statusCode` - Optional HTTP status code (default: 200)
-- `options.notFoundMiddleware` - Optional middleware applied when the route falls through to not-found handling
+- `options.notFoundMiddleware` - Optional middleware of a not-found page, composed after its ancestor layouts' middleware in place of the page's own
 
 **Returns:** `ReactApplication` instance for chaining
 

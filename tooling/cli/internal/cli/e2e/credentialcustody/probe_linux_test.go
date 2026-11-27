@@ -168,9 +168,10 @@ func probeProcFD(role string, pid int) finding {
 	f.Detail = fmt.Sprintf("fds=%d read=%d", len(entries), read)
 	// A partial copy left bytes unread where a credential could lie, so the
 	// probe did not check the descriptor: the run fails on "recorded no check"
-	// rather than pass on what the copy happened to hold.
+	// rather than pass on what the copy happened to hold, except under root,
+	// which the threat model leaves out (readByRoot).
 	if partials > 0 {
-		f.Checked = false
+		f.Checked, f.Partial = false, partials
 		f.Detail += fmt.Sprintf(" partial=%d", partials)
 	}
 	return f

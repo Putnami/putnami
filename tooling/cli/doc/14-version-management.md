@@ -313,16 +313,17 @@ the next `putnami upgrade` of that workspace follows `latest` again. See
 [`workspace`](03-commands.md#workspace) and
 [ADR 0056](adr/0056-init-resolves-on-one-channel.md).
 
-After a candidate is published, any configured external release execution plane
-runs `tooling/cli/scripts/smoke-check-release.sh <channel>` on the four supported
-macOS/Linux × amd64/arm64 targets before promotion: four candidate jobs. While
-Windows support is suspended, no `windows/amd64` job runs. It then runs `latest`
-nightly through the default public installer URL on the same four targets. The
-repository intentionally does not
-duplicate that post-publication matrix in GitHub Actions; the release owner runs
-the same four candidate jobs manually if no plane is configured or it is
-unavailable, plus the same four-target `latest` smoke nightly until automation
-is configured or restored.
+After a candidate is published, the release owner dispatches the external
+release execution plane, the `release-smoke` workflow of Putnami/release-smoke,
+for its channel. It runs `tooling/cli/scripts/smoke-check-release.sh <channel>`
+on the four supported macOS/Linux × amd64/arm64 targets and `smoke-first-use.sh`
+on two Linux targets before promotion: six candidate jobs. While Windows support
+is suspended, no `windows/amd64` job runs. It then runs `latest` nightly through
+the default public installer URL on the same four targets. This repository
+intentionally does not duplicate that post-publication matrix in its own GitHub
+Actions; the release owner runs the same six candidate jobs manually if that
+workflow is unavailable, plus the same four-target `latest` smoke nightly until
+it is restored.
 
 The smoke runs the exact `curl` install, TypeScript `init`, and `serve` commands
 against isolated home/config/cache/store/workspace state with credentials

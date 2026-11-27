@@ -48,8 +48,20 @@ type RemoteCache interface {
 	// project's current source binding (SourceBoundEntryKey). The second
 	// result is false when that binding cannot be computed.
 	SetSourceBoundEntryKey(resolve func(job *jobmodel.ScheduledJob, key string) (string, bool))
+	// UsePlanKeys hands the next Negotiate what an earlier pass over the same
+	// plan computed, so it computes none of it again.
+	UsePlanKeys(keys *PlanKeys)
 	// DrainUploads waits for the background uploads at the end of the run.
 	DrainUploads()
 	// Stop is the scheduler's end-of-run hook.
 	Stop()
+}
+
+// PlanKeys is what a pass over the plan computed before any job ran: the keys
+// PrecomputeKeys returned, and the key movement PlanKeyMovement decided, or
+// nil when that pass decided none. The same plan, command params, versions,
+// store and bypass give the same keys until a job runs.
+type PlanKeys struct {
+	Keys     map[string]string
+	Movement *KeyMovement
 }

@@ -75,3 +75,62 @@ func TestWriteFilesAtCommitRefusesANameWithABackslashOrAColon(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteFilesAtCommitRefusesNamesThatDifferOnlyInCase holds the refusal of
+// a commit holding two files whose names differ only in case: on a file
+// system that ignores case the second would overwrite the first, so the
+// extraction fails whole on every platform and writes nothing (protocols/job
+// ADR 0002, point 6). The entries are staged from a blob, so the commit is
+// made on any volume.
+func TestWriteFilesAtCommitRefusesNamesThatDifferOnlyInCase(t *testing.T) {
+	t.Parallel()
+	dir := initGitRepo(t)
+	write(t, filepath.Join(dir, "pkg", "a.txt"), "alpha\n")
+	runGit(t, dir, "add", "pkg")
+	runGit(t, dir, "commit", "-m", "add pkg")
+	blob := strings.TrimSpace(runGit(t, dir, "rev-parse", ":pkg/a.txt"))
+	runGit(t, dir, "update-index", "--add", "--cacheinfo", "100644,"+blob+",pkg/A.txt")
+	runGit(t, dir, "commit", "-m", "add a case twin")
+	commit := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
+
+	target := t.TempDir()
+	err := WriteFilesAtCommit(dir, commit, []string{"pkg"}, target)
+	if err == nil || !strings.Contains(err.Error(), "differ only in case") {
+		t.Fatalf("WriteFilesAtCommit of a commit holding pkg/a.txt and pkg/A.txt: err = %v, want a refusal", err)
+	}
+	entries, readErr := os.ReadDir(target)
+	if readErr != nil || len(entries) != 0 {
+		t.Fatalf("a refused extraction wrote %d entries (err=%v), want none", len(entries), readErr)
+	}
+}
+
+// TestWriteFilesAtCommitRefusesANameThatIsNotUTF8 holds the refusal of a
+// committed name that is not valid UTF-8, which Windows would write under
+// another name: the extraction fails whole on every platform and writes
+// nothing, and two names that differ only in invalid bytes are not taken for
+// a case collision (protocols/job ADR 0002, point 6).
+func TestWriteFilesAtCommitRefusesANameThatIsNotUTF8(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("a Windows command line cannot carry the invalid bytes")
+	}
+	dir := initGitRepo(t)
+	write(t, filepath.Join(dir, "pkg", "a.txt"), "alpha\n")
+	runGit(t, dir, "add", "pkg")
+	runGit(t, dir, "commit", "-m", "add pkg")
+	blob := strings.TrimSpace(runGit(t, dir, "rev-parse", ":pkg/a.txt"))
+	runGit(t, dir, "update-index", "--add", "--cacheinfo", "100644,"+blob+",pkg/b\xfe.txt")
+	runGit(t, dir, "update-index", "--add", "--cacheinfo", "100644,"+blob+",pkg/b\xff.txt")
+	runGit(t, dir, "commit", "-m", "add names that are not UTF-8")
+	commit := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
+
+	target := t.TempDir()
+	err := WriteFilesAtCommit(dir, commit, []string{"pkg"}, target)
+	if err == nil || !strings.Contains(err.Error(), "is not valid UTF-8") {
+		t.Fatalf("WriteFilesAtCommit of a commit holding names that are not UTF-8: err = %v, want the UTF-8 refusal", err)
+	}
+	entries, readErr := os.ReadDir(target)
+	if readErr != nil || len(entries) != 0 {
+		t.Fatalf("a refused extraction wrote %d entries (err=%v), want none", len(entries), readErr)
+	}
+}

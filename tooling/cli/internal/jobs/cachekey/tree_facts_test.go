@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -250,16 +251,19 @@ func TestAReleaseBaselineThroughALinkIsExtracted(t *testing.T) {
 }
 
 // Prime reads each declared work-tree fact before the run's first task: a
-// directory a task creates afterwards is in neither the fact nor the key.
+// directory a task creates afterwards is in neither the fact nor the key. The
+// run asks for no fact and no key before the task writes, so only Prime can
+// have read them first.
 func TestPrimeReadsTheTreeFactsBeforeTheFirstTask(t *testing.T) {
 	spectest.Proves(t, treeFactsFeature, "tree-facts-follow-the-key", "a-run-reads-each-tree-fact-once")
 	root := treeFactsRepo(t)
 	ws := treeFactsWorkspace(root)
 	job := treeFactsJob(ws.ProjectByID("/app"), extproto.RuntimeInputIgnoredDirectories, extproto.RuntimeInputTrackedFiles)
+	// The key of another run, which read the tree before the task wrote.
+	before := keyOf(t, ws, job, newRunCache(t))
 	cache := newRunCache(t)
 	facts := RunTreeFacts(cache, root)
 	facts.Prime([]*jobmodel.ScheduledJob{job})
-	before := keyOf(t, ws, job, cache)
 
 	// A task of the run writes an ignored directory and stages a file.
 	writeFileAt(t, filepath.Join(root, "app", "later", "dist", "x"), "x\n")
@@ -276,6 +280,64 @@ func TestPrimeReadsTheTreeFactsBeforeTheFirstTask(t *testing.T) {
 	}
 	if after := keyOf(t, ws, job, cache); after != before {
 		t.Error("the key of one run moved with a change a task made")
+	}
+}
+
+// A line's extraction holds a sibling's directory only when the sibling's
+// baseline names the same tag commit: a project whose baseline names another
+// commit extracts its own directory alone.
+func TestAReleaseBaselineExtractsOnlySiblingsOfTheSameCommit(t *testing.T) {
+	spectest.Proves(t, treeFactsFeature, "tree-facts-follow-the-key", "a-release-baseline-is-extracted-once-per-tag-commit")
+	root := treeFactsRepo(t)
+	first := treeKeyedGit(t, root, "rev-parse", "v1.0.0^{commit}")
+	writeFileAt(t, filepath.Join(root, "lib", "lib.go"), "package lib\n\nconst Next = true\n")
+	treeKeyedGit(t, root, "commit", "-q", "-am", "feat(lib): next")
+	treeKeyedGit(t, root, "tag", "-a", "v1.1.0", "-m", "release 1.1.0")
+	ws := treeFactsWorkspace(root)
+	app := treeFactsJob(ws.ProjectByID("/app"), extproto.RuntimeInputReleaseBaseline, extproto.RuntimeInputReleaseBaselineFiles)
+	lib := treeFactsJob(ws.ProjectByID("/lib"), extproto.RuntimeInputReleaseBaseline, extproto.RuntimeInputReleaseBaselineFiles)
+
+	var extracted [][]string
+	saved := writeFilesAtCommit
+	writeFilesAtCommit = func(root, commit string, paths []string, target string) error {
+		extracted = append(extracted, slices.Clone(paths))
+		return saved(root, commit, paths, target)
+	}
+	t.Cleanup(func() { writeFilesAtCommit = saved })
+
+	facts := RunTreeFacts(newRunCache(t), root)
+	facts.SetPlanned(ws, []*jobmodel.ScheduledJob{app, lib})
+	t.Cleanup(facts.Close)
+	pattern := LineTagPattern(ws, "")
+	libBaseline, err := facts.ReleaseBaseline(filepath.Join(root, "lib"), pattern)
+	if err != nil || libBaseline.State != putnamigit.ReleaseBaselineTagged || libBaseline.Tag != "v1.1.0" {
+		t.Fatalf("lib baseline = %+v, %v; want v1.1.0", libBaseline, err)
+	}
+	// app's baseline names the first release's commit, which lib's does not.
+	appBaseline := putnamigit.ReleaseBaseline{
+		State: putnamigit.ReleaseBaselineTagged, Pattern: pattern, Tag: "v1.0.0",
+		Object: "tree " + treeKeyedGit(t, root, "rev-parse", "v1.0.0:app"), Commit: first, Prefix: "app",
+	}
+	if _, err := facts.BaselineDirectory(filepath.Join(root, "app"), pattern, appBaseline); err != nil {
+		t.Fatalf("baseline directory: %v", err)
+	}
+	if len(extracted) != 1 || !slices.Equal(extracted[0], []string{"app"}) {
+		t.Fatalf("extracted %v, want app alone: lib's baseline names another commit", extracted)
+	}
+}
+
+// A tagged baseline of a workspace outside every work tree names no
+// directory: the extraction has no repository to read, and says so.
+func TestAReleaseBaselineOutsideAWorkTreeIsAnError(t *testing.T) {
+	spectest.Proves(t, treeFactsFeature, "tree-facts-follow-the-key", "a-release-baseline-is-extracted-once-per-tag-commit")
+	root := t.TempDir()
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(root))
+	facts := RunTreeFacts(newRunCache(t), root)
+	t.Cleanup(facts.Close)
+	baseline := putnamigit.ReleaseBaseline{State: putnamigit.ReleaseBaselineTagged, Tag: "v1.0.0", Object: "tree 0", Commit: "0"}
+	got, err := facts.BaselineDirectory(root, "v*", baseline)
+	if err == nil || !strings.Contains(err.Error(), "outside a work tree") {
+		t.Fatalf("baseline directory = %q, %v; want the outside-a-work-tree error", got, err)
 	}
 }
 

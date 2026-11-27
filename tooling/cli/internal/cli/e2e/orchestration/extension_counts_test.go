@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/fileindex"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/repotest"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -405,7 +406,11 @@ func TestTheExtensionCounts(t *testing.T) {
 			// but those that run every time. It comes last, so the ledgers above
 			// count what they counted before it.
 			if tc.settles {
+				trace, stop := scheduler.TraceKeys()
+				defer stop()
 				executed, ended := clitest.ExecutedTasks(t, root, tc.command...)
+				stop()
+				holdPrecomputedKeys(t, trace)
 				if ended != cold.Tasks {
 					t.Errorf("a run after a run of the unchanged workspace ended %d tasks, want the %d it selects", ended, cold.Tasks)
 				}

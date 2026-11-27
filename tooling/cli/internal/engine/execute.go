@@ -539,7 +539,7 @@ func (e *Engine) executeSession(
 		if req.specGate != nil {
 			_ = session.WriteSpecVerification(req.specGate.record)
 		}
-		finishSessionReporting(reporter, session.ID, finalizeErr)
+		finishSessionReporting(ctx, req, reporter, session, finalizeErr)
 		// `latest` names the user's last build, and every `--session latest`
 		// reader resolves it. An adapter whose runs are not the user's build must
 		// therefore stay OUT of the rotation, or an audit run landing after a

@@ -318,6 +318,8 @@ func (rt *invocationRuntime) isPruned(job *ScheduledJob, present func(consumer *
 // producer confirms the decision then, from the keys the consumers compute at
 // that moment (isPruned). Otherwise it is not pruned: a consumer that
 // missed its entry would run against a resource nobody provisioned.
+//
+// It returns the keys it precomputed, nil when it computed none.
 func (rt *invocationRuntime) prune(
 	ws *workspace.Workspace,
 	planned []*ScheduledJob,
@@ -326,13 +328,13 @@ func (rt *invocationRuntime) prune(
 	cache *store.CacheManager,
 	bypass cachekey.CacheBypass,
 	stats *cachekey.CacheStats,
-) {
+) *cachekey.PlanKeys {
 	if rt == nil || cache == nil || bypass.All {
-		return
+		return nil
 	}
 	keys, err := cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cache, bypass, stats)
 	if err != nil {
-		return
+		return nil
 	}
 	var movement *cachekey.KeyMovement
 	var byKey map[string]*ScheduledJob
@@ -379,10 +381,14 @@ func (rt *invocationRuntime) prune(
 		rel.recheck = recheck
 		rel.mu.Unlock()
 	}
+	return &cachekey.PlanKeys{Keys: keys, Movement: movement}
 }
 
 // cachedEntryPresent reports whether the local store already holds the job's
 // entry at hash, using the same address the execution path would look it up at.
+//
+// A source-bound task's entry counts absent here (cachekey.CacheEntryPresent):
+// prune decides on key movement, which covers keys and not source bindings.
 func cachedEntryPresent(cache *store.CacheManager, job *ScheduledJob, hash string) bool {
 	present, err := cachekey.CacheEntryPresent(cache, job, hash)
 	return err == nil && present

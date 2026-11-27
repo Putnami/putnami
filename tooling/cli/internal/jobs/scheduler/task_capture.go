@@ -847,13 +847,16 @@ func (s *Scheduler) lookupDeclaredEntry(
 	// either, so it stores nothing.
 	entryKey, ok := s.lookupEntryKey(job, hash)
 	if !ok {
+		s.keyTrace.started(job, hash, false)
 		return hash, nil, noop
 	}
 
 	restoreStarted := time.Now()
 	entry, err := s.cache.LookupTaskEntry(entryKey)
+	s.keyTrace.started(job, hash, false)
 	if err == nil && entry != nil {
 		if result := s.restoreDeclaredCacheHit(ctx, job, hash, entry, mu, hashes); result != nil {
+			s.keyTrace.started(job, hash, true)
 			s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
 			s.waits.restore(job, restoreStarted)
 			s.cacheStats.RecordLocalHit()

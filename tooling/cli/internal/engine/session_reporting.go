@@ -109,14 +109,48 @@ func (h *HostedReporters) holders() *sessionreporter.Holders {
 	return &h.held
 }
 
-func finishSessionReporting(reporters *sessionreporter.Runs, sessionID string, finalizeErr error) {
+// finishSessionReporting ends the session's reporting. A terminal job run
+// that may detach its reporting (Request.DetachedReporting,
+// sessionreporter.Detaches) stops each worker at its durable
+// checkpoint and hands what remains to a detached replay, then starts one for
+// each of the newest other sessions a replay still owes (ADR 0115). Any other
+// run drains before it returns.
+func finishSessionReporting(ctx context.Context, req *Request, reporters *sessionreporter.Runs, session *workspace_state.Session, finalizeErr error) {
 	if finalizeErr != nil {
 		iox.Fprintln(os.Stderr, "putnami: finalized session could not be persisted")
 	}
+	if req.DetachedReporting && sessionreporter.Detaches(!reporters.Empty(), finalizeErr == nil) {
+		launch := req.startReplay
+		if launch == nil {
+			launch = sessionreporter.StartDetachedReplay
+		}
+		if reporters.Stop() {
+			if err := launch(ctx, req.WorkspaceRoot, session.ID); err != nil {
+				iox.Fprintf(os.Stderr, "putnami: reporting incomplete: its replay did not start; replay with putnami sessions replay --session %s\n", session.ID)
+			}
+		}
+		// Earlier sessions that no replay is delivering any more are named
+		// once, then handed to a replay again.
+		pending := sessionreporter.PendingSessions(ctx, filepath.Dir(session.Dir()), session.ID, flushedPendingSessions)
+		if len(pending) > 0 {
+			iox.Fprintf(os.Stderr, "putnami: %d earlier session(s) not delivered by their reporters; replaying them in the background (putnami sessions inspect %s)\n", len(pending), pending[0])
+		}
+		for _, id := range pending {
+			_ = launch(ctx, req.WorkspaceRoot, id)
+		}
+		return
+	}
 	for _, failure := range reporters.Finish() {
-		iox.Fprintf(os.Stderr, "putnami: %s incomplete: %v; replay with putnami sessions replay --session %s\n", failure.Capability.Activity, failure.Err, sessionID)
+		iox.Fprintf(os.Stderr, "putnami: %s incomplete: %v; replay with putnami sessions replay --session %s\n", failure.Capability.Activity, failure.Err, session.ID)
 	}
 }
+
+// flushedPendingSessions is how many other sessions a detaching run hands to
+// a detached replay: the newest ones whose delivery is incomplete.
+const flushedPendingSessions = 3
+
+// replayLauncher starts the delivery of one retained session's reporting.
+type replayLauncher func(ctx context.Context, wsRoot, sessionID string) error
 
 func reportingResolver(ctx context.Context, capability sessionreporter.Capability, ws *workspace.Workspace, discovered *extension.DiscoveryResult) sessionreporter.Resolve {
 	return func(setupCtx context.Context) (sessionreporter.LaunchSpec, error) {

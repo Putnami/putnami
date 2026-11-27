@@ -22,21 +22,45 @@ import (
 // is never reported present, and a format-1 entry at the raw key never reads
 // as a hit.
 //
-// A source-bound task's entry is never reported present. Its store key also
-// binds the project's current source binding (SourceBoundEntryKey), which
+// A source-bound task's entry is never reported present here. Its store key
+// also binds the project's current source binding (SourceBoundEntryKey), which
 // this projection does not compute, so the honest answer is absent: a reader
-// then plans an execution, never a hit the lookup could not serve.
+// then plans an execution, never a hit the lookup could not serve. A reader
+// that knows the binding asks CacheEntryPresentAt.
 func CacheEntryPresent(cache *store.CacheManager, job *jobmodel.ScheduledJob, hash string) (bool, error) {
+	return CacheEntryPresentAt(cache, job, hash, nil)
+}
+
+// EntryKeyResolver returns the store key a job's entry is looked up at for its
+// cache key: the key itself for a task that is not source-bound, and the key
+// bound to its project's current source binding for one that is
+// (SourceBoundEntryKey). The second result is false when there is none: the
+// task then has no entry to read.
+type EntryKeyResolver func(job *jobmodel.ScheduledJob, key string) (string, bool)
+
+// CacheEntryPresentAt is CacheEntryPresent at the store key entryKey resolves,
+// which is how a source-bound task's entry is found: at the binding the job
+// would look it up at when it starts. A nil entryKey reports a source-bound
+// entry absent, as CacheEntryPresent does.
+func CacheEntryPresentAt(cache *store.CacheManager, job *jobmodel.ScheduledJob, hash string, entryKey EntryKeyResolver) (bool, error) {
 	if cache == nil {
 		return false, fmt.Errorf("cache manager is nil")
 	}
-	if hash == "" || TaskIsSourceBound(job) {
+	if hash == "" || !jobmodel.UsesDeclaredCapture(job) {
 		return false, nil
 	}
-	if !jobmodel.UsesDeclaredCapture(job) {
-		return false, nil
+	address := hash
+	if TaskIsSourceBound(job) {
+		if entryKey == nil {
+			return false, nil
+		}
+		bound, ok := entryKey(job, hash)
+		if !ok || bound == "" {
+			return false, nil
+		}
+		address = bound
 	}
-	entry, err := cache.LookupTaskEntry(hash)
+	entry, err := cache.LookupTaskEntry(address)
 	return err == nil && entry != nil, err
 }
 

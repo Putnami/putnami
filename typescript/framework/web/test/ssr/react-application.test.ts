@@ -418,6 +418,71 @@ describe('ReactApplication', () => {
     );
 
     specTest(
+      'nests each page under its layout at a multi-segment address, in both registration orders',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'route-graph',
+        check: 'the-route-graph-does-not-depend-on-the-registration-order',
+      },
+      () => {
+        type Node = { path?: string; id?: string; index?: boolean; action?: unknown; children?: Node[] };
+        // React Router ranks sibling routes by their paths, not by their order.
+        const shape = (node: Node): Node => ({
+          path: node.path,
+          id: node.id,
+          ...(node.index ? { index: true } : {}),
+          ...(node.action ? { action: 'action' } : {}),
+          ...(node.children?.length
+            ? { children: node.children.map(shape).sort((a, b) => String(a.id).localeCompare(String(b.id))) }
+            : {}),
+        });
+        // The layout comes from one scan root and the pages from another, so
+        // either may register first.
+        const addLayouts = (subject: ReactApplication) =>
+          subject.reactLayout('/w/:workspace', { layout: { default: () => null } });
+        const addPages = (subject: ReactApplication) => {
+          subject.reactPage('/w', { page: { default: () => 'W' } });
+          subject.reactPage('/w/:workspace', {
+            page: { default: () => 'Workspace' },
+            action: { action: actionBuilder(() => ({ ok: true })) },
+          });
+          subject.reactPage('/w/:workspace/settings', { page: { default: () => 'Settings' } });
+        };
+
+        for (const layoutFirst of [true, false]) {
+          const subject = new ReactApplication(undefined, { get: mock(), post: mock() } as unknown as HttpPlugin);
+          if (layoutFirst) {
+            addLayouts(subject);
+            addPages(subject);
+          } else {
+            addPages(subject);
+            addLayouts(subject);
+          }
+
+          const root = (subject as unknown as { reactRouter: Node[] }).reactRouter[0] as Node;
+          expect(root.children?.map(shape)).toEqual([
+            {
+              path: 'w',
+              id: 'root-w',
+              children: [
+                { path: '', id: 'root-w-page', index: true },
+                {
+                  path: ':workspace',
+                  id: 'root-w-workspace-layout',
+                  action: 'action',
+                  children: [
+                    { path: '', id: 'root-w-workspace-page', index: true, action: 'action' },
+                    { path: 'settings', id: 'root-w-workspace-settings-page' },
+                  ],
+                },
+              ],
+            },
+          ]);
+        }
+      },
+    );
+
+    specTest(
       'gives a layout its index page action, as the generated client does',
       {
         feature: 'typescript/web-application-delivery',
@@ -433,20 +498,17 @@ describe('ReactApplication', () => {
           {
             route: '/n',
             httpRoute: '/n',
-            pageFirst: true,
             at: (root: Node) => root.children?.find((c) => c.path === 'n'),
           },
-          { route: '/', httpRoute: '/', pageFirst: true, at: (root: Node) => root },
+          { route: '/', httpRoute: '/', at: (root: Node) => root },
           {
             route: '/r/:run',
             httpRoute: '/r/[run]',
-            pageFirst: false,
             at: (root: Node) => root.children?.[0]?.children?.find((c) => c.path === ':run'),
           },
         ];
-        // As in the client test, the page-first order is covered where it nests the page.
-        for (const { route, httpRoute, pageFirst, at } of cases) {
-          for (const layoutFirst of pageFirst ? [true, false] : [true]) {
+        for (const { route, httpRoute, at } of cases) {
+          for (const layoutFirst of [true, false]) {
             const httpPlugin = { get: mock(), post: mock() };
             const subject = new ReactApplication(undefined, httpPlugin as unknown as HttpPlugin);
             const addLayout = () => subject.reactLayout(route, { layout: layoutMock });
@@ -1078,6 +1140,108 @@ describe('ReactApplication', () => {
       const actionResponse = await runInContext(actionCtx, async () => actionCall?.[1](actionCtx));
       expect(actionResponse.status).toBe(401);
     });
+  });
+
+  describe('a secured layout registered after its descendants', () => {
+    // Generation registers each scan root in turn, so a descendant from an
+    // earlier scan root registers before the secured layout of a later one.
+    const securedLayout = () => ({
+      layout: {
+        default: layout()
+          .secure({ roles: ['admin'] })
+          .render(() => null),
+      },
+    });
+    const descendants: {
+      name: string;
+      register: (subject: ReactApplication) => void;
+      method: 'get' | 'post';
+      route: string;
+      url: string;
+    }[] = [
+      {
+        name: 'a child layout loader endpoint',
+        register: (subject) =>
+          subject.reactLayout('/admin/reports', {
+            layout: { default: () => null },
+            loader: async () => ({ default: loaderBuilder(() => ({ section: 'reports' })) }),
+          }),
+        method: 'get',
+        route: '/admin/reports-layout.json',
+        url: 'http://localhost/admin/reports-layout.json',
+      },
+      {
+        name: 'an eager page',
+        register: (subject) =>
+          subject.reactPage('/admin/settings', { page: { default: page().render(() => 'secret content') } }),
+        method: 'get',
+        route: '/admin/settings',
+        url: 'http://localhost/admin/settings',
+      },
+      {
+        name: 'an eager page loader endpoint',
+        register: (subject) =>
+          subject.reactPage('/admin/data', {
+            page: { default: page().render(() => null) },
+            loader: { loader: loaderBuilder(() => ({ secret: true })) },
+          }),
+        method: 'get',
+        route: '/admin/data.json',
+        url: 'http://localhost/admin/data.json',
+      },
+      {
+        name: 'an eager page action endpoint',
+        register: (subject) =>
+          subject.reactPage('/admin/save', {
+            page: { default: page().render(() => null) },
+            action: { action: actionBuilder(() => ({ saved: true })) },
+          }),
+        method: 'post',
+        route: '/admin/save',
+        url: 'http://localhost/admin/save',
+      },
+      {
+        name: 'a not-found catch-all',
+        register: (subject) =>
+          subject.reactNotFound('/admin', { notFound: { default: notFound().render(() => 'missing admin page') } }),
+        method: 'get',
+        route: '/admin*',
+        url: 'http://localhost/admin/missing',
+      },
+    ];
+
+    for (const { name, register, method, route, url } of descendants) {
+      specTest(
+        `answers 401 to ${name} without credentials, in both registration orders`,
+        {
+          feature: 'typescript/web-application-delivery',
+          requirement: 'security-propagation',
+          check: 'a-layout-secures-its-descendants-whatever-the-registration-order',
+        },
+        async () => {
+          for (const layoutFirst of [true, false]) {
+            const httpPlugin = { get: mock(), post: mock() };
+            const subject = new ReactApplication(undefined, httpPlugin as unknown as HttpPlugin);
+            if (layoutFirst) {
+              subject.reactLayout('/admin', securedLayout());
+              register(subject);
+            } else {
+              register(subject);
+              subject.reactLayout('/admin', securedLayout());
+            }
+
+            const call = httpPlugin[method].mock.calls.find((c: unknown[]) => c[0] === route);
+            expect(call).toBeDefined();
+            const ctx = createHttpContext(url, method === 'post' ? { method: 'POST' } : {});
+            const response = await runInContext(ctx, async () => call?.[1](ctx));
+            expect({ layoutFirst, status: (response as { status?: number }).status }).toEqual({
+              layoutFirst,
+              status: 401,
+            });
+          }
+        },
+      );
+    }
   });
 
   // ---------------------------------------------------------------------------

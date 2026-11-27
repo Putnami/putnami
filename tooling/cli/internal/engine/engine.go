@@ -236,6 +236,15 @@ type Request struct {
 	// caller; session metadata has no origin field, so its audit run must not
 	// take that slot.
 	EphemeralSession bool
+	// DetachedReporting lets the run return before its session reporting
+	// delivered: it stops each reporter at its durable checkpoint and starts a
+	// detached `sessions replay` for the rest, unless the run is hosted, runs
+	// in CI or could not finalize its session (ADR 0115). Only the terminal
+	// job adapter sets it; every other adapter drains before it returns.
+	DetachedReporting bool
+	// startReplay starts a detached replay of a session. Nil starts
+	// `sessions replay` with this executable; only tests replace it.
+	startReplay replayLauncher
 	// ExecutesUnderDryRun keeps --dry-run from short-circuiting into the engine's
 	// plan-only preview, so the jobs actually run.
 	//

@@ -46,6 +46,9 @@ type fakeCacheServer struct {
 	// resultOnly makes initialize echo cache.CapabilityRestoreResultOnly when
 	// core lists it; a result-only restore then places no blob.
 	resultOnly bool
+	// notReady makes initialize answer Ready=false, as a signed-out or
+	// disabled provider does.
+	notReady bool
 	// requests holds every raw request line, in arrival order.
 	requests []string
 	// placed counts the blobs restores wrote to an exchange directory.
@@ -65,6 +68,12 @@ func newFakeCacheServer() *fakeCacheServer {
 		blobs:   map[string][]byte{},
 		dropped: map[string]bool{},
 	}
+}
+
+func (f *fakeCacheServer) isNotReady() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.notReady
 }
 
 func (f *fakeCacheServer) has(key string) bool {
@@ -281,7 +290,7 @@ func serveSharedFakeProvider(stdin io.Reader, stdout io.Writer, server *fakeCach
 				ProtocolVersion: negotiated,
 				ProviderName:    fakeProviderExtensionName,
 				ProviderVersion: fakeProviderVersion,
-				Ready:           true,
+				Ready:           !server.isNotReady(),
 				Capabilities:    capabilities,
 				Mode:            mode,
 			})

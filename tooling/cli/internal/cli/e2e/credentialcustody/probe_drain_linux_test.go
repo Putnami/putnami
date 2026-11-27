@@ -5,6 +5,7 @@ package credentialcustody
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"slices"
@@ -139,8 +140,10 @@ func TestTheDescriptorProbeRecordsNoCheckOnAPartialCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := probeProcFD("test", os.Getpid())
-	if f.Checked || !strings.Contains(f.Detail, "partial=") {
-		t.Fatalf("the probe recorded checked=%v with detail %q; want no check and the partial copy named", f.Checked, f.Detail)
+	// Both ends of the pipe are descriptors of this process, so each is
+	// copied in part.
+	if f.Checked || f.Partial == 0 || !strings.Contains(f.Detail, fmt.Sprintf("partial=%d", f.Partial)) {
+		t.Fatalf("the probe recorded checked=%v partial=%d with detail %q; want no check and the partial copies counted", f.Checked, f.Partial, f.Detail)
 	}
 	if !slices.Contains(f.Found, "bearer") {
 		t.Fatalf("the probe found %v; want the credential the partial copy holds", f.Found)

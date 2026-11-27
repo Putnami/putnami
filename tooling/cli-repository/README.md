@@ -118,6 +118,7 @@ tests.
 - `internal/cli/e2e/orchestration.TestATscOutputGitDoesNotIgnoreIsRefusedOnceItKeysTheBuild`
 - `internal/cli/e2e/orchestration.TestEveryExtensionBuiltHereIsCounted`
 - `internal/cli/e2e/orchestration.TestTheExtensionCounts`
+- `internal/cli/e2e/orchestration.TestThisRepositoryStartsAtItsPrecomputedKeys`
 - `internal/cli/e2e/pantsdelegation.TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants`
 - `internal/cli/e2e/pantsdelegation.TestANestedPantsPackageRunsWithItsEdgesAcrossScopes`
 - `internal/cli/e2e/pantsdelegation.TestARootRequirementOrAStrayLockfileRunsThePackagesThatUseIt`
