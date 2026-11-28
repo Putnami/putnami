@@ -7,7 +7,14 @@ import { ISLAND_TAG } from '../../client/island/island-types';
 import { isLoaderDefinition, type LoaderInjectMeta } from '../loader';
 import { isPageDefinition } from '../page';
 import type { ReactApplication } from '../react-application';
-import { fillRoutePath, isDynamicRoute, isStaticRenderViolation, type StaticConfig, staticHtmlPath } from '../static';
+import {
+  fillRoutePath,
+  isDynamicRoute,
+  isStaticRenderViolation,
+  type StaticConfig,
+  StaticPathStatusError,
+  staticHtmlPath,
+} from '../static';
 import { restampableVersion, writeStaticBuildVersion } from '../static-build-version';
 
 /** A route discovered to be `.static()` at build time. */
@@ -162,6 +169,9 @@ export async function prerenderStaticRoutes(
     for (const { pathname, params } of pathnames) {
       try {
         const result = await app.prerender(pathname, params, route);
+        if (!result.redirectLocation && result.status >= 400 && result.status < 500) {
+          throw new StaticPathStatusError(route, pathname, result.status);
+        }
         if (result.redirectLocation || !result.html) {
           log?.(`Skipping ${pathname}: resolved to status ${result.status}`);
           continue;
@@ -182,7 +192,7 @@ export async function prerenderStaticRoutes(
         });
         log?.(`Pre-rendered ${pathname} → ${rel} (${result.status})`);
       } catch (err) {
-        if (isStaticRenderViolation(err)) throw err;
+        if (isStaticRenderViolation(err) || err instanceof StaticPathStatusError) throw err;
         log?.(`Failed to pre-render ${pathname}: ${err}; will render live at runtime`);
       }
     }

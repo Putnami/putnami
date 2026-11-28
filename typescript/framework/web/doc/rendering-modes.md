@@ -82,6 +82,15 @@ export default page()
 Each enumerated path is emitted as its own HTML file (`blog/hello.html`, …).
 Requests for a path that was **not** enumerated fall back to a live static render.
 
+A static loader throws an `HttpException` as a live page's loader does, and the
+page answers with its status: a `NotFoundException` renders the not-found
+boundary with 404. When a path that `paths()` lists resolves to a 4xx, the build
+fails with a message that names the route, the path and the status, and writes
+no page for it. A pre-rendered file is served with 200, so the build does not
+write a not-found page in its place: remove the path from `paths()`, or make the
+loader return data for it. A path that is not listed still renders live and
+answers its own status, such as 404.
+
 ### Incremental Static Regeneration (ISR)
 
 ISR keeps the speed of static while staying fresh. It reuses the framework's

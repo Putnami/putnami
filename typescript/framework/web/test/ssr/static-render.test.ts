@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test';
+import { NotFoundException } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import React from 'react';
 import type { RouteObject } from 'react-router';
 import { Style } from '../../src/client/document/style';
+import { NotFoundErrorBoundary } from '../../src/ssr/error-boundaries';
 import { loaderHandler } from '../../src/ssr/handlers';
 import { inlineDeferredBoundaries, renderStaticDocument } from '../../src/ssr/static-render';
 import { isStaticRenderViolation } from '../../src/ssr/static';
@@ -76,6 +78,41 @@ describe('renderStaticDocument', () => {
         caught = e;
       }
       expect(isStaticRenderViolation(caught)).toBe(true);
+    },
+  );
+
+  specTest(
+    'renders the not-found page with 404 when a static loader throws NotFoundException',
+    {
+      feature: 'typescript/web-application-delivery',
+      requirement: 'static-loader-status',
+      check: 'a-static-loader-http-exception-renders-its-own-status',
+    },
+    async () => {
+      const routes: RouteObject[] = [
+        {
+          path: '/',
+          id: 'root',
+          element: React.createElement(Page),
+          errorElement: React.createElement(NotFoundErrorBoundary, {
+            notFoundElement: React.createElement('p', null, 'Page not found'),
+          }),
+          children: [
+            {
+              path: 'posts/:slug',
+              loader: loaderHandler(() => {
+                throw new NotFoundException('no such post');
+              }),
+              element: React.createElement('article', null, 'Post'),
+            },
+          ],
+        },
+      ];
+      const result = await renderStaticDocument({ routes, route: '/posts/:slug', pathname: '/posts/gone' });
+
+      expect(result.status).toBe(404);
+      expect(result.html).toContain('Page not found');
+      expect(result.html).not.toContain('Post');
     },
   );
 

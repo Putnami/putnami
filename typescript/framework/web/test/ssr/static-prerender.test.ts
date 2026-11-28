@@ -12,7 +12,7 @@ import {
 } from '../../src/ssr/generator/static-prerender';
 import type { ReactApplication } from '../../src/ssr/react-application';
 import type { StaticRenderResult } from '../../src/ssr/static-render';
-import { StaticRenderViolation } from '../../src/ssr/static';
+import { StaticPathStatusError, StaticRenderViolation, staticHtmlPath } from '../../src/ssr/static';
 import { readStaticBuildVersion, writeStaticBuildVersion } from '../../src/ssr/static-build-version';
 
 function fakeApp(prerender: (pathname: string) => Promise<StaticRenderResult>): ReactApplication {
@@ -112,6 +112,42 @@ describe('prerenderStaticRoutes', () => {
     ).rejects.toBeInstanceOf(StaticRenderViolation);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  specTest(
+    'fails the build when a path that paths() lists resolves to a 4xx',
+    {
+      feature: 'typescript/web-application-delivery',
+      requirement: 'static-loader-status',
+      check: 'prerender-fails-on-a-listed-path-that-resolves-to-a-4xx',
+    },
+    async () => {
+      const dir = tempDir();
+      const app = fakeApp(async (pathname) => ({
+        html: pathname === '/posts/gone' ? '<p>Page not found</p>' : `<p>${pathname}</p>`,
+        status: pathname === '/posts/gone' ? 404 : 200,
+      }));
+      const specs = [
+        {
+          route: '/posts/:slug',
+          staticConfig: { mode: 'ssg' as const, paths: async () => [{ slug: 'kept' }, { slug: 'gone' }] },
+        },
+      ];
+
+      let caught: unknown;
+      try {
+        await prerenderStaticRoutes(app, specs, dir);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(StaticPathStatusError);
+      const message = (caught as Error).message;
+      expect(message).toContain('/posts/:slug');
+      expect(message).toContain('/posts/gone');
+      expect(message).toContain('404');
+      expect(existsSync(join(dir, staticHtmlPath('/posts/gone')))).toBe(false);
+      rmSync(dir, { recursive: true, force: true });
+    },
+  );
 
   it('swallows non-violation errors so one page cannot break the build', async () => {
     const dir = tempDir();

@@ -14,26 +14,13 @@ import {
   SHARED_CACHE_CONTEXT_KEY,
   startTelemetrySpan,
 } from '@putnami/application';
-import {
-  getHttpStatusText,
-  HttpException,
-  type Logger,
-  shouldExposeErrorStack,
-  useConfig,
-  useContext,
-  useLogger,
-} from '@putnami/runtime';
+import { HttpException, type Logger, shouldExposeErrorStack, useConfig, useContext, useLogger } from '@putnami/runtime';
 import type { ClientSecurityContext } from '../shared/security.types';
 import React, { type ReactElement, type ReactNode } from 'react';
 import { type ReactDOMServerReadableStream, renderToReadableStream } from 'react-dom/server';
 import type { RouteObject, StaticHandlerContext } from 'react-router';
-import {
-  createStaticHandler,
-  createStaticRouter,
-  isRouteErrorResponse,
-  StaticRouterProvider,
-  UNSAFE_ErrorResponseImpl,
-} from 'react-router';
+import { createStaticHandler, createStaticRouter, isRouteErrorResponse, StaticRouterProvider } from 'react-router';
+import { answerLoaderExceptions, isClientErrorException } from './loader-exceptions';
 import type { StaticHandlerCache } from './static-handler.cache';
 import { DocumentMetaContext } from '../client/document/document-context';
 import type { DocumentMeta } from '../client/document/document.types';
@@ -528,7 +515,10 @@ function failedStepCode(error: unknown, request: RequestEnd): 'canceled' | 'erro
  * unless it is an `HttpException`. A thrown `Response` or `HttpResponse` is a
  * redirect or a status the loader chose, not an error, and a loader that stopped
  * with its ended request did not fail. Returns the loaders span's status code:
- * `error` when it recorded an error, `canceled` when a loader only stopped.
+ * `error` when a loader failed with a 5xx `HttpException` or an unknown error,
+ * `canceled` when a loader only stopped. A 4xx `HttpException` stays the
+ * request error, which the request log writes below ERROR, but is the answer
+ * the loader chose, not a failure of the span.
  */
 function reportLoaderErrors(
   context: StaticHandlerContext | Response,
@@ -537,6 +527,7 @@ function reportLoaderErrors(
 ): 'canceled' | 'error' | undefined {
   if (!('errors' in context) || !context.errors) return undefined;
   let recorded = false;
+  let failed = false;
   let stopped = false;
   for (const error of Object.values(context.errors)) {
     if (isRouteErrorResponse(error) || error instanceof Response || error instanceof HttpResponse) continue;
@@ -548,46 +539,10 @@ function reportLoaderErrors(
       recordRequestError(reqContext, error);
       recorded = true;
     }
+    if (!isClientErrorException(error)) failed = true;
     if (!(error instanceof HttpException)) logger.error(error);
   }
-  return recorded ? 'error' : stopped ? 'canceled' : undefined;
-}
-
-/**
- * Answers a 4xx or 5xx `HttpException` a loader threw with its own status:
- * React Router keeps it as an unknown error and computes a 500, so each one is
- * replaced by the route error response of its status, which the not-found and
- * error boundaries render, with `{ statusCode, error, message }` as its
- * `data`, and the router status follows the first error as React Router
- * computes it. Runs after `reportLoaderErrors`, which records the
- * exception itself as the request error.
- */
-function answerLoaderExceptions(context: StaticHandlerContext | Response): void {
-  if (context instanceof Response || !context.errors) return;
-  let converted = false;
-  const errors: Record<string, unknown> = {};
-  for (const [routeId, error] of Object.entries(context.errors)) {
-    // An exception with a status below 400 is not an error answer.
-    if (error instanceof HttpException && error.getStatus() >= 400) {
-      const status = error.getStatus();
-      const statusText = getHttpStatusText(status) ?? error.name;
-      // Only the status and the message reach the hydration payload, as
-      // `sanitizeErrors` keeps of an `Error`: the exception's details stay on
-      // the server.
-      errors[routeId] = new UNSAFE_ErrorResponseImpl(status, statusText, {
-        statusCode: status,
-        error: statusText,
-        message: error.message,
-      });
-      converted = true;
-    } else {
-      errors[routeId] = error;
-    }
-  }
-  if (!converted) return;
-  context.errors = errors;
-  const first = Object.values(errors)[0];
-  context.statusCode = isRouteErrorResponse(first) ? first.status : 500;
+  return failed ? 'error' : stopped ? 'canceled' : undefined;
 }
 
 function handleStaticContext(reactStaticContext: StaticHandlerContext | Response): HttpResponse | undefined {

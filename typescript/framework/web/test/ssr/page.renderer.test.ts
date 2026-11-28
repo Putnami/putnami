@@ -566,6 +566,60 @@ describe('page.renderer', () => {
     });
 
     specTest(
+      'a 4xx HttpException ends the loaders span without an error code, a 5xx and an unknown error with it',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'loaders-span-status',
+        check: 'a-4xx-loader-exception-ends-the-loaders-span-without-error',
+      },
+      async () => {
+        const collector = new TelemetryCollector();
+        setCollector(collector);
+        try {
+          const loadersSpanOf = async (thrown: unknown) => {
+            const ctx = createMockContext({ req: new Request('http://localhost/orders'), logger: new MemoryLogger() });
+            const handler = pageRenderer(
+              () => [
+                {
+                  path: '/orders',
+                  loader: () => {
+                    throw thrown;
+                  },
+                  element: React.createElement('div', null, 'Orders'),
+                  errorElement: React.createElement(DefaultErrorBoundary),
+                } as never,
+              ],
+              () => RootHtml,
+              () => 'hydrate.js',
+              SSR_TIMEOUT_MS,
+            );
+            const response = await runInContext(ctx, () => respond(handler, ctx));
+            await response?.get().text();
+            const span = collector.drainSpans().find((entry) => entry.name === 'ssr loaders');
+            return { span, requestError: (ctx as Record<string, unknown>)['__requestError'] };
+          };
+
+          const notFound = new NotFoundException('no such order');
+          const clientError = await loadersSpanOf(notFound);
+          expect(clientError.span?.statusCode).not.toBe(2);
+          expect(clientError.span?.statusMessage).toBeUndefined();
+          // The exception stays the request error, which the request log writes below ERROR.
+          expect(clientError.requestError).toBe(notFound);
+
+          const serverError = await loadersSpanOf(new HttpException('upstream down', 503));
+          expect(serverError.span?.statusCode).toBe(2);
+          expect(serverError.span?.statusMessage).toBe('error');
+
+          const unknownError = await loadersSpanOf(new Error('boom'));
+          expect(unknownError.span?.statusCode).toBe(2);
+          expect(unknownError.span?.statusMessage).toBe('error');
+        } finally {
+          setCollector(undefined);
+        }
+      },
+    );
+
+    specTest(
       'a NotFoundException a loader throws answers 404 with the not-found page, logged at no ERROR',
       {
         feature: 'typescript/web-application-delivery',

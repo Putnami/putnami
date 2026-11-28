@@ -183,6 +183,26 @@ export function isStaticRenderViolation(value: unknown): value is StaticRenderVi
 }
 
 /**
+ * Thrown by static prerender when a path that a route's `paths()` lists
+ * resolves to a 4xx, such as a loader that throws `NotFoundException`: the
+ * build fails rather than write a not-found page the server would serve as a
+ * found one.
+ */
+export class StaticPathStatusError extends Error {
+  constructor(
+    readonly route: string,
+    readonly pathname: string,
+    readonly status: number,
+  ) {
+    super(
+      `Static route ${route}: paths() lists ${pathname}, but its render resolved to status ${status}. ` +
+        'Remove the path from paths(), or make its loader return data for it.',
+    );
+    this.name = 'StaticPathStatusError';
+  }
+}
+
+/**
  * Request-context members that are inherently request-scoped. Reading any of
  * them inside a `.static()` loader is a determinism violation.
  */

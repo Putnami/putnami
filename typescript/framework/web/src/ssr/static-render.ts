@@ -22,6 +22,7 @@ import {
   localeBasename,
   seedDocumentLocale,
 } from './i18n/runtime';
+import { answerLoaderExceptions } from './loader-exceptions';
 import { createStaticRenderContext, isStaticRenderViolation, type StaticPathParams } from './static';
 import { ensureDocumentMeta } from '../shared/context-slots';
 
@@ -208,6 +209,9 @@ export async function renderStaticDocument(options: StaticRenderOptions): Promis
       }
     }
   }
+  // A loader `HttpException` renders the not-found or error boundary with its
+  // own status, as live SSR does, instead of a 500.
+  answerLoaderExceptions(context);
 
   const router = createStaticRouter(staticHandler.dataRoutes, context);
   const documentMeta = ensureDocumentMeta(ctx);
