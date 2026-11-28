@@ -20,6 +20,7 @@ import React, { type ReactElement, type ReactNode } from 'react';
 import { type ReactDOMServerReadableStream, renderToReadableStream } from 'react-dom/server';
 import type { RouteObject, StaticHandlerContext } from 'react-router';
 import { createStaticHandler, createStaticRouter, isRouteErrorResponse, StaticRouterProvider } from 'react-router';
+import type { StaticHandlerCache } from './static-handler.cache';
 import { DocumentMetaContext } from '../client/document/document-context';
 import type { DocumentMeta } from '../client/document/document.types';
 import { escapeHtml } from '../client/document/tag.utils';
@@ -63,6 +64,11 @@ export const pageRenderer =
     i18n?: () => I18nRuntimeOptions | undefined,
     /** Whether a request waits for every Suspense boundary before the head. */
     waitForAll?: (req: Request) => boolean,
+    /**
+     * The application's static handlers, rebuilt only when its route tree
+     * changes. Without it, the handler is built for every request.
+     */
+    staticHandlers?: StaticHandlerCache,
   ): RouteHandler =>
   async () => {
     const logger = useLogger();
@@ -91,9 +97,17 @@ export const pageRenderer =
         )
       : undefined;
     const resolvedBasename = i18nState ? localeBasename(i18nState, moduleBase) : moduleBase;
-    const staticOpts = resolvedBasename ? { basename: resolvedBasename } : undefined;
-    const tree = i18nState ? localeRoutes(routes(), i18nState.settings, i18nState.locale) : routes();
-    const reactStaticHandler = createStaticHandler(tree, staticOpts);
+    const source = routes();
+    const tree = () => (i18nState ? localeRoutes(source, i18nState.settings, i18nState.locale) : source);
+    // Localized applications keep one handler per locale tree and basename.
+    const reactStaticHandler = staticHandlers
+      ? staticHandlers.handler(
+          source,
+          `${i18nState?.locale ?? ''}\u0000${resolvedBasename ?? ''}`,
+          tree,
+          resolvedBasename,
+        )
+      : createStaticHandler(tree(), resolvedBasename ? { basename: resolvedBasename } : undefined);
     // The loaders, or the action of a form post, run under their own span.
     const loaders = startTelemetrySpan({ name: 'ssr loaders', kind: 'internal' });
     let reactStaticContext: Awaited<ReturnType<typeof reactStaticHandler.query>>;
