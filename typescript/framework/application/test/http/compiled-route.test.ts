@@ -413,10 +413,10 @@ describe('RequestDeadlines', () => {
     const entry = () => ({ at: 0, prev: undefined, next: undefined, queued: false, expire: () => {} });
     const first = entry();
     const second = entry();
-    deadlines.enqueue(first, 1_000);
-    expect(first.at).toBe(1_100);
+    deadlines.enqueue(first, 1000);
+    expect(first.at).toBe(1100);
     deadlines.enqueue(second, 900);
-    expect(second.at).toBe(1_100);
+    expect(second.at).toBe(1100);
     deadlines.remove(first);
     deadlines.remove(second);
   });
