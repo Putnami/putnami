@@ -20,6 +20,7 @@ import React, { type ReactElement, type ReactNode } from 'react';
 import { type ReactDOMServerReadableStream, renderToReadableStream } from 'react-dom/server';
 import type { RouteObject, StaticHandlerContext } from 'react-router';
 import { createStaticHandler, createStaticRouter, isRouteErrorResponse, StaticRouterProvider } from 'react-router';
+import type { StaticHandlerCache } from './static-handler.cache';
 import { DocumentMetaContext } from '../client/document/document-context';
 import type { DocumentMeta } from '../client/document/document.types';
 import { escapeHtml } from '../client/document/tag.utils';
@@ -63,6 +64,11 @@ export const pageRenderer =
     i18n?: () => I18nRuntimeOptions | undefined,
     /** Whether a request waits for every Suspense boundary before the head. */
     waitForAll?: (req: Request) => boolean,
+    /**
+     * The application's static handlers, rebuilt only when its route tree
+     * changes. Without it, the handler is built for every request.
+     */
+    staticHandlers?: StaticHandlerCache,
   ): RouteHandler =>
   async () => {
     const logger = useLogger();
@@ -91,9 +97,17 @@ export const pageRenderer =
         )
       : undefined;
     const resolvedBasename = i18nState ? localeBasename(i18nState, moduleBase) : moduleBase;
-    const staticOpts = resolvedBasename ? { basename: resolvedBasename } : undefined;
-    const tree = i18nState ? localeRoutes(routes(), i18nState.settings, i18nState.locale) : routes();
-    const reactStaticHandler = createStaticHandler(tree, staticOpts);
+    const source = routes();
+    const tree = () => (i18nState ? localeRoutes(source, i18nState.settings, i18nState.locale) : source);
+    // Localized applications keep one handler per locale tree and basename.
+    const reactStaticHandler = staticHandlers
+      ? staticHandlers.handler(
+          source,
+          `${i18nState?.locale ?? ''}\u0000${resolvedBasename ?? ''}`,
+          tree,
+          resolvedBasename,
+        )
+      : createStaticHandler(tree(), resolvedBasename ? { basename: resolvedBasename } : undefined);
     // The loaders, or the action of a form post, run under their own span.
     const loaders = startTelemetrySpan({ name: 'ssr loaders', kind: 'internal' });
     let reactStaticContext: Awaited<ReturnType<typeof reactStaticHandler.query>>;
@@ -167,27 +181,23 @@ export const pageRenderer =
     );
     const staticRouter = i18nState ? React.createElement(I18nProvider, { value: i18nState }, routerTree) : routerTree;
 
-    // Declared in the function scope so the catch can clear it, but the timer
-    // itself is only created inside the try below — a throw before that leaves
-    // nothing to leak, and a throw after it is released in the catch.
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    // Declared in the function scope so the catch can release it, but the
+    // lifetime itself is only created inside the try below — a throw before
+    // that leaves nothing to leak, and a throw after it is released in the catch.
+    let lifetime: RenderLifetime | undefined;
 
     try {
-      const controller = new AbortController();
-      timeoutId = setTimeout(() => {
-        controller.abort();
-      }, ssrTimeout);
-
-      // The render also stops when the request ends: its client left or it
-      // outlived the HTTP plugin's request timeout.
-      const requestSignal = reqContext.signal;
+      // The render stops at its timeout, and when the request ends: its client
+      // left or it outlived the HTTP plugin's request timeout.
+      const renderLifetime = new RenderLifetime(ssrTimeout, reqContext.signal);
+      lifetime = renderLifetime;
       // The span ends once React has rendered the shell the stream starts with.
       const render = startTelemetrySpan({ name: 'ssr render', kind: 'internal' });
       let reactStream: ReactDOMServerReadableStream;
       try {
         reactStream = await render.within(() =>
           createReactStream(staticRouter, {
-            signal: requestSignal ? AbortSignal.any([controller.signal, requestSignal]) : controller.signal,
+            signal: renderLifetime.signal,
             nonce,
             onError: (error) => {
               // A request that ended stops its render on purpose: that stop is
@@ -223,7 +233,7 @@ export const pageRenderer =
       // carries what it published, whether or not the stream completes.
       markClientBootstrapEmitted(reqContext);
       const readable = await wrapInHtmlDocument(reactStream, docHelper, {
-        timeoutId,
+        release: () => renderLifetime.release(),
         context: context,
         logger,
         hydrateScript: hydrateScript(),
@@ -248,13 +258,13 @@ export const pageRenderer =
 
       return response;
     } catch (error) {
-      // On the happy path wrapInHtmlDocument clears this in its finally after
-      // streaming; if createReactStream (or anything after the timer is created
-      // above) throws, that finally never runs, so release the timer here to
-      // avoid a dangling abort timer per failed render. (A finally around the
-      // whole try would clear it too early — the timer must outlive this return
-      // to cover async streaming.)
-      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      // On the happy path wrapInHtmlDocument releases this in its finally after
+      // streaming; if createReactStream (or anything after the lifetime is
+      // created above) throws, that finally never runs, so release it here: no
+      // timer and no request listener outlive a failed render. (A finally
+      // around the whole try would release it too early — the lifetime must
+      // outlive this return to cover async streaming.)
+      lifetime?.release();
       // The request ended (its client left or it passed its timeout): the
       // HTTP plugin answers it, quietly, so its stop is not a render failure.
       if (isRequestStop(error, reqContext)) throw error;
@@ -263,6 +273,49 @@ export const pageRenderer =
       return handleRenderError(error);
     }
   };
+
+/**
+ * The abort signal of one render: it aborts at the render's timeout, and with
+ * the request's reason when the request ends.
+ *
+ * React renders with a plain signal of its own, never one `AbortSignal.any`
+ * builds over the request's: React before 19.3 removes its abort listener only
+ * when the signal aborts, that listener reaches the request through `onError`,
+ * and Bun keeps a signal `AbortSignal.any` built, listeners included, alive
+ * while one of its sources is. The request's end reaches this signal through
+ * one listener that `release` removes, with the timer, once the render settles.
+ */
+class RenderLifetime {
+  private readonly controller = new AbortController();
+  private readonly timer: ReturnType<typeof setTimeout>;
+
+  constructor(
+    timeoutMs: number,
+    private readonly request: AbortSignal | undefined,
+  ) {
+    this.timer = setTimeout(() => this.controller.abort(), timeoutMs);
+    if (request?.aborted) {
+      this.controller.abort(request.reason);
+    } else {
+      request?.addEventListener('abort', this, { once: true });
+    }
+  }
+
+  get signal(): AbortSignal {
+    return this.controller.signal;
+  }
+
+  /** The request ended: the render stops with the request's reason. */
+  handleEvent(): void {
+    this.controller.abort(this.request?.reason);
+  }
+
+  /** The render settled: its timer and its listener on the request go. */
+  release(): void {
+    clearTimeout(this.timer);
+    this.request?.removeEventListener('abort', this);
+  }
+}
 
 /**
  * Creates the React readable stream from the static router element. React
@@ -299,7 +352,8 @@ export async function wrapInHtmlDocument(
   reactStream: ReactDOMServerReadableStream,
   docHelper: SsrDocumentHelper,
   options: {
-    timeoutId: ReturnType<typeof setTimeout>;
+    /** Releases the render's lifetime (its timer and request listener) once the document is written. */
+    release: () => void;
     context: StaticHandlerContext;
     hydrateScript: string;
     basename?: string;
@@ -424,7 +478,7 @@ export async function wrapInHtmlDocument(
         // Ignore errors if writing to the closed/errored stream fails
       }
     } finally {
-      clearTimeout(options.timeoutId);
+      options.release();
       await writer.close();
     }
   })();
