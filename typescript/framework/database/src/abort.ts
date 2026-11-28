@@ -65,7 +65,7 @@ export function throwIfAborted(): void {
 /**
  * Wrap a pending query so it is cancelled when the context signal fires.
  *
- * - If the signal is already aborted, throws without starting the query: a
+ * - If the signal is already aborted, rejects without starting the query: a
  *   query runs only once something awaits it, so nothing is sent.
  * - Otherwise, on abort it calls `pending.cancel()`, which drops a query still
  *   waiting for a connection or sends a PostgreSQL protocol-level cancel
@@ -75,68 +75,97 @@ export function throwIfAborted(): void {
  * - The listener is cleaned up once the query settles.
  *
  * Pass-through when there is no signal in the context.
+ *
+ * It starts the query in the call and adds no async frame: the promise it
+ * returns is settled by the query, or rejected at the abort. It never throws;
+ * every failure rejects.
  */
-export async function abortableQuery<T extends readonly any[]>(pending: SqlQuery<T>): Promise<SqlResult<T>> {
-  const context = tryContext<AbortContext>();
-  const hooks = requestHooksOf(context);
-  if (hooks !== undefined) return hookedQuery(pending, hooks);
-  const signal = context?.signal;
-  if (!signal) {
-    return pending;
-  }
-
-  if (signal.aborted) {
-    // Never await nor cancel it: cancel() on a query nobody awaits rejects a
-    // promise without a reader, an unhandled rejection.
-    throw new QueryAbortError();
-  }
-
-  let onAbort: (() => void) | undefined;
-  const aborted = new Promise<never>((_, reject) => {
-    onAbort = () => {
-      // Rejects before the cancel can settle the query, so the caller always
-      // sees the abort. The query settles later, if ever, with no reader.
-      reject(new QueryAbortError());
-      Promise.resolve(pending).catch(() => {});
-      pending.cancel();
-    };
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
-
+export function abortableQuery<T extends readonly any[]>(pending: SqlQuery<T>): Promise<SqlResult<T>> {
   try {
-    return await Promise.race([pending, aborted]);
-  } finally {
-    if (onAbort) signal.removeEventListener('abort', onAbort);
+    const context = tryContext<AbortContext>();
+    const hooks = requestHooksOf(context);
+    if (hooks !== undefined) {
+      // Never await nor cancel a query refused here: cancel() on a query
+      // nobody awaits rejects a promise without a reader, an unhandled rejection.
+      if (hooks.aborted()) return Promise.reject(new QueryAbortError());
+      return hookedQuery(pending, hooks);
+    }
+    const signal = context?.signal;
+    if (!signal) {
+      return pending.then() as Promise<SqlResult<T>>;
+    }
+    if (signal.aborted) return Promise.reject(new QueryAbortError());
+    return signalledQuery(pending, signal);
+  } catch (error) {
+    return Promise.reject(error);
   }
 }
 
 /**
- * {@link abortableQuery} through a request's abort hooks: the same answers,
- * with no AbortSignal and no DOM listener per query.
+ * Runs `pending` under a request's abort hooks: one listener, removed once the
+ * query settles, and no AbortSignal.
  */
-async function hookedQuery<T extends readonly any[]>(
-  pending: SqlQuery<T>,
-  hooks: RequestAbortHooks,
-): Promise<SqlResult<T>> {
-  if (hooks.aborted()) {
-    // Never await nor cancel it: cancel() on a query nobody awaits rejects a
-    // promise without a reader, an unhandled rejection.
-    throw new QueryAbortError();
-  }
-
-  let onAbort: (() => void) | undefined;
-  const aborted = new Promise<never>((_, reject) => {
-    onAbort = () => {
-      reject(new QueryAbortError());
-      Promise.resolve(pending).catch(() => {});
-      pending.cancel();
-    };
-    hooks.onAbort(onAbort);
+function hookedQuery<T extends readonly any[]>(pending: SqlQuery<T>, hooks: RequestAbortHooks): Promise<SqlResult<T>> {
+  let resolve!: (result: SqlResult<T>) => void;
+  let reject!: (reason: unknown) => void;
+  const answer = new Promise<SqlResult<T>>((resolveAnswer, rejectAnswer) => {
+    resolve = resolveAnswer;
+    reject = rejectAnswer;
   });
-
+  const onAbort = (): void => {
+    // Rejects before the cancel can settle the query, so the caller always
+    // sees the abort. The query settles later, if ever, into the handlers below.
+    reject(new QueryAbortError());
+    pending.cancel();
+  };
+  pending.then(
+    (result) => {
+      hooks.offAbort(onAbort);
+      resolve(result);
+    },
+    (error: unknown) => {
+      hooks.offAbort(onAbort);
+      reject(error);
+    },
+  );
   try {
-    return await Promise.race([pending, aborted]);
-  } finally {
-    if (onAbort) hooks.offAbort(onAbort);
+    hooks.onAbort(onAbort);
+  } catch (error) {
+    // The query runs already: the caller reads the failure through the answer,
+    // and the query is stopped; it settles, if ever, into the handlers above.
+    reject(error);
+    pending.cancel();
   }
+  return answer;
+}
+
+/** {@link hookedQuery} on the context's own signal. */
+function signalledQuery<T extends readonly any[]>(pending: SqlQuery<T>, signal: AbortSignal): Promise<SqlResult<T>> {
+  let resolve!: (result: SqlResult<T>) => void;
+  let reject!: (reason: unknown) => void;
+  const answer = new Promise<SqlResult<T>>((resolveAnswer, rejectAnswer) => {
+    resolve = resolveAnswer;
+    reject = rejectAnswer;
+  });
+  const onAbort = (): void => {
+    reject(new QueryAbortError());
+    pending.cancel();
+  };
+  pending.then(
+    (result) => {
+      signal.removeEventListener('abort', onAbort);
+      resolve(result);
+    },
+    (error: unknown) => {
+      signal.removeEventListener('abort', onAbort);
+      reject(error);
+    },
+  );
+  try {
+    signal.addEventListener('abort', onAbort, { once: true });
+  } catch (error) {
+    reject(error);
+    pending.cancel();
+  }
+  return answer;
 }

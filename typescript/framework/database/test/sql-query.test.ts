@@ -86,6 +86,82 @@ describe('client results', () => {
     expect(rows).toEqual([[1, [4, 5]]] as never);
     expect(rows.count).toBe(1);
   });
+
+  it('hands out the driver rows as they are when every column is already camelCase and no value converts', async () => {
+    const createdAt = new Date('2026-01-01T00:00:00Z');
+    const answer = result([
+      { id: 1, createdAt, tags: ['a'], blob: new Uint8Array([7]), note: null },
+      { id: 2, createdAt, tags: [], blob: new Uint8Array([8]), note: 'b' },
+    ]);
+    const { sql } = fakeDriver(answer);
+    const rows = await sql`SELECT 1`;
+    expect(rows as unknown).not.toBe(answer);
+    expect(rows).toHaveLength(2);
+    expect(rows[0] as unknown).toBe(answer[0]);
+    expect(rows[1] as unknown).toBe(answer[1]);
+    expect(rows.count).toBe(2);
+    expect(rows.command).toBe('SELECT');
+    expect(rows[1]?.['blob']).toBeInstanceOf(Uint8Array);
+  });
+
+  it('gives a result handed out as it is a zero count and an empty command when the driver set none', async () => {
+    const answer = [{ id: 1 }];
+    const { sql } = fakeDriver(answer);
+    const rows = await sql`SELECT 1`;
+    expect(rows[0] as unknown).toBe(answer[0]);
+    expect(rows.count).toBe(0);
+    expect(rows.command).toBe('');
+    // The driver's own result is left as it was.
+    expect(Object.keys(answer)).toEqual(['0']);
+  });
+
+  it('gives a result handed out as it is the shape of a copied one, not the driver result type', async () => {
+    // A driver result type with members of its own, as Bun's `SQLResultArray`.
+    class DriverResultArray extends Array {
+      lastInsertRowid = null;
+      affectedRows = null;
+      count = 1;
+      command = 'SELECT';
+    }
+    const driverResult = (rows: unknown[]) => DriverResultArray.from(rows) as unknown as unknown[];
+    const shape = (value: unknown[]) => ({
+      keys: Reflect.ownKeys(value),
+      prototype: Object.getPrototypeOf(value),
+      constructor: value.constructor,
+      enumerable: Object.keys(value),
+    });
+    const { sql: handedOut } = fakeDriver(driverResult([{ id: 1, createdAt: 'a' }]));
+    const { sql: copied } = fakeDriver(driverResult([{ id: 1, created_at: 'a' }]));
+    const left = await handedOut`SELECT 1`;
+    const right = await copied`SELECT 1`;
+    expect(left[0]).toEqual({ id: 1, createdAt: 'a' });
+    expect(right[0]).toEqual({ id: 1, createdAt: 'a' });
+    expect(shape(left)).toEqual(shape(right));
+    expect(Object.getPrototypeOf(left)).toBe(Array.prototype);
+    expect(left.constructor).toBe(Array);
+    expect(Reflect.ownKeys(left)).toEqual(['0', 'length', 'count', 'command']);
+    expect(Object.keys(left)).toEqual(['0', 'count', 'command']);
+  });
+
+  it('copies a result with a column to camelCase, a value to convert or a row without a column of the first', async () => {
+    const cases: [unknown[], unknown[]][] = [
+      [result([{ id: 1, created_at: 'a' }]), [{ id: 1, createdAt: 'a' }]],
+      [result([{ id: 1, scores: new Int32Array([1, 2]) }]), [{ id: 1, scores: [1, 2] }]],
+      [result([{ id: 1, scores: [new Int32Array([3])] }]), [{ id: 1, scores: [[3]] }]],
+      [result([{ id: 1, name: 'a' }, { id: 2 }]), [{ id: 1, name: 'a' }, { id: 2 }]],
+      [
+        result([{ id: 1 }, Object.assign(Object.create({ id: 'inherited' }), { name: 'b' })]),
+        [{ id: 1 }, { name: 'b' }],
+      ],
+    ];
+    for (const [answer, expected] of cases) {
+      const { sql } = fakeDriver(answer);
+      const rows = await sql`SELECT 1`;
+      expect(rows as unknown).not.toBe(answer);
+      expect<unknown[]>([...rows]).toEqual(expected);
+      expect(Array.isArray(rows[0]?.['scores'] ?? [])).toBe(true);
+    }
+  });
 });
 
 describe('server errors', () => {

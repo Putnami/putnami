@@ -308,4 +308,28 @@ describe('endpoints served through Bun routes', () => {
     expect(await (await fetch(`${base}/users/7`)).text()).toBe('native');
     expect(routed()).toBe(0);
   });
+
+  it('hands the context the URL and the method of the request Bun matched', async () => {
+    const { base, routed } = await start((plugin) => {
+      plugin.get('/echo/[name]', (ctx: HttpRequestContext) => ({
+        url: ctx.url,
+        requestUrl: ctx.req.url,
+        method: ctx.method,
+        path: ctx.path(),
+        query: ctx.queryParams(),
+        domain: ctx.domain(),
+      }));
+    });
+    const res = await fetch(`${base}/echo/ada?x=1`);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toEqual({
+      url: `${base}/echo/ada?x=1`,
+      requestUrl: `${base}/echo/ada?x=1`,
+      method: 'GET',
+      path: 'echo/ada',
+      query: { x: '1' },
+      domain: base,
+    });
+    expect(routed()).toBe(0);
+  });
 });
