@@ -500,7 +500,7 @@ function reportLoaderErrors(
 }
 
 /**
- * Answers an `HttpException` a loader or an action threw with its own status:
+ * Answers a 4xx or 5xx `HttpException` a loader threw with its own status:
  * React Router keeps it as an unknown error and computes a 500, so each one is
  * replaced by the route error response of its status, which the not-found and
  * error boundaries render, with `{ statusCode, error, message }` as its

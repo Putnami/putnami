@@ -332,8 +332,8 @@ export default error().render(function PostsError() {
 
 #### `isRouteErrorResponse(value)`
 
-Narrows an error-boundary value to a thrown `Response` or `HttpException` — a
-4xx/5xx raised by a loader, an action, or the router itself — exposing `status`, `statusText`, and
+Narrows an error-boundary value to a thrown `Response` — a 4xx/5xx raised by a
+loader, an action, or the router itself — or a page loader's `HttpException`, exposing `status`, `statusText`, and
 `data`. Re-exported so a boundary never imports `react-router` directly.
 
 ```typescript

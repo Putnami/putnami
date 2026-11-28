@@ -89,6 +89,46 @@ describe('Client Form Handlers', () => {
       },
     );
 
+    // An HTTP/2 answer carries no status text: the Fetch spec gives it as ''.
+    const loaderFailure = async (body: unknown, status: number) => {
+      fetchMock.mockImplementationOnce(
+        async () =>
+          new Response(JSON.stringify(body), {
+            status,
+            statusText: '',
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      );
+      return await pageLoaderHandler()({
+        request: new Request('http://localhost/posts/1'),
+        params: {},
+        context: undefined,
+      }).catch((error: unknown) => error);
+    };
+
+    it('keeps the message of an HttpException built from a string', async () => {
+      expect(await loaderFailure('Post not found', 404)).toMatchObject({
+        data: { statusCode: 404, error: 'Not Found', message: 'Post not found' },
+        init: { status: 404, statusText: 'Not Found' },
+      });
+    });
+
+    it('takes the status text from the status table when the answer carries none', async () => {
+      expect(await loaderFailure({ statusCode: 403, message: 'not an admin', error: '' }, 403)).toMatchObject({
+        data: { statusCode: 403, error: 'Forbidden', message: 'not an admin' },
+        init: { status: 403, statusText: 'Forbidden' },
+      });
+    });
+
+    it('returns a non-error answer below 400 as it came', async () => {
+      const notModified = new Response(null, { status: 304 });
+      fetchMock.mockImplementationOnce(async () => notModified);
+
+      expect(
+        await pageLoaderHandler()({ request: new Request('http://localhost/posts/1'), params: {}, context: undefined }),
+      ).toBe(notModified);
+    });
+
     it('reaches the error boundary with the status of a loader endpoint that answered no JSON', async () => {
       fetchMock.mockImplementationOnce(
         async () => new Response('Bad Gateway', { status: 502, statusText: 'Bad Gateway' }),

@@ -569,7 +569,8 @@ export default function UsersError() {
     return (
       <div>
         <h1>{error.status} {error.statusText}</h1>
-        {/* A thrown Response carries its body; an HttpException, { statusCode, error, message }. */}
+        {/* A Response thrown on a full page load carries its body; an HttpException, and any
+            failed loader on a client navigation, carry { statusCode, error, message }. */}
         <p>{typeof error.data === 'string' ? error.data : error.data?.message}</p>
       </div>
     );

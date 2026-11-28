@@ -1,3 +1,4 @@
+import { getHttpStatusText } from '@putnami/runtime';
 import { data, generatePath } from 'react-router';
 import { LOADER_REQUEST_HEADER } from '../../shared/client-redirect';
 import { clientFetchTimeoutMs } from './fetch-timeout';
@@ -101,24 +102,29 @@ async function loaderHandler(opt: {
   // boundary with its status, as on a full page load: the not-found page for a
   // 404, the error page otherwise, never the page rendered with the error as
   // its data.
-  if (!res.ok) throw await loaderError(res);
+  if (res.status >= 400) throw await loaderError(res);
   return res;
 }
 
 /**
  * The route error of a loader endpoint that failed, with the `data` a full page
- * load gives the boundary: `{ statusCode, error, message }`.
+ * load gives the boundary: `{ statusCode, error, message }`. The status text
+ * comes from the status table, as on the server: HTTP/2 answers carry none.
  */
 async function loaderError(res: Response) {
-  let body: { error?: unknown; message?: unknown } | undefined;
+  let body: unknown;
   try {
-    body = (await res.json()) as typeof body;
+    body = await res.json();
   } catch {
     body = undefined;
   }
-  const error = typeof body?.error === 'string' ? body.error : res.statusText;
-  const message = typeof body?.message === 'string' ? body.message : error;
-  return data({ statusCode: res.status, error, message }, { status: res.status, statusText: error });
+  const fields = typeof body === 'object' && body !== null ? (body as { error?: unknown; message?: unknown }) : {};
+  const statusText =
+    getHttpStatusText(res.status) ??
+    (typeof fields.error === 'string' && fields.error ? fields.error : res.statusText || 'Error');
+  // An `HttpException` built from a string answers that string as its body.
+  const message = typeof body === 'string' ? body : typeof fields.message === 'string' ? fields.message : statusText;
+  return data({ statusCode: res.status, error: statusText, message }, { status: res.status, statusText });
 }
 
 /** Whether a followed loader fetch ended on a loader JSON endpoint. */
