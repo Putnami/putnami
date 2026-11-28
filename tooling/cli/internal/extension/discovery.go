@@ -678,6 +678,7 @@ func applyVocabularyTraits(extensions []*ExtensionDescription) {
 }
 
 func tryLoadExtension(absPath, refName string, installed bool) (*ExtensionDescription, *SkippedExtension) {
+	probing(absPath)
 	manifestPath := filepath.Join(absPath, "putnami.extension.json")
 	// A missing manifest is normal (the dir is not an extension); a manifest
 	// that exists but fails to load is a real error the user needs to see.

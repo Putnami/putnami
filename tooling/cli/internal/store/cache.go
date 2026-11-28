@@ -336,30 +336,47 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 	}
 	if recordable {
 		forgets := record.Forgets()
-		if hash, witness, memoize, ok := recordedInputDigest(record, recorded, dir, patterns); ok {
+		if hash, witness, parts, memoize, ok := recordedInputDigest(record, recorded, dir, patterns); ok {
 			// A sample of the answers is collected again (ADR 0113 §1): one
 			// that differs, or that no longer collects, shows a witness the
 			// record should not have trusted, unless a write of the run came
 			// between the two. The record is then discarded for good, with
 			// every digest this run memoized: the run collects them again.
+			// A machine worker checks a sample once the run returned, and the
+			// run uses the answer (fileindex.Record.Defer), except a digest
+			// of input selectors, whose collection asks the run's extensions.
 			if record.Sample() {
-				collected, _, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope)
-				if (err != nil || collected != hash) && record.Forgets() == forgets {
-					reason := fmt.Sprintf("the input record answered %s for %s %s, which a collection gives as %s", hash, dir, strings.Join(patterns, ","), collected)
-					if err != nil {
-						reason = fmt.Sprintf("the input record answered %s for %s %s, which no longer collects (%v)", hash, dir, strings.Join(patterns, ","), err)
+				answered := hash
+				// difference names how a collection of the answer differs
+				// from it, "" when it gives the answer.
+				difference := func(collected string, err error) string {
+					switch {
+					case err != nil:
+						return fmt.Sprintf("the input record answered %s for %s %s, which no longer collects (%v)", answered, dir, strings.Join(patterns, ","), err)
+					case collected != answered:
+						return fmt.Sprintf("the input record answered %s for %s %s, which a collection gives as %s", answered, dir, strings.Join(patterns, ","), collected)
 					}
-					record.Discard(reason)
-					cm.InvalidateFileHashes()
+					return ""
 				}
-				if err != nil {
-					return "", err
-				}
-				if collected != hash {
-					// A write of the run came between: the answer may be
-					// sound, but nothing tells, so its entry is dropped.
-					record.Drop(InputDigestTable, recorded)
-					hash, memoize = collected, false
+				deferred := !(namesInputSelector(patterns) && expander != nil) && record.Defer(parts, func() string {
+					collected, _, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope)
+					return difference(collected, err)
+				})
+				if !deferred {
+					collected, _, err := memoizedHashFiles(cm.candidateSource(), dir, patterns, expander, scope)
+					if reason := difference(collected, err); reason != "" && record.Forgets() == forgets {
+						record.Discard(reason)
+						cm.InvalidateFileHashes()
+					}
+					if err != nil {
+						return "", err
+					}
+					if collected != hash {
+						// A write of the run came between: the answer may be
+						// sound, but nothing tells, so its entry is dropped.
+						record.Drop(InputDigestTable, recorded)
+						hash, memoize = collected, false
+					}
 				}
 			}
 			if record.Discarded() == "" {

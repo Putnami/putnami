@@ -38,3 +38,48 @@ type LastLocal struct {
 
 // ReadLastLocal answers nil on a platform without a machine process.
 func ReadLastLocal() *LastLocal { return nil }
+
+// ReadLastMemory answers nil on a platform without a machine process.
+func ReadLastMemory() *MemoryDecision { return nil }
+
+// RunMemory holds nothing on a platform without a machine process.
+type RunMemory struct{}
+
+// Take offers nothing.
+func (RunMemory) Take(string) any { return nil }
+
+// Keep holds nothing.
+func (RunMemory) Keep(string, any, bool) {}
+
+// Refused records nothing.
+func (RunMemory) Refused(string, string) {}
+
+// TakeRun offers nothing.
+func (RunMemory) TakeRun(string) any { return nil }
+
+// Witness witnesses nothing.
+func (RunMemory) Witness(string) string { return "" }
+
+// KeepRun holds nothing.
+func (RunMemory) KeepRun(string, any, bool) {}
+
+// PeekRun offers nothing.
+func (RunMemory) PeekRun(string) any { return nil }
+
+// Reused records nothing.
+func (RunMemory) Reused(string, string, bool) {}
+
+// TakeDispatch offers nothing.
+func TakeDispatch(string) any { return nil }
+
+// KeepsDispatch holds nothing.
+func KeepsDispatch(string) bool { return false }
+
+// KeepDispatch holds nothing.
+func KeepDispatch(string, any, bool) {}
+
+// DispatchMoved withdraws nothing.
+func DispatchMoved(string, string) {}
+
+// Witness takes no stat on a platform without a machine process.
+func Witness(string) string { return "" }

@@ -7,6 +7,7 @@ package machineproc_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -18,11 +19,16 @@ import (
 	"testing"
 	"time"
 
+	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
+	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machineproc"
+	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/template"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -34,6 +40,8 @@ func TestMain(m *testing.M) {
 		case "supervise":
 			os.Exit(machineproc.Supervise())
 		case "work":
+			engine.ServeHeldRuns(machineproc.RunMemory{})
+			scheduler.ServeHeldRuns(machineproc.RunMemory{})
 			os.Exit(machineproc.Work(func(ctx context.Context, args []string) int {
 				app, err := cli.NewApp()
 				if err != nil {
@@ -345,6 +353,379 @@ func TestARunWhoseWorkerEndsRunsAgainInItsOwnProcess(t *testing.T) {
 	}
 }
 
+// TestAnUnchangedRequestIsDecidedAnswerableFromMemory serves the same request
+// through a worker after a settled run: once the worker holds a run of the
+// unchanged worktree, the next one is answerable from memory; a write in the
+// worktree, or a commit, which the worktree's journal does not see, makes it
+// unanswerable (CLI ADR 0116 §6a).
+func TestAnUnchangedRequestIsDecidedAnswerableFromMemory(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("a run is answered from memory only where the platform has a watcher")
+	}
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	root := clitest.WritingCountsFixture(t, 2)
+	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\n")
+	clitest.RunGit(t, root, "add", "-A")
+	clitest.RunGit(t, root, "commit", "-m", "ignore the run's state")
+	args := []string{"lint,test,build", "--all"}
+	t.Setenv(machineproc.Env, "off")
+	for range 2 {
+		if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
+			t.Fatalf("settling run exit %d\n%s", code, out)
+		}
+	}
+	startSupervisor(t)
+	t.Setenv(machineproc.Env, "on")
+	decideArgs := func(step string, args ...string) *machineproc.MemoryDecision {
+		t.Helper()
+		if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
+			t.Fatalf("%s: exit %d\n%s", step, code, out)
+		}
+		// The worker records its decision once the client has its exit.
+		deadline := time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			if d := machineproc.ReadLastMemory(); d != nil && d.Kept != "" {
+				_ = os.Remove(machineLastMemory(t))
+				return d
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		t.Fatalf("%s: the worker recorded no decision (last run in its own process: %+v)", step, machineproc.ReadLastLocal())
+		return nil
+	}
+	decide := func(step string) *machineproc.MemoryDecision {
+		t.Helper()
+		return decideArgs(step, args...)
+	}
+
+	if d := decide("the first request"); d.Answerable || d.Kept != "kept" {
+		t.Fatalf("the first request: %+v, want unanswerable and kept", d)
+	}
+	if d := decide("the unchanged request"); !d.Answerable || d.Kept != "kept" {
+		t.Fatalf("the unchanged request: %+v, want answerable and kept", d)
+	}
+	clitest.WriteFile(t, filepath.Join(root, "apps", "p001", "src.txt"), "p001 edited\n")
+	if d := decide("after a write"); d.Answerable || !strings.Contains(d.Reason, "the worktree changed") {
+		t.Fatalf("after a write: %+v, want unanswerable for the worktree's change", d)
+	}
+	decide("the run that settles the write")
+	if d := decide("the unchanged request again"); !d.Answerable {
+		t.Fatalf("the unchanged request again: %+v, want answerable", d)
+	}
+	clitest.RunGit(t, root, "commit", "--allow-empty", "-m", "empty")
+	if d := decide("after a commit"); d.Answerable || !strings.Contains(d.Reason, "outside the worktree") {
+		t.Fatalf("after a commit: %+v, want unanswerable for Git's witness", d)
+	}
+	decide("the run that holds the commit")
+	if d := decideArgs("a request with other arguments", "lint,test", "--all"); d.Answerable || !strings.Contains(d.Reason, "request differs") {
+		t.Fatalf("a request with other arguments: %+v, want unanswerable", d)
+	}
+}
+
+// TestAnUnchangedRunIsAnsweredFromMemory serves the same request through a
+// worker until the worker holds it, then once more: the engine answers that
+// run from what the held run loaded and planned, without loading or planning,
+// and writes none of the state files a load and a plan maintain; the
+// scheduler answers its plan from the held one; the run records its session
+// and gives the tasks and the exit code a run in its own process gives on the
+// same tree. Once an entry a task was served from is evicted from the store,
+// after a write in the worktree, and for a request with other arguments, the
+// next request is not answered from memory, runs its plan, and still gives
+// what a run in its own process gives (CLI ADR 0116 §6a).
+func TestAnUnchangedRunIsAnsweredFromMemory(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("a run is answered from memory only where the platform has a watcher")
+	}
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	root := clitest.WritingCountsFixture(t, 2)
+	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\n")
+	clitest.RunGit(t, root, "add", "-A")
+	clitest.RunGit(t, root, "commit", "-m", "ignore the run's state")
+	args := []string{"lint,test,build", "--all"}
+	localArgs := func(step string, args ...string) (int, []string) {
+		t.Helper()
+		t.Setenv(machineproc.Env, "off")
+		code, out := clitest.RunGateArgs(t, root, args...)
+		if code != 0 {
+			t.Fatalf("%s: exit %d in its own process\n%s", step, code, out)
+		}
+		return code, latestTasks(t, root)
+	}
+	local := func(step string) (int, []string) {
+		t.Helper()
+		return localArgs(step, args...)
+	}
+	local("the first settling run")
+	local("the second settling run")
+	// A task served from the local cache is held under the witness of its
+	// entry, taken once the entry's files are the file index's margin old.
+	// The second settling run is the first to serve the entries, and the pin
+	// its session record takes links each result.json (CLI ADR 0137), which
+	// moves its status-change time: the margin runs from that run's end.
+	settled := time.Now().Add(fileindex.Margin)
+	startSupervisor(t)
+	time.Sleep(time.Until(settled))
+	// servedArgs runs a request through the worker, and returns its exit
+	// code, the tasks of the session it recorded and the worker's decision.
+	servedArgs := func(step string, args ...string) (int, []string, *machineproc.MemoryDecision) {
+		t.Helper()
+		t.Setenv(machineproc.Env, "on")
+		before := clitest.LatestSessionID(t, root)
+		code, out := clitest.RunGateArgs(t, root, args...)
+		decision := awaitMemoryDecision(t, step)
+		if clitest.LatestSessionID(t, root) == before {
+			t.Fatalf("%s: the run recorded no session\n%s", step, out)
+		}
+		return code, latestTasks(t, root), decision
+	}
+	served := func(step string) (int, []string, *machineproc.MemoryDecision) {
+		t.Helper()
+		return servedArgs(step, args...)
+	}
+
+	if _, _, d := served("the first request"); d.Answerable || d.Answered || d.PlanSkipped || d.VersionsHeld || d.DispatchHeld || d.Kept != "kept" {
+		t.Fatalf("the first request: %+v, want unanswerable, computed and kept", d)
+	}
+	// What a plan that executed computed is never held: the second request
+	// loads and plans, and only its plan is answered. What App.Run loaded
+	// before it dispatched is held from the first.
+	if _, _, d := served("the second request"); !d.Answerable || !d.Answered || d.PlanSkipped || d.VersionsHeld || !d.DispatchHeld || d.Kept != "kept" {
+		t.Fatalf("the second request: %+v, want answerable, dispatched from memory, planned, answered and kept", d)
+	}
+	state := stateFiles(t, root)
+	code, answered, d := served("the unchanged request")
+	// It took the version snapshot the held run read, without asking Git.
+	if !d.Answerable || !d.Answered || !d.PlanSkipped || !d.VersionsHeld || !d.FinalizersHeld || !d.DispatchHeld || d.Kept != "kept" {
+		t.Fatalf("the unchanged request: %+v, want answerable, answered from memory without a dispatch load, a plan, Git or finalizers, and kept", d)
+	}
+	if code != 0 {
+		t.Fatalf("the answered run exited %d, want 0", code)
+	}
+	if len(answered) != 6 {
+		t.Fatalf("the answered run recorded %d tasks, want 6: %v", len(answered), answered)
+	}
+	// It read nothing through the file index, the input record or the
+	// workspace snapshot, and so wrote none of them.
+	if after := stateFiles(t, root); after != state {
+		t.Errorf("the answered run changed the state files a load and a plan maintain:\nbefore %s\nafter  %s", state, after)
+	}
+	localCode, own := local("a run in its own process on the same tree")
+	if localCode != code {
+		t.Errorf("exit %d in its own process, %d answered from memory", localCode, code)
+	}
+	if got, want := strings.Join(normalize(answered), "\n"), strings.Join(normalize(own), "\n"); got != want {
+		t.Errorf("tasks differ\nanswered from memory:\n%s\nin its own process:\n%s", got, want)
+	}
+	if _, again, d := served("the unchanged request again"); !d.PlanSkipped || !d.Answered || !d.VersionsHeld ||
+		strings.Join(normalize(again), "\n") != strings.Join(normalize(own), "\n") {
+		t.Fatalf("the unchanged request again: %+v, want it answered without a plan, with the tasks of a run in its own process", d)
+	}
+
+	// An entry the store no longer holds, which a collection, a clean or
+	// another worktree's run evicted, is not the one the answer would report
+	// served: the next request is refused at the answer, runs its plan, which
+	// executes that task again, and gives what a run in its own process gives.
+	evictServedEntry(t, root, answered[0])
+	code, computed, d := served("after an eviction")
+	if !d.Answerable || d.Answered || !strings.Contains(d.Reason, "a served task's cache entry moved") {
+		t.Fatalf("after an eviction: %+v, want answerable, refused at the answer for the moved entry and computed", d)
+	}
+	if code != 0 {
+		t.Fatalf("after an eviction: exit %d, want 0", code)
+	}
+	localCode, own = local("a run in its own process after the eviction")
+	if localCode != code {
+		t.Errorf("after an eviction: exit %d in its own process, %d through the worker", localCode, code)
+	}
+	if got, want := strings.Join(normalize(computed), "\n"), strings.Join(normalize(own), "\n"); got != want || len(computed) != 6 {
+		t.Errorf("after an eviction: tasks differ, or are not the 6 asked\nthrough the worker:\n%s\nin its own process:\n%s", got, want)
+	}
+	// The run executed a task, so the worker holds none: the next request
+	// computes, and is held.
+	if _, _, d := served("the request that settles the eviction"); d.Answered || d.Kept != "kept" {
+		t.Fatalf("the request that settles the eviction: %+v, want computed and kept", d)
+	}
+
+	clitest.WriteFile(t, filepath.Join(root, "apps", "p001", "src.txt"), "p001 edited\n")
+	code, computed, d = served("after a write")
+	if d.Answerable || d.Answered || d.PlanSkipped || d.VersionsHeld || d.FinalizersHeld || d.DispatchHeld || !strings.Contains(d.Reason, "the worktree changed") {
+		t.Fatalf("after a write: %+v, want unanswerable for the worktree's change, planned and computed", d)
+	}
+	localCode, own = local("a run in its own process after the write")
+	if localCode != code {
+		t.Errorf("after a write: exit %d in its own process, %d through the worker", localCode, code)
+	}
+	if got, want := strings.Join(normalize(computed), "\n"), strings.Join(normalize(own), "\n"); got != want {
+		t.Errorf("after a write: tasks differ\nthrough the worker:\n%s\nin its own process:\n%s", got, want)
+	}
+
+	// The run after the write executed its tasks, so the worker holds none:
+	// the next request computes, and is held.
+	if _, _, d := served("the request that settles the write"); d.Answerable || d.Answered || d.PlanSkipped || d.Kept != "kept" {
+		t.Fatalf("the request that settles the write: %+v, want unanswerable, computed and kept", d)
+	}
+	// A request that selects other projects and runs other commands is not
+	// answered from the held one.
+	other := []string{"lint,test", "--projects", "p000"}
+	code, computed, d = servedArgs("a request with other arguments", other...)
+	if d.Answerable || d.Answered || d.PlanSkipped || !strings.Contains(d.Reason, "request differs") {
+		t.Fatalf("a request with other arguments: %+v, want unanswerable for the request, planned and computed", d)
+	}
+	localCode, own = localArgs("a run in its own process with the other arguments", other...)
+	if localCode != code {
+		t.Errorf("with other arguments: exit %d in its own process, %d through the worker", localCode, code)
+	}
+	if got, want := strings.Join(normalize(computed), "\n"), strings.Join(normalize(own), "\n"); got != want || len(own) != 2 {
+		t.Errorf("with other arguments: tasks differ, or are not the 2 asked\nthrough the worker:\n%s\nin its own process:\n%s", got, want)
+	}
+}
+
+// TestABeforeHookThatWritesTheWorktreeWithdrawsTheHeldRun pins the re-check
+// after the decision (CLI ADR 0116 §6a): a before-hook that writes a file of
+// the worktree after the worker decided a request answerable withdraws
+// everything the held run offers, so neither the engine nor the scheduler
+// answers the run from it, and the run gives what a run in its own process
+// gives. The hook writes only once a file outside the worktree, which no
+// witness covers, exists, so the request stays the held one.
+func TestABeforeHookThatWritesTheWorktreeWithdrawsTheHeldRun(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("a run is answered from memory only where the platform has a watcher")
+	}
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	root := clitest.WritingCountsFixture(t, 2)
+	trigger := filepath.Join(t.TempDir(), "write")
+	configPath := filepath.Join(root, "putnami.workspace.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hook, err := json.Marshal(fmt.Sprintf(`if [ -f %q ]; then printf 'p000 written by a hook\n' > apps/p000/src.txt; fi`, trigger))
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, found := strings.CutPrefix(string(data), "{")
+	if !found {
+		t.Fatalf("the workspace configuration %q is no object", data)
+	}
+	clitest.WriteFile(t, configPath, `{"hooks":{"cli":{"before":[`+string(hook)+`]}},`+config)
+	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\n")
+	clitest.RunGit(t, root, "add", "-A")
+	clitest.RunGit(t, root, "commit", "-m", "a before-hook")
+	args := []string{"lint,test,build", "--all"}
+	local := func(step string) []string {
+		t.Helper()
+		t.Setenv(machineproc.Env, "off")
+		forgetProcessMemos()
+		if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
+			t.Fatalf("%s: exit %d in its own process\n%s", step, code, out)
+		}
+		return latestTasks(t, root)
+	}
+	served := func(step string) ([]string, *machineproc.MemoryDecision) {
+		t.Helper()
+		t.Setenv(machineproc.Env, "on")
+		forgetProcessMemos()
+		if code, out := clitest.RunGateArgs(t, root, args...); code != 0 {
+			t.Fatalf("%s: exit %d through the worker\n%s", step, code, out)
+		}
+		return latestTasks(t, root), awaitMemoryDecision(t, step)
+	}
+	local("the first settling run")
+	local("the second settling run")
+	// A task served from the local cache is held under the witness of its
+	// entry, taken once the entry's files are the file index's margin old.
+	// The second settling run is the first to serve the entries, and the pin
+	// its session record takes links each result.json (CLI ADR 0137), which
+	// moves its status-change time: the margin runs from that run's end.
+	settled := time.Now().Add(fileindex.Margin)
+	startSupervisor(t)
+	time.Sleep(time.Until(settled))
+	if _, d := served("the first request"); d.Kept != "kept" {
+		t.Fatalf("the first request: %+v, want it kept", d)
+	}
+	if _, d := served("the second request"); !d.Answerable || !d.Answered || d.Kept != "kept" {
+		t.Fatalf("the second request: %+v, want it answered and kept", d)
+	}
+
+	clitest.WriteFile(t, trigger, "")
+	computed, d := served("a request whose before-hook writes the worktree")
+	if !d.Answerable || d.Answered || d.PlanSkipped || !strings.Contains(d.Reason, "the worktree changed after the decision") {
+		t.Fatalf("a request whose before-hook writes the worktree: %+v, want answerable, then withdrawn after the hook's write and computed", d)
+	}
+	own := local("a run in its own process after the hook's write")
+	if got, want := strings.Join(normalize(computed), "\n"), strings.Join(normalize(own), "\n"); got != want || len(own) != 6 {
+		t.Errorf("tasks differ, or are not the 6 asked\nthrough the worker:\n%s\nin its own process:\n%s", got, want)
+	}
+}
+
+// evictServedEntry removes from the store the entry the task of the session
+// line task (latestTasks) was served from, as a collection evicts it.
+func evictServedEntry(t *testing.T, root, task string) {
+	t.Helper()
+	fields := strings.Fields(task)
+	if len(fields) < 2 || !strings.HasPrefix(fields[1], "sha256:") {
+		t.Fatalf("the task %q names no input digest", task)
+	}
+	entry, err := store.NewLocalStore(store.ResolveStoreRoot(root)).LookupTaskEntry(strings.TrimPrefix(fields[1], "sha256:"))
+	if err != nil || entry == nil || entry.FilesDir == "" {
+		t.Fatalf("the entry the task %q was served from: %v, %v", task, entry, err)
+	}
+	if err := os.RemoveAll(filepath.Dir(entry.FilesDir)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// stateFiles describes the state files a run's load and plan maintain in the
+// worktree: the file index, the input record and the workspace snapshot, each
+// by its size and digest, or as absent.
+func stateFiles(t *testing.T, root string) string {
+	t.Helper()
+	var out []string
+	for _, name := range []string{"file-index", "input-record", "workspace-index.json"} {
+		data, err := os.ReadFile(filepath.Join(root, ".putnami", name))
+		switch {
+		case os.IsNotExist(err):
+			out = append(out, name+" absent")
+		case err != nil:
+			t.Fatal(err)
+		default:
+			sum := sha256.Sum256(data)
+			out = append(out, fmt.Sprintf("%s %d %x", name, len(data), sum[:8]))
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
+// awaitMemoryDecision waits for the worker's decision on the run it just
+// served, which it records once the client has its exit, and removes it so
+// the next run's is not mistaken for it.
+func awaitMemoryDecision(t *testing.T, step string) *machineproc.MemoryDecision {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if d := machineproc.ReadLastMemory(); d != nil && d.Kept != "" {
+			_ = os.Remove(machineLastMemory(t))
+			return d
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("%s: the worker recorded no decision (last run in its own process: %+v)", step, machineproc.ReadLastLocal())
+	return nil
+}
+
+// machineLastMemory is the path of the worker's last decision.
+func machineLastMemory(t *testing.T) string {
+	t.Helper()
+	dir, err := machineproc.Dir(os.Getenv, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(dir, "last-memory.json")
+}
+
 // TestEachWorktreeIsServedByAWorkerOfItsOwn serves two worktrees in turn:
 // each gets a worker of its own, which serves it again on its next request,
 // so the two can progress at once instead of one refusing the other (CLI ADR
@@ -402,5 +783,219 @@ func TestEachWorktreeIsServedByAWorkerOfItsOwn(t *testing.T) {
 	}
 	if again := serve(roots[1]); again != first[1] {
 		t.Errorf("the second worktree was served again by worker %d, want its own %d", again, first[1])
+	}
+}
+
+// gateFixture writes a workspace whose validate command projects one
+// executable requirement for each of two projects, alpha and beta, and whose
+// test command, of the verification kind, reports the observation its
+// project states: alpha's passes, beta states none. The spec gate collects a
+// record of two groups, alpha verified and beta missing. Every task is
+// cached, so a run of an unchanged tree serves each from the cache.
+func gateFixture(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"),
+		`{"name":"gate-fixture","includes":["gate-extension","alpha","beta"]}`)
+	ext := filepath.Join(root, "gate-extension")
+	clitest.WriteFile(t, filepath.Join(ext, "putnami.json"), `{"name":"@fixture/gate"}`)
+	clitest.WriteFile(t, filepath.Join(ext, "emit.sh"), `#!/bin/sh
+source="$PUTNAMI_PROJECT_ROOT/$1.src.json"
+if [ -f "$source" ]; then
+  mkdir -p "$PUTNAMI_OUTPUT_PATH"
+  cp "$source" "$PUTNAMI_OUTPUT_PATH/$1"
+  printf '%s\n' "{\"v\":2,\"type\":\"artifact\",\"id\":\"$2\",\"name\":\"$2\",\"kind\":\"report\",\"path\":\"$PUTNAMI_OUTPUT_PATH/$1\"}"
+else
+  rm -f "$PUTNAMI_OUTPUT_PATH/$1"
+fi
+`)
+	if err := os.Chmod(filepath.Join(ext, "emit.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	task := func(file, artifact, activation string) string {
+		return `{"kind": "command", "command": "{extensionRoot}/emit.sh", "args": ["` + file + `", "` + artifact + `"],
+      "cwd": "{projectRoot}", "timeoutMs": -1,
+      "inputs": {"sources": {"from": "project", "files": ["*.json", "*.txt", "` + activation + `"]}},
+      "cache": {"enabled": true},
+      "declares": {"outputs": {"out": {"kind": "file", "root": "command-output", "path": "` + file + `", "optionalEmpty": true}}}}`
+	}
+	clitest.WriteFile(t, filepath.Join(ext, "putnami.extension.json"), `{
+  "name": "@fixture/gate", "version": "0.1.0", "cliContract": 11,
+  "commands": {
+    "validate": {"activationFiles": ["gate.specs"], "traits": {"kind": "criteria"}, "run": [{"id": "specs", "task": "criteria"}]},
+    "test": {"activationFiles": ["gate.project"], "traits": {"kind": "verification"}, "run": [{"id": "test", "task": "report"}]}
+  },
+  "tasks": {
+    "criteria": `+task("spec-criteria.json", "putnami-spec-criteria", "gate.specs")+`,
+    "report": `+task("putnami-feature-verification.json", "putnami-feature-verification", "gate.project")+`
+  }
+}`)
+	for _, project := range []string{"alpha", "beta"} {
+		dir := filepath.Join(root, project)
+		clitest.WriteFile(t, filepath.Join(dir, "putnami.json"), `{"name":"`+project+`","extensions":["@fixture/gate"]}`)
+		clitest.WriteFile(t, filepath.Join(dir, "gate.project"), "")
+		clitest.WriteFile(t, filepath.Join(dir, "gate.specs"), "")
+		clitest.WriteFile(t, filepath.Join(dir, project+"_check.txt"), "fixture declaration\n")
+		clitest.WriteFile(t, filepath.Join(dir, "spec-criteria.json.src.json"), `{"protocolVersion": 1, "groups": [{
+  "feature": "gate/`+project+`", "spec": "`+project+`/specs/`+project+`.json", "specRequirements": ["holds"],
+  "requirements": [{"id": "holds", "stage": "coded", "evidenceKinds": ["attestation"],
+    "verification": {"kind": "acceptance", "checks": ["`+project+`-check"]}}]}]}`)
+	}
+	clitest.WriteFile(t, filepath.Join(root, "alpha", "putnami-feature-verification.json.src.json"), `{"protocolVersion": 1, "observations": [{
+  "feature": "gate/alpha", "requirement": "holds", "check": "alpha-check", "status": "passed",
+  "provenance": {"path": "alpha_check.txt", "symbol": "FixtureCheck"}}]}`)
+	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n")
+	clitest.InitGitRepo(t, root)
+	return root
+}
+
+// latestGateRecord is the spec gate's record of the latest session of root,
+// without the instant it was evaluated at and the session it names, which it
+// checks is that session, or "" when the session has none.
+func latestGateRecord(t *testing.T, root string) string {
+	t.Helper()
+	id := clitest.LatestSessionID(t, root)
+	path := filepath.Join(root, ".putnami", "sessions", id, features.SpecVerificationRecordFilename)
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return ""
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	var record map[string]json.RawMessage
+	if err := json.Unmarshal(data, &record); err != nil {
+		t.Fatal(err)
+	}
+	var at, session string
+	if json.Unmarshal(record["generatedAt"], &at) != nil || json.Unmarshal(record["sessionId"], &session) != nil {
+		t.Fatalf("the record of session %s names no instant or session: %s", id, data)
+	}
+	if _, err := time.Parse(time.RFC3339, at); err != nil {
+		t.Fatalf("the record's evaluation instant %q: %v", at, err)
+	}
+	if session != id {
+		t.Fatalf("the record of session %s names the session %s", id, session)
+	}
+	delete(record, "generatedAt")
+	delete(record, "sessionId")
+	out, err := json.Marshal(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
+}
+
+// gateWarnings are the spec gate's warning lines of a run's output.
+func gateWarnings(out string) string {
+	var lines []string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "spec verification") {
+			lines = append(lines, strings.TrimSpace(line))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// TestAnUnchangedGateRunReplaysTheHeldSpecGate serves a run whose session
+// carries the spec gate through a worker until the worker holds it, then
+// once more: that run replays what the held run's finalizers did instead of
+// collecting the gate again, and records the session, the gate's record and
+// its warnings, the tasks and the exit code a run in its own process gives on
+// the same tree. After a write in the worktree, nothing is held (CLI ADR 0116
+// §6a).
+func TestAnUnchangedGateRunReplaysTheHeldSpecGate(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("a run is answered from memory only where the platform has a watcher")
+	}
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	root := gateFixture(t)
+	args := []string{"validate,test", "--all"}
+	type run struct {
+		code     int
+		out      string
+		tasks    []string
+		record   string
+		decision *machineproc.MemoryDecision
+	}
+	local := func(step string) run {
+		t.Helper()
+		t.Setenv(machineproc.Env, "off")
+		code, out := clitest.RunGateArgs(t, root, args...)
+		if code != 0 {
+			t.Fatalf("%s: exit %d in its own process\n%s", step, code, out)
+		}
+		return run{code: code, out: out, tasks: latestTasks(t, root), record: latestGateRecord(t, root)}
+	}
+	local("the first settling run")
+	own := local("the second settling run")
+	// A task served from the local cache is held under the witness of its
+	// entry, taken once the entry's files are the file index's margin old.
+	// The second settling run is the first to serve the entries, and the pin
+	// its session record takes links each result.json (CLI ADR 0137), which
+	// moves its status-change time: the margin runs from that run's end.
+	settled := time.Now().Add(fileindex.Margin)
+	if own.record == "" || len(own.tasks) != 4 || gateWarnings(own.out) == "" {
+		t.Fatalf("a run in its own process recorded %d tasks and the record %q, and warned %q, want 4 tasks, the gate's record and its warning",
+			len(own.tasks), own.record, gateWarnings(own.out))
+	}
+	startSupervisor(t)
+	time.Sleep(time.Until(settled))
+	served := func(step string) run {
+		t.Helper()
+		t.Setenv(machineproc.Env, "on")
+		before := clitest.LatestSessionID(t, root)
+		code, out := clitest.RunGateArgs(t, root, args...)
+		decision := awaitMemoryDecision(t, step)
+		if clitest.LatestSessionID(t, root) == before {
+			t.Fatalf("%s: the run recorded no session\n%s", step, out)
+		}
+		return run{code: code, out: out, tasks: latestTasks(t, root), record: latestGateRecord(t, root), decision: decision}
+	}
+	same := func(step string, got, want run) {
+		t.Helper()
+		if got.code != want.code {
+			t.Errorf("%s: exit %d, %d in its own process", step, got.code, want.code)
+		}
+		if g, w := strings.Join(normalize(got.tasks), "\n"), strings.Join(normalize(want.tasks), "\n"); g != w {
+			t.Errorf("%s: tasks differ\nthrough the worker:\n%s\nin its own process:\n%s", step, g, w)
+		}
+		if got.record != want.record {
+			t.Errorf("%s: the gate's record differs\nthrough the worker:\n%s\nin its own process:\n%s", step, got.record, want.record)
+		}
+		if g, w := gateWarnings(got.out), gateWarnings(want.out); g != w {
+			t.Errorf("%s: the gate's warnings differ\nthrough the worker:\n%s\nin its own process:\n%s", step, g, w)
+		}
+	}
+
+	if d := served("the first request").decision; d.Answerable || d.FinalizersHeld || d.Kept != "kept" {
+		t.Fatalf("the first request: %+v, want unanswerable, computed and kept", d)
+	}
+	// The second request plans, so its finalizers run on the answered plan,
+	// and what they did is held with what it planned.
+	if d := served("the second request").decision; !d.Answered || d.PlanSkipped || d.FinalizersHeld || d.Kept != "kept" {
+		t.Fatalf("the second request: %+v, want answered, planned, its finalizers run, and kept", d)
+	}
+	answered := served("the unchanged request")
+	if d := answered.decision; !d.Answered || !d.PlanSkipped || !d.VersionsHeld || !d.FinalizersHeld || !d.DispatchHeld || d.Kept != "kept" {
+		t.Fatalf("the unchanged request: %+v, want answered without a dispatch load, a plan, Git or the finalizers, and kept", d)
+	}
+	same("the unchanged request", answered, local("a run in its own process on the same tree"))
+	if again := served("the unchanged request again"); !again.decision.FinalizersHeld {
+		t.Fatalf("the unchanged request again: %+v, want its finalizers replayed", again.decision)
+	}
+
+	clitest.WriteFile(t, filepath.Join(root, "beta", "putnami-feature-verification.json.src.json"), `{"protocolVersion": 1, "observations": [{
+  "feature": "gate/beta", "requirement": "holds", "check": "beta-check", "status": "failed",
+  "provenance": {"path": "beta_check.txt", "symbol": "FixtureCheck"}}]}`)
+	written := served("after a write")
+	if d := written.decision; d.Answerable || d.PlanSkipped || d.VersionsHeld || d.FinalizersHeld || d.DispatchHeld {
+		t.Fatalf("after a write: %+v, want nothing held", d)
+	}
+	after := local("a run in its own process after the write")
+	same("after a write", written, after)
+	if after.record == own.record {
+		t.Errorf("the write did not change the gate's record: the comparison proves nothing")
 	}
 }

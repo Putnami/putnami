@@ -31,8 +31,8 @@ worktree, is in scope, and distributed execution stays a design in this
 epic. On 2026-11-27 the owner set its shape: one supervisor per machine and
 user that owns the machine's execution flow, and behind it one engine worker
 per CLI build in use, with no fixed cap, compared with one process per
-worktree. Its default, first set to on for Linux and macOS, is decided on
-measurements (section 12).
+worktree. It is on by default on Linux and macOS, and off in CI, in hosted
+runs and in nested runs (section 12).
 
 Measured on 2026-11-27 at `299343dc` (main), on the 4-vCPU Linux container
 of the earlier measurements (ext4 root, 15 GiB), shallow clone, signed out of
@@ -135,8 +135,9 @@ The machine process is two kinds of process:
 runs one engine run at a time, so one worker per build made a second
 worktree's concurrent request wait or run in its own process: measured on
 two worktrees of this repository running the same unchanged request at once,
-one was served by the worker while the other was refused every round and ran
-in its own process. The supervisor therefore keeps a worker per build and
+one was answered from memory in 1.7 s while the other was refused every
+round and ran in its own process in 5.1 to 5.6 s. The supervisor therefore
+keeps a worker per build and
 worktree, routes a request to the worker of its worktree, and starts one when
 there is none, within the memory budget of section 10: before it starts one,
 it stops idle workers, least recently used first, while the workers' held
@@ -468,6 +469,217 @@ binary (today they are cleared at every run start).
   reporter's token for that upload only, in memory, until it ends or fails.
   Without the machine process, ADR 0115 applies as it stands.
 
+### 6a. An unchanged run is answered from memory
+
+Decided by the owner on 2026-11-27, in the performance epic's targets: the
+target of an unchanged run is zero waste, the way Bazel's and Pants's servers
+answer one (0.86 to 0.91 s on the scale bench). Measured on this repository
+once ADR 0113's record and the probe and activation witnesses had landed, an
+unchanged `lint,test,build,validate --all --enforce-coverage` takes 12.1 s
+with or without a worker, of which plan is 1.9 s, the execute setup 1.2 s,
+prune and key precompute 2.85 s, the 2,221 tasks 2.15 s, and the finalizers
+2.0 s. Holding each of those values separately under its witness (the table
+above) still computes all of them; this section skips them.
+
+**What a worker keeps, per worktree and request.** After a run it served
+that ended with every task served from the cache or skipped, the worker keeps
+the run's answer: its exit code, its session result, the outputs it left on
+disk, and the journal sequence read at its sync point before the run began.
+The request is the argument vector, the working directory, the digest of the
+environment and process context (section 4) and the CLI build.
+
+**When it answers from memory.** A later request answers from memory when
+all of these hold, checked in this order and the first that fails runs the
+command as usual:
+
+1. The request equals the held one.
+2. The worktree's journal, read after a sync point, is empty since the held
+   sequence: no file of the worktree was written, created, removed or
+   renamed, and no subtree broke (an overflow, a directory it could not
+   watch, a moved directory, the watcher's self-check, a restart).
+3. The witnesses of what the journal does not see hold: the stats of
+   `.git`'s HEAD, index, packed refs, configuration and the refs directories
+   a run reads (ADR 0112), of the extension runtimes and toolchains the run
+   used under the Putnami home, and of each served task's cache entry. Git's
+   status, diff and abbreviated names also read the repository's exclude and
+   attributes files, its grafts and alternates, the directory of its packs
+   (whose object count sets an abbreviation's length), and Git's
+   configuration: the system, global and repository files, those they
+   include, and the excludes and attributes files they name. Their stats are
+   witnessed too; Git lists the configuration's files once per worktree, and
+   again when one of them or HEAD moved, under stats taken before Git reads
+   them: a list during which one moved is not trusted. So is the global configuration under
+   the Putnami home, which every load of the workspace's configuration and
+   every extension discovery merges.
+4. The platform has a watcher: on macOS, which has none (section 7), no run
+   is answered from memory.
+
+A run that wrote a file of the worktree is not kept, nor one that executed a
+task, with one exception. A task is uncached for a reason, and the held
+answer may stand in for its execution only where that reason is a state the
+answer's witnesses cover. An executed task is held when all of these hold:
+
+- its declared inputs are environment variables, `changeHistory` and
+  workspace files, each of which the request digest, the Git witnesses or
+  the worktree's journal covers;
+- what keeps it out of the cache is the change-history contract
+  (`protocols/job` ADR 0003: a task that declares `changeHistory` is refused
+  with its cache enabled, since a key names no commit, CLI ADR 0059), and it
+  declares no other reason;
+- every read it makes falls inside the request, the Git witnesses and the
+  worktree.
+
+Any other uncached task keeps the run from being held: a test environment's
+setup reads Docker, which no witness covers. Once setup tasks run only when
+a task needs them, an unchanged run executes none. The exception is decided
+and not yet implemented: a worker keeps no run that executed a task, so an
+unchanged run that executes the steps below is computed until it is.
+
+The worked case is the three `@putnami/sdd` validation steps an unchanged
+`validate` runs. `breaking-marker-validate` and
+`feature-coverage-ratchet-validate` declare `changeHistory` and the
+proposal message's variable; the history is the range from the baseline to
+HEAD, which the refs, HEAD and index witnesses cover, and the variable is in
+the request digest. Reversing CLI ADR 0059 to key them would buy 0.1 s of
+the 12 s run; the held answer covers them under witnesses it takes anyway.
+`agent-attribution-validate` declares only the variable and is uncached by
+its own decision (`@putnami/sdd` ADR 0002), not by the contract, so it does
+not qualify until that decision changes. Two reads of these steps fall
+outside their declared inputs: `agent-attribution-validate` and the ratchet
+read the workspace's `options` from their job context, and
+`breaking-marker-validate` and the ratchet read Git themselves when the CLI
+delivers no history. The workspace configuration is in the journal's
+worktree and Git is witnessed, so the held answer stays sound; the day these
+steps get a key, those reads must become declared inputs.
+
+**What the answer writes.** No plan, no stat beyond step 3, no key, no
+restore, no replay. The worker renders the held result with the current
+times, writes the session the contract requires (its records will reference
+the held session's task records once the per-task report packages allow it,
+and are written in full until then), and returns the held exit code. It
+stamps the last use of each cache entry a task was served from, as a
+local-cache hit does, once the answer has returned: the check of every
+entry's witness, under the store's shared lock, is what keeps the answer
+sound, and each entry is checked again before its stamp. A stamp that is late
+or never written can only cost a later miss, should a collection run first,
+never a wrong answer; the collection's recency rule is unchanged. A run in its own process, in CI or on macOS gets the same exit code and
+the same task results from its full computation: memory decides nothing a
+witness would not.
+
+**Where it answers today.** The worker decides before the run. The CLI's
+dispatch then skips its load: before it dispatches a job command, a run's
+App.Run opens the workspace's file index read-only, loads the workspace's
+configuration and discovers its extensions, which loads the workspace, and a
+run of a request decided answerable takes what the held run's App.Run loaded
+instead, once the worker checked the journal and step 3's witnesses again,
+before any engine run or plan of the run. Discovery also reads extension
+manifests no witness covers (one the configuration names outside the
+worktree, a link in the worktree's state to a stored one), so the held load
+carries the stat of every manifest it read, taken before discovery read it,
+and of every place discovery looked for an extension and found none, so that
+one arriving there moves it too; one
+that moved withdraws everything the held run offers the run, which then loads
+and plans what is on disk (`dispatchHeld` says App.Run took it). The
+read-only file index is held as the held run opened it and installed for the
+run, since phase 4 still reads digests through it (the cache provider's
+extension runtime among them): it records nothing and answers a file only
+while its stat is the recorded one, so an index read earlier answers no less
+soundly than one read now. The engine then skips loading and planning: an engine run takes what the held run's engine run
+at the same position computed before phase 4 (the loaded workspace, the
+discovered extensions, the selected projects, the final plan, and the flags,
+parameters and versions they resolved) when it asks the same (workspace,
+configuration, commands, parameters, flags, hooks and version snapshot) and
+nothing the decision witnessed moved since it was taken: a first-use bootstrap
+or a before-hook runs in between. Its discovery read the manifests the held
+dispatch witnesses and those of the extensions it skipped, whether or not
+App.Run took the dispatch, so what it holds carries the stat of each
+extension manifest and root its discovery read, taken before it read them,
+absent ones included; a run whose discovery read one no such stat covers is
+not held. The
+decision refuses a request once one of those or of the held dispatch moved;
+one that moved after the decision withdraws everything the held run offers
+the run. So does anything the decision witnessed that moved after it, which a
+re-check finds at a sync point before App.Run takes the dispatch, before an
+engine run takes what the held run computed, and before the scheduler answers
+a plan: a first-use bootstrap or a before-hook that wrote the worktree leaves
+the run nothing of the held run, its plans' records included, since a record
+matches a plan by its jobs alone. A run that discovered a local-source
+extension outside the
+workspace's own path extensions whose runtime is prepared from its inputs is
+not held: that runtime's digest reads inputs no witness covers. It opens no
+file index or input record (which holds the release baselines, ADR 0113 §4),
+which it reads nothing through and so saves nothing to,
+leaving them as a run in its own process finds them, and runs no workspace
+load, runtime synchronization, probe, selection or plan; it prints what those
+printed (the workspace's warnings, the probe's diagnostics, the selection's
+notices), and runs phase 4 as any run does on the held values: the finalizers,
+the session's tree, declarations and plan, its reporting and the run marker.
+Those values are held only from an engine run whose plan the scheduler
+answered from a record, so no execution touched them: a request skips them
+only after an identical one whose plan was answered. The version snapshot
+(the commit, the branch and the dirty hash that the run reads from Git before
+its hooks) is held with them: an engine run that would read it takes the one
+the held run's engine run at the same position read itself, once the worker
+checked the journal and every witness of step 3 again at that point, which
+covers everything Git reads for it; the environment it reads is in the
+request. A snapshot the adapter gave, a held run that read none, and any
+check that fails read Git (`versionsHeld` says every engine run took it).
+What phase 4's finalizers did is held with them, and replayed by a run whose
+plan the scheduler answers from the held record, instead of running them.
+In a run that may be held the spec gate and the evidence verdict (ADR 0134)
+are the only finalizers (a publication guard, a release set and a publish
+keep a run from being held). The evidence verdict reads the answered results
+and the fragment files their tasks left in the worktree, which the journal
+covers, so an answer runs it on the answered results after the gate's
+replay, as any run runs it after the gate. The gate is held only when its
+record is a function of what the answer holds: its
+collection read the held run's workspace, plan and results, and no clock
+and no cache entry. A gate whose verdicts read the clock (a threshold over a
+rolling window, which goes stale with time) or whose recovery read a cache
+entry of a project the run did not plan (from the store or the remote
+cache, which no witness covers) is not held, and an answer runs it as any
+run does; so does a gate whose collection failed. The replay writes the held
+record with this run's time beside the session, as any gate's is, prints its
+warnings and applies its sanctions to the answered results as the gate
+applied them (`finalizersHeld`). A plan the scheduler runs, refused at the
+answer, runs the finalizers. A run whose phases read
+what the decision does not witness is never held this way: a bare selection,
+which reads the successful-run markers, a release set, a runner provider's
+placement and a production preflight; nor is a debug run, whose output an
+answer would not print. The scheduler answers each plan that holds the same
+jobs, in the same order and with the same dependencies, as the plan the held
+run executed at the same position, from the result that plan left: no prune,
+no key, no lookup, no restore and no task worker. The renderer and the session
+recorder see, task by task in plan order, what a local-cache hit makes them
+see (its start, its entry's events, its completion), the session is recorded
+as any run's is, and the result is the held one with the current times.
+Before it renders anything, the scheduler checks step 3's witness of each
+served task's cache entry, which the held run's hit took when its lookup read
+the entry: the stat (device, inode, mode, owner, size, modification and
+status-change times) of each file the lookup read, the entry's descriptor,
+result, metadata and manifest, or a result-only entry's record with no
+task-owned descriptor at its key. These are the stats the store's own memo of
+an entry is held under, taken only of files the file index's margin old
+(`protocols/workspace` ADR 0009), so a file written after them moves one
+whatever the filesystem's tick; a plan with a hit whose lookup read younger
+files leaves no record. The store never writes a published entry's files: an
+entry evicted by any process's collection or by `putnami cache clean` has no
+descriptor, and one published again at its address by another run is new
+files. When every witness holds, the answer stamps each entry's last use with
+this run's store generation, as a hit's lookup does, under the same hold of the
+store's shared lock as the check, so no collection evicts an entry between the
+two and none ages out what answers serve; per served task, that is what a hit
+pays to look up a memoized entry, four stats and one last-use write, spread
+over the processors. When one moved, the plan runs as usual, and the worker
+records why (`a served task's cache entry moved: <task>`). A plan that
+differs, a plan the held run did not leave a record for, and every plan after
+one the run computed run as usual. `putnami machine status` says whether the
+last run a worker served was answered, whether without loading and planning
+(`planSkipped`), without loading what it dispatches (`dispatchHeld`),
+without reading the version snapshot from Git (`versionsHeld`) and without
+running the finalizers (`finalizersHeld`), and why a run decided answerable
+was not.
+
 ### 7. How it learns of changes
 
 **One watcher, in the supervisor**, one watch set per worktree, shared by every
@@ -615,13 +827,11 @@ prototype measures a worker's held memory per worktree (section 15).
 
 ### 12. Settings, default and kill switch
 
-- **Off by default until the owner decides the default on measurements.**
-  The owner first set it on for Linux and macOS on 2026-11-27; the machine
-  process ships off, `putnami machine on` or `PUTNAMI_MACHINE=on` turns it on,
-  and the default changes only by the owner's decision on the measurements of
-  section 15, on Linux and on macOS. Always off in CI (`CI` set), in hosted
-  runs and in nested runs, whatever the setting. Windows has no machine
-  process (decision `windows-support-is-suspended`).
+- **On by default on Linux and macOS**, the owner's decision of 2026-11-27:
+  `putnami machine off` or `PUTNAMI_MACHINE=off` turns it off. Always off in
+  CI (`CI` set), in hosted runs (`--credential-fd`) and in nested runs,
+  whatever the setting or the variable says. Windows has no machine process
+  (decision `windows-support-is-suspended`).
 - **Setting**: `putnami machine on|off` records the user's choice in
   `machine.json` under the Putnami home, as `putnami telemetry on|off` does
   for telemetry: the switch is the user's, for every workspace.
@@ -637,14 +847,14 @@ prototype measures a worker's held memory per worktree (section 15).
 **The macOS risk.** This epic measures nothing on a Mac. What is unproven
 there: the descriptor and signal hand-off, `getpeereid`, the socket pair
 without `SOCK_CLOEXEC` (made under the fork lock), and the memory figures;
-the CLI is compiled for darwin, never run there. What bounds the risk: the
-machine process is off by default, so a Mac runs it only once its user turns
-it on; macOS has no watcher, so it skips no stat (section 7); a run whose worker ends runs
+the CLI is compiled for darwin, never run there. What bounds the risk: macOS
+has no watcher, so it skips no stat and answers no run from memory (sections
+6a and 7); a run whose worker ends runs
 again in its own process; the comparison test runs on that Mac with the
 first measurement; and the kill switch above leaves runs exactly as they are
 today. The first macOS measurement of
-the protocol of section 15 is a task of the implementation, before the owner
-decides the default.
+the protocol of section 15 is a task of the implementation that this record
+still owes.
 
 ### 13. The refusal of a background program is changed
 
@@ -725,7 +935,7 @@ worker's CPU over the run); engine Git calls; job processes; key, restore and
 ready-wait times; resident peak of the client, the supervisor and the worker;
 the worker's held memory per worktree after the run; the watch count and
 setup time; the breaks and self-check results. The same protocol runs once on
-a Mac before the owner decides the default (section 12).
+a Mac (section 12).
 
 **Expected, and what the prototype must show.** Through a worker the 2.8 s
 before execution and the 17 Git calls go to about nothing. The target, under
@@ -805,10 +1015,10 @@ step. Then the admission of section 5 and the memory budget of section 10.
   shell: they see the client's environment and descriptors, but their parent
   is the worker. A tool that reads its parent's identity sees
   `putnami __machine work`.
-- The machine process is off by default until the owner decides the default
-  on measurements (section 12); a user who turns it on before then opts in.
-  macOS is not measured in this epic; section 12 states the risk and the kill
-  switch. Windows has none.
+- The machine process is on by default on Linux and macOS (section 12); a
+  user who wants every run in its own process turns it off. macOS is on by
+  default without a measurement in this epic; section 12 states the risk and
+  the kill switch. Windows has none.
 
 ## Rejected alternatives
 

@@ -26,6 +26,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/cli"
+	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/runnerprovider"
 	"go.putnami.dev/tooling/cli/internal/runnersource"
 )
@@ -112,6 +113,10 @@ const (
 // the process's.
 func RunnerFixtureMain(m *testing.M) int {
 	if role := os.Getenv(RunnerFixtureRoleEnv); role != "" {
+		// The executing CLI a provider starts never reaches the user's
+		// machine process either (CLI ADR 0116), whatever environment the
+		// provider gave it.
+		_ = os.Setenv(machineproc.Env, "off")
 		return runRunnerFixtureRole(role)
 	}
 	return Main(m)

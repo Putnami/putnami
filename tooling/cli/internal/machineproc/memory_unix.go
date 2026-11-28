@@ -1,0 +1,1020 @@
+//go:build linux || darwin
+
+package machineproc
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"go.putnami.dev/sdk/extension/gitread"
+)
+
+// The worker's memory of the last run it served per worktree, and whether a
+// request could be answered from it (CLI ADR 0116 §6a). The worker decides;
+// the engine answers each of its runs of a request decided answerable from
+// what the held run's engine run at the same position loaded and planned
+// (RunMemory, engine.HeldRuns), and the scheduler each plan from the record
+// the held run's plan left (scheduler.HeldRuns). Either one computes what it
+// holds nothing for.
+
+// memorySyncTimeout bounds the sync point a decision waits for.
+const memorySyncTimeout = 2 * time.Second
+
+// lastMemoryName records the worker's last decision; `putnami machine status`
+// shows it.
+const lastMemoryName = "last-memory.json"
+
+// heldRun is what a worker keeps of the last run it served in a worktree.
+type heldRun struct {
+	request string
+	seq     uint64
+	witness map[string]string
+	// plans are the records the run's plans left the scheduler to answer the
+	// next request with, in the order the run executed them; nil when one of
+	// them left none.
+	plans []any
+	// runs are what the run's engine runs computed before they executed, in
+	// order; nil when one of them left nothing or plans is nil.
+	runs []heldEngineRun
+	// dispatch is what the run's App.Run loaded before it dispatched, or nil
+	// (TakeDispatch).
+	dispatch any
+}
+
+// heldEngineRun is what an engine run computed before it executed: its
+// workspace, extensions, selection and plan (engine.HeldRuns), and the
+// position of the plan it handed the scheduler, whose record answers it.
+type heldEngineRun struct {
+	record any
+	plan   int
+}
+
+var memory = struct {
+	sync.Mutex
+	watcher *Watcher
+	failed  bool
+	watched map[string]bool
+	held    map[string]*heldRun
+	gitDirs map[string][]string
+	// gitConfig is, per worktree, the files of Git's configuration a run's
+	// Git reads, listed under the stats memo holds (gitConfigFiles).
+	gitConfig map[string]*gitConfigMemo
+	// run is the memory of the run the worker serves now.
+	run runMemory
+	// withdrawn is why the worker last withdrew every run it held once a
+	// run returned, until it holds one again.
+	withdrawn string
+}{watched: map[string]bool{}, held: map[string]*heldRun{}, gitDirs: map[string][]string{}, gitConfig: map[string]*gitConfigMemo{}}
+
+// runMemory is what the scheduler reads and leaves during the run the worker
+// serves: the records the held run's plans left, offered to the run's plans
+// in order when the worker decided it answerable, and the records its own
+// plans leave. It is armed only for a run that may be kept.
+type runMemory struct {
+	armed bool
+	root  string
+	// offered are the held run's records; nil unless the run is answerable.
+	offered []any
+	// taken counts the plans that asked for a record.
+	taken int
+	// plans are the records the run's plans left; partial says one plan left
+	// none, or ran in another workspace, so the run holds none.
+	plans   []any
+	partial bool
+	// answered and computed count the plans answered from a record and the
+	// plans that ran; planAnswered says it of each plan, in order.
+	answered, computed int
+	planAnswered       []bool
+	// check is the state the decision took, which an engine run takes again
+	// before it skips loading and planning; nil unless the run is answerable.
+	check *memoryCheck
+	// offeredRuns are what the held run's engine runs computed; nil unless
+	// the run is answerable.
+	offeredRuns []heldEngineRun
+	// runsTaken counts the engine runs that asked, and runPlan is the
+	// position of the plan the current one hands the scheduler.
+	runsTaken, runPlan int
+	// runs are what the run's engine runs computed; runsPartial says one of
+	// them left nothing, or its plan was not answered from a record.
+	runs        []heldEngineRun
+	runsPartial bool
+	// skipped and planned count the engine runs answered from what the held
+	// run computed and those that loaded and planned.
+	skipped, planned int
+	// refused says why a plan the held run's record matched was not answered
+	// from it: an entry a task of the held run was served from moved since.
+	refused string
+	// reused counts, per step an engine run may take from the held run rather
+	// than compute ("versions", "finalizers"), the engine runs that took it
+	// and those that computed it (Reused).
+	reused map[string]*reuseCount
+	// offeredDispatch is what the held run's App.Run loaded before it
+	// dispatched; nil unless the run is answerable. dispatch is what this
+	// run's App.Run loaded, and dispatchHeld says it took the offered one.
+	offeredDispatch, dispatch any
+	dispatchHeld              bool
+	// sampled counts the input record's sampled answers of the run the
+	// worker collected again once the run returned, in sampledTime, and
+	// withdrawn names the first that differed (checkSamples).
+	sampled     int
+	sampledTime time.Duration
+	withdrawn   string
+}
+
+// reuseCount is how many engine runs of a run took a step from the held run,
+// and how many computed it.
+type reuseCount struct{ held, computed int }
+
+// allHeld says every engine run that reached the step took it from the held
+// run, and at least one did.
+func (r *runMemory) allHeld(step string) bool {
+	c := r.reused[step]
+	return c != nil && c.held > 0 && c.computed == 0
+}
+
+// memoryCheck is the state a decision took before the run: the journal
+// sequence after the sync point and the witnesses of what the journal does
+// not see.
+type memoryCheck struct {
+	root    string
+	request string
+	seq     uint64
+	witness map[string]string
+	started time.Time
+}
+
+// RunMemory is the worker's memory as the engine and the scheduler read it
+// (engine.HeldRuns, scheduler.HeldRuns): main installs it in a worker, never
+// elsewhere.
+type RunMemory struct{}
+
+// Take returns the record the held run left for the next plan of the run in
+// root, or nil: for a run not decided answerable, past the plans the held run
+// executed, once a plan of the run was computed, after which the held records
+// no longer describe what the run left on disk, and once anything the
+// decision witnessed moved since it was taken, which withdraws everything the
+// held run offers the run (recheck). A plan's record matches by its jobs
+// alone, so it answers only a run whose world is still the decision's.
+func (RunMemory) Take(root string) any {
+	memory.Lock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) {
+		memory.Unlock()
+		return nil
+	}
+	i := r.taken
+	r.taken++
+	if r.computed > 0 || i >= len(r.offered) || r.check == nil {
+		memory.Unlock()
+		return nil
+	}
+	offered, check, w := r.offered[i], r.check, memory.watcher
+	memory.Unlock()
+	if !recheck(root, w, check) {
+		return nil
+	}
+	return offered
+}
+
+// Keep records what a plan of the run left, and whether it was answered.
+func (RunMemory) Keep(root string, record any, answered bool) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed {
+		return
+	}
+	if record == nil || !sameRoot(r.root, root) {
+		r.partial = true
+	}
+	r.plans = append(r.plans, record)
+	r.planAnswered = append(r.planAnswered, answered)
+	if answered {
+		r.answered++
+	} else {
+		r.computed++
+	}
+}
+
+// Refused records why the record Take returned answered no plan of the run:
+// the scheduler found that an entry a task of the held run was served from
+// moved since (CLI ADR 0116 §6a). The decision records the first reason.
+func (RunMemory) Refused(root, reason string) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if r.armed && sameRoot(r.root, root) && r.refused == "" {
+		r.refused = reason
+	}
+}
+
+// TakeRun returns what the held run's engine run at the same position
+// computed before it executed, for the next engine run of the run in root, or
+// nil: for a run not decided answerable, past the engine runs the held run
+// made, when the plan this one would hand the scheduler is not the one whose
+// record the held run paired with it, once anything of the run was computed,
+// and when anything the decision witnessed moved since it was taken. What ran
+// in this process before the engine, a first-use bootstrap or a before-hook,
+// can write the worktree or move Git, and the engine then loads and plans what
+// is there (CLI ADR 0116 §6a).
+func (RunMemory) TakeRun(root string) any {
+	return offerRun(root, true)
+}
+
+// PeekRun returns what TakeRun would return for the next engine run of the
+// run in root, under the same conditions and after the same check of what the
+// decision witnessed, without taking it: the engine run that asks it before
+// its hooks, for the version snapshot the held run read, still takes once its
+// hooks ran (CLI ADR 0116 §6a).
+func (RunMemory) PeekRun(root string) any {
+	return offerRun(root, false)
+}
+
+// Reused records whether an engine run of the run in root took step from what
+// the held run computed (held) or computed it.
+func (RunMemory) Reused(root, step string, held bool) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) {
+		return
+	}
+	if r.reused == nil {
+		r.reused = map[string]*reuseCount{}
+	}
+	c := r.reused[step]
+	if c == nil {
+		c = &reuseCount{}
+		r.reused[step] = c
+	}
+	if held {
+		c.held++
+	} else {
+		c.computed++
+	}
+}
+
+// Witness is the stat of path as the decision's witnesses hold it: an engine
+// run that may be held takes it of each path its discovery probes for an
+// extension, before discovery reads it (engine.HeldRuns).
+func (RunMemory) Witness(path string) string { return statWitness(path) }
+
+// offerRun is TakeRun, which takes the engine run's position when take is set,
+// and PeekRun, which does not. What the held engine run computed is offered
+// only while nothing the decision witnessed moved (recheck) and every file
+// its discovery read holds the stat it was read with (movedRecord); either
+// that moved withdraws everything the held run offers the run, as a moved
+// manifest of the held dispatch does.
+func offerRun(root string, take bool) any {
+	memory.Lock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) {
+		memory.Unlock()
+		return nil
+	}
+	i, plan := r.runsTaken, len(r.plans)
+	if take {
+		r.runsTaken++
+		r.runPlan = plan
+	}
+	if r.check == nil || r.computed > 0 || r.planned > 0 || i >= len(r.offeredRuns) ||
+		r.offeredRuns[i].plan != plan || r.taken != plan {
+		memory.Unlock()
+		return nil
+	}
+	offered, check, w := r.offeredRuns[i].record, r.check, memory.watcher
+	memory.Unlock()
+	if !recheck(root, w, check) {
+		return nil
+	}
+	if moved := movedRecord(offered); moved != "" {
+		withdraw(root, "a file the held run's discovery read moved: "+moved)
+		return nil
+	}
+	return offered
+}
+
+// witnessed is a record the worker holds that carries witnesses of its own:
+// the stats of the files it read that the worktree's journal does not see and
+// the decision's witnesses do not cover, taken as it read them (Witness). The
+// engine's record of an engine run carries those of the extension manifests
+// and roots its discovery read, and App.Run's held dispatch those of the
+// manifests its discovery read.
+type witnessed interface{ Witnesses() map[string]string }
+
+// movedRecord names the first file record read whose stat moved since, in
+// path order, or "".
+func movedRecord(record any) string {
+	w, ok := record.(witnessed)
+	if !ok {
+		return ""
+	}
+	held := w.Witnesses()
+	paths := make([]string, 0, len(held))
+	for path := range held {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		if statWitness(path) != held[path] {
+			return path
+		}
+	}
+	return ""
+}
+
+// heldMoved names the first file a record of held read whose stat moved
+// since, or "": its dispatch's, then its engine runs' in order.
+func heldMoved(held *heldRun) string {
+	if moved := movedRecord(held.dispatch); moved != "" {
+		return moved
+	}
+	for _, run := range held.runs {
+		if moved := movedRecord(run.record); moved != "" {
+			return moved
+		}
+	}
+	return ""
+}
+
+// movedSince checks again, at a sync point, what the decision witnessed, and
+// names what moved since it was taken: a write in the worktree, or a witness
+// outside it; "" when nothing did.
+func movedSince(w *Watcher, check *memoryCheck) string {
+	if w == nil {
+		return "the platform has no watcher"
+	}
+	if err := w.Sync(check.root, memorySyncTimeout); err != nil {
+		return "the watcher did not reach its sync point"
+	}
+	if changed := worktreeChanges(w.Since(check.root, check.seq), check.root); changed != "" {
+		return "the worktree changed after the decision: " + changed
+	}
+	if moved := movedWitness(check.witness, outsideWitness(check.root)); moved != "" {
+		return "a witness outside the worktree moved after the decision: " + moved
+	}
+	return ""
+}
+
+// recheck reports whether nothing the decision witnessed moved since it was
+// taken. When something did (a first-use bootstrap or a before-hook wrote the
+// worktree, Git moved), it withdraws everything the held run offers the run in
+// root, the engine runs, the dispatch and the plans' records alike, and
+// records why: what the run computes from then on was never the held run's
+// (CLI ADR 0116 §6a).
+func recheck(root string, w *Watcher, check *memoryCheck) bool {
+	moved := movedSince(w, check)
+	if moved == "" {
+		return true
+	}
+	withdraw(root, moved)
+	return false
+}
+
+// TakeDispatch returns what the held run's App.Run loaded before it
+// dispatched (the workspace configuration and the extensions its dispatch
+// discovered), for the App.Run of a run in root the worker decided
+// answerable, before any engine run or plan of it, once the worker checked
+// again what the decision witnessed; nil otherwise (CLI ADR 0116 §6a). What
+// moved since the decision withdraws everything the held run offers the run
+// (recheck).
+func TakeDispatch(root string) any {
+	memory.Lock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) || r.check == nil || r.offeredDispatch == nil ||
+		r.taken > 0 || r.runsTaken > 0 {
+		memory.Unlock()
+		return nil
+	}
+	offered, check, w := r.offeredDispatch, r.check, memory.watcher
+	memory.Unlock()
+	if !recheck(root, w, check) {
+		return nil
+	}
+	return offered
+}
+
+// KeepsDispatch says whether the worker may hold what the App.Run of the run
+// in root loads (KeepDispatch): never outside a worker, nor for a run the
+// worker does not keep.
+func KeepsDispatch(root string) bool {
+	memory.Lock()
+	defer memory.Unlock()
+	return memory.run.armed && sameRoot(memory.run.root, root)
+}
+
+// KeepDispatch hands the worker what the App.Run of the run in root loaded
+// before it dispatched, and whether it took it from TakeDispatch. It is held
+// with the run when the run is kept.
+func KeepDispatch(root string, record any, held bool) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) {
+		return
+	}
+	r.dispatch, r.dispatchHeld = record, held && record != nil
+}
+
+// DispatchMoved withdraws everything the held run offers the run in root:
+// App.Run found that a file it read to dispatch, which no witness of the
+// decision covers, moved since the held run read it. Every engine run and
+// plan of the run computes, and the decision records why.
+func DispatchMoved(root, reason string) { withdraw(root, reason) }
+
+// withdraw withdraws everything the held run offers the run in root, which
+// then computes every engine run and plan, and records why.
+func withdraw(root, reason string) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed || !sameRoot(r.root, root) {
+		return
+	}
+	r.check, r.offered, r.offeredRuns, r.offeredDispatch = nil, nil, nil, nil
+	if r.refused == "" {
+		r.refused = reason
+	}
+}
+
+// KeepRun records what an engine run of the run computed before it executed,
+// and whether it was answered from what TakeRun returned. It is held only when
+// the engine run handed the scheduler one plan and the scheduler answered it
+// from the held run's record: a value whose plan executed is not held, so what
+// a later run reuses was never touched by an execution.
+func (RunMemory) KeepRun(root string, record any, skipped bool) {
+	memory.Lock()
+	defer memory.Unlock()
+	r := &memory.run
+	if !r.armed {
+		return
+	}
+	if skipped {
+		r.skipped++
+	} else {
+		r.planned++
+	}
+	p := r.runPlan
+	if record == nil || !sameRoot(r.root, root) || len(r.plans) != p+1 || r.plans[p] == nil || !r.planAnswered[p] {
+		r.runsPartial = true
+		return
+	}
+	r.runs = append(r.runs, heldEngineRun{record: record, plan: p})
+}
+
+// sameRoot says whether a and b name the same worktree, through any symbolic
+// link: the engine resolves the workspace root its own way.
+func sameRoot(a, b string) bool {
+	if filepath.Clean(a) == filepath.Clean(b) {
+		return true
+	}
+	ra, errA := filepath.EvalSymlinks(a)
+	rb, errB := filepath.EvalSymlinks(b)
+	return errA == nil && errB == nil && ra == rb
+}
+
+// beforeRun decides whether req could be answered from memory, and takes the
+// state the run is held under when it qualifies. It returns nil when the
+// request names no worktree or the platform has no watcher.
+func beforeRun(req request) (*memoryCheck, MemoryDecision) {
+	memory.Lock()
+	memory.run = runMemory{}
+	memory.Unlock()
+	decision := MemoryDecision{Time: time.Now().UTC().Format(time.RFC3339)}
+	root := worktreeRoot(req.Dir)
+	decision.Root = root
+	if root == "" {
+		decision.Reason = "the command names no workspace"
+		return nil, decision
+	}
+	w := memoryWatcher()
+	if w == nil {
+		decision.Reason = "this platform has no watcher"
+		return nil, decision
+	}
+	memory.Lock()
+	first := !memory.watched[root]
+	memory.watched[root] = true
+	memory.Unlock()
+	if first {
+		_ = w.Watch(root)
+	}
+	if err := w.Sync(root, memorySyncTimeout); err != nil {
+		decision.Reason = "the watcher did not reach its sync point: " + err.Error()
+		return nil, decision
+	}
+	check := &memoryCheck{
+		root: root, request: requestDigest(req), started: time.Now(),
+		seq: w.Since(root, ^uint64(0)).Seq, witness: outsideWitness(root),
+	}
+	memory.Lock()
+	held := memory.held[root]
+	withdrawn := memory.withdrawn
+	memory.Unlock()
+	switch {
+	case first:
+		decision.Reason = "the worktree was not watched before this request"
+	case held == nil && withdrawn != "":
+		decision.Reason = "the worker withdrew what it held once the last run returned: " + withdrawn
+	case held == nil:
+		decision.Reason = "no run of this worktree is held"
+	case held.request != check.request:
+		decision.Reason = "the request differs from the held one"
+	default:
+		if changed := worktreeChanges(w.Since(root, held.seq), root); changed != "" {
+			decision.Reason = "the worktree changed: " + changed
+		} else if moved := movedWitness(held.witness, check.witness); moved != "" {
+			decision.Reason = "a witness outside the worktree moved: " + moved
+		} else if moved := heldMoved(held); moved != "" {
+			decision.Reason = "a file the held run's discovery read moved: " + moved
+		} else {
+			decision.Answerable = true
+		}
+	}
+	// The run's plans and engine runs leave their records for keep, and a run
+	// decided answerable is offered the held run's: the decision and the offer
+	// read the same held run.
+	run := runMemory{armed: true, root: root}
+	if decision.Answerable {
+		run.offered, run.offeredRuns, run.check, run.offeredDispatch = held.plans, held.runs, check, held.dispatch
+	}
+	memory.Lock()
+	memory.run = run
+	memory.Unlock()
+	return check, decision
+}
+
+// afterRun keeps the run it followed when it ended with code 0, executed no
+// task the answer could not hold, and wrote nothing in the worktree, and
+// records the decision.
+func afterRun(check *memoryCheck, decision MemoryDecision, code int) {
+	memory.Lock()
+	run := memory.run
+	memory.run = runMemory{}
+	memory.Unlock()
+	decision.Answered = run.answered > 0 && run.computed == 0
+	decision.PlanSkipped = run.skipped > 0 && run.planned == 0
+	decision.VersionsHeld = run.allHeld("versions")
+	decision.FinalizersHeld = run.allHeld("finalizers")
+	decision.DispatchHeld = run.dispatchHeld
+	if run.refused != "" {
+		decision.Reason = run.refused
+	}
+	decision.Sampled, decision.SampledMillis = run.sampled, run.sampledTime.Milliseconds()
+	switch {
+	case run.withdrawn != "":
+		// A sampled answer of the run differed once the run returned: no
+		// answer the worker holds is trusted, the run's included.
+		memory.Lock()
+		clear(memory.held)
+		memory.withdrawn = run.withdrawn
+		memory.Unlock()
+		decision.Withdrawn = run.withdrawn
+		decision.Kept = "not kept: a sampled answer of the input record differed"
+	case check != nil:
+		plans, runs := run.plans, run.runs
+		if run.partial || len(plans) == 0 {
+			plans = nil
+		}
+		// What an engine run computed answers only with the record of the plan
+		// it handed the scheduler.
+		if plans == nil || run.runsPartial || len(runs) == 0 {
+			runs = nil
+		}
+		decision.Kept = keep(check, code, plans, runs, run.dispatch)
+	}
+	if dir, err := Dir(os.Getenv, false); err == nil {
+		if data, err := json.Marshal(decision); err == nil {
+			path := filepath.Join(dir, lastMemoryName)
+			if os.WriteFile(path+".tmp", data, 0o600) == nil {
+				_ = os.Rename(path+".tmp", path)
+			}
+		}
+	}
+}
+
+func keep(check *memoryCheck, code int, plans []any, runs []heldEngineRun, dispatch any) string {
+	memory.Lock()
+	delete(memory.held, check.root)
+	w := memory.watcher
+	memory.Unlock()
+	if code != 0 {
+		return "not kept: the run exited " + strconv.Itoa(code)
+	}
+	if reason := sessionDisqualifies(check.root, check.started); reason != "" {
+		return "not kept: " + reason
+	}
+	if err := w.Sync(check.root, memorySyncTimeout); err != nil {
+		return "not kept: the watcher did not reach its sync point"
+	}
+	if changed := worktreeChanges(w.Since(check.root, check.seq), check.root); changed != "" {
+		return "not kept: the run changed the worktree: " + changed
+	}
+	memory.Lock()
+	memory.held[check.root] = &heldRun{request: check.request, seq: check.seq, witness: check.witness, plans: plans, runs: runs, dispatch: dispatch}
+	memory.withdrawn = ""
+	memory.Unlock()
+	return "kept"
+}
+
+// memoryWatcher is the worker's watcher, started on first use; nil where the
+// platform has none.
+func memoryWatcher() *Watcher {
+	memory.Lock()
+	defer memory.Unlock()
+	if memory.watcher == nil && !memory.failed {
+		w, err := NewWatcher(defaultWatchBudget())
+		if err != nil {
+			memory.failed = true
+			return nil
+		}
+		memory.watcher = w
+	}
+	return memory.watcher
+}
+
+// requestDigest identifies what the request asks and the context it runs in.
+func requestDigest(req request) string {
+	h := sha256.New()
+	env := append([]string(nil), req.Env...)
+	sort.Strings(env)
+	for _, part := range [][]string{req.Args, {req.Dir, req.Build, req.Executable, req.Fingerprint, strconv.FormatUint(uint64(req.Umask), 8), strconv.FormatBool(req.Terminal), strconv.FormatBool(req.StderrTerminal)}, env} {
+		for _, s := range part {
+			h.Write([]byte(s)) //nolint:errcheck // hash.Hash.Write never errors
+			h.Write([]byte{0}) //nolint:errcheck // hash.Hash.Write never errors
+		}
+		h.Write([]byte{1}) //nolint:errcheck // hash.Hash.Write never errors
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// worktreeChanges names the first change the journal holds outside the
+// worktree's .putnami directory, the run's own state, or "".
+func worktreeChanges(j Journal, root string) string {
+	state := filepath.Join(root, ".putnami")
+	for _, b := range j.Broken {
+		if !within(b, state) {
+			return "broken " + b
+		}
+	}
+	for _, c := range j.Changed {
+		if !within(c, state) {
+			return c
+		}
+	}
+	return ""
+}
+
+// outsideWitness takes what a run reads that the worktree's journal does not
+// see: the stats of Git's HEAD, configuration, packed refs and every
+// directory of its refs, the digest of the index's entries (a run's status
+// refreshes the index's cached stats without changing an entry), the stats
+// of the directories of the Putnami home that hold extension runtimes and
+// toolchains, and of its global configuration, which every load of the
+// workspace's configuration merges.
+//
+// The version snapshot a held run read is reused under it (CLI ADR 0116 §6a),
+// so it also takes what Git's status, diff and abbreviated names read besides
+// the worktree, the index and the refs: the repository's exclude and
+// attributes files, its grafts and alternates, the directory of its packs,
+// whose object count sets an abbreviation's length, and every file of Git's
+// configuration (gitConfigFiles).
+func outsideWitness(root string) map[string]string {
+	paths := []string{}
+	for _, dir := range gitDirs(root) {
+		for _, name := range []string{"HEAD", "config", "config.worktree", "packed-refs", "shallow", "commondir",
+			"info/exclude", "info/attributes", "info/grafts", "objects/info/alternates", "objects/pack"} {
+			paths = append(paths, filepath.Join(dir, name))
+		}
+		_ = filepath.WalkDir(filepath.Join(dir, "refs"), func(path string, d os.DirEntry, err error) error {
+			if err == nil && d.IsDir() {
+				paths = append(paths, path)
+			}
+			return nil
+		})
+	}
+	configured, settled := gitConfigFiles(root)
+	paths = append(paths, configured...)
+	if home, err := os.UserHomeDir(); err == nil {
+		for _, name := range []string{"config.json", "artifacts", "artifacts/sha256", "artifacts/cli-source", "toolchains", "tools"} {
+			paths = append(paths, filepath.Join(home, ".putnami", name))
+		}
+	}
+	witness := make(map[string]string, len(paths)+2)
+	for _, path := range paths {
+		witness[path] = statWitness(path)
+	}
+	witness["git index entries"] = indexEntries(root)
+	if !settled {
+		// A list of Git's configuration that moved while Git listed it may
+		// miss a file: the witness holds nothing it could match later.
+		witness["git configuration"] = "moved while listed at " + strconv.FormatInt(time.Now().UnixNano(), 10)
+	}
+	return witness
+}
+
+// Witness is the stat of path as the decision's witnesses hold it; an absent
+// path is witnessed absent. App.Run witnesses with it the files it reads to
+// dispatch that the decision does not cover.
+func Witness(path string) string { return statWitness(path) }
+
+// statWitness is the stat of path as a witness holds it; an absent path is
+// witnessed absent.
+func statWitness(path string) string {
+	sig, _ := SigOf(path)
+	return sigString(sig)
+}
+
+// gitConfigMemo is the list gitConfigFiles made for a worktree, and the stat
+// of each file it read to make it.
+type gitConfigMemo struct {
+	sigs  map[string]string
+	paths []string
+}
+
+// gitConfigFiles names the files of Git's configuration a run's Git reads in
+// root, and the ignore and attributes files they make it read: the system,
+// global and repository configuration at their default places, the files they
+// include, the excludes and attributes files they name, and the default global
+// ones. Git lists them once per worktree; the list is made again when one of
+// the files it was made from, or HEAD, which a conditional include reads, moved
+// since. An absent file is in it, witnessed absent.
+//
+// The stat of each file a list is made from is taken before Git reads it: Git
+// lists the configuration, the files that listing names are stated, and Git
+// lists it again. The list is kept under those stats only when the second
+// listing names the same files and none of them moved while Git read them;
+// otherwise it is not kept, and settled is false: the list may miss a file
+// written in between.
+func gitConfigFiles(root string) (paths []string, settled bool) {
+	memory.Lock()
+	memo := memory.gitConfig[root]
+	memory.Unlock()
+	if memo != nil && memo.holds() {
+		return memo.paths, true
+	}
+	defaults := defaultGitConfigFiles(root)
+	read := slices.Clone(defaults)
+	for _, dir := range gitDirs(root) {
+		read = append(read, filepath.Join(dir, "HEAD"))
+	}
+	list := func() ([]string, bool) {
+		out, err := gitConfigListing(root)
+		if err != nil {
+			return defaults, false
+		}
+		listed := append(slices.Clone(defaults), configuredGitFiles(root, out)...)
+		sort.Strings(listed)
+		return slices.Compact(listed), true
+	}
+	first, ok := list()
+	if !ok {
+		// An unreadable configuration is witnessed by its files alone, and
+		// listed again at the next decision.
+		return first, true
+	}
+	memo = &gitConfigMemo{sigs: map[string]string{}, paths: first}
+	for _, path := range append(read, first...) {
+		memo.sigs[path] = statWitness(path)
+	}
+	second, ok := list()
+	if !ok || !slices.Equal(first, second) || !memo.holds() {
+		return second, false
+	}
+	memory.Lock()
+	memory.gitConfig[root] = memo
+	memory.Unlock()
+	return first, true
+}
+
+// gitConfigListing is Git's listing of its configuration in root, with the
+// origin of each entry. It is a variable only so a test can write a file
+// while Git lists it.
+var gitConfigListing = func(root string) ([]byte, error) {
+	return exec.Command(gitread.Executable(), "-C", root, "config", "--list", "--show-origin", "-z").Output() //nolint:gosec // fixed arguments
+}
+
+// holds says no file the list was made from moved since.
+func (m *gitConfigMemo) holds() bool {
+	for path, sig := range m.sigs {
+		if statWitness(path) != sig {
+			return false
+		}
+	}
+	return true
+}
+
+// defaultGitConfigFiles are the places Git reads its configuration and its
+// global ignore and attributes files from when nothing names others.
+func defaultGitConfigFiles(root string) []string {
+	paths := []string{"/etc/gitconfig"}
+	for _, name := range []string{"GIT_CONFIG_SYSTEM", "GIT_CONFIG_GLOBAL"} {
+		if v := os.Getenv(name); v != "" {
+			paths = append(paths, v)
+		}
+	}
+	xdg := os.Getenv("XDG_CONFIG_HOME")
+	if home, err := os.UserHomeDir(); err == nil {
+		paths = append(paths, filepath.Join(home, ".gitconfig"))
+		if xdg == "" {
+			xdg = filepath.Join(home, ".config")
+		}
+	}
+	if xdg != "" {
+		for _, name := range []string{"config", "ignore", "attributes"} {
+			paths = append(paths, filepath.Join(xdg, "git", name))
+		}
+	}
+	for _, dir := range gitDirs(root) {
+		paths = append(paths, filepath.Join(dir, "config"), filepath.Join(dir, "config.worktree"))
+	}
+	return paths
+}
+
+// configuredGitFiles reads Git's listing of its configuration with origins
+// (`git config --list --show-origin -z`) and names the files it read and the
+// files its entries make Git read: an included file, and the excludes and
+// attributes files.
+func configuredGitFiles(root string, listing []byte) []string {
+	var paths []string
+	fields := strings.Split(string(listing), "\x00")
+	for i := 0; i+1 < len(fields); i += 2 {
+		origin, entry := fields[i], fields[i+1]
+		from := ""
+		if file, ok := strings.CutPrefix(origin, "file:"); ok {
+			from = gitPath(root, file)
+			paths = append(paths, from)
+		}
+		key, value, _ := strings.Cut(entry, "\n")
+		key = strings.ToLower(key)
+		switch {
+		case key == "core.excludesfile" || key == "core.attributesfile":
+			paths = append(paths, gitPath(root, value))
+		case from != "" && (key == "include.path" || strings.HasPrefix(key, "includeif.") && strings.HasSuffix(key, ".path")):
+			paths = append(paths, gitPath(filepath.Dir(from), value))
+		}
+	}
+	return paths
+}
+
+// gitPath resolves a path Git's configuration names: a leading ~/ is the
+// home directory, and a relative path is relative to dir.
+func gitPath(dir, path string) string {
+	if rest, ok := strings.CutPrefix(path, "~/"); ok {
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, rest)
+		}
+	}
+	if !filepath.IsAbs(path) {
+		return filepath.Join(dir, path)
+	}
+	return filepath.Clean(path)
+}
+
+func sigString(sig FileSig) string {
+	return strconv.FormatUint(sig.Dev, 16) + ":" + strconv.FormatUint(sig.Ino, 16) + ":" + strconv.FormatUint(sig.Mode, 8) + ":" +
+		strconv.FormatUint(sig.Uid, 10) + ":" + strconv.FormatUint(sig.Gid, 10) + ":" + strconv.FormatInt(sig.Size, 10) + ":" +
+		strconv.FormatInt(sig.ModNano, 10) + ":" + strconv.FormatInt(sig.CtimeNano, 10)
+}
+
+// indexEntries is the digest of the index's entries: mode, object, stage
+// and path of each.
+func indexEntries(root string) string {
+	out, err := exec.Command(gitread.Executable(), "-C", root, "ls-files", "--stage", "-z").Output() //nolint:gosec // fixed arguments
+	if err != nil {
+		return "unreadable"
+	}
+	sum := sha256.Sum256(out)
+	return hex.EncodeToString(sum[:])
+}
+
+// movedWitness names the first path whose stat differs, or "".
+func movedWitness(held, now map[string]string) string {
+	for path, sig := range held {
+		if now[path] != sig {
+			return path
+		}
+	}
+	for path := range now {
+		if _, ok := held[path]; !ok {
+			return path
+		}
+	}
+	return ""
+}
+
+// gitDirs is the worktree's Git directory and its common directory, read once
+// per worktree that Git manages. A worktree Git does not manage is asked again
+// each time: a repository created in it later is witnessed from then on.
+func gitDirs(root string) []string {
+	memory.Lock()
+	dirs, ok := memory.gitDirs[root]
+	memory.Unlock()
+	if ok {
+		return dirs
+	}
+	out, err := exec.Command(gitread.Executable(), "-C", root, "rev-parse", "--absolute-git-dir", "--git-common-dir").Output() //nolint:gosec // fixed arguments
+	if err == nil {
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		seen := map[string]bool{}
+		for _, line := range lines {
+			dir := line
+			if !filepath.IsAbs(dir) {
+				dir = filepath.Join(root, dir)
+			}
+			dir = filepath.Clean(dir)
+			if !seen[dir] {
+				seen[dir] = true
+				dirs = append(dirs, dir)
+			}
+		}
+	}
+	if len(dirs) > 0 {
+		memory.Lock()
+		memory.gitDirs[root] = dirs
+		memory.Unlock()
+	}
+	return dirs
+}
+
+// sessionDisqualifies reads the session the run recorded and names why it
+// cannot be held: a task that did not end served from the cache, skipped, or
+// executed in a step whose inputs the answer's witnesses cover.
+func sessionDisqualifies(root string, started time.Time) string {
+	sessions := filepath.Join(root, ".putnami", "sessions")
+	entries, err := os.ReadDir(sessions)
+	if err != nil {
+		return "the run recorded no session"
+	}
+	newest, newestTime := "", time.Time{}
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil || !e.IsDir() || info.ModTime().Before(started) {
+			continue
+		}
+		if info.ModTime().After(newestTime) {
+			newest, newestTime = e.Name(), info.ModTime()
+		}
+	}
+	if newest == "" {
+		return "the run recorded no session"
+	}
+	data, err := os.ReadFile(filepath.Join(sessions, newest, "session.json")) //nolint:gosec // the run's own session
+	if err != nil {
+		return "the run's session cannot be read"
+	}
+	var session struct {
+		Tasks []struct {
+			Identity struct {
+				Key string `json:"key"`
+			} `json:"identity"`
+			Status string `json:"status"`
+			Reuse  string `json:"reuse"`
+		} `json:"tasks"`
+	}
+	if json.Unmarshal(data, &session) != nil {
+		return "the run's session cannot be read"
+	}
+	executed := 0
+	first := ""
+	for _, t := range session.Tasks {
+		if t.Status == "skipped" || t.Reuse == "local-cache" {
+			continue
+		}
+		executed++
+		if first == "" {
+			first = t.Identity.Key
+		}
+	}
+	if executed > 0 {
+		return strconv.Itoa(executed) + " tasks executed, first " + first
+	}
+	return ""
+}
+
+// ReadLastMemory is the worker's last decision, or nil.
+func ReadLastMemory() *MemoryDecision {
+	dir, err := Dir(os.Getenv, false)
+	if err != nil {
+		return nil
+	}
+	data, err := os.ReadFile(filepath.Join(dir, lastMemoryName))
+	if err != nil {
+		return nil
+	}
+	var d MemoryDecision
+	if json.Unmarshal(data, &d) != nil {
+		return nil
+	}
+	return &d
+}

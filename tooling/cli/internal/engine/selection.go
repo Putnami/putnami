@@ -108,8 +108,10 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 		case err != nil && impactedFailureEndsRun(req, ws.Root, err):
 			return nil, ExitError
 		case err != nil:
-			// Fallback to all — FilterProjects below uses ws.Projects
-			iox.Fprintf(os.Stderr, impactedFallbackExplanation, err)
+			// Fallback to all — FilterProjects below uses ws.Projects. A
+			// worker that holds the run prints the explanation again when it
+			// answers a later identical run without selecting (Request.hold).
+			iox.Fprintf(req.hold.notices(os.Stderr, true), impactedFallbackExplanation, err)
 			req.selectionEvidence.diagnostics = append(req.selectionEvidence.diagnostics, strings.TrimSpace(fmt.Sprintf(impactedFallbackExplanation, err)))
 			req.Global.Projects = "*"
 			// The wire block reports what RAN, not what was asked for. This

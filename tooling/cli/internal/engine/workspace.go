@@ -39,35 +39,28 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 		return nil, nil, ExitError
 	}
 	ApplyEnvOverrides(&req.Global, req.Config)
-
-	// Workspace warnings (e.g., name divergence, malformed package.json/go.mod)
-	// go to the caller's report when it passes one. Otherwise they go to
-	// stderr unless the run is quiet or supervised: a supervised serve run's
-	// stderr is its serve log, and its supervisor reports the warnings of its
-	// own load of the workspace. Every result envelope the run writes carries
-	// them, quiet or not.
-	req.workspaceWarnings = req.WarningReport
-	if req.workspaceWarnings == nil {
-		var warningOut io.Writer = os.Stderr
-		if req.Global.Quiet || SupervisedServe(&req.Global) {
-			warningOut = nil
-		}
-		req.workspaceWarnings = workspace.NewWarningReport(warningOut)
-	}
-	req.workspaceWarnings.Report(ws)
-	if req.latestWarnings != nil {
-		req.latestWarnings.Store(req.workspaceWarnings)
-	}
+	reportWorkspaceWarnings(req, ws)
 
 	projectPaths := make([]string, len(ws.Projects))
 	for i, p := range ws.Projects {
 		projectPaths[i] = p.Path
 	}
+	// A run that may be held witnesses what discovery reads before it reads
+	// it (witnessDiscovery).
+	probed := func() map[string]string { return nil }
+	heldRuns.Lock()
+	memory := heldRuns.memory
+	heldRuns.Unlock()
+	if memory != nil && req.hold != nil && !req.hold.complete {
+		probed = extension.WitnessProbes(memory.Witness)
+	}
 	discovered, err := extension.DiscoverExtensionsDetailed(req.WorkspaceRoot, req.Config, projectPaths)
+	probes := probed()
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: discover extensions: %v\n", err)
 		return nil, nil, ExitError
 	}
+	req.witnessDiscovery(discovered, probes)
 	// Resolve placement before runtime preparation, selection, or snapshot
 	// capture. Absence follows this same local lifecycle exactly once. The
 	// EXECUTING side of a portable request never resolves placement: it is the
@@ -95,6 +88,28 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 		}
 	}
 	return ws, discovered, ExitSuccess
+}
+
+// reportWorkspaceWarnings reports the warnings of the workspace ws the run
+// loaded, or a machine worker held (CLI ADR 0116 §6a). They go to the
+// caller's report when it passes one (e.g., name divergence, malformed
+// package.json/go.mod). Otherwise they go to stderr unless the run is quiet or
+// supervised: a supervised serve run's stderr is its serve log, and its
+// supervisor reports the warnings of its own load of the workspace. Every
+// result envelope the run writes carries them, quiet or not.
+func reportWorkspaceWarnings(req *Request, ws *workspace.Workspace) {
+	req.workspaceWarnings = req.WarningReport
+	if req.workspaceWarnings == nil {
+		var warningOut io.Writer = os.Stderr
+		if req.Global.Quiet || SupervisedServe(&req.Global) {
+			warningOut = nil
+		}
+		req.workspaceWarnings = workspace.NewWarningReport(warningOut)
+	}
+	req.workspaceWarnings.Report(ws)
+	if req.latestWarnings != nil {
+		req.latestWarnings.Store(req.workspaceWarnings)
+	}
 }
 
 // loadRunWorkspace is loadWorkspaceAndExtensions for a run, which also refuses

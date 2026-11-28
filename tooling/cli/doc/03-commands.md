@@ -1385,10 +1385,10 @@ putnami machine on                  # Let runs go through the machine process
 putnami machine off                 # Run every command in its own process, and stop the machine process
 ```
 
-The machine process is off by default; `putnami machine on` turns it on, on
-Linux and macOS. Once it is on, a run that finds no supervisor runs in its own
-process and starts one, detached, when it ends; the next run goes through the
-worker of its executable and worktree. Each worktree has a worker of its own,
+The machine process is on by default on Linux and macOS; `putnami machine
+off` turns it off. A run that finds no supervisor runs in its own process and
+starts one, detached, when it ends; the next run goes through the worker of
+its executable and worktree. Each worktree has a worker of its own,
 so two worktrees run at once; a second command in a worktree whose worker is
 busy waits for it. A run always runs in its own process in CI (`CI`, or a CI
 service's own variable), in a hosted run (`--credential-fd`), when a job of a
@@ -1402,7 +1402,25 @@ At a terminal, the worker gives the run a pseudo-terminal that the command
 relays: the output, prompts, Ctrl-C and the window size behave as in a run
 in its own process. Ctrl-Z suspends the command; the run goes on and its
 output waits until the command resumes.
-`putnami machine status` shows why the last command ran in its own process.
+On Linux, a worker answers a request it served before from memory when the
+worktree, Git's state and the Putnami home's runtimes and toolchains did not
+change since, and the store still holds each cache entry a task of the held
+run was served from: the run records the held results in its session without
+looking a task up or restoring it, stamps each entry's last use as a cache hit
+does, and exits as the held run did. An entry evicted or published again since
+makes the run compute as usual. Once the
+worker holds such an answer, the next identical request does not load the
+workspace or plan either; a bare command, which selects its projects from the
+last successful run, and a `--debug` run still do.
+`putnami machine status` shows why the last command ran in its own process,
+and whether the last run a worker served was answered from memory, and
+without loading and planning, or why it was not. A worker checks the input
+record's sampled digests once the run returned; status says how many and how
+long, and names one that differed, after which the worker holds nothing and
+the next run collects every digest. A command a worker refuses because it
+started in another process context (identity, groups, limits, priority or
+control group, such as a supervisor another session started) says so in one
+line on stderr, and runs in its own process.
 `PUTNAMI_MACHINE=off` turns it off for one command and `PUTNAMI_MACHINE=on` on;
 `machine on|off` records the user's choice in `machine.json` under the
 Putnami home. The supervisor lives in `$XDG_RUNTIME_DIR/putnami` on Linux,

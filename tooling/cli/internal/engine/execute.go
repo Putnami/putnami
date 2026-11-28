@@ -336,7 +336,7 @@ func (e *Engine) executeSession(
 			executionRenderer(req, sessStore, extensions, sink, isServeMode, isRunMode), isServeMode)
 	}
 
-	// The cache manager arrives from Engine.run, which builds it before
+	// The cache manager arrives from Engine.lifecycle, which builds it before
 	// planning so this execution and a release-set publish's selection keys
 	// share one memoized file-hash pass. It is built even under --no-cache:
 	// the memo is not a cache of RESULTS.
@@ -385,6 +385,7 @@ func (e *Engine) executeSession(
 	// A run whose sessions travel elsewhere tells the runs it spawns.
 	schedCfg.RecordSessionsWhole = recordsSessionsWhole(req)
 	attachResultFinalizers(&schedCfg, resultFinalizers)
+	schedCfg.FinalizeAnswered = req.answeredFinalizers
 
 	// Normal (non-watch) execution
 	var session *workspace_state.Session

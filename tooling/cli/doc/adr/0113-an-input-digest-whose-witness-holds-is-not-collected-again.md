@@ -216,6 +216,30 @@ collections the record saves on this repository, and about 16 a run on a
 smaller one (an answer looked up again after a write is sampled again). The tests that assert no false hit turn the sample off, so a
 false hit fails them instead of being corrected.
 
+In a machine worker ([CLI ADR 0116](0116-one-machine-process-keeps-every-worktree-warm.md))
+the sample is checked in the worker's idle time, once the run returned. The
+run uses a sampled answer as it uses any other; the worker collects it again
+after the client has its exit and before it reads its next request, in the
+run's environment and working directory and through the run's file index, so
+the next run of the worktree waits for the checks and never starts from a
+record they could still condemn. A check collects only while the answer's
+witness, stated again before and after the collection, holds: a path written
+since the answer, by the run or by anyone else, refuses that answer to the
+next run anyway, and raises no alarm. A wrong witness is then caught after
+the answer that used it instead of before it: the worker saves the record
+empty and withdraws every run it holds, so the next request is not answered
+from memory, and the next run starts from the empty record, collects every
+digest and reports the warning; `putnami machine status` names the digest.
+A digest of input selectors is still checked within the run, since its
+collection asks the run's extensions, and so is the sample of a run that only
+plans, whose record writes nothing. Without the machine process (CI, a
+hosted run, `PUTNAMI_MACHINE=off`) the sample runs as before. Measured on
+2026-11-27 on a 4-core Linux container, through a worker, medians of three
+unchanged runs after warm ones: `validate --all` took 4.38 s with the sample
+inline and 4.13 s deferred, and `lint,test,build,validate --projects
+/tooling/cli` 10.81 s and 10.53 s, differences within the runs' spread; the
+deferred checks took 0 to 11 ms after the exit, for 0 to 17 sampled answers.
+
 ### 2. The racy rule, for files and for directories
 
 Every part of a witness follows ADR 0009 §2, against the clock the run that

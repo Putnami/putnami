@@ -436,7 +436,9 @@ func runEnv(t *testing.T) []string {
 		}
 		env = append(env, entry)
 	}
-	return append(env, "HOME="+t.TempDir(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1", "LC_ALL=C", "DO_NOT_TRACK=1")
+	// No run reaches the user's machine process (CLI ADR 0116).
+	return append(env, "HOME="+t.TempDir(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1", "LC_ALL=C", "DO_NOT_TRACK=1",
+		"PUTNAMI_MACHINE=off")
 }
 
 // limitConcurrency bounds how many cases run at once: each one starts a CLI

@@ -268,7 +268,11 @@ func (r *Record) SetSampleRate(rate float64) {
 // then answers and records nothing, and makes its save write an empty record:
 // a value it answered differed from the value computed again, so no entry of
 // it is trusted. reason says which; the first reason is kept.
-func (r *Record) Discard(reason string) {
+func (r *Record) Discard(reason string) { r.discard(reason, true) }
+
+// discard is Discard, which calls the function OnDiscard installed when
+// notify is set.
+func (r *Record) discard(reason string, notify bool) {
 	if r == nil {
 		return
 	}
@@ -278,10 +282,10 @@ func (r *Record) Discard(reason string) {
 		r.discarded = reason
 	}
 	r.loaded, r.fresh, r.confirmed, r.stale = map[recordKey]recordEntry{}, map[recordKey]recordEntry{}, map[recordKey]bool{}, map[recordKey]bool{}
-	notify := r.onDiscard
+	onDiscard := r.onDiscard
 	r.mu.Unlock()
-	if first && notify != nil {
-		notify(reason)
+	if first && notify && onDiscard != nil {
+		onDiscard(reason)
 	}
 }
 
@@ -873,10 +877,19 @@ func (r *Record) Hold(parts []RecordPart) bool {
 	stat := r.heldStat
 	for _, part := range parts {
 		if part.Stat.Mode&linkModeMask == linkMode {
-			stat = func(path string) (Stat, bool) { return recordLstat(filepath.Clean(path)) }
+			stat = freshStat
 			break
 		}
 	}
+	return holdsBy(parts, stat)
+}
+
+// freshStat is the lstat of path taken now, whatever a run holds of it.
+func freshStat(path string) (Stat, bool) { return recordLstat(filepath.Clean(path)) }
+
+// holdsBy reports whether every part's path has the stat recorded with it,
+// as stat takes it: a part recorded absent holds while its path is absent.
+func holdsBy(parts []RecordPart, stat func(path string) (Stat, bool)) bool {
 	for _, part := range parts {
 		st, ok := stat(part.Path)
 		if part.Absent() {

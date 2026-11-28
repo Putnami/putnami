@@ -199,18 +199,37 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	}
 	launchedFromPin := launch.ConsumeLaunched()
 
+	// A machine worker answers a run of a request it decided answerable with
+	// what the held run's App.Run loaded before it dispatched: it then opens
+	// no index, loads no configuration and discovers no extension (CLI ADR
+	// 0116 §6a, takeHeldDispatch).
+	held := takeHeldDispatch(wsRoot, args)
+
 	// The configuration this process loads before a run (the workspace
 	// configuration, and the projects that extension discovery names) is read
 	// through the workspace's file index, read-only: this process does not yet
 	// know whether its run may write. A file it reads rather than answers is
 	// recorded by the index of a run that records (engine, fileindex.Adopt).
+	// A held dispatch reuses the read-only index the held run opened, which
+	// answers a file only while its stat is the recorded one.
+	var index *fileindex.Index
 	if wsRoot != "" {
-		restoreIndex := fileindex.Use(fileindex.OpenReadOnly(fileindex.Path(wsRoot), fileindex.ExecutableIdentity()))
+		if held != nil && held.index != nil {
+			index = held.index
+		} else {
+			index = fileindex.OpenReadOnly(fileindex.Path(wsRoot), fileindex.ExecutableIdentity())
+		}
+		restoreIndex := fileindex.Use(index)
 		defer restoreIndex()
 		defer wsproto.UseConfigReader(fileindex.ReadFile)()
 	}
 
-	cfg := wsproto.Load(wsRoot)
+	var cfg *wsproto.Config
+	if held != nil {
+		cfg = held.cfg
+	} else {
+		cfg = wsproto.Load(wsRoot)
+	}
 
 	// A runner provider launched this process to execute a bound portable
 	// request. The typed request is the only invocation authority: it
@@ -222,13 +241,31 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// The bootstrap provider serves the lock-pinned extension downloads that
 	// discovery below, or a structured command's install, would start, and ends
 	// before the workspace's provider is installed.
-	boot.ensureArtifactsAndClose(ctx, wsRoot, cfg, bootstrapEnsuresArtifacts(wsRoot, providerMode))
-
+	//
 	// Discover extensions when the first argument might be an extension-owned
 	// command group (e.g. "putnami cloud login"). Skip discovery for help/
 	// version/flag-only invocations and for built-in commands so simple paths
 	// stay fast.
-	extensions, extensionGroups := discoverDispatchExtensions(ctx, args, wsRoot, cfg, providerMode)
+	var extensions []*extension.ExtensionDescription
+	var extensionGroups map[string]bool
+	var probes map[string]string
+	if held != nil {
+		boot.close()
+		extensions, extensionGroups = held.extensions, held.groups
+	} else {
+		boot.ensureArtifactsAndClose(ctx, wsRoot, cfg, bootstrapEnsuresArtifacts(wsRoot, providerMode))
+		// What a worker may hold is witnessed before discovery reads it.
+		probed := func() map[string]string { return nil }
+		if machineproc.KeepsDispatch(wsRoot) {
+			probed = extension.WitnessProbes(machineproc.Witness)
+		}
+		extensions, extensionGroups = discoverDispatchExtensions(ctx, args, wsRoot, cfg, providerMode)
+		probes = probed()
+	}
+	loaded := held
+	if loaded == nil {
+		loaded = loadedDispatch(wsRoot, args, index, cfg, extensions, extensionGroups, probes)
+	}
 
 	aliases, aliasWarnings := processAliases(cfg, providerMode, extensions)
 	parsed := parseArgs(args, aliases, extensionGroups)
@@ -416,6 +453,9 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return noWorkspaceFound(os.Stderr)
 	}
 
+	// A job command's run leaves the worker what this App.Run loaded, which
+	// the worker holds when it keeps the run.
+	machineproc.KeepDispatch(wsRoot, loaded, held != nil)
 	return a.runTerminalSession(ctx, cfg, parsed, wsRoot, hostedCache, hostedReporters, extensions...)
 }
 

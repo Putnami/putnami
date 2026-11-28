@@ -35,3 +35,9 @@ func (*Watcher) Since(root string, _ uint64) Journal { return Journal{Broken: []
 
 // Sync refuses.
 func (*Watcher) Sync(string, time.Duration) error { return errNoWatcher }
+
+// defaultWatchBudget is no watch: there is no watcher.
+func defaultWatchBudget() int { return 0 }
+
+// SigOf answers nothing: no run is answered from memory without a watcher.
+func SigOf(string) (FileSig, bool) { return FileSig{}, false }

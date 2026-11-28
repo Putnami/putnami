@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"go.putnami.dev/tooling/cli/internal/abort"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 )
 
 // RunFunc runs one command in this process, as main would: the worker calls
@@ -36,6 +37,9 @@ const goTimeout = 30 * time.Second
 // standard streams to its own process for that run (CLI ADR 0116 §4).
 func Work(run RunFunc) int {
 	inWorker = true
+	// The input record's sampled answers are checked once a run returned,
+	// before the worker takes its next request (checkSamples).
+	fileindex.DeferSamples(true)
 	handleSignals()
 	ownFingerprint, ownRuntimeEnv = processFingerprint(), runtimeEnv(os.Environ())
 	f := os.NewFile(3, "machine-ctrl")
@@ -179,6 +183,7 @@ func serve(run RunFunc, req request, files []*os.File, free func()) {
 	}
 	finished := make(chan struct{})
 	go listen(client, stop, finished)
+	check, decision := beforeRun(req)
 	code := run(ctx, req.Args)
 	close(finished)
 	stop.done()
@@ -188,9 +193,38 @@ func serve(run RunFunc, req request, files []*os.File, free func()) {
 	}
 	release()
 	_ = client.send(event{Exit: &code})
+	// The sampled answers the run used are checked, and what the run leaves
+	// to hold is decided, once the client has its exit: they cost the client
+	// nothing (tooling/cli ADR 0113 §1, CLI ADR 0116 §6a). The worker reads
+	// its next request once serve returned, so no run starts before them.
+	checkSamples(req)
+	afterRun(check, decision, code)
 	// A run leaves garbage; give the memory back so an idle worker keeps
 	// about its held state (CLI ADR 0116 §10).
 	debug.FreeOSMemory()
+}
+
+// checkSamples checks the input record's sampled answers the run used
+// (fileindex.TakeDeferredSamples), in the run's environment and working
+// directory, which their collection reads as the run's did, and with the
+// worker's own standard streams. An answer that differed discarded its record
+// and withdraws what the worker holds (afterRun). A run whose context cannot
+// be applied again leaves its answers unchecked.
+func checkSamples(req request) {
+	run := fileindex.TakeDeferredSamples()
+	started := time.Now()
+	restore, err := apply(req, []*os.File{os.Stdin, os.Stdout, os.Stderr})
+	if err != nil {
+		return
+	}
+	checked, reason := run()
+	restore()
+	memory.Lock()
+	memory.run.sampled, memory.run.sampledTime, memory.run.withdrawn = checked, time.Since(started), reason
+	memory.Unlock()
+	if reason != "" {
+		fmt.Fprintln(os.Stderr, "machine: worker: "+reason+"; the input record is discarded and what the worker holds is withdrawn")
+	}
 }
 
 // shutdownTimeout and interactiveShutdownTimeout bound a run after its first

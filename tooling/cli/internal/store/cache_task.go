@@ -33,6 +33,13 @@ func (cm *CacheManager) LookupResultOnlyTaskEntry(hash string) *ResultOnlyTaskEn
 	return cm.store.LookupResultOnlyTaskEntry(hash)
 }
 
+// ServeWitnessed serves again the entries witnesses were taken of, as a hit's
+// lookup does, or returns the index of one that moved, and serves none
+// (LocalStore.ServeWitnessed).
+func (cm *CacheManager) ServeWitnessed(witnesses []EntryWitness) (int, func()) {
+	return cm.store.ServeWitnessed(witnesses)
+}
+
 // PublishResultOnlyTaskEntry records the result of a task-owned provider hit
 // restored without its files, or fails without publishing anything.
 func (cm *CacheManager) PublishResultOnlyTaskEntry(hit RemoteTaskEntryHit) (*ResultOnlyTaskEntry, error) {

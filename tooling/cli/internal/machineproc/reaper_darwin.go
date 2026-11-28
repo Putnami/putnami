@@ -9,4 +9,6 @@ func endOrphans() {}
 
 func reapOrphans() {}
 
+func reapOnExit() {}
+
 var liveWorkers = func() map[int]bool { return nil }

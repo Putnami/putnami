@@ -2111,7 +2111,7 @@ A pass during a run reclaims only entries the run has not touched. On a fresh di
 
 These three GC settings are also configurable in the `store` section of `~/.putnami/config.json` / `putnami.workspace.json` (precedence: env > workspace > global > default) — see [Configuration → Build store settings](05-configuration.md#build-store-settings). The store **location** is env-only (`PUTNAMI_STORE_DIR`).
 
-A `lastused` stamp is written on every cache hit (local or remote), so frequently-used entries naturally outlive idle ones.
+A `lastused` stamp is written on every cache hit (local or remote), and on every entry a machine worker's answer from memory serves again (CLI ADR 0116 §6a), so frequently-used entries naturally outlive idle ones.
 
 ## Extension-owned machine caches
 

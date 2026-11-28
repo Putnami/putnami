@@ -118,6 +118,11 @@ func Serve(ctx context.Context, args []string) (code int, served bool) {
 	return code, served
 }
 
+// contextRefusalNotice is what a command prints when the worker refused it
+// for a process context other than its own (CodeContext): the command runs in
+// its own process.
+const contextRefusalNotice = "putnami: running in this process: the machine process's worker started in another process context (identity, groups, limits, priority or control group); `putnami machine stop` stops it\n"
+
 // readyTimeout bounds the wait for the worker to take the request: a
 // supervisor that does not answer, or a worker slow to start, costs at most
 // this before the command runs in its own process.
@@ -206,6 +211,11 @@ func await(ctx context.Context, c *conn) (code int, served bool, reason string) 
 			}
 			switch {
 			case ev.Refused != "":
+				if ev.Refused == CodeContext {
+					// A worker of another process context is the one refusal
+					// the command reports, in one line.
+					_, _ = os.Stderr.WriteString(contextRefusalNotice)
+				}
 				return 0, false, "refused: " + ev.Refused
 			case ev.Ready && !gone:
 				readyC = nil

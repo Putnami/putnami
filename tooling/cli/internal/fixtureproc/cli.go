@@ -65,8 +65,9 @@ func removeCLI() {
 // CLIEnv returns this process's environment for a CLI that CLI built: every
 // PUTNAMI_ variable is dropped but the store and artifact roots a TestMain
 // points at its scratch directory, so the run a test starts never joins the
-// session, job or host channel of a putnami run that started the test, and
-// telemetry is off.
+// session, job or host channel of a putnami run that started the test,
+// telemetry is off, and the run never reaches the user's machine process (CLI
+// ADR 0116), which is on by default.
 func CLIEnv() []string {
 	var env []string
 	for _, entry := range os.Environ() {
@@ -75,7 +76,7 @@ func CLIEnv() []string {
 			env = append(env, entry)
 		}
 	}
-	return append(env, "DO_NOT_TRACK=1")
+	return append(env, "DO_NOT_TRACK=1", "PUTNAMI_MACHINE=off")
 }
 
 // reachesCLI reports whether the variable name reaches a CLI a test starts.

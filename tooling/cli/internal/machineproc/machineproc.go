@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 // ProtocolVersion is the version of the client ↔ supervisor and supervisor ↔
@@ -85,6 +87,46 @@ type request struct {
 	StderrTerminal bool `json:"stderrTerminal,omitempty"`
 }
 
+// MemoryDecision is whether the last request a worker served could have been
+// answered from memory, and why not.
+type MemoryDecision struct {
+	Time       string `json:"time"`
+	Root       string `json:"root"`
+	Answerable bool   `json:"answerable"`
+	Reason     string `json:"reason"`
+	// Answered says the scheduler answered every plan of the run from the
+	// records the held run left, with no lookup, key or restore.
+	Answered bool `json:"answered"`
+	// PlanSkipped says the engine answered every run of the request from
+	// what the held run loaded and planned: no workspace load, runtime
+	// synchronization, probe, selection or plan (CLI ADR 0116 §6a).
+	PlanSkipped bool `json:"planSkipped"`
+	// VersionsHeld says every engine run of the request that would read the
+	// version snapshot from Git took the one the held run read instead (CLI
+	// ADR 0116 §6a).
+	VersionsHeld bool `json:"versionsHeld"`
+	// FinalizersHeld says every engine run of the request that reached its
+	// finalizers replayed what the held run's did, the spec gate's record
+	// included, instead of running them (CLI ADR 0116 §6a).
+	FinalizersHeld bool `json:"finalizersHeld"`
+	// DispatchHeld says App.Run took what the held run's App.Run loaded
+	// before it dispatched, the workspace configuration and the extensions
+	// its dispatch discovered, instead of loading them (CLI ADR 0116 §6a).
+	DispatchHeld bool `json:"dispatchHeld"`
+	// Kept says the run that followed is held for the next request, or why
+	// not.
+	Kept string `json:"kept"`
+	// Sampled is how many of the input record's sampled answers the run used
+	// the worker collected again once the run returned, and SampledMillis
+	// how long the checks took (tooling/cli ADR 0113 §1).
+	Sampled       int   `json:"sampled,omitempty"`
+	SampledMillis int64 `json:"sampledMillis,omitempty"`
+	// Withdrawn names the sampled answer that differed from its collection
+	// once the run returned: the worker discarded the input record and
+	// withdrew every run it held. Empty when none differed.
+	Withdrawn string `json:"withdrawn,omitempty"`
+}
+
 // Reply answers a request.
 type Reply struct {
 	Protocol int    `json:"protocol"`
@@ -147,11 +189,18 @@ type WorkerStatus struct {
 	HeldBytes  uint64 `json:"heldBytes"`
 }
 
+// platform is the operating system the process runs on; a test sets another.
+var platform = runtime.GOOS
+
 // supported reports whether this platform has a machine process: Linux and
 // macOS (CLI ADR 0116 §12; Windows support is suspended).
 func supported() bool {
-	return runtime.GOOS == "linux" || runtime.GOOS == "darwin"
+	return platform == "linux" || platform == "darwin"
 }
+
+// hosted reports whether this process is a hosted run: it captured a run
+// credential (`--credential-fd`).
+var hosted = runcredential.Hosted
 
 // Decision is whether a command may go through the machine process, and why
 // not when it may not.
@@ -163,13 +212,16 @@ type Decision struct {
 // Decide is the machine process's switch for one command, from the
 // environment getenv reads and the user's setting: off in CI, in a hosted or
 // nested run, when PUTNAMI_MACHINE or the setting says off, and on platforms
-// without one. defaultOn is the default when neither says.
+// without one, whatever PUTNAMI_MACHINE or the setting says for the first
+// four. defaultOn is the default when neither says.
 func Decide(getenv func(string) string, setting string, defaultOn bool) Decision {
 	switch {
 	case !supported():
 		return Decision{Reason: "platform"}
 	case inWorker || getenv(jobEnv) != "":
 		return Decision{Reason: "nested"}
+	case hosted():
+		return Decision{Reason: "hosted"}
 	case inCI(getenv):
 		return Decision{Reason: "ci"}
 	}

@@ -655,13 +655,16 @@ func WalkWorkspaceGraph(workspaceRoot string, cfg *wsproto.Config, lf *lockfile.
 // name from: its stable link, or the artifact directory of version. It
 // returns "" when neither holds a manifest.
 func InstalledDependencyDir(workspaceRoot, name, version string) string {
-	if dir := layout.StableDir(workspaceRoot, layout.Extensions, name); manifestResolves(dir, ManifestFilename) {
-		return dir
+	stable := layout.StableDir(workspaceRoot, layout.Extensions, name)
+	probing(stable)
+	if manifestResolves(stable, ManifestFilename) {
+		return stable
 	}
 	if version == "" {
 		return ""
 	}
 	dir := layout.ArtifactDir(workspaceRoot, layout.Extensions, name, version)
+	probing(dir)
 	if _, err := os.Stat(filepath.Join(dir, ManifestFilename)); err != nil {
 		return ""
 	}
@@ -680,6 +683,7 @@ type rootLocation struct {
 // probe order: an absolute path, a workspace path, then the install layout.
 func locateRoot(workspaceRoot, key string, lf *lockfile.LockFile, hosted bool) rootLocation {
 	holds := func(dir string) bool {
+		probing(dir)
 		_, err := os.Stat(filepath.Join(dir, ManifestFilename))
 		return err == nil
 	}
@@ -728,6 +732,7 @@ func (m rawManifest) floorErr() error {
 // the manifest in dir. The name falls back as discovery's does: putnami.json,
 // then ref.
 func readRawManifest(dir, ref string) rawManifest {
+	probing(dir)
 	path := filepath.Join(dir, ManifestFilename)
 	data, err := os.ReadFile(path)
 	if err != nil {

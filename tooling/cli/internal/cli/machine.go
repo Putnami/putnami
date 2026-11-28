@@ -2,7 +2,9 @@ package cli
 
 import (
 	"errors"
+	"io"
 	"os"
+	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
@@ -50,12 +52,15 @@ type machineStatusResult struct {
 	// LastLocal is why the last command meant for the machine process ran in
 	// its own process.
 	LastLocal *machineproc.LastLocal `json:"lastLocal,omitempty"`
+	// LastMemory is whether the last run a worker served could have been
+	// answered from memory, and whether it is held for the next one.
+	LastMemory *machineproc.MemoryDecision `json:"lastMemory,omitempty"`
 }
 
 func machineStatus(output string) error {
 	setting := machineproc.ReadSetting(os.Getenv)
 	decision := machineproc.Decide(os.Getenv, setting, machineproc.DefaultOn)
-	result := machineStatusResult{Use: decision.Use, Reason: decision.Reason, Setting: setting, LastLocal: machineproc.ReadLastLocal()}
+	result := machineStatusResult{Use: decision.Use, Reason: decision.Reason, Setting: setting, LastLocal: machineproc.ReadLastLocal(), LastMemory: machineproc.ReadLastMemory()}
 	if r, err := machineproc.Query("status"); err == nil && r.OK {
 		result.Running, result.Machine = true, r.Status
 	}
@@ -71,6 +76,9 @@ func machineStatus(output string) error {
 	}
 	if last := result.LastLocal; last != nil {
 		iox.Fprintf(os.Stdout, "  Last run in its own process: %s, %s (%s)\n", last.Time, last.Reason, last.Dir)
+	}
+	if m := result.LastMemory; m != nil {
+		writeLastMemory(os.Stdout, m)
 	}
 	if !result.Running {
 		iox.Fprintln(os.Stdout, "  Supervisor: not running")
@@ -94,6 +102,35 @@ func machineStatus(output string) error {
 	return nil
 }
 
+// writeLastMemory writes what `machine status` says of the last run a worker
+// served: whether it was answerable from memory and held, and what the worker
+// checked once it returned.
+func writeLastMemory(w io.Writer, m *machineproc.MemoryDecision) {
+	answer := "no, " + m.Reason
+	if m.Answerable {
+		answer = "yes"
+		if m.Reason != "" {
+			answer = "yes, not answered: " + m.Reason
+		}
+	}
+	if m.Answered {
+		answer = "yes, answered from memory"
+	}
+	if m.Answered && m.PlanSkipped {
+		answer = "yes, answered from memory without loading or planning"
+	}
+	if held := heldSteps(m); m.Answered && held != "" {
+		answer += " (held: " + held + ")"
+	}
+	iox.Fprintf(w, "  Last worker run answerable from memory: %s; %s (%s)\n", answer, m.Kept, m.Root)
+	if m.Sampled > 0 {
+		iox.Fprintf(w, "  Sampled input digests checked after it returned: %d, in %d ms\n", m.Sampled, m.SampledMillis)
+	}
+	if m.Withdrawn != "" {
+		iox.Fprintf(w, "  Withdrawn after it returned: %s; the input record is discarded\n", m.Withdrawn)
+	}
+}
+
 func machineStop() error {
 	if _, err := machineproc.Query("stop"); err != nil {
 		if errors.Is(err, machineproc.ErrNotRunning) {
@@ -111,4 +148,19 @@ func shortBuild(build string) string {
 		return build[:12]
 	}
 	return build
+}
+
+// heldSteps names what an answered run took from the held run besides its
+// load, plan and tasks (CLI ADR 0116 §6a), or "".
+func heldSteps(m *machineproc.MemoryDecision) string {
+	var held []string
+	for _, step := range []struct {
+		name string
+		held bool
+	}{{"dispatch", m.DispatchHeld}, {"version snapshot", m.VersionsHeld}, {"finalizers", m.FinalizersHeld}} {
+		if step.held {
+			held = append(held, step.name)
+		}
+	}
+	return strings.Join(held, ", ")
 }

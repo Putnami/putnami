@@ -350,7 +350,8 @@ func devVersionEnv(t *testing.T, root string, tc devVersionCase) []string {
 		}
 		env = append(env, entry)
 	}
-	env = append(env, "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1", "LC_ALL=C", "DO_NOT_TRACK=1")
+	// No run reaches the user's machine process (CLI ADR 0116).
+	env = append(env, "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1", "LC_ALL=C", "DO_NOT_TRACK=1", "PUTNAMI_MACHINE=off")
 	if tc.env != nil {
 		env = append(env, tc.env(t, root)...)
 	}

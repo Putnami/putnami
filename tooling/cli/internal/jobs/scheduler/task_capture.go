@@ -922,6 +922,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 	s.keyTrace.started(job, hash, false)
 	if err == nil && entry != nil {
 		if result := s.restoreDeclaredCacheHit(ctx, job, hash, entry, mu, hashes); result != nil {
+			s.witnessServed(job, entry.Witness)
 			s.keyTrace.started(job, hash, true)
 			s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
 			s.waits.restore(job, restoreStarted)
@@ -939,6 +940,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 	if resultOnly {
 		if recorded := s.cache.LookupResultOnlyTaskEntry(entryKey); recorded != nil {
 			if result := s.serveStatusOnlyHit(job, hash, recorded, ReuseLocalCache, mu, hashes); result != nil {
+				s.witnessServed(job, recorded.Witness)
 				s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
 				s.waits.restore(job, restoreStarted)
 				s.cacheStats.RecordLocalHit()

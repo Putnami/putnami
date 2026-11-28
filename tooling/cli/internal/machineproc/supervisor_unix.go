@@ -127,6 +127,7 @@ func Supervise() int {
 		workers: map[string]*worker{}, pids: map[int]bool{}, lastUsed: time.Now(), stopped: make(chan struct{}),
 	}
 	liveWorkers = s.workerPIDs
+	reapOnExit()
 	s.describe()
 	fmt.Fprintf(os.Stderr, "machine: supervisor %d listening, protocol %d\n", os.Getpid(), ProtocolVersion)
 	go s.watchIdle()

@@ -116,7 +116,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -294,6 +296,10 @@ type TaskEntry struct {
 	// what a remote hit writes back, so one entry has one descriptor digest on
 	// every machine that holds it (task_remote.go).
 	Descriptor []byte `json:"-"`
+
+	// Witness identifies the files the lookup read the entry from, when they
+	// answer for it (EntryWitness); its zero value otherwise.
+	Witness EntryWitness `json:"-"`
 }
 
 // Output returns the recorded output with the given id.
@@ -424,12 +430,17 @@ type taskEntryMemo struct {
 // were written less than the file index's margin before the load, and every
 // entry on a platform whose stat the file index does not decode, is read
 // again on each lookup. The caller holds the store's shared lock.
+//
+// The entry it returns carries those stats as its witness when they answer
+// for what was read, the condition under which the memo holds it (CLI ADR
+// 0116 §6a, EntryWitness).
 func (s *LocalStore) loadTaskEntryOnce(blobDir, address string) *TaskEntry {
 	now := time.Now()
 	stats := statTaskEntry(blobDir)
 	if cached, ok := s.loaded.Load(address); ok {
 		if memo, ok := cached.(taskEntryMemo); ok && memo.stats == stats {
 			clone := *memo.entry
+			clone.Witness = EntryWitness{address: address, stats: stats}
 			return &clone
 		}
 		s.loaded.Delete(address)
@@ -441,10 +452,14 @@ func (s *LocalStore) loadTaskEntryOnce(blobDir, address string) *TaskEntry {
 	}
 	// A file written while it was read has two stats; the entry answers for
 	// neither.
-	if stats.settled(now) && statTaskEntry(blobDir) == stats {
+	settled := stats.settled(now) && statTaskEntry(blobDir) == stats
+	if settled {
 		s.loaded.Store(address, taskEntryMemo{stats: stats, entry: entry})
 	}
 	clone := *entry
+	if settled {
+		clone.Witness = EntryWitness{address: address, stats: stats}
+	}
 	return &clone
 }
 
@@ -486,6 +501,160 @@ func loadTaskEntry(blobDir, address string) *TaskEntry {
 		entry.FilesDir = filepath.Join(blobDir, "files")
 	}
 	return entry
+}
+
+// The witness of a served entry (CLI ADR 0116 §6a).
+//
+// A machine worker answers an unchanged run from what the held run computed,
+// and reports each task the held run served from the local cache as served
+// from it again. That is true only while the store holds the very entry the
+// task was served from: an entry evicted since, by any process's collection or
+// by `putnami cache clean`, or published again at its address by another run,
+// is not the entry the answer reports, and a run in its own process would not
+// report it. So the held run keeps, for each such task, a witness of its entry,
+// and the answer checks every witness first (ServeWitnessed).
+//
+// The witness is the stat of each file the hit's lookup read (device, inode,
+// mode, owner, size, modification and status-change times), taken when the
+// lookup read them: for a task-owned entry, the stats loadTaskEntryOnce
+// already takes for its memo, so taking it costs the hit nothing; for a
+// result-only entry, two stats of its record. It is sound because the store
+// never writes a published entry's files: an entry is staged complete and
+// renamed into place as one directory, and leaves it only as one directory,
+// renamed aside by a collection or removed by a clean. An evicted entry's
+// descriptor is absent, and an entry published again at the address is a new
+// set of files, written after the witness was taken. A witness is taken only
+// of files a margin older than the clock (fileindex.Margin, the file index's
+// rule): a file written after it then has another modification or
+// status-change time, whatever the filesystem's tick, even where an inode
+// number is reused. A lookup of files younger than that witnesses nothing,
+// and a worker holds no answer for its run.
+//
+// The last-use sidecar is not witnessed: a hit writes it, and the answer
+// writes it as a hit does.
+
+// EntryWitness identifies the published entry a local hit was served from,
+// by its store address, so it is checked in the store of the run that checks
+// it. Its zero value witnesses nothing.
+type EntryWitness struct {
+	// address is the store address of the key's task-owned entry. For a
+	// task-owned hit, stats is the stat of each file its lookup read; for a
+	// result-only hit, the task-owned lookup missed, and it must keep missing.
+	address string
+	stats   taskEntryStats
+	// record is the store address of the result-only entry a result-only hit
+	// read, and recordStat the stat of its record; "" for a task-owned hit.
+	record     string
+	recordStat taskEntryFileStat
+}
+
+// Sound reports whether w witnesses an entry: whether its lookup read files a
+// margin older than the clock, which kept their stat while they were read.
+func (w EntryWitness) Sound() bool { return w.address != "" }
+
+// witnessParallelFloor is the least number of witnesses ServeWitnessed hands
+// each goroutine it spreads a set over: a set below twice as many is checked
+// and stamped on one.
+const witnessParallelFloor = 64
+
+// ServeWitnessed serves again the entries witnesses were taken of, as a hit's
+// lookup serves an entry: it checks that each still is the entry its witness
+// was taken of, then stamps each one's last use with this handle's generation,
+// as LookupTaskEntry and LookupResultOnlyTaskEntry stamp a hit's. A task-owned
+// entry holds when every file its lookup read has its stat; a result-only one
+// when its record has its stat and no task-owned descriptor, which a lookup
+// serves first, stands at its key. It holds the store's shared lock once for
+// all of them, and returns the stamping of their last use, which the caller
+// runs once its answer returned. It returns the index
+// of a witness whose entry moved, with a stamping that stamps nothing, or -1
+// when every entry holds (CLI ADR 0116 §6a).
+//
+// Each witness costs what a hit's lookup of a memoized entry costs, the stat
+// of its files and one last-use write, without the lock and the generation
+// each lookup takes; a set above witnessParallelFloor is spread over the
+// processors, in contiguous ranges that stop once one entry moved.
+func (s *LocalStore) ServeWitnessed(witnesses []EntryWitness) (int, func()) {
+	if len(witnesses) == 0 {
+		return -1, func() {}
+	}
+	s.ensureGeneration()
+	release := s.lockShared()
+	defer release()
+
+	each := func(fn func(int) bool) {
+		workers := min(runtime.GOMAXPROCS(0), len(witnesses)/witnessParallelFloor)
+		size := len(witnesses)
+		if workers > 1 {
+			size = (len(witnesses) + workers - 1) / workers
+		}
+		var stop atomic.Bool
+		var wg sync.WaitGroup
+		for start := 0; start < len(witnesses); start += size {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := start; i < min(start+size, len(witnesses)) && !stop.Load(); i++ {
+					if !fn(i) {
+						stop.Store(true)
+					}
+				}
+			}()
+		}
+		wg.Wait()
+	}
+	// dirs are the blob directories whose last use a hit on each entry stamps.
+	dirs := make([]string, len(witnesses))
+	var moved atomic.Int64
+	moved.Store(-1)
+	// holds reports whether the entry witness i was taken of still is at
+	// dirs[i].
+	holds := func(i int) bool {
+		w := witnesses[i]
+		if w.record == "" {
+			return statTaskEntry(dirs[i]) == w.stats
+		}
+		st, ok := fileindex.Lstat(filepath.Join(dirs[i], resultOnlyRecordFilename))
+		return taskEntryFileStat{stat: st, ok: ok} == w.recordStat
+	}
+	each(func(i int) bool {
+		w := witnesses[i]
+		dirs[i] = s.blobDir(w.address)
+		holds := w.Sound()
+		switch {
+		case !holds:
+		case w.record == "":
+			holds = statTaskEntry(dirs[i]) == w.stats
+		default:
+			_, shadowed := fileindex.Lstat(filepath.Join(dirs[i], entryDescriptorFilename))
+			dirs[i] = s.blobDir(w.record)
+			st, ok := fileindex.Lstat(filepath.Join(dirs[i], resultOnlyRecordFilename))
+			holds = !shadowed && taskEntryFileStat{stat: st, ok: ok} == w.recordStat
+		}
+		if !holds {
+			moved.CompareAndSwap(-1, int64(i))
+		}
+		return holds
+	})
+	if i := moved.Load(); i >= 0 {
+		return int(i), func() {}
+	}
+	// The last-use stamps are the caller's to write once its answer returned:
+	// the check above, under the shared lock, is what keeps the answer sound.
+	// A stamp that is late or never written can only cost a later miss, should
+	// a collection run first, never a wrong answer. Each entry is checked
+	// again under the lock before its stamp, so an entry evicted in between is
+	// not stamped (CLI ADR 0116 §6a).
+	return -1, func() {
+		release := s.lockShared()
+		defer release()
+		now := time.Now()
+		each(func(i int) bool {
+			if holds(i) {
+				writeLastUsed(dirs[i], now, s.gen)
+			}
+			return true
+		})
+	}
 }
 
 // TryClaimTaskEntry attempts to own the computation that will publish key's

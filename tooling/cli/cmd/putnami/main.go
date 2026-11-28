@@ -12,9 +12,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
+	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/githooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/launch"
 	"go.putnami.dev/tooling/cli/internal/machineproc"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -74,6 +76,11 @@ func runMachine(args []string) (int, bool) {
 	case "supervise":
 		return machineproc.Supervise(), true
 	case "work":
+		// A worker answers an unchanged run from what it holds, through the
+		// engine, which skips loading and planning, and the scheduler, which
+		// skips the tasks (CLI ADR 0116 §6a); no other process holds anything.
+		engine.ServeHeldRuns(machineproc.RunMemory{})
+		scheduler.ServeHeldRuns(machineproc.RunMemory{})
 		return machineproc.Work(func(ctx context.Context, args []string) int {
 			// What a CLI process memoizes for its life, a worker forgets
 			// before each run: the run must read what is on disk now.

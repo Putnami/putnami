@@ -55,8 +55,9 @@ func TestMain(m *testing.M) {
 
 // collaborationLauncher runs the harness CLI with no Putnami variable an
 // enclosing run exported (a workspace root, a session, a selection), its own
-// Putnami home, and telemetry and automatic installs off, so the suites'
-// temporary workspaces are the only workspaces it sees.
+// Putnami home, and telemetry, automatic installs and the machine process (CLI
+// ADR 0116) off, so the suites' temporary workspaces are the only workspaces it
+// sees and no run reaches the user's machine process.
 const collaborationLauncher = `#!/usr/bin/env bash
 for name in $(compgen -e); do
   case "$name" in
@@ -66,6 +67,7 @@ done
 export PUTNAMI_HOME=@HOME@
 export PUTNAMI_TELEMETRY=off
 export PUTNAMI_NO_AUTO_INSTALL=1
+export PUTNAMI_MACHINE=off
 export DO_NOT_TRACK=1
 exec @BINARY@ "$@"
 `

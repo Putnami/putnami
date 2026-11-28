@@ -17,10 +17,11 @@ const (
 )
 
 // DefaultOn is the machine process's default where neither PUTNAMI_MACHINE
-// nor the user's setting says: off, until the owner decides the default on
-// the measurements of CLI ADR 0116 §15 (§12). `putnami machine on` or
-// PUTNAMI_MACHINE=on turns it on.
-const DefaultOn = false
+// nor the user's setting says: on, on Linux and macOS (CLI ADR 0116 §12).
+// `putnami machine off` or PUTNAMI_MACHINE=off turns it off; a run in CI, a
+// hosted run and a nested run run in their own process whatever it says
+// (Decide).
+const DefaultOn = true
 
 // settingFile is the user's setting under the Putnami home.
 const settingFile = "machine.json"

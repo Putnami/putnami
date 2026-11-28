@@ -478,20 +478,21 @@ func recordKey(key string, patterns []string, expander InputExpander) (string, b
 
 // recordedInputDigest answers the digest the input record holds at key when
 // every part of its witness holds now, with the in-run witness of ADR 0109
-// rebuilt from the files it recorded: its value is the digest and how many of
-// the witness's first parts are the files it selected.
-func recordedInputDigest(record *fileindex.Record, key, dir string, patterns []string) (hash string, witness *selectionWitness, memoize, ok bool) {
+// rebuilt from the files it recorded, and the record's witness, its parts:
+// its value is the digest and how many of the witness's first parts are the
+// files it selected.
+func recordedInputDigest(record *fileindex.Record, key, dir string, patterns []string) (hash string, witness *selectionWitness, parts []fileindex.RecordPart, memoize, ok bool) {
 	value, parts, ok := record.Answer(InputDigestTable, key, record.Hold)
 	if !ok {
-		return "", nil, false, false
+		return "", nil, nil, false, false
 	}
 	fields := strings.Split(string(value), "\x00")
 	if len(fields) != 3 || fields[0] == "" {
-		return "", nil, false, false
+		return "", nil, nil, false, false
 	}
 	n, err := strconv.Atoi(fields[1])
 	if err != nil || n < 0 || n > len(parts) {
-		return "", nil, false, false
+		return "", nil, nil, false, false
 	}
 	files := make([]fileEntry, n)
 	for i, part := range parts[:n] {
@@ -499,7 +500,7 @@ func recordedInputDigest(record *fileindex.Record, key, dir string, patterns []s
 	}
 	witness = newSelectionWitness(dir, patterns, files, collectionFacts{})
 	if witness == nil {
-		return fields[0], nil, fields[2] == "memoized", true
+		return fields[0], nil, parts, fields[2] == "memoized", true
 	}
 	// The record just took the stat of every part: when it shows each
 	// selected file regular and each directory between it and dir a
@@ -532,7 +533,7 @@ func recordedInputDigest(record *fileindex.Record, key, dir string, patterns []s
 			witness.files, witness.usable = prepared, true
 		})
 	}
-	return fields[0], witness, fields[2] == "memoized", true
+	return fields[0], witness, parts, fields[2] == "memoized", true
 }
 
 // recordInputDigest offers a collected digest to the input record with its
