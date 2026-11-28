@@ -1,8 +1,8 @@
 import type { ContainerContext } from '@putnami/runtime';
 import type { HealthContribution, Module, Plugin } from '../application';
 import { HttpPlugin } from '../http/http.plugin';
-import type { HttpMiddleware } from '../http/http-middleware.type';
 import { HttpResponse } from '../http/http-response';
+import { middlewareFromForm } from '../http/middleware-form';
 import { actsOnRoutes, routeMayMatch } from '../http/route-scope';
 import { isHealthChecker, isReadinessChecker } from './checker';
 import {
@@ -175,30 +175,32 @@ export class PlatformPlugin implements Plugin {
     const version = joinPrefix(this.prefix, PATH_VERSION);
     const probePaths = [livez, healthz, readyz, version];
 
-    const probes: HttpMiddleware = async (ctx, next) => {
-      if (ctx.method !== 'GET') return next();
+    // A probe path is answered before the inner chain; any other request goes on untouched.
+    const probes = middlewareFromForm({
+      passes: (ctx) => ctx.method !== 'GET',
+      answer: (ctx) => {
+        // ctx.path() returns the request path; compare against the
+        // configured mount paths via joinPrefix so the matching shape
+        // matches the published helper.
+        const path = `/${ctx.path()}`.replace(/^\/+/, '/');
 
-      // ctx.path() returns the request path; compare against the
-      // configured mount paths via joinPrefix so the matching shape
-      // matches the published helper.
-      const path = `/${ctx.path()}`.replace(/^\/+/, '/');
-
-      if (path === livez) {
-        return this.livez();
-      }
-      if (path === healthz) {
-        this.discoverHealthContributions();
-        return this.aggregate(this.running, this.healthCheckers);
-      }
-      if (path === readyz) {
-        this.discoverHealthContributions();
-        return this.aggregate(this.running && this.ready, this.readinessCheckers, this.required);
-      }
-      if (path === version) {
-        return HttpResponse.json(this.version);
-      }
-      return next();
-    };
+        if (path === livez) {
+          return this.livez();
+        }
+        if (path === healthz) {
+          this.discoverHealthContributions();
+          return this.aggregate(this.running, this.healthCheckers);
+        }
+        if (path === readyz) {
+          this.discoverHealthContributions();
+          return this.aggregate(this.running && this.ready, this.readinessCheckers, this.required);
+        }
+        if (path === version) {
+          return HttpResponse.json(this.version);
+        }
+        return undefined;
+      },
+    });
     // The probes answer GET on their own paths only: a route that cannot
     // match one of them never runs them.
     httpPlugin.prepend(
