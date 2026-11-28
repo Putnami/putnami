@@ -15,8 +15,11 @@ import type { StaticRenderResult } from '../../src/ssr/static-render';
 import { StaticPathStatusError, StaticRenderViolation, staticHtmlPath } from '../../src/ssr/static';
 import { readStaticBuildVersion, writeStaticBuildVersion } from '../../src/ssr/static-build-version';
 
-function fakeApp(prerender: (pathname: string) => Promise<StaticRenderResult>): ReactApplication {
-  return { prerender, localizedPathnames: (pathname: string) => [pathname] } as unknown as ReactApplication;
+function fakeApp(
+  prerender: (pathname: string) => Promise<StaticRenderResult>,
+  localizedPathnames: (pathname: string) => string[] = (pathname) => [pathname],
+): ReactApplication {
+  return { prerender, localizedPathnames } as unknown as ReactApplication;
 }
 
 function tempDir(): string {
@@ -114,7 +117,7 @@ describe('prerenderStaticRoutes', () => {
   });
 
   specTest(
-    'fails the build when a path that paths() lists resolves to a 4xx',
+    'fails the build when a path that paths() lists resolves to a 4xx in every locale',
     {
       feature: 'typescript/web-application-delivery',
       requirement: 'static-loader-status',
@@ -142,12 +145,59 @@ describe('prerenderStaticRoutes', () => {
       expect(caught).toBeInstanceOf(StaticPathStatusError);
       const message = (caught as Error).message;
       expect(message).toContain('/posts/:slug');
-      expect(message).toContain('/posts/gone');
-      expect(message).toContain('404');
+      expect(message).toContain('"slug":"gone"');
+      expect(message).toContain('/posts/gone → 404');
+      expect(existsSync(join(dir, staticHtmlPath('/posts/kept')))).toBe(true);
       expect(existsSync(join(dir, staticHtmlPath('/posts/gone')))).toBe(false);
       rmSync(dir, { recursive: true, force: true });
     },
   );
+
+  specTest(
+    'writes no page for a locale that resolves to a 4xx, and keeps the build for the others',
+    {
+      feature: 'typescript/web-application-delivery',
+      requirement: 'static-loader-status',
+      check: 'prerender-skips-a-locale-that-resolves-to-a-4xx',
+    },
+    async () => {
+      const dir = tempDir();
+      const app = fakeApp(
+        async (pathname) =>
+          pathname.startsWith('/fr/')
+            ? { html: '<p>Page introuvable</p>', status: 404 }
+            : { html: `<p>${pathname}</p>`, status: 200 },
+        (pathname) => [pathname, `/fr${pathname}`],
+      );
+      const pages = await prerenderStaticRoutes(
+        app,
+        [{ route: '/posts/:slug', staticConfig: { mode: 'ssg', paths: async () => [{ slug: 'hello' }] } }],
+        dir,
+      );
+
+      expect(pages.map((page) => page.pathname)).toEqual(['/posts/hello']);
+      expect(existsSync(join(dir, staticHtmlPath('/fr/posts/hello')))).toBe(false);
+      rmSync(dir, { recursive: true, force: true });
+    },
+  );
+
+  it('keeps the build for a static route that redirects or answers a 5xx', async () => {
+    const dir = tempDir();
+    const app = fakeApp(async (pathname) =>
+      pathname === '/old' ? { html: '', status: 301, redirectLocation: '/new' } : { html: '<p>down</p>', status: 503 },
+    );
+    const pages = await prerenderStaticRoutes(
+      app,
+      [
+        { route: '/old', staticConfig: { mode: 'ssg' } },
+        { route: '/down', staticConfig: { mode: 'ssg' } },
+      ],
+      dir,
+    );
+
+    expect(pages.map((page) => page.pathname)).toEqual(['/down']);
+    rmSync(dir, { recursive: true, force: true });
+  });
 
   it('swallows non-violation errors so one page cannot break the build', async () => {
     const dir = tempDir();

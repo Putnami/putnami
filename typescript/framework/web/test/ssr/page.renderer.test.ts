@@ -601,12 +601,14 @@ describe('page.renderer', () => {
 
           const notFound = new NotFoundException('no such order');
           const clientError = await loadersSpanOf(notFound);
+          expect(clientError.span).toBeDefined();
           expect(clientError.span?.statusCode).not.toBe(2);
           expect(clientError.span?.statusMessage).toBeUndefined();
           // The exception stays the request error, which the request log writes below ERROR.
           expect(clientError.requestError).toBe(notFound);
 
           const serverError = await loadersSpanOf(new HttpException('upstream down', 503));
+          expect(serverError.span).toBeDefined();
           expect(serverError.span?.statusCode).toBe(2);
           expect(serverError.span?.statusMessage).toBe('error');
 

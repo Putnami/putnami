@@ -183,21 +183,23 @@ export function isStaticRenderViolation(value: unknown): value is StaticRenderVi
 }
 
 /**
- * Thrown by static prerender when a path that a route's `paths()` lists
- * resolves to a 4xx, such as a loader that throws `NotFoundException`: the
- * build fails rather than write a not-found page the server would serve as a
- * found one.
+ * Thrown by static prerender when a static path resolves to a 4xx in every
+ * locale it expands to, such as a loader that throws `NotFoundException`: the
+ * route lists a page that does not exist, and the build fails rather than
+ * write a not-found page the server would serve with 200.
  */
 export class StaticPathStatusError extends Error {
   constructor(
     readonly route: string,
-    readonly pathname: string,
-    readonly status: number,
+    readonly params: StaticPathParams,
+    readonly resolved: readonly { pathname: string; status: number }[],
   ) {
-    super(
-      `Static route ${route}: paths() lists ${pathname}, but its render resolved to status ${status}. ` +
-        'Remove the path from paths(), or make its loader return data for it.',
-    );
+    const statuses = resolved.map(({ pathname, status }) => `${pathname} → ${status}`).join(', ');
+    const listed = Object.keys(params).length > 0 ? ` with params ${JSON.stringify(params)}` : '';
+    const hint = listed
+      ? 'Remove the entry from paths(), or make the loader return data for it.'
+      : 'Make the loader return data for it.';
+    super(`Static route ${route}${listed} resolved to a client error in every locale (${statuses}). ${hint}`);
     this.name = 'StaticPathStatusError';
   }
 }

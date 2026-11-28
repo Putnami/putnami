@@ -84,12 +84,14 @@ Requests for a path that was **not** enumerated fall back to a live static rende
 
 A static loader throws an `HttpException` as a live page's loader does, and the
 page answers with its status: a `NotFoundException` renders the not-found
-boundary with 404. When a path that `paths()` lists resolves to a 4xx, the build
-fails with a message that names the route, the path and the status, and writes
-no page for it. A pre-rendered file is served with 200, so the build does not
-write a not-found page in its place: remove the path from `paths()`, or make the
-loader return data for it. A path that is not listed still renders live and
-answers its own status, such as 404.
+boundary with 404. A pre-rendered file is served with 200, so the build writes
+no page for a pathname that resolves to a 4xx: that pathname renders live and
+answers its own status. When a static path resolves to a 4xx in every locale it
+expands to, the route lists a page that does not exist, and the build fails
+with a message that names the route, the params and each status: remove the
+entry from `paths()`, or make the loader return data for it. A path that
+resolves to a 4xx in one locale only, such as an untranslated post, keeps the
+build. A 5xx is still written as the error page.
 
 ### Incremental Static Regeneration (ISR)
 
