@@ -13,7 +13,9 @@ import type { HttpRequestContext, HttpRequestContextInternal } from './http-cont
  */
 export function isMinimalRoute(ctx: HttpRequestContext): boolean {
   const matched = (ctx as HttpRequestContextInternal).__matchedHandlers;
-  return matched !== undefined && matched.length > 0 && matched.every((h) => h.minimal === true);
+  if (matched === undefined || matched.length === 0) return false;
+  if (matched.length === 1) return matched[0].minimal === true;
+  return matched.every((h) => h.minimal === true);
 }
 
 /**
@@ -24,9 +26,7 @@ export function isMinimalRoute(ctx: HttpRequestContext): boolean {
  */
 export function skipsSecurityHeaders(ctx: HttpRequestContext): boolean {
   const matched = (ctx as HttpRequestContextInternal).__matchedHandlers;
-  return (
-    matched !== undefined &&
-    matched.length > 0 &&
-    matched.every((h) => h.minimal === true || h.securityHeaders === false)
-  );
+  if (matched === undefined || matched.length === 0) return false;
+  if (matched.length === 1) return matched[0].minimal === true || matched[0].securityHeaders === false;
+  return matched.every((h) => h.minimal === true || h.securityHeaders === false);
 }
