@@ -156,6 +156,13 @@
       ]
     },
     {
+      "id": "feature-findings-are-evidence-fragments",
+      "text": [
+        "validate-workspace runs features-validate once: it validates every project validate activates on, each as its own task would, and states each finding as a finding fragment at the workspace file it names, in its required putnami-evidence.jsonl, empty when it finds nothing.",
+        "It succeeds whatever the findings say and reads no selection, so a narrowed validate fails only on the error findings of the projects it selected."
+      ]
+    },
+    {
       "id": "every-project-carries-feature-coverage",
       "text": [
         "With options.sdd.featureCoverage declared, validate-workspace judges every project, with or without a putnami.json.",
@@ -278,6 +285,7 @@
     "protocols/features/doc/adr/0006-the-spec-source-contract.md",
     "protocols/architecture/doc/adr/0003-authored-documents-are-promised-findings-are-not.md",
     "tooling/sdd-extension/doc/adr/0005-a-structurizr-model-is-an-authored-architecture.md",
-    "protocols/ci/doc/adr/0008-a-verdict-policy-states-what-a-gap-costs.md"
+    "protocols/ci/doc/adr/0008-a-verdict-policy-states-what-a-gap-costs.md",
+    "tooling/sdd-extension/doc/adr/0006-feature-validation-runs-once-and-states-its-findings.md"
   ]
 }

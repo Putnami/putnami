@@ -291,7 +291,9 @@ build task because `channel` is neither a declared input nor a flag of the
 `build` command, while changing its `target`, `minify`, or `sourcemap` input
 still produces a miss. Operational parameters such as project selection,
 output formatting, and parallelism likewise stay outside task keys unless the
-task contract or its owning command defines them.
+task contract or its owning command defines them. A workspace task's key is
+the exception: it holds the projects the run selected, unless the task
+declares `selection: none` (see Failure replay below).
 
 ### File Content Hashing
 
@@ -744,16 +746,24 @@ because both used to surprise:
   get past a stuck verdict was the single path that could not clear it.
   A bypassed **failure** is still refused — its verdict is not describable by a
   key the run declined to read, which is what the bypass means.
-- **A task keys the same under every selection.** `--projects <p>` and
-  `--impacted` give the same task the same key for the same inputs, so a green
-  run under either clears what the other recorded. The selection decides which
-  tasks run, never how one is keyed: the planner resolves a task's upstream
-  dependencies against the workspace dependency **graph**, not against the
-  selection, so the same upstream jobs are planned — and therefore the same
-  upstream hashes folded — whichever way the run was narrowed. A project that
-  `disable.tags` removes from an `--impacted` selection contributes nothing to
-  this: its own tasks are simply not planned there, and a task that is not
-  planned produces no replay line to read.
+- **A project task keys the same under every selection.** `--projects <p>`
+  and `--impacted` give the same project task the same key for the same
+  inputs, so a green run under either clears what the other recorded. The
+  selection decides which tasks run, never how one is keyed: the planner
+  resolves a task's upstream dependencies against the workspace dependency
+  **graph**, not against the selection, so the same upstream jobs are planned
+  — and therefore the same upstream hashes folded — whichever way the run was
+  narrowed. A project that `disable.tags` removes from an `--impacted`
+  selection contributes nothing to this: its own tasks are simply not planned
+  there, and a task that is not planned produces no replay line to read.
+- **A workspace task keys on the selected projects, unless it reads none.** A
+  task that runs once for the workspace is handed the projects the run
+  selected, in `selectedProjects`, and its key holds their ids, so each
+  selection gets its own entry. A task that declares `selection: none` is
+  handed no `selection` and no `selectedProjects`, so it cannot read them,
+  and its key holds none: one entry serves `--all`, `--impacted` and
+  `--projects`
+  ([ADR 0134](adr/0134-a-run-fails-on-the-findings-of-the-projects-it-selected.md)).
 
 **What is never recorded.** A verdict is recorded only when the cache key
 explains it, so these seven are always re-executed:
@@ -1842,7 +1852,7 @@ no ignore rule excludes, and keys on `git:**`, which hashes exactly that set
 (ADR [0041](adr/0041-git-candidate-file-inputs.md)): its read set and its key
 are then one list. `lint-docs`, the `validate-workspace` checks,
 `@putnami/sdd`'s `features-validate` (the `features` step of `putnami
-validate`) and `@putnami/clientgen`'s `clientgen-workspace-check` (the
+validate-workspace`) and `@putnami/clientgen`'s `clientgen-workspace-check` (the
 `clientgen-guard` task of `putnami validate`) do this.
 
 ### Source-Bound Tasks

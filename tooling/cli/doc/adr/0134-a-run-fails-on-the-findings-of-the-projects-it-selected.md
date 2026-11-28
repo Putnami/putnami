@@ -2,9 +2,14 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-27
+- **Amended**: 2026-11-27. A workspace task keys on the projects the run
+  selected unless its task declares `selection: none` (Context, items 1, 2 and
+  6), and warnings print one line per project and rule (item 4)
 - **Scope**: `@putnami/cli` (`internal/engine`, `internal/specgate`,
-  `internal/jobs/cachekey`, `internal/jobs/remotecache`),
-  `protocols/evidence` (the evidence fragment, kind `finding`)
+  `internal/jobs/cachekey`, `internal/jobs/remotecache`,
+  `internal/jobs/scheduler`), `protocols/evidence` (the evidence fragment,
+  kind `finding`), `protocols/extension` and `protocols/cli` (the task member
+  `selection` and contract 30)
 - **Implements**: part of ADR 0006 of `protocols/evidence` (evidence is
   fragments that tasks emit and a collector streams): the `finding` fragment
   and a first, local verdict over fragments
@@ -17,11 +22,11 @@ reads nearly the same files, and each re-runs on every commit. One workspace
 task would do the work once, but a narrowed run must still report, and fail
 on, the findings of the projects it selected only.
 
-A task cannot read the selection: a task keys the same under every selection
-(`doc/10-caching.md`), so a cached verdict that depended on it would be
-replayed for another selection. Adding the selection to the key would give
-every selection its own entry, and would become redundant once the verdict
-over fragments of ADR 0006 lands.
+A verdict must not depend on the selection, or a cached one would be
+replayed for another selection. A project task keys the same under every
+selection, but a task that runs once for the workspace is handed the projects
+the run selected, and its key holds them (`doc/10-caching.md`): each selection
+gets its own entry, whether the task reads the selection or not.
 
 The spec gate already decides after the session from what tasks wrote, read
 from the session or, on a narrowed run, from the cache (ADRs 0026 and 0072).
@@ -34,7 +39,7 @@ flowchart LR
   R --> F["evidence verdict finalizer<br/>after the session"]
   S["run selection"] --> F
   F -->|"error finding of a selected project"| X["&lt;project&gt;:evidence~verdict failed"]
-  F -->|"warning"| E["stderr"]
+  F -->|"warnings, counted per project and rule"| E["stderr and the session record"]
 ```
 
 1. **A task states findings; it does not decide.** A task writes its findings
@@ -42,11 +47,13 @@ flowchart LR
    which it declares as a required file of its command output and writes on
    every run, empty when it finds nothing. Their paths are relative to the
    task's project. A task that only reports findings succeeds whatever they
-   say. The planner lets one task per project and command declare the file.
+   say. The planner lets one task per project and command declare the file. A
+   workspace task that reads no selection declares `selection: none` (item 6).
 2. **The declaration decides what is read.** Every execution and every
    restore replaces a required command-output file whole, so the verdict reads
    the same file whether the task ran or was served from the cache, and never
-   an earlier run's. One entry serves every selection. `putnami-evidence`
+   an earlier run's. For a task that declares `selection: none`, one entry
+   serves every selection. `putnami-evidence`
    names the file as an artifact: a cache hit restores it on the result, as for
    the verification report and the criteria projection, so reports list it.
 3. **The CLI decides after the session.** A finalizer reads the fragment file
@@ -59,20 +66,39 @@ flowchart LR
 4. **The selection decides what fails.** An unscoped run counts every
    project. A narrowed run counts the projects it selected, and findings that
    no project owns, which belong to no selection and so count under every
-   one. Warnings of the counted projects print on stderr and change no exit
-   code.
+   one. The warnings of the counted projects change no exit code. They print
+   on stderr as one line per project and rule, with its count, sorted, and
+   each reaches the session record as one `evidence:warning` session event in
+   `events.jsonl`: its project, the task that stated it, its rule, message and
+   place. A session event is no task, so a warning neither counts nor votes,
+   and a warm run records it without executing anything.
 5. **A file the reader refuses fails the task that wrote it**, as
    `<project>:evidence~verdict`, naming the file, under every selection. So
    does a declared file that is missing, one declared optional, and the
    artifact reported by a task that does not declare the file. Silence is no
    verdict. The diagnostics carry the producers' rule names as codes, which
    are not codes of the CLI.
+6. **A task that reads no selection says so.** A task declares
+   `selection: none` (`protocols/extension`, contract 30 of `protocols/cli`)
+   when what it does is the same whichever projects the run selected. The CLI
+   then hands it no `selection` and no `selectedProjects` in its job context,
+   so no `PUTNAMI_SELECTED_*` variable and no selection template variable,
+   and keys it on no selected project. The task cannot read what its key
+   omits, and one entry serves `--all`, `--impacted` and `--projects`. A task
+   that does not declare it keeps its key on the projects the run selected.
 
 ## Rejected alternatives
 
 - **The selection as a keyed runtime input of the task.** Sound, but each
   selection would get its own entry, and the primitive would retire with the
-  verdict of ADR 0006.
+  verdict of ADR 0006. A workspace task that does not declare
+  `selection: none` is keyed this way.
+- **A key without the selected projects for every workspace task.** A task
+  that reads `selectedProjects` would be replayed for another selection.
+- **Every warning on its own stderr line.** An unscoped run of this
+  repository printed one line per warning, about 2,600.
+- **A succeeded synthetic row that lists the warnings.** It would count as a
+  task that ran, on every run that has a warning, warm runs included.
 - **An uncached workspace task that reads the selection.** It would run on
   every run, unchanged runs included.
 - **A cached workspace task that fails on any project's finding.** A narrowed

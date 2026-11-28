@@ -99,7 +99,8 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: RuntimeEntriesContract for runtime entries, compiled inputs or
+// the manifest: SelectionFreeTaskContract for a task that declares selection
+// none, RuntimeEntriesContract for runtime entries, compiled inputs or
 // a task that names a runtime entry, ContextActivationContract for a step
 // activation that declares projectTypes or anyOf, EmptiedFileOutputContract for a file
 // output that declares emptied, PromptHostHooksContract for a host hook at UserPromptSubmit or
@@ -164,6 +165,9 @@ func RequiredLoadContract(m *Manifest) int {
 		}
 		if declaresPublishChannels(task) {
 			required = max(required, protocolcli.PublishChannelsContract)
+		}
+		if task.ReadsNoSelection() {
+			required = max(required, protocolcli.SelectionFreeTaskContract)
 		}
 	}
 	// A vocabulary's default traits change plans wherever the manifest loads

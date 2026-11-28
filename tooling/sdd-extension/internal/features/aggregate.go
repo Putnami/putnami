@@ -203,8 +203,9 @@ func authoredFeatureAuthority(manifests []featureproto.ManifestSource) (map[stri
 	ids := make(map[string]bool)
 	roots := make(map[string]bool)
 	for _, source := range manifests {
-		manifest := featureproto.CanonicalManifest(source.Manifest)
-		for _, feature := range manifest.Features {
+		// The identities form a set, so the authored order serves as well as the
+		// canonical one, and the manifest is not copied to read them.
+		for _, feature := range source.Manifest.Features {
 			ids[feature.ID] = true
 			roots[featureManifestRoot(source.Path)] = true
 		}

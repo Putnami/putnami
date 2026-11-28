@@ -21,6 +21,12 @@ import (
 // reported under: <project>:evidence~verdict.
 const EvidenceVerdictTask = "evidence~verdict"
 
+// EvidenceWarningRecord is the type of the session record that carries one
+// warning finding of a counted project. A session record is no task: it is
+// neither counted nor voted, and a warm run records it without executing
+// anything.
+const EvidenceWarningRecord = "evidence:warning"
+
 // maxListedFindings bounds the findings one sanction message names; the
 // diagnostics list every one.
 const maxListedFindings = 5
@@ -179,8 +185,8 @@ type EvidenceSanction struct {
 // and, under any selection, a finding no project owns and a fragment file the
 // reader refused. It returns the sanction of each
 // failing project, keyed by its id ("" for findings no project owns), and the
-// warnings of the counted projects, in a deterministic order.
-func EvidenceVerdict(findings []Finding, refusals []Refusal, selection *protocoljob.Selection) (map[string]EvidenceSanction, []string) {
+// warning findings of the counted projects, in the order of findings.
+func EvidenceVerdict(findings []Finding, refusals []Refusal, selection *protocoljob.Selection) (map[string]EvidenceSanction, []Finding) {
 	counts := func(project string) bool {
 		if project == "" || selection == nil || !selection.Scoped {
 			return true
@@ -193,7 +199,7 @@ func EvidenceVerdict(findings []Finding, refusals []Refusal, selection *protocol
 		return false
 	}
 	errorsByProject := map[string][]Finding{}
-	var warnings []string
+	var warnings []Finding
 	for _, finding := range findings {
 		if !counts(finding.Project) {
 			continue
@@ -202,7 +208,7 @@ func EvidenceVerdict(findings []Finding, refusals []Refusal, selection *protocol
 		case evidence.FindingError:
 			errorsByProject[finding.Project] = append(errorsByProject[finding.Project], finding)
 		case evidence.FindingWarning:
-			warnings = append(warnings, fmt.Sprintf("%s: %s (%s)", location(finding), finding.Fragment.Message, finding.Fragment.Rule))
+			warnings = append(warnings, finding)
 		}
 	}
 	sanctions := map[string]EvidenceSanction{}
@@ -247,8 +253,65 @@ func EvidenceVerdict(findings []Finding, refusals []Refusal, selection *protocol
 		}
 		sanctions[refusal.Project] = sanction
 	}
-	sort.Strings(warnings)
 	return sanctions, warnings
+}
+
+// warningSummary is one line per counted project and rule of warnings, with
+// its count, sorted by project, then rule.
+func warningSummary(warnings []Finding) []string {
+	type group struct{ project, rule string }
+	counted := map[group]int{}
+	for _, finding := range warnings {
+		counted[group{orWorkspace(finding.Project), finding.Fragment.Rule}]++
+	}
+	groups := make([]group, 0, len(counted))
+	for key := range counted {
+		groups = append(groups, key)
+	}
+	sort.Slice(groups, func(i, j int) bool {
+		if groups[i].project != groups[j].project {
+			return groups[i].project < groups[j].project
+		}
+		return groups[i].rule < groups[j].rule
+	})
+	lines := make([]string, 0, len(groups))
+	for _, key := range groups {
+		lines = append(lines, fmt.Sprintf("%s: %d warning finding(s) %s", key.project, counted[key], key.rule))
+	}
+	return lines
+}
+
+// warningRecords are the session records of warnings, one per finding, in
+// their order: the project that owns it ("" for none), the task whose
+// fragments stated it, its rule, message and place.
+func warningRecords(warnings []Finding) []jobs.SessionRecord {
+	records := make([]jobs.SessionRecord, 0, len(warnings))
+	for _, finding := range warnings {
+		data := map[string]any{
+			"project":  finding.Project,
+			"task":     finding.Task,
+			"severity": evidence.FindingWarning,
+			"code":     finding.Fragment.Rule,
+			"message":  finding.Fragment.Message,
+			"file":     finding.Path,
+		}
+		if line := finding.Fragment.Subject.Line; line > 0 {
+			data["line"] = line
+		}
+		if column := finding.Fragment.Subject.Column; column > 0 {
+			data["column"] = column
+		}
+		records = append(records, jobs.SessionRecord{Type: EvidenceWarningRecord, Data: data})
+	}
+	return records
+}
+
+// orWorkspace names the owner of a finding no project owns "workspace".
+func orWorkspace(project string) string {
+	if project == "" {
+		return "workspace"
+	}
+	return project
 }
 
 // location renders a finding's place: path, then line and column when known.
@@ -316,18 +379,25 @@ func slashProjectPath(projectPath string) string {
 // (CLI ADR 0134). After the session it reads the finding fragments every
 // result carries, run or restored from the cache, and decides under the run's
 // selection: each counted project with an error finding fails as
-// <project>:evidence~verdict, and the counted projects' warnings go to warn.
-// The selection enters no task's key, so one cache entry serves every
-// selection.
-func EvidenceVerdictFinalizer(ws *workspace.Workspace, planned []*jobs.ScheduledJob, selection *protocoljob.Selection, warn io.Writer) func(map[string]*jobs.JobResult) {
+// <project>:evidence~verdict. The counted projects' warnings go to warn as one
+// line per project and rule with its count, and each one reaches the session
+// record through record, when it is set, as an EvidenceWarningRecord. A task
+// that declares it reads no selection keys on none, so one cache entry serves
+// every selection.
+func EvidenceVerdictFinalizer(ws *workspace.Workspace, planned []*jobs.ScheduledJob, selection *protocoljob.Selection, warn io.Writer, record func(jobs.SessionRecord)) func(map[string]*jobs.JobResult) {
 	return func(results map[string]*jobs.JobResult) {
 		findings, refusals := CollectFindings(ws, planned, results)
 		if len(findings) == 0 && len(refusals) == 0 {
 			return
 		}
 		sanctions, warnings := EvidenceVerdict(findings, refusals, selection)
-		for _, warning := range warnings {
-			_, _ = fmt.Fprintf(warn, "putnami: evidence: %s\n", warning)
+		for _, line := range warningSummary(warnings) {
+			_, _ = fmt.Fprintf(warn, "putnami: evidence: %s\n", line)
+		}
+		if record != nil {
+			for _, warning := range warningRecords(warnings) {
+				record(warning)
+			}
 		}
 		// A finding no project owns is reported under "workspace", which a
 		// workspace task's own sanction may also be: the two merge, in a
@@ -339,11 +409,7 @@ func EvidenceVerdictFinalizer(ws *workspace.Workspace, planned []*jobs.Scheduled
 		sort.Strings(projects)
 		for _, project := range projects {
 			sanction := sanctions[project]
-			owner := project
-			if owner == "" {
-				owner = "workspace"
-			}
-			key := owner + ":" + EvidenceVerdictTask
+			key := orWorkspace(project) + ":" + EvidenceVerdictTask
 			if earlier, ok := results[key]; ok && earlier.Error != nil && earlier.Canonical != nil {
 				sanction.Message = earlier.Error.Message + "; " + sanction.Message
 				sanction.Diagnostics = append(append([]jobs.TaskDiagnostic(nil), earlier.Canonical.Diagnostics...), sanction.Diagnostics...)

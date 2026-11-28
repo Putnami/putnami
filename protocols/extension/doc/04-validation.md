@@ -389,10 +389,13 @@ refuse the event or the member, or run the hook in the foreground.
 that declares `self` is read from contract 26 and raises no rung: a reader
 below 26 drops the member and probes the binary once per run, with the same
 answer, so neither `RequiredCLIContract` nor `RequiredLoadContract` includes
-it. A manifest that
+it. A manifest with a task that declares `selection: none` requires
+contract 30 wherever it loads from: a reader at 30 hands the task no run
+selection and keys it on no selected project, and an older reader refuses the
+member. `RequiredLoadContract` includes that rung too. A manifest that
 still carries the deleted `tools` section loads leniently with no provider,
 and strict validation refuses the member. The reader loads every stamp from
-the one the manifest's vocabulary requires up to `protocols/cli.LatestContract` (26):
+the one the manifest's vocabulary requires up to `protocols/cli.LatestContract` (30):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|

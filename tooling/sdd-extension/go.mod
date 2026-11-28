@@ -9,6 +9,7 @@ require (
 	go.putnami.dev/protocol/cli v0.0.0
 	go.putnami.dev/protocol/contracts v0.0.0
 	go.putnami.dev/protocol/diagnostic v0.0.0
+	go.putnami.dev/protocol/evidence v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
@@ -19,6 +20,7 @@ require (
 )
 
 require (
+	go.putnami.dev/protocol/codehost v0.0.0 // indirect
 	go.putnami.dev/protocol/config v0.0.0 // indirect
 	go.putnami.dev/protocol/distribution v0.0.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
@@ -28,9 +30,11 @@ replace (
 	go.putnami.dev/protocol/architecture => ../../protocols/architecture
 	go.putnami.dev/protocol/capabilities => ../../protocols/capabilities
 	go.putnami.dev/protocol/cli => ../../protocols/cli
+	go.putnami.dev/protocol/codehost => ../../protocols/codehost
 	go.putnami.dev/protocol/config => ../../protocols/config
 	go.putnami.dev/protocol/contracts => ../../protocols/contracts
 	go.putnami.dev/protocol/diagnostic => ../../protocols/diagnostic
+	go.putnami.dev/protocol/evidence => ../../protocols/evidence
 	go.putnami.dev/protocol/extension => ../../protocols/extension
 	go.putnami.dev/protocol/features => ../../protocols/features
 	go.putnami.dev/protocol/gomod => ../../protocols/gomod

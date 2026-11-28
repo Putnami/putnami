@@ -806,6 +806,18 @@ one-spec-per-feature uniqueness. The reusable byte-conformance runners and the
 Go/TypeScript/Python-authored and hand-authored vectors live under
 `conformance/` and `fixtures/equivalence/`.
 
+`ValidateManifest` memoizes its findings for the process, by the SHA-256 of
+the manifest's content: every field, exported or not, a nil apart from an
+empty list, and each string's exact bytes. It never keys on a path or a file
+time. A hit returns the findings a fresh validation returns, in the same
+order, as the caller's own copy, so a caller that rewrites a field changes
+nothing another caller holds. `ValidateRepository` reaches the memo through
+each manifest it validates, so a workspace validation that reads one manifest
+for every project validates it once. The memo is safe for concurrent use,
+holds at most 4096 answers and starts over past them, and keeps nothing
+beyond the process. A manifest whose content holds a map or an interface,
+which no manifest type declares, is validated fresh.
+
 ## Ownership and support status
 
 - **Owner**: `go.putnami.dev/protocol/features` (`protocols/features`).

@@ -624,9 +624,11 @@ so a serve workload's log lines cannot crowd out the claim a supervisor waits
 on.
 
 Session-wide `scheduler:parallel`, `selection:impacted`,
-`selection:change-shape` and `invocation:reaped` audit signals use a stable
-workspace-scoped `@putnami/cli` system identity because the v2 stream has no
-free-standing event variant. Their original type
+`selection:change-shape`, `invocation:reaped` and `evidence:warning` audit
+signals use a stable workspace-scoped `@putnami/cli` system identity because
+the v2 stream has no free-standing event variant. The evidence verdict records
+one `evidence:warning` after the session for each warning finding it counts,
+with its project, task, severity, code, message and position (CLI ADR 0134). Their original type
 and data remain in the normalized event object; the legacy `job:end` projection
 is not duplicated.
 

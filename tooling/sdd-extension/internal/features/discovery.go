@@ -25,6 +25,10 @@ type Request struct {
 	// Only validation sets it: a stale claim fails validation, and never
 	// withholds a snapshot, an inspection or a listing.
 	ResolveSurfaces bool
+	// Documents, when set, answers the strict parse of each authored manifest,
+	// feature document and evidence document, so evaluations of one tree that
+	// share it parse each document once. Nil parses every document.
+	Documents *DocumentCache
 }
 
 type discoveryRoot struct {
@@ -251,7 +255,7 @@ func (result *discoveredRepository) discoverEvidence(
 			result.diagnostics = append(result.diagnostics, findings...)
 			continue
 		}
-		document, parseFindings := featureproto.ParseEvidenceDocument(data)
+		document, parseFindings := request.Documents.evidenceDocument(data)
 		appendPathDiagnostics(&findings, workspacePath, parseFindings)
 		if document == nil || !seed && !documentCarriesSelected(document, selected) {
 			// A document that never mentions a selected feature is outside the
@@ -344,7 +348,9 @@ func selectedFeatureIdentities(scope *Scope, manifests []featureproto.ManifestSo
 		if source.Manifest == nil {
 			continue
 		}
-		for _, feature := range featureproto.CanonicalManifest(source.Manifest).Features {
+		// The identities form a set, so the authored order serves as well as the
+		// canonical one, and the manifest is not copied to read them.
+		for _, feature := range source.Manifest.Features {
 			if feature.ID != "" {
 				features.ids[feature.ID] = true
 			}
@@ -361,7 +367,9 @@ func manifestDeclaresSelected(source featureproto.ManifestSource, selected selec
 	if source.Manifest == nil {
 		return false
 	}
-	for _, feature := range featureproto.CanonicalManifest(source.Manifest).Features {
+	// The identities form a set, so the authored order serves as well as the
+	// canonical one, and the manifest is not copied to read them.
+	for _, feature := range source.Manifest.Features {
 		if selected.has(feature.ID) {
 			return true
 		}
@@ -506,14 +514,14 @@ func discoverManifests(request Request, roots []discoveryRoot, seenPaths map[str
 			continue
 		}
 		if single {
-			manifest, findings := featureproto.ParseManifest(data)
+			manifest, findings := request.Documents.manifest(data)
 			appendPathDiagnostics(&diagnostics, manifestPath, findings)
 			if manifest != nil {
 				manifests = append(manifests, featureproto.ManifestSource{Path: manifestPath, Manifest: manifest})
 			}
 		}
 		for _, document := range documents {
-			parsed, findings := featureproto.ParseFeatureDocument(document.data)
+			parsed, findings := request.Documents.featureDocument(document.data)
 			appendPathDiagnostics(&diagnostics, document.path, findings)
 			if parsed != nil {
 				manifests = append(manifests, featureproto.ManifestSource{Document: true, Path: document.path, Manifest: parsed.Manifest()})

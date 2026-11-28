@@ -187,10 +187,10 @@ func TestSpecVerdictFailsOnASeededViolationAcrossTheWire(t *testing.T) {
 	}
 }
 
-// TestFeatureVerdictMatchesTheLoaderOnAProjectScopedJob pins the first step of
-// the `validate` pipeline the same way. features-validate runs before
-// specs-validate and reads the same membership, so a view that could not see
-// the project would have made both steps vacuous together.
+// TestFeatureVerdictMatchesTheLoaderOnAProjectScopedJob pins the feature
+// evaluation the same way. features-validate evaluates each project over the
+// membership specs-validate reads, so a view that could not see the project
+// would have made both steps vacuous together.
 func TestFeatureVerdictMatchesTheLoaderOnAProjectScopedJob(t *testing.T) {
 	root := specsFixtureProject(t, validBillingSpec)
 

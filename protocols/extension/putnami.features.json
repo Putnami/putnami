@@ -341,7 +341,9 @@
               "context-activation-requires-contract-28",
               "context-activation-below-contract-28-does-not-load",
               "runtime-entries-require-contract-29",
-              "runtime-entries-below-contract-29-do-not-load"
+              "runtime-entries-below-contract-29-do-not-load",
+              "selection-free-tasks-require-contract-30",
+              "selection-free-tasks-below-contract-30-do-not-load"
             ]
           }
         },

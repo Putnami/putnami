@@ -312,6 +312,14 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 		if task.Command == "" {
 			diags = append(diags, diag.Errorf("required-field", field+".command", "task command is required"))
 		}
+		if task.Selection != "" && task.Selection != TaskSelectionNone {
+			diags = append(diags, diag.Errorf("invalid-enum", field+".selection",
+				"invalid task selection %q; the one value is %q, for a task that reads no run selection", task.Selection, TaskSelectionNone))
+		}
+		if task.ReadsNoSelection() && task.Batchable != nil {
+			diags = append(diags, diag.Errorf("invalid-value", field+".selection",
+				"a batchable task cannot declare selection %q: a batch hands its members to the task as its selected projects", TaskSelectionNone))
+		}
 		if task.Batchable != nil {
 			if strings.TrimSpace(task.Batchable.Tool) == "" {
 				diags = append(diags, diag.Errorf("required-field", field+".batchable.tool", "batchable tool is required"))

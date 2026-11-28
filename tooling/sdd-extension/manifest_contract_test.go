@@ -68,7 +68,8 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 		// `validate` plans `validate-workspace` too, with its own activation,
 		// even when no project's features or specs are touched.
 		Command("validate", proto.CommandDefinition{
-			Description: "Validate a project's specification-driven declarations: its features and the specs that detail them.",
+			Description: "Validate a project's specs against the features they detail. " +
+				"The features themselves are validated once per workspace, by the features step of validate-workspace, which validate also runs.",
 			// The command activates for a project that authors either artifact.
 			// A project with neither has nothing to validate, so it is pruned at
 			// plan time rather than skipped at run time.
@@ -78,21 +79,19 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			// criteria, and declare it, so a workspace without @putnami/dev
 			// keeps the kind.
 			Traits: &proto.CommandTraits{Kind: proto.CommandKindCriteria},
+			// The features of every project are a step of validate-workspace:
+			// their key is the whole candidate cut, so one task answers for
+			// every project, and the CLI fails a run only on the findings of
+			// the projects it selected (ADR 0006 of this extension).
 			Run: []proto.PipelineStep{
-				{ID: "features", Task: "features-validate"},
-				// No dependsOn orders the two steps. specs-validate reads the
-				// manifests itself and reports one that fails to parse, and a
-				// step's key holds the key of every step it depends on: an
-				// edge to features-validate, keyed on the whole candidate cut,
-				// would move every project's specs key on any edit anywhere.
 				{ID: "specs", Task: "specs-validate"},
 			},
 		}).
 		Command("validate-workspace", proto.CommandDefinition{
-			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decision registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority and that the list holds no entry the merge base with the impacted baseline lacks, and check each putnami.verdict-policy.json file and the directory it sits in.",
+			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decision registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority and that the list holds no entry the merge base with the impacted baseline lacks, check each putnami.verdict-policy.json file and the directory it sits in, and validate the feature manifests of every project and the evidence behind them, stating each finding as an evidence fragment the CLI judges for the projects a run selects.",
 			Activation:  "workspace-once",
 			Traits:      &proto.CommandTraits{Kind: proto.CommandKindCriteria},
-			// The eleven steps are independent workspace-wide steps; none reads
+			// The twelve steps are independent workspace-wide steps; none reads
 			// another's answer, so no dependsOn orders them.
 			Run: []proto.PipelineStep{
 				{ID: "architecture", Task: "architecture-validate"},
@@ -106,45 +105,66 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				{ID: "feature-coverage", Task: "feature-coverage-validate"},
 				{ID: "feature-coverage-ratchet", Task: "feature-coverage-ratchet-validate"},
 				{ID: "verdict-policy", Task: "verdict-policy-validate"},
+				{ID: "features", Task: "features-validate"},
 			},
 		}).
 		Task("features-validate", proto.TaskDefinition{
-			Description: "Validate one project's durable feature manifest and the evidence backing its requirements. " +
-				"It reads the workspace's Git candidate cut and nothing else: the tracked files and the untracked files no ignore rule excludes, which the input `git:**` holds, " +
-				"so editing, adding, deleting or renaming any file it reads moves the key, and an ignored file is neither read nor keyed. " +
+			Description: "Validate the durable feature manifests of every project `validate` activates on, and the evidence backing their requirements, once per workspace: " +
+				"each project as a per-project task would, with the same rules and severities. " +
+				"It states what it finds as finding fragments in putnami-evidence.jsonl, a required file of its command output it writes on every run, empty when it finds nothing, each fragment located at the workspace file it names. " +
+				"It publishes no diagnostic and succeeds whatever the findings say: " +
+				"the CLI fails the run on the error findings of the projects the run selected. " +
+				"The task declares selection none: it reads no selection and is given none, so it writes the same file under every selection and one cache entry serves every selection. " +
+				"Its findings read the workspace's Git candidate cut and nothing else: " +
+				"the tracked files and the untracked files no ignore rule excludes, which the input `git:**` holds, so editing, adding, deleting or renaming any file it reads moves the key, and an ignored file is neither read nor keyed. " +
+				"That key is an interim: " +
+				"the collector of ADR 0006 of protocols/evidence keys each check on the files it reads. " +
+				"Across runs the task keeps each project's evaluation in a memo under the job's cacheRoot, with a digest of the answer to every read the evaluation made, and evaluates again only the projects whose reads answer otherwise; " +
+				"the memo is never an input, so a hit, a miss and a refused memo write the same bytes. " +
 				"An evidence source binding records each bound file's bytes or link text and its executable bit, and the key holds the bit too; " +
 				"a submodule or an unmerged path produces no key, so the task then runs uncached. " +
-				"Every project is read at the tree base version 0.0.0, the version the CLI gives a task the cache can serve, and the report names no commit, " +
-				"so two runs on one tree share one entry whatever the commit, the ref or the checkout. " +
-				"The project port names the project's own manifest so that the project side of the key reads no ignored build output.",
+				"Every project is read at the tree base version 0.0.0, the version the CLI gives a task the cache can serve, and nothing it writes names a commit, so two runs on one tree share one entry whatever the commit, the ref or the checkout. " +
+				"The task's project is the workspace root, and the project port names its manifest so that the project side of the key reads no ignored build output.",
 			Kind:      "command",
 			Command:   "{extensionRuntime}",
 			Args:      []string{"features-validate"},
-			Cwd:       "{projectRoot}",
+			Cwd:       "{workspaceRoot}",
 			TimeoutMs: 120000,
 			Inputs: map[string]proto.TaskInputPort{
 				// The workspace's cut the repository port keys, read from one file of the run.
 				"workspaceCandidateFiles": {From: "runtime"},
 				// The read set: manifests and evidence at every root, the
 				// capability manifests evidence reaches, and every file a source
-				// binding hashes. Workspace-scoped, so one digest of the cut
-				// serves every project's key in a run.
+				// binding hashes.
 				"repository": {From: "workspace", Files: []string{"git:**"}},
-				// A project side left empty would key on every file under the
-				// project root, ignored build output included.
+				// The project is the workspace root. A project side left empty
+				// would key on every file under it, ignored build output included.
 				"manifest": {From: "project", Files: []string{"putnami.features.json", "features/*.json"}},
 			},
-			// It reads the project's own source tree — the durable manifest and
-			// every evidence fragment beside it — so it is serialized after the
-			// tasks that REWRITE that tree. A formatter that reflows a JSON
+			// It reads every project's source tree — the durable manifests and
+			// every evidence fragment beside them — so it is serialized after
+			// the tasks that REWRITE that tree. A formatter that reflows a JSON
 			// document while this task parses it is a verdict about bytes that
 			// no longer exist.
 			Reads: []proto.ResourceRef{{ID: proto.ResourceIDSources}},
-			Cache: cacheEnabledNoOutput(),
+			// Cache captures the declared fragment file (no noOutput): the CLI
+			// reads it after the session from a run and from a cache hit alike.
+			Cache: cacheEnabled(),
 			Outputs: map[string]proto.TaskOutputPort{
-				"data": {Description: "Feature validation report: counts, assessments and sorted diagnostics."},
+				"data": {Description: "Feature validation report: the projects validated, the distinct features, requirements and evidence assessed, and the findings stated, counted by severity."},
 			},
-			Declares: sdkmanifest.Declares(),
+			// What the task writes is the same under every selection, so it
+			// declares it reads none: its job context carries no selection and
+			// its key holds no selected project (ADR 0134 of the CLI).
+			Selection: proto.TaskSelectionNone,
+			// Required, never optionalEmpty: the task writes the file on every
+			// run, empty when it finds nothing, so the CLI never reads an
+			// earlier run's file (ADR 0134 of the CLI).
+			Declares: sdkmanifest.Declares(
+				sdkmanifest.Output("evidence", sdkmanifest.File("putnami-evidence.jsonl",
+					sdkmanifest.InCommandOutput(),
+					sdkmanifest.Describe("Evidence fragments: one finding fragment for each feature finding of a validated project, located at the workspace file it names. Empty when nothing is found."))),
+			),
 		}).
 		Task("specs-validate", proto.TaskDefinition{
 			Description: "Validate one project's specs against the features they detail, resolve their decision links in this worktree, and report the completeness gaps around them. " +
@@ -823,16 +843,12 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 	if want := []string{"putnami.features.json", "features/*.json", "specs/*.json"}; !reflect.DeepEqual(project.ActivationFiles, want) {
 		t.Errorf("validate activationFiles = %v, want %v", project.ActivationFiles, want)
 	}
-	// No dependsOn orders the two steps: a step's key holds the key of every
-	// step it depends on, and features-validate keys on the whole candidate
-	// cut, so an edge would move specs-validate's key with every file of the
-	// repository. specs-validate reads and reports the manifests itself.
-	if len(project.Run) != 2 ||
-		project.Run[0].Task != "features-validate" ||
-		project.Run[1].Task != "specs-validate" ||
-		len(project.Run[0].DependsOn) != 0 ||
-		len(project.Run[1].DependsOn) != 0 {
-		t.Errorf("validate pipeline = %+v, want features-validate and specs-validate side by side", project.Run)
+	// The features of every project are a step of validate-workspace, keyed
+	// on the whole candidate cut once; the per-project command keeps the specs.
+	if len(project.Run) != 1 ||
+		project.Run[0].Task != "specs-validate" ||
+		len(project.Run[0].DependsOn) != 0 {
+		t.Errorf("validate pipeline = %+v, want specs-validate alone", project.Run)
 	}
 
 	workspace, found := m.Commands["validate-workspace"]
@@ -842,9 +858,9 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 	if workspace.Activation != "workspace-once" {
 		t.Errorf("validate-workspace activation = %q, want workspace-once", workspace.Activation)
 	}
-	// The eleven workspace-wide steps are independent — none reads another's
+	// The twelve workspace-wide steps are independent — none reads another's
 	// answer — so no dependsOn orders them.
-	if len(workspace.Run) != 11 ||
+	if len(workspace.Run) != 12 ||
 		workspace.Run[0].Task != "architecture-validate" ||
 		workspace.Run[1].Task != "specs-ratchet-validate" ||
 		workspace.Run[2].Task != "decisions-validate" ||
@@ -856,6 +872,7 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 		workspace.Run[8].Task != "feature-coverage-validate" ||
 		workspace.Run[9].Task != "feature-coverage-ratchet-validate" ||
 		workspace.Run[10].Task != "verdict-policy-validate" ||
+		workspace.Run[11].Task != "features-validate" ||
 		len(workspace.Run[1].DependsOn) != 0 ||
 		len(workspace.Run[2].DependsOn) != 0 ||
 		len(workspace.Run[3].DependsOn) != 0 ||
@@ -865,8 +882,9 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 		len(workspace.Run[7].DependsOn) != 0 ||
 		len(workspace.Run[8].DependsOn) != 0 ||
 		len(workspace.Run[9].DependsOn) != 0 ||
-		len(workspace.Run[10].DependsOn) != 0 {
-		t.Errorf("validate-workspace pipeline = %+v, want the architecture step, the specs ratchet, the decision gate, the recipe gate, the CODEOWNERS step, the documentation link gate, the breaking-marker step, the agent-attribution step, the feature-coverage gate, its ratchet and the verdict policy gate", workspace.Run)
+		len(workspace.Run[10].DependsOn) != 0 ||
+		len(workspace.Run[11].DependsOn) != 0 {
+		t.Errorf("validate-workspace pipeline = %+v, want the architecture step, the specs ratchet, the decision gate, the recipe gate, the CODEOWNERS step, the documentation link gate, the breaking-marker step, the agent-attribution step, the feature-coverage gate, its ratchet, the verdict policy gate and the features step", workspace.Run)
 	}
 	// Both are user-facing: they are what `putnami validate` and the CI gate
 	// run. The internal self-check is the only hidden command here.
@@ -887,13 +905,13 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 // REPORTS ON. specs-validate reports on one project and resolves against every
 // authored manifest and spec in the workspace, so it declares both.
 // architecture-validate reads the workspace's ARC declarations, capability
-// evidence, and adoption policy, which is exactly what it declares. The five
+// evidence, and adoption policy, which is exactly what it declares. The six
 // workspace steps whose read set no narrow pattern names (decisions, recipes,
-// codeowners, docs links and feature coverage) read the repository's Git
-// candidate cut and declare `git:**`, which holds it. features-validate reads the same cut,
-// evidence source bindings included: a binding records each bound file's
-// executable bit, which a `git:` key holds, and a submodule commit, over which
-// a `git:` key refuses to exist.
+// codeowners, docs links, feature coverage and features) read the repository's
+// Git candidate cut and declare `git:**`, which holds it. features-validate
+// reads evidence source bindings through that cut: a binding records each
+// bound file's executable bit, which a `git:` key holds, and a submodule
+// commit, over which a `git:` key refuses to exist.
 //
 // It asserts the SCOPE of each port rather than its file list: the lists are
 // held byte-for-byte by TestCommittedManifestIsTheAuthoredOne against the
@@ -907,11 +925,12 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 	// features-validate reads the workspace's Git candidate cut: manifests,
 	// evidence, capability manifests and every file a source binding hashes,
 	// the executable bit included, which `git:**` holds (ADR 0063 of the CLI).
-	// The cut is workspace-scoped so one digest serves every project's key;
-	// the project port keeps the project side off ignored build output.
+	// The project port keeps the project side, the workspace root, off ignored
+	// build output. Its cache keeps the evidence fragment file it declares, so
+	// it is enabled without noOutput.
 	features := m.Tasks["features-validate"]
-	if !features.Cache.IsEnabled() || !features.Cache.NoOutput {
-		t.Errorf("task \"features-validate\" cache = %+v, want enabled with noOutput: its key holds the candidate cut it reads", features.Cache)
+	if !features.Cache.IsEnabled() || features.Cache.NoOutput {
+		t.Errorf("task \"features-validate\" cache = %+v, want enabled without noOutput: its key holds the candidate cut it reads, and its entry the fragments it writes", features.Cache)
 	}
 	wantFeatures := map[string]proto.TaskInputPort{
 		"repository":              {From: "workspace", Files: []string{"git:**"}},
@@ -1134,11 +1153,13 @@ func TestEveryTaskCarriesAV3Declaration(t *testing.T) {
 // declared output path. A task added later has to justify itself here rather
 // than be excused by a row someone remembered to add.
 //
-// One task owns one path, and the exception is the justification:
+// Two tasks own one path each, and the exceptions are the justification:
 // specs-validate emits the executable-criteria projection (D9), the
 // bounded derivation core joins with run observations, and declaring it is
 // exactly what makes a cache hit restore it instead of silently disarming the
-// spec gate.
+// spec gate. features-validate states its findings in the required evidence
+// fragment file the CLI's verdict reads after the session, from a run or a
+// cache hit alike (ADR 0134 of the CLI).
 //
 // Some tasks nevertheless WRITE into the source tree: the authoring
 // subcommands (`specs init`, `contracts generate` and the others
@@ -1170,8 +1191,20 @@ func TestNoTaskDeclaresAnEffectOrOwnsAPath(t *testing.T) {
 			}
 			continue
 		}
+		if name == "features-validate" {
+			output, owns := declares.Outputs["evidence"]
+			if len(declares.Outputs) != 1 || !owns {
+				t.Errorf("features-validate must declare exactly the evidence fragment file, got %v", sortedKeys(declares.Outputs))
+				continue
+			}
+			if output.Kind != "file" || output.Root != proto.OutputRootCommandOutput ||
+				output.Path != "putnami-evidence.jsonl" || output.OptionalEmpty {
+				t.Errorf("evidence fragment declaration = %+v; it must be a required file at putnami-evidence.jsonl under command-output", output)
+			}
+			continue
+		}
 		if len(declares.Outputs) > 0 {
-			t.Errorf("task %q claims declared output paths %v; only specs-validate owns a path here (the criteria projection), and that exception is justified above", name, sortedKeys(declares.Outputs))
+			t.Errorf("task %q claims declared output paths %v; only specs-validate and features-validate own a path here, and those exceptions are justified above", name, sortedKeys(declares.Outputs))
 		}
 	}
 	// The self-check is uncacheable because its whole verdict is about the

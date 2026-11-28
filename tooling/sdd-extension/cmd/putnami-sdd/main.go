@@ -13,7 +13,7 @@
 // Jobs (the DAG's):
 //
 //	selfcheck                         Report the runtime and the job context this extension receives
-//	features-validate                 Validate one project's durable feature manifest and its evidence
+//	features-validate                 Validate every project's feature manifests and evidence, stating findings as fragments
 //	specs-validate                    Validate one project's specs against the features they detail
 //	specs-ratchet-validate            Compare the enforced-spec floor against the committed baseline
 //	architecture-validate             Validate the workspace's ARC/DARC declarations and project graph

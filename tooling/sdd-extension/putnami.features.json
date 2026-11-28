@@ -326,6 +326,21 @@
           }
         },
         {
+          "id": "feature-findings-are-evidence-fragments",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-projects-findings-are-stated-at-the-files-they-name",
+              "the-features-step-succeeds-on-error-findings",
+              "validate-workspace-runs-the-features-step"
+            ]
+          }
+        },
+        {
           "id": "every-project-carries-feature-coverage",
           "stage": "coded",
           "evidenceKinds": [

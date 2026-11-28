@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/sdd",
-  "cliContract": 11,
+  "cliContract": 30,
   "optionNamespaces": ["sdd", "publish", "evidence"],
   "extensionDependencies": {},
   "runtime": {
@@ -267,7 +267,7 @@
       ]
     },
     "validate": {
-      "description": "Validate a project's specification-driven declarations: its features and the specs that detail them.",
+      "description": "Validate a project's specs against the features they detail. The features themselves are validated once per workspace, by the features step of validate-workspace, which validate also runs.",
       "traits": {"kind": "criteria"},
       "activationFiles": [
         "putnami.features.json",
@@ -275,10 +275,6 @@
         "specs/*.json"
       ],
       "run": [
-        {
-          "id": "features",
-          "task": "features-validate"
-        },
         {
           "id": "specs",
           "task": "specs-validate"
@@ -289,7 +285,7 @@
       ]
     },
     "validate-workspace": {
-      "description": "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decision registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority and that the list holds no entry the merge base with the impacted baseline lacks, and check each putnami.verdict-policy.json file and the directory it sits in.",
+      "description": "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decision registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority and that the list holds no entry the merge base with the impacted baseline lacks, check each putnami.verdict-policy.json file and the directory it sits in, and validate the feature manifests of every project and the evidence behind them, stating each finding as an evidence fragment the CLI judges for the projects a run selects.",
       "activation": "workspace-once",
       "traits": {"kind": "criteria"},
       "run": [
@@ -336,6 +332,10 @@
         {
           "id": "verdict-policy",
           "task": "verdict-policy-validate"
+        },
+        {
+          "id": "features",
+          "task": "features-validate"
         }
       ]
     }
@@ -1064,13 +1064,13 @@
       "declares": {}
     },
     "features-validate": {
-      "description": "Validate one project's durable feature manifest and the evidence backing its requirements. It reads the workspace's Git candidate cut and nothing else: the tracked files and the untracked files no ignore rule excludes, which the input `git:**` holds, so editing, adding, deleting or renaming any file it reads moves the key, and an ignored file is neither read nor keyed. An evidence source binding records each bound file's bytes or link text and its executable bit, and the key holds the bit too; a submodule or an unmerged path produces no key, so the task then runs uncached. Every project is read at the tree base version 0.0.0, the version the CLI gives a task the cache can serve, and the report names no commit, so two runs on one tree share one entry whatever the commit, the ref or the checkout. The project port names the project's own manifest so that the project side of the key reads no ignored build output.",
+      "description": "Validate the durable feature manifests of every project `validate` activates on, and the evidence backing their requirements, once per workspace: each project as a per-project task would, with the same rules and severities. It states what it finds as finding fragments in putnami-evidence.jsonl, a required file of its command output it writes on every run, empty when it finds nothing, each fragment located at the workspace file it names. It publishes no diagnostic and succeeds whatever the findings say: the CLI fails the run on the error findings of the projects the run selected. The task declares selection none: it reads no selection and is given none, so it writes the same file under every selection and one cache entry serves every selection. Its findings read the workspace's Git candidate cut and nothing else: the tracked files and the untracked files no ignore rule excludes, which the input `git:**` holds, so editing, adding, deleting or renaming any file it reads moves the key, and an ignored file is neither read nor keyed. That key is an interim: the collector of ADR 0006 of protocols/evidence keys each check on the files it reads. Across runs the task keeps each project's evaluation in a memo under the job's cacheRoot, with a digest of the answer to every read the evaluation made, and evaluates again only the projects whose reads answer otherwise; the memo is never an input, so a hit, a miss and a refused memo write the same bytes. An evidence source binding records each bound file's bytes or link text and its executable bit, and the key holds the bit too; a submodule or an unmerged path produces no key, so the task then runs uncached. Every project is read at the tree base version 0.0.0, the version the CLI gives a task the cache can serve, and nothing it writes names a commit, so two runs on one tree share one entry whatever the commit, the ref or the checkout. The task's project is the workspace root, and the project port names its manifest so that the project side of the key reads no ignored build output.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
         "features-validate"
       ],
-      "cwd": "{projectRoot}",
+      "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
       "inputs": {
         "workspaceCandidateFiles": {
@@ -1092,17 +1092,26 @@
       },
       "outputs": {
         "data": {
-          "description": "Feature validation report: counts, assessments and sorted diagnostics."
+          "description": "Feature validation report: the projects validated, the distinct features, requirements and evidence assessed, and the findings stated, counted by severity."
         }
       },
       "reads": [
         "sources"
       ],
       "cache": {
-        "enabled": true,
-        "noOutput": true
+        "enabled": true
       },
-      "declares": {}
+      "selection": "none",
+      "declares": {
+        "outputs": {
+          "evidence": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "putnami-evidence.jsonl",
+            "description": "Evidence fragments: one finding fragment for each feature finding of a validated project, located at the workspace file it names. Empty when nothing is found."
+          }
+        }
+      }
     },
     "sdd-architecture-init-exec": {
       "description": "Scaffold one domain manifest. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",

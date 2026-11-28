@@ -1,17 +1,24 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"unicode/utf8"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
 	featureproto "go.putnami.dev/protocol/features"
 	job "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/cpubudget"
 	"go.putnami.dev/sdk/extension/docslinks"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/treefacts"
@@ -26,33 +33,175 @@ import (
 // commands give.
 //
 // The two commands exist separately because their SUBJECTS differ, not for
-// convenience. features and specs are about a project's own durable documents,
-// so they run per project and their cache keys are that project's files.
-// architecture is about the workspace graph, so it runs once and its key is the
-// workspace's architecture declarations. One command cannot mix the two
-// activations, which is what D1 settles.
+// convenience. specs are about a project's own durable documents, so they run
+// per project and their cache keys are that project's files. architecture is
+// about the workspace graph, so it runs once and its key is the workspace's
+// architecture declarations. Features run once too: their read set, and so
+// their key, is the whole candidate cut, which every per-project copy keyed
+// alike, and they state their findings as evidence fragments the CLI judges per
+// selected project. One command cannot mix the two activations, which is what
+// D1 settles.
 
-// runFeaturesValidate is the first step of the project-scoped `validate`
-// pipeline: the durable feature manifest and the evidence that backs it.
+// runFeaturesValidate is the features step of the workspace-scoped
+// `validate-workspace` command: the durable feature manifests of every project
+// and the evidence that backs them (ADR 0006 of this extension).
+//
+// It validates each project `validate` activates on as a per-project task
+// would, and states what each evaluation reports as finding fragments in
+// putnami-evidence.jsonl, its declared command-output file, which it writes on
+// every run, empty when nothing is found. It publishes no diagnostic and
+// succeeds whatever the findings say: the CLI reads the fragments after the
+// session and fails the run on the error findings of the projects it selected
+// (ADR 0134 of the CLI). The task reads no selection, so it writes the same
+// file under every selection.
 //
 // The task is cached (D8) on the input `git:**`, the workspace's Git candidate
-// cut, and its verdict reads that cut and nothing else
-// (sdd.BuildFeatureTaskValidationResult). An evidence source binding records
+// cut, an interim until the evidence collector keys each check on what it
+// reads, and its findings read that cut and nothing else
+// (sdd.BuildFeatureFindingsResult). An evidence source binding records
 // each bound file's bytes or link text and its executable bit, which the key
 // holds too (ADR 0063 of the CLI); a submodule or an unmerged path produces no
 // key, so a run that meets one is never served. Every project carries the
-// tree base version, and the report names no commit, so two runs on one tree
-// write one report whatever the commit, the ref or the checkout.
+// tree base version, and nothing it writes names a commit, so two runs on one
+// tree write the same bytes whatever the commit, the ref or the checkout.
+//
+// Across runs, the task keeps the evaluation of each project in a memo in the
+// workspace scratch the job context names as its cacheRoot, and evaluates
+// again only the projects whose reads answer otherwise (featuresMemo). The
+// memo never changes what the task writes: a hit, a miss, a refused memo and
+// none give the same bytes.
 func runFeaturesValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
-	ws, selection, err := projectValidationView(ctx)
+	ws, err := workspaceValidationView(ctx)
 	if err != nil {
 		return "", nil, err
 	}
-	report, verdict := sdd.BuildFeatureTaskValidationResult(ws, selection)
-	publishDiagnostics(emit, report.Diagnostics)
-	emit.Summary(fmt.Sprintf("features: %d feature(s), %d requirement(s), %d evidence record(s)",
-		report.Summary.Features, report.Summary.Requirements, report.Summary.Evidence))
-	return finish(report, verdict)
+	// The evaluations take the CPUs the scheduler grants the job, else the
+	// CPUs Go grants the process.
+	report, fragments, err := sdd.BuildFeatureFindingsResultWithMemo(ws, extensionReferences(ctx), cpubudget.Threads(), featuresMemo(ctx))
+	if err != nil {
+		return "", nil, err
+	}
+	if err := emitEvidenceFragments(ctx, emit, fragments); err != nil {
+		return "", nil, err
+	}
+	emit.Summary(fmt.Sprintf("features: %d project(s), %d feature(s), %d requirement(s), %d evidence record(s); %d error and %d warning finding(s) stated as evidence",
+		len(report.Projects), report.Summary.Features, report.Summary.Requirements, report.Summary.Evidence,
+		report.Findings.Errors, report.Findings.Warnings))
+	return finish(report, nil)
+}
+
+// featuresMemoFile is the memo of the features step, under the job's cacheRoot.
+var featuresMemoFile = filepath.Join("sdd-features", "evaluations.memo")
+
+// featuresMemo is the memo the features step keeps: a file under the
+// workspace scratch directory the job context names as its cacheRoot, written
+// by the code this executable holds. A context without an absolute cacheRoot,
+// or an executable it cannot read, keeps no memo.
+func featuresMemo(ctx *pctx.Context) sdd.FeatureFindingsMemo {
+	if !filepath.IsAbs(ctx.CacheRoot) {
+		return sdd.FeatureFindingsMemo{}
+	}
+	code := executableDigest()
+	if code == "" {
+		return sdd.FeatureFindingsMemo{}
+	}
+	return sdd.FeatureFindingsMemo{Path: filepath.Join(ctx.CacheRoot, featuresMemoFile), Code: code}
+}
+
+// executableDigest is the SHA-256 of the running executable, "" when it cannot
+// be read.
+func executableDigest() string {
+	path, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return ""
+	}
+	return "sha256:" + hex.EncodeToString(hash.Sum(nil))
+}
+
+// extensionReferences are the references a project's resolved extensions or
+// dependencies name this extension by: its manifest name, the name the job
+// context gives it, and, when it is loaded from a directory of the workspace,
+// that directory's project id.
+func extensionReferences(ctx *pctx.Context) []string {
+	references := []string{extensionName}
+	if ctx.Extension.Name != "" && ctx.Extension.Name != extensionName {
+		references = append(references, ctx.Extension.Name)
+	}
+	if ctx.Extension.Root == "" || ctx.WorkspaceRoot == "" {
+		return references
+	}
+	rel, err := filepath.Rel(ctx.WorkspaceRoot, ctx.Extension.Root)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return references
+	}
+	return append(references, wsproto.ProjectIDFromPath(filepath.ToSlash(rel)))
+}
+
+// emitEvidenceFragments writes fragments as the task's evidence fragment file,
+// in the command output the job context names, and announces it under its
+// reserved artifact id. It writes the file on every run, empty when there is
+// no fragment, so a cache hit restores the same bytes a run writes.
+//
+// A string member longer than evidence.MaxStringBytes is cut at the last
+// character boundary within it, as the protocol asks a producer to do. A file
+// holds at most evidence.MaxFragments fragments: past it, the task fails and
+// says so, since a file it cut short would hide findings.
+func emitEvidenceFragments(ctx *pctx.Context, emit *jsonl.Emitter, fragments []evidence.Fragment) error {
+	if ctx.OutputPath == "" {
+		return protocolcli.Classify(
+			fmt.Errorf("the job context names no output path for %s", evidence.FragmentFilename),
+			protocolcli.ErrInvalidConfig,
+		)
+	}
+	if len(fragments) > evidence.MaxFragments {
+		return protocolcli.Classify(fmt.Errorf(
+			"the validation found %d distinct findings, more than the %d one %s holds: fix the findings it reports, then run it again",
+			len(fragments), evidence.MaxFragments, evidence.FragmentFilename), protocolcli.ErrInvalidConfig)
+	}
+	bounded := make([]evidence.Fragment, len(fragments))
+	for i, fragment := range fragments {
+		fragment.Source.Tool = boundedString(fragment.Source.Tool)
+		fragment.Subject.Path = boundedString(fragment.Subject.Path)
+		fragment.Subject.Symbol = boundedString(fragment.Subject.Symbol)
+		fragment.Rule = boundedString(fragment.Rule)
+		fragment.Message = boundedString(fragment.Message)
+		bounded[i] = fragment
+	}
+	encoded, err := evidence.EncodeFragments(bounded)
+	if err != nil {
+		return protocolcli.Classify(fmt.Errorf("encode evidence fragments: %w", err), protocolcli.ErrInvalidConfig)
+	}
+	if err := os.MkdirAll(ctx.OutputPath, 0o755); err != nil {
+		return protocolcli.Classify(fmt.Errorf("prepare evidence fragment output: %w", err), protocolcli.ErrInvalidConfig)
+	}
+	destination := filepath.Join(ctx.OutputPath, evidence.FragmentFilename)
+	if err := os.WriteFile(destination, encoded, 0o644); err != nil {
+		return protocolcli.Classify(fmt.Errorf("write evidence fragments: %w", err), protocolcli.ErrInvalidConfig)
+	}
+	emit.Artifact(evidence.FragmentArtifactID, "Evidence fragments", "report", destination)
+	return nil
+}
+
+// boundedString cuts value to evidence.MaxStringBytes at the last character
+// boundary within it.
+func boundedString(value string) string {
+	if len(value) <= evidence.MaxStringBytes {
+		return value
+	}
+	cut := evidence.MaxStringBytes
+	for cut > 0 && !utf8.RuneStart(value[cut]) {
+		cut--
+	}
+	return value[:cut]
 }
 
 // runSpecsValidate is the second step: the specs that detail those features,
@@ -505,8 +654,8 @@ func runVerdictPolicyValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string
 // scoping it to the rest would make its verdict depend on how many siblings
 // happened to be selected beside it — the same key, two answers.
 //
-// The selection report names no baseline either. Both tasks that read this
-// view are cached, and no key reads the ref an impacted run measured against:
+// The selection report names no baseline either. The task that reads this
+// view is cached, and no key reads the ref an impacted run measured against:
 // a replayed report would name another run's ref.
 func projectValidationView(ctx *pctx.Context) (*wsview.Workspace, sdd.Selection, error) {
 	ws, _ := wsview.FromContext(ctx)

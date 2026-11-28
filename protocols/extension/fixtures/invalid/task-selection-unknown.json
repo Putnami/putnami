@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@test/extension",
+  "commands": {
+    "check": {
+      "activation": "workspace-once",
+      "run": [{ "id": "check", "task": "check-exec" }]
+    }
+  },
+  "tasks": {
+    "check-exec": {
+      "kind": "command",
+      "command": "echo",
+      "selection": "projects"
+    }
+  }
+}
