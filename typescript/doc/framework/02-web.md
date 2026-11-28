@@ -188,7 +188,7 @@ export default loader(async (ctx) => {
 });
 ```
 
-The page answers `404` with the nearest not-found page. Any `HttpException` a loader throws answers with its own status.
+The page answers `404` with the nearest not-found page, on a full page load and on a client navigation alike. Any `HttpException` a loader throws answers with its own status.
 
 ### Loader with query parameters
 
@@ -569,7 +569,8 @@ export default function UsersError() {
     return (
       <div>
         <h1>{error.status} {error.statusText}</h1>
-        <p>{error.data}</p>
+        {/* A thrown Response carries its body; an HttpException, { statusCode, error, message }. */}
+        <p>{typeof error.data === 'string' ? error.data : error.data?.message}</p>
       </div>
     );
   }

@@ -54,7 +54,7 @@ describe('error boundaries', () => {
   });
 
   it('renders the status and message of a route error response', () => {
-    routeError = { status: 403, statusText: 'Forbidden', data: { message: 'not an admin' } };
+    routeError = { status: 403, statusText: 'Forbidden', internal: false, data: { message: 'not an admin' } };
 
     const html = renderToStaticMarkup(React.createElement(ErrorBoundary));
 

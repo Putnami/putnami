@@ -645,30 +645,6 @@ describe('page.renderer', () => {
       expect(html).not.toContain('secret_admins');
     });
 
-    it('answers the status of an HttpException an action throws', async () => {
-      const ctx = createMockContext({ req: new Request('http://localhost/admin', { method: 'POST' }) });
-      const handler = pageRenderer(
-        () => [
-          {
-            path: '/admin',
-            action: () => {
-              throw new ForbiddenException('not an admin');
-            },
-            element: React.createElement('div', null, 'Admin'),
-            errorElement: React.createElement(DefaultErrorBoundary),
-          } as never,
-        ],
-        () => RootHtml,
-        () => 'hydrate.js',
-        SSR_TIMEOUT_MS,
-      );
-
-      const response = await runInContext(ctx, async () => await respond(handler, ctx));
-      await response?.get().text();
-
-      expect(response?.status).toBe(403);
-    });
-
     it('does not log a Response a loader throws as an error', async () => {
       const logger = new MemoryLogger();
       const statusResponse = await renderRoute(

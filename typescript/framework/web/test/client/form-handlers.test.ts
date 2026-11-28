@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
+import { createMemoryRouter, isRouteErrorResponse } from 'react-router';
 import { actionHandler as clientActionHandler } from '../../src/client/form/action.handler';
 import { layoutLoaderHandler, pageLoaderHandler } from '../../src/client/form/loader.handler';
 import { setRouterRoutes } from '../../src/client/router/router-routes';
@@ -48,6 +49,61 @@ describe('Client Form Handlers', () => {
         signal: expect.any(AbortSignal),
       });
       expect(response).toBeInstanceOf(Response);
+    });
+
+    specTest(
+      'a loader HttpException reaches the error boundary with its status on a client navigation',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'ssr-response',
+        check: 'an-http-exception-a-loader-throws-answers-its-own-status',
+      },
+      async () => {
+        // The loader endpoint answers the exception's response, details included.
+        fetchMock.mockImplementationOnce(
+          async () =>
+            new Response(
+              JSON.stringify({ statusCode: 404, message: 'rows out of range', error: 'Not Found', table: 'rows' }),
+              { status: 404, headers: { 'Content-Type': 'application/json' } },
+            ),
+        );
+        const router = createMemoryRouter(
+          [
+            { path: '/', element: null },
+            { id: 'table', path: '/table/:rows', loader: pageLoaderHandler() as never, element: null },
+          ],
+          { initialEntries: ['/'] },
+        );
+
+        await router.navigate('/table/9999');
+        const routeError = router.state.errors?.['table'];
+        router.dispose();
+
+        expect(isRouteErrorResponse(routeError)).toBe(true);
+        expect(routeError).toMatchObject({
+          status: 404,
+          statusText: 'Not Found',
+          data: { statusCode: 404, error: 'Not Found', message: 'rows out of range' },
+        });
+        expect(router.state.loaderData['table']).toBeUndefined();
+      },
+    );
+
+    it('reaches the error boundary with the status of a loader endpoint that answered no JSON', async () => {
+      fetchMock.mockImplementationOnce(
+        async () => new Response('Bad Gateway', { status: 502, statusText: 'Bad Gateway' }),
+      );
+
+      const thrown = await pageLoaderHandler()({
+        request: new Request('http://localhost/tasks'),
+        params: {},
+        context: undefined,
+      }).catch((error: unknown) => error);
+
+      expect(thrown).toMatchObject({
+        data: { statusCode: 502, error: 'Bad Gateway', message: 'Bad Gateway' },
+        init: { status: 502, statusText: 'Bad Gateway' },
+      });
     });
 
     it('keeps the query string after the JSON suffix', async () => {

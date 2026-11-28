@@ -1,4 +1,4 @@
-import { generatePath } from 'react-router';
+import { data, generatePath } from 'react-router';
 import { LOADER_REQUEST_HEADER } from '../../shared/client-redirect';
 import { clientFetchTimeoutMs } from './fetch-timeout';
 import { routerRedirect } from './follow-redirect';
@@ -95,7 +95,30 @@ async function loaderHandler(opt: {
   // to, not the JSON endpoint, as the server render does on a full page load.
   // A followed redirect is data only when it ends on a loader endpoint: a page
   // answers the JSON request with an error, never with loader data.
-  return routerRedirect(res, args.request.url, isLoaderEndpoint) ?? res;
+  const redirected = routerRedirect(res, args.request.url, isLoaderEndpoint);
+  if (redirected) return redirected;
+  // A loader that failed, an `HttpException` among them, reaches the error
+  // boundary with its status, as on a full page load: the not-found page for a
+  // 404, the error page otherwise, never the page rendered with the error as
+  // its data.
+  if (!res.ok) throw await loaderError(res);
+  return res;
+}
+
+/**
+ * The route error of a loader endpoint that failed, with the `data` a full page
+ * load gives the boundary: `{ statusCode, error, message }`.
+ */
+async function loaderError(res: Response) {
+  let body: { error?: unknown; message?: unknown } | undefined;
+  try {
+    body = (await res.json()) as typeof body;
+  } catch {
+    body = undefined;
+  }
+  const error = typeof body?.error === 'string' ? body.error : res.statusText;
+  const message = typeof body?.message === 'string' ? body.message : error;
+  return data({ statusCode: res.status, error, message }, { status: res.status, statusText: error });
 }
 
 /** Whether a followed loader fetch ended on a loader JSON endpoint. */

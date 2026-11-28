@@ -490,12 +490,13 @@ export default error().render(function ErrorBoundary() {
 
 ```tsx nocheck
 // src/app/dashboard/error.tsx
-import { error, useRouteError } from '@putnami/web';
+import { error, isRouteErrorResponse, useRouteError } from '@putnami/web';
 
 export default error().render(function DashboardError() {
-  const err = useRouteError() as Error;
+  const err = useRouteError();
 
-  if (err.status === 403) {
+  // A loader's ForbiddenException arrives as a 403 ErrorResponse.
+  if (isRouteErrorResponse(err) && err.status === 403) {
     return (
       <div>
         <h2>Access Denied</h2>
@@ -507,7 +508,7 @@ export default error().render(function DashboardError() {
   return (
     <div>
       <h2>Dashboard Error</h2>
-      <p>{err.message}</p>
+      <p>{err instanceof Error ? err.message : 'Unknown error'}</p>
     </div>
   );
 });
@@ -618,26 +619,32 @@ Behaviour worth knowing:
 
 ```tsx nocheck
 // src/app/error.tsx
-import { error, useRouteError } from '@putnami/web';
+import { error, isRouteErrorResponse, useRouteError } from '@putnami/web';
 import { useEffect } from 'react';
 
 export default error().render(function ErrorBoundary() {
-  const err = useRouteError() as Error;
+  const err = useRouteError();
+  // A thrown Response or a loader's HttpException arrives as an ErrorResponse.
+  const message = isRouteErrorResponse(err)
+    ? `${err.status} ${err.statusText}`
+    : err instanceof Error
+      ? err.message
+      : 'Unknown error';
 
   useEffect(() => {
     // Send error to monitoring service
     if (typeof window !== 'undefined') {
       window.analytics?.track('error', {
-        message: err.message,
-        stack: err.stack,
+        message,
+        stack: err instanceof Error ? err.stack : undefined,
       });
     }
-  }, [err]);
+  }, [err, message]);
 
   return (
     <div>
       <h1>Something went wrong</h1>
-      <p>{err.message}</p>
+      <p>{message}</p>
     </div>
   );
 });

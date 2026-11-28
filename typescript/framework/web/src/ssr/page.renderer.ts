@@ -513,7 +513,8 @@ function answerLoaderExceptions(context: StaticHandlerContext | Response): void 
   let converted = false;
   const errors: Record<string, unknown> = {};
   for (const [routeId, error] of Object.entries(context.errors)) {
-    if (error instanceof HttpException) {
+    // An exception with a status below 400 is not an error answer.
+    if (error instanceof HttpException && error.getStatus() >= 400) {
       const status = error.getStatus();
       const statusText = getHttpStatusText(status) ?? error.name;
       // Only the status and the message reach the hydration payload, as

@@ -295,7 +295,7 @@ export default error().render(function UsersError() {
     return (
       <div>
         <h1>{err.status} {err.statusText}</h1>
-        <p>{err.data}</p>
+        <p>{typeof err.data === 'string' ? err.data : err.data?.message}</p>
       </div>
     );
   }

@@ -1,6 +1,7 @@
 import { shouldExposeErrorStack } from '@putnami/runtime';
 import React, { type ReactNode } from 'react';
 import { isRouteErrorResponse, useRouteError } from 'react-router';
+import { describeRouteError } from '../shared/route-error';
 
 /**
  * Error boundary component that renders the not-found page for 404 errors
@@ -35,19 +36,6 @@ export function LazyNotFoundErrorBoundary({
     return lazyNotFoundElement;
   }
   return fallbackErrorElement ?? React.createElement(DefaultErrorBoundary);
-}
-
-/** The message and stack a default boundary shows in development, for an `Error` or a route error response. */
-function describeRouteError(error: unknown): { message: string; stack?: string } {
-  if (isRouteErrorResponse(error)) {
-    const data = error.data as { message?: unknown } | null | undefined;
-    const message = typeof data?.message === 'string' ? data.message : undefined;
-    return { message: `${error.status} ${error.statusText}${message ? `: ${message}` : ''}` };
-  }
-  if (error instanceof Error) return { message: error.message, stack: error.stack };
-  // A hydrated error arrives as the `{ message, status }` `sanitizeErrors` kept of it.
-  const message = (error as { message?: unknown } | null | undefined)?.message;
-  return { message: typeof message === 'string' ? message : String(error) };
 }
 
 export function DefaultErrorBoundary() {

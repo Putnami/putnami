@@ -292,7 +292,7 @@ import {
   useParams,        // Route parameters
   useNavigate,      // Programmatic navigation
   useRouteError,    // Error in error boundaries (unknown by default)
-  isRouteErrorResponse, // Narrow it to a thrown 4xx/5xx Response
+  isRouteErrorResponse, // Narrow it to a thrown 4xx/5xx Response or a loader's HttpException
 } from '@putnami/web';
 ```
 
