@@ -236,6 +236,7 @@ export const pageRenderer =
         release: () => renderLifetime.release(),
         context: context,
         logger,
+        request: reqContext,
         hydrateScript: hydrateScript(),
         basename: resolvedBasename,
         securityContext,
@@ -373,6 +374,8 @@ export async function wrapInHtmlDocument(
      * does. Otherwise the head and the shell are sent once the shell is ready.
      */
     waitForAll?: boolean;
+    /** The request the document answers: a stream it stops does not log. */
+    request?: RequestEnd;
     // biome-ignore lint/suspicious/noExplicitAny: logger type
     logger?: any;
   },
@@ -381,6 +384,12 @@ export async function wrapInHtmlDocument(
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
   const logger = options.logger || console;
+  // A write fails once its client left, with an error of its own (Bun cancels
+  // the body while a write is in flight): report it as the request's stop.
+  const write = (chunk: Uint8Array) =>
+    writer.write(chunk).catch((error: unknown) => {
+      throw requestEnded(options.request) ? (options.request?.signal?.reason ?? error) : error;
+    });
 
   // Start streaming in the background
   (async () => {
@@ -436,7 +445,7 @@ export async function wrapInHtmlDocument(
       const i18nScript = i18n ? i18nPayloadScript(i18n.options, i18n.state, true) : '';
 
       // Send HTML prefix, then the body chunk by chunk.
-      await writer.write(
+      await write(
         encoder.encode(
           `<!DOCTYPE html><html ${htmlAttributes(docHelper.lang, i18n?.state)}>${headHtml}<body>${i18nScript}${hydrationScript}<div id="root">`,
         ),
@@ -450,8 +459,8 @@ export async function wrapInHtmlDocument(
         if (done) break;
         // Styles a later boundary inserted go before the chunk that shows it.
         const lateStyles = docHelper.lateStylesHtml();
-        if (lateStyles) await writer.write(encoder.encode(lateStyles));
-        await writer.write(value);
+        if (lateStyles) await write(encoder.encode(lateStyles));
+        await write(value);
       }
 
       // Plugin-owned module scripts, emitted after the hydrate script so they
@@ -465,13 +474,15 @@ export async function wrapInHtmlDocument(
 
       // Send HTML suffix
       // Inject bootstrap script after the root div so it's outside hydration boundary
-      await writer.write(
+      await write(
         encoder.encode(
           `</div>${docHelper.lateHeadHtml()}<script type="module"${nonceAttr} src="${hydrateSrc}"></script>${extraScripts}</body></html>`,
         ),
       );
     } catch (error) {
-      logger.error('Streaming error:', error);
+      // A client that closed its connection mid-stream ends its request: that
+      // stop is not a failure. Any other error still is.
+      if (!isRequestStop(error, options.request)) logger.error('Streaming error:', error);
       try {
         await writer.write(encoder.encode('</div><!-- SSR error --></body></html>'));
       } catch {
@@ -479,7 +490,8 @@ export async function wrapInHtmlDocument(
       }
     } finally {
       options.release();
-      await writer.close();
+      // A client that left has already errored the stream, so closing it fails.
+      await writer.close().catch(() => undefined);
     }
   })();
 
