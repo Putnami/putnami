@@ -28,6 +28,44 @@ const settingFile = "machine.json"
 
 type settingDoc struct {
 	Process string `json:"process"`
+	// CPUShare is "fair" or "off" (CPUShareFair, CPUShareOff).
+	CPUShare string `json:"cpuShare,omitempty"`
+}
+
+// The CPU share's values: with "fair", the supervisor shares the machine's
+// CPU between the concurrent runs of its workers; with "off", the default,
+// each run admits its jobs on its own, as in its own process (CLI ADR 0116
+// §5).
+const (
+	CPUShareFair = "fair"
+	CPUShareOff  = "off"
+)
+
+// readSettingDoc is the user's setting file, or an empty one when none is set
+// or it cannot be read.
+func readSettingDoc(getenv func(string) string) settingDoc {
+	h, err := home(getenv)
+	if err != nil {
+		return settingDoc{}
+	}
+	data, err := os.ReadFile(filepath.Join(h, settingFile))
+	if err != nil {
+		return settingDoc{}
+	}
+	var doc settingDoc
+	if json.Unmarshal(data, &doc) != nil {
+		return settingDoc{}
+	}
+	return doc
+}
+
+// ReadCPUShare is the user's CPU share: CPUShareFair when the setting says so,
+// CPUShareOff otherwise.
+func ReadCPUShare(getenv func(string) string) string {
+	if readSettingDoc(getenv).CPUShare == CPUShareFair {
+		return CPUShareFair
+	}
+	return CPUShareOff
 }
 
 // home is the Putnami home: PUTNAMI_HOME, else ~/.putnami.
@@ -45,18 +83,7 @@ func home(getenv func(string) string) (string, error) {
 // ReadSetting is the user's setting, "on", "off", or "" when none is set or
 // it cannot be read.
 func ReadSetting(getenv func(string) string) string {
-	h, err := home(getenv)
-	if err != nil {
-		return ""
-	}
-	data, err := os.ReadFile(filepath.Join(h, settingFile))
-	if err != nil {
-		return ""
-	}
-	var doc settingDoc
-	if json.Unmarshal(data, &doc) != nil {
-		return ""
-	}
+	doc := readSettingDoc(getenv)
 	switch doc.Process {
 	case SettingOn, SettingOff:
 		return doc.Process
@@ -64,7 +91,8 @@ func ReadSetting(getenv func(string) string) string {
 	return ""
 }
 
-// WriteSetting records the user's setting, "on" or "off".
+// WriteSetting records the user's setting, "on" or "off", and keeps the rest
+// of the setting file.
 func WriteSetting(getenv func(string) string, value string) error {
 	if value != SettingOn && value != SettingOff {
 		return fmt.Errorf("machine: setting %q is neither on nor off", value)
@@ -76,7 +104,9 @@ func WriteSetting(getenv func(string) string, value string) error {
 	if err := os.MkdirAll(h, 0o755); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(settingDoc{Process: value}, "", "  ")
+	doc := readSettingDoc(getenv)
+	doc.Process = value
+	data, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return err
 	}

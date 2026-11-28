@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync"
 
 	"golang.org/x/sys/unix"
 )
@@ -26,6 +27,9 @@ const maxFiles = 4
 // each with the descriptors it passes (SCM_RIGHTS).
 type conn struct {
 	c *net.UnixConn
+	// mu serializes the writes of the goroutines that share a control
+	// channel.
+	mu sync.Mutex
 }
 
 // send writes msg as a 4-byte big-endian length and its JSON, with files
@@ -49,7 +53,9 @@ func (c *conn) send(msg any, files ...*os.File) error {
 		}
 		oob = unix.UnixRights(fds...)
 	}
+	c.mu.Lock()
 	n, oobn, err := c.c.WriteMsgUnix(frame, oob, nil)
+	c.mu.Unlock()
 	if err != nil {
 		return err
 	}

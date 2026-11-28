@@ -16,8 +16,9 @@ import (
 
 // ProtocolVersion is the version of the client ↔ supervisor and supervisor ↔
 // worker protocols. It changes by addition only (CLI ADR 0116 §3): a
-// supervisor serves every version from 1 to its own.
-const ProtocolVersion = 1
+// supervisor serves every version from 1 to its own. Version 2 adds the CPU
+// admission of section 5.
+const ProtocolVersion = 2
 
 // Env turns the machine process on or off for one command: "on" or "off".
 // It overrides the user's setting (Setting).
@@ -65,8 +66,20 @@ const (
 // worker it routes a run to.
 type request struct {
 	Protocol int `json:"protocol"`
-	// Op is "run", "status" or "stop".
+	// Op is "run", "status" or "stop"; from a supervisor to its worker, "run"
+	// or "grant".
 	Op string `json:"op"`
+	// Grant is the acquire request a "grant" answers.
+	Grant uint64 `json:"grant,omitempty"`
+	// ShareMilli is the run's share of the machine when a "grant" was given,
+	// in thousandths of a CPU: the most a subprocess of the run is granted.
+	ShareMilli int `json:"shareMilli,omitempty"`
+	// SupervisorProtocol is the protocol of the supervisor that forwards a run
+	// to its worker: from admissionProtocol on, the worker may ask it for CPU.
+	SupervisorProtocol int `json:"supervisorProtocol,omitempty"`
+	// CPUShare is the client's CPU share setting, read from the client's own
+	// Putnami home (ReadCPUShare): with CPUShareFair, the worker asks for CPU.
+	CPUShare string `json:"cpuShare,omitempty"`
 	// Build is the client's build identity (fileindex.BuildIdentity).
 	Build string `json:"build,omitempty"`
 	// Executable is the path of the client's executable, which the supervisor
@@ -164,9 +177,16 @@ type clientSignal struct {
 
 // control is what a worker and its supervisor exchange.
 type control struct {
-	Op string `json:"op"` // "ready", "done"
-	// HeldBytes is the worker's heap in use after a run.
+	Op string `json:"op"` // "ready", "done", "held", "acquire", "release"
+	// HeldBytes is the worker's heap in use after a run; with "held", once
+	// the run's garbage is collected.
 	HeldBytes uint64 `json:"heldBytes,omitempty"`
+	// ID names an acquire request, and the release that returns it.
+	ID uint64 `json:"id,omitempty"`
+	// CPUMilli is the CPU an acquire asks for, in thousandths of a CPU.
+	CPUMilli int `json:"cpuMilli,omitempty"`
+	// CapacityMilli is the CPU capacity the run's scheduler admits against.
+	CapacityMilli int `json:"capacityMilli,omitempty"`
 }
 
 // Status describes the supervisor and its workers.

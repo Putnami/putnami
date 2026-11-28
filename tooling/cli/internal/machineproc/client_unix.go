@@ -106,6 +106,7 @@ func Serve(ctx context.Context, args []string) (code int, served bool) {
 		Protocol: ProtocolVersion, Op: "run", Build: build, Executable: exe,
 		Args: args, Env: env, Dir: wd, Umask: umask, Fingerprint: processFingerprint(),
 		Terminal: terminal, StderrTerminal: terminal && isTerminal(os.Stderr),
+		CPUShare: ReadCPUShare(os.Getenv),
 	}
 	if err := c.send(req, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		recordLocal(dir, "the request could not be sent")

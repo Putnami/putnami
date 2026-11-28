@@ -1390,7 +1390,13 @@ off` turns it off. A run that finds no supervisor runs in its own process and
 starts one, detached, when it ends; the next run goes through the worker of
 its executable and worktree. Each worktree has a worker of its own,
 so two worktrees run at once; a second command in a worktree whose worker is
-busy waits for it. A run always runs in its own process in CI (`CI`, or a CI
+busy waits for it. Work the two worktrees have in common is computed once:
+a task one run is executing is awaited by the other, which restores its
+entry. Each run admits its jobs on its own, as in its own process; with
+`"cpuShare": "fair"` in `~/.putnami/machine.json` (or `machine.json` under
+`PUTNAMI_HOME`), the supervisor shares the CPU between concurrent runs
+instead, so that they progress evenly, at the cost of a later finish for the
+last one (ADR 0116 §5). A run always runs in its own process in CI (`CI`, or a CI
 service's own variable), in a hosted run (`--credential-fd`), when a job of a
 run starts it, in watch mode (`--watch`, `-w`, or a serve workload), for
 `publish`, `deploy` and `release`, from a terminal whose input or output is

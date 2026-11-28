@@ -58,12 +58,10 @@ func Work(run RunFunc) int {
 	if err := ctrl.send(control{Op: "ready"}); err != nil {
 		return 1
 	}
-	for {
-		var req request
-		files, err := ctrl.receive(&req)
-		if err != nil {
-			return 0 // the supervisor closed the channel
-		}
+	admitter := newCPUAdmitter(func(msg control) error { return ctrl.send(msg) })
+	runs := readControl(ctrl, admitter)
+	for next := range runs {
+		req, files := next.req, next.files
 		if len(files) != 4 {
 			closeAll(files)
 			_ = ctrl.send(control{Op: "done"})
@@ -72,7 +70,11 @@ func Work(run RunFunc) int {
 		// The worker is free again before its client learns the exit code, so
 		// a command the client runs next finds it idle.
 		var ctrlErr error
+		if asksForCPU(req) {
+			currentAdmitter.Store(admitter)
+		}
 		serve(run, req, files, func() {
+			currentAdmitter.Store(nil)
 			var mem runtime.MemStats
 			runtime.ReadMemStats(&mem)
 			ctrlErr = ctrl.send(control{Op: "done", HeldBytes: mem.HeapInuse})
@@ -80,7 +82,50 @@ func Work(run RunFunc) int {
 		if ctrlErr != nil {
 			return 0
 		}
+		// What the worker holds once the run's garbage is collected and
+		// returned (serve ends with it) is what the budget counts.
+		var mem runtime.MemStats
+		runtime.ReadMemStats(&mem)
+		if ctrl.send(control{Op: "held", HeldBytes: mem.HeapInuse}) != nil {
+			return 0
+		}
 	}
+	return 0 // the supervisor closed the channel
+}
+
+// forwarded is a run request a supervisor forwarded, with its descriptors.
+type forwarded struct {
+	req   request
+	files []*os.File
+}
+
+// readControl reads the control channel until it closes: it ends the waits
+// of the grants it reads, and answers the run requests on the channel it
+// returns, which it closes with the channel. Once the channel is closed,
+// admitter grants every wait.
+func readControl(ctrl *conn, admitter *cpuAdmitter) <-chan forwarded {
+	runs := make(chan forwarded)
+	go func() {
+		defer close(runs)
+		defer admitter.close()
+		for {
+			var req request
+			files, err := ctrl.receive(&req)
+			if err != nil {
+				return
+			}
+			switch req.Op {
+			case "grant":
+				closeAll(files)
+				admitter.granted(req.Grant, req.ShareMilli)
+			case "run":
+				runs <- forwarded{req: req, files: files}
+			default:
+				closeAll(files) // an operation of a later protocol
+			}
+		}
+	}()
+	return runs
 }
 
 // serve runs one request: files are the client's stdin, stdout, stderr and

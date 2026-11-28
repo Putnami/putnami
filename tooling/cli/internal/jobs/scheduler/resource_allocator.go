@@ -9,6 +9,25 @@ import (
 	"sync"
 )
 
+// MachineCPU asks the machine-wide admission for cpuMilli thousandths of a
+// CPU, against the run's capacity of capacityMilli, and answers what returns
+// the grant and the run's share of the machine, in thousandths of a CPU, or
+// zero for no share; false, holding nothing, when ctx ends first.
+type MachineCPU func(ctx context.Context, cpuMilli, capacityMilli int) (func(), int, bool)
+
+// machineCPU is the machine-wide admission an execution that charges CPU asks
+// once the run's own admission granted it (CLI ADR 0116 §5). Unset, it grants
+// at once, as for a run in its own process.
+var machineCPU MachineCPU = func(context.Context, int, int) (func(), int, bool) { return func() {}, 0, true }
+
+// SetMachineCPU sets the machine-wide admission. The CLI's entry point sets
+// it once, before any run.
+func SetMachineCPU(acquire MachineCPU) {
+	if acquire != nil {
+		machineCPU = acquire
+	}
+}
+
 const (
 	lightBootstrapMemoryMiB       = 512
 	heavyBootstrapMemoryMiB       = 1280
@@ -88,6 +107,12 @@ type resourcePool struct {
 	// run behaves exactly as it did before named budgets existed.
 	budgets map[string]int
 	claimed map[string]int
+	// machine holds what returns each live reservation's machine-wide CPU
+	// grant, by reservation id.
+	machine map[uint64]func()
+	// machineShare is the run's share of the machine, in whole CPUs, as the
+	// latest machine-wide grant gave it; zero when it gave none.
+	machineShare int
 }
 
 func newResourcePool(cpu int, memoryBytes uint64, budgets map[string]int) *resourcePool {
@@ -96,6 +121,7 @@ func newResourcePool(cpu int, memoryBytes uint64, budgets map[string]int) *resou
 		cpuCapacity:      max(cpu, 1),
 		memoryCapacity:   memoryBytes,
 		live:             make(map[uint64]resourceRequest),
+		machine:          make(map[uint64]func()),
 		grants:           make(map[string]resourceRequest),
 	}
 	for name, units := range budgets {
@@ -280,12 +306,37 @@ func (p *resourcePool) tryAcquireLocked(request resourceRequest, workConserving 
 }
 
 // acquireExecution waits until the CPU and memory of one subprocess fit, in
-// rank order, and takes them. It answers false, holding nothing, when ctx ends
-// first.
+// rank order, and takes them; then, when it charges CPU, until the machine
+// process grants that CPU across the machine's concurrent runs. It answers
+// false, holding nothing, when ctx ends first.
 func (p *resourcePool) acquireExecution(ctx context.Context, request resourceRequest, rank executionRank) (resourceReservation, bool) {
 	if p == nil {
 		return resourceReservation{}, true
 	}
+	reservation, ok := p.acquireLocal(ctx, request, rank)
+	if !ok || reservation.request.cpuMilli <= 0 {
+		return reservation, ok
+	}
+	release, share, ok := machineCPU(ctx, reservation.request.cpuMilli, p.cpuCapacityMilli)
+	if !ok {
+		p.release(reservation)
+		return resourceReservation{}, false
+	}
+	p.mu.Lock()
+	p.machineShare = (share + milliCPU - 1) / milliCPU
+	_, live := p.live[reservation.id]
+	if live {
+		p.machine[reservation.id] = release
+	}
+	p.mu.Unlock()
+	if !live {
+		release()
+	}
+	return reservation, true
+}
+
+// acquireLocal is the run's own admission of acquireExecution.
+func (p *resourcePool) acquireLocal(ctx context.Context, request resourceRequest, rank executionRank) (resourceReservation, bool) {
 	request.claims = nil
 	p.mu.Lock()
 	waiter := &executionWaiter{request: p.normalize(request), rank: rank, granted: make(chan resourceReservation, 1)}
@@ -341,6 +392,12 @@ func (p *resourcePool) resize(reservation *resourceReservation, request resource
 	if p == nil || reservation == nil || !reservation.acquired {
 		return false
 	}
+	var machine func()
+	defer func() {
+		if machine != nil {
+			machine()
+		}
+	}()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	held, ok := p.live[reservation.id]
@@ -367,8 +424,25 @@ func (p *resourcePool) resize(reservation *resourceReservation, request resource
 	}
 	p.live[reservation.id] = next
 	reservation.request = next
+	if next.cpuMilli == 0 {
+		machine = p.takeMachineLocked(reservation.id)
+	}
 	p.grantWaitersLocked()
 	return covered
+}
+
+// takeMachineLocked removes and answers what returns the machine-wide CPU
+// grant of reservation id, which the caller calls once it unlocked the pool;
+// nil when it holds none. The machine process keeps the grant it gave while
+// the reservation charges any CPU: a resize changes the run's own admission
+// only.
+func (p *resourcePool) takeMachineLocked(id uint64) func() {
+	release, ok := p.machine[id]
+	if !ok {
+		return nil
+	}
+	delete(p.machine, id)
+	return release
 }
 
 // grantCeiling records that a subprocess which reserves CPU starts with
@@ -379,6 +453,8 @@ func (p *resourcePool) resize(reservation *resourceReservation, request resource
 // it. A task with no history (cold) keeps its planned ceiling, the whole
 // machine: it may be the run's long pole, and a ceiling never grows once its
 // subprocess started. Admission still charges what planChargeMilli says.
+// Under the machine process's admission, the run's share of the machine takes
+// the place of the machine in both rules (CLI ADR 0116 §5).
 // releaseCeiling returns what grantCeiling answered.
 func (p *resourcePool) grantCeiling(ceiling int, cold bool) int {
 	if p == nil {
@@ -386,8 +462,15 @@ func (p *resourcePool) grantCeiling(ceiling int, cold bool) int {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	limit := p.cpuCapacity
+	if p.machineShare > 0 {
+		limit = min(limit, p.machineShare)
+	}
 	if !cold {
-		ceiling = max(ceiling, p.cpuCapacity-p.grantedCPU)
+		ceiling = max(ceiling, limit-p.grantedCPU)
+	}
+	if p.machineShare > 0 {
+		ceiling = max(min(ceiling, limit), 1)
 	}
 	p.grantedCPU += ceiling
 	return ceiling
@@ -417,6 +500,12 @@ func (p *resourcePool) release(reservation resourceReservation) {
 	if p == nil || !reservation.acquired {
 		return
 	}
+	var machine func()
+	defer func() {
+		if machine != nil {
+			machine()
+		}
+	}()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	defer p.grantWaitersLocked()
@@ -425,6 +514,7 @@ func (p *resourcePool) release(reservation resourceReservation) {
 		return
 	}
 	delete(p.live, reservation.id)
+	machine = p.takeMachineLocked(reservation.id)
 	p.cpuUsedMilli = max(p.cpuUsedMilli-request.cpuMilli, 0)
 	if request.memoryBytes >= p.memoryUsed {
 		p.memoryUsed = 0

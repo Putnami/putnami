@@ -71,12 +71,19 @@ type worker struct {
 	gone       chan struct{}
 }
 
+// run names the worker's runs in the supervisor's CPU ledger.
+func (w *worker) run() string { return fmt.Sprintf("%p", w) }
+
 type supervisor struct {
 	dir      string
 	exe      string
 	exeInfo  os.FileInfo
 	started  time.Time
 	listener *net.UnixListener
+
+	// cpu shares the machine's CPU between the runs of the workers (CLI ADR
+	// 0116 §5).
+	cpu *cpuLedger
 
 	mu      sync.Mutex
 	workers map[string]*worker
@@ -124,7 +131,7 @@ func Supervise() int {
 	exeInfo, _ := os.Stat(exe)
 	s := &supervisor{exeInfo: exeInfo,
 		dir: dir, exe: exe, started: time.Now(), listener: listener,
-		workers: map[string]*worker{}, pids: map[int]bool{}, lastUsed: time.Now(), stopped: make(chan struct{}),
+		cpu: newCPULedger(), workers: map[string]*worker{}, pids: map[int]bool{}, lastUsed: time.Now(), stopped: make(chan struct{}),
 	}
 	liveWorkers = s.workerPIDs
 	reapOnExit()
@@ -215,7 +222,7 @@ func (s *supervisor) route(c *conn, req request, files []*os.File) {
 		refuse("machine.handoff")
 		return
 	}
-	err = w.ctrl.send(req, append(files, connFile)...)
+	err = w.ctrl.send(forwardedRun(req), append(files, connFile)...)
 	closeAll(files)
 	_ = connFile.Close()
 	if err != nil {
@@ -395,21 +402,9 @@ func (s *supervisor) follow(w *worker) {
 		if err != nil {
 			break
 		}
-		if msg.Op == "done" {
-			s.mu.Lock()
-			if w.client != nil {
-				_ = w.client.c.Close()
-				w.client = nil
-			}
-			w.busy = false
-			w.runs++
-			w.lastUsed = time.Now()
-			w.heldBytes = msg.HeldBytes
-			s.mu.Unlock()
-			s.touch()
-			s.maybeStopWhenIdle()
-		}
+		s.control(w, msg)
 	}
+	s.cpu.end(w.run())
 	_ = w.ctrl.c.Close()
 	_ = w.cmd.Wait()
 	s.mu.Lock()
@@ -433,6 +428,40 @@ func (s *supervisor) follow(w *worker) {
 	fmt.Fprintf(os.Stderr, "machine: worker %d ended\n", w.cmd.Process.Pid)
 	s.describe()
 	s.maybeStopWhenIdle()
+}
+
+// control handles one control message of worker w: CPU admission, its held
+// memory, and the end of its run. A message of a later protocol is ignored.
+func (s *supervisor) control(w *worker, msg control) {
+	switch msg.Op {
+	case "acquire":
+		id := msg.ID
+		s.cpu.acquire(w.run(), id, msg.CPUMilli, msg.CapacityMilli, func(share int) {
+			_ = w.ctrl.send(request{Protocol: ProtocolVersion, Op: "grant", Grant: id, ShareMilli: share})
+		})
+	case "release":
+		s.cpu.release(w.run(), msg.ID)
+	case "held":
+		s.mu.Lock()
+		w.heldBytes = msg.HeldBytes
+		s.mu.Unlock()
+	case "done":
+		if counts := s.cpu.end(w.run()); counts.Granted > 0 {
+			fmt.Fprintf(os.Stderr, "machine: worker %d run: %d CPU grants, %d waited for another run\n", w.cmd.Process.Pid, counts.Granted, counts.Waited)
+		}
+		s.mu.Lock()
+		if w.client != nil {
+			_ = w.client.c.Close()
+			w.client = nil
+		}
+		w.busy = false
+		w.runs++
+		w.lastUsed = time.Now()
+		w.heldBytes = msg.HeldBytes
+		s.mu.Unlock()
+		s.touch()
+		s.maybeStopWhenIdle()
+	}
 }
 
 // release marks w idle after a hand-off that failed.

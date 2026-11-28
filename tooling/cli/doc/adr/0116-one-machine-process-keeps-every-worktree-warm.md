@@ -148,8 +148,28 @@ computed once where it is keyed by content: the store and its in-flight
 claims (a task key already executing for one run is awaited by the other),
 the toolchains, the probe and activation witnesses persisted per program,
 and, once its record lands, the extension pool. The supervisor stays the
-single admission point that shares the machine's CPU fairly between the
-concurrent runs (section 5).
+single admission point that can share the machine's CPU fairly between the
+concurrent runs, a setting off by default (section 5).
+
+**Amended 2026-11-27: worktrees side by side, never refused.** A request of
+one worktree never waits for, and is never refused because of, a run of
+another worktree: each has its worker, started within the budget of
+section 10, whose eviction stops only idle workers and never refuses a
+start. What two worktrees compute in common is computed once by the store's
+claim lease, which already spans processes: the run that loses the claim of a
+task key waits for the owner's entry and restores it, and gives its CPU back
+while it waits (ADR 0100), so no code of the machine process adds to it.
+Measured on 2026-11-28 on this container (4 vCPU), two worktrees of this
+repository at one commit, the same new comment line appended to
+`typescript/framework/utils/src/index.ts` in both, the gate of section 15
+started in both at once: 205.5 s and 205.7 s through the machine process,
+228.3 s and 228.7 s each in its own process, against 216 s for one run
+alone. One run computes a task and the other is served its entry: of the
+executions the change needs, 151 ran in one worktree and 116 in the other.
+The exception is a task whose key is bound to its worktree (a source-bound
+task, and the workspace's own validations), which each run computes: 19
+tasks, 10.4 s of task time, ran in both. With a different line in each
+worktree, the two runs share nothing and run side by side (section 5).
 
 ```
  client (any build) ──unix socket──▶ supervisor (one per user)
@@ -412,6 +432,58 @@ from its own admission. The prototype measures what one budget changes
 not the total work. When both worktrees make the same change, the second run
 is served by the first one's entries in the shared store (27.7 s); started
 together, one computes and the other waits for it (126.9 s and 133.2 s).
+
+**Amended 2026-11-28: the fair share, per run, off by default.** The
+supervisor can share the machine's CPU between the concurrent runs of its
+workers. With the user's `cpuShare` setting at `fair` (in `machine.json`
+under the Putnami home), a worker asks the supervisor before each subprocess
+that charges CPU, once its own scheduler admitted it and before any cache
+lease, so a wait for the machine never holds a lease another run awaits; it
+returns the grant with its reservation, or when a resize drops its CPU to
+none. The supervisor counts what each run holds, in the thousandths of a CPU
+ADR 0100 charges, against the largest capacity its runs report:
+
+- with one run holding or waiting, every request is granted at once: a run
+  alone admits exactly as today;
+- with several, each run's share is the capacity divided by the runs that
+  hold or wait. A request is granted, in the order its run sent them, when
+  its run holds nothing, or when CPU is free and its run holds less than its
+  share, or when CPU is free and no other run below its share waits.
+
+A run is therefore granted past its share only while no other run below its
+share waits; what it was granted alone, it keeps until those grants return.
+Since a run that holds nothing is always granted one request, the runs'
+charges pass the capacity by about one charge per run, as ADR 0100's
+work-conserving rule lets one run's charges do. Each grant carries the run's
+share at that moment, and the share takes the machine's place in ADR 0100's
+ceiling rule: a task with history is raised to at most the CPUs its run's
+share leaves free, a planned ceiling above the share is lowered to it, and a
+task with no history is granted the share. A run's grants end with its run,
+and with its worker. The supervisor marks the run it forwards
+with its protocol version; a worker asks only a supervisor of version 2 or
+later, and an older worker never asks. The grant changes when a subprocess
+starts, never what it computes.
+
+**The default is `off`, rejected for the default by measurement.** With
+`off`, a run admits its jobs on its own, as in its own process, and makes no
+round trip to the supervisor for them. Measured on 2026-11-28, same
+container and protocol, a different new comment line appended to
+`typescript/framework/utils/src/index.ts` in each of two worktrees, both
+runs started together, two rounds:
+
+| Each run in its own process | Through the machine process, share `fair` |
+|---|---|
+| 303.6 s and 394.8 s; 301.0 s and 393.4 s | 449.9 s and 453.4 s; 423.1 s and 420.8 s |
+| CPU of the pair 1,524 s and 1,519 s, peak load 18.8 | 1,624 s and 1,484 s, peak load 19.5 and 22.7 |
+
+The share makes the two runs progress evenly, but it lowers neither the
+load nor the CPU, and the later run ends 7 to 15 percent later. The work of
+the pair is the same and the machine is saturated either way: the charges
+are occupancy estimates and many tools ignore their ceiling, so admitting
+both runs against one capacity leaves CPU idle at times, while two runs in
+their own processes admit up to twice the capacity together and keep it
+busy. The setting keeps the protocol for a workload where evenness matters
+more than the later finish, and for the execution protocol.
 
 ### 6. What it holds
 
