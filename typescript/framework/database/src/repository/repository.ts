@@ -6,16 +6,20 @@ import { assertSafeIdentifier, type EntityHelper, entityHelper, quoteIdentifier 
 import { type QueryMetrics, recordQuery, recordQueryError, recordSlowQuery, type SqlOperation } from '../observability';
 import type { PostgresConfig } from '../postgres/config';
 import { resolveDatasourceName } from '../primary-datasource';
-import type { SqlClient, SqlQuery } from '../sql-client';
+import type { SqlClient, SqlQuery, SqlRow } from '../sql-client';
 import type { TableDefinition } from '../table';
 import type { InferTable } from '../table/table-inference';
 import { useTxConnection } from '../transaction';
 import { Outcome } from '../transaction-outcome';
+import { compiledFind } from './find-statement';
 import type { QueryFilters } from './query-builder';
 import { buildWhere, buildWhereFromColumnNames } from './repository-where';
 
 /** Implicit page size for `find()` when no `limit` is supplied. */
 const DEFAULT_FIND_LIMIT = 1000;
+
+/** The row count of a find's result. */
+const countOf = (entities: readonly unknown[]): number => entities.length;
 
 /** Inferred entity type alias for a given TableDefinition */
 type Entity<T extends TableDefinition> = InferTable<T>;
@@ -138,25 +142,36 @@ export class Repository<T extends TableDefinition> {
 
     try {
       const result = await queryFn();
-      const duration = performance.now() - start;
-      const metrics: QueryMetrics = {
-        operation,
-        table,
-        duration,
-        rowCount: rowCount?.(result),
-        datasource,
-      };
-      recordQuery(metrics);
-
-      if (this.slowQueryThresholdMs > 0) {
-        recordSlowQuery(metrics, this.slowQueryThresholdMs);
-      }
-
+      this.recordSuccess(operation, start, table, datasource, result, rowCount);
       return result;
     } catch (error) {
       const duration = performance.now() - start;
       recordQueryError(operation, table, duration, error, datasource);
       throw error;
+    }
+  }
+
+  /** Records an operation {@link observe} saw succeed: its metrics, and the slow-query record past the threshold. */
+  private recordSuccess<R>(
+    operation: SqlOperation,
+    start: number,
+    table: string,
+    datasource: string | undefined,
+    result: R,
+    rowCount: ((result: R) => number) | undefined,
+  ): void {
+    const duration = performance.now() - start;
+    const metrics: QueryMetrics = {
+      operation,
+      table,
+      duration,
+      rowCount: rowCount?.(result),
+      datasource,
+    };
+    recordQuery(metrics);
+
+    if (this.slowQueryThresholdMs > 0) {
+      recordSlowQuery(metrics, this.slowQueryThresholdMs);
     }
   }
 
@@ -476,6 +491,7 @@ export class Repository<T extends TableDefinition> {
    * Find a single entity matching filters
    */
   async findOne(filters: Partial<Entity<T>>): Promise<Entity<T> | undefined> {
+    // A fresh object: `find` is overridable, and an override may change its options.
     const results = await this.find(filters, { limit: 1 });
     return results[0];
   }
@@ -511,32 +527,76 @@ export class Repository<T extends TableDefinition> {
     filters: Partial<Entity<T>> | QueryFilters<Entity<T>> = {} as Partial<Entity<T>>,
     options: { limit?: number; offset?: number; orderBy?: string } = {},
   ): Promise<Entity<T>[]> {
-    return this.observe(
-      'find',
-      async () => {
-        // Clamp the requested limit to a hard ceiling so request-controlled
-        // input can't ask for an unbounded result set (memory-exhaustion DoS).
-        const maxRowLimit = this.maxRowLimit;
-        const requested = Math.max(0, Math.floor(Number(options.limit ?? DEFAULT_FIND_LIMIT))) || DEFAULT_FIND_LIMIT;
-        const limit = Math.min(requested, maxRowLimit);
-        const offset = Math.max(0, Math.floor(Number(options.offset ?? 0)));
-        const sql = await this.conn('read');
-        const { fragment: where, hasConditions } = buildWhere(sql, filters, (prop) => this.helper.columnName(prop));
-        const whereClause: SqlQuery = hasConditions ? sql`WHERE ${where}` : sql``;
-        const orderBy = this.buildOrderBy(sql, options.orderBy);
-        const offsetClause: SqlQuery = offset > 0 ? sql`OFFSET ${offset}` : sql``;
+    // What observe('find', …) does, in this frame: a read is the common call.
+    throwIfAborted();
+    const start = performance.now();
+    const table = this.helper.tableName;
+    const datasource = this.datasourceName();
 
-        const rows = await abortableQuery(sql`
+    try {
+      // Clamp the requested limit to a hard ceiling so request-controlled
+      // input can't ask for an unbounded result set (memory-exhaustion DoS).
+      const maxRowLimit = this.maxRowLimit;
+      const requested = Math.max(0, Math.floor(Number(options.limit ?? DEFAULT_FIND_LIMIT))) || DEFAULT_FIND_LIMIT;
+      const limit = Math.min(requested, maxRowLimit);
+      const offset = Math.max(0, Math.floor(Number(options.offset ?? 0)));
+      const sql = await this.conn('read');
+      const rows = await abortableQuery(this.findQuery(sql, filters, limit, offset, options.orderBy));
+      const entities = new Array<Entity<T>>(rows.length);
+      for (let i = 0; i < rows.length; i++) {
+        entities[i] = this.helper.toEntity<Entity<T>>(rows[i] as SqlRow);
+      }
+      this.recordSuccess('find', start, table, datasource, entities, countOf);
+      return entities;
+    } catch (error) {
+      const duration = performance.now() - start;
+      recordQueryError('find', table, duration, error, datasource);
+      throw error;
+    }
+  }
+
+  /**
+   * The statement of a find: compiled once per filter and option shape when
+   * each filter property is compared to a value (see find-statement.ts),
+   * else composed from fragments.
+   */
+  private findQuery(
+    sql: SqlClient,
+    filters: Partial<Entity<T>> | QueryFilters<Entity<T>>,
+    limit: number,
+    offset: number,
+    orderBy: string | undefined,
+  ): SqlQuery {
+    const values: unknown[] = [];
+    const strings = compiledFind(this.helper, filters, orderBy, offset > 0, values);
+    if (strings === undefined) {
+      return this.composedFindQuery(sql, filters, limit, offset, orderBy);
+    }
+    values.push(limit);
+    if (offset > 0) values.push(offset);
+    return sql(strings, ...values);
+  }
+
+  /** The statement of a find, composed from fragments: any filter. */
+  private composedFindQuery(
+    sql: SqlClient,
+    filters: Partial<Entity<T>> | QueryFilters<Entity<T>>,
+    limit: number,
+    offset: number,
+    orderByOption: string | undefined,
+  ): SqlQuery {
+    const { fragment: where, hasConditions } = buildWhere(sql, filters, (prop) => this.helper.columnName(prop));
+    const whereClause: SqlQuery = hasConditions ? sql`WHERE ${where}` : sql``;
+    const orderBy = this.buildOrderBy(sql, orderByOption);
+    const offsetClause: SqlQuery = offset > 0 ? sql`OFFSET ${offset}` : sql``;
+
+    return sql`
           SELECT * FROM ${sql(this.helper.tableName)}
           ${whereClause}
           ${orderBy}
           LIMIT ${limit}
           ${offsetClause}
-        `);
-        return rows.map((row) => this.helper.toEntity<Entity<T>>(row));
-      },
-      (rows) => rows.length,
-    );
+        `;
   }
 
   /**

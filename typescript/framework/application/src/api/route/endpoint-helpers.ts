@@ -1,4 +1,5 @@
-import type { AotValidators, SchemaDefinition, TagSelector, Token } from '@putnami/runtime';
+import type { AotFieldValidator, AotValidators, SchemaDefinition, TagSelector, Token } from '@putnami/runtime';
+import { compileAcceptedInput } from '@putnami/utils';
 import { useLogger } from '@putnami/runtime';
 import { resolveInjection, useContainer } from '@putnami/runtime/inject';
 import type { HttpRequestContext, HttpRequestContextInternal } from '../../http/http-context.type';
@@ -73,10 +74,34 @@ export function buildHttpEndpointHandler(def: EndpointDefinition, aot?: AotValid
   if (aot && middleware.length === 0) {
     validated = validatingInput(raw, def.schemas, aot) ?? buildAotValidatedHandler(def, aot);
   } else if (needsValidation(def.schemas)) {
-    validated = validatingInput(raw, def.schemas) ?? wrapWithValidation(raw, def.schemas);
+    const compiled = compileInputValidators(def.schemas);
+    validated = validatingInput(raw, def.schemas, compiled) ?? wrapWithValidation(raw, def.schemas, compiled);
   }
   const answered = answeringNoContent(validated);
   return middleware.length > 0 ? wrapWithMiddleware(answered, middleware) : answered;
+}
+
+/**
+ * The input validators of an endpoint, compiled once when it is built: each
+ * accepts a valid input in one loop over its fields and hands any other input
+ * to the generic `validateSchema`, so a rejected input answers the same 400.
+ * A schema it cannot compile (an array, a map, a nested object) keeps the
+ * generic validator alone.
+ */
+function compileInputValidators(schemas: EndpointDefinition['schemas']): AotValidators | undefined {
+  const params = compileInputValidator(schemas?.params, true);
+  const query = compileInputValidator(schemas?.query, true);
+  const body = schemas?.bodyBinary
+    ? undefined
+    : compileInputValidator(schemas?.body, schemas?.bodyContentType === 'application/x-www-form-urlencoded');
+  if (!params && !query && !body) return undefined;
+  return { params, query, body };
+}
+
+function compileInputValidator(schema: SchemaDefinition | undefined, coerce: boolean): AotFieldValidator | undefined {
+  const accepted = schema ? compileAcceptedInput(schema, { coerce }) : undefined;
+  if (!accepted) return undefined;
+  return (raw, fallback) => accepted(raw) ?? fallback(raw);
 }
 
 /** The empty answers {@link answeringNoContent} built, so a bridge can read them back as no result. */

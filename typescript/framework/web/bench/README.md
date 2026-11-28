@@ -30,6 +30,26 @@ absolute numbers.
 | SSR render: 100-row table | 1,261  | 793 µs   | 1.14 ms  |
 | SSR render: 1000-row table| 158    | 6.32 ms  | 6.71 ms  |
 
+### Static handler per route tree
+
+Each renderer is built once, as the application builds one per page, and
+shares the application's static handler cache: React Router's static handler is
+built once per route tree and basename, not per request. The
+`handler per request` row keeps the former behavior, for comparison.
+
+Same-process A/B, `NODE_ENV=production`, pinned to one CPU with `taskset`,
+four runs (Bun 1.4, linux/x86_64 container):
+
+| Benchmark                                   | avg, four runs     |
+| ------------------------------------------- | ------------------ |
+| SSR render: minimal page, six routes        | 141 µs to 160 µs   |
+| SSR render: six routes, handler per request | 219 µs to 375 µs   |
+
+A CPU profile of the cached rows no longer shows `createStaticHandler`,
+`flattenRoutes` or `compilePath` on the request path; what React Router keeps
+per request is `createStaticRouter`'s conversion of the data routes, about 2 %
+of the process.
+
 ### History
 
 Previous captures, kept for the row *ratios* only — each block was measured on a

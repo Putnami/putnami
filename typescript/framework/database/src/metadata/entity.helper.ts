@@ -34,6 +34,9 @@ function isNumericType(type: SchemaPrimitive): boolean {
  * Reads metadata from a TableDefinition (no reflect-metadata).
  */
 export class EntityHelper<T extends TableDefinition> {
+  /** How each field of the schema is read from a row, in schema order; built on the first row. */
+  private readers: readonly FieldReader[] | undefined;
+
   constructor(private tableDef: T) {
     assertSafeIdentifier(tableDef.tableName, 'tableName');
     for (const [prop, field] of Object.entries(tableDef.schema)) {
@@ -170,37 +173,70 @@ export class EntityHelper<T extends TableDefinition> {
 
   /** Convert a database row to an entity object */
   toEntity<E = unknown>(row: Record<string, DatabaseValue>): E {
+    const readers = this.readers ?? this.buildReaders();
     const entity: Record<string, unknown> = {};
 
-    for (const [prop, field] of Object.entries(this.tableDef.schema)) {
-      const columnName = field.options.columnName ?? prop;
+    for (let i = 0; i < readers.length; i++) {
+      const reader = readers[i] as FieldReader;
 
       // Try column name first, then property name (for camel transform)
-      let value = row[columnName];
-      if (value === undefined && columnName !== prop) {
-        value = row[prop];
+      let value = row[reader.column];
+      if (value === undefined && reader.column !== reader.prop) {
+        value = row[reader.prop];
       }
 
-      if (value === undefined) {
-        continue;
-      }
-
-      // Apply fromDatabase transform if available, or auto-coerce Date → ISO string for DateIso columns
-      if (field.options.fromDatabase) {
-        entity[prop] = field.options.fromDatabase(value);
-      } else if (value instanceof Date && isDateIsoType(field.type)) {
-        entity[prop] = value.toISOString();
-      } else if (typeof value === 'string' && isNumericType(field.type)) {
-        // NUMERIC arrives as a lossless string; a column declared as a number
-        // opts into JS-number semantics, so coerce it back here.
-        entity[prop] = Number(value);
-      } else {
-        entity[prop] = value;
+      if (value !== undefined) {
+        entity[reader.prop] = entityValue(reader, value);
       }
     }
 
     return entity as E;
   }
+
+  private buildReaders(): readonly FieldReader[] {
+    const readers: FieldReader[] = [];
+    for (const [prop, field] of Object.entries(this.tableDef.schema)) {
+      readers.push({
+        prop,
+        column: field.options.columnName ?? prop,
+        options: field.options,
+        dateIso: isDateIsoType(field.type),
+        numeric: isNumericType(field.type),
+      });
+    }
+    this.readers = readers;
+    return readers;
+  }
+}
+
+/**
+ * A column value as the entity holds it: the field's fromDatabase transform
+ * if it has one, else a Date as an ISO string for a DateIso column, else a
+ * NUMERIC string as a number for a column declared as a number.
+ */
+function entityValue(reader: FieldReader, value: DatabaseValue): unknown {
+  if (reader.options.fromDatabase) {
+    return reader.options.fromDatabase(value);
+  }
+  if (reader.dateIso && value instanceof Date) {
+    return value.toISOString();
+  }
+  if (reader.numeric && typeof value === 'string') {
+    // NUMERIC arrives as a lossless string; a column declared as a number
+    // opts into JS-number semantics, so coerce it back here.
+    return Number(value);
+  }
+  return value;
+}
+
+/** How {@link EntityHelper.toEntity} reads one field of a row. */
+interface FieldReader {
+  readonly prop: string;
+  readonly column: string;
+  /** The field's options, read on each row as the field's own: `fromDatabase` is called on them. */
+  readonly options: ColumnOptions;
+  readonly dateIso: boolean;
+  readonly numeric: boolean;
 }
 
 /** The helper of each table definition: a repository built per request reuses it. */

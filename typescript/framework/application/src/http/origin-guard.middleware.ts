@@ -3,6 +3,7 @@ import type { HttpRequestContext } from './http-context.type';
 import type { HttpMiddleware } from './http-middleware.type';
 import { HttpResponse } from './http-response';
 import { isMinimalRoute } from './minimal.util';
+import { middlewareFromForm } from './middleware-form';
 import { actsOnRoutes } from './route-scope';
 
 export interface OriginGuardOptions {
@@ -26,28 +27,26 @@ export function OriginGuardMiddleware(options: OriginGuardOptions = {}): HttpMid
   const allowSameSite = options.allowSameSite ?? true;
   const enforce = (options.mode ?? 'enforce') === 'enforce';
 
-  // Not async: a request the guard lets through goes on with no frame of its own.
-  const middleware: HttpMiddleware = (ctx, next) => {
-    // Per-route opt-out: skip only when every matched candidate is minimal.
-    if (isMinimalRoute(ctx)) return next();
-
-    if (SAFE_METHODS.has(ctx.method)) return next();
-
-    if (isOriginAllowed(ctx, trustedHosts, allowSameSite)) return next();
-
-    if (!enforce) {
-      useLogger('origin-guard').warn('Cross-origin request would be blocked', {
-        method: ctx.method,
-        path: ctx.path(),
-        origin: ctx.headers.get('Origin'),
-        secFetchSite: ctx.headers.get('Sec-Fetch-Site'),
-        host: ctx.host(),
-      });
-      return next();
-    }
-
-    return Promise.resolve(HttpResponse.json({ error: 'Cross-origin request blocked' }, { status: 403 }));
-  };
+  // A request the guard lets through goes on untouched; a refused one is
+  // answered 403 before the inner chain, or only reported in `report` mode.
+  const middleware = middlewareFromForm({
+    passes: (ctx) =>
+      // Per-route opt-out: skip only when every matched candidate is minimal.
+      isMinimalRoute(ctx) || SAFE_METHODS.has(ctx.method) || isOriginAllowed(ctx, trustedHosts, allowSameSite),
+    answer: (ctx) => {
+      if (!enforce) {
+        useLogger('origin-guard').warn('Cross-origin request would be blocked', {
+          method: ctx.method,
+          path: ctx.path(),
+          origin: ctx.headers.get('Origin'),
+          secFetchSite: ctx.headers.get('Sec-Fetch-Site'),
+          host: ctx.host(),
+        });
+        return undefined;
+      }
+      return HttpResponse.json({ error: 'Cross-origin request blocked' }, { status: 403 });
+    },
+  });
   // A route served on a safe method, or a minimal one, never runs it.
   return actsOnRoutes(middleware, (route) => !route.minimal && !SAFE_METHODS.has(route.method));
 }

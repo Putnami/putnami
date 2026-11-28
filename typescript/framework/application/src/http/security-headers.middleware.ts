@@ -2,6 +2,7 @@ import type { HttpRequestContext } from './http-context.type';
 import type { HttpMiddleware } from './http-middleware.type';
 import type { HttpResponse } from './http-response';
 import { skipsSecurityHeaders } from './minimal.util';
+import { middlewareFromForm } from './middleware-form';
 import { actsOnRoutes } from './route-scope';
 
 export const CSP_NONCE_CONTEXT_KEY = 'cspNonce';
@@ -208,22 +209,9 @@ export const SecurityHeadersMiddleware = (options: SecurityHeadersOptions = {}):
     return res;
   };
 
-  // No async layer of its own: the headers apply in the continuation of the
-  // inner chain's promise.
-  const middleware: HttpMiddleware = (ctx, next) => {
-    // Per-route opt-out: skip only when every matched candidate opts out.
-    if (skipsSecurityHeaders(ctx)) return next();
-
-    let inner: Promise<HttpResponse | undefined>;
-    try {
-      inner = next();
-    } catch (error) {
-      return Promise.reject(error);
-    }
-    const apply = (res: HttpResponse | undefined) => secure(ctx, res);
-    // A middleware that broke its contract and returned a plain value still works.
-    return inner instanceof Promise ? inner.then(apply) : Promise.resolve(inner).then(apply);
-  };
+  // The headers apply after the inner chain answered, unless every matched
+  // candidate opted out.
+  const middleware = middlewareFromForm({ passes: skipsSecurityHeaders, leave: secure });
   // A route that opted out of the headers, or a minimal one, never runs it.
   return actsOnRoutes(middleware, (route) => !route.minimal && route.securityHeaders);
 };

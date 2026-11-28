@@ -37,7 +37,7 @@ export type {
   InferPrimitive,
   InferSchema,
 } from './schema';
-export { validateSchema } from './validate';
-export type { ValidationError, ValidateOptions, ValidateResult } from './validate';
+export { compileAcceptedInput, validateSchema } from './validate';
+export type { AcceptedInput, ValidationError, ValidateOptions, ValidateResult } from './validate';
 export { compileSchemaValidator } from './validator-codegen';
 export type { CompiledValidator, CompileOptions, AotFieldValidator, AotValidators } from './validator-codegen';

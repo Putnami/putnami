@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import {
   CSP_NONCE_CONTEXT_KEY,
   LoggerMiddleware,
@@ -762,6 +762,75 @@ describe('page.renderer', () => {
         globalThis.clearTimeout = realClearTimeout;
       }
     });
+
+    // The render holds no listener on the request's signal once it settled,
+    // and never renders with a signal AbortSignal.any builds over it.
+    function trackedRequestSignal() {
+      const request = new AbortController();
+      const signal = request.signal;
+      const active = new Set<unknown>();
+      const add = signal.addEventListener.bind(signal);
+      const remove = signal.removeEventListener.bind(signal);
+      signal.addEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: unknown) => {
+        if (type === 'abort') active.add(listener);
+        add(type, listener, options as AddEventListenerOptions);
+      }) as typeof signal.addEventListener;
+      signal.removeEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: unknown) => {
+        if (type === 'abort') active.delete(listener);
+        remove(type, listener, options as EventListenerOptions);
+      }) as typeof signal.removeEventListener;
+      return { request, signal, active };
+    }
+
+    async function renderWithSignal(route: Record<string, unknown>, signal: AbortSignal) {
+      const handler = pageRenderer(
+        () => [route as never],
+        () => RootHtml,
+        () => 'hydrate.js',
+        SSR_TIMEOUT_MS,
+      );
+      const ctx = Object.assign(
+        buildHttpContext<HttpRequestContext>({ req: new Request('http://localhost/'), signal }),
+        {
+          params: {},
+          statusCode: 0,
+        },
+      ) as never as HttpRequestContext;
+      return await runInContext(ctx, async () => await respond(handler, ctx));
+    }
+
+    it('renders with a signal of its own and releases its listener on the request once the page is written', async () => {
+      const tracked = trackedRequestSignal();
+      const anySpy = spyOn(AbortSignal, 'any');
+      try {
+        const response = await renderWithSignal(
+          { path: '/', element: React.createElement('div', null, 'Hello SSR') },
+          tracked.signal,
+        );
+        expect(response?.status).toBe(200);
+        expect(tracked.active.size).toBe(1);
+        expect(await response?.get().text()).toContain('Hello SSR');
+        expect(tracked.active.size).toBe(0);
+        expect(anySpy).not.toHaveBeenCalled();
+      } finally {
+        anySpy.mockRestore();
+      }
+    });
+
+    it('releases its listener on the request when rendering throws before streaming', async () => {
+      const tracked = trackedRequestSignal();
+      const response = await renderWithSignal(
+        {
+          path: '/',
+          element: React.createElement(() => {
+            throw new Error('boom');
+          }),
+        },
+        tracked.signal,
+      );
+      expect(response?.status).toBe(500);
+      expect(tracked.active.size).toBe(0);
+    });
   });
 
   describe('wrapInHtmlDocument', () => {
@@ -782,7 +851,7 @@ describe('page.renderer', () => {
         } as never,
         helper,
         {
-          timeoutId: setTimeout(() => {}, 1000),
+          release: () => {},
           context: createRouterContext({
             loaderData: { root: { title: 'Docs' } },
           }),
@@ -814,7 +883,7 @@ describe('page.renderer', () => {
         }) as never;
       const render = async () => {
         const readable = await wrapInHtmlDocument(emptyStream(), new SsrDocumentHelper(), {
-          timeoutId: setTimeout(() => {}, 1000),
+          release: () => {},
           context: createRouterContext(),
           hydrateScript: 'hydrate.js',
         });
@@ -846,7 +915,7 @@ describe('page.renderer', () => {
         } as never,
         new SsrDocumentHelper(),
         {
-          timeoutId: setTimeout(() => {}, 1000),
+          release: () => {},
           context: createRouterContext(),
           hydrateScript: 'hydrate.js',
           nonce: 'test-nonce-123',
@@ -867,7 +936,7 @@ describe('page.renderer', () => {
         } as never,
         new SsrDocumentHelper(),
         {
-          timeoutId: setTimeout(() => {}, 1000),
+          release: () => {},
           context: createRouterContext(),
           hydrateScript: 'hydrate.js',
           nonce: 'test-nonce-123',
@@ -894,7 +963,7 @@ describe('page.renderer', () => {
         } as never,
         new SsrDocumentHelper(),
         {
-          timeoutId: setTimeout(() => {}, 1000),
+          release: () => {},
           context: createRouterContext(),
           hydrateScript: 'hydrate.js',
         },
@@ -919,7 +988,7 @@ describe('page.renderer', () => {
         } as never,
         new SsrDocumentHelper(),
         {
-          timeoutId: setTimeout(() => {}, 1000),
+          release: () => {},
           context: createRouterContext(),
           hydrateScript: 'hydrate.js',
           logger,
@@ -946,7 +1015,7 @@ describe('page.renderer', () => {
         } as never,
         new SsrDocumentHelper(),
         {
-          timeoutId: setTimeout(() => {}, 1000),
+          release: () => {},
           context: createRouterContext({
             loaderData: { root: { evil: hostile } },
           }),

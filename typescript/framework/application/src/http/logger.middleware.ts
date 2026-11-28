@@ -1,7 +1,8 @@
 import { HttpException, type Logger, useLogger } from '@putnami/runtime';
 import { deferHttpLogContext } from './http-context.builder';
-import type { HttpRequestContextInternal } from './http-context.type';
+import type { HttpRequestContext, HttpRequestContextInternal } from './http-context.type';
 import type { HttpMiddleware } from './http-middleware.type';
+import { middlewareFromForm } from './middleware-form';
 
 /** Configuration for the logger middleware. */
 export interface LoggerOptions {
@@ -42,74 +43,63 @@ export const LoggerMiddleware = (options: LoggerOptions = {}): HttpMiddleware =>
     logger.error(`[${context.method}] ${routePath}`, error);
   };
 
-  /** What a request that answered leaves: an error record for a 5xx it failed with, else the access record. */
-  const finish = (
-    context: HttpRequestContextInternal,
-    method: string,
-    routePath: string,
-    start: number,
-    response: Awaited<ReturnType<Parameters<HttpMiddleware>[1]>>,
-  ) => {
-    // HttpResponse instances may omit `status` to mean implicit 200.
-    const status = response ? (response.status ?? 200) : 404;
-    const requestError = context.__requestError;
-    if (status >= 500 && requestError) {
-      logError(context, routePath, status, start, requestError);
+  /** The path a request logs under: its route pattern, else its path. */
+  const loggedRoute = (context: HttpRequestContext): string => {
+    const routePath = context.route || context.path();
+    return routePath.startsWith('/') ? routePath : `/${routePath}`;
+  };
+
+  return middlewareFromForm<LoggedRequest>({
+    passes:
+      exclude.size > 0 ? (context) => exclude.has(loggedRoute(context)) || exclude.has(context.path()) : undefined,
+    enter: (context) => {
+      const method = context.method;
+      // Read before the inner chain: a HEAD request is matched to its GET route inside it.
+      const routePath = loggedRoute(context);
+      if (!deferHttpLogContext(context, method, routePath)) {
+        httpLogger().with('http', { method, routePath });
+      }
+      return { method, routePath, start: Date.now() };
+    },
+    // What a request that answered leaves: an error record for a 5xx it failed with, else the access record.
+    leave: (ctx, response, { method, routePath, start }) => {
+      const context = ctx as HttpRequestContextInternal;
+      // HttpResponse instances may omit `status` to mean implicit 200.
+      const status = response ? (response.status ?? 200) : 404;
+      const requestError = context.__requestError;
+      if (status >= 500 && requestError) {
+        logError(context, routePath, status, start, requestError);
+        return response;
+      }
+
+      // The http.server.* metrics count every served request, so the access
+      // line stays out of info (ADR 0002 of go.putnami.dev/logger).
+      const logger = httpLogger();
+      if (logger.isEnabled('debug')) {
+        logger.with('http', { status, durationMs: Date.now() - start, outcome: status < 500 ? 'success' : 'failure' });
+        logger.debug(`[${method}] ${routePath}`);
+      } else {
+        // Below debug the record is dropped: it is still counted as dropped.
+        logger.debug();
+      }
       return response;
-    }
-
-    // The http.server.* metrics count every served request, so the access
-    // line stays out of info (ADR 0002 of go.putnami.dev/logger).
-    const logger = httpLogger();
-    if (logger.isEnabled('debug')) {
-      logger.with('http', { status, durationMs: Date.now() - start, outcome: status < 500 ? 'success' : 'failure' });
-      logger.debug(`[${method}] ${routePath}`);
-    } else {
-      // Below debug the record is dropped: it is still counted as dropped.
-      logger.debug();
-    }
-    return response;
-  };
-
-  // Not an async function: a request it does not log adds no frame of its own,
-  // only the continuation of the chain's promise.
-  return (context, next) => {
-    const method = context.method;
-    let routePath = context.route || context.path();
-    if (!routePath.startsWith('/')) {
-      routePath = `/${routePath}`;
-    }
-
-    if (exclude.size > 0 && (exclude.has(routePath) || exclude.has(context.path()))) {
-      // As the async version did: a synchronous throw rejects, a plain value resolves.
-      try {
-        return Promise.resolve(next());
-      } catch (error) {
-        return Promise.reject(error);
-      }
-    }
-
-    if (!deferHttpLogContext(context, method, routePath)) {
-      httpLogger().with('http', { method, routePath });
-    }
-    const start = Date.now();
-    const internal = context as HttpRequestContextInternal;
-    const failed = (error: unknown): never => {
-      // Errors that escape the dispatcher (framework-level failures)
-      logError(internal, routePath, error instanceof HttpException ? error.getStatus() : 500, start, error);
-      throw error;
-    };
-
-    let pending: ReturnType<typeof next>;
-    try {
-      pending = next();
-    } catch (error) {
-      try {
-        failed(error);
-      } catch (thrown) {
-        return Promise.reject(thrown);
-      }
-    }
-    return Promise.resolve(pending!).then((response) => finish(internal, method, routePath, start, response), failed);
-  };
+    },
+    // Errors that escape the dispatcher (framework-level failures).
+    fail: (context, error, { routePath, start }) => {
+      logError(
+        context as HttpRequestContextInternal,
+        routePath,
+        error instanceof HttpException ? error.getStatus() : 500,
+        start,
+        error,
+      );
+    },
+  });
 };
+
+/** What the logger keeps of a request between its start and its answer. */
+interface LoggedRequest {
+  readonly method: string;
+  readonly routePath: string;
+  readonly start: number;
+}

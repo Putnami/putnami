@@ -65,6 +65,7 @@ import {
   registerRouteLoader,
 } from './route-registration.utils';
 import type { StaticPathParams } from './static';
+import { createStaticHandlerCache } from './static-handler.cache';
 
 /**
  * The HTTP plugin of a React application. Pages, their loaders and actions
@@ -95,6 +96,11 @@ export class ReactApplication {
   private readonly statics: ReactStaticServer;
   private readonly errors: ReactErrorRegistry;
   private _i18n?: I18nRuntimeOptions;
+  /**
+   * The React Router static handlers of the page renderers, built once per
+   * route tree: every method that changes the tree invalidates them.
+   */
+  private readonly staticHandlers = createStaticHandlerCache();
 
   constructor(
     private config: ReactPluginConfig & PutnamiReactConfigExtras = {
@@ -184,6 +190,7 @@ export class ReactApplication {
     if (this.reactRouter[0]) {
       this.reactRouter[0].path = basename;
     }
+    this.staticHandlers.invalidate();
   }
 
   /**
@@ -280,6 +287,7 @@ export class ReactApplication {
       basename: () => this._basename,
       hydrateScript: () => this.scripts.hydrateScript || '/hydrate.main.js',
       i18n: () => this._i18n,
+      staticHandlers: this.staticHandlers,
     };
   }
 
@@ -394,6 +402,7 @@ export class ReactApplication {
       }
     }
 
+    this.staticHandlers.invalidate();
     return this;
   }
 
@@ -551,6 +560,7 @@ export class ReactApplication {
       layout.action = pageNode.action;
     }
 
+    this.staticHandlers.invalidate();
     return this;
   }
 
@@ -562,6 +572,7 @@ export class ReactApplication {
    */
   reactError(route: string, options: { error: ErrorModule | LazyErrorModule }) {
     this.errors.register(route, options);
+    this.staticHandlers.invalidate();
     return this;
   }
 
@@ -573,6 +584,7 @@ export class ReactApplication {
    */
   reactNotFound(route: string, options: { notFound: NotFoundModule | LazyNotFoundModule }) {
     this.errors.registerNotFound(route, options);
+    this.staticHandlers.invalidate();
     return this;
   }
 
