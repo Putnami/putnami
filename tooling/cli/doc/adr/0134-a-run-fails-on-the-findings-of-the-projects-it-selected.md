@@ -9,7 +9,7 @@
   `internal/jobs/cachekey`, `internal/jobs/remotecache`,
   `internal/jobs/scheduler`), `protocols/evidence` (the evidence fragment,
   kind `finding`), `protocols/extension` and `protocols/cli` (the task member
-  `selection` and contract 31)
+  `selection` and contract 30)
 - **Implements**: part of ADR 0006 of `protocols/evidence` (evidence is
   fragments that tasks emit and a collector streams): the `finding` fragment
   and a first, local verdict over fragments
@@ -79,7 +79,7 @@ flowchart LR
    verdict. The diagnostics carry the producers' rule names as codes, which
    are not codes of the CLI.
 6. **A task that reads no selection says so.** A task declares
-   `selection: none` (`protocols/extension`, contract 31 of `protocols/cli`)
+   `selection: none` (`protocols/extension`, contract 30 of `protocols/cli`)
    when what it does is the same whichever projects the run selected. The CLI
    then hands it no `selection` and no `selectedProjects` in its job context,
    so no `PUTNAMI_SELECTED_*` variable and no selection template variable,
@@ -96,7 +96,7 @@ flowchart LR
 - **A key without the selected projects for every workspace task.** A task
   that reads `selectedProjects` would be replayed for another selection.
 - **Every warning on its own stderr line.** An unscoped run of this
-  repository printed 2,574 lines.
+  repository printed one line per warning, about 2,600.
 - **A succeeded synthetic row that lists the warnings.** It would count as a
   task that ran, on every run that has a warning, warm runs included.
 - **An uncached workspace task that reads the selection.** It would run on

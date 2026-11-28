@@ -786,11 +786,19 @@ rule is the diagnostic code; the severity and the message are the diagnostic's
 own. The subject path is the workspace-relative file the diagnostic names, and
 the member after `#` is the symbol. Equal fragments are one. A diagnostic that
 names no file is placed at the file it is about: the `featureAuthority` warning
-at the project's `putnami.json`, the workspace view and the revision at
-`putnami.workspace.json`, any other at the `putnami.features.json` of the
-project whose evaluation reported it.
+at the project's `putnami.json`, any other at the `putnami.features.json` of the
+project whose evaluation reported it. A finding that concerns several files is
+stated at each: a feature id declared twice at every declaration, and a
+contribution that does not resolve at every capability manifest that declares
+it and at every evidence record that references it. A string longer than
+4096 bytes, the bound of `protocols/evidence`, is cut at a character boundary.
 
 The task publishes no diagnostic and succeeds whatever the findings say. It
+fails when it cannot read its inputs: the candidate cut, or a finding of an
+evaluation about the workspace view, the reader or the revision, which no
+project's file holds. It also fails, and states the cap, when the findings
+would exceed the 50000 fragments one file holds, since a file cut short would
+hide findings. It
 declares `selection: none`: the CLI hands it no selection and keys it on no
 selected project, so it writes the same file under every selection and one
 cache entry serves `--all`, `--impacted` and `--projects`. After the session,
@@ -802,10 +810,11 @@ rule with the count of its warnings, and records each warning in the session
 
 A finding counts for the project that owns the file it names. Some checks of
 one project's evaluation name another project's file: a manifest of any
-project that does not parse, the later declaration of a feature id declared
-twice, a record followed across a project boundary, and the first capability
-manifest a contribution finding names. A run narrowed to the first project
-does not fail on those; a run that selects the owner does
+project that does not parse, and a record followed across a project boundary.
+A run narrowed to the first project does not fail on those; a run that selects
+the owner does. A duplicate feature id and an unresolved contribution are
+stated at every file they concern, so a run that selects any project involved
+fails on them
 ([ADR 0006](adr/0006-feature-validation-runs-once-and-states-its-findings.md)).
 
 `putnami features validate`, the interactive command, still reads the disk,

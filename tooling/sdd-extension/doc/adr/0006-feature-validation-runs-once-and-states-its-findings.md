@@ -53,13 +53,19 @@ decide, and it does not read the selection.
    the diagnostic names, and the member after `#` is the symbol. Equal
    fragments are one. A diagnostic that names no file is placed at the file it
    is about: the `featureAuthority` warning at the project's `putnami.json`,
-   the workspace view and the revision at `putnami.workspace.json`, and any
-   other at the `putnami.features.json` of the project whose evaluation
-   reported it. The task writes `putnami-evidence.jsonl`, a required file of
+   and any other at the `putnami.features.json` of the project whose
+   evaluation reported it. A finding that concerns several files is stated at
+   each: a feature id declared twice at every declaration, and a contribution
+   that does not resolve at every capability manifest that declares it and
+   every evidence record that references it. A string longer than the 4096
+   bytes of `protocols/evidence` is cut at a character boundary. The task writes `putnami-evidence.jsonl`, a required file of
    its command output, on every run, empty when it finds nothing.
 4. **The task does not decide.** It publishes no diagnostic and succeeds
-   whatever the findings say. It fails only when it cannot read the candidate
-   cut or write the file. It declares `selection: none`: the CLI hands it no
+   whatever the findings say. It fails only when it cannot read its inputs or
+   write the file: the candidate cut does not open, an evaluation reports a
+   finding about the workspace view, the reader or the revision, which no
+   project's file holds, or the findings exceed the 50000 fragments one file
+   holds, which the failure states. It declares `selection: none`: the CLI hands it no
    selection and keys it on no selected project, so it writes the same
    fragments under every selection and one cache entry serves every one. The
    CLI's evidence verdict fails the run once per selected project with an
@@ -80,7 +86,8 @@ counts every project.
 
 Before, a project's task failed on every error its evaluation reported,
 wherever the file. Five checks of an evaluation report a file outside its own
-project. Each finding now counts for the project that owns the file it names:
+project. Each finding now counts for the project that owns the file it names,
+and a finding that concerns several files is stated at each:
 
 - **A manifest or a feature document that cannot be read or parsed.** Every
   evaluation reads every project's authored manifests, and it reports one
@@ -88,20 +95,25 @@ project. Each finding now counts for the project that owns the file it names:
   used to fail on it. It now fails a run that selects the project that holds
   the file.
 - **A feature id declared twice.** The finding names the later declaration in
-  path order, and both declaring projects' evaluations report it. It now fails
-  a run that selects the project of the later declaration.
+  path order, and both declaring projects' evaluations report it. It is stated
+  at every declaration, so it fails a run that selects either declaring
+  project, as before.
 - **A record followed across a project boundary.** An evaluation follows
   another root's evidence document that carries a record for one of its
   features, and the capability manifest of a project that owns a contribution
   such a record references. A finding in one of those files counts for the
   project that holds it.
-- **A contribution that does not resolve.** The finding names the first
-  capability manifest the evaluation read, which can belong to another
-  project, and counts for that project.
+- **A contribution that does not resolve.** The finding is stated at every
+  capability manifest that declares the contribution and at every evidence
+  record that references it, so it fails a run that selects any of their
+  projects.
 - **A file at the workspace root.** The workspace root is a root of every
   evaluation, so every project's task reported its findings. They now count
   for the root project, or, in a workspace without one, under every
   selection, as before.
+- **A finding about the inputs.** A finding about the workspace view, the
+  reader or the revision names no project's file. The task fails on it
+  instead of stating it, so no selection passes over it.
 
 ## Rejected alternatives
 
