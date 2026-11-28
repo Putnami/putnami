@@ -64,7 +64,7 @@
     },
     {
       "id": "ssr-response",
-      "text": "SSR executes the static handler and loaders before rendering, preserves redirects and router status, answers an `HttpException` a loader throws with its own status and the not-found or error page, logs an unexpected loader error and records it as the request error, then emits one HTML document whose React body is streamed and whose timer is released on success or error. The loaders and the render stop when their request ends, and that stop logs and records no error. Loaders run under an `ssr loaders` span and the shell under an `ssr render` span."
+      "text": "SSR runs the static handler and loaders before rendering, keeps redirects, router status and a loader `HttpException`'s own status, logs an unexpected loader error and records it as the request error, then emits one HTML document whose React body streams and whose timer is released on success or error. Loaders and render stop when their request ends, logging and recording no error. Loaders run under an `ssr loaders` span and the shell under an `ssr render` span."
     },
     {
       "id": "ssr-streaming",
