@@ -3,6 +3,7 @@ import { useLogger } from '@putnami/runtime';
 import { resolveInjection, useContainer } from '@putnami/runtime/inject';
 import type { HttpRequestContext, HttpRequestContextInternal } from '../../http/http-context.type';
 import type { HttpMiddleware } from '../../http/http-middleware.type';
+import { withEndpointAnswer } from '../../http/endpoint-answer';
 import { HttpResponse } from '../../http/http-response';
 import type { RouteHandler, RouteHandlerResult } from '../../http/route.type';
 import { ENDPOINT_MARKER, type EndpointDefinition } from './endpoint.types';
@@ -102,7 +103,7 @@ function answeringNoContent(handler: RouteHandler): RouteHandler {
   // No async frame of its own: the answer is read in the continuation of the
   // handler's promise, and a handler that throws or answers at once still
   // answers through a promise.
-  return (ctx: HttpRequestContext) => {
+  const answering = (ctx: HttpRequestContext) => {
     let result: Promise<RouteHandlerResult> | RouteHandlerResult;
     try {
       result = handler(ctx);
@@ -111,6 +112,10 @@ function answeringNoContent(handler: RouteHandler): RouteHandler {
     }
     return Promise.resolve(result).then((value) => answer(ctx, value));
   };
+  return withEndpointAnswer(answering, {
+    inner: handler,
+    answer: answer as (ctx: HttpRequestContext, result: unknown) => unknown,
+  });
 }
 
 function needsValidation(schemas: EndpointDefinition['schemas']): boolean {

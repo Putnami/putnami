@@ -9,6 +9,7 @@ import {
 import { stableWireCode } from '../api/route/error-codes';
 import { negotiateResponse } from './content-negotiation';
 import { devErrorsEnabled, isDevHtmlRequest, renderDevErrorPage } from './dev-error-page';
+import { type EndpointAnswer, endpointAnswerOf } from './endpoint-answer';
 import { buildHttpContext } from './http-context.builder';
 import type { HttpRequestContext, HttpRequestContextInternal, Server } from './http-context.type';
 import { HttpResponse } from './http-response';
@@ -83,6 +84,78 @@ export class HttpDispatcher {
       return this.runHandler(handlers[0].handler, httpContext).catch(skipNotAcceptable);
     }
     return this.handleEach(httpContext, handlers, alreadyInContext);
+  }
+
+  /**
+   * Runs the one handler of a route compiled at start, inside the request's
+   * context, as {@link handle} runs a single candidate, and hands its answer
+   * to `answered` in the same continuation: at once, with no promise, when
+   * the handler answers at once. An error past the dispatcher's own answer
+   * goes to `failed`. An endpoint is called through its parts, so its empty
+   * answer adds no promise either.
+   */
+  runRoute<R>(
+    httpContext: HttpRequestContextInternal,
+    handler: RouteHandler<HttpRequestContext>,
+    answered: (response: HttpResponse | undefined) => R | Promise<R>,
+    failed: (error: unknown) => R | Promise<R>,
+  ): R | Promise<R> {
+    const parts = endpointAnswerOf(handler as RouteHandler);
+    const call = parts === undefined ? handler : (parts.inner as RouteHandler<HttpRequestContext>);
+    let result: ReturnType<RouteHandler<HttpRequestContext>>;
+    try {
+      result = call(httpContext);
+    } catch (e) {
+      return this.routeError(e, httpContext, answered, failed);
+    }
+    if (isThenable(result)) {
+      return Promise.resolve(result).then(
+        (value) => this.routeValue(parts, value, httpContext, answered, failed),
+        (e: unknown) => this.routeError(e, httpContext, answered, failed),
+      );
+    }
+    return this.routeValue(parts, result, httpContext, answered, failed);
+  }
+
+  /** The answer of a compiled route's handler that gave `value`, as `runHandler` wraps and flushes it. */
+  private routeValue<R>(
+    parts: EndpointAnswer | undefined,
+    value: unknown,
+    httpContext: HttpRequestContextInternal,
+    answered: (response: HttpResponse | undefined) => R | Promise<R>,
+    failed: (error: unknown) => R | Promise<R>,
+  ): R | Promise<R> {
+    let wrapped: HttpResponse | undefined;
+    try {
+      wrapped = wrapResponse(parts === undefined ? value : parts.answer(httpContext, value), httpContext);
+    } catch (e) {
+      return this.routeError(e, httpContext, answered, failed);
+    }
+    let flushed: HttpResponse | undefined;
+    try {
+      flushed = flushRequest(httpContext, wrapped);
+    } catch (e) {
+      return failed(e);
+    }
+    return answered(flushed);
+  }
+
+  /** The answer of a compiled route's handler that failed with `e`, as `runHandler` answers it. */
+  private routeError<R>(
+    e: unknown,
+    httpContext: HttpRequestContextInternal,
+    answered: (response: HttpResponse | undefined) => R | Promise<R>,
+    failed: (error: unknown) => R | Promise<R>,
+  ): Promise<R> {
+    return this.handleError(e, httpContext).then((answer) => {
+      let flushed: HttpResponse | undefined;
+      try {
+        flushed = flushRequest(httpContext, answer);
+      } catch (x) {
+        return failed(x);
+      }
+      return answered(flushed);
+    }, failed);
   }
 
   private async handleEach(
@@ -354,6 +427,24 @@ const flushContext = <R = undefined | HttpResponse | Promise<HttpResponse>>(r: R
 type ContextWithCallback = {
   __callbacks?: ((r: HttpResponse) => HttpResponse)[];
 };
+
+/**
+ * The request's response callbacks applied to `r`, read from the request's
+ * own context; a callback that refuses the request's Accept leaves it
+ * unanswered, as {@link skipNotAcceptable} does for a single candidate.
+ */
+function flushRequest(httpContext: HttpRequestContextInternal, r: HttpResponse | undefined): HttpResponse | undefined {
+  const cbs = (httpContext as ContextWithCallback).__callbacks;
+  if (!cbs || !(r instanceof HttpResponse)) return r;
+  try {
+    let rh = r;
+    for (const cb of cbs) rh = cb(rh);
+    return rh;
+  } catch (e) {
+    if (e instanceof NotAcceptableException) return undefined;
+    throw e;
+  }
+}
 
 /** Records `candidate` as the handler the request now tries. */
 function useCandidate(

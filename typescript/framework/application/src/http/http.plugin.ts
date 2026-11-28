@@ -9,6 +9,7 @@ import { Application, type GenerateResult, type Module, type Plugin } from '../a
 import { PutnamiConfig } from '../application/putnami.config';
 import { commitRequestSession, loadRequestSession } from '../session/request-session';
 import { SessionConfig } from '../session/session.config';
+import { type CompiledAnswer, compiledForms, runCompiledRoute } from './compiled-route';
 import { CompressionMiddleware } from './compression.middleware';
 import { CsrfMiddleware, isCsrfMiddleware } from './csrf.middleware';
 import { isDevHtmlRequest, renderDevErrorPage } from './dev-error-page';
@@ -24,6 +25,7 @@ import { HttpDispatcher, isRequestStop, requestEnded } from './http-dispatcher';
 import type { HttpMethod } from './http-method.type';
 import { HttpMethodsMiddleware, resolveHttpMethodsOptions } from './http-methods.middleware';
 import type { HttpMiddleware } from './http-middleware.type';
+import type { MiddlewareForm } from './middleware-form';
 import { HttpResponse } from './http-response';
 import { retainRawHttpStreamScope } from './raw-http-stream';
 import { OriginGuardMiddleware } from './origin-guard.middleware';
@@ -46,6 +48,39 @@ type BunNativeHandler = (req: Request, server: Server<WsDataType>) => Response |
 
 /** A Bun native route value: a static response, a bare handler, or a per-method map of either. */
 type BunNativeRoute = Response | BunNativeHandler | Record<string, Response | BunNativeHandler>;
+
+/** Serves a request through the pipeline: with Bun's match, or matched by the JS router. */
+type ServeRequest = (
+  req: Request,
+  server: Server<WsDataType>,
+  matched?: HandlerResult<RouteHandler<HttpRequestContext>>[],
+  url?: string,
+  method?: HttpMethod,
+) => Promise<Response>;
+
+/** Serves a request Bun matched to a compiled route, with Bun's params and the request's URL. */
+type CompiledServe = (
+  req: Request,
+  server: Server<WsDataType>,
+  params: Record<string, string> | undefined,
+  url: string,
+) => Response | Promise<Response>;
+
+/** An endpoint Bun matches, compiled at start: its match, its handler and its middlewares' forms. */
+interface CompiledRoute {
+  readonly method: HttpMethod;
+  readonly route: string;
+  /** The one candidate a request to the route is matched to, frozen: its params are the context's. */
+  readonly matched: HandlerResult<RouteHandler<HttpRequestContext>>[];
+  readonly statusCode?: number;
+  readonly firstPartyErrors?: boolean;
+  readonly handler: RouteHandler<HttpRequestContext>;
+  /** The forms of the middlewares acting on the route, the first outermost. */
+  readonly forms: readonly MiddlewareForm<unknown>[];
+}
+
+/** The response a settled request answers with, as it is. */
+const sameResponse = (response: Response | Promise<Response>): Response | Promise<Response> => response;
 
 /**
  * The address a bound server accepts traffic on, or `undefined` when it is not
@@ -397,6 +432,77 @@ export class HttpPlugin implements Plugin {
       );
     }
 
+    // An error the chain throws becomes the request's answer; it runs in the
+    // request context, so the logger has its traceId / logContext.
+    const answerChainError = (
+      context: HttpRequestContextInternal,
+      lifetime: ServedRequest | undefined,
+      e: unknown,
+    ): HttpResponse | Promise<HttpResponse> => {
+      // A request that ended (its timeout fired or its client left)
+      // answers 408. Its stopped work unwinds quietly; any other
+      // error is logged as it would be during the request.
+      if (lifetime?.timedOut || requestEnded(context)) {
+        const loggedLive = e instanceof HttpResponse || e instanceof HttpException;
+        if (!loggedLive && !isRequestStop(e, context) && !context.__requestErrorLogged) {
+          useLogger().error('Unhandled error', e);
+        }
+        return HttpResponse.json({ error: 'Request Timeout', statusCode: 408 }, { status: 408 });
+      }
+      if (e instanceof HttpResponse) {
+        return e;
+      }
+      if (isDevHtmlRequest(context)) {
+        return renderDevErrorPage(e, context);
+      }
+      if (e instanceof HttpException) {
+        return HttpResponse.json(e.getResponse(), { status: e.getStatus() });
+      }
+      if (!context.__requestErrorLogged) {
+        useLogger().error('Unhandled error', e);
+      }
+      return new HttpResponse('Internal Server Error', { status: 500 });
+    };
+
+    // The request failed outside the chain's own answer: its scope closes, then the error goes on.
+    const failResponse = (context: HttpRequestContextInternal, error: unknown): Promise<never> => {
+      const closed = closeRequestScope(context);
+      return closed === undefined ? Promise.reject(error) : closed.then(() => Promise.reject(error));
+    };
+
+    // The native response, once the request scope is closed: at once when
+    // the request never opened one, as most do.
+    const finishResponse = (
+      context: HttpRequestContextInternal,
+      lifetime: ServedRequest | undefined,
+      res: HttpResponse | undefined,
+    ): Response | Promise<Response> => {
+      let response: Response;
+      try {
+        if (!res) {
+          response = this.unmatchedResponse(context);
+        } else {
+          response = res.get();
+          if (context.__rawHttpStreamResponse && response.body && !lifetime?.timedOut) {
+            // The stream owns the scope from here, and closes it.
+            return retainRawHttpStreamScope(response, context, () => closeRequestScope(context));
+          }
+          if (lifetime?.timedOut && response.body) {
+            const answered = response;
+            return response.body
+              .cancel()
+              .catch(() => {})
+              .then(() => closeRequestScope(context))
+              .then(() => answered);
+          }
+        }
+      } catch (error) {
+        return failResponse(context, error);
+      }
+      const closed = closeRequestScope(context);
+      return closed === undefined ? response : closed.then(() => response);
+    };
+
     /**
      * Serves one request through the framework pipeline. `matched` is the
      * match Bun's native router already made; without it, the JS router
@@ -433,68 +539,9 @@ export class HttpPlugin implements Plugin {
         context.deadlineAt = Date.now() + requestTimeoutMs;
       }
 
-      // An error the chain throws becomes the request's answer; it runs in the
-      // request context, so the logger has its traceId / logContext.
-      const answerChainError = (e: unknown): HttpResponse | Promise<HttpResponse> => {
-        // A request that ended (its timeout fired or its client left)
-        // answers 408. Its stopped work unwinds quietly; any other
-        // error is logged as it would be during the request.
-        if (lifetime?.timedOut || requestEnded(context)) {
-          const loggedLive = e instanceof HttpResponse || e instanceof HttpException;
-          if (!loggedLive && !isRequestStop(e, context) && !context.__requestErrorLogged) {
-            useLogger().error('Unhandled error', e);
-          }
-          return HttpResponse.json({ error: 'Request Timeout', statusCode: 408 }, { status: 408 });
-        }
-        if (e instanceof HttpResponse) {
-          return e;
-        }
-        if (isDevHtmlRequest(context)) {
-          return renderDevErrorPage(e, context);
-        }
-        if (e instanceof HttpException) {
-          return HttpResponse.json(e.getResponse(), { status: e.getStatus() });
-        }
-        if (!context.__requestErrorLogged) {
-          useLogger().error('Unhandled error', e);
-        }
-        return new HttpResponse('Internal Server Error', { status: 500 });
-      };
-
-      // The native response, once the request scope is closed: at once when
-      // the request never opened one, as most do.
-      const finishRequest = (res: HttpResponse | undefined): Response | Promise<Response> => {
-        let response: Response;
-        try {
-          if (!res) {
-            response = this.unmatchedResponse(context);
-          } else {
-            response = res.get();
-            if (context.__rawHttpStreamResponse && response.body && !lifetime?.timedOut) {
-              // The stream owns the scope from here, and closes it.
-              return retainRawHttpStreamScope(response, context, () => closeRequestScope(context));
-            }
-            if (lifetime?.timedOut && response.body) {
-              const answered = response;
-              return response.body
-                .cancel()
-                .catch(() => {})
-                .then(() => closeRequestScope(context))
-                .then(() => answered);
-            }
-          }
-        } catch (error) {
-          return failRequest(error);
-        }
-        const closed = closeRequestScope(context);
-        return closed === undefined ? response : closed.then(() => response);
-      };
-
-      // The request failed outside the chain's own answer: its scope closes, then the error goes on.
-      const failRequest = (error: unknown): Promise<never> => {
-        const closed = closeRequestScope(context);
-        return closed === undefined ? Promise.reject(error) : closed.then(() => Promise.reject(error));
-      };
+      const answerError = (e: unknown) => answerChainError(context, lifetime, e);
+      const finishRequest = (res: HttpResponse | undefined) => finishResponse(context, lifetime, res);
+      const failRequest = (error: unknown) => failResponse(context, error);
 
       // No async frame of its own: the chain's promise carries the request, and
       // its answer becomes the response in the continuation its caller adds.
@@ -528,7 +575,7 @@ export class HttpPlugin implements Plugin {
             } catch (error) {
               chained = Promise.reject(error);
             }
-            return chained.then(undefined, answerChainError);
+            return chained.then(undefined, answerError);
           }) as Promise<HttpResponse | undefined>;
         } catch (error) {
           return Promise.reject(error);
@@ -549,10 +596,125 @@ export class HttpPlugin implements Plugin {
       return response;
     };
 
+    /**
+     * Serves a request Bun matched to a compiled route: the same context,
+     * protections and answers as `serveRequest`, with the route's match built
+     * at start and its middlewares run through their forms, with no chain. A
+     * handler that answers at once is answered with the `Response` itself;
+     * only an answer that waits is held to the request's deadline.
+     */
+    const serveCompiled = (
+      req: Request,
+      server: Server<WsDataType>,
+      route: CompiledRoute,
+      params: Record<string, string> | undefined,
+      url: string,
+    ): Response | Promise<Response> => {
+      const lifetime = deadlines !== undefined ? new ServedRequest(req, deadlines) : undefined;
+      const context = buildHttpContext<HttpRequestContextInternal>({
+        req,
+        url,
+        method: route.method,
+        server: server as unknown as HttpServer,
+        lifetime,
+        maxBodySizeBytes,
+      });
+      context.__drain = drain;
+      if (lifetime !== undefined) context.deadlineAt = Date.now() + requestTimeoutMs;
+      context.__matchedHandlers = route.matched;
+      context.route = route.route;
+      context.params = params;
+      context.statusCode = route.statusCode;
+      context.__firstPartyErrors = route.firstPartyErrors;
+
+      let answered: CompiledAnswer;
+      try {
+        if (containerContext) attachRequestScope(context, containerContext);
+        answered = runInContext(context, () =>
+          runCompiledRoute(
+            context,
+            route.forms,
+            (done, failed) => httpDispatcher.runRoute(context, route.handler, done, failed),
+            (e) => answerChainError(context, lifetime, e),
+          ),
+        ) as CompiledAnswer;
+      } catch (error) {
+        answered = Promise.reject(error);
+      }
+
+      if (!(answered instanceof Promise)) {
+        // Answered at once: no sweep of the deadlines could have run since
+        // the request arrived.
+        const response = finishResponse(context, lifetime, answered);
+        if (lifetime === undefined) return response;
+        if (!(response instanceof Promise)) {
+          lifetime.release(context);
+          return response;
+        }
+        const held = lifetime.start(context);
+        lifetime.settle(sameResponse, response);
+        return held;
+      }
+      if (lifetime === undefined) {
+        return answered.then(
+          (res) => finishResponse(context, undefined, res),
+          (error: unknown) => failResponse(context, error),
+        );
+      }
+      const held = lifetime.start(context);
+      answered.then(
+        (res) => lifetime.settle((r: HttpResponse | undefined) => finishResponse(context, lifetime, r), res),
+        (error: unknown) => lifetime.settle((e: unknown) => failResponse(context, e), error),
+      );
+      return held;
+    };
+
+    /**
+     * The compiled form of an endpoint Bun matches, when every middleware
+     * acting on it has a synchronous form; otherwise the reason it keeps the
+     * middleware chain.
+     */
+    const compileEndpoint = (endpoint: NativeEndpoint): CompiledServe | string => {
+      const { match } = endpoint;
+      const candidate: HandlerResult<RouteHandler<HttpRequestContext>> = Object.freeze({
+        route: match.route,
+        handler: match.handler,
+        accept: match.accept,
+        statusCode: match.statusCode,
+        params: undefined,
+        score: endpoint.slashes * 10,
+        headMeta: match.headMeta,
+        csrfExempt: match.csrfExempt,
+        minimal: match.minimal,
+        securityHeaders: match.securityHeaders,
+        firstPartyErrors: match.firstPartyErrors,
+      });
+      const compiled = compiledForms(
+        routeChains.middlewaresFor({
+          method: endpoint.method,
+          route: match.route,
+          minimal: match.minimal === true,
+          securityHeaders: match.securityHeaders !== false,
+          csrfExempt: match.csrfExempt === true,
+        }),
+      );
+      if ('reason' in compiled) return compiled.reason;
+      const route: CompiledRoute = {
+        method: endpoint.method,
+        route: match.route,
+        matched: Object.freeze([candidate]) as unknown as HandlerResult<RouteHandler<HttpRequestContext>>[],
+        statusCode: match.statusCode,
+        firstPartyErrors: match.firstPartyErrors,
+        handler: match.handler,
+        forms: compiled.forms,
+      };
+      return (req, server, params, url) => serveCompiled(req, server, route, params, url);
+    };
+
     // Native routes are served by Bun's own router, ahead of (and bypassing)
     // the JS pipeline below. Anything not matched here falls through to fetch().
     // Endpoints Bun can match alone join them, through the pipeline.
-    const nativeRoutes = this.buildNativeRoutes(serveRequest);
+    const nativeRoutes = this.buildNativeRoutes(serveRequest, compileEndpoint);
 
     this.server = serve<WsDataType>({
       port,
@@ -738,13 +900,8 @@ export class HttpPlugin implements Plugin {
    * maps no endpoint: a rewrite may route the request elsewhere.
    */
   private buildNativeRoutes(
-    serveRequest: (
-      req: Request,
-      server: Server<WsDataType>,
-      matched?: HandlerResult<RouteHandler<HttpRequestContext>>[],
-      url?: string,
-      method?: HttpMethod,
-    ) => Promise<Response>,
+    serveRequest: ServeRequest,
+    compile: (endpoint: NativeEndpoint) => CompiledServe | string,
   ): Record<string, BunNativeRoute> | undefined {
     const routes: Record<string, BunNativeRoute> = {};
     let empty = true;
@@ -768,6 +925,8 @@ export class HttpPlugin implements Plugin {
     // native route may share a path with stays on the fetch path.
     const nativePaths = this._nativeRoutes.map(({ path }) => path);
     const endpoints = this._rewrites.length === 0 ? nativeEndpoints(this._routeEntries) : [];
+    const compiledRoutes: string[] = [];
+    const chained: { method: string; route: string; reason: string }[] = [];
     for (const endpoint of endpoints) {
       if (nativePaths.some((path) => patternsMayOverlap(endpoint.route, path))) continue;
       let byMethod = routes[endpoint.bunPath] as Record<string, BunNativeHandler> | undefined;
@@ -775,8 +934,20 @@ export class HttpPlugin implements Plugin {
         byMethod = {};
         routes[endpoint.bunPath] = byMethod;
       }
-      byMethod[endpoint.method] = nativeEndpointHandler(endpoint, serveRequest);
+      const compiled = compile(endpoint);
+      if (typeof compiled === 'string') chained.push({ method: endpoint.method, route: endpoint.route, reason: compiled });
+      else compiledRoutes.push(`${endpoint.method} ${endpoint.route}`);
+      byMethod[endpoint.method] = nativeEndpointHandler(
+        endpoint,
+        serveRequest,
+        typeof compiled === 'string' ? undefined : compiled,
+      );
       empty = false;
+    }
+    if (endpoints.length > 0) {
+      // Which routes run compiled, and why the others keep the chain: a
+      // middleware with no synchronous form returns a route to the chain.
+      useLogger('putnami').debug('compiled routes', { compiled: compiledRoutes, chained });
     }
     return empty ? undefined : routes;
   }
@@ -976,6 +1147,18 @@ class ServedRequest implements RequestLifetime, RequestDeadline {
   }
 
   /**
+   * The request answered: its deadline bounded it until its response. A
+   * stream or a background task that runs on after it is no longer held to
+   * it. A request that never built its signal does not read req.signal here:
+   * requestEnded() reads the signal, which still sees the client leave.
+   */
+  release(context: HttpRequestContextInternal): void {
+    if (!this.timedOut && this.stopReason === undefined && !this.controller?.signal.aborted) {
+      context.deadlineAt = undefined;
+    }
+  }
+
+  /**
    * Queues the request on its deadline and gives the promise that answers it:
    * with the response {@link settle} hands it, or with the 408 the shared
    * deadline sweeper sends first.
@@ -1009,13 +1192,7 @@ class ServedRequest implements RequestLifetime, RequestDeadline {
       return;
     }
     this.deadlines.remove(this);
-    // The deadline bounded the request until its response. A stream or a
-    // background task that runs on after it is no longer held to it. A
-    // request that never built its signal does not read req.signal here:
-    // requestEnded() reads the signal, which still sees the client leave.
-    if (!this.timedOut && this.stopReason === undefined && !this.controller?.signal.aborted && this.context) {
-      this.context.deadlineAt = undefined;
-    }
+    if (this.context) this.release(this.context);
     this.resolve?.(response);
   }
 
@@ -1068,18 +1245,13 @@ const CODE_SLASH = 47;
 
 /**
  * The Bun route handler of an endpoint: it hands Bun's match to the
- * pipeline, or the request alone when the JS router could answer it
- * differently (see `buildNativeRoutes`).
+ * compiled route or to the pipeline, or the request alone when the JS router
+ * could answer it differently (see `buildNativeRoutes`).
  */
 function nativeEndpointHandler(
   endpoint: NativeEndpoint,
-  serveRequest: (
-    req: Request,
-    server: Server<WsDataType>,
-    matched?: HandlerResult<RouteHandler<HttpRequestContext>>[],
-    url?: string,
-    method?: HttpMethod,
-  ) => Promise<Response>,
+  serveRequest: ServeRequest,
+  compiled: CompiledServe | undefined,
 ): BunNativeHandler {
   const { method, match, slashes, hasParams, route } = endpoint;
   return (req, server) => {
@@ -1104,6 +1276,7 @@ function nativeEndpointHandler(
     }
     const accepted = acceptScore(match.accept, requestAcceptOf(req.headers.get('Accept')));
     if (accepted === 0) return serveRequest(req, server);
+    if (compiled !== undefined) return compiled(req, server, params, url);
     const matched = [
       {
         route: match.route,
