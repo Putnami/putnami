@@ -264,19 +264,41 @@ func TestWorkspaceWideFindingsAreStatedOnceAtTheFileTheyName(t *testing.T) {
 	}
 	var stated []string
 	for _, fragment := range fragments {
-		if strings.HasPrefix(fragment.Subject.Path, "billing/") {
-			t.Errorf("a finding is located in billing, which holds no error: %+v", fragment)
-		}
 		if fragment.Severity == evidence.FindingError {
 			stated = append(stated, fragment.Rule+" "+fragment.Subject.Path+"#"+fragment.Subject.Symbol)
 		}
 	}
+	// The duplicate concerns both declaring files, so billing's own file
+	// carries it too, and a run that selects billing still fails on it. The
+	// broken manifest concerns its own file only.
 	want := []string{
+		featureproto.ErrorCodeDuplicateFeature + " billing/putnami.features.json#features[0].id",
 		featureproto.ErrorCodeParseError + " broken/putnami.features.json#",
 		featureproto.ErrorCodeDuplicateFeature + " platform/putnami.features.json#features[0].id",
 	}
 	if !slices.Equal(stated, want) {
-		t.Fatalf("stated errors = %v, want each once at the file it names: %v", stated, want)
+		t.Fatalf("stated errors = %v, want each once at every file it concerns: %v", stated, want)
+	}
+}
+
+// TestAFindingAboutTheInputsFailsTheTask pins the other workspace-level
+// findings: one about the workspace view, the reader or the revision means
+// the evaluation could not read its inputs, so the task fails rather than
+// stating it at a file only one project's selection counts.
+func TestAFindingAboutTheInputsFailsTheTask(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "feature-findings-are-evidence-fragments",
+		"every-projects-findings-are-stated-at-the-files-they-name")
+	project := &workspace.Project{ID: "/billing", Path: "billing"}
+	for _, field := range []string{"workspace", "reader", "revision", "revision.kind", "projects"} {
+		err := evaluationInputFailure(project, diag.Diagnostic{Severity: diag.Error, Code: featureproto.ErrorCodeParseError, Field: field, Message: "the candidate files are unavailable"})
+		if err == nil || !strings.Contains(err.Error(), "could not read its inputs: "+field) {
+			t.Errorf("%s: error = %v, want the task to fail on it", field, err)
+		}
+	}
+	for _, field := range []string{"billing/putnami.features.json#features[0].id", "capabilities#contribution", "billing"} {
+		if err := evaluationInputFailure(project, diag.Diagnostic{Severity: diag.Error, Field: field}); err != nil {
+			t.Errorf("%s: a finding about a file failed the task: %v", field, err)
+		}
 	}
 }
 
@@ -322,10 +344,6 @@ func TestAFindingThatNamesNoFileIsPlacedAtTheFileItIsAbout(t *testing.T) {
 			evidence.FragmentSubject{Path: "libs/ledger/putnami.json", Symbol: "featureAuthority"}},
 		{featureproto.WarningCodeUnresolvedFeatureAuthority, "",
 			evidence.FragmentSubject{Path: "putnami.json", Symbol: "featureAuthority"}},
-		{featureproto.ErrorCodeInvalidPath, "projects",
-			evidence.FragmentSubject{Path: "putnami.workspace.json", Symbol: "projects"}},
-		{featureproto.ErrorCodeInvalidSubject, "revision.kind",
-			evidence.FragmentSubject{Path: "putnami.workspace.json", Symbol: "revision.kind"}},
 		{"capabilities.parse_error", "capabilities#contribution",
 			evidence.FragmentSubject{Path: "libs/billing/putnami.features.json", Symbol: "capabilities#contribution"}},
 		{featureproto.ErrorCodeInvalidPath, "../escape.json",

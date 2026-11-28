@@ -22,20 +22,28 @@ func buildContributionCatalog(containers []capabilityproto.ManifestContainer) co
 		byIdentity:       make(map[string]ContributionAssessment),
 		resolutionErrors: make(map[string][]diag.Diagnostic),
 	}
-	identitySet := make(map[capabilityproto.ContributionIdentity]bool)
+	// identitySet maps each identity to the capability manifests that declare
+	// it, in container order: a finding about the identity is stated at each,
+	// so it counts for every project that declares it.
+	identitySet := make(map[capabilityproto.ContributionIdentity][]string)
+	declare := func(identity capabilityproto.ContributionIdentity, path string) {
+		if paths := identitySet[identity]; len(paths) == 0 || paths[len(paths)-1] != path {
+			identitySet[identity] = append(paths, path)
+		}
+	}
 	for _, container := range containers {
 		if container.Manifest == nil {
 			continue
 		}
 		if container.Manifest.V2 != nil {
 			for _, identity := range v2Identities(container.Manifest.V2) {
-				identitySet[identity] = true
+				declare(identity, container.Path)
 			}
 			continue
 		}
 		if container.Manifest.V1 != nil {
 			for _, identity := range v1ReferenceableIdentities(container.Manifest.V1) {
-				identitySet[identity] = true
+				declare(identity, container.Path)
 			}
 			catalog.all = append(catalog.all, v1MigrationAssessments(container.Path, container.Manifest.V1)...)
 		}
@@ -51,13 +59,13 @@ func buildContributionCatalog(containers []capabilityproto.ManifestContainer) co
 		resolved, findings := capabilityproto.ResolveContribution(identity, containers)
 		key := contributionKey(identity)
 		if len(findings) > 0 {
-			field := "capabilities#contribution"
-			if len(containers) > 0 {
-				field = containers[0].Path + "#contribution"
+			for index, declaring := range identitySet[identity] {
+				prefixed := prefixContributionDiagnostics(declaring+"#contribution", findings)
+				if index == 0 {
+					catalog.resolutionErrors[key] = prefixed
+				}
+				catalog.diagnostics = append(catalog.diagnostics, prefixed...)
 			}
-			prefixed := prefixContributionDiagnostics(field, findings)
-			catalog.resolutionErrors[key] = prefixed
-			catalog.diagnostics = append(catalog.diagnostics, prefixed...)
 			continue
 		}
 		assessment, err := contributionFromResolved(resolved)

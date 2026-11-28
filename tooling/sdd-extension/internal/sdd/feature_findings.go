@@ -86,6 +86,15 @@ func BuildFeatureFindingsResult(ws *workspace.Workspace, extensionReferences []s
 	features := map[string]featureengine.FeatureAssessment{}
 	unclassified := map[string]featureengine.ContributionAssessment{}
 	stated := map[string]evidence.Fragment{}
+	state := func(fragment evidence.Fragment) error {
+		line, err := json.Marshal(fragment)
+		if err != nil {
+			return fmt.Errorf("features validate: encode a finding: %w", err)
+		}
+		stated[string(line)] = fragment
+		return nil
+	}
+	var duplicates []diag.Diagnostic
 	for index, project := range projects {
 		result := results[index]
 		if result.Snapshot == nil && !diag.HasErrors(result.Diagnostics) {
@@ -105,12 +114,24 @@ func BuildFeatureFindingsResult(ws *workspace.Workspace, extensionReferences []s
 			}
 		}
 		for _, finding := range result.Diagnostics {
-			fragment := featureFinding(finding, project, projectRoots)
-			line, err := json.Marshal(fragment)
-			if err != nil {
-				return FeatureFindingsReport{}, nil, fmt.Errorf("features validate: encode a finding: %w", err)
+			if err := evaluationInputFailure(project, finding); err != nil {
+				return FeatureFindingsReport{}, nil, err
 			}
-			stated[string(line)] = fragment
+			if finding.Code == featureproto.ErrorCodeDuplicateFeature {
+				duplicates = append(duplicates, finding)
+			}
+			if err := state(featureFinding(finding, project, projectRoots)); err != nil {
+				return FeatureFindingsReport{}, nil, err
+			}
+		}
+	}
+	// A duplicate feature id names its later declaration; it is stated at every
+	// declaration too, so it counts for each project that declares the id.
+	if len(duplicates) > 0 {
+		for _, fragment := range duplicateDeclarations(view, reader, duplicates) {
+			if err := state(fragment); err != nil {
+				return FeatureFindingsReport{}, nil, err
+			}
 		}
 	}
 	fragments := make([]evidence.Fragment, 0, len(stated))
@@ -212,6 +233,22 @@ func authorsSDDDocuments(reader featureengine.Reader, root string) bool {
 	return false
 }
 
+// evaluationInputFailure is the task's failure for a finding about the
+// workspace view, the reader or the revision, nil for any other. Such a
+// finding means the evaluation could not read its inputs: the workspace, its
+// candidate files, or the revision this task sets itself. Stating it at a file
+// one project owns would let a run that selects another project pass, so the
+// task fails instead.
+func evaluationInputFailure(project *workspace.Project, finding diag.Diagnostic) error {
+	if !workspaceLevelFields[finding.Field] {
+		return nil
+	}
+	return protocolcli.Classify(
+		fmt.Errorf("features validate: the evaluation of %s could not read its inputs: %s: %s", project.ID, finding.Field, finding.Message),
+		protocolcli.ErrInvalidConfig,
+	)
+}
+
 // workspaceLevelFields are the diagnostic fields of the feature engine that
 // name no file: the workspace view and the revision every evaluation reads.
 var workspaceLevelFields = map[string]bool{
@@ -220,6 +257,51 @@ var workspaceLevelFields = map[string]bool{
 	"revision":      true,
 	"revision.kind": true,
 	"projects":      true,
+}
+
+// duplicateDeclarations states each duplicate feature finding at every
+// declaration of its id in the workspace's authored manifests, with the
+// finding's rule, severity and message. A finding whose declaration it does
+// not find adds nothing; the finding itself is already stated.
+func duplicateDeclarations(ws *workspace.Workspace, reader featureengine.Reader, duplicates []diag.Diagnostic) []evidence.Fragment {
+	authored := featureengine.DiscoverAuthoredManifestsWith(ws, reader).Manifests
+	byPath := make(map[string]featureproto.ManifestSource, len(authored))
+	for _, source := range authored {
+		byPath[source.Path] = source
+	}
+	declarationField := func(source featureproto.ManifestSource, index int) string {
+		return source.Field(fmt.Sprintf("features[%d]", index)) + ".id"
+	}
+	var fragments []evidence.Fragment
+	for _, finding := range duplicates {
+		artifact, member, _ := strings.Cut(finding.Field, "#")
+		source, ok := byPath[artifact]
+		if !ok || source.Manifest == nil {
+			continue
+		}
+		id := ""
+		for index, feature := range source.Manifest.Features {
+			if declarationField(source, index) == member {
+				id = feature.ID
+			}
+		}
+		if id == "" {
+			continue
+		}
+		stated := featureFinding(finding, &workspace.Project{}, nil)
+		for _, declaring := range authored {
+			if declaring.Manifest == nil {
+				continue
+			}
+			for index, feature := range declaring.Manifest.Features {
+				if feature.ID == id {
+					stated.Subject = evidence.FragmentSubject{Path: declaring.Path, Symbol: declarationField(declaring, index)}
+					fragments = append(fragments, stated)
+				}
+			}
+		}
+	}
+	return fragments
 }
 
 // featureFinding states one diagnostic of the evaluation of project as a
@@ -252,18 +334,14 @@ func featureFinding(finding diag.Diagnostic, project *workspace.Project, project
 //
 //   - the featureAuthority finding, which names a project root, at that
 //     project's putnami.json;
-//   - the workspace view or the revision, which every evaluation reports, at
-//     putnami.workspace.json, with the field as its symbol;
 //   - any other field that names no file the engine reads, such as a
 //     contribution no capability manifest is named for, at putnami.features.json
 //     of the project whose evaluation reported it, with the field as its symbol.
 func featureFindingSubject(finding diag.Diagnostic, project *workspace.Project, projectRoots map[string]bool) evidence.FragmentSubject {
-	artifact, member, named := strings.Cut(finding.Field, "#")
+	artifact, member, _ := strings.Cut(finding.Field, "#")
 	switch {
 	case finding.Code == featureproto.WarningCodeUnresolvedFeatureAuthority && projectRoots[artifact]:
 		return evidence.FragmentSubject{Path: joinRootPath(artifact, wsproto.ConfigFilename), Symbol: "featureAuthority"}
-	case !named && workspaceLevelFields[artifact]:
-		return evidence.FragmentSubject{Path: wsproto.WorkspaceConfigFilename, Symbol: finding.Field}
 	case discoveredArtifact(artifact):
 		return evidence.FragmentSubject{Path: artifact, Symbol: member}
 	default:

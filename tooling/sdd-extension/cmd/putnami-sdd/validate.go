@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -103,6 +104,11 @@ func extensionReferences(ctx *pctx.Context) []string {
 // in the command output the job context names, and announces it under its
 // reserved artifact id. It writes the file on every run, empty when there is
 // no fragment, so a cache hit restores the same bytes a run writes.
+//
+// A string member longer than evidence.MaxStringBytes is cut at the last
+// character boundary within it, as the protocol asks a producer to do. A file
+// holds at most evidence.MaxFragments fragments: past it, the task fails and
+// says so, since a file it cut short would hide findings.
 func emitEvidenceFragments(ctx *pctx.Context, emit *jsonl.Emitter, fragments []evidence.Fragment) error {
 	if ctx.OutputPath == "" {
 		return protocolcli.Classify(
@@ -110,7 +116,21 @@ func emitEvidenceFragments(ctx *pctx.Context, emit *jsonl.Emitter, fragments []e
 			protocolcli.ErrInvalidConfig,
 		)
 	}
-	encoded, err := evidence.EncodeFragments(fragments)
+	if len(fragments) > evidence.MaxFragments {
+		return protocolcli.Classify(fmt.Errorf(
+			"the validation found %d distinct findings, more than the %d one %s holds: fix the findings it reports, then run it again",
+			len(fragments), evidence.MaxFragments, evidence.FragmentFilename), protocolcli.ErrInvalidConfig)
+	}
+	bounded := make([]evidence.Fragment, len(fragments))
+	for i, fragment := range fragments {
+		fragment.Source.Tool = boundedString(fragment.Source.Tool)
+		fragment.Subject.Path = boundedString(fragment.Subject.Path)
+		fragment.Subject.Symbol = boundedString(fragment.Subject.Symbol)
+		fragment.Rule = boundedString(fragment.Rule)
+		fragment.Message = boundedString(fragment.Message)
+		bounded[i] = fragment
+	}
+	encoded, err := evidence.EncodeFragments(bounded)
 	if err != nil {
 		return protocolcli.Classify(fmt.Errorf("encode evidence fragments: %w", err), protocolcli.ErrInvalidConfig)
 	}
@@ -123,6 +143,19 @@ func emitEvidenceFragments(ctx *pctx.Context, emit *jsonl.Emitter, fragments []e
 	}
 	emit.Artifact(evidence.FragmentArtifactID, "Evidence fragments", "report", destination)
 	return nil
+}
+
+// boundedString cuts value to evidence.MaxStringBytes at the last character
+// boundary within it.
+func boundedString(value string) string {
+	if len(value) <= evidence.MaxStringBytes {
+		return value
+	}
+	cut := evidence.MaxStringBytes
+	for cut > 0 && !utf8.RuneStart(value[cut]) {
+		cut--
+	}
+	return value[:cut]
 }
 
 // runSpecsValidate is the second step: the specs that detail those features,

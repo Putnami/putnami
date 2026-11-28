@@ -147,7 +147,7 @@ func TestTheFeaturesStepWritesAnEmptyFileWhenClean(t *testing.T) {
 // selection; a context that carries one changes nothing.
 func TestTheFeaturesStepReadsNoSelection(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "feature-findings-are-evidence-fragments",
-		"the-features-step-succeeds-on-error-findings")
+		"every-projects-findings-are-stated-at-the-files-they-name")
 	root := validationFixture(t, validInvoicingSpec)
 	writeFixture(t, filepath.Join(root, "billing", featureproto.ManifestFilename),
 		billingManifest(`{"kind": "parent", "target": "platform/nonexistent"}`))
