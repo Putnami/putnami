@@ -3,6 +3,7 @@ package extension
 import (
 	"slices"
 	"sort"
+	"sync"
 
 	proto "go.putnami.dev/protocol/extension"
 )
@@ -31,6 +32,7 @@ func Resolve(manifest *Manifest, extPath string) *ExtensionDescription {
 		Hooks:             manifest.Hooks,
 		AutoServe:         manifest.AutoServe == nil || *manifest.AutoServe,
 		Tasks:             manifest.Tasks,
+		taskDigests:       &sync.Map{},
 		Contracts:         manifest.Contracts,
 		Providers:         manifest.Providers,
 		Runtime:           manifest.Runtime,

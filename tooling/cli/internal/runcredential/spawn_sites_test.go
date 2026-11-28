@@ -187,7 +187,7 @@ var spawnSites = map[string]spawnSite{
 		why: "git rev-parse, through gitread.IsShallow, where the in-process reader steps aside"},
 	"git/inprocess_repo.go:readConfig": {spawns: 1, verdict: noRepositoryCode,
 		why: "git config --list reads the configuration and runs no hook, through the gitread runners"},
-	"git/candidate.go:TrackedPaths": {spawns: 2, verdict: noRepositoryCode,
+	"git/candidate.go:TrackedPathsFromGit": {spawns: 2, verdict: noRepositoryCode,
 		why: "read verbs only: ls-files, and rev-parse through gitread.Unmanaged"},
 	"git/tree_history.go:CandidateFilesFromGit": {spawns: 2, verdict: noRepositoryCode,
 		why: "read verbs only, through the gitread runners: ls-files, and rev-parse through gitread.Unmanaged"},

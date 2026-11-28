@@ -358,6 +358,9 @@ func synchronizeExtensionRuntimesWithEnv(
 	}
 
 	started := time.Now()
+	// The nodes replace the same modules: one reading of their trees answers
+	// every digest of the stage.
+	ctx = cachekey.WithRuntimeTreeReading(ctx)
 	workers := preparationWorkers(len(nodes), runtime.NumCPU(), machineprobe.TotalMemoryBytes())
 	spans := make([]*preparationSpans, len(nodes))
 	errs := make([]error, len(nodes))
@@ -608,7 +611,7 @@ func synchronizeDeclaredExtensionRuntimeWithEnv(
 	if ext.LocalSource && ext.Runtime.Prepare != nil {
 		var err error
 		resolving := time.Now()
-		digest, err = cachekey.ExtensionRuntimeDigest(ext)
+		digest, err = cachekey.ExtensionRuntimeDigestIn(ctx, ext)
 		spans.since(PreparationResolution, resolving)
 		if err != nil {
 			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,

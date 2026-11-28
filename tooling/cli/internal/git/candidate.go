@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -116,8 +117,68 @@ func CandidatePathsFromGit(root string, prefixes ...string) ([]string, error) {
 // reads the index alone, so a tracked file deleted from the worktree is
 // listed, and an untracked file is not. TrackedPathsUnder reads the paths
 // below one path from the list.
-// When Git does not manage dir, the error is an *UnmanagedError.
+// When Git does not manage dir, the error is an *UnmanagedError. It reads the
+// index in-process when it can (tooling/cli ADR 0112), and asks Git otherwise.
 func TrackedPaths(dir string) ([]string, error) {
+	if paths, err := trackedPathsInProcess(dir); err == nil {
+		return paths, nil
+	}
+	return TrackedPathsFromGit(dir)
+}
+
+// trackedPathsInProcess is TrackedPaths read in-process: the index's entries
+// at or below dir, which it reads from the root of the work tree holding it.
+// Any error leaves the answer, and the shape of its error, to Git.
+func trackedPathsInProcess(dir string) ([]string, error) {
+	top, err := workTreeRootInProcess(dir)
+	if err != nil {
+		return nil, err
+	}
+	physical, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil, err
+	}
+	if physical, err = filepath.Abs(physical); err != nil {
+		return nil, err
+	}
+	rel, err := filepath.Rel(top, physical)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil, unsupported("%s is not below %s", dir, top)
+	}
+	prefix := ""
+	if rel != "." {
+		prefix = filepath.ToSlash(rel) + "/"
+	}
+	repo, err := openLocal(top)
+	if err != nil {
+		return nil, err
+	}
+	// On a file system that folds case, Git names dir as the file system
+	// spells it, which its path here need not.
+	if prefix != "" && repo.config.IgnoreCase {
+		return nil, unsupported("a directory below the root under core.ignoreCase")
+	}
+	// Under core.precomposeUnicode Git names dir in NFC, which its path here
+	// need not be.
+	if repo.config.PrecomposeUnicode && !isASCII(prefix) {
+		return nil, unsupported("a non-ASCII directory under core.precomposeUnicode")
+	}
+	index, err := repo.index()
+	if err != nil {
+		return nil, err
+	}
+	paths := []string{}
+	for _, entry := range index.Entries {
+		if path, ok := strings.CutPrefix(entry.Path, prefix); ok {
+			paths = append(paths, path)
+		}
+	}
+	sort.Strings(paths)
+	return slices.Compact(paths), nil
+}
+
+// TrackedPathsFromGit is TrackedPaths read from Git alone.
+func TrackedPathsFromGit(dir string) ([]string, error) {
 	stdout, stderr, err := gitread.RunCapture(dir, "ls-files", "-z", "--cached")
 	if err != nil {
 		if unmanaged := gitread.Unmanaged(dir); unmanaged != nil {

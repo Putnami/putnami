@@ -6,6 +6,9 @@
 package extension
 
 import (
+	"reflect"
+	"sync"
+
 	proto "go.putnami.dev/protocol/extension"
 )
 
@@ -294,9 +297,13 @@ type ExtensionDescription struct {
 	Hooks             *ManifestHooks
 	AutoServe         bool
 	Tasks             map[string]TaskDefinition
-	Contracts         *ContractsDefinition
-	Providers         map[string]ProviderDeclaration
-	Runtime           *RuntimeDefinition
+	// taskDigests holds, by task name, the contract digest of each task a
+	// plan expanded (taskContractDigest). Resolve sets it: the tasks of a
+	// resolved description do not change.
+	taskDigests *sync.Map
+	Contracts   *ContractsDefinition
+	Providers   map[string]ProviderDeclaration
+	Runtime     *RuntimeDefinition
 	// Workspace is the extension's workspace adapter, when it declares one. Nil
 	// means the extension contributes nothing to project discovery and is never
 	// probed — which is what keeps the probe's cost proportional to the number
@@ -413,4 +420,29 @@ type JobDefinition struct {
 	// (proto.TaskContractDigest) of the manifest task this job executes,
 	// stamped at discovery and folded into cache key v5. Empty when the job has no manifest task.
 	ContractDigest string
+}
+
+// taskContractDigest is proto.TaskContractDigest(task) for the task the
+// description names name, computed once per resolved description: every
+// project that expands the task digests the same contract.
+func (d *ExtensionDescription) taskContractDigest(name string, task TaskDefinition) string {
+	if d == nil || d.taskDigests == nil {
+		return proto.TaskContractDigest(task)
+	}
+	// The digest is kept for the task map Resolve set: a copy of the
+	// description that holds another map digests its own tasks.
+	key := keptTaskDigest{tasks: reflect.ValueOf(d.Tasks).Pointer(), name: name}
+	if kept, ok := d.taskDigests.Load(key); ok {
+		if digest, ok := kept.(string); ok {
+			return digest
+		}
+	}
+	digest := proto.TaskContractDigest(task)
+	d.taskDigests.Store(key, digest)
+	return digest
+}
+
+type keptTaskDigest struct {
+	tasks uintptr
+	name  string
 }

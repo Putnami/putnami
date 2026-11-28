@@ -40,6 +40,10 @@ func emitUpstreamJobs(
 			depName string
 		}
 		var needs []need
+		// A need is asked once per pass: the downstream jobs of one upstream
+		// project ask for its step alike, and a repeated need would only
+		// expand the steps the first one already added.
+		asked := make(map[need]bool)
 
 		// Build the lookup index once per fixpoint iteration. *allJobs only
 		// grows at the end of the iteration, so this snapshot is valid for the
@@ -59,10 +63,12 @@ func emitUpstreamJobs(
 				// Emission is gated on the SAME exact identity that resolution
 				// uses, over the same upstream projects.
 				for _, depName := range ws.Graph.UpstreamOf(job.Project.ID) {
-					if len(index.matchingKeys(depName, cmdName, stepID)) > 0 {
+					n := need{cmdName: cmdName, stepID: stepID, depName: depName}
+					if asked[n] || len(index.matchingKeys(depName, cmdName, stepID)) > 0 {
 						continue
 					}
-					needs = append(needs, need{cmdName: cmdName, stepID: stepID, depName: depName})
+					asked[n] = true
+					needs = append(needs, n)
 				}
 			}
 		}
