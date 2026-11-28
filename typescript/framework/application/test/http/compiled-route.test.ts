@@ -19,6 +19,7 @@ import { HttpResponse } from '../../src/http/http-response';
 import { HttpPlugin, http } from '../../src/http/http.plugin';
 import { LoggerMiddleware } from '../../src/http/logger.middleware';
 import type { MiddlewareForm } from '../../src/http/middleware-form';
+import { RequestDeadlines } from '../../src/http/request-deadlines';
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
@@ -154,6 +155,26 @@ describe('CompiledRequest', () => {
     expect(hooks).toBe(0);
   });
 
+  it('runs each fail hook once when answering an error after an early answer throws', () => {
+    let outerFails = 0;
+    const forms: MiddlewareForm<unknown>[] = [
+      { fail: () => outerFails++ },
+      {
+        leave: () => {
+          throw new Error('leave threw');
+        },
+        fail: () => outerFails++,
+      },
+      { answer: () => new HttpResponse('refused', { status: 403 }) },
+    ];
+    const throwing = () => {
+      throw new Error('cannot answer');
+    };
+    const request = new CompiledRequest(ctx, forms, undefined, throwing);
+    expect(() => request.run({ runRoute: () => undefined }, () => undefined)).toThrow('cannot answer');
+    expect(outerFails).toBe(1);
+  });
+
   it('answers early, at once or through a promise, past the inner forms and the handler', async () => {
     const refused = new HttpResponse('refused', { status: 403 });
     for (const early of [refused, Promise.resolve(refused)]) {
@@ -230,6 +251,27 @@ describe('a route Bun matches, compiled', () => {
     const response = await res;
     expect(response.status).toBe(408);
     expect(await response.json()).toEqual({ error: 'Request Timeout', statusCode: 408 });
+  });
+
+  it('answers 408 at the deadline counted from the arrival, past a synchronous prefix', async () => {
+    const plugin = http({ port: 0, requestTimeoutMs: 200 });
+    plugin.get('/busy', async () => {
+      const until = performance.now() + 400;
+      while (performance.now() < until) {
+        // A synchronous prefix longer than the deadline.
+      }
+      await sleep(2000);
+      return { late: true };
+    });
+    const served = await startCapturing(() => application().use(plugin), plugin);
+    stop = () => served.app.stop();
+    const started = performance.now();
+    const response = await served.call('GET', '/busy', `${served.base}/busy`);
+    const elapsed = performance.now() - started;
+    expect(response.status).toBe(408);
+    // The chain answers once the prefix ends; a deadline counted from the
+    // queuing would answer 200 ms after it.
+    expect(elapsed).toBeLessThan(550);
   });
 
   it('refuses a cross-site state change with the secure headers, and serves a same-origin one', async () => {
@@ -362,5 +404,20 @@ describe('a route Bun matches, compiled', () => {
     }[];
     expect(chained[0]?.route).toBe('/stamped');
     expect(chained[0]?.reason).toContain('(stamp) has no synchronous form');
+  });
+});
+
+describe('RequestDeadlines', () => {
+  it('counts a deadline from a given start, and keeps the queue in deadline order', () => {
+    const deadlines = new RequestDeadlines(100);
+    const entry = () => ({ at: 0, prev: undefined, next: undefined, queued: false, expire: () => {} });
+    const first = entry();
+    const second = entry();
+    deadlines.enqueue(first, 1_000);
+    expect(first.at).toBe(1_100);
+    deadlines.enqueue(second, 900);
+    expect(second.at).toBe(1_100);
+    deadlines.remove(first);
+    deadlines.remove(second);
   });
 });

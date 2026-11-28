@@ -610,6 +610,9 @@ export class HttpPlugin implements Plugin {
       params: Record<string, string> | undefined,
       url: string,
     ): Response | Promise<Response> => {
+      // The deadline counts from the request's arrival, as on the chain, even
+      // though the request is queued on it only once its answer waits.
+      const arrivedAt = deadlines !== undefined ? performance.now() : 0;
       const lifetime = deadlines !== undefined ? new ServedRequest(req, deadlines) : undefined;
       const context = buildHttpContext<HttpRequestContextInternal>({
         req,
@@ -645,7 +648,7 @@ export class HttpPlugin implements Plugin {
           lifetime.release(context);
           return response;
         }
-        const held = lifetime.start(context);
+        const held = lifetime.start(context, arrivedAt);
         lifetime.settle(sameResponse, response);
         return held;
       }
@@ -655,7 +658,7 @@ export class HttpPlugin implements Plugin {
           (error: unknown) => failResponse(context, error),
         );
       }
-      const held = lifetime.start(context);
+      const held = lifetime.start(context, arrivedAt);
       answered.then(
         (res) => lifetime.settle((r: HttpResponse | undefined) => finishResponse(context, lifetime, r), res),
         (error: unknown) => lifetime.settle((e: unknown) => failResponse(context, e), error),
@@ -1158,14 +1161,14 @@ class ServedRequest implements RequestLifetime, RequestDeadline {
    * with the response {@link settle} hands it, or with the 408 the shared
    * deadline sweeper sends first.
    */
-  start(context: HttpRequestContextInternal): Promise<Response> {
+  start(context: HttpRequestContextInternal, arrivedAt?: number): Promise<Response> {
     const promise = new Promise<Response>(captureResolvers);
     this.resolve = capturedResolve;
     this.reject = capturedReject;
     capturedResolve = undefined;
     capturedReject = undefined;
     this.context = context;
-    this.deadlines.enqueue(this);
+    this.deadlines.enqueue(this, arrivedAt);
     return promise;
   }
 
