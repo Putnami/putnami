@@ -1025,6 +1025,24 @@ written. An `optional` port means the consuming task handles absence itself.
 `optional` has no meaning on the other sources; a missing `project` file is
 simply an input that contributes nothing to the cache key.
 
+A `task` port folds its producer's cache key into the consumer's key. With
+`"fold": "artifact"` it folds instead the digest of the producer output its
+step binds, so a producer edit that writes the same bytes keeps the
+consumer's key:
+
+```json
+"inputs": {
+  "emitManifest": { "from": "task", "fold": "artifact" },
+  "dependencyOutDir": { "from": "task", "fold": "artifact", "optional": true }
+}
+```
+
+The step binds such a port with `fromStep` and `output`, and the output port
+names one declared output of the producer task (see Artifact Inputs in
+[Pipelines](03-pipelines.md)). `fold` is valid only on a `task` port
+(`invalid-value`), and `artifact` is its only value (`invalid-enum`).
+Declaring it requires `cliContract` 32.
+
 ### Output Ports
 
 Tasks declare their outputs via `outputs`:

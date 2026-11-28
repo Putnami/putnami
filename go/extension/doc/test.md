@@ -26,7 +26,64 @@ Runs Go tests with `go test -json`, parses results into structured metrics, and 
    - Emit metrics and diagnostics
    - Generate HTML report if `--coverhtml` is set
 
-The `config-merge`, `generate` and `describe` steps of `test` declare `commandLayerInputs: false`: a project's `options.test.filePatterns` and `options.test.envInputs` key and select the steps that run the tests, not the steps that prepare the project (the config merge, generation and describe). A dependent's tests therefore do not run again when a file only this project's tests read changes. Declare an input those steps read in the extension layer (`options."@putnami/go"`), which still reaches every step.
+The `config-merge`, `generate`, `describe` and `test-identity` steps of `test` declare `commandLayerInputs: false`: a project's `options.test.filePatterns` and `options.test.envInputs` key and select the steps that run the tests, not the steps that prepare the project (the config merge, generation, describe and the [test identity](#test-identity)). A dependent's tests therefore do not run again when a file only this project's tests read changes. Declare an input those steps read in the extension layer (`options."@putnami/go"`), which still reaches every step.
+
+### Test identity
+
+The `test` step keys on the identity of the binaries it tests, not on the keys
+of the steps before it
+([ADR 0017](adr/0017-a-test-run-keys-on-the-identity-of-its-test-binaries.md)).
+Those keys move with every Go source of the dependency closure, so without the
+identity an end-of-line comment in a library re-ran the tests of every project
+that depends on it.
+
+1. The `test-identity` step lists the binaries with
+   `go list -e -trimpath -buildvcs=false -export -deps -test ./...`, in the
+   environment and with the compile flags the test step derives for the run:
+   coverage (`-cover`, `-coverpkg` over the packages the module owns,
+   `-covermode`) and `-race`.
+2. It writes `test-identity.json` into the command output: the Go version,
+   `GOOS`, `GOARCH`, the flags, and, for each test main package
+   (`<pkg>.test`) and each package `./...` matches that has a Go file to
+   compile, the SHA-256 of the sorted import paths and content IDs of its link
+   closure. A content ID is the hash
+   of a package's compiled output.
+3. The test step folds that file instead of the keys of `generate`,
+   `describe` and `test-identity` (an artifact input, CLI contract 32). It
+   also folds the `.gen` tree its project's `generate` wrote and the outputs
+   its `describe` declares, the emitted feature evidence left out of the
+   `.gen/schema` tree, and keeps its own inputs: the project's Go sources and
+   `testdata`, its modules, config, parameters and environment.
+
+| Edit in a dependency | Its content ID | The dependent's tests |
+|---|---|---|
+| A comment within a line | Unchanged | Served from the cache |
+| A line-shifting edit, such as a comment on a line of its own | Changes, and so does the content ID of a package that inlines from it | Run |
+| A change of a body or a signature | Changes | Run |
+
+An end-of-line comment in `go/framework/errors` re-runs 1 of the 24
+`go/framework` test runs, its own, against 21 before (measured in ADR 0017).
+
+The listing compiles a trimmed variant of each package into the Go build
+cache: about 2 s cold and 0.15 s warm for `go/framework/app`. `-trimpath` keeps
+the checkout path out of every content ID, so two machines whose workspace
+roots differ write the same identity; the test step still runs untrimmed
+binaries, which differ from the listed ones by their embedded paths alone. A
+listing that fails, or a package that does not compile, writes an identity no
+other run shares and reports the step skipped, which the cache never stores,
+and the test step runs and reports the failure. The
+identity folds the host platform, so a test result is not served to another
+operating system or architecture.
+
+The test step keeps the project's own files as inputs. A dependency's source
+that a test reads or compiles at run time, outside the binaries it links, is
+keyed only when the project declares it in `options.test.filePatterns`.
+
+A project whose dependency closure commits an `infra/requirements.json` plans
+`test-env` before the test step, and the test step folds that step's action.
+`test-env` reads and keys the closure's `infra/requirements.json` files after
+`describe` converged them, and binds the outputs of `describe` the test step
+binds, so its action folds what `describe` wrote, not the key of `describe`.
 
 ### Workspace batching
 

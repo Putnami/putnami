@@ -24,8 +24,14 @@ import (
 // project declare the same .gen output, and a mode in that file made their
 // cache entries differ by it alone, so each restore of one rewrote the tree
 // the other left (CLI ADR 0121). Nothing reads the mode back from the file.
+//
+// Hash, the content hash of the project's sources, stays out of the file too:
+// a test run folds the bytes of its closure's .gen trees (typescript/extension
+// ADR 0016), and a hash of the sources there moved every dependent's key on an
+// edit that emits the same JavaScript. Nothing reads the hash back from the
+// file; the task's data output reports it.
 type GenerateResult struct {
-	Hash    string            `json:"hash"`
+	Hash    string            `json:"-"`
 	Mode    string            `json:"-"`
 	Exports map[string]string `json:"exports"`
 	Assets  map[string]string `json:"assets"`

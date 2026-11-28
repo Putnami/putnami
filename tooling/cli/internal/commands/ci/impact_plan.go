@@ -201,7 +201,8 @@ func buildPlanCache(ctx context.Context, ws *workspace.Workspace, planned []*job
 		}
 	}
 	cache.SetInputResolver(inputresolve.New(ctx, ws, extensions, nil))
-	keys, err := cachekey.PrecomputeKeys(ws, planned, nil, versions, cache, cachekey.CacheBypass{})
+	// The ChangePlan's keys are recomputable from the revision on any machine.
+	keys, err := cachekey.PrecomputeKeys(ws, planned, nil, versions, cache, cachekey.CacheBypass{}, cachekey.RevisionOnly())
 	if err != nil {
 		return ciproto.ChangePlanCache{Status: "unavailable", Reason: "key-computation-failed"}
 	}

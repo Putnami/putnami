@@ -769,7 +769,9 @@ var WorkspaceSourceState = func(cache *store.CacheManager, workspaceRoot string)
 // ComputeJobCacheHash derives a job's cache key from its inputs. The upstream
 // hashes mixed into the key are the dependencies' cache keys (read from
 // hashes), not their output bytes — so the key is fully input-derived and
-// computable before the job runs, given its dependencies' keys are known.
+// computable before the job runs, given its dependencies' keys are known. An
+// edge that declares an artifact input folds the digest of the artifact its
+// producer published instead (artifact_inputs.go).
 func ComputeJobCacheHash(
 	ws *workspace.Workspace,
 	job *jobmodel.ScheduledJob,
@@ -857,13 +859,20 @@ func ComputeJobCacheHashWith(
 	}
 	policy.RuntimeIdentity = append(policy.RuntimeIdentity, facts...)
 
-	// Collect upstream hashes for dependencies
+	// Collect upstream hashes for dependencies. An edge to a producer whose
+	// artifact the job binds (an artifact input) folds the artifact's digest
+	// instead of the producer's key (artifact_inputs.go, CLI ADR 0043).
 	var upstreamHashes []string
+	artifactProducers := job.ArtifactProducerKeys()
 	for _, depKey := range job.DependsOn {
+		if artifactProducers[depKey] {
+			continue
+		}
 		if h, ok := hashes[depKey]; ok {
 			upstreamHashes = append(upstreamHashes, h)
 		}
 	}
+	upstreamHashes = append(upstreamHashes, artifactInputFolds(job, hashes)...)
 
 	// A consumer of an invocation-scoped resource folds in the PRODUCING
 	// ACTION's digest.

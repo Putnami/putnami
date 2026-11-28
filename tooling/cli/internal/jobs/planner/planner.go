@@ -165,6 +165,9 @@ func Plan(
 
 	// Resolve cross-project dependencies (^, /, *)
 	resolveExternalDeps(allJobs, ws)
+	if err := resolveArtifactInputs(allJobs, ws); err != nil {
+		return nil, err
+	}
 	serializeWithSharedExecutions(ws, allJobs, attachSharedExecutions(ws, allJobs, commandParams))
 
 	if err := validateCyclicComponents(allJobs, ws); err != nil {

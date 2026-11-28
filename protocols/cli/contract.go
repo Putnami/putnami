@@ -45,6 +45,16 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	32: ADDITIVE — a task input port that declares `fold`, and a task output
+//	   port that declares `artifactExcludes`. From 32 on, a `from: "task"`
+//	   port with `fold: "artifact"` folds into the consumer's cache key the
+//	   digest of the producer output its step binds, instead of the
+//	   producer's key, less the subpaths the producer's port excludes, and a
+//	   `^step` binding of such a port binds that step in every direct
+//	   dependency that runs it. A reader below 32 would fold the producer's
+//	   key and plan no edge for the binding, so a manifest that declares one
+//	   is stamped 32 from every origin. A `^step` binding of a port that
+//	   folds no artifact stays inert, as below 32, and raises no stamp.
 //	30: ADDITIVE — a task that declares `selection: none`. From 30 on, the
 //	   CLI hands such a task no `selection` and no `selectedProjects` in its
 //	   job context and keys it on no selected project, so one cache entry
@@ -427,7 +437,15 @@ const SelectionFreeTaskContract = 30
 // stamp instead.
 const ModuleGraphEdgesContract = 31
 
+// ArtifactInputsContract is required by a manifest whose task input port
+// declares fold, or whose task output port declares artifactExcludes. A
+// reader at this contract keys the consumer on the digest of the artifact it
+// binds, ^step bindings of such a port included, and plans the binding's
+// edges. An older reader would fold the producer's key and plan no edge for
+// the binding, so it refuses the stamp instead.
+const ArtifactInputsContract = 32
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = ModuleGraphEdgesContract
+const LatestContract = ArtifactInputsContract

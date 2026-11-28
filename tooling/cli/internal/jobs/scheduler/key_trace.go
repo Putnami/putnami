@@ -144,7 +144,7 @@ func (s *Scheduler) startKeyTrace() *keyTrace {
 		run.prune.Err = "the run has no cache"
 		return run
 	}
-	precomputed, err := cachekey.PrecomputeKeys(s.ws, s.planned, s.commandParams, s.cfg.VersionInfo, s.cache, s.bypass)
+	precomputed, err := cachekey.PrecomputeKeys(s.ws, s.planned, s.commandParams, s.cfg.VersionInfo, s.cache, s.bypass, cachekey.AtEntryKeys(s.lookupEntryKey))
 	if err != nil {
 		run.prune.Err = err.Error()
 		return run

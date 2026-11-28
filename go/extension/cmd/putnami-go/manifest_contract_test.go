@@ -484,6 +484,9 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		// The reserved feature-verification report, one per project under
 		// batching too; optional because most projects bind no checks.
 		{task: "test-exec", id: "featureVerification", kind: "file", root: "command-output", path: "putnami-feature-verification.json", optionalEmpty: true},
+		// The test identity manifest test-exec folds (ADR 0017); absent when
+		// the project has no go.mod and the identity skips.
+		{task: "test-identity-exec", id: "manifest", kind: "file", root: "command-output", path: "test-identity.json", optionalEmpty: true},
 	}
 
 	got := declaredOwnerRows(m)
@@ -1547,7 +1550,11 @@ func TestTaskEffectTable(t *testing.T) {
 		"run-exec":         {"network", "process", "toolchain-cache"},
 		"serve-run":        {"network", "process", "toolchain-cache"},
 		"test-exec":        {"network", "toolchain-cache"},
-		"test-race-exec":   {"network", "toolchain-cache"},
+		// The test identity compiles the test binaries' packages, trimmed, to
+		// list their content IDs: the build cache effect, and the module
+		// downloads a build may need.
+		"test-identity-exec": {"network", "toolchain-cache"},
+		"test-race-exec":     {"network", "toolchain-cache"},
 		// The database test environment runs a container (process) and may pull
 		// its pinned image (network). Both are external effects a cache hit
 		// could not reproduce, which is also why the pair is uncacheable — and
@@ -2401,6 +2408,10 @@ func TestHeavyStepsSurfaceTheAuditedDeadlines(t *testing.T) {
 		"package/cross-compile -> build-cross-compile = 900000ms",
 		"test/describe -> build-describe = 900000ms",
 		"test/test -> test-exec = 600000ms",
+		// The identity compiles every package the test binaries link, trimmed,
+		// so on a cold build cache it does test's compile work; it carries
+		// test's ceiling.
+		"test/test-identity -> test-identity-exec = 600000ms",
 		// The race step builds and runs the touched packages' tests under
 		// the detector after test, so it is heavy and carries test's ceiling.
 		"test/test-race -> test-race-exec = 600000ms",

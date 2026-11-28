@@ -1605,6 +1605,22 @@
         }
       },
       {
+        "id": "a-key-folds-the-artifact-it-binds",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-same-artifact-bytes-keep-the-consumer-key",
+            "an-artifact-binding-plans-its-producers",
+            "a-consumer-of-an-artifact-is-keyed-when-it-starts",
+            "a-hit-publishes-the-artifact-digest-its-entry-recorded"
+          ]
+        }
+      },
+      {
         "id": "a-key-reads-a-dependency-that-publishes-none",
         "stage": "coded",
         "evidenceKinds": [

@@ -27,8 +27,8 @@ func TestUncacheableArtifact(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.rel, func(t *testing.T) {
-			if got := uncacheableArtifact(tt.rel); got != tt.want {
-				t.Errorf("uncacheableArtifact(%q) = %v, want %v", tt.rel, got, tt.want)
+			if got := UncacheableArtifact(tt.rel); got != tt.want {
+				t.Errorf("UncacheableArtifact(%q) = %v, want %v", tt.rel, got, tt.want)
 			}
 		})
 	}

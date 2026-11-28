@@ -593,23 +593,15 @@ func batchTestArgs(
 	if options.benchtime != "" {
 		args = append(args, "-benchtime", options.benchtime)
 	}
-	if coverageEnabled(options) {
-		args = append(args, "-cover")
-		if len(coverPackages) > 0 {
-			args = append(args, "-coverpkg", strings.Join(coverPackages, ","))
-		}
-		// Only ask for a profile when there is somewhere to put it. Passing an empty
-		// -coverprofile makes `go test` treat the next argument as the path.
-		if coverFile != "" {
-			args = append(args, "-coverprofile", coverFile)
-		}
-	}
-	if options.covermode != "" {
-		args = append(args, "-covermode", options.covermode)
-	}
-	if options.race {
-		args = append(args, "-race")
-	}
+	// The flags that decide the binaries' bytes are the ones a solo run and
+	// the test identity derive (binaryFlags); only -coverpkg is the
+	// invocation's, the union of the group under coverage-scope batch.
+	args = append(args, binaryFlags{
+		cover:         coverageEnabled(options),
+		coverPackages: coverPackages,
+		covermode:     options.covermode,
+		race:          options.race,
+	}.args(coverFile)...)
 	if options.timeout != "" {
 		timeout := options.timeout
 		if isNumeric(timeout) {

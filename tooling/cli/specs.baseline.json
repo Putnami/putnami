@@ -189,6 +189,7 @@
     "cli/job-planning-execution#a-declared-provider-that-cannot-serve-says-so-once",
     "cli/job-planning-execution#a-flag-takes-its-ci-default-when-ci-is-set",
     "cli/job-planning-execution#a-group-default-takes-positionals",
+    "cli/job-planning-execution#a-key-folds-the-artifact-it-binds",
     "cli/job-planning-execution#a-key-reads-a-dependency-that-publishes-none",
     "cli/job-planning-execution#a-package-run-with-no-channel-on-says-which-option-to-set",
     "cli/job-planning-execution#a-plan-holds-only-the-steps-a-project-context-gives-work-to",

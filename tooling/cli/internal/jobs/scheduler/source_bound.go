@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // A source-bound task (cache.sourceBound) writes outputs that embed the
@@ -210,6 +212,13 @@ func (s *Scheduler) currentSourceBinding(job *ScheduledJob) (string, bool) {
 	result, spawned := s.capabilitySourceBindings.sourceBinding(s.ws.Root, filepath.Join(s.ws.Root, job.Project.Path))
 	s.versionFilesMu.Unlock()
 	s.cacheStats.RecordLocalBindings(started, time.Now(), spawned)
+	return result.lookupBinding()
+}
+
+// lookupBinding is the binding a lookup binds a source-bound entry's store key
+// to: the empty binding of an unmanaged workspace, else the computed one. The
+// second result is false when there is none.
+func (result capabilitySourceBindingResult) lookupBinding() (string, bool) {
 	if result.unmanaged {
 		return "", true
 	}
@@ -217,6 +226,33 @@ func (s *Scheduler) currentSourceBinding(job *ScheduledJob) (string, bool) {
 		return "", false
 	}
 	return result.binding, true
+}
+
+// SourceBoundEntryKeys returns the resolver of the store key a job's entry is
+// looked up at, as a scheduler's lookup resolves it (lookupEntryKey), for a
+// reader that runs no scheduler: the key itself for a task that is not
+// source-bound, and for one that is the key bound to its project's source
+// binding for the tree as it stands. It computes each project's binding once,
+// and is safe for concurrent use.
+func SourceBoundEntryKeys(ws *workspace.Workspace) cachekey.EntryKeyResolver {
+	memo := newCapabilitySourceBindingMemo()
+	var mu sync.Mutex
+	return func(job *ScheduledJob, key string) (string, bool) {
+		if !cachekey.TaskIsSourceBound(job) {
+			return key, true
+		}
+		if ws == nil || job.Project == nil {
+			return "", false
+		}
+		mu.Lock()
+		result, _ := memo.sourceBinding(ws.Root, filepath.Join(ws.Root, job.Project.Path))
+		mu.Unlock()
+		binding, ok := result.lookupBinding()
+		if !ok {
+			return "", false
+		}
+		return cachekey.SourceBoundEntryKey(key, binding), true
+	}
 }
 
 // executedEntryKey returns the store key an execution's entry is stored and

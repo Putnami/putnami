@@ -452,9 +452,10 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 		planned, edited := dirty.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
 		// A task that keys on the workspace's Git candidate cut reads the edited
 		// file, whichever project declares it: lint-docs checks links into it.
+		// One that keys on the cut of its project and closure alone does not.
 		readsTheCut := map[string]bool{}
 		for _, job := range planned {
-			readsTheCut[job.Key()] = cachekey.KeysOnCandidateCut(job)
+			readsTheCut[job.Key()] = keysOnTheWorkspaceCut(job)
 		}
 		cutReaders := 0
 		for _, key := range sortedKeyNames(clean) {

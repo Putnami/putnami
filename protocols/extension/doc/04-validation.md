@@ -395,7 +395,7 @@ selection and keys it on no selected project, and an older reader refuses the
 member. `RequiredLoadContract` includes that rung too. A manifest that
 still carries the deleted `tools` section loads leniently with no provider,
 and strict validation refuses the member. The reader loads every stamp from
-the one the manifest's vocabulary requires up to `protocols/cli.LatestContract` (30):
+the one the manifest's vocabulary requires up to `protocols/cli.LatestContract` (32):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|

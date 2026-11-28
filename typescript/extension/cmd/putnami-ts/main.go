@@ -18,6 +18,7 @@ import (
 var commands = map[string]cli.JobFunc{
 	"build":           runBuild,
 	"build-generate":  runBuildGenerate,
+	"build-emit":      runBuildEmit,
 	"build-transpile": runBuildTranspile,
 	"build-types":     runBuildTypes,
 	"build-compile":   runBuildCompile,

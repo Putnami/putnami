@@ -39,26 +39,8 @@ import (
 //	   the require mode, so a suite that asks for a test database fails
 //	   instead of skipping.
 func buildTestEnv(ctx *pctx.Context, projectPath string, race bool, goBinary string) ([]string, error) {
-	// Base the test env on WorkspaceTestEnv, not a raw os.Environ(): an
-	// inherited GOWORK=off is stripped and GOWORK points at the governing go.work.
-	//
-	// Then drop the HOST's platform identity block. The scrub applies to the
-	// INHERITED environment only: every setEnv below runs after it and still wins.
-	//
-	// Then drop the variables that describe this job to the extension
-	// (hostenv.JobVars). WorkspaceTestEnv already read the offline
-	// signal and turned module downloads off, and those go settings stay: the
-	// repository's tests run offline, but they are not jobs of the run.
-	env := hostenv.ScrubJobVars(hostenv.ScrubPlatformIdentity(toolchain.WorkspaceTestEnv(os.Environ(), projectPath, goBinary)))
+	env := testCompileEnv(projectPath, race, goBinary)
 	envName := testEnvironment()
-	env = setEnv(env, envAppEnv, envName)
-	env = setEnv(env, "FORCE_COLOR", "1")
-	if race {
-		// The Go race detector requires cgo. CI and reproducible build
-		// environments commonly pin CGO_ENABLED=0, so a race-enabled project
-		// must override that ambient build setting for its host test process.
-		env = setEnv(env, "CGO_ENABLED", "1")
-	}
 
 	if strings.TrimSpace(os.Getenv(envDatabaseTestBindings)) != "" {
 		return env, nil
@@ -80,6 +62,32 @@ func buildTestEnv(ctx *pctx.Context, projectPath string, race bool, goBinary str
 		return setEnv(env, envDatabaseTestBindings, requiredEmptyBinding), nil
 	}
 	return env, nil
+}
+
+// testCompileEnv is the environment `go test` builds and runs the test
+// binaries under, before the database test binding: the one the test identity
+// lists the binaries with, so both name the same compile actions.
+func testCompileEnv(projectPath string, race bool, goBinary string) []string {
+	// Base the test env on WorkspaceTestEnv, not a raw os.Environ(): an
+	// inherited GOWORK=off is stripped and GOWORK points at the governing go.work.
+	//
+	// Then drop the HOST's platform identity block. The scrub applies to the
+	// INHERITED environment only: every setEnv below runs after it and still wins.
+	//
+	// Then drop the variables that describe this job to the extension
+	// (hostenv.JobVars). WorkspaceTestEnv already read the offline
+	// signal and turned module downloads off, and those go settings stay: the
+	// repository's tests run offline, but they are not jobs of the run.
+	env := hostenv.ScrubJobVars(hostenv.ScrubPlatformIdentity(toolchain.WorkspaceTestEnv(os.Environ(), projectPath, goBinary)))
+	env = setEnv(env, envAppEnv, testEnvironment())
+	env = setEnv(env, "FORCE_COLOR", "1")
+	if race {
+		// The Go race detector requires cgo. CI and reproducible build
+		// environments commonly pin CGO_ENABLED=0, so a race-enabled project
+		// must override that ambient build setting for its host test process.
+		env = setEnv(env, "CGO_ENABLED", "1")
+	}
+	return env
 }
 
 // requiredEmptyBinding is the binding a `--require-test-db` run hands a test

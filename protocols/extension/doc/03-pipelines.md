@@ -89,7 +89,7 @@ Three binding types:
 |------|--------|-------------|
 | Value | `value` | Literal value |
 | Context | `from`, `path` | A planner fact; `from` is `context` |
-| Step result | `fromStep`, `output` | Named output port from a previous step |
+| Step result | `fromStep`, `output` | Named output port from a previous step, or from that step in each direct dependency (`^step`, see Artifact Inputs) |
 
 A literal and a context binding become the step's own parameters: the task
 receives them after every command, option and CLI layer, and they key the
@@ -104,6 +104,64 @@ value, and the task receives no parameter. A manifest that binds
 Strict validation refuses any other `from` or `path` (`unresolvable-binding`),
 and so does loading a manifest stamped 16. Below 16, such a binding loads and
 binds nothing.
+
+### Artifact Inputs
+
+A task input port that declares `fold: "artifact"` keys its consumer on the
+bytes a producer wrote, not on the producer's cache key. Its step binds it to
+the producer's output port:
+
+```json
+{
+  "id": "test",
+  "task": "test-run",
+  "with": {
+    "emitManifest": { "fromStep": "emit", "output": "manifest" },
+    "dependencyOutDir": { "fromStep": "^tsc", "output": "outDir" }
+  }
+}
+```
+
+`fromStep` names a step of the same command in the same project, or, as
+`^step`, that step in every direct dependency project that runs it. `^` binds
+only a port that folds an artifact (`invalid-upstream-binding`). The binding is
+an edge: the step runs after its producers whether or not `dependsOn` lists
+them.
+
+`output` names an output port of the producer task (`outputs`), and the port
+names the artifact: the one durable declared output (`declares.outputs`) whose
+id is the port name, or whose `pathFrom` names the port. A port that states a
+`kind` states that output's kind, and one that states a `path` states that
+output's literal path. Strict validation refuses a binding that names no step
+of the command (`unknown-reference` on `fromStep`), no output port of its task
+(`unknown-reference` on `output`), a port that names no declared output
+(`undeclared-artifact`), two of them (`ambiguous-artifact`), or an
+invocation-scoped output or a disagreeing kind or path
+(`invalid-artifact-output`). A port that folds an artifact and is bound by a
+value or a context is `invalid-artifact-binding`. A `^step` binding whose step
+the manifest's own command does not run is checked against the plan instead:
+planning fails when a producer it resolves to does not declare the artifact.
+
+The consumer's key folds the artifact's digest on the edge to that producer:
+a file's bytes, or a directory's sorted relative paths, executable bits and content
+digests, and a fixed empty value for a missing or empty output. A `^step`
+binding folds the sorted list of each dependency's project and digest. An
+`optional` port with no producer in the plan (an `if` condition or an
+activation gate removed it, or no direct dependency runs the step) folds a
+fixed absent value; a required one fails planning, as any required `task`
+port does. A `dependsOn` edge to a producer the step binds no artifact of
+folds the producer's key, as before (CLI ADR 0043). A manifest that declares
+`fold` requires `cliContract` 32, and loading a manifest stamped 32 applies the
+same rules. A `^step` binding of a port that declares no `fold` stays inert, as
+below 32, and raises no stamp.
+
+A producer's output port may declare `artifactExcludes`: canonical paths,
+relative to the directory artifact the port names, that the artifact's digest
+leaves out, for bytes no consumer's verdict reads (Go's `build-describe`
+leaves out `feature-evidence`, which names the project's source binding). The
+files are still captured and restored. It requires `cliContract` 32 and a
+directory artifact; strict validation refuses a duplicate or a non-canonical
+path.
 
 ## Conditional Execution
 

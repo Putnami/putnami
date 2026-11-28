@@ -769,11 +769,34 @@ const (
 	RuntimeInputChangeHistory = "changeHistory"
 )
 
+// TaskInputFoldArtifact is the TaskInputPort.Fold of a `from: "task"` port
+// whose consumer keys on the digest of the producer output its step binds,
+// not on the producer's cache key.
+const TaskInputFoldArtifact = "artifact"
+
+// ValidTaskInputFolds is the closed TaskInputPort.Fold vocabulary in canonical
+// order. The empty string is not a member: it is the absent field, which folds
+// the producer's cache key.
+var ValidTaskInputFolds = []string{TaskInputFoldArtifact}
+
 // TaskInputPort declares a task input source.
 type TaskInputPort struct {
 	From     string   `json:"from"`               // "project", "workspace", "closure", "task", "params", "env", "runtime"
 	Files    []string `json:"files,omitempty"`    // file globs (for "project", "workspace" or "closure")
 	Optional bool     `json:"optional,omitempty"` // only for "task" inputs
+	// Fold is how a `from: "task"` port's producer enters the consumer's
+	// cache key. Empty folds the producer's cache key. TaskInputFoldArtifact
+	// folds the digest of the producer output the consuming step binds
+	// (ArtifactOutputFor), so a producer edit that writes the same bytes keeps
+	// the consumer's key. Valid only on a task port. Declaring it requires
+	// protocolcli.ArtifactInputsContract.
+	Fold string `json:"fold,omitempty"`
+}
+
+// FoldsArtifact reports whether the port keys its consumer on the digest of
+// the artifact its step binds.
+func (p TaskInputPort) FoldsArtifact() bool {
+	return p.From == TaskInputFromTask && p.Fold == TaskInputFoldArtifact
 }
 
 // RequiresProducer reports whether the port states a HARD dependency on
@@ -795,6 +818,14 @@ type TaskOutputPort struct {
 	Kind        string `json:"kind,omitempty"`        // "file", "directory", or empty for data
 	Path        string `json:"path,omitempty"`        // output path (for file/directory)
 	Description string `json:"description,omitempty"` // human-readable description
+	// ArtifactExcludes are the subpaths, relative to the directory output the
+	// port names as an artifact (ArtifactOutputFor), that the artifact's
+	// digest leaves out: bytes the output holds that no consumer's verdict
+	// reads, such as a record that names the project's source binding. They
+	// are still captured and restored with the output. Each entry is a
+	// canonical relative path (NormalizeOutputPath), declared once. Declaring
+	// one requires protocolcli.ArtifactInputsContract.
+	ArtifactExcludes []string `json:"artifactExcludes,omitempty"`
 }
 
 // TaskCachePolicy controls caching for a task. The JSON "cache" field
@@ -968,7 +999,9 @@ type InputBinding struct {
 	Path    string `json:"path,omitempty"`
 	Default any    `json:"default,omitempty"`
 
-	// Step result binding
+	// Step result binding. FromStep names a step of the same command in the
+	// same project, or, as UpstreamStepPrefix+step, that step in every direct
+	// dependency that runs it (only for a port that folds an artifact).
 	FromStep string `json:"fromStep,omitempty"`
 	Output   string `json:"output,omitempty"` // v2: named output port (replaces Path for step bindings)
 	Required bool   `json:"required,omitempty"`

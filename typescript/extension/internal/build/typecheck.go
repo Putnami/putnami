@@ -34,12 +34,24 @@ const (
 	TypeCheckerBun = "bun"
 )
 
-// ResolveTypeChecker returns the type-checker the parameter names: tsc when it
-// is unset, else tsc or bun as given. The choice is explicit: nothing in the
-// project's sources or scripts changes it.
-func ResolveTypeChecker(param string) (string, error) {
+// ResolveTypeChecker returns the type-checker the parameter names, tsc or bun.
+// Unset, it is bun when the bun at bunBin runs bun check (bunCheckBun or
+// later), read from what it prints for --version in workDir, and tsc
+// otherwise. The Bun release is part of the key of every task of the
+// extension, through its task runtime, so the default is a function of the
+// key; a version probe that fails, or prints a version this does not read,
+// fails the task. Only the parameter chooses: nothing in the project's
+// sources, dependencies or scripts changes it.
+func ResolveTypeChecker(param, bunBin, workDir string) (string, error) {
 	switch param {
 	case "":
+		version, err := readBunVersion(bunBin, workDir)
+		if err != nil {
+			return "", err
+		}
+		if slices.Compare(version[:], bunCheckBun[:]) >= 0 {
+			return TypeCheckerBun, nil
+		}
 		return TypeCheckerTsc, nil
 	case TypeCheckerTsc, TypeCheckerBun:
 		return param, nil

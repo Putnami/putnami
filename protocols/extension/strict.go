@@ -385,6 +385,10 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 
 	diags = append(diags, ValidateTreeFactInputs(m)...)
 
+	// The artifact inputs (artifact_inputs.go). Inert for a manifest that
+	// declares none.
+	diags = append(diags, ValidateArtifactInputs(m)...)
+
 	// v3 task contract, through the same harness a conformance fixture and the
 	// extension SDK's authoring gate run: exact paths, one owner per output,
 	// honest effects. Returns nothing for a manifest whose tasks carry no
@@ -943,7 +947,8 @@ func NormalizeManifest(m *Manifest) {
 	NormalizeWorkspaceAdapter(m)
 }
 
-// ValidatePipelineDAG checks that pipeline steps form an acyclic graph.
+// ValidatePipelineDAG checks that pipeline steps form an acyclic graph, the
+// edges an artifact binding implies included (WithArtifactEdges).
 // It returns diagnostics for any cycles found.
 func ValidatePipelineDAG(m *Manifest) []diag.Diagnostic {
 	if m == nil {
@@ -957,9 +962,10 @@ func ValidatePipelineDAG(m *Manifest) []diag.Diagnostic {
 		if len(cmd.Run) == 0 {
 			continue
 		}
+		run := WithArtifactEdges(cmd.Run, m.Tasks)
 
-		stepIdx := make(map[string]int, len(cmd.Run))
-		for i, step := range cmd.Run {
+		stepIdx := make(map[string]int, len(run))
+		for i, step := range run {
 			stepIdx[step.ID] = i
 		}
 
@@ -968,12 +974,12 @@ func ValidatePipelineDAG(m *Manifest) []diag.Diagnostic {
 			gray  = 1
 			black = 2
 		)
-		color := make([]int, len(cmd.Run))
+		color := make([]int, len(run))
 
 		var visit func(i int) bool
 		visit = func(i int) bool {
 			color[i] = gray
-			for _, dep := range cmd.Run[i].DependsOn {
+			for _, dep := range run[i].DependsOn {
 				if isExternalRef(dep) {
 					continue
 				}
@@ -984,7 +990,7 @@ func ValidatePipelineDAG(m *Manifest) []diag.Diagnostic {
 				if color[j] == gray {
 					diags = append(diags, diag.Errorf("pipeline-cycle",
 						fmt.Sprintf("commands.%s.run", cmdName),
-						"pipeline has a cycle: %s → %s", cmd.Run[i].ID, dep))
+						"pipeline has a cycle: %s → %s", run[i].ID, dep))
 					return false
 				}
 				if color[j] == white {
@@ -997,7 +1003,7 @@ func ValidatePipelineDAG(m *Manifest) []diag.Diagnostic {
 			return true
 		}
 
-		for i := range cmd.Run {
+		for i := range run {
 			if color[i] == white {
 				if !visit(i) {
 					break

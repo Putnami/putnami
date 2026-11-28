@@ -238,8 +238,9 @@ be a Mach-O binary, and a library's compile-check verdict would be reused across
 operating systems even though `//go:build linux` files are only ever compiled on
 linux — so linux-only compile errors would pass CI.
 
-> The same gap is **pre-existing** on `test-exec`, whose key likewise has no host
-> component. It is deliberately out of scope here and left to its own change.
+> `test-exec` had the same gap. It now keys on the test identity, which names
+> the platform its binaries are built for and folds the host platform
+> ([ADR 0017](adr/0017-a-test-run-keys-on-the-identity-of-its-test-binaries.md)).
 
 ### Why test files are not in the build cache key
 
@@ -251,7 +252,9 @@ above applies.
 
 The exclusion matters most on `build-describe`, which carries the `^describe`
 edge: every dependent reaches its dependencies through it, and a dependent's
-`compile` and `test-exec` sit behind its own `describe`. A test file in
+`compile` sits behind its own `describe`. `test-exec` no longer does: it keys on
+the identity of its test binaries and on describe's declared outputs
+([ADR 0017](adr/0017-a-test-run-keys-on-the-identity-of-its-test-binaries.md)). A test file in
 describe's key therefore moves the identity of a project's whole dependent
 closure. Measured on this repository with a warm cache, one blank line appended
 to a `go/framework/http` test file re-ran 12 cacheable tasks across four
@@ -816,6 +819,7 @@ Every declared output has exactly one owning task:
 | `build-compile` | `bin/` | per-command output dir (`build` only) |
 | `build-cross-compile` | `bin/` | per-command output dir (`package` only) |
 | `test-exec` | `coverage.out`, `coverage.html` | per-command output dir |
+| `test-identity-exec` | `test-identity.json` | per-command output dir |
 | `package-go` | `go/` | per-command output dir |
 | `package-archives` | `archives/` | per-command output dir |
 | `package-docker` | `docker/` | per-command output dir |

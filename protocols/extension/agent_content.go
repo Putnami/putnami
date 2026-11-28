@@ -99,10 +99,12 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: SelectionFreeTaskContract for a task that declares selection
-// none, RuntimeEntriesContract for runtime entries, compiled inputs or
-// a task that names a runtime entry, ContextActivationContract for a step
-// activation that declares projectTypes or anyOf, EmptiedFileOutputContract for a file
+// the manifest: ArtifactInputsContract for a task input port that declares
+// fold or a task output port that declares artifactExcludes,
+// SelectionFreeTaskContract for a task that declares selection none,
+// RuntimeEntriesContract for runtime entries, compiled inputs or a task that
+// names a runtime entry, ContextActivationContract for a step activation that
+// declares projectTypes or anyOf, EmptiedFileOutputContract for a file
 // output that declares emptied, PromptHostHooksContract for a host hook at UserPromptSubmit or
 // one that declares async, ProviderMembersContract for a provider operation
 // that declares members, DependencyClosureContract for a command that depends on a
@@ -268,6 +270,12 @@ func RequiredLoadContract(m *Manifest) int {
 	// loads from.
 	if DeclaresContextActivation(m) {
 		required = max(required, protocolcli.ContextActivationContract)
+	}
+	// A port that folds an artifact keys its consumer on the artifact, and a
+	// `^step` binding of it plans its edges, only in a reader that reads them,
+	// whatever origin the manifest loads from.
+	if DeclaresArtifactInputs(m) {
+		required = max(required, protocolcli.ArtifactInputsContract)
 	}
 	return required
 }

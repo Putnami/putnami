@@ -150,12 +150,64 @@ type ScheduledJob struct {
 	// instead of anything the producer wrote — a secret's content must never
 	// reach a cache key.
 	InvocationProducer *ScheduledJob
+	// ArtifactInputs are the input ports of the job's task that fold the
+	// digest of a produced artifact instead of the producer's cache key,
+	// each with the producers the plan holds for its binding. The planner
+	// stamps them once the plan's edges are resolved; sorted by port.
+	ArtifactInputs []ArtifactInput
+	// ArtifactOutputs are the output ports of the job's task that a planned
+	// job's ArtifactInputs bind. When the job's result is published, the
+	// scheduler publishes the digest of each one's declared output. Sorted,
+	// once each.
+	ArtifactOutputs []string
+
 	// Invocation is the non-secret locator (id + private artifact root) for the
 	// relation this node participates in. It is written ONCE, when the producer
 	// starts, and is delivered only to that relation's producer, listed
 	// consumers, and finalizer; every other node keeps it nil and receives
 	// neither the context member nor the {invocationArtifactRoot} token.
 	Invocation *protocoljob.Invocation
+}
+
+// ArtifactInput is one input port of a job's task that folds the digest of
+// an artifact (`fold: "artifact"`), resolved against the plan.
+type ArtifactInput struct {
+	// Port is the consumer task's input port.
+	Port string
+	// Output is the producer task's output port the step binds.
+	Output string
+	// Upstream reports a `^step` binding: the step in every direct
+	// dependency that runs it.
+	Upstream bool
+	// Optional is the port's optional flag.
+	Optional bool
+	// Producers are the planned producer jobs, sorted by project then key.
+	// None means the plan holds no producer: an optional port folds a fixed
+	// absent value, and a required one fails planning.
+	Producers []ArtifactProducer
+}
+
+// ArtifactProducer is one planned job an ArtifactInput reads the artifact of.
+type ArtifactProducer struct {
+	// Key is the producer's job key.
+	Key string
+	// Project is the producer's project id.
+	Project string
+}
+
+// ArtifactProducerKeys returns the job keys of every producer the job's
+// ArtifactInputs read, the edges whose key the job's key does not fold.
+func (s *ScheduledJob) ArtifactProducerKeys() map[string]bool {
+	if s == nil || len(s.ArtifactInputs) == 0 {
+		return nil
+	}
+	keys := make(map[string]bool)
+	for _, input := range s.ArtifactInputs {
+		for _, producer := range input.Producers {
+			keys[producer.Key] = true
+		}
+	}
+	return keys
 }
 
 // EffectiveCPUWeight combines the configured weight with the learned boost.

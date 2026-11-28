@@ -341,12 +341,13 @@ func copyDirOpts(src, dst string, sync bool) error {
 	})
 }
 
-// uncacheableArtifact reports whether a captured output file is a throwaway
+// UncacheableArtifact reports whether a captured output file is a throwaway
 // intermediate that must not be stored in the cache. Coverage runs emit
 // per-shard lcov temp files (lcov.info.<n>.tmp) that dominate the test task's
 // cached output (the bulk of its multi-megabyte payload) without being a real
-// deliverable, so they are excluded from the stored artifact set.
-func uncacheableArtifact(rel string) bool {
+// deliverable, so they are excluded from the stored artifact set, and from the
+// digest of an artifact a consumer binds.
+func UncacheableArtifact(rel string) bool {
 	base := filepath.Base(rel)
 	return strings.HasPrefix(base, "lcov.info.") && strings.HasSuffix(base, ".tmp")
 }

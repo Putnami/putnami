@@ -289,7 +289,8 @@ func (r *RemoteCache) Negotiate(
 		}
 		started = time.Since(begin)
 	}
-	keys, err := cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cm, bypass, r.stats)
+	keys, err := cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cm, bypass,
+		cachekey.WithCacheStats(r.stats), cachekey.AtEntryKeys(r.sourceBoundEntryKey))
 	if err != nil {
 		slog.Warn("remote cache: key precompute failed; skipping remote cache", "error", err)
 		return

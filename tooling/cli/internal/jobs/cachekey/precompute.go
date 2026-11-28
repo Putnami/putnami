@@ -95,6 +95,38 @@ func cacheKeyUsesAmbientInputs(ws *workspace.Workspace, job *jobmodel.ScheduledJ
 	return len(ProjectEnvInputs(ws, job)) > 0
 }
 
+// PrecomputeOption configures one PrecomputeKeys call.
+type PrecomputeOption func(*precomputeConfig)
+
+type precomputeConfig struct {
+	stats    *CacheStats
+	entryKey EntryKeyResolver
+	// revisionOnly reads no local entry (RevisionOnly).
+	revisionOnly bool
+}
+
+// WithCacheStats records the call's key computations in stats.
+func WithCacheStats(stats *CacheStats) PrecomputeOption {
+	return func(config *precomputeConfig) { config.stats = stats }
+}
+
+// AtEntryKeys makes PrecomputeKeys read a source-bound producer's entry at the
+// store key entryKey resolves for it, the key its lookup reads when it starts
+// (SourceBoundEntryKey at its project's current binding), and fold the digest
+// that entry recorded into its consumers' keys, as a hit there would publish
+// it. A nil entryKey reads none.
+func AtEntryKeys(entryKey EntryKeyResolver) PrecomputeOption {
+	return func(config *precomputeConfig) { config.entryKey = entryKey }
+}
+
+// RevisionOnly makes PrecomputeKeys read no store: a consumer's key folds its
+// producer's key on the edge of an artifact input, never a digest a local
+// entry recorded, so every key is recomputable from the revision alone, on any
+// machine. The ChangePlan computes its keys this way.
+func RevisionOnly() PrecomputeOption {
+	return func(config *precomputeConfig) { config.revisionOnly = true }
+}
+
 // PrecomputeKeys computes the cache key for every cacheable job in the plan in
 // a single topological pass, before any job executes.
 //
@@ -108,6 +140,17 @@ func cacheKeyUsesAmbientInputs(ws *workspace.Workspace, job *jobmodel.ScheduledJ
 //
 // The CacheManager's memoized file-hash cache is reused, so files hashed here
 // are not re-read when the same keys are recomputed during execution.
+//
+// A consumer's key folds the artifact digest its producer's local entry
+// recorded (publishRecordedArtifacts), so it depends on what this machine's
+// store holds. A caller whose keys are recorded or compared across machines
+// passes RevisionOnly instead.
+//
+// Without AtEntryKeys, PrecomputeKeys reads no source-bound producer's entry:
+// its store key binds its project's current source binding, which this
+// function does not compute, so such a producer contributes its key. A caller
+// whose precomputed keys must equal the keys execution computes passes the
+// resolver of those store keys.
 func PrecomputeKeys(
 	ws *workspace.Workspace,
 	planned []*jobmodel.ScheduledJob,
@@ -115,12 +158,13 @@ func PrecomputeKeys(
 	versions RunVersions,
 	cache *store.CacheManager,
 	bypass CacheBypass,
-	stats ...*CacheStats,
+	options ...PrecomputeOption,
 ) (map[string]string, error) {
-	var cacheStats *CacheStats
-	if len(stats) > 0 {
-		cacheStats = stats[0]
+	var config precomputeConfig
+	for _, option := range options {
+		option(&config)
 	}
+	recorded, entryKey, cacheStats := !config.revisionOnly, config.entryKey, config.stats
 	order, err := topoSortJobs(planned)
 	if err != nil {
 		return nil, err
@@ -132,11 +176,18 @@ func PrecomputeKeys(
 	// (KeylessIdentities); each key reads its dependencies through a
 	// KeylessResolver, as execution does.
 	identities := make(map[string]string)
+	// artifacts holds the artifact digests a producer's local entry recorded
+	// (publishRecordedArtifacts), published as a hit publishes them, apart from
+	// the job keys this function returns.
+	artifacts := make(map[string]string)
 	keyless := KeylessIdentities(planned)
 	resolver := KeylessResolver{
 		ByKey: JobsByKey(planned),
 		Published: func(key string) (string, bool) {
-			value, ok := keys[key]
+			if value, ok := keys[key]; ok {
+				return value, true
+			}
+			value, ok := artifacts[key]
 			return value, ok
 		},
 		Identity: func(key string) (string, bool) {
@@ -167,6 +218,9 @@ func PrecomputeKeys(
 			return nil, fmt.Errorf("precompute cache key for %s: %w", job.Key(), err)
 		}
 		keys[job.Key()] = hash
+		if recorded {
+			publishRecordedArtifacts(job, hash, cache, entryKey, artifacts)
+		}
 	}
 
 	return keys, nil

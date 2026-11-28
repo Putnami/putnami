@@ -252,6 +252,8 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 
 	want := []ownerRow{
 		{task: "build-compile", id: "compile", kind: "directory", root: "command-output", path: "compile", optionalEmpty: true},
+		// The emit manifest test-run folds (ADR 0016).
+		{task: "build-emit", id: "manifest", kind: "file", root: "command-output", path: "emit-manifest.json"},
 		{task: "build-generate", id: "capabilities", kind: "file", root: "project", path: "schema/capabilities.json", optionalEmpty: true},
 		{task: "build-generate", id: "gen", kind: "directory", root: "project", path: ".gen"},
 		{task: "build-generate", id: "httpRoutes", kind: "file", root: "project", path: "schema/http-routes.json", optionalEmpty: true, drift: "fail"},
@@ -418,6 +420,7 @@ func TestTaskEffectTable(t *testing.T) {
 		"cache-clean-exec":    {"toolchain-cache"},
 		"cache-gc-exec":       {"toolchain-cache"},
 		"build-compile":       {"toolchain-cache"},
+		"build-emit":          {"toolchain-cache"},
 		"build-transpile":     {"toolchain-cache"},
 		"build-types":         {"toolchain-cache"},
 		"config-extract-exec": {"toolchain-cache"},
@@ -1347,6 +1350,7 @@ func TestThePortConfigKeysTheImageThroughTheCompileStep(t *testing.T) {
 // does not read moves its key for nothing. The lint tasks declare none: the
 // skip guard reads the files their key holds (doc/adr/0014). build-tsc reads
 // its outputs' tracked and unignored paths from the candidate cut (doc/adr/0015).
+// build-emit lists its own project's files from the same cut (doc/adr/0016).
 // validate-api keeps the release
 // baseline of tooling/cli ADR 0062: releaseBaselineFiles adds nothing to a
 // key, and candidateFiles adds the working tree's candidate cut.
@@ -1358,6 +1362,7 @@ func TestTasksDeclareTheTreeFactsTheyRead(t *testing.T) {
 		proto.RuntimeInputWorkspaceCandidateFiles: true,
 	}
 	want := map[string][]string{
+		"build-emit":   {proto.RuntimeInputCandidateFiles},
 		"build-tsc":    {proto.RuntimeInputCandidateFiles},
 		"lint-docs":    {proto.RuntimeInputWorkspaceCandidateFiles},
 		"validate-api": {proto.RuntimeInputCandidateFiles, proto.RuntimeInputReleaseBaseline, proto.RuntimeInputReleaseBaselineFiles},

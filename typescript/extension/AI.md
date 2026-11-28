@@ -63,10 +63,11 @@ batchable until it has one.
   phase reads `src`, `bin` and `.gen` only, to keep declaration builds fast;
   `test~types` runs `tsc --noEmit` over every project file, dot-directories
   included and dot-named files left out, with the same compiler options
-  (`tscCompilerFlags`). Keep the two flag sets shared. A project that sets
-  the test `type-checker` parameter to `bun` runs `bun check` on the same
-  scratch tsconfig and flags instead (`bunCheckArgs`); the choice is explicit
-  and never inferred.
+  (`tscCompilerFlags`). Keep the two flag sets shared. The test
+  `type-checker` parameter chooses `tsc` or `bun check`, which runs on the
+  same scratch tsconfig and flags (`bunCheckArgs`); unset, it is `bun check`
+  on a Bun that supports it (1.4.4 or later) and `tsc` otherwise
+  (`ResolveTypeChecker`). It is never inferred from the project.
 - **`catalog:` has one reader.** `internal/catalog` is it. Install, upgrade and
   the npm publisher all resolve specifiers through that package.
 

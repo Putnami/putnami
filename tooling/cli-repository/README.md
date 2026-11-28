@@ -247,6 +247,7 @@ tests.
 - `internal/jobs/scheduler.TestSynchronizeFirstPartyRuntimesFromCleanArtifactStore`
 - `internal/jobs/scheduler.TestTheAPICheckKeysOnTheReleaseBaselineNotTheCommit`
 - `internal/jobs/scheduler.TestTheJobContextCarriesTheTagsTheCacheKeyHolds`
+- `internal/jobs/scheduler.TestTheShippedEmitAndDocsTasksReadTheirCuts`
 - `internal/jobs/scheduler.TestTwoLanesOnOneTreeShareTheirCacheKeys`
 - `internal/jobs/scheduler.TestTypeScriptGenerateEditOutsideItsKeyExecutesAtTheNewBinding`
 - `internal/jobs/scheduler.TestWarmSourceBoundHitsComputeTheBindingOnce`

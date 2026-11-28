@@ -3,7 +3,8 @@
 // (always) and the project tree (for committed schemas).
 //
 // Visitor discovery happens at link time via blank imports of generator
-// subpackages from the extension binary; see go/extension/cmd/putnami-go/main.go.
+// subpackages from the extension binary; see
+// go/extension/cmd/putnami-go/handlers_codegen.go.
 // This package owns only the orchestration — the contract lives in the SDK
 // (go.putnami.dev/sdk/extension/codegen).
 package codegen

@@ -82,6 +82,11 @@ func (s *Scheduler) serveStatusOnlyHit(
 	if recorded == nil || recorded.Result == nil {
 		return nil
 	}
+	// A consumer reads the artifact this job publishes, so the files must
+	// reach the tree.
+	if len(job.ArtifactOutputs) > 0 {
+		return nil
+	}
 	result := cachekey.JobResultFromEntryResult(recorded.Result)
 	if cachekey.DeclaredSourceRewriter(job) && result.SourceMutated {
 		return nil

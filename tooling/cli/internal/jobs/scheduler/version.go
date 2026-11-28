@@ -83,7 +83,7 @@ type CapabilityPackageStamp struct {
 // stamp generateVersionFilesAt writes. store.isVersionStamp recognizes the same
 // file when hashing cache-key inputs, and restoreDeclaredCacheHit uses it to
 // decide whether a restored declared output replaced the stamp.
-const versionStampRelPath = ".gen/version.json"
+const versionStampRelPath = cachekey.VersionStampRelPath
 
 // versionStampOwnedFields is the closed set of top-level keys the SCHEDULER owns
 // in .gen/version.json: exactly the JSON names of VersionInfo, no more and no

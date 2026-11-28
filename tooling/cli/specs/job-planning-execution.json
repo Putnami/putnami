@@ -422,6 +422,13 @@
       ]
     },
     {
+      "id": "a-key-folds-the-artifact-it-binds",
+      "text": [
+        "A task port that folds an artifact keys its consumer on the digest of the producer output its step binds, not on the producer's key: an edit that writes the same bytes keeps the key. The binding plans its producers, ^step each direct dependency running it; an optional port without one folds a fixed absent value.",
+        "Before a producer runs, the key folds the digest its local entry recorded, else its key; the consumer is keyed again when it starts. No digest reads the build stamp."
+      ]
+    },
+    {
       "id": "a-consumer-keys-on-the-generation-of-its-clients",
       "text": [
         "With the shipped Go and TypeScript extensions, a test, serve or build of a consumer selected alone plans the generation of every client in its dependency closure, a library client with no test file included.",

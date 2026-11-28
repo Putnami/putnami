@@ -101,11 +101,12 @@ The summary, the test cases and `--enforce-coverage` read the reports the same w
 ## Execution Flow
 
 ```text
-generate ──→ discover ──→ run ──→ parse
+generate ──→ emit ──→ discover ──→ run ──→ parse
          └──→ types
 ```
 
 1. **Generate** — runs the build generate phase to ensure `.gen/` is current. It writes the same `.gen/` tree as the `generate` step of `build`, so in a run such as `putnami lint,test,build` the planner orders the two: one never starts while the other, or a step that reads its output, still runs
+   - **Emit** — writes the emit manifest of the project's dependency closure (`emit-manifest.json`): each TypeScript module keyed on the JavaScript Bun emits for it, every other file on its bytes. It leaves out each `.gen` tree's build stamp and the `.gen` files other tasks write, such as `build-infra`'s `.gen/requirements.json`, and its key reads the files of the closure's projects only. The test run's key folds this manifest, not its dependencies' sources, so a type-only or comment-only change in a dependency reruns no dependent test; a change to the emitted JavaScript, to a file read at run time or to a config still does. A module that no `tsconfig.json` of its project governs keys on its bytes unless the project sits directly under the workspace root, since the key does not read the directories between them. A closure in which a `bunfig.toml` `preload` or a Bun plugin can transform modules keys every module on its bytes, and so does a project whose [test runner](#test-runner) is Vitest or Jest, whose transforms are not Bun's ([ADR 0016](adr/0016-a-test-run-keys-on-the-javascript-its-dependencies-emit.md))
 2. **Discover** — scans the project for test files matching `**/*.{test,spec}.{ts,tsx,js,jsx}` (excludes `node_modules`, `.gen`, and `dist` directories)
 3. **Run** — executes the project's [test runner](#test-runner) with the configured options
 4. **Parse** — reads JUnit XML and optional LCOV output, extracts failures and metrics
@@ -128,19 +129,19 @@ Bun strips types when it runs a test, and `build~types` reads only `src/`, `bin/
 
 ### Checking with `bun check`
 
-The step runs `tsc` unless the project chooses Bun's own checker, `bun check`, in the `type-checker` parameter:
+The step runs Bun's own checker, `bun check`, when the Bun that runs it supports it (1.4.4 or later), and `tsc` otherwise. The `type-checker` parameter chooses one or the other:
 
 ```json
 {
   "options": {
     "@putnami/typescript:test": {
-      "type-checker": "bun"
+      "type-checker": "tsc"
     }
   }
 }
 ```
 
-`--type-checker bun` does the same for one run. Nothing else sets it: an import, a dependency or a script never switches a project to `bun check`.
+`--type-checker tsc` does the same for one run, and `bun` asks for `bun check` whatever the default. Nothing else sets it: an import, a dependency or a script never switches a project's checker. The Bun release is part of the step's cache key, so the default it picks is too.
 
 - `bun check` reads the same scratch tsconfig and the same compiler options as `tsc`, with `--no-pretty --all`: one line per error, every error shown. Its diagnostics are reported the way `tsc`'s are, and a type error or an unused `@ts-expect-error` fails `putnami test` the same way.
 - `--no-script` keeps a `check` script of the project's `package.json` from running in its place.
@@ -148,7 +149,7 @@ The step runs `tsc` unless the project chooses Bun's own checker, `bun check`, i
 - It checks with the TypeScript version Bun embeds, TypeScript 7 in Bun 1.4, not the `typescript` package the workspace installs. A project whose code relies on a behavior TypeScript 7 changed can get different diagnostics.
 - TypeScript 7 removed some tsconfig options that `tsc` 6 with `--ignoreDeprecations 6.0` still accepts. A `baseUrl` in the tsconfig chain stops `bun check` with TS5102 before it checks anything, on every project. `moduleResolution` `node` or `node10` and `target` `es5` stop it with TS5108 only when the runner is Vitest or Jest, whose check keeps the project's own compiler options; otherwise the step's own flags override them. Remove those options, or keep `tsc` for that project.
 - It uses one thread per CPU core, and Putnami runs several projects at once, so many projects that opt in can compete for the CPU.
-- It needs Bun 1.4.4 or later: the step reads the version of the Bun that runs it, which is not always the pinned one, and fails on an older Bun, whose `bun check` would run a `check` script instead of type-checking.
+- It needs Bun 1.4.4 or later: the step reads the version of the Bun that runs it, which is not always the pinned one. On an older Bun, whose `bun check` would run a `check` script instead of type-checking, the default is `tsc`, and `type-checker` set to `bun` fails the step.
 - Any value other than `tsc` and `bun` fails the step and names the choices.
 
 ## Test File Conventions
@@ -317,7 +318,7 @@ Unhandled errors between tests (module-level crashes) are extracted and reported
 | `--concurrent` | `string` | — | Treat all tests as concurrent |
 | `--pass-with-no-tests` | `boolean` | `true` | Pass if no test files are found |
 | `--types` | `boolean` | `true` | Type-check every TypeScript file of the project, tests included, in the `types` step |
-| `--type-checker` | `string` | `tsc` | Checker of the `types` step: `tsc`, or `bun` for `bun check` (see [Checking with `bun check`](#checking-with-bun-check)) |
+| `--type-checker` | `string` | `bun` on Bun 1.4.4 or later, else `tsc` | Checker of the `types` step: `tsc`, or `bun` for `bun check` (see [Checking with `bun check`](#checking-with-bun-check)) |
 | `--test-verbose` | `boolean` | `false` | Show the complete Bun transcript at info level; changes visibility only, never the invocation or verdict |
 | `--require-test-db` | `boolean` | `false` | Put the `require` mode on the database test binding `test-env-up` provisions, so a suite whose test database does not answer fails instead of skipping. A binding provisioned on CI carries it already. The run still starts the local test database it may start: a Docker container, or the PostgreSQL installed on the machine when no Docker daemon answers |
 | `--infra` | `string` | `require` on CI, `auto` otherwise | How `test-env-up` provisions the test database of a project that declares one in `infra/requirements.json`: `auto` starts a local server, `require` consumes the binding the environment supplies and fails without one, `skip` provisions nothing. The `test.infra` option sets it too |

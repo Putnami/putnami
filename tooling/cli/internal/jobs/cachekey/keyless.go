@@ -26,6 +26,12 @@ import (
 //     already, and a keyless fixer that rewrites them would move the key
 //     between a run and the next.
 //
+// On an edge where a keyless job binds outputs of its dependency as artifact
+// inputs, what it relays is the published digest of each output it binds,
+// not the dependency's key, as its identity folds them (artifactInputFolds).
+// An edge that binds no artifact, or one whose digests are not all
+// published, relays what it relays without the binding.
+//
 // An identity never addresses a lookup, a restore or a store. A plan where no
 // cacheable job waits for a keyless one computes none.
 
@@ -43,11 +49,18 @@ type KeylessResolver struct {
 
 // View is the map job's key reads its dependencies' keys from
 // (ComputeJobCacheHash): each published key of CacheKeyDependencies, then for
-// each keyless dependency what it stands for. A keyless job folds the
+// each keyless dependency what it stands for, and each artifact digest that
+// its artifact inputs, and those of the invocation producers its key folds,
+// read (ArtifactDigestKeys) that was published. A keyless job folds the
 // identity of each keyless dependency, whatever its project, so its own
 // identity covers the whole chain.
 func (r KeylessResolver) View(job *jobmodel.ScheduledJob) map[string]string {
 	view := make(map[string]string)
+	for _, key := range ArtifactDigestKeys(job) {
+		if value, ok := r.Published(key); ok {
+			view[key] = value
+		}
+	}
 	for _, key := range CacheKeyDependencies(job) {
 		if value, ok := r.Published(key); ok {
 			view[key] = value
@@ -71,9 +84,10 @@ func (r KeylessResolver) View(job *jobmodel.ScheduledJob) map[string]string {
 }
 
 // through digests what reaches the keyless dependency of job's own project
-// from other projects: each key its dependencies publish, and each keyless
-// dependency's identity in another project, or what reaches a keyless one of
-// the same project in turn. Empty when nothing does.
+// from other projects: each key its dependencies publish, or the digests of
+// the outputs it binds of one (artifactRelay), and each keyless dependency's
+// identity in another project, or what reaches a keyless one of the same
+// project in turn. Empty when nothing does.
 func (r KeylessResolver) through(job, dependency *jobmodel.ScheduledJob, seen map[string]bool) string {
 	var parts []string
 	r.walkThrough(job, dependency, seen, &parts)
@@ -90,23 +104,53 @@ func (r KeylessResolver) walkThrough(job, dependency *jobmodel.ScheduledJob, see
 		return
 	}
 	seen[dependency.Key()] = true
-	for _, key := range CacheKeyDependencies(dependency) {
-		if value, ok := r.Published(key); ok {
-			*parts = append(*parts, key+"="+value)
-			continue
-		}
-		upstream := r.ByKey[key]
-		if upstream == nil || jobmodel.CanUseCache(upstream) {
-			continue
-		}
-		if sameProject(job, upstream) {
-			r.walkThrough(job, upstream, seen, parts)
-			continue
-		}
-		if identity, ok := r.Identity(key); ok {
-			*parts = append(*parts, key+"="+identity)
+	// The edges CacheKeyDependencies names, each with the job that declares it.
+	for owner := dependency; owner != nil; owner = owner.InvocationProducer {
+		for _, key := range owner.DependsOn {
+			if relayed, ok := r.artifactRelay(owner, key); ok {
+				*parts = append(*parts, relayed...)
+				continue
+			}
+			if value, ok := r.Published(key); ok {
+				*parts = append(*parts, key+"="+value)
+				continue
+			}
+			upstream := r.ByKey[key]
+			if upstream == nil || jobmodel.CanUseCache(upstream) {
+				continue
+			}
+			if sameProject(job, upstream) {
+				r.walkThrough(job, upstream, seen, parts)
+				continue
+			}
+			if identity, ok := r.Identity(key); ok {
+				*parts = append(*parts, key+"="+identity)
+			}
 		}
 	}
+}
+
+// artifactRelay returns what owner relays on its edge to the producer at
+// key when owner binds outputs of that producer as artifact inputs: the
+// published digest of each one, at its ArtifactDigestKey. It reports false
+// when owner binds no output of the producer, or when a digest it binds is
+// not published: the edge then relays what an edge without a binding relays.
+func (r KeylessResolver) artifactRelay(owner *jobmodel.ScheduledJob, key string) ([]string, bool) {
+	var parts []string
+	for _, input := range owner.ArtifactInputs {
+		for _, producer := range input.Producers {
+			if producer.Key != key {
+				continue
+			}
+			entry := ArtifactDigestKey(key, input.Output)
+			digest, ok := r.Published(entry)
+			if !ok {
+				return nil, false
+			}
+			parts = append(parts, entry+"="+digest)
+		}
+	}
+	return parts, len(parts) > 0
 }
 
 // KeylessIdentities names the keyless jobs whose identity some cacheable

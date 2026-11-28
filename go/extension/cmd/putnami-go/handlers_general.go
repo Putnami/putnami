@@ -41,6 +41,7 @@ func generalHandlers() map[string]cli.JobFunc {
 		"test-env-up":    dbtestenv.UpJob(),
 		"test-env-down":  dbtestenv.DownJob(),
 		"test":           test.Run,
+		"test-identity":  test.RunIdentity,
 		"test-race":      test.RunRace,
 		"lint":           lint.Run,
 		"validate-api":   apicheck.Run,

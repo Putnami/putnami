@@ -122,6 +122,13 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 				return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
 			}
 		}
+		// From ArtifactInputsContract, every artifact input binds an output
+		// the engine digests.
+		if m.CLIContract >= protocolcli.ArtifactInputsContract {
+			if diags := ValidateArtifactInputs(&m); diag.HasErrors(diags) {
+				return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
+			}
+		}
 		return &m, nil
 	case !DeclaresContractSurface(&m):
 		// Hook-only: nothing the contract governs, and nothing the packager
@@ -134,6 +141,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.ArtifactInputsContract:
+			reason = " for its artifact inputs"
 		case required == protocolcli.ModuleGraphEdgesContract:
 			reason = " for its module-graph edges"
 		case required == protocolcli.SelectionFreeTaskContract:

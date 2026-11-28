@@ -102,7 +102,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "planner",
 		prefix: "internal/jobs/planner/plan",
 		files:  10,
-		funcs:  93,
+		funcs:  95,
 		why: "internal/jobs/planner/plan*.go: the single planner entrypoint (planner.Plan), its " +
 			"dependency, activation, matching, sharing and resource passes, plus the plan " +
 			"contract and its validation. Planning is pure, selection in and typed plan out, and " +

@@ -569,15 +569,16 @@ The propagation is exactly as precise as A's declared inputs. A task that
 carries a `^` edge is where an over-wide declaration stops being local: every
 file in A's key is a file that re-keys B, and B's own dependents after it. Go's
 `build-describe` is that carrier — every dependent reaches its dependencies
-through `^describe`, and a dependent's `compile` and `test-exec` sit behind its
-own `describe` — so while it declared `**/*.go`, one edited `_test.go` in a
-library re-ran 12 cacheable tasks across four projects on a warm cache. It
+through `^describe`, a dependent's `compile` sits behind its own `describe`, and
+its `test-exec` and `test-env` fold what that `describe` writes, not its key —
+so while it declared `**/*.go`, one edited `_test.go` in a library re-ran 12
+cacheable tasks across four projects on a warm cache. It
 declares `["**/*.go", "!**/*_test.go"]`, like `build-compile` and
 `build-generate`; the same edit now re-runs the owning project's `test` alone.
 `test-exec` keeps the test sources, because it runs them. See
 [ADR 0043](adr/0043-a-cross-project-carrier-task-keys-only-on-what-it-reads.md)
 for why the folded value stays the upstream *key* rather than an output digest
-or a closure digest.
+or a closure digest, except on an edge that declares an artifact input.
 
 A file wrongly excluded from a key serves a stale result; a file wrongly
 included costs a rebuild. Narrow a declaration only against the action's own
@@ -594,6 +595,82 @@ the client project's own files, which no task writes. A key may leave out bytes
 another task writes only when a key it folds fixes them: the TypeScript
 `build-generate` owns `.gen` as a required output, and the Go `build-describe`
 declares its trees `emptied`.
+
+### Artifact inputs
+
+A task input port that declares `fold: "artifact"` folds, on the edge to the
+producer its step binds, the digest of the bound output instead of the
+producer's key (ADR 0043, CLI contract 32). The step names the producer with
+`fromStep` (a step of the same command and project, or `^step` for that step in
+every direct dependency that runs it) and the output port with `output`, which
+names the producer's declared output whose id is the port or whose `pathFrom`
+names it. The binding is an edge, so the step need not list it in `dependsOn`;
+a `dependsOn` edge to a producer the step binds no artifact of folds its key as
+before.
+
+- **The digest.** A file output is its bytes. A directory output is the sorted
+  list of its files' relative paths, executable bits and content digests,
+  without the subpaths it cedes or preserves and without the coverage shards a
+  capture leaves out. No other permission bit is folded: the umask of the
+  machine that wrote a file decides it. The producer's output port may name
+  subpaths of a directory artifact that its digest leaves out
+  (`artifactExcludes`): bytes the output holds that no consumer's verdict
+  reads, which are still captured and restored with it. Go's `build-describe`
+  leaves `feature-evidence` out of its `schema` artifact, since the evidence
+  names the project's source binding, which every file of the project moves.
+  An output that holds nothing, missing or empty, has one fixed empty digest.
+- **The build stamp is part of no digest.** `.gen/version.json` under the
+  project root is left out of every artifact, on an execution and on a hit.
+  The scheduler rewrites it at the current identity after every restore, so a
+  cached verdict already replays against another stamp, and no cache key folds
+  it: a task whose output embeds the version folds the version itself
+  (`cache.versionAware`). Folding it would move the key of every consumer of a
+  `.gen` directory on every run.
+- **The fold.** A binding of a step of the same project folds that producer's
+  digest. A `^step` binding folds the sorted list of each producer's project
+  and digest, so the order of the dependencies does not move it. An `optional`
+  port with no producer in the plan folds a fixed absent value; a required one
+  fails planning.
+- **A producer that published nothing.** A producer whose digest is not
+  published folds its key instead. One that published neither, such as a
+  skipped step whose digest could not be read, folds a value no other run
+  shares, so its consumer's key matches no stored entry.
+- **A consumer whose cache is off.** It publishes no key, and a dependent
+  folds what it stands for instead: an invocation producer's action, or what
+  reaches a keyless step of the dependent's own project (ADR 0097). On an
+  edge where it binds an artifact, that is the digest too, and the producer's
+  key only while the digest is not published. Go's `test-env` binds the
+  outputs of `describe` the test step binds, so no key of `describe` reaches
+  the test step.
+- **Publication.** When a producer's result is published, it publishes the
+  digest of each output a planned consumer binds into the run's dependency
+  hash map, at `<producer job key>\x00artifact\x00<output port>`, before any
+  dependent starts. An execution digests the files the task left, and so does
+  a skip the task reports itself, whether its result is cached or not: a
+  consumer keys on the bytes it reads. A hit reads
+  the digest from the paths, modes and content digests its entry's manifest
+  recorded at capture, and reads no file; an entry whose manifest does not
+  list the output's files is answered from the restored files. Restores stay
+  eager, and a producer whose artifact a consumer binds is never served
+  status-only.
+- **Before the producers ran.** `PrecomputeKeys` (the remote negotiation,
+  `--dry-run`, `--impacted`, a key trace, the spec gate's recovery of an
+  unselected project's report) looks a producer's entry up in the local store
+  at the producer's precomputed key, and folds the digest that entry recorded,
+  the one its hit would publish. A source-bound producer (`cache.sourceBound`,
+  Go's `build-describe`) is looked up where its own lookup reads it: at its
+  key bound to its project's current source binding. So a consumer's
+  precomputed key is the key it executes under whenever its producers hit
+  locally, and a recovery at that key finds the consumer's entry. A producer without a local entry, and every key
+  recorded or compared across machines, which reads no store
+  (`PrecomputeKeys` with `RevisionOnly` for an impact plan's cache keys, a selection
+  fingerprint), fold the producer's key on that edge instead: pessimistic,
+  never stale, and recomputable from the revision alone. A producer may still execute,
+  so the consumer is always reported moving (`PlanKeyMovement`): the
+  negotiation records no precomputed key for it, and it, and every job whose
+  key folds its key, is decided on the key it computes when it starts. A digest
+  that cannot be read is not published, and the consumer folds the producer's
+  key.
 
 ### Outputs written earlier in the session
 

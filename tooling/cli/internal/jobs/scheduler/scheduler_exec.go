@@ -940,6 +940,15 @@ func (s *Scheduler) finalizeExecutedJob(
 	// disproved. Local only — the record has no remote address to travel to.
 	s.recordExecutedOutcome(job, result, cacheEnabled, cacheHash)
 
+	// The artifacts a planned consumer binds are published from the files the
+	// task left, before any dependent starts (artifact_digests.go). An in-job
+	// skip publishes them too, cached or not: a consumer keys on the bytes it
+	// reads, and a skip whose result is not cacheable, which publishes no key,
+	// would otherwise leave its consumer folding a fixed value for them.
+	if result.Status == "success" || cachekey.IsCacheableResult(job, result) || inJobSkip(result) {
+		s.publishArtifactDigests(job, result, nil, mu, hashes)
+	}
+
 	return result
 }
 

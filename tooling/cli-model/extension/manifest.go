@@ -62,7 +62,7 @@ func Resolve(manifest *Manifest, extPath string) *ExtensionDescription {
 			Quiet:                cmd.Quiet,
 			Traits:               declaredTraits(cmd.Traits),
 			TraitsDeclared:       cmd.Traits != nil,
-			PipelineSteps:        cmd.Run,
+			PipelineSteps:        proto.WithArtifactEdges(cmd.Run, manifest.Tasks),
 			PipelineOutputs:      cmd.Outputs,
 		}
 

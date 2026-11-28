@@ -218,8 +218,9 @@ type KeyMovement struct {
 	// Writers maps a job key to the other planned jobs that may write a file
 	// its key reads, or change which files it reads, sorted.
 	Writers map[string][]string
-	// Moving holds every job that has such a writer, and every job whose key
-	// folds the key of a moving job (CacheKeyDependencies).
+	// Moving holds every job that has such a writer, every job with an
+	// artifact input, and every job whose key folds the key of a moving job
+	// (CacheKeyDependencies).
 	Moving map[string]bool
 }
 
@@ -283,7 +284,10 @@ func PlanKeyMovement(inputs KeyInputs, planned []*jobmodel.ScheduledJob) KeyMove
 				movement.Writers[key] = append(movement.Writers[key], writer)
 			}
 		}
-		if len(movement.Writers[key]) > 0 {
+		// A key that folds an artifact folds its producer's key until the
+		// producer published the artifact's digest (artifact_inputs.go), so
+		// the key it computes when it starts is another one.
+		if len(movement.Writers[key]) > 0 || len(job.ArtifactInputs) > 0 {
 			movement.Moving[key] = true
 			queue = append(queue, key)
 		}

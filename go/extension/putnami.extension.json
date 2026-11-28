@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/go",
-  "cliContract": 31,
+  "cliContract": 32,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-go",
@@ -224,9 +224,37 @@
           "id": "test-env",
           "task": "test-env-up",
           "dependsOn": ["describe"],
-          "activation": { "closureFiles": ["infra/requirements.json"] }
+          "activation": { "closureFiles": ["infra/requirements.json"] },
+          "with": {
+            "describeSchema": { "fromStep": "describe", "output": "schema" },
+            "describeMigrationBundle": { "fromStep": "describe", "output": "migrationBundle" },
+            "describeMigrations": { "fromStep": "describe", "output": "migrations" },
+            "describeDesign": { "fromStep": "describe", "output": "design" },
+            "describeHttpRoutes": { "fromStep": "describe", "output": "httpRoutes" }
+          }
         },
-        { "id": "test", "heavy": true, "task": "test-exec", "dependsOn": ["describe", "test-env"] },
+        {
+          "id": "test-identity",
+          "heavy": true,
+          "task": "test-identity-exec",
+          "commandLayerInputs": false,
+          "dependsOn": ["generate"]
+        },
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-exec",
+          "dependsOn": ["test-env"],
+          "with": {
+            "testIdentity": { "fromStep": "test-identity", "output": "manifest" },
+            "gen": { "fromStep": "generate", "output": "gen" },
+            "describeSchema": { "fromStep": "describe", "output": "schema" },
+            "describeMigrationBundle": { "fromStep": "describe", "output": "migrationBundle" },
+            "describeMigrations": { "fromStep": "describe", "output": "migrations" },
+            "describeDesign": { "fromStep": "describe", "output": "design" },
+            "describeHttpRoutes": { "fromStep": "describe", "output": "httpRoutes" }
+          }
+        },
         {
           "id": "test-race",
           "heavy": true,
@@ -577,7 +605,7 @@
   },
   "tasks": {
     "test-env-up": {
-      "description": "Provision the database test environment this project's tests run against, and write the resolved binding into the invocation-scoped sensitive artifact `test-exec` reads. Extension-owned since an earlier migration — the CLI used to discover the datasources, run the container and inject the binding through a private env seam it then had to hide from its own cache key. Policy is unchanged: an externally supplied DATABASE_TEST_BINDINGS always wins, `--infra` (auto|require|skip) steers the mode with the CI default `require`, `--infra-down` stops every server it started and provisions nothing, and only a local `auto` run ever starts a server: a Docker container when a Docker daemon answers, the PostgreSQL installed on the machine otherwise. `--require-test-db` puts the require mode on the binding without changing what the run may start. NEVER FAILS: an environment that could not be provisioned is reported by `test-exec` itself, which fails under `require` and skips its live cases otherwise.",
+      "description": "Provision the database test environment this project's tests run against, and write the resolved binding into the invocation-scoped sensitive artifact `test-exec` reads. Extension-owned since an earlier migration — the CLI used to discover the datasources, run the container and inject the binding through a private env seam it then had to hide from its own cache key. Policy is unchanged: an externally supplied DATABASE_TEST_BINDINGS always wins, `--infra` (auto|require|skip) steers the mode with the CI default `require`, `--infra-down` stops every server it started and provisions nothing, and only a local `auto` run ever starts a server: a Docker container when a Docker daemon answers, the PostgreSQL installed on the machine otherwise. `--require-test-db` puts the require mode on the binding without changing what the run may start. NEVER FAILS: an environment that could not be provisioned is reported by `test-exec` itself, which fails under `require` and skips its live cases otherwise. Its step waits for describe, which converges the committed infra/requirements.json the requirements input keys, and binds describe's declared outputs as artifacts, which the task does not read, so that edge folds what describe wrote and not describe's key, which moves with the closure's Go sources.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["test-env-up"],
@@ -586,6 +614,11 @@
       "timeoutMs": 360000,
       "inputs": {
         "requirements": { "from": "closure", "files": ["infra/requirements.json"] },
+        "describeSchema": { "from": "task", "fold": "artifact", "optional": true },
+        "describeMigrationBundle": { "from": "task", "fold": "artifact", "optional": true },
+        "describeMigrations": { "from": "task", "fold": "artifact", "optional": true },
+        "describeDesign": { "from": "task", "fold": "artifact", "optional": true },
+        "describeHttpRoutes": { "from": "task", "fold": "artifact", "optional": true },
         "infra": { "from": "params" },
         "infra-down": { "from": "params" },
         "require-test-db": { "from": "params" },
@@ -632,7 +665,7 @@
       }
     },
     "test-exec": {
-      "description": "Run `go test` for the project. Declared outputs are the coverage artifacts it writes into the per-command output directory; the test binaries and build artifacts `go test` produces live in the machine-global Go build cache, which is why this task declares the toolchain-cache effect instead of trying to name them.",
+      "description": "Run `go test` for the project. Declared outputs are the coverage artifacts it writes into the per-command output directory; the test binaries and build artifacts `go test` produces live in the machine-global Go build cache, which is why this task declares the toolchain-cache effect instead of trying to name them. Key decision (ADR 0017): the test run keys on the identity of the binaries it tests, not on its dependencies' keys. The testIdentity port folds the manifest test-identity-exec writes, the content IDs of every test binary's link closure, so an edit of a dependency that compiles to the same bytes keeps this key. The project's own files stay ordinary inputs, its Go sources included, because a test may read them as text. The other artifact ports fold what the generate and describe steps of this project wrote (.gen, and describe's declared outputs) instead of their keys, which move with the dependency closure's Go sources. No edge of this step folds such a key: test-env, the invocation producer whose action it folds, binds the same describe outputs instead of describe's key.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["test"],
@@ -643,6 +676,13 @@
       },
       "timeoutMs": 600000,
       "inputs": {
+        "testIdentity": { "from": "task", "fold": "artifact" },
+        "gen": { "from": "task", "fold": "artifact" },
+        "describeSchema": { "from": "task", "fold": "artifact", "optional": true },
+        "describeMigrationBundle": { "from": "task", "fold": "artifact", "optional": true },
+        "describeMigrations": { "from": "task", "fold": "artifact", "optional": true },
+        "describeDesign": { "from": "task", "fold": "artifact", "optional": true },
+        "describeHttpRoutes": { "from": "task", "fold": "artifact", "optional": true },
         "tests": { "from": "project", "files": ["**/*_test.go", "**/testdata/**"] },
         "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
@@ -713,6 +753,50 @@
             "path": "putnami-feature-verification.json",
             "optionalEmpty": true,
             "description": "The reserved run-scoped feature verification report: the merged observations of every test bound to a declared check through protocol/features/spectest. Absent when no test in the project bound one. Written per member under batching, so per-project attribution and cache restore hold for both the singleton and the batched run — a cache hit that lost this report would silently disarm the spec gate."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-identity-exec": {
+      "description": "Name the test binaries test-exec builds, as the artifact test-exec keys on (ADR 0017). It runs `go list -e -trimpath -buildvcs=false -export -deps -test ./...` in the project with the environment and the compile flags test-exec derives for the run (coverage instrumentation, -coverpkg over the packages the module owns, -covermode, -race; one function derives them for both), and writes test-identity.json: the Go version, GOOS and GOARCH, the flags, and for each test main package and each package ./... matches the SHA-256 of the sorted (import path, content ID) pairs of its link closure. A content ID is the hash of a package's compiled output, so a dependency edit that compiles to the same bytes, a comment within a line, leaves the manifest unchanged, and a line-shifting edit changes the content IDs of the edited package and of the packages that inline from it. -trimpath keeps the checkout path out of every content ID, so two machines whose workspace roots differ write the same manifest; test-exec still runs untrimmed binaries, which differ from the listed ones by their embedded paths alone. Its key may move with every Go source of the closure: it folds generate's key and the project's sources, embeds and modules, and the host platform the binaries are built for. It is cheap, a warm listing reuses the trimmed compile actions in the Go build cache. A listing that fails, or a package that does not compile, writes a manifest with a random unresolved value, so test-exec executes and reports the failure itself. It skips without go.mod, as test-exec does.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["test-identity"],
+      "nativeRegistryCredential": {"registry": "go", "endpoint": "origin"},
+      "cwd": "{projectRoot}",
+      "timeoutMs": 600000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
+        "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "coverage": { "from": "params" },
+        "coverprofile": { "from": "params" },
+        "covermode": { "from": "params" },
+        "coverhtml": { "from": "params" },
+        "race": { "from": "params" },
+        "hostPlatform": { "from": "runtime" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Test binary and package counts, and whether the manifest is unresolved" },
+        "manifest": { "kind": "file", "description": "Command-output path of the test identity manifest, the artifact test-exec folds." }
+      },
+      "reads": ["gen", "sources"],
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "manifest": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "test-identity.json",
+            "optionalEmpty": true,
+            "description": "The test identity manifest. Sole owner of <command-output>/test-identity.json. Absent when the project has no go.mod and the task skips."
           }
         },
         "effects": [
@@ -1009,7 +1093,8 @@
         "extensionVersion": { "from": "runtime" }
       },
       "outputs": {
-        "data": { "description": "Generated specs (openapi, proto, …) and exports map" }
+        "data": { "description": "Generated specs (openapi, proto, …) and exports map" },
+        "gen": { "kind": "directory", "description": "The project's generated .gen subtree this task owns, the artifact test-exec folds instead of this task's key." }
       },
       "writes": ["gen"],
       "reads": ["sources"],
@@ -1073,7 +1158,16 @@
         "extensionVersion": { "from": "runtime" }
       },
       "outputs": {
-        "data": { "description": "Build-time describe artifacts (openapi, proto, …) emitted by Describer plugins" }
+        "data": { "description": "Build-time describe artifacts (openapi, proto, …) emitted by Describer plugins" },
+        "schema": {
+          "kind": "directory",
+          "artifactExcludes": ["feature-evidence"],
+          "description": "The converged .gen/schema tree, an artifact test-exec and test-env-up fold instead of this task's key. Its digest leaves out feature-evidence/, the emitted feature evidence, which names the project's source binding: every file of the project moves the binding, and no test reads it."
+        },
+        "migrationBundle": { "kind": "directory", "description": "The .gen/migration-bundle tree, an artifact test-exec and test-env-up fold instead of this task's key." },
+        "migrations": { "kind": "file", "description": "The .gen/migrations.json registry view, an artifact test-exec and test-env-up fold instead of this task's key." },
+        "design": { "kind": "directory", "description": "The .gen/design graph, an artifact test-exec and test-env-up fold instead of this task's key." },
+        "httpRoutes": { "kind": "file", "description": "The committed schema/http-routes.json inventory, an artifact test-exec and test-env-up fold instead of this task's key." }
       },
       "reads": ["gen", "sources"],
       "writes": ["gen"],

@@ -372,6 +372,7 @@ workspace-local runtime that declares compiled inputs keys each task on the exec
 0133). A reader below 29 would run the main executable, so the floor binds a
 manifest wherever it loads from. Only a manifest with such a runtime or task
 is stamped 29.
+
 Contract `30` (`SelectionFreeTaskContract`) is additive for a task that
 declares `selection: none`. From 30 on, the CLI hands such a task no
 `selection` and no `selectedProjects` in its job context, and keys it on no
@@ -390,6 +391,17 @@ architecture contract does not count them as project dependencies
 answer that names the source, so it refuses the stamp instead. The floor binds
 a manifest wherever it loads from. Only a manifest whose adapter declares the
 member is stamped 31.
+Contract `32` (`ArtifactInputsContract`) is additive for a task input port
+that declares `fold` and for a task output port that declares
+`artifactExcludes`. From 32 on, a `from: "task"` port with `fold: "artifact"`
+folds into the consumer's cache key the digest of the producer output its step
+binds, instead of the producer's key, less the subpaths the producer's port
+excludes, and a `^step` binding of such a port binds that step in every direct
+dependency that runs it (CLI ADR 0043). A reader below 32 would fold the
+producer's key and plan no edge for the binding, so the floor binds a manifest
+wherever it loads from. Only a manifest with such a port is stamped 32. A
+`^step` binding of a port that folds no artifact stays inert, as contracts
+below 32 read it, and raises no stamp.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

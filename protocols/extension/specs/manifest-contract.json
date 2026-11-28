@@ -173,7 +173,7 @@
     {
       "id": "later-rungs-raise-the-contract-floor",
       "text": [
-        "A step that gates on or binds the run's changed files requires contract 16, a hostHooks member contract 17, a command's ^command dependency contract 22, an async or UserPromptSubmit host hook contract 25, an emptied task file output contract 27, a projectTypes or anyOf step activation contract 28, runtime entries, compiled inputs or a task runtimeEntry contract 29, and a task with selection none contract 30, each only when used.",
+        "A step gate or binding on the run's changed files requires contract 16, a hostHooks member contract 17, a ^command dependency contract 22, an async or UserPromptSubmit hook contract 25, an emptied task file output contract 27, a projectTypes or anyOf activation contract 28, runtime entries, compiled inputs or a runtimeEntry contract 29, a task with selection none contract 30, and an artifact input contract 32, each only when used.",
         "A manifest stamped below the rung its vocabulary requires does not load."
       ]
     },
@@ -191,6 +191,13 @@
       "text": [
         "A step input binding reads only the context path selection.changedFiles; any other source or path is unresolvable-binding under strict validation.",
         "A manifest stamped at contract 16 or above that holds one does not load, and the error names the binding; below that rung it loads as before."
+      ]
+    },
+    {
+      "id": "an-artifact-input-binds-a-declared-output",
+      "text": [
+        "A fold artifact port is a task port bound with fromStep and output; a ^step binding binds only such a port, and stays inert in a manifest that declares no fold.",
+        "output names the producer's output port, which names its one durable declared output by id or pathFrom, with the port's kind and literal path; a directory port may list artifactExcludes, canonical relative paths its digest leaves out. Strict validation, and loading at 32, refuse anything else with a stable code on its field."
       ]
     },
     {

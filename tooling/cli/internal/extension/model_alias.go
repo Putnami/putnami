@@ -42,6 +42,9 @@ const (
 	TaskInputFromParams    = model.TaskInputFromParams
 	TaskInputFromEnv       = model.TaskInputFromEnv
 	TaskInputFromRuntime   = model.TaskInputFromRuntime
+	// TaskInputFoldArtifact is the fold of a task port that keys its
+	// consumer on the artifact its step binds.
+	TaskInputFoldArtifact = model.TaskInputFoldArtifact
 )
 
 type CommandGroupDefinition = model.CommandGroupDefinition
@@ -215,6 +218,25 @@ var Resolve = model.Resolve
 
 // ExpandTemplateVars replaces template variables in a string.
 var ExpandTemplateVars = model.ExpandTemplateVars
+
+// ArtifactBinding is the step binding of an input port that folds an
+// artifact.
+type ArtifactBinding = model.ArtifactBinding
+
+// ArtifactOutputError is why an output port names no artifact.
+type ArtifactOutputError = model.ArtifactOutputError
+
+// StepArtifactBindings returns a step's bindings of the ports that fold an
+// artifact.
+var StepArtifactBindings = model.StepArtifactBindings
+
+// ArtifactOutputFor returns the declared output an output port names as an
+// artifact.
+var ArtifactOutputFor = model.ArtifactOutputFor
+
+// ArtifactExcludes returns the subpaths an output port's artifact leaves out
+// of its digest.
+var ArtifactExcludes = model.ArtifactExcludes
 
 // BuildTemplateVars builds the standard template variable map.
 var BuildTemplateVars = model.BuildTemplateVars

@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"go.putnami.dev/go/extension/internal/parse"
 	"go.putnami.dev/go/extension/internal/toolchain"
@@ -51,7 +50,6 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	parallel := ctx.Params.String("parallel")
 	failfast := ctx.Params.Bool("failfast", false)
 	coverprofile := ctx.Params.String("coverprofile")
-	covermode := ctx.Params.String("covermode")
 	outputdir := ctx.Params.String("outputdir")
 	coverhtml := ctx.Params.Bool("coverhtml", false)
 	coverageThreshold := ctx.Params.Float("coverage-threshold", 0, "coverageThreshold")
@@ -145,24 +143,22 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	// independent of --enforce-coverage: turning the gate off must not also blind
 	// the run, otherwise a drop goes unseen for exactly the runs that opted out of
 	// failing on it.
-	coverageEnabled := coverage || coverprofile != "" || covermode != "" || coverhtml
+	//
+	// -coverpkg names the packages this module owns, listed with the same env
+	// `go test` runs under. `./...` selects the tests below but must not
+	// instrument: it would also reach a module nested under this one and
+	// charge its statements here. An empty module keeps -cover alone and
+	// `go test` reports the empty selection itself. The test identity derives
+	// the same flags (projectBinaryFlags), so it names these binaries.
+	flags, listErr := projectBinaryFlags(readBatchOptions(ctx), goBinary, ctx.Project.FullPath, testEnv)
+	if listErr != nil {
+		emit.PhaseEnd("run", "failed")
+		emit.Diagnostic("error", listErr.Error(), "", 0)
+		return "FAILED", nil, nil
+	}
+	coverageEnabled := flags.cover
 	var coverFile string
 	if coverageEnabled {
-		// -coverpkg names the packages this module owns, listed with the same
-		// env `go test` runs under. `./...` selects the tests below but must
-		// not instrument: it would also reach a module nested under this one
-		// and charge its statements here. An empty module keeps
-		// -cover alone and `go test` reports the empty selection itself.
-		packages, listErr := listModulePackages(goBinary, ctx.Project.FullPath, testEnv)
-		if listErr != nil {
-			emit.PhaseEnd("run", "failed")
-			emit.Diagnostic("error", listErr.Error(), "", 0)
-			return "FAILED", nil, nil
-		}
-		testArgs = append(testArgs, "-cover")
-		if len(packages) > 0 {
-			testArgs = append(testArgs, "-coverpkg="+strings.Join(packages, ","))
-		}
 		coverFile = coverprofile
 		if coverFile == "" {
 			coverFile = "coverage.out"
@@ -170,15 +166,8 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 		if !filepath.IsAbs(coverFile) {
 			coverFile = filepath.Join(outDir, coverFile)
 		}
-		testArgs = append(testArgs, "-coverprofile", coverFile)
 	}
-
-	if covermode != "" {
-		testArgs = append(testArgs, "-covermode", covermode)
-	}
-	if race {
-		testArgs = append(testArgs, "-race")
-	}
+	testArgs = append(testArgs, flags.args(coverFile)...)
 
 	testArgs = appendTimeoutArg(testArgs, timeout)
 

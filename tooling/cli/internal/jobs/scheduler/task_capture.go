@@ -174,14 +174,7 @@ func sourceInputDigest(
 // The stamp lives under the project root only. The containment folds case, as
 // every ownership comparison does.
 func versionStampWithin(root, rel string) (string, bool) {
-	if root != extension.OutputRootProject {
-		return "", false
-	}
-	if len(versionStampRelPath) <= len(rel)+1 || versionStampRelPath[len(rel)] != '/' ||
-		!strings.EqualFold(versionStampRelPath[:len(rel)], rel) {
-		return "", false
-	}
-	return versionStampRelPath[len(rel)+1:], true
+	return cachekey.VersionStampWithin(root, rel)
 }
 
 // emptyOwnedOutputs empties what job owns in each of its declared directory
@@ -623,6 +616,10 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 	// Judged after the restore is complete and before the hit is published as
 	// this task's result: the diagnostic is this run's, never the entry's.
 	result = s.judgeRestoredDrift(job, entry, result, drift)
+
+	// The artifacts a planned consumer binds are published from what the
+	// entry recorded, before the hit is (artifact_digests.go).
+	s.publishArtifactDigests(job, result, entry, mu, hashes)
 
 	mu.Lock()
 	hashes[job.Key()] = hash

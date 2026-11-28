@@ -2,7 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
   "id": "type-checker-is-a-test-parameter",
-  "statement": "compiler chooses what emits a build and type-checker chooses what checks test~types: tsc by default, bun for bun check; only the parameter sets it, never an import, a dependency or a script (D-070, tooling/stacks ADR 0017)",
+  "statement": "compiler chooses what emits a build and type-checker what checks test~types: bun check by default if the workspace's Bun supports it, else tsc; only the parameter sets it, never an import, a dependency or a script (D-070, stacks ADR 0017; owner 2026-11-28)",
   "settled": "2026-11-22",
   "settledBy": "fdumay",
   "reviewOnly": true

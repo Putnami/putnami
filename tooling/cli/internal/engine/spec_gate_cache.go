@@ -292,7 +292,7 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 				fmt.Sprintf("their test plan could not be derived: %v", err), features.UnconsultedPlanFailed})
 		}
 		keys, err := cachekey.PrecomputeKeys(source.ws, planned, source.req.CommandParams,
-			source.runVersions(), source.cache, cachekey.CacheBypass{})
+			source.runVersions(), source.cache, cachekey.CacheBypass{}, cachekey.AtEntryKeys(scheduler.SourceBoundEntryKeys(source.ws)))
 		if err != nil {
 			return source.unconsultedAll(all, unconsultedCause{
 				fmt.Sprintf("their cache keys could not be derived: %v", err), features.UnconsultedPlanFailed})

@@ -65,7 +65,29 @@ const (
 	TaskInputFromParams    = proto.TaskInputFromParams
 	TaskInputFromEnv       = proto.TaskInputFromEnv
 	TaskInputFromRuntime   = proto.TaskInputFromRuntime
+	// TaskInputFoldArtifact is the fold of a task port that keys its
+	// consumer on the artifact its step binds.
+	TaskInputFoldArtifact = proto.TaskInputFoldArtifact
 )
+
+// ArtifactBinding is the step binding of an input port that folds an
+// artifact.
+type ArtifactBinding = proto.ArtifactBinding
+
+// ArtifactOutputError is why an output port names no artifact.
+type ArtifactOutputError = proto.ArtifactOutputError
+
+// StepArtifactBindings returns a step's bindings of the ports that fold an
+// artifact.
+var StepArtifactBindings = proto.StepArtifactBindings
+
+// ArtifactOutputFor returns the declared output an output port names as an
+// artifact.
+var ArtifactOutputFor = proto.ArtifactOutputFor
+
+// ArtifactExcludes returns the subpaths an output port's artifact leaves out
+// of its digest.
+var ArtifactExcludes = proto.ArtifactExcludes
 
 // CommandDependency is one entry of a command's dependsOn, read by
 // ParseCommandDependency. Every reader of CommandDependsOn parses through it.

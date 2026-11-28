@@ -19,6 +19,10 @@ type tscManifestStep struct {
 	DependsOn  []string       `json:"dependsOn"`
 	If         string         `json:"if"`
 	Activation map[string]any `json:"activation"`
+	With       map[string]struct {
+		FromStep string `json:"fromStep"`
+		Output   string `json:"output"`
+	} `json:"with"`
 }
 
 type tscManifest struct {
@@ -202,10 +206,15 @@ func TestTscKeyReadsWhatTscReads(t *testing.T) {
 			t.Errorf("build-tsc does not key on the %s parameter", param)
 		}
 	}
+	// types depends on its dependencies' tsc steps; test binds their outDir,
+	// which plans the same edges (ADR 0016).
 	run := steps(m, "test")
-	for _, id := range []string{"test", "types"} {
-		if !slices.Contains(run[id].DependsOn, "^tsc") || !slices.Contains(run[id].DependsOn, "^tsc-auto") {
-			t.Errorf("test~%s depends on %v, want its dependencies' tsc steps", id, run[id].DependsOn)
+	if !slices.Contains(run["types"].DependsOn, "^tsc") || !slices.Contains(run["types"].DependsOn, "^tsc-auto") {
+		t.Errorf("test~types depends on %v, want its dependencies' tsc steps", run["types"].DependsOn)
+	}
+	for port, from := range map[string]string{"dependencyOutDir": "^tsc", "dependencyAutoOutDir": "^tsc-auto"} {
+		if binding := run["test"].With[port]; binding.FromStep != from || binding.Output != "outDir" {
+			t.Errorf("test~test binds %s to %+v, want %s's outDir", port, binding, from)
 		}
 	}
 }

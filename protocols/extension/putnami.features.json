@@ -357,7 +357,9 @@
               "runtime-entries-require-contract-29",
               "runtime-entries-below-contract-29-do-not-load",
               "selection-free-tasks-require-contract-30",
-              "selection-free-tasks-below-contract-30-do-not-load"
+              "selection-free-tasks-below-contract-30-do-not-load",
+              "artifact-inputs-require-contract-32",
+              "artifact-inputs-below-contract-32-do-not-load"
             ]
           }
         },
@@ -388,6 +390,21 @@
             "checks": [
               "an-unresolved-binding-at-contract-16-does-not-load",
               "an-unresolved-binding-below-contract-16-loads-as-before"
+            ]
+          }
+        },
+        {
+          "id": "an-artifact-input-binds-a-declared-output",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "artifact-input-rules-report-their-codes",
+              "an-output-port-names-one-declared-output",
+              "an-invalid-artifact-input-at-contract-32-does-not-load"
             ]
           }
         },

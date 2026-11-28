@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/typescript",
-  "cliContract": 28,
+  "cliContract": 32,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-ts",
@@ -447,12 +447,11 @@
         },
         "type-checker": {
           "type": "string",
-          "default": "tsc",
           "choices": [
             "tsc",
             "bun"
           ],
-          "description": "Checker of the types step, set in options[\"@putnami/typescript:test\"][\"type-checker\"]: tsc runs the TypeScript compiler; bun runs bun check, Bun's checker, on the same tsconfig and compiler options. Never inferred"
+          "description": "Checker of the types step, set in options[\"@putnami/typescript:test\"][\"type-checker\"]: tsc runs the TypeScript compiler; bun runs bun check, Bun's checker, on the same tsconfig and compiler options. Default: bun when the Bun that runs the step supports bun check (1.4.4 or later), else tsc. Never inferred from the project"
         },
         "test-verbose": {
           "type": "boolean",
@@ -512,6 +511,14 @@
           "if": "params.compiler == 'tsc'"
         },
         {
+          "id": "emit",
+          "task": "build-emit",
+          "commandLayerInputs": false,
+          "dependsOn": [
+            "generate"
+          ]
+        },
+        {
           "id": "test-env",
           "task": "test-env-up",
           "dependsOn": [
@@ -527,12 +534,13 @@
           "id": "test",
           "heavy": true,
           "task": "test-run",
-          "dependsOn": [
-            "generate",
-            "test-env",
-            "^tsc",
-            "^tsc-auto"
-          ]
+          "dependsOn": ["test-env"],
+          "with": {
+            "emitManifest": { "fromStep": "emit", "output": "manifest" },
+            "gen": { "fromStep": "generate", "output": "gen" },
+            "dependencyOutDir": { "fromStep": "^tsc", "output": "outDir" },
+            "dependencyAutoOutDir": { "fromStep": "^tsc-auto", "output": "outDir" }
+          }
         },
         {
           "id": "types",
@@ -1398,6 +1406,10 @@
       "outputs": {
         "data": {
           "description": "Generated code metadata and exports map"
+        },
+        "gen": {
+          "kind": "directory",
+          "description": "The project's generated .gen subtree, the artifact test-run folds."
         }
       },
       "writes": [
@@ -1456,6 +1468,78 @@
             "description": "The project's committed putnami.http-routes.v1 inventory: the committed form, without its digest, of the canonical .gen/schema/http-routes.json this task aggregates from the framework pre-build hooks' route fragments (protocols/http-routes ADR 0003), written after every pre-build hook reported a complete data.httpRoutes evaluation, {\"v\":1,\"state\":\"complete\"}, and the aggregate validated. The framework hooks are its sole authors; this task only drops the digest of the aggregate, and reads no project option to decide it. Fragments that hold no route commit an inventory with routes []. A run whose hooks all reported complete and wrote no fragment removes the file, including for a project that declares no pre-build hook. The task fails and leaves the file and infra/requirements.json as they stand when a hook fails, when the aggregate is invalid, and, before it aggregates anything, when it cannot evaluate every route producer: discovery could not read package.json or a dependency's putnami.extension.json, a hook reported its routes unavailable or returned no or a malformed data.httpRoutes, or Bun is missing for a project with a pre-build hook. It is committed, and this task is its first writer in a session, so the engine compares what it writes, removes, or a cache hit restores with the bytes present before and fails the task with generated-output-drift on a difference — the worktree then holds the regenerated inventory to commit (protocols/extension ADR 0004). Absent for a project whose hooks complete without a route fragment."
           }
         },
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-emit": {
+      "description": "Write the emit manifest of the project's dependency closure, the project included: each TypeScript module keyed on the SHA-256 of the JavaScript Bun's transpiler emits for it, under the compiler options of the tsconfig that governs it, and every other file Git does not ignore, the closure's .gen trees included, on the SHA-256 of its bytes. A declaration file is left out: Bun never runs one, and so are each .gen tree's build stamp and the .gen paths its generate cedes to other tasks, which write them in no order this task waits for. Its key reads each closure member's own files, not the rest of the workspace. Every narrowing falls back to bytes: a module that does not transpile, whose tsconfig chain reaches a package or a config outside this key, or whose search for a tsconfig leaves its closure member below the workspace root, keys on its bytes, a closure in which a bunfig.toml preload or a Bun plugin can transform modules before Bun runs them keys every module on its bytes, and so does a project whose tests run under Vitest or Jest, the runner test-run resolves from the runner parameter or the project's package.json test script, since their transforms are not Bun's. test-run folds the manifest's digest instead of its dependencies' sources, so a type-only or comment-only change in a dependency reruns no dependent test of a Bun project (ADR 0016).",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build-emit"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "closure": {
+          "from": "closure",
+          "files": [
+            "git:**/*",
+            "!../**",
+            "!node_modules/**",
+            "!**/node_modules/**"
+          ]
+        },
+        "sources": {
+          "from": "project",
+          "files": [
+            "git:**/*",
+            "!../**",
+            "!node_modules/**",
+            "!**/node_modules/**"
+          ]
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "bunfig.toml",
+            "tsconfig*.json"
+          ]
+        },
+        "runner": {
+          "from": "params"
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        },
+        "candidateFiles": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The manifest's mode and file count"
+        },
+        "manifest": {
+          "description": "Command-output path of the emit manifest, the artifact test-run folds."
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "manifest": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "emit-manifest.json",
+            "description": "The emit manifest: version, mode (emit, or bytes with the reason), and one entry per closure file with its project, path, kind (js, bytes or absent) and SHA-256."
+          }
+        }
+      ,
         "effects": [
           "toolchain-cache"
         ]
@@ -2572,6 +2656,10 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 600000,
       "inputs": {
+        "emitManifest": { "from": "task", "fold": "artifact" },
+        "gen": { "from": "task", "fold": "artifact" },
+        "dependencyOutDir": { "from": "task", "fold": "artifact", "optional": true },
+        "dependencyAutoOutDir": { "from": "task", "fold": "artifact", "optional": true },
         "sources": {
           "from": "project",
           "files": [

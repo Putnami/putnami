@@ -316,7 +316,7 @@ func (s *LocalStore) ingestOutputTree(srcDir, dstDir, id string, manifest *cache
 		if err != nil {
 			return err
 		}
-		if uncacheableArtifact(rel) {
+		if UncacheableArtifact(rel) {
 			return nil
 		}
 		size, err := s.ingestOneFile(p, filepath.Join(dstDir, rel), info, id+"/"+filepath.ToSlash(rel), manifest)

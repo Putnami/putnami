@@ -23,8 +23,8 @@
     "cliContract": {
       "type": "integer",
       "minimum": 4,
-      "maximum": 31,
-      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, contract 9 a verbs vocabulary, contract 10 a task that declares cache.sourceBound, contract 11 command or verb traits that declare kind, workload, rewritesSources or consumesReleaseSet, or a batchable policy that declares kind or phase, contract 12 a task that declares publishChannels, contract 13 a runtime toolchain that declares a provisioned candidate, contract 14 input selectors listed in runtime.inputSelectors or named by a task file pattern, contract 15 a command group whose default subcommand declares positionals, contract 16 a step that gates on the run's changed files (activation.changedFiles) or binds them (a from: context input binding), contract 17 a hostHooks member, contract 18 a command dependsOn entry that names one step of another command (command~step), contract 19 a providers section, contract 20 an agentContent.userScope list, contract 21 a workspace adapter that declares buildGraphEdges, contract 22 a command dependsOn entry that names a command across the dependency closure (^command), contract 23 a pipeline step that declares commandLayerInputs, contract 24 a provider operation that declares members, contract 25 a host hook at UserPromptSubmit or one that declares async, and contract 26 a runtime toolchain probe that declares self, which raises no stamp: a reader below 26 drops it, contract 27 a task file output that declares emptied, contract 28 a step activation that declares projectTypes or anyOf, contract 29 runtime entries or compiled inputs, or a task that names a runtimeEntry, contract 30 a task that declares selection none, and contract 31 a workspace adapter that declares moduleGraphEdges. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
+      "maximum": 32,
+      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, contract 9 a verbs vocabulary, contract 10 a task that declares cache.sourceBound, contract 11 command or verb traits that declare kind, workload, rewritesSources or consumesReleaseSet, or a batchable policy that declares kind or phase, contract 12 a task that declares publishChannels, contract 13 a runtime toolchain that declares a provisioned candidate, contract 14 input selectors listed in runtime.inputSelectors or named by a task file pattern, contract 15 a command group whose default subcommand declares positionals, contract 16 a step that gates on the run's changed files (activation.changedFiles) or binds them (a from: context input binding), contract 17 a hostHooks member, contract 18 a command dependsOn entry that names one step of another command (command~step), contract 19 a providers section, contract 20 an agentContent.userScope list, contract 21 a workspace adapter that declares buildGraphEdges, contract 22 a command dependsOn entry that names a command across the dependency closure (^command), contract 23 a pipeline step that declares commandLayerInputs, contract 24 a provider operation that declares members, contract 25 a host hook at UserPromptSubmit or one that declares async, and contract 26 a runtime toolchain probe that declares self, which raises no stamp: a reader below 26 drops it, contract 27 a task file output that declares emptied, contract 28 a step activation that declares projectTypes or anyOf, contract 29 runtime entries or compiled inputs, or a task that names a runtimeEntry, contract 30 a task that declares selection none, contract 31 a workspace adapter that declares moduleGraphEdges, and contract 32 a task input port that declares fold, which a step binding whose fromStep names a step of the direct dependencies (^step) may bind, or a task output port that declares artifactExcludes. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
     },
     "extensionDependencies": {
       "description": "Other extensions this extension needs: a list of names, or a map from name to version constraint. A name is a registry name (@scope/name) or an unscoped package name; each part holds lowercase letters, digits, '.', '_' and '-' and starts with a letter or digit. The CLI installs, pins and loads each registry name for an extension installed from the artifact store or declared by path, and leaves any other name to the package manager. A manifest that names a registry dependency requires cliContract 8 when it loads from the artifact store or a declared path.",
@@ -1233,7 +1233,8 @@
           ],
           "properties": {
             "fromStep": {
-              "type": "string"
+              "type": "string",
+              "description": "The step of the same command whose result the binding reads. ^step names that step in every direct dependency project that runs it, and binds only an input port that declares fold 'artifact' (cliContract 32); in a manifest that declares no fold, a ^step binding is inert, as below contract 32. A binding of such a port orders the step after its producers without a dependsOn entry."
             },
             "output": {
               "type": "string",
@@ -2086,6 +2087,11 @@
         "optional": {
           "type": "boolean",
           "description": "Only for 'task' inputs. False (the default) states a hard producer requirement: the consuming pipeline step must bind the port to a producing step that survives into the plan, or planning fails naming both identities. True means the consuming task handles a missing producer itself."
+        },
+        "fold": {
+          "type": "string",
+          "enum": ["artifact"],
+          "description": "Only for 'task' inputs. How the producer enters the consumer's cache key: absent folds the producer's cache key; 'artifact' folds the digest of the producer output the consuming step binds (fromStep and output), which names the declared output whose id is that output port or whose pathFrom names it. An optional port with no producer in the plan folds a fixed absent value. Requires cliContract 32."
         }
       }
     },
@@ -2109,6 +2115,13 @@
         "description": {
           "type": "string",
           "description": "Human-readable description of this output."
+        },
+        "artifactExcludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only on a port that names a directory artifact. Canonical paths relative to that declared output, each once, that the artifact's digest leaves out: bytes it holds that no consumer's verdict reads, such as a record naming the project's source binding. They are still captured and restored with the output. Requires cliContract 32."
         }
       }
     },

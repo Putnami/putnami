@@ -242,10 +242,11 @@ func TestLoadGenerateResult_ValidFile(t *testing.T) {
 	data, _ := json.MarshalIndent(genResult, "", "  ")
 	os.WriteFile(filepath.Join(genDir, "generate-result.json"), data, 0644)
 
-	result := loadGenerateResult(dir)
-	if result.Hash != "abc123" {
-		t.Errorf("hash = %q, want abc123", result.Hash)
+	// The content hash stays out of the file (build.GenerateResult).
+	if strings.Contains(string(data), "abc123") {
+		t.Errorf("generate-result.json carries the content hash: %s", data)
 	}
+	result := loadGenerateResult(dir)
 	if want := filepath.Join(dir, ".gen", "version.json"); result.Exports["version-info"] != want {
 		t.Errorf("exports[version-info] = %q, want %q", result.Exports["version-info"], want)
 	}

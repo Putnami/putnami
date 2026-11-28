@@ -217,9 +217,9 @@ func TestRunTypeCheck_ProjectTypesKeepTheProjectsCompilerOptions(t *testing.T) {
 }
 
 func TestResolveTypeChecker(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-type-checker-choice", "the-type-checker-is-tsc-unless-the-project-chooses-bun")
-	for param, want := range map[string]string{"": TypeCheckerTsc, "tsc": TypeCheckerTsc, "bun": TypeCheckerBun} {
-		got, err := ResolveTypeChecker(param)
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-type-checker-choice", "the-type-checker-is-the-parameter-else-bun-check-on-a-bun-that-runs-it")
+	for param, want := range map[string]string{"tsc": TypeCheckerTsc, "bun": TypeCheckerBun} {
+		got, err := ResolveTypeChecker(param, "bun", t.TempDir())
 		if err != nil || got != want {
 			t.Errorf("ResolveTypeChecker(%q) = %q, %v, want %q", param, got, err, want)
 		}
@@ -228,7 +228,7 @@ func TestResolveTypeChecker(t *testing.T) {
 
 func TestResolveTypeChecker_RefusesAnUnknownValue(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-type-checker-choice", "an-unknown-type-checker-fails-the-task-naming-the-choices")
-	_, err := ResolveTypeChecker("tsgo")
+	_, err := ResolveTypeChecker("tsgo", "bun", t.TempDir())
 	if err == nil {
 		t.Fatal("an unknown type-checker resolved")
 	}
@@ -327,7 +327,7 @@ func TestRunTypeCheck_BunRefusesABunWithoutBunCheck(t *testing.T) {
 }
 
 func TestRunTypeCheck_ACheckScriptNeverChoosesBunCheck(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-type-checker-choice", "the-type-checker-is-tsc-unless-the-project-chooses-bun")
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-type-checker-choice", "the-type-checker-is-the-parameter-else-bun-check-on-a-bun-that-runs-it")
 	dir := t.TempDir()
 	writeProjectFiles(t, dir, "tsconfig.json", "src/index.ts")
 	manifest := `{"name":"app","scripts":{"check":"bun check","typecheck":"bun check","test":"bun check && bun test"}}`
@@ -336,11 +336,14 @@ func TestRunTypeCheck_ACheckScriptNeverChoosesBunCheck(t *testing.T) {
 	}
 	var args []string
 	withMockExec(t, func(_ string, a []string, _ ...exec.Option) (*exec.Result, error) {
+		if slices.Equal(a, []string{"--version"}) {
+			return &exec.Result{Success: true, Stdout: "1.3.9\n"}, nil
+		}
 		args = a
 		return &exec.Result{Success: true}, nil
 	})
 
-	checker, err := ResolveTypeChecker("")
+	checker, err := ResolveTypeChecker("", "bun", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,6 +351,6 @@ func TestRunTypeCheck_ACheckScriptNeverChoosesBunCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(args) < 2 || args[0] != "x" || args[1] != "tsc" {
-		t.Errorf("args %v, want x tsc: a script that runs bun check does not choose the checker", args)
+		t.Errorf("args %v, want x tsc on a Bun without bun check: a script that runs bun check does not choose the checker", args)
 	}
 }

@@ -11,6 +11,7 @@
 //	build           Compile Go project
 //	build-generate  Generate openapi/proto/etc. specs from project sources
 //	test            Run Go tests with coverage
+//	test-identity   Name the test binaries a test run builds, as test-exec's key
 //	lint            Lint Go code with golangci-lint and staticcheck
 //	validate-api    Check a stable project's exported API and command surface against its line's last tag
 //	serve           Run Go application with hot-reload

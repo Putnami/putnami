@@ -15,7 +15,8 @@ import (
 // fails on a type error, or an unused @ts-expect-error, in a test. A project
 // whose test runner is Vitest or Jest is checked with its own tsconfig's
 // compiler options, where the runner's globals are declared. The
-// type-checker parameter chooses tsc, the default, or bun check.
+// type-checker parameter chooses tsc or bun check; unset, bun check runs when
+// the Bun that runs the task supports it, and tsc otherwise.
 func runTestTypes(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	projectPath := filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)
 	bunBin, err := resolveBunBin()
@@ -28,7 +29,7 @@ func runTestTypes(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string
 		return "FAILED", nil, err
 	}
 
-	checker, err := build.ResolveTypeChecker(ctx.Params.String("type-checker"))
+	checker, err := build.ResolveTypeChecker(ctx.Params.String("type-checker"), bunBin, projectPath)
 	if err != nil {
 		return "FAILED", nil, err
 	}
