@@ -373,9 +373,11 @@ var extensionCases = []extensionCase{
 		files:      delegatedToolsAbsentFiles,
 		setup:      [][]string{{"projects", "sync"}},
 		command:    []string{"validate", "--all", "--max-parallel", "1"},
-		cold:       "engine git 13 | engine git diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		plan:       "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
-		settles:    true,
+		// config 1: the witness of the Git answers the run keeps reads the
+		// configuration, which no other read of this run opens (ADR 0136).
+		cold:    "engine git 14 | engine git config 1 · diff 1 · for-each-ref 1 · ls-files 1 · rev-parse 5 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		plan:    "engine git 9 | engine git diff 1 · for-each-ref 1 · rev-parse 3 · show 1 · status 1 · symbolic-ref 1 · tag 1 | jobs none | jobs git none",
+		settles: true,
 	},
 }
 

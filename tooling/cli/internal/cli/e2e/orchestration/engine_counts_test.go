@@ -1,9 +1,12 @@
 package orchestration
 
 import (
+	"path/filepath"
 	"testing"
+	"time"
 
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 )
@@ -85,10 +88,47 @@ func TestAWriteUnderAnIgnoredPutnamiListsNoCandidateAgain(t *testing.T) {
 	cold := clitest.RunCounts(t, root, "lint,test,build", "--all", "--max-parallel", "1", "--no-cache")
 	// The listings are read in-process (tooling/cli ADR 0112): one per
 	// project's candidates, one of the workspace's cut, one of the source
-	// binding snapshot, whatever the tasks wrote under .putnami.
-	if reads = putnamigit.InProcessCutReads() - reads; reads > 5 {
-		t.Errorf("in-process reads of the cut = %d, above its ceiling 5\n%s", reads, countsHint)
+	// binding snapshot, whatever the tasks wrote under .putnami, and one for
+	// the witness of the work tree's Git answers the run keeps (ADR 0136).
+	if reads = putnamigit.InProcessCutReads() - reads; reads > 6 {
+		t.Errorf("in-process reads of the cut = %d, above its ceiling 6\n%s", reads, countsHint)
 	}
 	holdCeiling(t, "a run of 9 tasks that write under the ignored .putnami", cold.Ledger(),
 		"engine job 9 · git 15 | engine git check-ignore 1 · config 1 · for-each-ref 1 · ls-files 1 · rev-parse 6 · show 1 · status 2 · symbolic-ref 1 · tag 1 | jobs none | jobs git none")
+}
+
+// TestAnUnchangedRunStartsNoGitProcess holds that a run of an unchanged
+// workspace starts no git process: the Git reads an earlier run made are
+// answered from the input record while the files they read keep their stats
+// (tooling/cli ADR 0136). The runs before it leave the margin of the record's
+// clock between the fixture's writes and the run that records them.
+func TestAnUnchangedRunStartsNoGitProcess(t *testing.T) {
+	clitest.RequireShell(t)
+	clitest.UnsetHostRunEnvironment(t)
+	hometest.Temp(t)
+	root := clitest.CountsFixture(t, 3, false)
+	// A workspace's .putnami holds what its runs write, which Git ignores: a
+	// run that wrote in the work tree would change what Git answers.
+	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami/\n")
+	clitest.RunGit(t, root, "add", ".gitignore")
+	clitest.RunGit(t, root, "commit", "-m", "ignore .putnami")
+	// RunCounts antedates HEAD before each run, which moves its stat; these
+	// runs leave the repository as they find it.
+	run := func() clitest.Counts {
+		code, out := clitest.RunGateArgs(t, root, "lint,test,build", "--all", "--output=json")
+		if code != 0 {
+			t.Fatalf("putnami lint,test,build --all exit %d:\n%s", code, out)
+		}
+		return clitest.ParseCounts(t, out)
+	}
+	// The first run executes every task, and its Git calls refresh the index;
+	// the next records what the margin of the record's clock left out.
+	for range 3 {
+		run()
+		time.Sleep(fileindex.Margin + 100*time.Millisecond)
+	}
+	unchanged := run()
+	if calls := total(unchanged.EngineGit); calls != 0 {
+		t.Errorf("a run of the unchanged workspace made %d engine git call(s), want none\n%s\n%s", calls, unchanged.Ledger(), countsHint)
+	}
 }

@@ -325,6 +325,39 @@ func RemoteURL(repoRoot, remote string) string {
 	return strings.TrimSpace(output)
 }
 
+// commonDirInProcess answers `git rev-parse --git-common-dir` in dir from the
+// nearest .git at or above it, as the in-process reader discovers it (ADR
+// 0112), and false for any layout it does not read, or past a file system
+// boundary: Git answers then.
+func commonDirInProcess(dir string) (string, bool) {
+	current, err := filepath.Abs(dir)
+	if err != nil {
+		return "", false
+	}
+	device, err := deviceOf(current)
+	if err != nil {
+		return "", false
+	}
+	for {
+		// Git does not cross a file system boundary to find a repository.
+		if here, err := deviceOf(current); err != nil || here != device {
+			return "", false
+		}
+		if _, err := os.Lstat(filepath.Join(current, ".git")); err == nil {
+			repo, err := discover(current)
+			if err != nil {
+				return "", false
+			}
+			return repo.commonDir, true
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return "", false
+		}
+		current = parent
+	}
+}
+
 // dirtyHash returns a short hash of uncommitted changes, or "" if clean.
 func dirtyHash(repoRoot string) string {
 	status, err := gitread.Run(repoRoot, "status", "--porcelain")
@@ -674,11 +707,14 @@ func IgnoredDirs(repoRoot string) map[string]bool {
 // keying a machine-global, per-repo build store shared across all worktrees.
 // Returns "" when git is unavailable or repoRoot is not inside a work tree.
 func CommonDir(repoRoot string) string {
-	output, err := gitread.Run(repoRoot, "rev-parse", "--git-common-dir")
-	if err != nil {
-		return ""
+	p, ok := commonDirInProcess(repoRoot)
+	if !ok {
+		output, err := gitread.Run(repoRoot, "rev-parse", "--git-common-dir")
+		if err != nil {
+			return ""
+		}
+		p = strings.TrimSpace(output)
 	}
-	p := strings.TrimSpace(output)
 	if p == "" {
 		return ""
 	}

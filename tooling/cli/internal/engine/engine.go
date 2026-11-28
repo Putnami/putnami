@@ -645,6 +645,67 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	// A run PUTNAMI_SOURCE_REVISION binds to a commit whose version cannot be
 	// read fails here, before any hook or job, instead of running with no
 	// version (captureVersionSnapshot explains why).
+	// The run's file index and input record are opened before it reads the
+	// version snapshot: the Git reads the record holds are answered from it
+	// (tooling/cli ADR 0136). The release baselines a run read are answered
+	// to the next run while the commits they name hold (tooling/cli ADR 0113
+	// §4), from the input record's release-baseline table. Both are saved
+	// once the run, its after hooks included, returned.
+	if req.WorkspaceRoot != "" {
+		// The workspace snapshot and the input hashes read a file's digest through
+		// the workspace's file index (internal/fileindex): a file whose stat it
+		// recorded is not read again. The configuration loaders take a file's
+		// bytes from it the same way. What the run recorded is saved at its end. A
+		// run that only plans (`--plan`, a preview-only `--dry-run`) reads the
+		// index and writes nothing.
+		open := fileindex.Open
+		if req.Global.Plan || req.previewsOnly() {
+			open = fileindex.OpenReadOnly
+		}
+		index := open(fileindex.Path(req.WorkspaceRoot), fileindex.ExecutableIdentity())
+		// The configuration this process read before the run, through the
+		// read-only index the CLI opens at its start, is recorded by the run's.
+		index.Adopt(fileindex.Current())
+		restoreIndex := fileindex.Use(index)
+		restoreConfigReader := wsproto.UseConfigReader(fileindex.ReadFile)
+		// The input digests of cache keys are answered from the workspace's
+		// input record while their witnesses hold (tooling/cli ADR 0113), under
+		// the same rule: a run that only plans reads it and writes nothing.
+		var record *fileindex.Record
+		if req.Global.Plan || req.previewsOnly() {
+			record = fileindex.OpenRecordReadOnly(fileindex.RecordPath(req.WorkspaceRoot), fileindex.RecordIdentity(), time.Now().UnixNano())
+		} else {
+			record = fileindex.OpenRecord(fileindex.RecordPath(req.WorkspaceRoot), fileindex.RecordIdentity())
+		}
+		// A record whose sampled answer differed from a collection is
+		// discarded: the run's result carries it from then on, and the run
+		// writes it once, after it rendered.
+		record.OnDiscard(func(reason string) {
+			req.workspaceWarnings.Keep(workspace.Warning{
+				Code:    "cache.input_record_discarded",
+				Message: reason + "; the input record is discarded and every input digest is collected (tooling/cli ADR 0113)",
+			})
+		})
+		restoreRecord := fileindex.UseRecord(record)
+		restoreReads := git.UseHeldReads(record)
+		defer func() {
+			restoreReads()
+			restoreRecord()
+			restoreConfigReader()
+			restoreIndex()
+			if req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] file index: %d digests answered, %d files read\n", index.Hits(), index.Reads())
+				iox.Fprintf(os.Stderr, "[debug] input record: %d values answered, %d computed\n", record.Answered(), record.Computed())
+			}
+			if err := index.Save(); err != nil && req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] file index: %v\n", err)
+			}
+			if err := record.Save(); err != nil && req.Global.Debug {
+				iox.Fprintf(os.Stderr, "[debug] input record: %v\n", err)
+			}
+			req.workspaceWarnings.Flush()
+		}()
+	}
 	if req.VersionSnapshot == nil {
 		snapshot, err := captureVersionSnapshot(req.WorkspaceRoot)
 		if err != nil {
@@ -710,6 +771,9 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	if err := runBeforeHooks(ctx, req, verbose); err != nil {
 		return SessionResult{ExitCode: ExitError}, err
 	}
+	// The hooks are repository code: a stat the record took before them may
+	// have moved.
+	fileindex.CurrentRecord().ForgetAll()
 
 	result, runErr := e.run(ctx, req, sink)
 	// Every return path of the run, after the workspace load or before it,
@@ -747,62 +811,6 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// Each phase below records its wall on the run's orchestration report.
 	clock := req.orchestration
 	phaseStarted := time.Now()
-	// The workspace snapshot and the input hashes read a file's digest through
-	// the workspace's file index (internal/fileindex): a file whose stat it
-	// recorded is not read again. The configuration loaders take a file's
-	// bytes from it the same way. What the run recorded is saved at its end. A
-	// run that only plans (`--plan`, a preview-only `--dry-run`) reads the
-	// index and writes nothing.
-	if req.WorkspaceRoot != "" {
-		open := fileindex.Open
-		if req.Global.Plan || req.previewsOnly() {
-			open = fileindex.OpenReadOnly
-		}
-		index := open(fileindex.Path(req.WorkspaceRoot), fileindex.ExecutableIdentity())
-		// The configuration this process read before the run, through the
-		// read-only index the CLI opens at its start, is recorded by the run's.
-		index.Adopt(fileindex.Current())
-		restoreIndex := fileindex.Use(index)
-		restoreConfigReader := wsproto.UseConfigReader(fileindex.ReadFile)
-		// The input digests of cache keys are answered from the workspace's
-		// input record while their witnesses hold (tooling/cli ADR 0113), under
-		// the same rule: a run that only plans reads it and writes nothing.
-		var record *fileindex.Record
-		if req.Global.Plan || req.previewsOnly() {
-			record = fileindex.OpenRecordReadOnly(fileindex.RecordPath(req.WorkspaceRoot), fileindex.RecordIdentity(), time.Now().UnixNano())
-		} else {
-			record = fileindex.OpenRecord(fileindex.RecordPath(req.WorkspaceRoot), fileindex.RecordIdentity())
-		}
-		// A record whose sampled answer differed from a collection is
-		// discarded: the run's result carries it from then on, and the run
-		// writes it once, after it rendered.
-		record.OnDiscard(func(reason string) {
-			req.workspaceWarnings.Keep(workspace.Warning{
-				Code:    "cache.input_record_discarded",
-				Message: reason + "; the input record is discarded and every input digest is collected (tooling/cli ADR 0113)",
-			})
-		})
-		restoreRecord := fileindex.UseRecord(record)
-		defer func() {
-			restoreRecord()
-			restoreConfigReader()
-			restoreIndex()
-			if req.Global.Debug {
-				iox.Fprintf(os.Stderr, "[debug] file index: %d digests answered, %d files read\n", index.Hits(), index.Reads())
-				iox.Fprintf(os.Stderr, "[debug] input record: %d values answered, %d computed\n", record.Answered(), record.Computed())
-			}
-			if err := index.Save(); err != nil && req.Global.Debug {
-				iox.Fprintf(os.Stderr, "[debug] file index: %v\n", err)
-			}
-			if err := record.Save(); err != nil && req.Global.Debug {
-				iox.Fprintf(os.Stderr, "[debug] input record: %v\n", err)
-			}
-			req.workspaceWarnings.Flush()
-		}()
-		// The release baselines a run read are answered to the next run while
-		// the commits they name hold (tooling/cli ADR 0113 §4), from the
-		// input record's release-baseline table.
-	}
 	// Phase 1: load the workspace and resolve extensions — once per run.
 	ws, discovered, code, err := loadRunWorkspace(req)
 	if code != ExitSuccess {
