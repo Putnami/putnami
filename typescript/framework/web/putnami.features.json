@@ -118,7 +118,8 @@
             "kind": "acceptance",
             "checks": [
               "a-static-loader-http-exception-renders-its-own-status",
-              "prerender-fails-on-a-listed-path-that-resolves-to-a-4xx"
+              "prerender-fails-on-a-listed-path-that-resolves-to-a-4xx",
+              "prerender-skips-a-locale-that-resolves-to-a-4xx"
             ]
           }
         },
