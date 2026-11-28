@@ -27,9 +27,7 @@ import type { HttpResponse } from './http-response';
  */
 export interface MiddlewareForm<S = undefined> {
   readonly passes?: (ctx: HttpRequestContext) => boolean;
-  readonly answer?: (
-    ctx: HttpRequestContext,
-  ) => HttpResponse | Promise<HttpResponse | undefined> | undefined;
+  readonly answer?: (ctx: HttpRequestContext) => HttpResponse | Promise<HttpResponse | undefined> | undefined;
   readonly enter?: (ctx: HttpRequestContext) => S;
   readonly leave?: (ctx: HttpRequestContext, response: HttpResponse | undefined, state: S) => HttpResponse | undefined;
   readonly fail?: (ctx: HttpRequestContext, error: unknown, state: S) => void;
@@ -55,7 +53,7 @@ export function middlewareFromForm<S>(form: MiddlewareForm<S>): HttpMiddleware {
   // No async frame of its own: the hooks run in the continuation of the inner
   // chain's promise.
   const middleware: HttpMiddleware = (ctx, next) => {
-    if (passes !== undefined && passes(ctx)) return untouched(next);
+    if (passes?.(ctx)) return untouched(next);
     let state: S;
     try {
       if (answer !== undefined) {

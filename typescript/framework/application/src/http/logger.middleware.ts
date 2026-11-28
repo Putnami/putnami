@@ -51,9 +51,7 @@ export const LoggerMiddleware = (options: LoggerOptions = {}): HttpMiddleware =>
 
   return middlewareFromForm<LoggedRequest>({
     passes:
-      exclude.size > 0
-        ? (context) => exclude.has(loggedRoute(context)) || exclude.has(context.path())
-        : undefined,
+      exclude.size > 0 ? (context) => exclude.has(loggedRoute(context)) || exclude.has(context.path()) : undefined,
     enter: (context) => {
       const method = context.method;
       // Read before the inner chain: a HEAD request is matched to its GET route inside it.
