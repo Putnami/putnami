@@ -193,6 +193,14 @@
         "Without the echo nothing changes.",
         "An upload the provider answers with accepted false and no error is declined: core counts it as no upload error and logs no error."
       ]
+    },
+    {
+      "id": "a-settled-marker-is-kept-under-its-scope",
+      "text": [
+        "Core lists marker-scope; a provider echoes it only when listed, with a key and the files and variables its marker answer is read from.",
+        "A marker the provider published or refused as read-only is recorded with that scope; a later run at the same commit, workspace and provider publishes nothing while every file and variable holds.",
+        "Any other answer records nothing."
+      ]
     }
   ],
   "decisions": [

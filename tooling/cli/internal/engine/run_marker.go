@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/cli/model/workspace"
+	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
@@ -17,6 +18,12 @@ import (
 // recordSuccessfulBuild is best-effort: every failure is swallowed (logged only
 // under --debug) so it never affects the command's exit code.
 
+// runMarkerPublisher publishes a run's marker (remotecache.RemoteCache).
+type runMarkerPublisher interface {
+	PublishRunMarker(ctx context.Context, workspaceID, branch string, commands []string, paramsHash, sha, observedSHA string) *cacheprovider.ScopeWitness
+	ProviderIdentity() string
+}
+
 func recordSuccessfulBuild(
 	sessStore *workspace_state.SessionStore,
 	ws *workspace.Workspace,
@@ -24,7 +31,7 @@ func recordSuccessfulBuild(
 	commands []string,
 	params map[string]any,
 	debug bool,
-	remote *remotecache.RemoteCache,
+	remote runMarkerPublisher,
 	observedSHA string,
 ) {
 	if sessStore == nil || wsRoot == "" {
@@ -50,10 +57,27 @@ func recordSuccessfulBuild(
 		}
 		return
 	}
-	if err := sessStore.RecordSuccessfulBuild(branch, commands, params, sha); err != nil && debug {
+	err = sessStore.RecordSuccessfulBuild(branch, commands, params, sha)
+	if err != nil && debug {
 		iox.Fprintf(os.Stderr, "[debug] last build state skipped: %v\n", err)
 	}
-	remote.PublishRunMarker(context.Background(), remotecache.RunMarkerWorkspaceID(ws), branch, commands, workspace_state.LastBuildParamsHash(params), sha, observedSHA)
+	recorded := err == nil
+	workspaceID, provider := remotecache.RunMarkerWorkspaceID(ws), remote.ProviderIdentity()
+	// A marker the provider settled at this commit, under a scope that still
+	// holds, has nothing to advance: the run starts no provider for it
+	// (tooling/cli ADR 0138).
+	if settled, err := sessStore.SettledMarker(branch, commands, params); recorded && err == nil && settled.Holds(sha, workspaceID, provider) {
+		return
+	}
+	witness := remote.PublishRunMarker(context.Background(), workspaceID, branch, commands, workspace_state.LastBuildParamsHash(params), sha, observedSHA)
+	if !recorded || witness == nil {
+		return
+	}
+	if marker, ok := workspace_state.NewSettledMarker(sha, workspaceID, provider, witness); ok {
+		if err := sessStore.RecordSettledMarker(branch, commands, params, marker); err != nil && debug {
+			iox.Fprintf(os.Stderr, "[debug] settled run marker skipped: %v\n", err)
+		}
+	}
 }
 
 func observedRunMarkerSHA(req *Request) string {

@@ -4,6 +4,7 @@
   "executableRequirements": [
     "cache/remote-cache-contract#a-read-only-session-is-declared",
     "cache/remote-cache-contract#a-reference-socket-server",
+    "cache/remote-cache-contract#a-settled-marker-is-kept-under-its-scope",
     "cache/remote-cache-contract#accelerators-are-optional",
     "cache/remote-cache-contract#blobs-cross-through-the-exchange-directory",
     "cache/remote-cache-contract#every-op-is-best-effort",

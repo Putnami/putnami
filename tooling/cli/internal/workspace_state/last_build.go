@@ -21,6 +21,8 @@ type lastBuildState struct {
 type lastBuildEntry struct {
 	SHA       string `json:"sha"`
 	UpdatedAt string `json:"updatedAt"`
+	// Marker is the run marker the cache provider settled for this entry.
+	Marker *SettledMarker `json:"marker,omitempty"`
 }
 
 // LastBuildSHA returns the last fully successful HEAD SHA recorded for the
@@ -80,6 +82,7 @@ func (ss *SessionStore) RecordSuccessfulBuild(branch string, commands []string, 
 	state.Branches[branch][commandKey] = lastBuildEntry{
 		SHA:       sha,
 		UpdatedAt: time.Now().Format(time.RFC3339Nano),
+		Marker:    state.Branches[branch][commandKey].Marker,
 	}
 	return ss.writeLastBuildState(state)
 }

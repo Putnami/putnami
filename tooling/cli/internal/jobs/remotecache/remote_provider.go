@@ -37,6 +37,8 @@ type providerRemote struct {
 	// extensionName names the extension that serves the provider command, or
 	// is empty when unknown.
 	extensionName string
+	// extensionVersion is that extension's version.
+	extensionVersion string
 	// runtime is the runtime executable of that extension, prepared with the
 	// launch, or empty when it has none. A hosted run starts the provider only
 	// when launch.Command is this file (runcredential.RequireNativeHolder).
@@ -122,7 +124,9 @@ func loadProviderRemoteCache(ctx context.Context, wsRoot string, exts []*extensi
 
 	remote := newProviderRemoteCache(wsRoot, launch, trust)
 	remote.provider.extensionName = provider.ExtensionName
-	remote.provider.runtime = findExtensionByName(exts, provider.ExtensionName).RuntimeExecutable
+	providerExtension := findExtensionByName(exts, provider.ExtensionName)
+	remote.provider.runtime = providerExtension.RuntimeExecutable
+	remote.provider.extensionVersion = providerExtension.Version
 	return remote, "", nil
 }
 

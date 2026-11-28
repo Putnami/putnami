@@ -275,6 +275,47 @@ only later that it cannot write keeps answering `upload` with
 `accepted: false`; core logs that decline at debug level and does not count it
 as an upload error.
 
+## Marker scope
+
+A run at a commit whose marker the provider already settled has nothing to
+publish, but core cannot know that without starting the provider
+([ADR 0138](adr/0138-a-run-marker-the-provider-settled-is-not-published-again-under-its-scope.md)).
+
+**Negotiation.** Core lists `marker-scope` (`CapabilityMarkerScope`) in
+`InitializeParams.Capabilities` of every session. A provider that can say
+where its answer about a marker comes from echoes it, and only when core
+listed it, with `InitializeResult.markerScope`:
+
+| Field | Meaning |
+|-------|---------|
+| `key` | An opaque digest of the endpoint, the account and the workspace the provider resolved. Never empty. |
+| `files` | The absolute paths of the configuration and credential files the provider read, present or not. |
+| `env` | The names of the variables it read. |
+| `envPrefixes` | Prefixes: every variable whose name starts with one belongs to the scope. |
+
+Strict validation refuses a scope without the echo, without a key, or with a
+relative file.
+
+**What core does after the echo.** Core witnesses the scope when the session
+initializes: the stat of each file and a salted digest of the variables. When
+the provider publishes the marker, answers that the marker in effect is that
+commit's, or refuses it as read-only, and the witness still holds, core
+records the commit with the key and the witness, beside the last-build entry.
+A later successful run at the same commit, with the same workspace identity
+and the same provider extension, version and runtime, publishes nothing while
+the witness holds. It starts no provider for the marker. Any other answer
+records nothing.
+
+`@putnami/cloud` names a scope for the signed-in user's recipe, which reads
+`~/.putnami/auth.json`, and for a token in a variable. Its scope files are
+`.putnami/cache.json`, `.putnami/cloud-link.json`, `putnami.workspace.json`,
+`putnami.json` and the auth file. Its variables are `HOME`, `USERPROFILE`,
+`PUTNAMI_HOME`, `PUTNAMI_CONTROL_PLANE_URL`, `PUTNAMI_CLI_EXECUTABLE`, `PATH`
+and the prefixes `PUTNAMI_CACHE_`, `PUTNAMI_CLOUD_`, `PUTNAMI_ALLOW_INSECURE_`
+and `PUTNAMI_AUTH_`. A configured token command, a token URL, a metadata
+identity or a hosted run names no scope, and a run then publishes every
+marker.
+
 ## Session lifecycle and fallback
 
 `internal/cacheprovider.Session` spawns one provider per build run:
