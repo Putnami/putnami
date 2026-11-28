@@ -88,8 +88,8 @@ httpPlugin.get('/legacy/[id]', servedByFetch((ctx) => ({ id: ctx.params?.id })))
 ```
 
 A route Bun matches is compiled at start when every middleware acting on it
-is one of the framework's built-ins (security headers, origin guard, logger,
-platform probes): its middlewares then run in one continuation, and a handler
+is one of the framework's built-ins (telemetry, security headers, origin guard,
+logger, platform probes): its middlewares then run in one continuation, and a handler
 that answers at once is answered without a promise. Any other middleware on
 the route (one added with `use()`, CSRF, rate limiting, an asynchronous
 session store) keeps it on the middleware chain, with the same answers. At
