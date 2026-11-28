@@ -163,32 +163,25 @@ describe('buildDispatchContext', () => {
   const route = { path: '/items', method: 'GET' } as unknown as DiscoveredRoute;
   const internalReq = new Request('http://internal/items');
 
-  it('stops the handler when its HTTP request ends, and carries the request deadline', () => {
+  it('stops the handler with the HTTP request it runs in, and carries the request deadline', () => {
     const request = new AbortController();
-    const grpcDeadline = new AbortController();
     const endRequest = () => {};
     const ctx = { signal: request.signal, deadlineAt: 1234, __endRequest: endRequest } as unknown as HttpRequestContext;
 
-    const apiCtx = buildDispatchContext(ctx, internalReq, route, {}, {}, {}, grpcDeadline.signal);
+    const apiCtx = buildDispatchContext(ctx, internalReq, route, {}, {}, {});
 
-    expect(apiCtx.signal?.aborted).toBe(false);
+    expect(apiCtx.signal).toBe(request.signal);
     expect(apiCtx.deadlineAt).toBe(1234);
     expect((apiCtx as HttpRequestContextInternal).__endRequest).toBe(endRequest);
-    request.abort(new DOMException('Request Timeout', 'TimeoutError'));
-    expect(apiCtx.signal?.aborted).toBe(true);
-    expect(apiCtx.signal?.reason).toBeInstanceOf(DOMException);
-    expect((apiCtx.signal?.reason as DOMException | undefined)?.name).toBe('TimeoutError');
   });
 
-  it('stops the handler at the gRPC deadline', () => {
+  it("stops the handler with the call's own signal when it has one", () => {
     const request = new AbortController();
-    const grpcDeadline = new AbortController();
+    const call = new AbortController();
     const ctx = { signal: request.signal } as unknown as HttpRequestContext;
 
-    const apiCtx = buildDispatchContext(ctx, internalReq, route, {}, {}, {}, grpcDeadline.signal);
+    const apiCtx = buildDispatchContext(ctx, internalReq, route, {}, {}, {}, call.signal);
 
-    grpcDeadline.abort();
-    expect(apiCtx.signal?.aborted).toBe(true);
-    expect(request.signal.aborted).toBe(false);
+    expect(apiCtx.signal).toBe(call.signal);
   });
 });

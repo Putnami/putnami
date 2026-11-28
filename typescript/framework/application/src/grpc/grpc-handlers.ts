@@ -50,6 +50,7 @@ import {
   readRequestEnvelope,
 } from './grpc-request';
 import { formatResult } from './grpc-response';
+import { SignalLink } from '../http/signal-link';
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -115,6 +116,7 @@ export function buildUnaryRpcHandler(
     const logger = useLogger('putnami:grpc');
     const deadline = parseGrpcTimeout(ctx.headers);
     let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+    let callSignal: SignalLink | undefined;
 
     // Content negotiation (before try so catch can use isGrpcWeb)
     const contentType = ctx.headers.get('content-type') ?? CT_JSON;
@@ -148,8 +150,16 @@ export function buildUnaryRpcHandler(
         deadlineTimer = setTimeout(() => deadline.controller.abort(), deadline.timeoutMs);
       }
 
+      // The handler stops at the gRPC deadline and with the HTTP request it
+      // runs in: its client leaving or the request timeout aborts it too. The
+      // link leaves both once the call settles (finally below), so no listener
+      // the handler left on its signal keeps the request alive.
+      if (deadline) {
+        callSignal = new SignalLink([ctx.signal, deadline.controller.signal]);
+      }
+
       // Build context and dispatch directly to the handler
-      const apiCtx = buildDispatchContext(ctx, internalReq, route, params, query, body, signal);
+      const apiCtx = buildDispatchContext(ctx, internalReq, route, params, query, body, callSignal?.signal);
 
       const answered = await runInContext(apiCtx, () => apiHandler(apiCtx));
       // An endpoint that returned nothing answers 204 on HTTP; on this wire it
@@ -189,6 +199,7 @@ export function buildUnaryRpcHandler(
       return handleGrpcError(logger, err, isGrpcWeb, useBinaryResponse, route.responses);
     } finally {
       if (deadlineTimer) clearTimeout(deadlineTimer);
+      callSignal?.release();
     }
   };
 }
