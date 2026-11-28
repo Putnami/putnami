@@ -377,6 +377,7 @@
             "kind": "acceptance",
             "checks": [
               "a-cached-page-waits-for-every-boundary",
+              "a-client-that-leaves-mid-stream-logs-nothing",
               "a-crawler-request-gets-every-head-contribution-in-the-head",
               "a-late-head-tag-is-applied-after-the-root",
               "a-late-style-is-written-before-the-chunk-that-needs-it",

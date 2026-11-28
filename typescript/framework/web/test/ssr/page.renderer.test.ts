@@ -1056,6 +1056,33 @@ describe('page.renderer', () => {
       expect(html).toContain('</body></html>');
     });
 
+    it('still logs a streaming error while its request is open', async () => {
+      // The served stream a departed client stops is proven in
+      // page.renderer.client-leaves.test.ts.
+      const errors: unknown[] = [];
+      const open = new AbortController();
+      const failing = await wrapInHtmlDocument(
+        {
+          allReady: Promise.resolve(),
+          getReader: () => ({
+            read: async () => {
+              throw new DOMException('The connection was closed.', 'AbortError');
+            },
+          }),
+        } as never,
+        new SsrDocumentHelper(),
+        {
+          release: () => {},
+          context: createRouterContext(),
+          hydrateScript: 'hydrate.js',
+          logger: { error: (...args: unknown[]) => errors.push(args) },
+          request: { signal: open.signal },
+        },
+      );
+      expect(await new Response(failing).text()).toContain('<!-- SSR error -->');
+      expect(errors).toHaveLength(1);
+    });
+
     it('keeps a hostile loader return value from breaking out of the hydration <script>', async () => {
       // End-to-end guard: whatever a loader returns is serialized into the inline
       // window.__staticRouterHydrationData script, so a break-out payload there

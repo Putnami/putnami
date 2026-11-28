@@ -72,7 +72,7 @@
     },
     {
       "id": "ssr-streaming",
-      "text": "A browser request receives the head and the React shell once the shell is ready, and each Suspense boundary streams as it resolves. The head holds the contributions known at the shell; an extracted Emotion style a later chunk needs is written before that chunk; other late styles, scripts, and title, meta and link tags are written after the root, the tags by one nonced script. A request whose user agent matches the crawler pattern, and a page whose HTML is cached, wait for every boundary."
+      "text": "A browser request gets the head and the React shell once the shell is ready; each Suspense boundary streams as it resolves. The head holds what is known at the shell; an extracted Emotion style a later chunk needs is written before it; other late styles, scripts, and title, meta and link tags follow the root, the tags in one nonced script. A request whose user agent matches the crawler pattern, and a cached page, wait for every boundary. A client leaving mid-stream logs nothing; other errors are logged."
     },
     {
       "id": "document-isolation",
