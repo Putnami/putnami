@@ -413,7 +413,7 @@ export class HttpPlugin implements Plugin {
       // instead of running on after the 408. The signal is built the first
       // time something reads it: a request that never reads it pays for no
       // controller.
-      const lifetime = deadlines !== undefined ? new ServedRequest(req) : undefined;
+      const lifetime = deadlines !== undefined ? new ServedRequest(req, deadlines) : undefined;
       const context = buildHttpContext<HttpRequestContextInternal>({
         req,
         url: this._rewrites.length > 0 ? this.rewrittenUrl(req) : undefined,
@@ -493,8 +493,8 @@ export class HttpPlugin implements Plugin {
       };
 
       // No async frame of its own: the chain's promise carries the request, and
-      // its answer becomes the response in the continuations below.
-      const executeRequest = (): Promise<Response> => {
+      // its answer becomes the response in the continuation its caller adds.
+      const executeRequest = (): Promise<HttpResponse | undefined> => {
         let middlewareChain: MiddlewareChain;
         let dispatch: () => Promise<HttpResponse | undefined>;
         try {
@@ -527,15 +527,22 @@ export class HttpPlugin implements Plugin {
             return chained.then(undefined, answerChainError);
           }) as Promise<HttpResponse | undefined>;
         } catch (error) {
-          return failRequest(error);
+          return Promise.reject(error);
         }
-        return answered.then(finishRequest, failRequest);
+        return answered;
       };
 
-      if (lifetime === undefined || deadlines === undefined) {
-        return executeRequest();
+      if (lifetime === undefined) {
+        return executeRequest().then(finishRequest, failRequest);
       }
-      return lifetime.answer(deadlines, context, executeRequest);
+      // The promise the deadline also answers. The chain's answer settles it
+      // directly: no promise waits on the response in between.
+      const response = lifetime.start(context);
+      executeRequest().then(
+        (res) => lifetime.settle(finishRequest, res),
+        (error: unknown) => lifetime.settle(failRequest, error),
+      );
+      return response;
     };
 
     // Native routes are served by Bun's own router, ahead of (and bypassing)
@@ -854,6 +861,18 @@ function formatAllowHeader(methods: string[]): string {
 }
 
 /**
+ * The resolving functions of the promise {@link ServedRequest.start} builds,
+ * which it takes at once. One executor serves every request: building the
+ * promise costs no closure, and no object as `Promise.withResolvers()` does.
+ */
+let capturedResolve: ((response: Response) => void) | undefined;
+let capturedReject: ((reason: unknown) => void) | undefined;
+function captureResolvers(resolve: (response: Response) => void, reject: (reason: unknown) => void): void {
+  capturedResolve = resolve;
+  capturedReject = reject;
+}
+
+/**
  * The lifetime of one request served with a deadline, in one object: the
  * signal it builds on first read, its stop, its entry in the shared deadline
  * queue and the answer that the response or the 408 settles first.
@@ -867,11 +886,17 @@ class ServedRequest implements RequestLifetime, RequestDeadline {
   timedOut = false;
   private stopReason: DOMException | undefined = undefined;
   private controller: LinkedAbortController | undefined = undefined;
-  private settle: ((response: Response) => void) | undefined = undefined;
+  /** The resolving functions of the promise the request answers through, from {@link start}. */
+  private resolve: ((response: Response) => void) | undefined = undefined;
+  private reject: ((reason: unknown) => void) | undefined = undefined;
+  private context: HttpRequestContextInternal | undefined = undefined;
   /** The abort listeners, and whether the request follows its client for them. */
   private listeners: Set<() => void> | undefined = undefined;
 
-  constructor(private readonly req: Request) {}
+  constructor(
+    private readonly req: Request,
+    private readonly deadlines: RequestDeadlines,
+  ) {}
 
   /** Whether the request ended: it stopped, or its client left. */
   aborted(): boolean {
@@ -941,36 +966,56 @@ class ServedRequest implements RequestLifetime, RequestDeadline {
   expire(): void {
     this.timedOut = true;
     this.stop();
-    this.settle?.(createJsonErrorResponse(408, 'Request Timeout'));
+    this.resolve?.(createJsonErrorResponse(408, 'Request Timeout'));
   }
 
-  /** One promise answers the request: its response, or the 408 the shared deadline sweeper sends first. */
-  answer(
-    deadlines: RequestDeadlines,
-    context: HttpRequestContextInternal,
-    run: () => Promise<Response>,
-  ): Promise<Response> {
-    return new Promise<Response>((resolve, reject) => {
-      this.settle = resolve;
-      deadlines.enqueue(this);
-      run().then(
-        (response) => {
-          deadlines.remove(this);
-          // The deadline bounded the request until its response. A stream or a
-          // background task that runs on after it is no longer held to it. A
-          // request that never built its signal does not read req.signal here:
-          // requestEnded() reads the signal, which still sees the client leave.
-          if (!this.timedOut && this.stopReason === undefined && !this.controller?.signal.aborted) {
-            context.deadlineAt = undefined;
-          }
-          resolve(response);
-        },
-        (error: unknown) => {
-          deadlines.remove(this);
-          reject(error);
-        },
+  /**
+   * Queues the request on its deadline and gives the promise that answers it:
+   * with the response {@link settle} hands it, or with the 408 the shared
+   * deadline sweeper sends first.
+   */
+  start(context: HttpRequestContextInternal): Promise<Response> {
+    const promise = new Promise<Response>(captureResolvers);
+    this.resolve = capturedResolve;
+    this.reject = capturedReject;
+    capturedResolve = undefined;
+    capturedReject = undefined;
+    this.context = context;
+    this.deadlines.enqueue(this);
+    return promise;
+  }
+
+  /** Answers with what `answer` makes of the chain's outcome, unless the deadline answered first. */
+  settle<T>(answer: (outcome: T) => Response | Promise<Response>, outcome: T): void {
+    try {
+      this.respond(answer(outcome));
+    } catch (error) {
+      this.fail(error);
+    }
+  }
+
+  private respond(response: Response | Promise<Response>): void {
+    if (response instanceof Promise) {
+      response.then(
+        (answered) => this.respond(answered),
+        (error: unknown) => this.fail(error),
       );
-    });
+      return;
+    }
+    this.deadlines.remove(this);
+    // The deadline bounded the request until its response. A stream or a
+    // background task that runs on after it is no longer held to it. A
+    // request that never built its signal does not read req.signal here:
+    // requestEnded() reads the signal, which still sees the client leave.
+    if (!this.timedOut && this.stopReason === undefined && !this.controller?.signal.aborted && this.context) {
+      this.context.deadlineAt = undefined;
+    }
+    this.resolve?.(response);
+  }
+
+  private fail(error: unknown): void {
+    this.deadlines.remove(this);
+    this.reject?.(error);
   }
 }
 
