@@ -16,6 +16,7 @@ import type { HttpResponse } from '@putnami/application';
 import { runInContext } from '../../runtime/src/context/context.utils';
 import RootHtml from '../src/ssr/default.html';
 import { pageRenderer } from '../src/ssr/page.renderer';
+import { createStaticHandlerCache } from '../src/ssr/static-handler.cache';
 
 // ---------------------------------------------------------------------------
 // Helpers (shared shape with application/bench/bench.ts)
@@ -91,18 +92,46 @@ function createMockContext(overrides: Record<string, unknown> = {}) {
   } as never;
 }
 
-/** Render a single route to completion (streams the full document body). */
-async function renderToCompletion(route: Record<string, unknown>): Promise<void> {
-  const handler = pageRenderer(
-    () => [route as never],
+/**
+ * A renderer for a route tree, built once as the application builds one per
+ * page: `cached` gives it the application's static handler cache, otherwise
+ * React Router's static handler is rebuilt on every request.
+ */
+function createRenderer(routes: Record<string, unknown>[], cached = true) {
+  const tree = routes as never[];
+  return pageRenderer(
+    () => tree,
     () => RootHtml,
     () => 'hydrate.js',
     5000,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    cached ? createStaticHandlerCache() : undefined,
   );
+}
+
+/** Render one request to completion (streams the full document body). */
+async function renderToCompletion(handler: ReturnType<typeof createRenderer>): Promise<void> {
   const ctx = createMockContext();
   const response = await runInContext(ctx, async () => (await handler(ctx)) as HttpResponse);
   // Drain the streamed body so we measure render-to-completion, not just TTFB.
   await response?.get().text();
+}
+
+/** A root route with an index page and five sibling pages, as a small application has. */
+function sixRoutes(): Record<string, unknown>[] {
+  const page = (text: string) => React.createElement('div', null, text);
+  return [
+    {
+      path: '/',
+      children: [
+        { index: true, element: page('Hello SSR') },
+        ...['about', 'pricing', 'docs/:slug', 'users/:id', 'settings'].map((path) => ({ path, element: page(path) })),
+      ],
+    },
+  ];
 }
 
 /** A component that re-executes per render (representative of a real page). */
@@ -133,23 +162,20 @@ function Table({ rows }: { rows: number }) {
 async function benchSsrRender(): Promise<BenchResult[]> {
   const results: BenchResult[] = [];
 
-  results.push(
-    await bench('SSR render: minimal page', 5000, () =>
-      renderToCompletion({ path: '/', element: React.createElement('div', null, 'Hello SSR') }),
-    ),
-  );
+  const minimal = createRenderer([{ path: '/', element: React.createElement('div', null, 'Hello SSR') }]);
+  results.push(await bench('SSR render: minimal page', 5000, () => renderToCompletion(minimal)));
 
-  results.push(
-    await bench('SSR render: 100-row table', 3000, () =>
-      renderToCompletion({ path: '/', element: React.createElement(Table, { rows: 100 }) }),
-    ),
-  );
+  const six = createRenderer(sixRoutes());
+  results.push(await bench('SSR render: minimal page, six routes', 5000, () => renderToCompletion(six)));
 
-  results.push(
-    await bench('SSR render: 1000-row table', 800, () =>
-      renderToCompletion({ path: '/', element: React.createElement(Table, { rows: 1000 }) }),
-    ),
-  );
+  const sixUncached = createRenderer(sixRoutes(), false);
+  results.push(await bench('SSR render: six routes, handler per request', 5000, () => renderToCompletion(sixUncached)));
+
+  const table100 = createRenderer([{ path: '/', element: React.createElement(Table, { rows: 100 }) }]);
+  results.push(await bench('SSR render: 100-row table', 3000, () => renderToCompletion(table100)));
+
+  const table1000 = createRenderer([{ path: '/', element: React.createElement(Table, { rows: 1000 }) }]);
+  results.push(await bench('SSR render: 1000-row table', 800, () => renderToCompletion(table1000)));
 
   return results;
 }

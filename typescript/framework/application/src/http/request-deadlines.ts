@@ -27,15 +27,20 @@ export class RequestDeadlines {
 
   /**
    * Queues an entry the caller owns, such as the request itself, so queuing
-   * allocates nothing: it expires `timeoutMs` from now unless removed first.
+   * allocates nothing: it expires `timeoutMs` after `from` (now by default,
+   * or when the request arrived, on the `performance.now()` clock) unless
+   * removed first. An entry never expires before the one queued ahead of it,
+   * so the queue stays in deadline order.
    */
-  enqueue(entry: RequestDeadline): void {
-    entry.at = performance.now() + this.timeoutMs;
-    entry.prev = this.tail;
+  enqueue(entry: RequestDeadline, from: number = performance.now()): void {
+    const at = from + this.timeoutMs;
+    const tail = this.tail;
+    entry.at = tail !== undefined && tail.at > at ? tail.at : at;
+    entry.prev = tail;
     entry.next = undefined;
     entry.queued = true;
-    if (this.tail) {
-      this.tail.next = entry;
+    if (tail) {
+      tail.next = entry;
     } else {
       this.head = entry;
     }

@@ -25,6 +25,7 @@ import type {
 import type { PageCacheOptions } from './page';
 import type { I18nRuntimeOptions } from './i18n/runtime';
 import { pageRenderer } from './page.renderer';
+import type { StaticHandlerCache } from './static-handler.cache';
 import { crawlerPattern, isCrawler } from './crawlers';
 import type { LazyPageData, MiddlewareResolver, ReactModuleCache } from './react-module-cache';
 import type { ReactPluginConfig } from './react-plugin';
@@ -92,6 +93,8 @@ export interface PageRenderContext {
   hydrateScript: () => string;
   /** The application's locales and catalogs, when it is localized. */
   i18n?: () => I18nRuntimeOptions | undefined;
+  /** The application's React Router static handlers, invalidated when its route tree changes. */
+  staticHandlers?: StaticHandlerCache;
 }
 
 /**
@@ -120,6 +123,7 @@ export function createPageRenderer(
     ctx.config.clientFetchTimeout,
     ctx.i18n,
     waitForAll,
+    ctx.staticHandlers,
   );
   // A localized page renders its links and router basename for the origin it
   // is served at, so each origin caches its own HTML.

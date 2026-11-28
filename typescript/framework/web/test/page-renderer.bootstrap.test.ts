@@ -40,7 +40,7 @@ const emptyStream = () =>
 
 async function renderShell(options: { bootstrap?: Record<string, unknown>; clientScripts?: readonly string[] }) {
   const readable = await wrapInHtmlDocument(emptyStream(), new SsrDocumentHelper(), {
-    timeoutId: setTimeout(() => {}, 1000),
+    release: () => {},
     context: routerContext(),
     hydrateScript: 'hydrate.js',
     nonce: NONCE,

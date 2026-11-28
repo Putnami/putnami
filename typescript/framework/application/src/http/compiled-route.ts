@@ -79,6 +79,7 @@ export class CompiledRequest<E> implements RouteContinuation {
   run(dispatcher: RouteDispatcher, handler: RouteHandler<HttpRequestContext>): CompiledAnswer {
     const { ctx, forms, states } = this;
     let depth = 0;
+    let early: HttpResponse | Promise<HttpResponse | undefined> | undefined;
     try {
       for (; depth < forms.length; depth++) {
         const form = forms[depth];
@@ -87,20 +88,23 @@ export class CompiledRequest<E> implements RouteContinuation {
           continue;
         }
         if (form.answer !== undefined) {
-          const early = form.answer(ctx);
-          if (early !== undefined) {
-            if (!(early instanceof Promise)) return this.unwind(depth, early);
-            const at = depth;
-            return early.then(
-              (response) => this.unwind(at, response),
-              (error: unknown) => this.fail(at, error),
-            );
-          }
+          early = form.answer(ctx);
+          if (early !== undefined) break;
         }
         states[depth] = form.enter === undefined ? undefined : form.enter(ctx);
       }
     } catch (error) {
       return this.fail(depth, error);
+    }
+    // An early answer leaves the forms outside the one that gave it, after
+    // the hooks above: what fails from here is not theirs to fail twice.
+    if (early !== undefined) {
+      if (!(early instanceof Promise)) return this.unwind(depth, early);
+      const at = depth;
+      return early.then(
+        (response) => this.unwind(at, response),
+        (error: unknown) => this.fail(at, error),
+      );
     }
     return dispatcher.runRoute(ctx, handler, this);
   }
