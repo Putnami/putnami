@@ -20,8 +20,8 @@
     "@putnami/ui": "workspace:*",
     "@putnami/utils": "workspace:*",
     "@putnami/web": "workspace:*",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
+    "react": "catalog:",
+    "react-dom": "catalog:",
     "typescript": "^6.0.2"
   },
   "devDependencies": {

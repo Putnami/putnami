@@ -71,5 +71,9 @@
     "typescript/samples/13-fullstack-app",
     "typescript/samples/14-capabilities",
     "typescript/templates/proof"
-  ]
+  ],
+  "catalog": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  }
 }
