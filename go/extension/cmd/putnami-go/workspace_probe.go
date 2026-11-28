@@ -798,9 +798,11 @@ func goReplaceTarget(fromDir, toDir string) string {
 // a source file of this module import that module?
 //
 // An edge a source file imports is `go-module` — the build really reads it. An
-// edge only go.mod states is `declared`: the requirement is available to the
-// build and nothing uses it, which is the same standing a putnami.json entry
-// has. The edge SET is unchanged; a require stays an edge until someone removes
+// `// indirect` require or a replace alone that no source imports is
+// `module-graph`: the module graph needs it and the code reads none of it
+// (protocols/workspace ADR 0010). A direct require no source imports is
+// `declared`: the requirement is available to the build and nothing uses it,
+// which is the same standing a putnami.json entry has. The edge SET is unchanged; a require stays an edge until someone removes
 // it from go.mod, and the consumers that act on real imports alone — the
 // visibility check, the declared-edge check — read the attribution rather than
 // re-deriving it. A module with no workspace edge is answered with an empty
@@ -828,14 +830,22 @@ func goDependencySources(c *goCandidate, dependencies []string, byModule map[str
 	sources := make(map[string]wsproto.DependencySource, len(dependencies))
 	for _, dependency := range dependencies {
 		module, known := moduleByPath[dependency]
-		// Two edges are attributed to the module graph without the scan. A
-		// dependency path no candidate module answers to is one this provider
-		// resolved onto a directory it does not know as a module. An
-		// `// indirect` requirement is the module graph's own need rather than
-		// this module's declaration, and `go mod tidy` puts it back. An
-		// unrequired import is not a direct require either, and the scan read it.
-		if !known || !direct[module] || scan.importsModule(module) || slices.Contains(generated, module) {
+		// An edge a source imports, an unrequired import included, is an
+		// import, and so is a require of a module a generated client imports.
+		// A dependency path no candidate module answers to is one this provider
+		// resolved onto a directory it does not know as a module, so it keeps
+		// the import's standing without the scan.
+		if !known || scan.importsModule(module) || slices.Contains(generated, module) {
 			sources[dependency] = wsproto.DependencySourceGoModule
+			continue
+		}
+		// An `// indirect` require, or a replace alone, of a module no source
+		// imports is the module graph's own need: a module-mode build reads only
+		// this go.mod's replaces, so it states every transitive workspace module
+		// it resolves, and `go mod tidy` puts the require back. It backs the
+		// edge, but the module's code reads none of it.
+		if !direct[module] {
+			sources[dependency] = wsproto.DependencySourceModuleGraph
 			continue
 		}
 		sources[dependency] = wsproto.DependencySourceDeclared

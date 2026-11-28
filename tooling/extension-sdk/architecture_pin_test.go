@@ -65,7 +65,6 @@ func authoredExtensionSDKDomain() *arch.Builder {
 				arch.Bind("/tooling/extension-sdk", "/protocols/database"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/diagnostic"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/distribution"),
-				arch.Bind("/tooling/extension-sdk", "/protocols/events"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/extension"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/features"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/gomod"),
@@ -75,7 +74,6 @@ func authoredExtensionSDKDomain() *arch.Builder {
 				arch.Bind("/tooling/extension-sdk", "/protocols/put"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/registry"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/runtime"),
-				arch.Bind("/tooling/extension-sdk", "/protocols/storage"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/workspace"),
 			),
 		)

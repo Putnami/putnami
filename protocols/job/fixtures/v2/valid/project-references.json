@@ -105,6 +105,9 @@
       "type": "application",
       "runsWith": [
         "legacy"
+      ],
+      "moduleGraphDependencies": [
+        "/libs/widget"
       ]
     },
     {

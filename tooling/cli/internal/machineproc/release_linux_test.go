@@ -13,11 +13,13 @@ import (
 )
 
 // processState is the state letter /proc/<pid>/stat gives the process pid,
-// and false once no process has that pid: it ended and was reaped.
+// and false once no process has that pid: it ended and was reaped. A process
+// reaped between the open and the read of its stat file answers ESRCH rather
+// than ENOENT, and is just as gone.
 func processState(t *testing.T, pid int) (byte, bool) {
 	t.Helper()
 	data, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
-	if errors.Is(err, fs.ErrNotExist) {
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ESRCH) {
 		return 0, false
 	}
 	if err != nil {

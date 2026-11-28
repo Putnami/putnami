@@ -306,6 +306,20 @@
           }
         },
         {
+          "id": "module-graph-edges-are-declared-by-the-adapter",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "module-graph-edges-require-dependency-sources",
+              "module-graph-edges-require-contract-31"
+            ]
+          }
+        },
+        {
           "id": "user-scope-skills-are-named-by-the-author",
           "stage": "coded",
           "evidenceKinds": [

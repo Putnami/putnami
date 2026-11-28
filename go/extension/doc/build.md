@@ -391,10 +391,11 @@ the project's files, and kept until one of them changes.
 - **Generate** stays planned: its key reads the project's sources, and every
   dependent reaches them through it.
 
-1. **Tidy** (unless `--skip-deps`). With `--tidy=false`, the default when the
-   `CI` environment variable is set, build runs `go mod tidy -diff` instead and
+1. **Tidy** (unless `--skip-deps`). With `--tidy=false` or `--fix=false`, both
+   the default when the `CI` environment variable is set, build runs
+   `go mod tidy -diff` instead and
    writes neither file: an untidy module fails with the diff and names
-   `putnami build --tidy --projects <project>`
+   `putnami build --tidy --fix --projects <project>`
    ([ADR 0014](adr/0014-a-check-run-in-ci-writes-no-source.md)). Otherwise:
    - Scans Go imports for matches against workspace modules
    - Adds `replace` directives to `go.mod` for workspace dependencies
@@ -415,6 +416,10 @@ the project's files, and kept until one of them changes.
      that only exists after tidy is absent from the release-set plan and
      `package~go` refuses the module. The remedy is to commit `go.mod` and run
      `putnami projects sync` so every dependent's replace closure follows.
+     The replaces and `// indirect` requires that closure adds for modules no
+     source imports are module-graph edges: they order and key the build like
+     any edge, but they are no import, so neither the visibility check nor the
+     architecture contract counts them as a project dependency.
    - Reports a `warning` diagnostic when tidy had to look up a package
      (`go: finding module for package`) or raised a requirement `go.mod`
      already names. This happens when the version `go.mod` requires lacks an
@@ -1041,6 +1046,7 @@ putnami-go gocacheprog: object cache served 182 objects, offered 3
 |------|---------|-------------|
 | `--skip-deps` | `false` | Skip `go mod tidy` and dependency sync |
 | `--tidy` | `true`; `false` when `CI` is set | Run `go mod tidy`. Off, check the module files with `go mod tidy -diff` and fail on a diff |
+| `--fix` | `true`; `false` when `CI` is set | Write the fixes the build owes its sources. Off, build checks the module files as `--tidy=false` does, whatever `--tidy` says, so `putnami lint,test,build --fix=false` writes no source |
 | `--readonly` | `false` | Use `--mod readonly` (same as `--mod readonly`) |
 | `--mod <mode>` | — | Module download mode: `readonly`, `vendor`, or `mod` |
 | `--target` / `-t` | — | Cross-compile for one platform instead of the host: `os/arch` (e.g. `linux/amd64`). Wins over `platforms` |

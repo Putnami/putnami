@@ -107,7 +107,8 @@ func (c AgentContentContribution) Packaged() bool {
 // one that declares async, ProviderMembersContract for a provider operation
 // that declares members, DependencyClosureContract for a command that depends on a
 // command across its project's dependency closure, BuildGraphEdgesContract for
-// a workspace adapter that declares buildGraphEdges, UserScopeSkillsContract for agent content that names
+// a workspace adapter that declares buildGraphEdges, ModuleGraphEdgesContract for
+// one that declares moduleGraphEdges, UserScopeSkillsContract for agent content that names
 // user-scope skills, ProviderContract for a providers section, StepDependencyContract
 // for a command that depends on one step of another command,
 // HostHooksContract for a hostHooks member, ChangedFilesContract
@@ -224,6 +225,11 @@ func RequiredLoadContract(m *Manifest) int {
 	// knows it, whatever origin the manifest loads from.
 	if DeclaresBuildGraphEdges(m) {
 		required = max(required, protocolcli.BuildGraphEdgesContract)
+	}
+	// A module-graph source passes the probe validation only of a reader that
+	// knows it, whatever origin the manifest loads from.
+	if DeclaresModuleGraphEdges(m) {
+		required = max(required, protocolcli.ModuleGraphEdgesContract)
 	}
 	// A provider is reached only through a reader that calls its operations,
 	// whatever origin the manifest loads from.

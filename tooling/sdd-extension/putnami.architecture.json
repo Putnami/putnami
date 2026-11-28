@@ -101,37 +101,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/codehost"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
           "producerProject": "/protocols/contracts"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -151,42 +126,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
           "producerProject": "/protocols/job"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/registry"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
           "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/sdd-extension",
-          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",

@@ -344,25 +344,35 @@ func backedTargets(ws *Workspace, project *Project, assets map[string][]string) 
 			backed[target] = true
 		}
 	}
+	for target := range inputReadTargets(ws, project, assets) {
+		backed[target] = true
+	}
+	return backed
+}
+
+// inputReadTargets collects the project IDs this project reads through a file
+// input it declares inside them (DeclaredInputRoots and its asset roots).
+func inputReadTargets(ws *Workspace, project *Project, assets map[string][]string) map[string]bool {
 	declared := model.DeclaredInputRoots(project)
 	roots := make([]string, 0, len(declared)+len(assets[project.ID]))
 	roots = append(roots, declared...)
 	roots = append(roots, assets[project.ID]...)
+	read := map[string]bool{}
 	if len(roots) == 0 {
-		return backed
+		return read
 	}
 	for _, target := range ws.Projects {
-		if target == nil || target.ID == project.ID || backed[target.ID] {
+		if target == nil || target.ID == project.ID {
 			continue
 		}
 		for _, root := range roots {
 			if model.InputRootReadsProject(root, target.Path) {
-				backed[target.ID] = true
+				read[target.ID] = true
 				break
 			}
 		}
 	}
-	return backed
+	return read
 }
 
 // authoredDependencySet is the putnami.json `dependencies` list, in the exact
@@ -471,4 +481,68 @@ func declaredEdgesRefusal(findings []diag.Diagnostic) *wsproto.ProbeFailure {
 		len(findings), declaredEdgesOptionNamespace, declaredEdgesOptionKey, DeclaredEdgesModeEnforce)
 	failure.Diagnostics = append(failure.Diagnostics, findings...)
 	return failure
+}
+
+// ModuleGraphDependencies returns, per project ID, the sorted ids of the
+// project's direct dependencies that only its module graph needs: an entry
+// that reaches the target is attributed to module-graph (a Go `// indirect`
+// require or a replace alone that no source imports), and nothing else states
+// or reads it. A project with none is absent from the map.
+//
+// One other backing is enough to keep a target out: an entry its putnami.json
+// authors, even one a provider's module-graph entry merged into; an import or
+// an entry no provider attributed; a contract edge; or a file input the
+// project declares inside the target. Each states a dependency the module
+// graph does not explain. The edge itself stays in the graph; this answers
+// which edges a rule about what the code reads leaves out.
+func ModuleGraphDependencies(ws *Workspace) map[string][]string {
+	if ws == nil {
+		return nil
+	}
+	var assets map[string][]string
+	out := map[string][]string{}
+	for _, project := range ws.Projects {
+		if project == nil || len(project.DependencySources) == 0 {
+			continue
+		}
+		moduleGraph := map[string]bool{}
+		other := map[string]bool{}
+		authored := authoredDependencySet(project)
+		for _, entry := range project.Dependencies {
+			target := dependencyTargetID(ws, entry)
+			if target == "" || target == project.ID {
+				continue
+			}
+			if project.DependencySources[entry] == wsproto.DependencySourceModuleGraph && !authored[entry] {
+				moduleGraph[target] = true
+			} else {
+				other[target] = true
+			}
+		}
+		if len(moduleGraph) == 0 {
+			continue
+		}
+		if ws.Graph != nil {
+			if provider := ws.Graph.ContractProviderOf(project.ID); provider != "" {
+				other[provider] = true
+			}
+		}
+		if assets == nil {
+			assets = CollectProjectAssetPaths(ws)
+		}
+		for target := range inputReadTargets(ws, project, assets) {
+			other[target] = true
+		}
+		var ids []string
+		for target := range moduleGraph {
+			if !other[target] {
+				ids = append(ids, target)
+			}
+		}
+		if len(ids) > 0 {
+			sort.Strings(ids)
+			out[project.ID] = ids
+		}
+	}
+	return out
 }

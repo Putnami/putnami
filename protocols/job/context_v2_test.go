@@ -155,6 +155,8 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 		"selectedProjects[0].extensions",
 		"selectedProjects[0].type",
 		"selectedProjects[0].runsWith",
+		"selectedProjects[0].moduleGraphDependencies",
+		"workspaceProjects[0].moduleGraphDependencies",
 		"workspaceProjects",
 		"workspaceProjects[1].path",
 		"userScope",

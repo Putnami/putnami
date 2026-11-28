@@ -63,6 +63,37 @@ func TestDetectProjectDependenciesReportsOnlyMappedCrossDomainEdges(t *testing.T
 	}
 }
 
+// A dependency only the consumer's module graph needs, a Go `// indirect`
+// require or a replace alone that no source imports, is no project dependency:
+// making a module tidy must not raise an architecture finding for a module its
+// code never reads. The same edge an import backs is still observed.
+func TestDetectProjectDependenciesSkipsAModuleGraphDependency(t *testing.T) {
+	spectest.Proves(t, "architecture/executable-contracts", "exact-drift", "a-module-graph-dependency-is-no-observed-edge")
+	sources := []archproto.ManifestSource{
+		{Path: "producer/" + archproto.ManifestFilename, Manifest: mustParseArchitectureManifest(t, architectureProducerManifest())},
+		{Path: "consumer/" + archproto.ManifestFilename, Manifest: mustParseArchitectureManifest(t, architectureConsumerManifest(true))},
+	}
+	for _, test := range []struct {
+		name        string
+		moduleGraph []string
+		want        int
+	}{
+		{name: "a module-graph dependency", moduleGraph: []string{"/producer"}, want: 0},
+		{name: "an imported dependency", want: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ws := workspace.NewWorkspace("/workspace", &wsproto.Config{Name: "architecture-test"}, []*workspace.Project{
+				{ID: "/producer", Name: "producer", Path: "producer"},
+				{ID: "/consumer", Name: "consumer", Path: "consumer", Dependencies: []string{"/producer"},
+					ModuleGraphDependencies: test.moduleGraph},
+			})
+			if edges := DetectProjectDependencies(ws, sources); len(edges) != test.want {
+				t.Fatalf("observed edges = %+v, want %d", edges, test.want)
+			}
+		})
+	}
+}
+
 func TestEvaluateWorkspaceUsesOneDeclaredObservedInterpretation(t *testing.T) {
 	for _, test := range []struct {
 		name         string

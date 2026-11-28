@@ -73,7 +73,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "an-observed-edge-needs-an-exact-consumer-to-producer-declaration"
+              "an-observed-edge-needs-an-exact-consumer-to-producer-declaration",
+              "a-module-graph-dependency-is-no-observed-edge"
             ]
           }
         },

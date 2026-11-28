@@ -104,6 +104,13 @@ type WorkspaceAdapter struct {
 	// (protocolcli.BuildGraphEdgesContract), so a CLI that predates the source
 	// refuses the manifest instead of rejecting every answer that names it.
 	BuildGraphEdges bool `json:"buildGraphEdges,omitempty"`
+	// ModuleGraphEdges declares that the probe attributes edges to
+	// module-graph: the edges a module graph needs and no source of the
+	// project imports, such as a Go `// indirect` require or a replace alone.
+	// It requires DependencySources, and contract 31
+	// (protocolcli.ModuleGraphEdgesContract), so a CLI that predates the source
+	// refuses the manifest instead of rejecting every answer that names it.
+	ModuleGraphEdges bool `json:"moduleGraphEdges,omitempty"`
 	// InstallInputs are the files whose content change makes the installed
 	// tree stale: a lockfile, or a file that names the modules an install
 	// prepares ("bun.lock", "uv.lock", "go.work"). Each one is a literal file
@@ -233,6 +240,11 @@ func ValidateWorkspaceAdapter(m *Manifest) []diag.Diagnostic {
 			"workspace.buildGraphEdges needs workspace.dependencySources: core asks for edge provenance only "+
 				"from an adapter that declares it"))
 	}
+	if adapter.ModuleGraphEdges && !adapter.DependencySources {
+		diags = append(diags, diag.Errorf("module-graph-without-dependency-sources", "workspace.moduleGraphEdges",
+			"workspace.moduleGraphEdges needs workspace.dependencySources: core asks for edge provenance only "+
+				"from an adapter that declares it"))
+	}
 
 	return diags
 }
@@ -242,6 +254,13 @@ func ValidateWorkspaceAdapter(m *Manifest) []diag.Diagnostic {
 // protocolcli.BuildGraphEdgesContract.
 func DeclaresBuildGraphEdges(m *Manifest) bool {
 	return m != nil && m.Workspace != nil && m.Workspace.BuildGraphEdges
+}
+
+// DeclaresModuleGraphEdges reports whether the manifest's workspace adapter
+// attributes edges to module-graph, which requires
+// protocolcli.ModuleGraphEdgesContract.
+func DeclaresModuleGraphEdges(m *Manifest) bool {
+	return m != nil && m.Workspace != nil && m.Workspace.ModuleGraphEdges
 }
 
 // validatePatternSet checks one pattern list and returns its normalized

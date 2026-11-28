@@ -41,7 +41,8 @@
       "id": "exact-drift",
       "text": [
         "The v1 detector compares exact consumer-project to producer-project edges only when both projects map to declared domains;",
-        "a domain-pair match cannot authorize additional dependencies."
+        "a domain-pair match cannot authorize additional dependencies.",
+        "A dependency only the consumer's module graph needs, which none of its sources imports, is no project dependency."
       ]
     },
     {

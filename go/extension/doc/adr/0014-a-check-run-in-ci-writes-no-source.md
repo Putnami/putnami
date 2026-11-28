@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-10-27
 - **Scope**: `@putnami/go` (`go/extension`): the `fix` flag of `lint`, the
-  `tidy` flag and the `tidy-check` step of `build`, and the
+  `tidy` and `fix` flags and the `tidy-check` step of `build`, and the
   `build-tidy-check` task
 
 ## Context
@@ -31,10 +31,18 @@ issue gives a green run and a diff to commit.
    Off, build runs `build-tidy-check` instead of `build-tidy`: `go mod tidy
    -diff` reports the change tidy would make and writes nothing. A diff fails
    the task, carries the diff, and names
-   `putnami build --tidy --projects <project>`.
+   `putnami build --tidy --fix --projects <project>`.
 3. With module downloads disabled, the check is the same no-op as tidy. A check
    that cannot resolve the module graph is a warning and an uncacheable skip,
    like a failed tidy.
+
+## Amendment (2026-11-27)
+
+`build --fix` is a flag too, `true` by default and `false` with `CI` set, so a
+`lint,test,build --fix=false` gate writes no source either: build runs
+`build-tidy` only when both `--tidy` and `--fix` hold, and `build-tidy-check`
+otherwise. The remedy the check names sets both flags, so it tidies with `CI`
+set as well, where both default to `false`.
 
 ## Consequences
 

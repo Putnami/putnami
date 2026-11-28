@@ -448,6 +448,21 @@ type ProjectRef struct {
 	// whose producer resolves every project's list, an entry without RunsWith
 	// runs with nothing. v2 only, for the reason Config is.
 	RunsWith []string `json:"runsWith,omitempty"`
+	// ModuleGraphDependencies are the ids among Dependencies whose provider
+	// attributed the edge to module-graph (protocols/workspace ADR 0010): a
+	// module graph needs them, such as a Go `// indirect` require or a replace
+	// alone, and no source of the project imports them. Sorted and unique.
+	//
+	// The edge stays in Dependencies, since impact, ordering and cache keys
+	// follow it. This member is what lets a rule about what the project's code
+	// depends on, the architecture contract's project dependencies, leave
+	// those edges out without re-reading the provider's manifests.
+	//
+	// The orchestrator populates it on WorkspaceProjects, as RunsWith. Inside
+	// WorkspaceProjects an entry without it names none: either no edge of the
+	// project is such an edge, or the CLI predates the member and every edge
+	// keeps the standing it had. v2 only, for the reason Config is.
+	ModuleGraphDependencies []string `json:"moduleGraphDependencies,omitempty"`
 }
 
 // GetBinString returns the bin field as a string if it's a simple string value.

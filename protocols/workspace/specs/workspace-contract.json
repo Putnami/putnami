@@ -143,10 +143,10 @@
     {
       "id": "dependency-sources-attribute-each-edge",
       "text": [
-        "dependencySources attributes a reported edge to go-module, package-json, build-graph (a delegated build tool's own graph) or declared;",
-        "an unnamed edge is declared. build-graph backs an edge as an import does, but only an import crosses visibility.",
-        "It is answered only to a request that asks for it, and an empty map stays an answer.",
-        "Normalization drops provenance for an edge the project does not report, the digest moves with provenance, and a merge prefers the import in any provider order."
+        "dependencySources attributes a reported edge to go-module, package-json, build-graph (a delegated build tool's graph), module-graph (a module graph's need) or declared;",
+        "an unnamed edge is declared. build-graph and module-graph back an edge as an import does, and only an import crosses visibility.",
+        "It is answered only when asked, and an empty map stays an answer.",
+        "Normalization drops provenance for an edge the project does not report, the digest moves with it, and a merge prefers the import in any order."
       ]
     },
     {
@@ -256,6 +256,7 @@
     "protocols/workspace/doc/adr/0003-extensions-answer-toolchain-pins.md",
     "protocols/workspace/doc/adr/0004-extensions-expand-their-input-selectors.md",
     "protocols/workspace/doc/adr/0005-the-docker-registry-flag-overrides-the-oci-registry.md",
-    "protocols/workspace/doc/adr/0006-a-host-with-no-archive-keeps-the-committed-pin.md"
+    "protocols/workspace/doc/adr/0006-a-host-with-no-archive-keeps-the-committed-pin.md",
+    "protocols/workspace/doc/adr/0010-a-module-graph-edge-is-no-import.md"
   ]
 }

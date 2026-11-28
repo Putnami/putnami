@@ -418,7 +418,16 @@ const RuntimeEntriesContract = 29
 // member, so it refuses the stamp instead.
 const SelectionFreeTaskContract = 30
 
+// ModuleGraphEdgesContract is required by a manifest whose workspace adapter
+// declares `moduleGraphEdges`: its probe attributes edges to module-graph, the
+// source of an edge a module graph needs and no source of the project imports.
+// A reader at this contract accepts that source in a probe answer and keeps
+// those edges out of the architecture contract's project dependencies, so an
+// older reader, which would reject every answer that names it, refuses the
+// stamp instead.
+const ModuleGraphEdgesContract = 31
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = SelectionFreeTaskContract
+const LatestContract = ModuleGraphEdgesContract

@@ -1,0 +1,58 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/p/~build",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {
+    "name": "putnami"
+  },
+  "project": {
+    "name": "p",
+    "path": "p",
+    "fullPath": "/ws/p"
+  },
+  "extension": {
+    "name": "@putnami/go",
+    "root": "/ws/go/extension"
+  },
+  "job": {
+    "name": "build"
+  },
+  "identity": {
+    "key": "/p:build",
+    "scope": "project",
+    "project": {
+      "id": "/p",
+      "name": "p"
+    },
+    "task": {
+      "name": "build",
+      "command": "build",
+      "kind": "build"
+    },
+    "provider": {
+      "extension": "@putnami/go"
+    }
+  },
+  "params": {},
+  "workspaceProjects": [
+    {
+      "id": "/a",
+      "name": "a",
+      "path": "a",
+      "fullPath": "/ws/a",
+      "dependencies": [
+        "/b"
+      ],
+      "moduleGraphDependencies": [
+        "/c"
+      ]
+    },
+    {
+      "id": "/b",
+      "name": "b",
+      "path": "b",
+      "fullPath": "/ws/b"
+    }
+  ]
+}

@@ -82,16 +82,6 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
           "producerProject": "/protocols/cli"
         },
         {
@@ -107,22 +97,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -137,32 +112,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
           "producerProject": "/protocols/job"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/registry"
         },
         {
           "kind": "project-dependency",
@@ -173,11 +123,6 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/contributor",
           "producerProject": "/protocols/screenshots"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/contributor",
-          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",

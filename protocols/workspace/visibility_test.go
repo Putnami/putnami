@@ -72,6 +72,8 @@ func TestStrongerDependencySourcePrefersAnImportAndIsOrderIndependent(t *testing
 		{DependencySourceBuildGraph, DependencySourceDeclared, DependencySourceBuildGraph},
 		{DependencySourceGoModule, DependencySourceBuildGraph, DependencySourceGoModule},
 		{DependencySourceBuildGraph, DependencySourcePackageJSON, DependencySourcePackageJSON},
+		{DependencySourceDeclared, DependencySourceModuleGraph, DependencySourceModuleGraph},
+		{DependencySourceModuleGraph, DependencySourceGoModule, DependencySourceGoModule},
 	}
 	for _, tc := range cases {
 		if got := StrongerDependencySource(tc.a, tc.b); got != tc.want {
@@ -212,5 +214,24 @@ func TestProjectConfigCarriesDistributionVisibility(t *testing.T) {
 	}
 	if _, diags := ParseAndValidateScopeConfig([]byte(`{"tags":["x"],"distribution":{"visibility":"world"}}`)); !diag.HasErrors(diags) {
 		t.Error("a scope with an unknown distribution level was accepted")
+	}
+}
+
+// A module-graph edge is a module graph's own need: it backs the edge, so the
+// declared-edge check never calls it a phantom, and it is no import, so the
+// visibility check does not judge it.
+func TestModuleGraphEdgeBacksWithoutCrossingVisibility(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "dependency-sources-attribute-each-edge", "a-module-graph-edge-backs-without-crossing-visibility")
+	if DependencySourceModuleGraph.IsImport() || !DependencySourceModuleGraph.Backs() ||
+		!DependencySourceModuleGraph.ReportableByProvider() || !DependencySourceModuleGraph.Valid() {
+		t.Error("a module-graph edge backs the edge, is no import, and a provider may report it")
+	}
+	project := &ProbeProject{
+		Path:              "consumer",
+		Dependencies:      []string{"transitive"},
+		DependencySources: map[string]DependencySource{"transitive": DependencySourceModuleGraph},
+	}
+	if diags := validateDependencySources("projects[0].dependencySources", project); len(diags) != 0 {
+		t.Errorf("a provider's module-graph attribution reports %v", diags)
 	}
 }

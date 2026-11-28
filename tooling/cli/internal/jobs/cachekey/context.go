@@ -56,6 +56,12 @@ type JobContextProjectRef struct {
 	// manifest declares without reading Config, which holds only the authored
 	// list.
 	RunsWith []string `json:"runsWith,omitempty"`
+	// ModuleGraphDependencies are the ids among Dependencies that only the
+	// project's module graph needs: its provider attributed every entry that
+	// reaches them to module-graph. Set on workspaceProjects only, as Config
+	// is, so the architecture contract leaves those edges out of the project
+	// dependencies it observes.
+	ModuleGraphDependencies []string `json:"moduleGraphDependencies,omitempty"`
 }
 
 // JobContextVersion describes the computed version metadata in the context file.
@@ -300,6 +306,7 @@ func NewWorkspaceMembership(ws *workspace.Workspace) *WorkspaceMembership {
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i].ID < members[j].ID })
 	refs := make([]JobContextProjectRef, 0, len(members))
+	moduleGraph := workspace.ModuleGraphDependencies(ws)
 	for _, project := range members {
 		refs = append(refs, JobContextProjectRef{
 			ID:         project.ID,
@@ -317,6 +324,9 @@ func NewWorkspaceMembership(ws *workspace.Workspace) *WorkspaceMembership {
 			// none, because a producer that publishes the membership has already
 			// resolved the graph.
 			Dependencies: DirectDependencyIDs(ws, project),
+			// The direct edges no source of the project reads (protocols/
+			// workspace ADR 0010). They stay in Dependencies above.
+			ModuleGraphDependencies: moduleGraphDependencyIDs(ws, project, moduleGraph[project.ID]),
 		})
 	}
 	return &WorkspaceMembership{projects: members, refs: refs}
@@ -387,6 +397,17 @@ func DirectDependencyIDs(ws *workspace.Workspace, project *workspace.Project) []
 	ids := append([]string(nil), deps...)
 	sort.Strings(ids)
 	return ids
+}
+
+// moduleGraphDependencyIDs keeps, of the project's module-graph dependencies,
+// those its resolved direct edges carry, so the member is a subset of
+// Dependencies as the job contract requires.
+func moduleGraphDependencyIDs(ws *workspace.Workspace, project *workspace.Project, candidates []string) []string {
+	if len(candidates) == 0 {
+		return nil
+	}
+	direct := DirectDependencyIDs(ws, project)
+	return slices.DeleteFunc(slices.Clone(candidates), func(id string) bool { return !slices.Contains(direct, id) })
 }
 
 // ProjectDependencyClosure returns the project's in-workspace dependency

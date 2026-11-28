@@ -152,6 +152,12 @@ type Project struct {
 	Publish      []string
 	Extensions   []string
 	RunsWith     []string
+	// ModuleGraphDependencies are the ids among the resolved dependencies that
+	// only the project's module graph needs (protocols/workspace ADR 0010), as
+	// the job context's workspaceProjects names them. Their edges stay in the
+	// graph; the architecture detector leaves them out of the project
+	// dependencies it observes, since no source of the project reads them.
+	ModuleGraphDependencies []string
 	// ActivatedScope and ScopeIncludes carry a scope-self project's membership,
 	// so BuildGraph can add the same implicit include→scope edges core adds.
 	// Nothing on the wire supplies them.
@@ -296,6 +302,9 @@ func FromContext(ctx *pctx.Context) (ws *Workspace, scoped bool) {
 			// applies an extension-keyed option block to that extension's
 			// projects only.
 			Extensions: append([]string(nil), ref.Extensions...),
+			// The edges only the module graph needs, which the architecture
+			// detector does not count as project dependencies.
+			ModuleGraphDependencies: append([]string(nil), ref.ModuleGraphDependencies...),
 		})
 	}
 	if len(projects) == 0 {

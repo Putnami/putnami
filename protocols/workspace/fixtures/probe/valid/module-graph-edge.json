@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "projects": [
+    {
+      "path": "billing/api",
+      "sourceName": "example.com/billing/api",
+      "sourceFile": "billing/api/go.mod",
+      "dependencies": ["billing/core", "identity/client"],
+      "dependencySources": { "billing/core": "go-module", "identity/client": "module-graph" }
+    },
+    { "path": "billing/core", "sourceName": "example.com/billing/core", "sourceFile": "billing/core/go.mod" },
+    { "path": "identity/client", "sourceName": "example.com/identity/client", "sourceFile": "identity/client/go.mod" }
+  ]
+}

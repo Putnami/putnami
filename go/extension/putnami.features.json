@@ -405,7 +405,8 @@
               "with-ci-set-lint-and-build-schedule-no-step-that-writes-sources",
               "an-untidy-module-fails-the-check-and-names-the-command-that-tidies-it",
               "a-tidy-module-passes-the-check",
-              "a-read-only-lint-failure-names-the-command-that-applies-the-fixes"
+              "a-read-only-lint-failure-names-the-command-that-applies-the-fixes",
+              "fix-false-builds-without-writing-go-mod"
             ]
           }
         },
@@ -513,7 +514,8 @@
               "a-directory-without-the-marker-is-not-a-project",
               "a-manifest-with-no-module-warns-and-is-skipped",
               "a-project-is-classified-by-its-main-package",
-              "a-main-the-build-never-links-does-not-classify-the-project"
+              "a-main-the-build-never-links-does-not-classify-the-project",
+              "an-indirect-or-replace-only-edge-is-attributed-to-the-module-graph"
             ]
           }
         },

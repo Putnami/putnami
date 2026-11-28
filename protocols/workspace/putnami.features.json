@@ -254,7 +254,8 @@
             "checks": [
               "an-edge-is-attributed-to-its-manifest-family",
               "a-merge-prefers-the-import-in-any-order",
-              "dependency-sources-are-answered-only-when-asked"
+              "dependency-sources-are-answered-only-when-asked",
+              "a-module-graph-edge-backs-without-crossing-visibility"
             ]
           }
         },

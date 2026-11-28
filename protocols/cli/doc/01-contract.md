@@ -379,6 +379,17 @@ selected project, so one cache entry serves every selection. A reader below
 30 refuses the member, so it refuses the stamp instead. The floor binds a
 manifest wherever it loads from. Only a manifest with such a task is stamped
 30.
+Contract `31` (`ModuleGraphEdgesContract`) is additive for a workspace adapter
+that declares `moduleGraphEdges`: its probe attributes edges to
+`module-graph`, the source of an edge a module graph needs and no source of
+the project imports, such as a Go `// indirect` require or a replace alone.
+From 31 on, the CLI accepts that source in a probe answer, names those edges in
+the job context's `workspaceProjects[].moduleGraphDependencies`, and the
+architecture contract does not count them as project dependencies
+(workspace protocol ADR 0010). A reader below 31 would reject every probe
+answer that names the source, so it refuses the stamp instead. The floor binds
+a manifest wherever it loads from. Only a manifest whose adapter declares the
+member is stamped 31.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

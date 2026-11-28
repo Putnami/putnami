@@ -227,46 +227,6 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/clientgen-extension",
           "producerProject": "/go/framework/api"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/go/framework/app"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/go/framework/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/go/framework/errors"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/go/framework/http"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/go/framework/inject"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/go/framework/logger"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/go/framework/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/go/framework/schema"
         }
       ],
       "justification": "The workspace client extension packages the Go framework's own generator command and invokes that pinned emitter; it does not maintain a second Go emitter or resolve source from the consumer checkout."
@@ -298,11 +258,6 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/extension",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/extension",
           "producerProject": "/protocols/cli"
         },
         {
@@ -324,11 +279,6 @@
           "kind": "project-dependency",
           "consumerProject": "/go/extension",
           "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/extension",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -368,27 +318,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/extension",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/extension",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/extension",
           "producerProject": "/protocols/registry"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/extension",
           "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/extension",
-          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",
@@ -403,37 +338,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/python/extension",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
           "producerProject": "/protocols/cli"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/python/extension",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -448,32 +358,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/python/extension",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
           "producerProject": "/protocols/job"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
-          "producerProject": "/protocols/registry"
         },
         {
           "kind": "project-dependency",
@@ -483,27 +368,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/python/extension",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/python/extension",
           "producerProject": "/protocols/workspace"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/cli"
         },
         {
           "kind": "project-dependency",
@@ -513,32 +378,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -553,77 +393,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
           "producerProject": "/protocols/job"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/platform"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
           "producerProject": "/protocols/registry"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/clientgen-extension",
-          "producerProject": "/protocols/workspace"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -638,22 +413,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -668,57 +428,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/job"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/registry"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
           "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/github-collaboration",
-          "producerProject": "/protocols/workspace"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -733,22 +443,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -763,57 +458,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/job"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/registry"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
           "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/gitlab-collaboration",
-          "producerProject": "/protocols/workspace"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -828,22 +473,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -858,57 +488,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/job"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/registry"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
           "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/jira-collaboration",
-          "producerProject": "/protocols/workspace"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -923,22 +503,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -953,57 +518,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/job"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/registry"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
           "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/linear-collaboration",
-          "producerProject": "/protocols/workspace"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -1018,22 +533,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -1048,57 +548,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/job"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/registry"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
           "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/local-collaboration",
-          "producerProject": "/protocols/workspace"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -1113,22 +563,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -1143,62 +578,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/job"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/registry"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
           "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/memory-store",
-          "producerProject": "/protocols/workspace"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/cli"
         },
         {
           "kind": "project-dependency",
@@ -1208,27 +588,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/collaboration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -1248,42 +608,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
           "producerProject": "/protocols/job"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/registry"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/observe",
-          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",
@@ -1293,37 +618,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
           "producerProject": "/protocols/cli"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/distribution"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -1334,46 +634,6 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/scaffold",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/gomod"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/job"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/registry"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/scaffold",
-          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",
@@ -1388,22 +648,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/extension",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/typescript/extension",
           "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/extension",
           "producerProject": "/protocols/cli"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/typescript/extension",
-          "producerProject": "/protocols/database"
         },
         {
           "kind": "project-dependency",
@@ -1418,22 +668,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/extension",
-          "producerProject": "/protocols/events"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/typescript/extension",
           "producerProject": "/protocols/extension"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/extension",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/typescript/extension",
-          "producerProject": "/protocols/gomod"
         },
         {
           "kind": "project-dependency",
@@ -1453,27 +693,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/extension",
-          "producerProject": "/protocols/oci"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/typescript/extension",
-          "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/typescript/extension",
           "producerProject": "/protocols/registry"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/extension",
           "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/typescript/extension",
-          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",

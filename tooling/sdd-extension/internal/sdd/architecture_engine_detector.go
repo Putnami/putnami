@@ -1,6 +1,7 @@
 package sdd
 
 import (
+	"slices"
 	"sort"
 
 	archproto "go.putnami.dev/protocol/architecture"
@@ -9,7 +10,11 @@ import (
 
 // DetectProjectDependencies extracts exact cross-domain dependencies from the
 // already-resolved Putnami graph. Edges with an unmapped endpoint stay outside
-// v1 coverage rather than being guessed from paths or names.
+// v1 coverage rather than being guessed from paths or names. An edge only the
+// consumer's module graph needs, such as a Go `// indirect` require or a
+// replace alone that no source imports, is no project dependency: the
+// consumer's code reads none of it, and its own dependency that does import
+// the module is observed on its own.
 func DetectProjectDependencies(ws *workspace.Workspace, sources []archproto.ManifestSource) []archproto.ObservedEdge {
 	if ws == nil || ws.Graph == nil {
 		return nil
@@ -33,6 +38,9 @@ func DetectProjectDependencies(ws *workspace.Workspace, sources []archproto.Mani
 			continue
 		}
 		for _, producerID := range ws.Graph.DependenciesOf(consumer.ID) {
+			if slices.Contains(consumer.ModuleGraphDependencies, producerID) {
+				continue
+			}
 			producerDomain, mapped := domainByProject[producerID]
 			if !mapped || producerDomain == consumerDomain {
 				continue

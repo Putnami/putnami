@@ -2970,6 +2970,69 @@ func TestWithCISetLintAndBuildScheduleNoStepThatWritesSources(t *testing.T) {
 	}
 }
 
+// TestFixFalseBuildsWithoutWritingGoMod pins that --fix=false, the flag a
+// `lint,test,build --fix=false` gate passes to every command, selects the
+// read-only module check outside CI too, even with --tidy set: a gate run on a
+// developer's machine must not rewrite go.mod or go.sum of a module it did not
+// touch. The flag keys no task, since only the step selection reads it.
+func TestFixFalseBuildsWithoutWritingGoMod(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "a-check-run-writes-no-source",
+		"fix-false-builds-without-writing-go-mod")
+	m := loadExtensionManifest(t)
+	build := m.Commands["build"]
+	flag, declared := build.Flags["fix"]
+	if !declared {
+		t.Fatal("build declares no --fix flag; `lint,test,build --fix=false` would leave its tidy writing go.mod")
+	}
+	if flag.DefaultFor(false) != true || flag.DefaultFor(true) != false {
+		t.Errorf("build --fix defaults = %v locally, %v with CI; want true and false, as lint --fix",
+			flag.DefaultFor(false), flag.DefaultFor(true))
+	}
+	scheduled := func(params proto.ParamMap) []string {
+		var tasks []string
+		for _, step := range build.Run {
+			if !strings.HasPrefix(step.Task, "build-tidy") {
+				continue
+			}
+			active, valid := proto.EvaluateExpressionChecked(step.If, &proto.WhenContext{Params: params})
+			if !valid {
+				t.Fatalf("build step %s: condition %q does not resolve on %v", step.ID, step.If, params)
+			}
+			if active {
+				tasks = append(tasks, step.Task)
+			}
+		}
+		return tasks
+	}
+	for _, test := range []struct {
+		name   string
+		params proto.ParamMap
+		want   []string
+	}{
+		{"--fix=false", proto.ParamMap{"skip-deps": false, "tidy": true, "fix": false}, []string{"build-tidy-check"}},
+		{"--fix=false --tidy=false", proto.ParamMap{"skip-deps": false, "tidy": false, "fix": false}, []string{"build-tidy-check"}},
+		{"--tidy=false", proto.ParamMap{"skip-deps": false, "tidy": false, "fix": true}, []string{"build-tidy-check"}},
+		{"the local defaults", proto.ParamMap{"skip-deps": false, "tidy": true, "fix": true}, []string{"build-tidy"}},
+		// The remedy the tidy check names sets both flags, so it tidies with
+		// CI set too, where both default to false.
+		{"the named remedy --tidy --fix", proto.ParamMap{"skip-deps": false, "tidy": true, "fix": true}, []string{"build-tidy"}},
+		{"--tidy alone with CI set", proto.ParamMap{"skip-deps": false, "tidy": true, "fix": flag.DefaultFor(true)}, []string{"build-tidy-check"}},
+		{"--skip-deps --fix=false", proto.ParamMap{"skip-deps": true, "tidy": true, "fix": false}, nil},
+	} {
+		if got := scheduled(test.params); !slices.Equal(got, test.want) {
+			t.Errorf("%s: build schedules %v, want %v", test.name, got, test.want)
+		}
+	}
+	for name, task := range m.Tasks {
+		if !strings.HasPrefix(name, "build-") {
+			continue
+		}
+		if _, keyed := task.Inputs["fix"]; keyed {
+			t.Errorf("%s keys on --fix; the flag selects a step and keys none", name)
+		}
+	}
+}
+
 // TestLifecycleCommandsWaitForClientGeneration pins that every command that
 // compiles, checks, serves or packages a project first runs that project's
 // client-generate: a generated client project builds its client from the

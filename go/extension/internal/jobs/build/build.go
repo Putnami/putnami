@@ -830,7 +830,7 @@ func tidyCheckMessage(project, projectDir, diff string) string {
 	if module == "" {
 		module = filepath.Base(projectDir)
 	}
-	return fmt.Sprintf("go.mod or go.sum of %s is not tidy: run `putnami build --tidy --projects %s` and commit the result\n%s",
+	return fmt.Sprintf("go.mod or go.sum of %s is not tidy: run `putnami build --tidy --fix --projects %s` and commit the result\n%s",
 		module, project, strings.TrimSpace(diff))
 }
 

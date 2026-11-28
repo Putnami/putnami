@@ -249,6 +249,50 @@ func TestProbe_AttributesAnUnimportedRequireAsADeclaration(t *testing.T) {
 	}
 }
 
+// An `// indirect` require or a replace alone, of a workspace module no source
+// imports, is the module graph's own need: a module-mode build reads only this
+// go.mod's replaces, so it states each transitive workspace module, and tidy
+// puts the require back. It is attributed to module-graph, which backs the edge
+// without counting as an import, so neither visibility nor the architecture
+// contract judges it. The edge set is unchanged, and neither warns.
+func TestProbe_AttributesAnIndirectOrReplaceOnlyEdgeToTheModuleGraph(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "probe-graph-fidelity", "an-indirect-or-replace-only-edge-is-attributed-to-the-module-graph")
+	for _, test := range []struct {
+		name  string
+		goMod string
+	}{
+		{"an indirect require", "module example.com/svc\n\ngo 1.25\n\nrequire example.com/core v0.0.0 // indirect\n\nreplace example.com/core => ../../libs/core\n"},
+		{"a replace alone", "module example.com/svc\n\ngo 1.25\n\nreplace example.com/core => ../../libs/core\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := probeFixture(t)
+			writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"), test.goMod)
+			writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"), "package main\n\nfunc main() {}\n")
+
+			result := probeAll(t, root, "apps/svc", "libs/core")
+			svc := projectAt(t, result, "apps/svc")
+			if !slices.Equal(svc.Dependencies, []string{"libs/core"}) {
+				t.Fatalf("dependencies = %v, want the edge the go.mod still states", svc.Dependencies)
+			}
+			if got := svc.DependencySources["libs/core"]; got != wsproto.DependencySourceModuleGraph {
+				t.Errorf("dependencySources[libs/core] = %q, want %q", got, wsproto.DependencySourceModuleGraph)
+			}
+			if len(result.Diagnostics) != 0 {
+				t.Errorf("diagnostics = %v, want none: nothing imports the module", result.Diagnostics)
+			}
+		})
+	}
+	// An import keeps an indirect require an import: the scan, not the
+	// annotation, says what the code reads.
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"),
+		"module example.com/svc\n\ngo 1.25\n\nrequire example.com/core v0.0.0 // indirect\n\nreplace example.com/core => ../../libs/core\n")
+	svc := projectAt(t, probeAll(t, root, "apps/svc", "libs/core"), "apps/svc")
+	if got := svc.DependencySources["libs/core"]; got != wsproto.DependencySourceGoModule {
+		t.Errorf("an imported indirect require: dependencySources[libs/core] = %q, want %q", got, wsproto.DependencySourceGoModule)
+	}
+}
+
 // A require of a workspace module whose sources import only a module nested
 // inside it is a DECLARATION: the nested module provides those packages, so
 // the parent the go.mod requires is not read by the build.

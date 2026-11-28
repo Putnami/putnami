@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/go",
-  "cliContract": 29,
+  "cliContract": 31,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-go",
@@ -53,6 +53,7 @@
     "excludes": ["testdata", "vendor"],
     "syncTask": "workspace-sync-exec",
     "dependencySources": true,
+    "moduleGraphEdges": true,
     "installInputs": ["go.work"],
     "language": "go"
   },
@@ -64,6 +65,7 @@
       "flags": {
         "skip-deps": { "type": "boolean", "default": false, "description": "Skip dependency refresh" },
         "tidy": { "type": "boolean", "default": true, "ciDefault": false, "description": "Run `go mod tidy` before compiling. Off, build checks that go.mod and go.sum are tidy with `go mod tidy -diff`, writes neither, and fails with the diff. Off by default when CI is set." },
+        "fix": { "type": "boolean", "default": true, "ciDefault": false, "description": "Write the fixes the build owes its sources. Off, build runs no `go mod tidy` whatever --tidy says: it checks go.mod and go.sum with `go mod tidy -diff`, writes neither, and fails with the diff, so `lint,test,build --fix=false` writes no source. Off by default when CI is set." },
         "readonly": { "type": "boolean", "default": false, "description": "Use module download mode readonly" },
         "mod": { "type": "string", "description": "Module download mode: readonly, vendor, or mod" },
         "target": { "type": "string", "short": "-t", "description": "Cross-compile for one platform instead of the host (GOOS/GOARCH, e.g., linux/amd64). Wins over `platforms`." },
@@ -112,12 +114,12 @@
           "id": "tidy",
           "task": "build-tidy",
           "dependsOn": ["^tidy", "config-merge"],
-          "if": "!params.skip-deps && params.tidy"
+          "if": "!params.skip-deps && params.tidy && params.fix"
         },
         {
           "id": "tidy-check",
           "task": "build-tidy-check",
-          "if": "!params.skip-deps && !params.tidy"
+          "if": "!params.skip-deps && (!params.tidy || !params.fix)"
         },
         {
           "id": "generate",

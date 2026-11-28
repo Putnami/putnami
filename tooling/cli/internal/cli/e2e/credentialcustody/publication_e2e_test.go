@@ -633,8 +633,14 @@ func (fx *publicationE2EFixture) installExtension(t *testing.T, ext extensionFix
 	publish["command"], publish["env"] = rawJSON(t, fx.self), rawJSON(t, ext.publishEnv)
 	ext.stage.Command = fx.self
 	delete(shipped.Workspace, "syncTask")
+	// The shipped probe scope keeps the rung its vocabulary requires: an
+	// adapter that attributes module-graph edges loads only at contract 31.
+	stamp := protocolcli.PublishChannelsContract
+	if _, moduleGraph := shipped.Workspace["moduleGraphEdges"]; moduleGraph {
+		stamp = protocolcli.ModuleGraphEdgesContract
+	}
 	fx.install(t, ext.name, ext.shortName, fixtureManifest{
-		Name: ext.name, Version: e2eRuntimeVersion, CLIContract: protocolcli.PublishChannelsContract,
+		Name: ext.name, Version: e2eRuntimeVersion, CLIContract: stamp,
 		Runtime:    manifestRuntime{Executable: "compiled/" + filepath.Base(ext.runtime)},
 		Workspace:  shipped.Workspace,
 		Ecosystems: shipped.Ecosystems,

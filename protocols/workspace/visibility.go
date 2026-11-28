@@ -81,6 +81,14 @@ const (
 	// provider whose contract it was generated from. Core derives it from the
 	// client's `generatedFrom` and no provider reports it.
 	DependencySourceContract DependencySource = "contract"
+	// DependencySourceModuleGraph is an edge a module graph needs and no
+	// source of the project imports: for Go, an `// indirect` require or a
+	// replace alone, which a module-mode build needs to resolve a transitive
+	// workspace module and `go mod tidy` restores. It backs the edge as an
+	// import does, it is no import, and the project's code reads none of it,
+	// so the architecture contract does not count it as a project dependency
+	// (ADR 0010).
+	DependencySourceModuleGraph DependencySource = "module-graph"
 )
 
 // ValidDependencySources is the closed set, in declaration order.
@@ -90,6 +98,7 @@ var ValidDependencySources = []DependencySource{
 	DependencySourcePackageJSON,
 	DependencySourceContract,
 	DependencySourceBuildGraph,
+	DependencySourceModuleGraph,
 }
 
 // Valid reports whether s is a member of the closed set.
@@ -116,17 +125,19 @@ func (s DependencySource) IsImport() bool {
 	return s == DependencySourceGoModule || s == DependencySourcePackageJSON
 }
 
-// Backs reports whether this source makes the edge real: an import, or an
-// edge a delegated build tool's own graph states, which the tool performs.
-// The declared-edge check judges an edge no source backs. A build-graph edge
-// is no import: the tool's graph, not Putnami's scopes, says who may depend on
-// what, so visibility does not judge it.
+// Backs reports whether this source makes the edge real: an import, an edge
+// a delegated build tool's own graph states, which the tool performs, or an
+// edge a module graph needs, which the build resolves through. The
+// declared-edge check judges an edge no source backs. A build-graph edge is no
+// import: the tool's graph, not Putnami's scopes, says who may depend on what,
+// so visibility does not judge it. A module-graph edge is no import either: no
+// source of the project reads it.
 func (s DependencySource) Backs() bool {
-	return s.IsImport() || s == DependencySourceBuildGraph
+	return s.IsImport() || s == DependencySourceBuildGraph || s == DependencySourceModuleGraph
 }
 
 // dependencySourceRank orders the sources for a merge: an import, then a
-// build-graph edge, then a declaration.
+// build-graph or module-graph edge, then a declaration.
 func dependencySourceRank(s DependencySource) int {
 	switch {
 	case s.IsImport():

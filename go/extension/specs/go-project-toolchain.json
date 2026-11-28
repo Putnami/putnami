@@ -55,8 +55,9 @@
     {
       "id": "probe-graph-fidelity",
       "text": [
-        "The probe reports each project's module path as its identity and its dependency edges as repo-relative paths resolved from require and replace directives and from an import of a workspace module the go.mod does not require, which it also reports as a warning naming the require and local replace to add;",
-        "external modules contribute no edge and a project never depends on itself."
+        "The probe reports each project's module path as its identity and its dependency edges as repo-relative paths from require and replace directives and from an import of a workspace module the go.mod does not require, which it also warns about, naming the require and local replace to add;",
+        "external modules contribute no edge and a project never depends on itself.",
+        "An `// indirect` require or a replace alone, of a module no source imports, is a module-graph edge: tidy restores it and no code reads it."
       ]
     },
     {
@@ -124,8 +125,8 @@
     {
       "id": "a-check-run-writes-no-source",
       "text": [
-        "With CI set, lint and build schedule no step that writes sources: lint runs golangci-lint without --fix and build checks go.mod and go.sum with `go mod tidy -diff` instead of tidying them.",
-        "A fixable lint finding or an untidy module fails, and the failure names the command that applies the fix: `putnami lint --fix` or `putnami build --tidy`.",
+        "With CI set, or with --fix=false whatever --tidy says, lint and build schedule no step that writes sources: lint runs golangci-lint without --fix and build checks go.mod and go.sum with `go mod tidy -diff` instead of tidying them.",
+        "A fixable lint finding or an untidy module fails, and the failure names the command that applies the fix: `putnami lint --fix` or `putnami build --tidy --fix`.",
         "Without CI, both commands fix by default."
       ]
     },

@@ -614,12 +614,12 @@ func TestRunTidyCheck_AnUntidyModuleFailsNamingTheCommand(t *testing.T) {
 		if ev["type"] != "diagnostic" {
 			continue
 		}
-		if msg, _ := ev["message"].(string); strings.Contains(msg, "putnami build --tidy --projects app") {
+		if msg, _ := ev["message"].(string); strings.Contains(msg, "putnami build --tidy --fix --projects app") {
 			named = true
 		}
 	}
 	if !named {
-		t.Errorf("no diagnostic names `putnami build --tidy --projects app`, got %+v", events)
+		t.Errorf("no diagnostic names `putnami build --tidy --fix --projects app`, got %+v", events)
 	}
 	if got := readTidyFile(t, dir, "go.mod"); got != untidy {
 		t.Errorf("go.mod = %q, want the content the check found: %q", got, untidy)
@@ -646,7 +646,7 @@ func TestTidyCheckMessage_CarriesTheDiff(t *testing.T) {
 	dir := t.TempDir()
 	writeTidyFile(t, dir, "go.mod", "module example.com/app\n")
 	msg := tidyCheckMessage("app", dir, "--- go.mod\n+++ go.mod\n+go 1.26\n")
-	for _, want := range []string{"example.com/app is not tidy", "putnami build --tidy --projects app", "+go 1.26"} {
+	for _, want := range []string{"example.com/app is not tidy", "putnami build --tidy --fix --projects app", "+go 1.26"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("message %q lacks %q", msg, want)
 		}

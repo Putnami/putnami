@@ -1,0 +1,24 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/modules",
+  "version": "1.0.0",
+  "cliContract": 31,
+  "commands": {
+    "build": {
+      "run": [{ "id": "build", "task": "build-exec" }]
+    }
+  },
+  "tasks": {
+    "build-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["built"]
+    }
+  },
+  "workspace": {
+    "markers": ["mod.txt"],
+    "inputs": ["mod.txt"],
+    "dependencySources": true,
+    "moduleGraphEdges": true
+  }
+}

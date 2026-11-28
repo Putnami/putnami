@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 
@@ -196,6 +197,11 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 				diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField,
 					fmt.Sprintf("selectedProjects[%d].runsWith", i),
 					"selectedProjects[].runsWith requires protocolVersion %d", ProtocolVersion2))
+			}
+			if project.ModuleGraphDependencies != nil {
+				diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField,
+					fmt.Sprintf("selectedProjects[%d].moduleGraphDependencies", i),
+					"selectedProjects[].moduleGraphDependencies requires protocolVersion %d", ProtocolVersion2))
 			}
 		}
 	case ProtocolVersion2:
@@ -594,6 +600,7 @@ func validateWorkspaceProjects(projects []ProjectRef, present bool) []diag.Diagn
 			}
 		}
 		diags = append(diags, validateProjectRefConfig(prefix, project.Config)...)
+		diags = append(diags, validateModuleGraphDependencies(prefix, project)...)
 	}
 	for i := 1; i < len(projects); i++ {
 		if projects[i-1].ID >= projects[i].ID {
@@ -604,6 +611,26 @@ func validateWorkspaceProjects(projects []ProjectRef, present bool) []diag.Diagn
 		}
 	}
 	return diags
+}
+
+// validateModuleGraphDependencies checks that a reference names its
+// module-graph edges as a sorted, duplicate-free subset of its own
+// dependencies: the member qualifies edges the reference already carries and
+// never adds one.
+func validateModuleGraphDependencies(prefix string, project ProjectRef) []diag.Diagnostic {
+	field := prefix + ".moduleGraphDependencies"
+	for i, id := range project.ModuleGraphDependencies {
+		if i > 0 && project.ModuleGraphDependencies[i-1] >= id {
+			return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidValue, field,
+				"%s must be sorted and free of duplicates; %q precedes %q",
+				field, project.ModuleGraphDependencies[i-1], id)}
+		}
+		if !slices.Contains(project.Dependencies, id) {
+			return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidValue, field,
+				"%s names %q, which is not one of the project's dependencies", field, id)}
+		}
+	}
+	return nil
 }
 
 // validateProjectRefConfig keeps the raw workspace-protocol document raw while

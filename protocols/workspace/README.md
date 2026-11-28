@@ -338,7 +338,12 @@ and the graph it describes is one the workspace refuses to plan over (see
 every graph-dependent command fails, the repair commands stay reachable.
 
 `dependencySources` attributes each reported edge to the manifest family it was
-derived from: `go-module` for a go.mod `require` or `replace`, `package-json`
+derived from: `go-module` for a go.mod `require` or `replace` a source of the
+project imports, `module-graph` for an edge a module graph needs and no source
+imports, such as a Go `// indirect` require or a replace alone, which backs
+the edge as an import does, crosses no visibility boundary and is no
+architecture project dependency
+([ADR 0010](doc/adr/0010-a-module-graph-edge-is-no-import.md)), `package-json`
 for a package.json dependency on a workspace package, `build-graph` for an edge
 the build tool of a delegated stack states in its own graph, which backs the edge
 as an import does but crosses no visibility boundary

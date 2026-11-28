@@ -877,7 +877,12 @@ import, a type import, a re-export, `require`, `require.resolve`,
 file that imports a shared configuration, and the `extends` of a tsconfig
 file. An edge the probe of a monorepo tool's extension attributes to the
 tool's own graph (`build-graph`), such as an edge the Turborepo or Nx sync
-writes, is real without an import. Neither provider runs a
+writes, is real without an import, and so is an edge the Go probe attributes
+to the module graph (`module-graph`): an `// indirect` require or a replace
+alone of a module no source imports, which a module-mode build needs and
+`go mod tidy` restores. Neither is an import, so visibility does not judge
+them, and the architecture contract does not count a `module-graph` edge as a
+project dependency. Neither provider runs a
 toolchain, and
 neither reads a tree a build wrote, so a cold clone and a warm checkout answer
 the same thing. A scan that cannot read a file attributes nothing: the manifest

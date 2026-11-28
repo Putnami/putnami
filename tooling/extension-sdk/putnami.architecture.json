@@ -84,11 +84,6 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/extension-sdk",
-          "producerProject": "/protocols/events"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/extension-sdk",
           "producerProject": "/protocols/extension"
         },
         {
@@ -130,11 +125,6 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/extension-sdk",
           "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/extension-sdk",
-          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",

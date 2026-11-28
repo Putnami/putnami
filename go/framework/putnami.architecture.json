@@ -103,32 +103,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
           "producerProject": "/protocols/clientcontract"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/database"
         },
         {
           "kind": "project-dependency",
@@ -138,32 +113,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/events"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/migration"
         },
         {
           "kind": "project-dependency",
@@ -172,16 +122,6 @@
         },
         {
           "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/api",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
           "consumerProject": "/go/framework/app",
           "producerProject": "/protocols/architecture"
         },
@@ -198,17 +138,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/app",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/app",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/app",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -232,33 +162,8 @@
         },
         {
           "kind": "project-dependency",
-          "consumerProject": "/go/framework/app",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/cache",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/cache",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
           "consumerProject": "/go/framework/cache",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -268,72 +173,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/client",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/client",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/config",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/config",
-          "producerProject": "/protocols/diagnostic"
         },
         {
           "kind": "project-dependency",
@@ -343,32 +188,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/ctxutil",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/ctxutil",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/ctxutil",
           "producerProject": "/protocols/features"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/database",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/database",
           "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/database",
-          "producerProject": "/protocols/config"
         },
         {
           "kind": "project-dependency",
@@ -379,11 +204,6 @@
           "kind": "project-dependency",
           "consumerProject": "/go/framework/database",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/database",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -399,16 +219,6 @@
           "kind": "project-dependency",
           "consumerProject": "/go/framework/database",
           "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/database",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/database",
-          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",
@@ -418,42 +228,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/errors",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/errors",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/errors",
           "producerProject": "/protocols/features"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/events",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/events",
           "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/events",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/events",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/events",
-          "producerProject": "/protocols/database"
         },
         {
           "kind": "project-dependency",
@@ -473,47 +253,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/events",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/events",
-          "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/events",
           "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/events",
-          "producerProject": "/protocols/keyring"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/events",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/events",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/events",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -523,27 +263,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -563,72 +283,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/keyring"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
           "producerProject": "/protocols/platform"
         },
         {
           "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/grpc",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/http",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/http",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/http",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/http",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/http",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
           "consumerProject": "/go/framework/http",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/http",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -648,112 +308,22 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/http",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/http",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/http",
           "producerProject": "/protocols/runtime"
         },
         {
           "kind": "project-dependency",
-          "consumerProject": "/go/framework/http",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/inject",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/inject",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
           "consumerProject": "/go/framework/inject",
           "producerProject": "/protocols/features"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/events"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/infra"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/keyringstore",
           "producerProject": "/protocols/keyring"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/keyringstore",
-          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",
@@ -763,37 +333,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/logger",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/logger",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/logger",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -812,73 +352,8 @@
         },
         {
           "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration/migratecli",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration/migratecli",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration/migratecli",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration/migratecli",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration/migratecli",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration/migratecli",
-          "producerProject": "/protocols/events"
-        },
-        {
-          "kind": "project-dependency",
           "consumerProject": "/go/framework/migration/migratecli",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration/migratecli",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration/migratecli",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration/migratecli",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/migration/migratecli",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -888,82 +363,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
           "producerProject": "/protocols/contracts"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/events"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/keyring"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/platform"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/openapi",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/parallel",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/parallel",
-          "producerProject": "/protocols/diagnostic"
         },
         {
           "kind": "project-dependency",
@@ -973,87 +378,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/events"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/migration"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/platform",
           "producerProject": "/protocols/platform"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/platform",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -1063,77 +393,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/events"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/platform"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/proto",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/schema",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/schema",
-          "producerProject": "/protocols/diagnostic"
         },
         {
           "kind": "project-dependency",
@@ -1143,57 +403,17 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/capabilities"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
           "producerProject": "/protocols/diagnostic"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/events"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/http-routes"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/security",
           "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/infra"
         },
         {
           "kind": "project-dependency",
@@ -1202,48 +422,13 @@
         },
         {
           "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/security",
-          "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/storage",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
           "consumerProject": "/go/framework/storage",
           "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/storage",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/storage",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/storage",
           "producerProject": "/protocols/diagnostic"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/storage",
-          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",
@@ -1258,27 +443,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/storage",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/storage",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/storage",
           "producerProject": "/protocols/storage"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/architecture"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/capabilities"
         },
         {
           "kind": "project-dependency",
@@ -1288,67 +453,12 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/config"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/contracts"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/database"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
           "producerProject": "/protocols/diagnostic"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/events"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
           "producerProject": "/protocols/features"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/identity"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/infra"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/keyring"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/migration"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/runtime"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/go/framework/telemetry",
-          "producerProject": "/protocols/storage"
         },
         {
           "kind": "project-dependency",

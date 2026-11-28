@@ -1098,7 +1098,8 @@
           "kind": "acceptance",
           "checks": [
             "each-workspace-member-names-its-resolved-type",
-            "each-workspace-member-names-its-resolved-runs-with"
+            "each-workspace-member-names-its-resolved-runs-with",
+            "each-workspace-member-names-its-module-graph-dependencies"
           ]
         }
       },

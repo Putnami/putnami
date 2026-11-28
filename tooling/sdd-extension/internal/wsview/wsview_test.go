@@ -2,6 +2,7 @@ package wsview
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	workspaceproto "go.putnami.dev/protocol/workspace"
@@ -197,6 +198,27 @@ func TestFromContextPrefersTheCompleteMembership(t *testing.T) {
 	}
 	if ws.HasWarningCode(WarningCodeProviderViewUnavailable) {
 		t.Fatalf("a complete membership raised the incomplete-view warning: %v", ws.WarningCodes)
+	}
+}
+
+// The view carries the module-graph dependencies the membership names, and
+// keeps their edges in the graph: impact and ordering still follow them.
+func TestFromContextCarriesTheModuleGraphDependencies(t *testing.T) {
+	ws, _ := FromContext(&pctx.Context{
+		WorkspaceRoot: "/repo",
+		WorkspaceProjects: []pctx.ProjectRef{
+			{ID: "/api", Name: "@acme/api", Path: "api", FullPath: "/repo/api",
+				Dependencies: []string{"/client", "/core"}, ModuleGraphDependencies: []string{"/client"}},
+			{ID: "/client", Name: "@acme/client", Path: "client", FullPath: "/repo/client"},
+			{ID: "/core", Name: "@acme/core", Path: "core", FullPath: "/repo/core"},
+		},
+	})
+	api := ws.ProjectByID("/api")
+	if api == nil || !slices.Equal(api.ModuleGraphDependencies, []string{"/client"}) {
+		t.Fatalf("api = %+v, want moduleGraphDependencies [/client]", api)
+	}
+	if got := ws.Graph.DependenciesOf("/api"); !slices.Contains(got, "/client") {
+		t.Errorf("graph dependencies of /api = %v, want the module-graph edge kept", got)
 	}
 }
 

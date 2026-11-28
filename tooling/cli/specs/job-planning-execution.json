@@ -279,7 +279,7 @@
     },
     {
       "id": "job-context-names-member-types",
-      "text": "Every job context the core writes lists the complete workspace membership in workspaceProjects. Each entry names the project's resolved type: the one its putnami.json authors, else its provider's, else application; an entry without a type comes from a CLI that predates the member. Each entry names its resolved runsWith: the list its putnami.json authors, else its provider's; an entry without runsWith runs with nothing. selectedProjects and dependencyClosure carry neither."
+      "text": "Every job context the core writes lists the complete workspace membership in workspaceProjects. Each entry names its resolved type: its putnami.json's, else its provider's, else application. It names its resolved runsWith: its putnami.json's list, else its provider's; without one it runs with nothing. It names as moduleGraphDependencies the direct dependencies only module-graph edges back, and without them it names none. selectedProjects and dependencyClosure carry none of the three."
     },
     {
       "id": "extension-command-host-rpc",

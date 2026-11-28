@@ -47,7 +47,7 @@ both, and the v1 corpus is unchanged.
 | Version | Members | Corpus |
 | --- | --- | --- |
 | 1 | everything above | `fixtures/{valid,invalid}` |
-| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `project.generatedFrom`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `workspaceWarnings`, `tree`, `ProjectRef.config`, `ProjectRef.extensions`, `ProjectRef.type` and `ProjectRef.runsWith` | `fixtures/v2/{valid,invalid}` |
+| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `project.generatedFrom`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `workspaceWarnings`, `tree`, `ProjectRef.config`, `ProjectRef.extensions`, `ProjectRef.type`, `ProjectRef.runsWith` and `ProjectRef.moduleGraphDependencies` | `fixtures/v2/{valid,invalid}` |
 
 **Putnami's orchestrator produces v2 only.** The CLI requires an extension
 contract whose SDK reads v2, so a subprocess that reaches this context is
@@ -436,7 +436,18 @@ them:
   task's cached results, and the release that added the member invalidated
   each of them once, in a workspace where a project runs with another.
 
-All eight are omitempty, so a producer that has nothing to say emits none,
+- **`moduleGraphDependencies`** (v2 only) — the ids among `dependencies`
+  whose provider attributed the edge to `module-graph`: a module graph needs
+  them, such as a Go `// indirect` require or a replace alone, and no source
+  of the project imports them, nor does a `putnami.json` entry, a contract or
+  a declared file input state them (workspace protocol ADR 0010). Sorted, free
+  of duplicates, and a subset of `dependencies`. The edge stays in
+  `dependencies`; a rule about what the project's code depends on, such as
+  the architecture contract's project dependencies, leaves these out. It is
+  populated inside `workspaceProjects`, and a v1 document carrying it is
+  rejected (`job.unexpected_field`). An entry without it names none.
+
+All nine are omitempty, so a producer that has nothing to say emits none,
 except that a `workspaceProjects` entry always carries `type`.
 
 ## Environment variable mirror

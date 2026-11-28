@@ -39,7 +39,7 @@
     {
       "id": "an-additive-vocabulary-raises-the-contract-floor",
       "text": [
-        "Agent content, verbs, command kinds, publish channels, a provisioned toolchain, a group default with positionals, input selectors, a source-bound task, a git or release baseline input, a dependency on one step of a command, providers (19), user-scope skills (20), build-graph edges (21) and a provider operation's members (24) each raise the contract a manifest requires, only when used.",
+        "Agent content, verbs, command kinds, publish channels, a provisioned toolchain, a group default with positionals, input selectors, a source-bound task, a git or release baseline input, a dependency on one step of a command, providers (19), user-scope skills (20), build-graph edges (21), provider operation members (24) and module-graph edges (31) each raise the required contract when used.",
         "RequiredCLIContract takes the highest rung, and a manifest stamped below its vocabulary's rung does not load."
       ]
     },
@@ -153,6 +153,13 @@
       "text": [
         "`workspace.buildGraphEdges` declares that the adapter's probe attributes edges to build-graph, the source an edge takes from the build tool a delegated stack runs.",
         "It requires `workspace.dependencySources`, and declaring it requires contract 21 (BuildGraphEdgesContract), so a CLI that predates the source refuses the manifest instead of rejecting every probe answer that names it."
+      ]
+    },
+    {
+      "id": "module-graph-edges-are-declared-by-the-adapter",
+      "text": [
+        "`workspace.moduleGraphEdges` declares that the adapter's probe attributes edges to module-graph, the source of an edge a module graph needs and no source of the project imports.",
+        "It requires `workspace.dependencySources`, and declaring it requires contract 31 (ModuleGraphEdgesContract), so a CLI that predates the source refuses the manifest instead of rejecting every probe answer that names it."
       ]
     },
     {
