@@ -84,6 +84,12 @@ value is a bound parameter, and a query runs when you await it.
 | `sql.unsafe(text, parameters)` | A statement given as text, with `$1` parameters |
 | ``sql`...`.values()`` | Each row as an array of its values, untransformed |
 
+A row query copies its rows to give them camelCase keys. When every column
+already has its camelCase name, such as `created_at AS "createdAt"`, and no
+column is an integer or float array, you get the driver's row objects as they
+are, with no copy of them. The result is the same plain array with `count` and
+`command` either way.
+
 A query used inside another one runs as part of it, on the same connection.
 
 ```ts

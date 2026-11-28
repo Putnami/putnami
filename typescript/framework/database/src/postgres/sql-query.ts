@@ -139,7 +139,8 @@ function plainValue(value: unknown): unknown {
  * It relies on what `Bun.SQL` returns: the rows of one statement are plain
  * objects with the statement's columns, as own keys in one order. A row that
  * lacks one of them is converted on its own column names; a row with a column
- * the first row lacks, which no statement returns, would lose it.
+ * the first row lacks, which no statement returns, would lose it here, where
+ * {@link rowsNeedNothing} passes it through unconverted.
  */
 function convertRow(
   row: Record<string, unknown>,
@@ -159,19 +160,74 @@ function convertRow(
   return record;
 }
 
+/** Whether the client converts `value`: a typed array, or an array of them (see {@link plainValue}). */
+function convertsValue(value: unknown): boolean {
+  if (value === null || typeof value !== 'object') return false;
+  if (ArrayBuffer.isView(value)) return !(value instanceof Uint8Array) && !(value instanceof DataView);
+  return Array.isArray(value) && value.length > 0 && ArrayBuffer.isView(value[0]);
+}
+
+/**
+ * Whether the rows of a row query need no conversion: every row an object
+ * holding `columns`, the first row's, already camelCase, as own keys, and no
+ * value one the client converts. The rows are then handed out as they are,
+ * with no copy of them.
+ *
+ * Like {@link convertRow}, it relies on every row of a statement having the
+ * same columns: a row with a column beyond the first row's is not looked for
+ * (finding it would cost a key list per row), so it keeps that column as the
+ * driver named it where a copy would drop it. No statement returns such rows.
+ * The check stops at the first value to convert, so a result whose last row
+ * holds a typed array is scanned, then copied: the worst case costs the scan
+ * on top of the copy.
+ */
+function rowsNeedNothing(source: DriverResult, columns: readonly string[], keys: readonly string[]): boolean {
+  for (let j = 0; j < columns.length; j++) {
+    if (keys[j] !== columns[j]) return false;
+  }
+  for (let i = 0; i < source.length; i++) {
+    const row = source[i];
+    if (row === null || typeof row !== 'object' || Array.isArray(row)) return false;
+    for (let j = 0; j < columns.length; j++) {
+      const column = columns[j] as string;
+      if (!Object.hasOwn(row, column) || convertsValue((row as Record<string, unknown>)[column])) return false;
+    }
+  }
+  return true;
+}
+
+/** `out` with the `count` and `command` of the driver result it stands for, a zero and an empty one when the driver set none. */
+function withTally(out: DriverResult, source: DriverResult): DriverResult {
+  out.count = source.count ?? 0;
+  out.command = source.command ?? '';
+  return out;
+}
+
 /**
  * A result as the client hands it out, its `count` and `command` kept: a row
  * query's rows get camelCase keys, a `values()` query's rows stay arrays;
- * nested results (a multi-statement simple query) too.
+ * nested results (a multi-statement simple query) too. A row query whose
+ * rows need no conversion keeps the driver's rows themselves, in a new plain
+ * array: every result has the same shape, whatever its data.
  */
 function clientResult(result: unknown, camel: boolean): unknown {
   if (!Array.isArray(result)) return result;
   const source = result as DriverResult;
-  const out = new Array(source.length) as DriverResult;
   // The rows of one statement share its columns: their names are read, and
   // camelCased, once per result rather than once per row.
   let columns: string[] | undefined;
   let keys: string[] | undefined;
+  const first = source[0];
+  if (camel && first !== null && typeof first === 'object' && !Array.isArray(first)) {
+    columns = Object.keys(first);
+    keys = columns.map(camelKey);
+    if (rowsNeedNothing(source, columns, keys)) {
+      const out = new Array(source.length) as DriverResult;
+      for (let i = 0; i < source.length; i++) out[i] = source[i];
+      return withTally(out, source);
+    }
+  }
+  const out = new Array(source.length) as DriverResult;
   for (let i = 0; i < source.length; i++) {
     const row = source[i];
     if (Array.isArray(row)) {
@@ -189,9 +245,7 @@ function clientResult(result: unknown, camel: boolean): unknown {
       out[i] = row;
     }
   }
-  out.count = source.count ?? 0;
-  out.command = source.command ?? '';
-  return out;
+  return withTally(out, source);
 }
 
 /**
