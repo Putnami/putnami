@@ -199,7 +199,9 @@ export class StaticPathStatusError extends Error {
     const hint = listed
       ? 'Remove the entry from paths(), or make the loader return data for it.'
       : 'Make the loader return data for it.';
-    super(`Static route ${route}${listed} resolved to a client error in every locale (${statuses}). ${hint}`);
+    super(
+      `Static route ${route}${listed} resolved to a client error${resolved.length > 1 ? ' in every locale' : ''} (${statuses}). ${hint}`,
+    );
     this.name = 'StaticPathStatusError';
   }
 }
