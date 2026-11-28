@@ -87,6 +87,15 @@ import { servedByFetch } from '@putnami/application';
 httpPlugin.get('/legacy/[id]', servedByFetch((ctx) => ({ id: ctx.params?.id })));
 ```
 
+A route Bun matches is compiled at start when every middleware acting on it
+is one of the framework's built-ins (security headers, origin guard, logger,
+platform probes): its middlewares then run in one continuation, and a handler
+that answers at once is answered without a promise. Any other middleware on
+the route (one added with `use()`, CSRF, rate limiting, an asynchronous
+session store) keeps it on the middleware chain, with the same answers. At
+the `debug` log level, the server lists at start which routes are compiled
+and, for each other one, the middleware that keeps it on the chain.
+
 ## Automatic HTTP Methods
 
 The HTTP plugin automatically handles `HEAD`, `OPTIONS`, and (optionally) `TRACE` requests without requiring explicit route registration. This behaviour is enabled by default and can be configured or globally disabled.
