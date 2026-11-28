@@ -130,14 +130,16 @@ and a finding that concerns several files is stated at each:
 
 - One task replaces the 123 copies. On this repository it writes 2,578
   warning fragments and no error. After an untracked file is added, its
-  process runs 0.7 to 1.1 seconds under every selection, where the copies ran
+  process runs 0.7 to 1.2 seconds under every selection, where the copies ran
   0.2 seconds for a run that selects one features project, 0.8 for five, 4.7
   for 28 and 21.5 for all 123. A run narrowed to one features project is
-  therefore slower: its session takes 7.4 to 8.3 seconds instead of 7.1 to
-  8.0. An unscoped run's session drops from 13.0 to 7.9 seconds.
+  therefore slower, until the per-file keys of the evidence collector let the
+  task skip what did not change.
 - The task's cache entry holds the fragment file, about 800 KiB here, and one
   entry serves every selection.
 - An unscoped run prints one warning line per project and rule, 129 here, and
   the session records each warning.
-- `putnami features validate`, the interactive command, is unchanged: it
-  reads the disk and reports the HEAD commit.
+- `putnami features validate`, the interactive command, still reads the disk
+  and reports the HEAD commit. It shares the engine, so it too states a
+  duplicate id at every declaration and an unresolved contribution at every
+  capability manifest that declares it.
