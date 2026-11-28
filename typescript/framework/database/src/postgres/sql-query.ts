@@ -1,5 +1,5 @@
-import { REDACTED, useLogger } from '@putnami/runtime';
 import type { SQL } from 'bun';
+import { REDACTED, useLogger } from '@putnami/runtime';
 import type {
   ReservedSqlClient,
   SqlClient,
@@ -376,7 +376,9 @@ export class CapturedQuery implements SqlQuery {
       return Promise.reject(normalizeError(error));
     }
     const mode = this.#mode;
-    return Promise.resolve(query).then(
+    // The driver query is a promise: continuing it directly skips the job a
+    // Promise.resolve of a thenable adds.
+    return (query as unknown as Promise<unknown>).then(
       (result) => (mode === 'raw' ? result : clientResult(result, mode === 'rows')),
       (error) => {
         throw normalizeError(error);

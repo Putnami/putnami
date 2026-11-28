@@ -170,22 +170,37 @@ export function withTransaction(options?: TransactionOptions): void {
  * - In transactional mode + write: lazily reserves a connection and BEGINs a transaction.
  * - In transactional mode + read/write + tx already opened for this db: returns the tx connection.
  */
-export async function useTxConnection(dbName: string | undefined, mode: 'read' | 'write'): Promise<SqlClient> {
-  throwIfAborted();
-
-  const tx = getTxState();
-  const resolvedDbName = resolveDatasourceName(dbName);
-  const key = resolvedDbName ?? '__default__';
-
-  // Check timeout before active — rollback sets active=false, but we still want to reject operations
-  if (tx?.timedOut) {
-    throw new Error('Transaction has timed out and was rolled back');
+export function useTxConnection(dbName: string | undefined, mode: 'read' | 'write'): Promise<SqlClient> {
+  // Not an async function: a query outside a transaction takes the pool's
+  // client with no frame of its own. A check that throws still rejects.
+  let tx: TransactionState | undefined;
+  let resolvedDbName: string | undefined;
+  try {
+    throwIfAborted();
+    tx = getTxState();
+    resolvedDbName = resolveDatasourceName(dbName);
+    // Check timeout before active — rollback sets active=false, but we still want to reject operations
+    if (tx?.timedOut) {
+      throw new Error('Transaction has timed out and was rolled back');
+    }
+  } catch (error) {
+    return Promise.reject(error);
   }
 
   // No transactional mode → normal pool connection
   if (!tx?.active) {
     return connectionFactory(resolvedDbName);
   }
+  return txConnection(tx, resolvedDbName, mode);
+}
+
+/** The connection of an active transaction for one datasource, opened on its first write. */
+async function txConnection(
+  tx: TransactionState,
+  resolvedDbName: string | undefined,
+  mode: 'read' | 'write',
+): Promise<SqlClient> {
+  const key = resolvedDbName ?? '__default__';
 
   // Already have a tx connection for this db → reuse it
   const existing = tx.connections.get(key);
