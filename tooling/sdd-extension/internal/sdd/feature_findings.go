@@ -57,15 +57,31 @@ type FeatureFindingsReport struct {
 // in project order, so the bytes do not depend on workers. The error is a
 // failure to read the cut, never a finding.
 func BuildFeatureFindingsResult(ws *workspace.Workspace, extensionReferences []string, workers int) (FeatureFindingsReport, []evidence.Fragment, error) {
+	return BuildFeatureFindingsResultWithMemo(ws, extensionReferences, workers, FeatureFindingsMemo{})
+}
+
+// BuildFeatureFindingsResultWithMemo is BuildFeatureFindingsResult that
+// reuses, from the memo, the evaluation of each project whose reads answer as
+// they did, and keeps this run's evaluations there for the next
+// (FeatureFindingsMemo). The report and the fragments are the bytes
+// BuildFeatureFindingsResult returns, whatever the memo holds.
+func BuildFeatureFindingsResultWithMemo(ws *workspace.Workspace, extensionReferences []string, workers int, memo FeatureFindingsMemo) (FeatureFindingsReport, []evidence.Fragment, error) {
+	report, fragments, _, err := buildFeatureFindings(ws, extensionReferences, workers, memo)
+	return report, fragments, err
+}
+
+// buildFeatureFindings is BuildFeatureFindingsResultWithMemo, which also
+// returns the ids of the projects it evaluated rather than reused.
+func buildFeatureFindings(ws *workspace.Workspace, extensionReferences []string, workers int, options FeatureFindingsMemo) (FeatureFindingsReport, []evidence.Fragment, []string, error) {
 	if ws == nil {
-		return FeatureFindingsReport{}, nil, protocolcli.Classify(
+		return FeatureFindingsReport{}, nil, nil, protocolcli.Classify(
 			errors.New("workspace is required to evaluate features"),
 			protocolcli.ErrInvalidConfig,
 		)
 	}
 	cut, err := featureengine.NewTaskReaderFrom(ws.Tree, ws.Root)
 	if err != nil {
-		return FeatureFindingsReport{}, nil, fmt.Errorf("features validate: %w", err)
+		return FeatureFindingsReport{}, nil, nil, fmt.Errorf("features validate: %w", err)
 	}
 	reader := newMemoReader(cut)
 	documents := featureengine.NewDocumentCache()
@@ -81,10 +97,18 @@ func BuildFeatureFindingsResult(ws *workspace.Workspace, extensionReferences []s
 		}
 	}
 	projects := featureValidatedProjects(view, reader, extensionReferences)
-	results := evaluateEachProject(view, reader, documents, projects, workers)
+	memo := openFeatureMemo(options, view)
+	evaluations := evaluateEachProject(view, reader, documents, projects, workers, memo)
+	memo.save(reader, projects, evaluations)
+	var evaluated []string
+	for index, project := range projects {
+		if !evaluations[index].reused {
+			evaluated = append(evaluated, project.ID)
+		}
+	}
 
-	features := map[string]featureengine.FeatureAssessment{}
-	unclassified := map[string]featureengine.ContributionAssessment{}
+	features := map[string]FeatureCounts{}
+	unclassified := map[string]bool{}
 	stated := map[string]evidence.Fragment{}
 	state := func(fragment evidence.Fragment) error {
 		line, err := json.Marshal(fragment)
@@ -96,32 +120,29 @@ func BuildFeatureFindingsResult(ws *workspace.Workspace, extensionReferences []s
 	}
 	var duplicates []diag.Diagnostic
 	for index, project := range projects {
-		result := results[index]
-		if result.Snapshot == nil && !diag.HasErrors(result.Diagnostics) {
-			return FeatureFindingsReport{}, nil, protocolcli.Classify(
+		outcome := evaluations[index].outcome
+		if !outcome.Snapshot && !diag.HasErrors(outcome.Diagnostics) {
+			return FeatureFindingsReport{}, nil, nil, protocolcli.Classify(
 				fmt.Errorf("features validate: the evaluation of %s returned no snapshot and no error", project.ID),
 				protocolcli.ErrInvalidConfig,
 			)
 		}
 		report.Projects = append(report.Projects, project.ID)
-		if result.Snapshot != nil {
-			for _, feature := range result.Snapshot.Features {
-				features[feature.Source+"\x00"+feature.ID] = feature
-			}
-			for _, contribution := range result.Snapshot.Unclassified {
-				identity := contribution.Identity
-				unclassified[identity.OwnerProject+"\x00"+string(identity.Kind)+"\x00"+identity.Subkind+"\x00"+identity.Key] = contribution
-			}
+		for _, tally := range outcome.Features {
+			features[tally.Key] = tally.Counts
 		}
-		for _, finding := range result.Diagnostics {
+		for _, key := range outcome.Unclassified {
+			unclassified[key] = true
+		}
+		for _, finding := range outcome.Diagnostics {
 			if err := evaluationInputFailure(project, finding); err != nil {
-				return FeatureFindingsReport{}, nil, err
+				return FeatureFindingsReport{}, nil, nil, err
 			}
 			if finding.Code == featureproto.ErrorCodeDuplicateFeature {
 				duplicates = append(duplicates, finding)
 			}
 			if err := state(featureFinding(finding, project, projectRoots)); err != nil {
-				return FeatureFindingsReport{}, nil, err
+				return FeatureFindingsReport{}, nil, nil, err
 			}
 		}
 	}
@@ -130,7 +151,7 @@ func BuildFeatureFindingsResult(ws *workspace.Workspace, extensionReferences []s
 	if len(duplicates) > 0 {
 		for _, fragment := range duplicateDeclarations(view, reader, duplicates) {
 			if err := state(fragment); err != nil {
-				return FeatureFindingsReport{}, nil, err
+				return FeatureFindingsReport{}, nil, nil, err
 			}
 		}
 	}
@@ -147,22 +168,21 @@ func BuildFeatureFindingsResult(ws *workspace.Workspace, extensionReferences []s
 		}
 	}
 	sort.Slice(fragments, func(i, j int) bool { return lessFinding(fragments[i], fragments[j]) })
-	merged := &featureengine.Snapshot{}
-	for _, feature := range features {
-		merged.Features = append(merged.Features, feature)
+	// The summary of the merged snapshot, which counts each distinct feature
+	// once, as the last evaluation in project order assessed it.
+	for _, counts := range features {
+		report.Summary = report.Summary.plus(counts)
 	}
-	for _, contribution := range unclassified {
-		merged.Unclassified = append(merged.Unclassified, contribution)
-	}
-	report.Summary = summarizeFeatures(merged)
-	return report, fragments, nil
+	report.Summary.Unclassified = len(unclassified)
+	return report, fragments, evaluated, nil
 }
 
 // evaluateEachProject runs the evaluation of each project, a selection of that
-// one project, on up to workers goroutines, and returns the results in the
-// order of projects.
-func evaluateEachProject(view *workspace.Workspace, reader featureengine.Reader, documents *featureengine.DocumentCache, projects []*workspace.Project, workers int) []featureengine.Result {
-	results := make([]featureengine.Result, len(projects))
+// one project, on up to workers goroutines, and returns the evaluations in the
+// order of projects. With a memo, an evaluation whose entry still holds is
+// reused, and each other one records its reads.
+func evaluateEachProject(view *workspace.Workspace, reader *memoReader, documents *featureengine.DocumentCache, projects []*workspace.Project, workers int, memo *featureMemo) []projectEvaluation {
+	evaluations := make([]projectEvaluation, len(projects))
 	workers = max(1, min(workers, len(projects)))
 	next := make(chan int)
 	var wait sync.WaitGroup
@@ -171,8 +191,7 @@ func evaluateEachProject(view *workspace.Workspace, reader featureengine.Reader,
 		go func() {
 			defer wait.Done()
 			for index := range next {
-				selection := Selection{Mode: pctx.SelectionModeProjects, Scoped: true, ProjectIDs: []string{projects[index].ID}}
-				results[index], _ = evaluateFeatureTask(view, reader, documents, selection)
+				evaluations[index] = evaluateProject(view, reader, documents, projects[index], memo)
 			}
 		}()
 	}
@@ -181,7 +200,23 @@ func evaluateEachProject(view *workspace.Workspace, reader featureengine.Reader,
 	}
 	close(next)
 	wait.Wait()
-	return results
+	return evaluations
+}
+
+// evaluateProject is the evaluation of project, from the memo when its entry
+// holds.
+func evaluateProject(view *workspace.Workspace, reader *memoReader, documents *featureengine.DocumentCache, project *workspace.Project, memo *featureMemo) projectEvaluation {
+	if evaluation, ok := memo.reuse(project.ID, reader); ok {
+		return evaluation
+	}
+	selection := Selection{Mode: pctx.SelectionModeProjects, Scoped: true, ProjectIDs: []string{project.ID}}
+	if memo == nil {
+		result, _ := evaluateFeatureTask(view, reader, documents, selection)
+		return projectEvaluation{outcome: outcomeOf(result)}
+	}
+	tracing := newTracingReader(reader)
+	result, _ := evaluateFeatureTask(view, tracing, documents, selection)
+	return projectEvaluation{outcome: outcomeOf(result), reads: tracing.keys()}
 }
 
 // featureValidatedProjects returns the projects of ws whose features the
@@ -413,18 +448,21 @@ type memoReader struct {
 }
 
 type memoFile struct {
-	data []byte
-	err  error
+	data   []byte
+	err    error
+	digest [32]byte
 }
 
 type memoDir struct {
 	entries []featureengine.DirEntry
 	err     error
+	digest  [32]byte
 }
 
 type memoBinding struct {
 	binding string
 	err     error
+	digest  [32]byte
 }
 
 func newMemoReader(reader featureengine.Reader) *memoReader {
@@ -437,39 +475,70 @@ func newMemoReader(reader featureengine.Reader) *memoReader {
 }
 
 func (m *memoReader) ReadFile(root, relative string) ([]byte, error) {
+	answer := m.file(root, relative)
+	return bytes.Clone(answer.data), answer.err
+}
+
+func (m *memoReader) ReadDir(root, relative string) ([]featureengine.DirEntry, error) {
+	answer := m.dir(root, relative)
+	return slices.Clone(answer.entries), answer.err
+}
+
+func (m *memoReader) SourceBinding(root string) (string, error) {
+	answer := m.binding(root)
+	return answer.binding, answer.err
+}
+
+// digest is the answerDigest of the answer to key, which it reads once like
+// any other read.
+func (m *memoReader) digest(key readKey) [32]byte {
+	switch key.Op {
+	case readFile:
+		return m.file(key.Root, key.Path).digest
+	case readDir:
+		return m.dir(key.Root, key.Path).digest
+	case readBinding:
+		if key.Path == "" {
+			return m.binding(key.Root).digest
+		}
+	}
+	return answerDigest(0, nil, nil, "", errors.New("no such read"))
+}
+
+func (m *memoReader) file(root, relative string) memoFile {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	key := root + "\x00" + relative
 	answer, ok := m.files[key]
 	if !ok {
 		data, err := m.reader.ReadFile(root, relative)
-		answer = memoFile{data: data, err: err}
+		answer = memoFile{data: data, err: err, digest: answerDigest(readFile, data, nil, "", err)}
 		m.files[key] = answer
 	}
-	return bytes.Clone(answer.data), answer.err
+	return answer
 }
 
-func (m *memoReader) ReadDir(root, relative string) ([]featureengine.DirEntry, error) {
+func (m *memoReader) dir(root, relative string) memoDir {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	key := root + "\x00" + relative
 	answer, ok := m.dirs[key]
 	if !ok {
 		entries, err := m.reader.ReadDir(root, relative)
-		answer = memoDir{entries: entries, err: err}
+		answer = memoDir{entries: entries, err: err, digest: answerDigest(readDir, nil, entries, "", err)}
 		m.dirs[key] = answer
 	}
-	return slices.Clone(answer.entries), answer.err
+	return answer
 }
 
-func (m *memoReader) SourceBinding(root string) (string, error) {
+func (m *memoReader) binding(root string) memoBinding {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	answer, ok := m.bindings[root]
 	if !ok {
 		binding, err := m.reader.SourceBinding(root)
-		answer = memoBinding{binding: binding, err: err}
+		answer = memoBinding{binding: binding, err: err, digest: answerDigest(readBinding, nil, nil, binding, err)}
 		m.bindings[root] = answer
 	}
-	return answer.binding, answer.err
+	return answer
 }

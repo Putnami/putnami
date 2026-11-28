@@ -115,10 +115,12 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				"It publishes no diagnostic and succeeds whatever the findings say: " +
 				"the CLI fails the run on the error findings of the projects the run selected. " +
 				"The task declares selection none: it reads no selection and is given none, so it writes the same file under every selection and one cache entry serves every selection. " +
-				"It reads the workspace's Git candidate cut and nothing else: " +
+				"Its findings read the workspace's Git candidate cut and nothing else: " +
 				"the tracked files and the untracked files no ignore rule excludes, which the input `git:**` holds, so editing, adding, deleting or renaming any file it reads moves the key, and an ignored file is neither read nor keyed. " +
 				"That key is an interim: " +
 				"the collector of ADR 0006 of protocols/evidence keys each check on the files it reads. " +
+				"Across runs the task keeps each project's evaluation in a memo under the job's cacheRoot, with a digest of the answer to every read the evaluation made, and evaluates again only the projects whose reads answer otherwise; " +
+				"the memo is never an input, so a hit, a miss and a refused memo write the same bytes. " +
 				"An evidence source binding records each bound file's bytes or link text and its executable bit, and the key holds the bit too; " +
 				"a submodule or an unmerged path produces no key, so the task then runs uncached. " +
 				"Every project is read at the tree base version 0.0.0, the version the CLI gives a task the cache can serve, and nothing it writes names a commit, so two runs on one tree share one entry whatever the commit, the ref or the checkout. " +

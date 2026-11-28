@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,6 +64,12 @@ import (
 // key, so a run that meets one is never served. Every project carries the
 // tree base version, and nothing it writes names a commit, so two runs on one
 // tree write the same bytes whatever the commit, the ref or the checkout.
+//
+// Across runs, the task keeps the evaluation of each project in a memo in the
+// workspace scratch the job context names as its cacheRoot, and evaluates
+// again only the projects whose reads answer otherwise (featuresMemo). The
+// memo never changes what the task writes: a hit, a miss, a refused memo and
+// none give the same bytes.
 func runFeaturesValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	ws, err := workspaceValidationView(ctx)
 	if err != nil {
@@ -68,7 +77,7 @@ func runFeaturesValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (st
 	}
 	// The evaluations take the CPUs the scheduler grants the job, else the
 	// CPUs Go grants the process.
-	report, fragments, err := sdd.BuildFeatureFindingsResult(ws, extensionReferences(ctx), cpubudget.Threads())
+	report, fragments, err := sdd.BuildFeatureFindingsResultWithMemo(ws, extensionReferences(ctx), cpubudget.Threads(), featuresMemo(ctx))
 	if err != nil {
 		return "", nil, err
 	}
@@ -79,6 +88,43 @@ func runFeaturesValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (st
 		len(report.Projects), report.Summary.Features, report.Summary.Requirements, report.Summary.Evidence,
 		report.Findings.Errors, report.Findings.Warnings))
 	return finish(report, nil)
+}
+
+// featuresMemoFile is the memo of the features step, under the job's cacheRoot.
+var featuresMemoFile = filepath.Join("sdd-features", "evaluations.memo")
+
+// featuresMemo is the memo the features step keeps: a file under the
+// workspace scratch directory the job context names as its cacheRoot, written
+// by the code this executable holds. A context without an absolute cacheRoot,
+// or an executable it cannot read, keeps no memo.
+func featuresMemo(ctx *pctx.Context) sdd.FeatureFindingsMemo {
+	if !filepath.IsAbs(ctx.CacheRoot) {
+		return sdd.FeatureFindingsMemo{}
+	}
+	code := executableDigest()
+	if code == "" {
+		return sdd.FeatureFindingsMemo{}
+	}
+	return sdd.FeatureFindingsMemo{Path: filepath.Join(ctx.CacheRoot, featuresMemoFile), Code: code}
+}
+
+// executableDigest is the SHA-256 of the running executable, "" when it cannot
+// be read.
+func executableDigest() string {
+	path, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return ""
+	}
+	return "sha256:" + hex.EncodeToString(hash.Sum(nil))
 }
 
 // extensionReferences are the references a project's resolved extensions or
