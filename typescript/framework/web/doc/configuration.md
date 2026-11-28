@@ -148,6 +148,19 @@ react({
 })
 ```
 
+### `crawlerUserAgents`
+
+**Type:** `string`
+**Default:** a pattern of search crawlers and link-preview agents: `bot` (Googlebot, bingbot, Twitterbot, Slackbot, Discordbot...), `crawl`, `spider`, `facebookexternalhit`, `whatsapp/`, `iframely`, `cardyb` and a few more. Lighthouse and the in-app browsers of chat applications stream like any browser.
+
+A page response streams: a browser receives the document head and the React shell as soon as the shell is ready, and each Suspense boundary arrives when its data resolves. A request whose `User-Agent` matches this pattern, case-insensitive, waits for every boundary instead, so its `<head>` holds every title, meta tag and style the page sets: crawlers and link previews read the head without running JavaScript. An empty string streams every request. A page whose HTML one cache serves to every caller (a `cache({ ttl })`, or a `Cache-Control` a shared cache may store, through `maxAge`, `sMaxAge` or a raw `max-age`, on the page or a layout) waits for every boundary for every request.
+
+```typescript
+react({
+  crawlerUserAgents: 'googlebot|bingbot|slackbot', // only these wait for the whole page
+})
+```
+
 ### `clientFetchTimeout`
 
 **Type:** `number`

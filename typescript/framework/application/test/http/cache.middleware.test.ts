@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
-import { CacheMiddleware, buildCacheControl, computeETag } from '../../src/http/cache.middleware';
+import {
+  CacheMiddleware,
+  buildCacheControl,
+  computeETag,
+  isSharedCacheControl,
+  SHARED_CACHE_CONTEXT_KEY,
+} from '../../src/http/cache.middleware';
 import { http } from '../../src/http/http.plugin';
 import { HttpResponse } from '../../src/http/http-response';
 import { application } from '../../src/application';
@@ -239,4 +245,30 @@ describe('CacheMiddleware', () => {
       await app.stop();
     },
   );
+});
+
+describe('shared cache slot', () => {
+  it('names the Cache-Control values a shared cache may store', () => {
+    expect(isSharedCacheControl(buildCacheControl({ maxAge: 300 }))).toBe(true);
+    expect(isSharedCacheControl(buildCacheControl({ sMaxAge: 300 }))).toBe(true);
+    expect(isSharedCacheControl('max-age=60')).toBe(true);
+    expect(isSharedCacheControl('Public')).toBe(true);
+    expect(isSharedCacheControl(buildCacheControl({ privateMaxAge: 300 }))).toBe(false);
+    expect(isSharedCacheControl('no-store')).toBe(false);
+    expect(isSharedCacheControl('public, no-store')).toBe(false);
+    expect(isSharedCacheControl('')).toBe(false);
+  });
+
+  it('sets the slot before the handler runs, only for a shared response', async () => {
+    const seen: unknown[] = [];
+    const next = (ctx: Record<string, unknown>) => async () => {
+      seen.push(ctx[SHARED_CACHE_CONTEXT_KEY]);
+      return new HttpResponse('ok');
+    };
+    for (const options of [{ maxAge: 300 }, { privateMaxAge: 300 }]) {
+      const ctx: Record<string, unknown> = {};
+      await CacheMiddleware(options)(ctx as never, next(ctx) as never);
+    }
+    expect(seen).toEqual([true, undefined]);
+  });
 });

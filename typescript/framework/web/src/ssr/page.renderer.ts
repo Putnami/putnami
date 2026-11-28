@@ -11,6 +11,7 @@ import {
   CSP_NONCE_CONTEXT_KEY,
   CSRF_TOKEN_CONTEXT_KEY,
   type RouteHandler,
+  SHARED_CACHE_CONTEXT_KEY,
   startTelemetrySpan,
 } from '@putnami/application';
 import { HttpException, type Logger, shouldExposeErrorStack, useConfig, useContext, useLogger } from '@putnami/runtime';
@@ -60,6 +61,8 @@ export const pageRenderer =
     basename?: () => string | undefined,
     clientFetchTimeout?: number,
     i18n?: () => I18nRuntimeOptions | undefined,
+    /** Whether a request waits for every Suspense boundary before the head. */
+    waitForAll?: (req: Request) => boolean,
   ): RouteHandler =>
   async () => {
     const logger = useLogger();
@@ -231,6 +234,9 @@ export const pageRenderer =
         bootstrap: readClientBootstrap(reqContext),
         clientScripts: readClientScripts(reqContext),
         i18n: i18nOptions && i18nState ? { options: i18nOptions, state: i18nState, documentMeta } : undefined,
+        // A response a shared cache stores (CacheMiddleware, on the page or a
+        // layout) is served to crawlers too.
+        waitForAll: (waitForAll?.(req) ?? false) || contextSlots(reqContext)[SHARED_CACHE_CONTEXT_KEY] === true,
       });
 
       // Use React Router's computed status code (e.g. 404 from a loader-thrown Response),
@@ -308,6 +314,11 @@ export async function wrapInHtmlDocument(
     clientScripts?: readonly string[];
     /** The locale of the render, when the application is localized. */
     i18n?: { options: I18nRuntimeOptions; state: I18nState; documentMeta: DocumentMeta };
+    /**
+     * Wait for every Suspense boundary before the head, as a crawler request
+     * does. Otherwise the head and the shell are sent once the shell is ready.
+     */
+    waitForAll?: boolean;
     // biome-ignore lint/suspicious/noExplicitAny: logger type
     logger?: any;
   },
@@ -357,11 +368,12 @@ export async function wrapInHtmlDocument(
 
       const hydrateSrc = options.hydrateScript.startsWith('/') ? options.hydrateScript : `/${options.hydrateScript}`;
 
-      // Wait for all Suspense boundaries to resolve so that lazy components
-      // (including PageMeta) populate the shared documentMeta before we
-      // collect head HTML.  The body will still stream progressively because
-      // the reader loop below starts immediately after the head is flushed.
-      await reactStream.allReady;
+      // A crawler waits for every Suspense boundary, so the head it reads
+      // holds every contribution, lazy components (PageMeta) included. A
+      // browser gets the head and the shell as soon as the shell is ready:
+      // what a boundary adds after that streams with it (lateStylesHtml) or
+      // after the root (lateHeadHtml).
+      if (options.waitForAll) await reactStream.allReady;
 
       // A page's own canonical link and `<Lang>` are known only now.
       const i18n = options.i18n;
@@ -369,8 +381,7 @@ export async function wrapInHtmlDocument(
       const headHtml = docHelper.headHtml || '';
       const i18nScript = i18n ? i18nPayloadScript(i18n.options, i18n.state, true) : '';
 
-      // Send HTML prefix — TTFB is after allReady but the body streams
-      // chunk-by-chunk from here.
+      // Send HTML prefix, then the body chunk by chunk.
       await writer.write(
         encoder.encode(
           `<!DOCTYPE html><html ${htmlAttributes(docHelper.lang, i18n?.state)}>${headHtml}<body>${i18nScript}${hydrationScript}<div id="root">`,
@@ -383,6 +394,9 @@ export async function wrapInHtmlDocument(
         // biome-ignore lint/performance/noAwaitInLoops: Sequential stream reading is required
         const { done, value } = await reader.read();
         if (done) break;
+        // Styles a later boundary inserted go before the chunk that shows it.
+        const lateStyles = docHelper.lateStylesHtml();
+        if (lateStyles) await writer.write(encoder.encode(lateStyles));
         await writer.write(value);
       }
 
@@ -399,7 +413,7 @@ export async function wrapInHtmlDocument(
       // Inject bootstrap script after the root div so it's outside hydration boundary
       await writer.write(
         encoder.encode(
-          `</div><script type="module"${nonceAttr} src="${hydrateSrc}"></script>${extraScripts}</body></html>`,
+          `</div>${docHelper.lateHeadHtml()}<script type="module"${nonceAttr} src="${hydrateSrc}"></script>${extraScripts}</body></html>`,
         ),
       );
     } catch (error) {

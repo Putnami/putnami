@@ -64,7 +64,11 @@
     },
     {
       "id": "ssr-response",
-      "text": "SSR executes the static handler and loaders before rendering, preserves redirects and router status, logs an unexpected loader error and records it as the request error, waits for lazy head contributions, then emits one HTML document whose React body is streamed and whose timer is released on success or error. The loaders and the render stop when their request ends, and that stop logs and records no error. Loaders run under an `ssr loaders` span and the shell under an `ssr render` span."
+      "text": "SSR executes the static handler and loaders before rendering, preserves redirects and router status, logs an unexpected loader error and records it as the request error, then emits one HTML document whose React body is streamed and whose timer is released on success or error. The loaders and the render stop when their request ends, and that stop logs and records no error. Loaders run under an `ssr loaders` span and the shell under an `ssr render` span."
+    },
+    {
+      "id": "ssr-streaming",
+      "text": "A browser request receives the head and the React shell once the shell is ready, and each Suspense boundary streams as it resolves. The head holds the contributions known at the shell; an extracted Emotion style a later chunk needs is written before that chunk; other late styles, scripts, and title, meta and link tags are written after the root, the tags by one nonced script. A request whose user agent matches the crawler pattern, and a page whose HTML is cached, wait for every boundary."
     },
     {
       "id": "document-isolation",

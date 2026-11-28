@@ -1,5 +1,6 @@
 import { ArrayOf, Config, Default, Int, Optional, shouldExposeErrorStack } from '@putnami/runtime';
 import type { ReactElement, ReactNode } from 'react';
+import { DEFAULT_CRAWLER_USER_AGENTS } from './crawlers';
 
 export const PutnamiReactConfig = Config('putnami.react', {
   scanFolder: Default(String, 'app'),
@@ -16,6 +17,14 @@ export const PutnamiReactConfig = Config('putnami.react', {
   minify: Default(Boolean, true),
   splitting: Default(Boolean, false),
   ssrTimeout: Default(Int, 3000),
+  /**
+   * Pattern of the user agents whose SSR response waits for every Suspense
+   * boundary before the head, case-insensitive: search crawlers and
+   * link-preview agents, which read the head without running JavaScript. Every
+   * other request receives the head and the shell as soon as the shell is
+   * ready. An empty string streams every request.
+   */
+  crawlerUserAgents: Default(String, DEFAULT_CRAWLER_USER_AGENTS),
   /** Timeout (ms) for client-side loader/action data fetches. */
   clientFetchTimeout: Default(Int, 30_000),
   /** Maximum entries in the SSR module and page-data LRU caches before eviction. */

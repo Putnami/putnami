@@ -149,4 +149,10 @@ describe('escapeRawText', () => {
   it('leaves opening script-like substrings untouched (only end tags break out)', () => {
     expect(escapeRawText('el.querySelector("script")')).toBe('el.querySelector("script")');
   });
+  it('closes an element without content, and self-closes only a void element', () => {
+    expect(asHtml('script', { src: '/a.js' })).toBe('<script src="/a.js"></script>');
+    expect(asHtml('style', {})).toBe('<style></style>');
+    expect(asHtml('meta', { name: 'x', content: 'y' })).toBe('<meta name="x" content="y"/>');
+    expect(asHtml('link', { rel: 'icon', href: '/f.ico' })).toBe('<link rel="icon" href="/f.ico"/>');
+  });
 });

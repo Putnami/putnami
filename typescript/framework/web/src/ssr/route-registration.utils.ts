@@ -25,6 +25,7 @@ import type {
 import type { PageCacheOptions } from './page';
 import type { I18nRuntimeOptions } from './i18n/runtime';
 import { pageRenderer } from './page.renderer';
+import { crawlerPattern, isCrawler } from './crawlers';
 import type { LazyPageData, MiddlewareResolver, ReactModuleCache } from './react-module-cache';
 import type { ReactPluginConfig } from './react-plugin';
 import type { PutnamiReactConfigExtras } from './react-ssr.config';
@@ -104,6 +105,12 @@ export function createPageRenderer(
   route: string,
   cacheOpts: PageCacheOptions | undefined,
 ): RouteHandler {
+  const crawlers = crawlerPattern(ctx.config.crawlerUserAgents);
+  // A page the server caches (ttl) serves one HTML to every caller, crawlers
+  // included, so it waits for every boundary; a page a shared HTTP cache
+  // stores does too, through the slot CacheMiddleware sets. Otherwise only a
+  // crawler request does.
+  const waitForAll = cacheOpts?.ttl ? () => true : (req: Request) => isCrawler(req, crawlers);
   const baseRenderer = pageRenderer(
     ctx.routes,
     () => ctx.config.page || RootHtml,
@@ -112,6 +119,7 @@ export function createPageRenderer(
     ctx.basename,
     ctx.config.clientFetchTimeout,
     ctx.i18n,
+    waitForAll,
   );
   // A localized page renders its links and router basename for the origin it
   // is served at, so each origin caches its own HTML.

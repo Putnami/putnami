@@ -2,7 +2,8 @@ import type { LinkHTMLAttributes, MetaHTMLAttributes, ScriptHTMLAttributes, Styl
 import { tryContext } from '@putnami/runtime';
 import type { DocumentHelper, DocumentMeta } from './document.types';
 import { ensureDocumentMeta } from '../../shared/context-slots';
-import { asHtml, escapeHtml } from './tag.utils';
+import { asHtml, escapeCssAttrValue, escapeHtml } from './tag.utils';
+import { safeJsonForScript } from '../../ssr/safe-json';
 
 export class SsrDocumentHelper implements DocumentHelper {
   private readonly documentMeta: DocumentMeta;
@@ -117,44 +118,188 @@ export class SsrDocumentHelper implements DocumentHelper {
   }
 
   get headHtml(): string {
-    // Run style extractors (e.g. Emotion CSS) before building head HTML.
-    // Extractors are registered during rendering and called here after allReady.
-    if (this.documentMeta.styleExtractors) {
-      for (const extractor of this.documentMeta.styleExtractors) {
-        for (const style of extractor()) {
-          this.addStyle(style);
-        }
-      }
-      this.documentMeta.styleExtractors = undefined;
-    }
+    this.pullExtractedStyles();
+    const sent: SentHead = {
+      title: this.documentMeta.title,
+      lang: this.documentMeta.lang,
+      metas: new Map(),
+      links: new Map(),
+      scripts: new Set(),
+      elements: new Set(),
+    };
 
     const elems: string[] = [];
     elems.push('<head>');
     if (this.documentMeta.title) {
       elems.push(`<title>${escapeHtml(this.documentMeta.title)}</title>`);
     }
-    if (this.documentMeta.metas) {
-      for (const meta of this.documentMeta.metas) {
-        elems.push(asHtml('meta', meta));
-      }
+    for (const meta of this.documentMeta.metas ?? []) {
+      const tag = asHtml('meta', meta);
+      sent.metas.set(metaKey(meta), tag);
+      elems.push(tag);
     }
-    if (this.documentMeta.links) {
-      for (const link of this.documentMeta.links) {
-        elems.push(asHtml('link', link));
-      }
+    for (const link of this.documentMeta.links ?? []) {
+      const tag = asHtml('link', link);
+      sent.links.set(linkKey(link), tag);
+      elems.push(tag);
     }
-    if (this.documentMeta.scripts) {
-      for (const script of this.documentMeta.scripts) {
-        const withNonce = this.nonce && !script.nonce ? { ...script, nonce: this.nonce } : script;
-        elems.push(asHtml('script', withNonce));
-      }
+    for (const script of this.documentMeta.scripts ?? []) {
+      const tag = this.scriptHtml(script);
+      sent.elements.add(script);
+      sent.scripts.add(tag);
+      elems.push(tag);
     }
-    if (this.documentMeta.styles) {
-      for (const style of this.documentMeta.styles) {
-        elems.push(asHtml('style', style));
-      }
+    for (const style of this.documentMeta.styles ?? []) {
+      sent.elements.add(style);
+      elems.push(asHtml('style', style));
     }
     elems.push('</head>');
+    this.sent = sent;
     return elems.join('');
   }
+
+  /**
+   * The styles a render produced since the head, or since the last call, as
+   * HTML. The streaming renderer writes them before the React chunk that needs
+   * them. Only extracted Emotion styles (`data-emotion`) are returned: the
+   * Emotion client moves them into `<head>` before hydration, so they never
+   * reach the hydrated root. Any other style waits for {@link lateHeadHtml}.
+   */
+  lateStylesHtml(): string {
+    const sent = this.sent;
+    if (!sent || !this.documentMeta.styleExtractors?.length) return '';
+    const html: string[] = [];
+    for (const style of this.pullExtractedStyles()) {
+      if (!isEmotionStyle(style) || sent.elements.has(style)) continue;
+      sent.elements.add(style);
+      html.push(asHtml('style', style));
+    }
+    return html.join('');
+  }
+
+  /**
+   * What the render added to the document head after the head was sent, as
+   * HTML written after the root: the styles and scripts not sent yet, and one
+   * nonced script that sets the title and lang and puts each new or changed
+   * meta and link tag into `<head>`. Empty when nothing changed.
+   */
+  lateHeadHtml(): string {
+    const sent = this.sent;
+    if (!sent) return '';
+    this.pullExtractedStyles();
+    const elems: string[] = [];
+    for (const style of this.documentMeta.styles ?? []) {
+      if (sent.elements.has(style)) continue;
+      sent.elements.add(style);
+      elems.push(asHtml('style', style));
+    }
+    for (const script of this.documentMeta.scripts ?? []) {
+      if (sent.elements.has(script)) continue;
+      sent.elements.add(script);
+      // `addScript` replaces an entry by a new object: the same script added
+      // again late is the same HTML, and runs once.
+      const tag = this.scriptHtml(script);
+      if (sent.scripts.has(tag)) continue;
+      sent.scripts.add(tag);
+      elems.push(tag);
+    }
+
+    const tags: Array<{ s?: string; h: string }> = [];
+    for (const meta of this.documentMeta.metas ?? []) {
+      const key = metaKey(meta);
+      const tag = asHtml('meta', meta);
+      if (sent.metas.get(key) === tag) continue;
+      sent.metas.set(key, tag);
+      tags.push({ s: metaSelector(meta), h: tag });
+    }
+    for (const link of this.documentMeta.links ?? []) {
+      const key = linkKey(link);
+      const tag = asHtml('link', link);
+      if (sent.links.get(key) === tag) continue;
+      sent.links.set(key, tag);
+      tags.push({ s: link.href ? `link[href="${escapeCssAttrValue(String(link.href))}"]` : undefined, h: tag });
+    }
+    const patch: { t?: string; l?: string; e: typeof tags } = { e: tags };
+    if (this.documentMeta.title !== sent.title && this.documentMeta.title !== undefined) {
+      patch.t = this.documentMeta.title;
+      sent.title = this.documentMeta.title;
+    }
+    if (this.documentMeta.lang !== sent.lang && this.documentMeta.lang !== undefined) {
+      patch.l = this.documentMeta.lang;
+      sent.lang = this.documentMeta.lang;
+    }
+    if (patch.t !== undefined || patch.l !== undefined || tags.length > 0) {
+      const nonceAttr = this.nonce ? ` nonce="${escapeHtml(this.nonce)}"` : '';
+      elems.push(`<script${nonceAttr}>${LATE_HEAD_SCRIPT}(${safeJsonForScript(patch)})</script>`);
+    }
+    return elems.join('');
+  }
+
+  /** What the head sent, so the late output writes only what is new. */
+  private sent?: SentHead;
+
+  /**
+   * Run the style extractors (e.g. Emotion CSS) and add what they return to
+   * the document styles. An extractor returns what was inserted since its
+   * previous call, so it is called again for each chunk the render streams.
+   */
+  private pullExtractedStyles(): StyleHTMLAttributes<HTMLStyleElement>[] {
+    const pulled: StyleHTMLAttributes<HTMLStyleElement>[] = [];
+    for (const extractor of this.documentMeta.styleExtractors ?? []) {
+      for (const style of extractor()) {
+        pulled.push(style);
+        this.addStyle(style);
+      }
+    }
+    return pulled;
+  }
+
+  private scriptHtml(script: ScriptHTMLAttributes<HTMLScriptElement>): string {
+    const withNonce = this.nonce && !script.nonce ? { ...script, nonce: this.nonce } : script;
+    return asHtml('script', withNonce);
+  }
 }
+
+interface SentHead {
+  title?: string;
+  lang?: string;
+  /** Each meta and link tag the head holds, by the key that dedupes it. */
+  metas: Map<string, string>;
+  links: Map<string, string>;
+  /** The HTML of each script already written. */
+  scripts: Set<string>;
+  /** The script and style entries already written. */
+  elements: Set<object>;
+}
+
+const metaKey = (meta: MetaHTMLAttributes<HTMLMetaElement>) =>
+  meta.name
+    ? `name:${meta.name}`
+    : meta.property
+      ? `property:${meta.property}`
+      : meta.httpEquiv
+        ? `http-equiv:${meta.httpEquiv}`
+        : `html:${asHtml('meta', meta)}`;
+
+const linkKey = (link: LinkHTMLAttributes<HTMLLinkElement>) =>
+  link.href ? `href:${link.href}` : `html:${asHtml('link', link)}`;
+
+/** The selector of the head meta a late one replaces, as `asHtml` writes its attribute. */
+const metaSelector = (meta: MetaHTMLAttributes<HTMLMetaElement>): string | undefined => {
+  if (meta.name) return `meta[name="${escapeCssAttrValue(String(meta.name))}"]`;
+  if (meta.property) return `meta[property="${escapeCssAttrValue(String(meta.property))}"]`;
+  if (meta.httpEquiv) return `meta[httpequiv="${escapeCssAttrValue(String(meta.httpEquiv))}"]`;
+  return undefined;
+};
+
+const isEmotionStyle = (style: StyleHTMLAttributes<HTMLStyleElement>) =>
+  typeof (style as Record<string, unknown>)['data-emotion'] === 'string';
+
+/**
+ * Applies a late head patch: `t` the title, `l` the lang, `e` the tags, each
+ * replacing the head element its selector `s` names. The tags are HTML the
+ * server built with `asHtml`, so their attributes are escaped.
+ */
+const LATE_HEAD_SCRIPT =
+  '(function(p){var d=document,h=d.head;if(p.t!==undefined)d.title=p.t;if(p.l!==undefined)d.documentElement.lang=p.l;' +
+  'p.e.forEach(function(x){try{if(x.s){var o=h.querySelector(x.s);if(o)o.remove()}}catch(_){}h.insertAdjacentHTML("beforeend",x.h)})})';

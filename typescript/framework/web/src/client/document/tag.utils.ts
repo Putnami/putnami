@@ -46,11 +46,18 @@ export const asHtml = <A>(tag: string, attr: AllHTMLAttributes<A>) => {
     buf.push('>');
     buf.push(emitContent(tag, content, rawHtml !== undefined));
     buf.push(`</${tag}>`);
-  } else {
+  } else if (VOID_TAGS.has(tag)) {
     buf.push('/>');
+  } else {
+    // `<script src="x"/>` opens a script the parser never closes: it would
+    // swallow the markup that follows, such as the hydration script.
+    buf.push(`></${tag}>`);
   }
   return buf.join('');
 };
+
+/** Elements that have no end tag; every other one is closed explicitly. */
+const VOID_TAGS = new Set(['meta', 'link', 'base']);
 
 /**
  * Decide how to emit element content based on the tag's parsing mode.

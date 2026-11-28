@@ -345,6 +345,21 @@
               "ssr-loaders-and-render-have-their-own-spans"
             ]
           }
+        },
+        {
+          "id": "ssr-streaming",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cached-page-waits-for-every-boundary",
+              "a-crawler-request-gets-every-head-contribution-in-the-head",
+              "a-late-head-tag-is-applied-after-the-root",
+              "a-late-style-is-written-before-the-chunk-that-needs-it",
+              "the-shell-is-sent-before-a-pending-boundary-resolves"
+            ]
+          }
         }
       ]
     },

@@ -79,4 +79,25 @@ describe('ThemeProvider', () => {
       expect(documentMeta.styleExtractors).toHaveLength(2);
     },
   );
+  test('the SSR style extractor returns only what was inserted since its previous call', async () => {
+    const run = Bun.spawn([process.execPath, `${import.meta.dir}/../fixtures/ssr-style-extractor.tsx`], {
+      cwd: `${import.meta.dir}/../..`,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const [out, err, code] = await Promise.all([
+      new Response(run.stdout).text(),
+      new Response(run.stderr).text(),
+      run.exited,
+    ]);
+    expect(code, err).toBe(0);
+    const [atShell, again, late, last] = JSON.parse(out) as unknown[];
+
+    expect(JSON.stringify(atShell)).toContain('rgb(1, 2, 3)');
+    expect(JSON.stringify(atShell)).not.toContain('rgb(4, 5, 6)');
+    expect(again).toEqual([]);
+    expect(JSON.stringify(late)).toContain('rgb(4, 5, 6)');
+    expect(JSON.stringify(late)).not.toContain('rgb(1, 2, 3)');
+    expect(last).toEqual([]);
+  });
 });

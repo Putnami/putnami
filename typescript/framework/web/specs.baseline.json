@@ -22,6 +22,7 @@
     "typescript/web-application-delivery#security-propagation",
     "typescript/web-application-delivery#server-data-boundary",
     "typescript/web-application-delivery#ssr-response",
+    "typescript/web-application-delivery#ssr-streaming",
     "typescript/web-application-delivery#static-build-version",
     "typescript/web-localization#agent-translation",
     "typescript/web-localization#alternate-links",

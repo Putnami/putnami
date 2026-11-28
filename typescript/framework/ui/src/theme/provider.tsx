@@ -52,11 +52,16 @@ function createSsrEmotionCache(): { cache: EmotionCache; getStyleTags: () => Arr
     return originalInsert(...args);
   };
 
+  // Each call returns what was inserted since the previous one: the streaming
+  // renderer calls it again for each chunk, and writes each style once.
+  let returned = 0;
   const getStyleTags = () => {
     const tags: Array<{ css: string; names: string }> = [];
     let css = '';
     const names: string[] = [];
-    for (const name of insertedNames) {
+    const fresh = insertedNames.slice(returned);
+    returned = insertedNames.length;
+    for (const name of fresh) {
       const inserted = cache.inserted[name];
       if (typeof inserted === 'string') {
         css += inserted;
@@ -186,8 +191,8 @@ export function ThemeProvider({ theme: themeProp, colorMode: colorModeProp, chil
         documentMeta.scripts.unshift({ children: buildColorModeScript() });
       }
 
-      // Register a lazy style extractor on DocumentMeta.
-      // Called by SsrDocumentHelper.headHtml after allReady (all components rendered).
+      // Register a style extractor on DocumentMeta. SsrDocumentHelper calls it
+      // for the head, then before each chunk the render streams after the shell.
       documentMeta.styleExtractors ||= [];
       documentMeta.styleExtractors.push(() =>
         ssrCache.getStyleTags().map((tag) => ({

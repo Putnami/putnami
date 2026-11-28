@@ -11,7 +11,11 @@ export interface DocumentMeta {
   links?: LinkHTMLAttributes<HTMLLinkElement>[];
   metas?: MetaHTMLAttributes<HTMLMetaElement>[];
   styles?: StyleHTMLAttributes<HTMLStyleElement>[];
-  /** Lazy style extractors called after SSR rendering completes (e.g. Emotion CSS extraction). */
+  /**
+   * Style extractors (e.g. Emotion CSS extraction). The SSR document helper
+   * calls each one for the head, then before each chunk the render streams
+   * after the shell: a call returns what was inserted since the previous one.
+   */
   styleExtractors?: Array<() => StyleHTMLAttributes<HTMLStyleElement>[]>;
 }
 

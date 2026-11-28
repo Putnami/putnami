@@ -2,8 +2,9 @@
 
 Use `@putnami/web` for server-side rendering, file-based routing, server-owned
 data loading and mutation, explicit static rendering, bounded islands, and
-client hydration. It uses React 19 and streams the response body after the route
-graph and lazy document metadata are ready.
+client hydration. It uses React 19 and streams the response: the head and the
+shell leave as soon as the shell is ready, and each Suspense boundary follows when
+its data resolves.
 
 ## Getting started
 
@@ -34,6 +35,7 @@ react({
   autoScan: true,           // Auto-discover routes (default: true)
   publicFolder: 'public',   // Static assets folder (default: 'public')
   ssrTimeout: 3000,         // SSR render timeout in ms (default: 3000)
+  crawlerUserAgents: '…',   // User agents that wait for every Suspense boundary (default: crawlers and link previews)
   minify: true,             // Minify client bundles (default: true)
   sourcemap: 'external',    // 'none' | 'inline' | 'external' (default: 'external')
   splitting: false,         // Code splitting (default: false)
@@ -598,7 +600,19 @@ export default function GlobalError() {
 
 ## Streaming and Suspense
 
-React 19 streaming SSR is supported out of the box.
+React 19 streaming SSR is supported out of the box. A browser receives the
+document head and the React shell as soon as the shell is ready; a Suspense
+boundary first sends its fallback, then its content when its data resolves.
+
+What a boundary adds to the document after the shell still reaches the page:
+an Emotion style of `@putnami/ui` is written just before the chunk that uses
+it, and a title, meta or link tag is applied by one nonced script after the
+root. A crawler or link-preview request (the `crawlerUserAgents` option) waits
+for every boundary instead, so its `<head>` holds every tag without
+JavaScript. So does a page whose HTML one cache serves to every caller: a
+server cache `ttl`, or a `Cache-Control` a shared cache may store (`maxAge`,
+`sMaxAge`, a raw `max-age`), set on the page or on a layout. Static pages are
+rendered whole at build time.
 
 ### Using Suspense
 

@@ -35,6 +35,25 @@ export function buildCacheControl(options: HttpCacheOptions): string {
   return directives.join(', ');
 }
 
+/**
+ * Request slot `CacheMiddleware` sets before the handler runs when the
+ * response it caches is storable by a shared cache, such as a CDN that serves
+ * one copy to every caller. A handler that varies its output by caller, such as
+ * a streaming page renderer, reads it to send the one output every caller can
+ * share.
+ */
+export const SHARED_CACHE_CONTEXT_KEY = 'sharedCache';
+
+/**
+ * Whether a shared cache may store a response with this Cache-Control value:
+ * `public`, `s-maxage` or `max-age`, unless `private` or `no-store` says no.
+ */
+export function isSharedCacheControl(cacheControl: string): boolean {
+  const directives = cacheControl.toLowerCase();
+  if (/\b(private|no-store)\b/.test(directives)) return false;
+  return /\b(public|s-maxage|max-age)\b/.test(directives);
+}
+
 export function computeETag(body: string): string {
   const hash = createHash('md5').update(body).digest('hex').substring(0, 16);
   return `"${hash}"`;
@@ -43,10 +62,13 @@ export function computeETag(body: string): string {
 export const CacheMiddleware =
   (options: HttpCacheOptions = {}): HttpMiddleware =>
   async (ctx, next) => {
+    const cacheControl = buildCacheControl(options);
+    if (isSharedCacheControl(cacheControl)) {
+      (ctx as unknown as Record<string, unknown>)[SHARED_CACHE_CONTEXT_KEY] = true;
+    }
     let res = await next();
     if (!res) return res;
 
-    const cacheControl = buildCacheControl(options);
     if (cacheControl) {
       res = res.setHeader('Cache-Control', cacheControl);
     }
