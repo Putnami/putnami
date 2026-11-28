@@ -95,7 +95,7 @@
     },
     {
       "id": "static-loader-status",
-      "text": "A static render answers a loader `HttpException` with its own status and the not-found or error boundary, as SSR does; static prerender fails the build, naming the route, the path and the status, when a path that `paths()` lists resolves to a 4xx, and writes no page for it."
+      "text": "A static render answers a loader `HttpException` with its own status and the not-found or error boundary, as SSR does. Static prerender writes no page for a pathname that resolves to a 4xx, which then renders live with its status, and fails the build, naming the route, the params and each status, when a static path resolves to a 4xx in every locale it expands to."
     },
     {
       "id": "static-build-version",
