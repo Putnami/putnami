@@ -40,8 +40,12 @@ decide, and it does not read the selection.
    the candidate cut, every project at the tree base version `0.0.0`, and a
    revision that names no commit. The evaluations run in parallel on the CPUs
    the scheduler grants the job, and share one reader, which answers each read
-   once, and one strict parse of each authored document. Their answers merge
-   in project order, so the bytes do not depend on how many run at once.
+   once, and one strict parse of each authored document. Each evaluation
+   validates every project's manifests; `protocols/features` answers that
+   validation once per manifest content in the process, and an evaluation
+   reads feature identities in the authored order instead of copying each
+   manifest into canonical order. Their answers merge in project order, so the
+   bytes do not depend on how many run at once.
 3. **It states every finding, located at the file it names.** Each diagnostic
    of each evaluation becomes one `finding` fragment of source format
    `putnami-sdd`. The rule is the diagnostic code, and the severity and message
@@ -112,13 +116,13 @@ project. Each finding now counts for the project that owns the file it names:
 
 ## Consequences
 
-- One task replaces the 123 copies. On this repository it writes 2,574
+- One task replaces the 123 copies. On this repository it writes 2,578
   warning fragments and no error. After an untracked file is added, its
-  process runs 1.2 to 1.9 seconds under every selection, where the copies ran
-  0.2 seconds for a run that selects one features project, 0.9 for five, 5.3
-  for 28 and 24.3 for all 123. A run narrowed to one features project is
-  therefore slower: its session takes about 9.0 seconds instead of 7.7. An
-  unscoped run's session drops from 15.0 to 7.7 seconds.
+  process runs 0.7 to 1.1 seconds under every selection, where the copies ran
+  0.2 seconds for a run that selects one features project, 0.8 for five, 4.7
+  for 28 and 21.5 for all 123. A run narrowed to one features project is
+  therefore slower: its session takes 7.4 to 8.3 seconds instead of 7.1 to
+  8.0. An unscoped run's session drops from 13.0 to 7.9 seconds.
 - The task's cache entry holds the fragment file, about 800 KiB here, and one
   entry serves every selection.
 - An unscoped run prints one warning line per project and rule, 129 here, and
