@@ -15,6 +15,7 @@
     "typescript/shared-datasource-pooling#connections-on-demand",
     "typescript/shared-datasource-pooling#datasource-bound-acquire",
     "typescript/shared-datasource-pooling#one-pool-per-physical-database",
+    "typescript/shared-datasource-pooling#operations-share-a-connection",
     "typescript/shared-datasource-pooling#shared-pool-lifetime",
     "typescript/shared-datasource-pooling#tuning-agreement",
     "typescript/sql-migrations#atomic-bookkeeping",

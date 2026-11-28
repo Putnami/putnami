@@ -35,7 +35,7 @@
     },
     {
       "id": "one-pool-per-physical-database",
-      "text": "Physical pools are keyed by the effective connection identity of each datasource \u2014 host, port, database, resolved username, password source, ssl and the remaining startup parameters \u2014 never by datasource name: byte-identical identities share one physical pool, distinct identities open distinct pools, and concurrent first opens of one identity connect once."
+      "text": "Physical pools are keyed by the effective connection identity of each datasource — host, port, database, resolved username, password source, ssl and the remaining startup parameters — never by datasource name: byte-identical identities share one physical pool, distinct identities open distinct pools, and concurrent first opens of one identity connect once."
     },
     {
       "id": "shared-pool-lifetime",
@@ -51,18 +51,26 @@
     {
       "id": "connections-on-demand",
       "text": [
-        "A physical pool opens a connection only when every connection it holds is leased and it holds fewer than poolSize;",
-        "an operation that finds poolSize connections leased waits for one to be released, and the most recently released connection is reused first."
+        "A physical pool opens a connection only when every connection it holds is in use and it holds fewer than poolSize;",
+        "an operation that finds poolSize connections in use and none it may share waits for one to be released; an idle connection whose session holds the operation's path is reused first, else the most recently released."
+      ]
+    },
+    {
+      "id": "operations-share-a-connection",
+      "text": [
+        "Once poolSize connections are in use and no operation waits, a datasource operation joins the least busy connection whose session holds its search_path and on which a statement finished, or sharing began, under 100 ms ago;",
+        "a set, a reserve(), a transaction and a template call hold their connection alone; a freed connection serves the waiters in order, sharing it only with the same-path waiters right behind the first, up to an even share."
       ]
     },
     {
       "id": "connection-lifetime",
-      "text": "Each connection of a physical pool closes after maxLifetime seconds; when maxLifetime is 0, each connection draws a lifetime between 45 and 90 minutes, so a long-running workload recycles its connections and the prepared statements they hold."
+      "text": "Each connection of a physical pool retires after maxLifetime seconds, once no operation runs on it, and takes no new operation past that time; when maxLifetime is 0, each connection draws a lifetime between 45 and 90 minutes, so a long-running workload recycles its connections and the prepared statements they hold."
     }
   ],
   "decisions": [
     "typescript/framework/database/doc/adr/0003-shared-physical-pool-per-database.md",
     "typescript/framework/database/doc/adr/0005-bun-sql-is-the-driver.md",
-    "typescript/framework/database/doc/adr/0006-the-pool-remembers-each-connections-search-path.md"
+    "typescript/framework/database/doc/adr/0006-the-pool-remembers-each-connections-search-path.md",
+    "typescript/framework/database/doc/adr/0007-datasource-operations-share-a-connection.md"
   ]
 }

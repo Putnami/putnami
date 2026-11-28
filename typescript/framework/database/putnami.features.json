@@ -135,7 +135,10 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["an-unset-lifetime-draws-45-to-90-minutes-per-connection"]
+            "checks": [
+              "a-busy-member-retires-once-drained-and-takes-no-new-operation",
+              "an-unset-lifetime-draws-45-to-90-minutes-per-connection"
+            ]
           }
         },
         {
@@ -148,6 +151,21 @@
               "a-full-pool-makes-the-next-operation-wait",
               "a-pool-opens-a-connection-only-when-all-are-leased",
               "the-most-recently-released-connection-is-reused-first"
+            ]
+          }
+        },
+        {
+          "id": "operations-share-a-connection",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-full-pool-shares-a-connection-that-holds-the-path",
+              "a-connection-is-shared-only-under-the-path-its-session-holds",
+              "a-stalled-member-takes-no-joiner",
+              "an-exclusive-lease-waits-until-no-operation-runs-on-the-connection",
+              "freed-members-share-the-waiters-evenly-in-their-order"
             ]
           }
         },

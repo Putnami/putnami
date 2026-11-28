@@ -26,8 +26,9 @@ import {
  * The pool is the package's own (driver-pool.ts): each member holds one
  * connection and the pool records the `search_path` its session holds,
  * forgetting it whenever the connection closes. An operation leases a member
- * and, when the member's session already holds this datasource's path, runs
- * its statement with no set at all — the common case of a workload with one
+ * for this datasource's path and, when the member's session already holds it,
+ * runs its statement with no set at all, on a member other operations under
+ * the same path may share — the common case of a workload with one
  * datasource per database. Otherwise it first awaits
  * `SELECT set_config('search_path', $1, false)` (or `RESET search_path` for a
  * datasource on the server default, which must still neutralize what another
@@ -103,7 +104,7 @@ export function createDatasourceClient(physical: DriverSql, options: DatasourceC
   };
 
   const leaseDriver = async (): Promise<LeasedMember> => {
-    const leased = leaseMember(physical);
+    const leased = leaseMember(physical, wanted);
     if (!leased) {
       throw new Error('database: a datasource client runs on a pool built by createDriverPool');
     }

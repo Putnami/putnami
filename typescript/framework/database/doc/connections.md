@@ -212,10 +212,27 @@ ssl and startup parameters — share **one physical connection pool** of
 
 The pool opens connections as concurrent demand needs them: a connection is
 opened only when every connection the pool holds is in use, and never more than
-`poolSize`. The most recently released connection serves the next operation, so
-the others go idle and close after `idleTimeout` seconds; an operation that
-finds `poolSize` connections in use waits for one. A workload that runs one
-query at a time holds one backend.
+`poolSize`. An idle connection whose session holds the datasource's
+`search_path` serves the next operation first, else the most recently
+released one, so the others go idle and close after `idleTimeout` seconds. A
+workload that runs one query at a time holds one backend.
+
+Once `poolSize` connections are in use, a query shares the least busy
+connection whose session already holds its datasource's `search_path`: its
+statement follows the others on that connection, as on `Bun.SQL`'s own pool. A
+statement that fails or is cancelled fails alone. A connection where no
+statement finished, and sharing did not begin, in the last 100 ms takes no new
+query, so a statement waiting on a lock holds back only those already behind
+it. `sql.reserve()`,
+`sql.begin(...)` and a change of `search_path` hold their connection alone and
+wait until no query runs on it; while one waits, new queries wait behind it.
+
+A query behind a statement that waits on a lock waits too. When a transaction
+holds that lock and awaits such a query from the pool (another datasource, or
+`database()` inside `runInTransaction`), the two wait on each other, and
+PostgreSQL does not see it. The statement timeout ends it (`statementTimeoutMs`,
+30 seconds by default); a workload that turns it off and queries the pool from
+inside a transaction should set a `lock_timeout`.
 
 `database(name)` returns a *datasource-bound* client over that shared pool:
 
@@ -235,8 +252,9 @@ query at a time holds one backend.
   driver untouched.
 
 The pool forgets a connection's path when the connection closes. Each
-connection closes after `maxLifetime` seconds; with `maxLifetime: 0`, each one
-draws a lifetime between 45 and 90 minutes.
+connection retires after `maxLifetime` seconds, once no query runs on it, and
+takes no new query past that time; with `maxLifetime: 0`, each one draws a
+lifetime between 45 and 90 minutes.
 
 Do not change `search_path` with a pooled query (`sql.unsafe('SET search_path
 ...')`, `DISCARD ALL`). The pool does not see it, so the change holds on that
