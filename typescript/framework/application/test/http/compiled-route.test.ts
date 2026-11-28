@@ -254,13 +254,13 @@ describe('a route Bun matches, compiled', () => {
   });
 
   it('answers 408 at the deadline counted from the arrival, past a synchronous prefix', async () => {
-    const plugin = http({ port: 0, requestTimeoutMs: 200 });
+    const plugin = http({ port: 0, requestTimeoutMs: 500 });
     plugin.get('/busy', async () => {
-      const until = performance.now() + 400;
+      const until = performance.now() + 1000;
       while (performance.now() < until) {
         // A synchronous prefix longer than the deadline.
       }
-      await sleep(2000);
+      await sleep(3000);
       return { late: true };
     });
     const served = await startCapturing(() => application().use(plugin), plugin);
@@ -269,9 +269,9 @@ describe('a route Bun matches, compiled', () => {
     const response = await served.call('GET', '/busy', `${served.base}/busy`);
     const elapsed = performance.now() - started;
     expect(response.status).toBe(408);
-    // The chain answers once the prefix ends; a deadline counted from the
-    // queuing would answer 200 ms after it.
-    expect(elapsed).toBeLessThan(550);
+    // The chain answers once the 1000 ms prefix ends; a deadline counted from
+    // the queuing would answer 500 ms after it. The bound sits halfway.
+    expect(elapsed).toBeLessThan(1250);
   });
 
   it('refuses a cross-site state change with the secure headers, and serves a same-origin one', async () => {
