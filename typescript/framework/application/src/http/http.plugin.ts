@@ -9,7 +9,7 @@ import { Application, type GenerateResult, type Module, type Plugin } from '../a
 import { PutnamiConfig } from '../application/putnami.config';
 import { commitRequestSession, loadRequestSession } from '../session/request-session';
 import { SessionConfig } from '../session/session.config';
-import { type CompiledAnswer, compiledForms, runCompiledRoute } from './compiled-route';
+import { type CompiledAnswer, CompiledRequest, compiledForms } from './compiled-route';
 import { CompressionMiddleware } from './compression.middleware';
 import { CsrfMiddleware, isCsrfMiddleware } from './csrf.middleware';
 import { isDevHtmlRequest, renderDevErrorPage } from './dev-error-page';
@@ -630,13 +630,9 @@ export class HttpPlugin implements Plugin {
       let answered: CompiledAnswer;
       try {
         if (containerContext) attachRequestScope(context, containerContext);
+        const request = new CompiledRequest(context, route.forms, lifetime, answerChainError);
         answered = runInContext(context, () =>
-          runCompiledRoute(
-            context,
-            route.forms,
-            (done, failed) => httpDispatcher.runRoute(context, route.handler, done, failed),
-            (e) => answerChainError(context, lifetime, e),
-          ),
+          request.run(httpDispatcher, route.handler),
         ) as CompiledAnswer;
       } catch (error) {
         answered = Promise.reject(error);

@@ -13,7 +13,7 @@ import { MemorySink } from '@putnami/runtime/testing';
 import { api } from '../../src/api';
 import { endpoint } from '../../src/api/route/endpoint';
 import { application } from '../../src/application';
-import { type CompiledAnswer, runCompiledRoute } from '../../src/http/compiled-route';
+import { type CompiledAnswer, CompiledRequest } from '../../src/http/compiled-route';
 import type { HttpRequestContextInternal } from '../../src/http/http-context.type';
 import { HttpResponse } from '../../src/http/http-response';
 import { HttpPlugin, http } from '../../src/http/http.plugin';
@@ -56,21 +56,24 @@ async function startCapturing(buildApp: () => ReturnType<typeof application>, pl
   };
 }
 
-describe('runCompiledRoute', () => {
+describe('CompiledRequest', () => {
   const ctx = {} as HttpRequestContextInternal;
-  const answerError = (error: unknown) => new HttpResponse(String((error as Error).message), { status: 599 });
+  const answerError = (_ctx: unknown, _served: unknown, error: unknown) =>
+    new HttpResponse(String((error as Error).message), { status: 599 });
   const run = (forms: MiddlewareForm<unknown>[], inner: () => HttpResponse | undefined): CompiledAnswer =>
-    runCompiledRoute(
-      ctx,
-      forms,
-      (answered, failed) => {
-        try {
-          return answered(inner());
-        } catch (error) {
-          return failed(error);
-        }
+    new CompiledRequest(ctx, forms, undefined, answerError).run(
+      {
+        runRoute: (_ctx, _handler, continuation) => {
+          let response: HttpResponse | undefined;
+          try {
+            response = inner();
+          } catch (error) {
+            return continuation.failed(error);
+          }
+          return continuation.answered(response);
+        },
       },
-      answerError,
+      () => undefined,
     );
 
   it('enters outermost first, leaves innermost first, and answers at once', () => {
