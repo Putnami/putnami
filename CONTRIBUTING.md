@@ -402,9 +402,18 @@ private members (the web samples, `typescript/doc-examples` and
 `sites/putnami.dev`) reference it through `catalog:`;
 `typescript/templates/proof` keeps the specifiers the templates ship.
 Because `bun.lock` must satisfy that floor, it cannot fall back to an older
-minor. When React publishes a new minor, raise the floor in one member,
-which rewrites the catalog entry and refreshes `bun.lock`, then run the
-impacted gate:
+minor. It does not move forward by itself, so whoever changes `@putnami/web`
+or `@putnami/ui`, and the release owner before each release, compare the locked
+version with the one a fresh install resolves:
+
+```bash
+grep -o '"react@[0-9.]*"' bun.lock
+curl -s https://registry.npmjs.org/react | jq -r '."dist-tags".latest'
+```
+
+When the registry is on a newer minor, raise the floor in one member, which
+rewrites the catalog entry and refreshes `bun.lock`, then run the impacted
+gate:
 
 ```bash
 putnami deps add react@^<version> --projects @example/03-web
