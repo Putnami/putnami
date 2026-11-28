@@ -550,6 +550,15 @@ const InvocationDirEnv = "PUTNAMI_INVOCATION_DIR"
 // credential provider off unless its own command line turns it on.
 const ProvidersEnv = "PUTNAMI_PROVIDERS"
 
+// selectedProjectsEnv names the variables that carry the run's selected
+// projects, in the order BuildEnvVars writes them: names, ids, paths, roots.
+var selectedProjectsEnv = [4]string{
+	"PUTNAMI_SELECTED_PROJECTS",
+	"PUTNAMI_SELECTED_PROJECT_IDS",
+	"PUTNAMI_SELECTED_PROJECT_PATHS",
+	"PUTNAMI_SELECTED_PROJECT_ROOTS",
+}
+
 // BuildEnvVars returns PUTNAMI_* environment variables that mirror the JSON
 // context file. Shell extensions read these to avoid parsing JSON in bash.
 // Go extensions should prefer the context file via extension-sdk/context.
@@ -589,10 +598,10 @@ func BuildEnvVars(ctx *JobCommandContext) []string {
 	}
 	if len(ctx.SelectedProjects) > 0 {
 		vars = append(vars,
-			"PUTNAMI_SELECTED_PROJECTS="+strings.Join(selectedProjectField(ctx.SelectedProjects, "name"), ","),
-			"PUTNAMI_SELECTED_PROJECT_IDS="+strings.Join(selectedProjectField(ctx.SelectedProjects, "id"), ","),
-			"PUTNAMI_SELECTED_PROJECT_PATHS="+strings.Join(selectedProjectField(ctx.SelectedProjects, "path"), ","),
-			"PUTNAMI_SELECTED_PROJECT_ROOTS="+strings.Join(selectedProjectField(ctx.SelectedProjects, "fullPath"), ","),
+			selectedProjectsEnv[0]+"="+strings.Join(selectedProjectField(ctx.SelectedProjects, "name"), ","),
+			selectedProjectsEnv[1]+"="+strings.Join(selectedProjectField(ctx.SelectedProjects, "id"), ","),
+			selectedProjectsEnv[2]+"="+strings.Join(selectedProjectField(ctx.SelectedProjects, "path"), ","),
+			selectedProjectsEnv[3]+"="+strings.Join(selectedProjectField(ctx.SelectedProjects, "fullPath"), ","),
 		)
 	}
 	return vars

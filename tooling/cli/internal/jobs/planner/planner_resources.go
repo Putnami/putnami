@@ -98,6 +98,15 @@ func serializeWriteResources(jobs []*jobmodel.ScheduledJob, leaders map[string]s
 	// it takes its leader's place in the write order instead of a place of its
 	// own. Its leader is the same task over the same project, so it writes the
 	// same resources.
+	//
+	// A job that runs once for the workspace (it carries the selected projects)
+	// reads a project-scoped resource of every project, not of the synthetic
+	// workspace project it runs under: its read joins the group of that
+	// resource in every project, so it is ordered against each project's
+	// writers as that project's own reader would be.
+	projectGroups := make(map[string][]string)
+	type spanningRead struct{ job, resource string }
+	var spanning []spanningRead
 	for _, job := range jobs {
 		key := job.Key()
 		written := make(map[string]bool)
@@ -107,6 +116,9 @@ func serializeWriteResources(jobs []*jobmodel.ScheduledJob, leaders map[string]s
 				continue
 			}
 			written[ck] = true
+			if groups[ck] == nil && ref.EffectiveScope() != extension.ResourceScopeWorkspace {
+				projectGroups[ref.ID] = append(projectGroups[ref.ID], ck)
+			}
 			if leader, ok := leaders[key]; ok {
 				ensure(ck).followers[leader] = append(ensure(ck).followers[leader], key)
 				continue
@@ -118,8 +130,20 @@ func serializeWriteResources(jobs []*jobmodel.ScheduledJob, leaders map[string]s
 			if written[ck] {
 				continue
 			}
+			if ref.EffectiveScope() != extension.ResourceScopeWorkspace && len(job.SelectedProjects) > 0 {
+				spanning = append(spanning, spanningRead{job: key, resource: ref.ID})
+				continue
+			}
+			if groups[ck] == nil && ref.EffectiveScope() != extension.ResourceScopeWorkspace {
+				projectGroups[ref.ID] = append(projectGroups[ref.ID], ck)
+			}
 			g := ensure(ck)
 			g.readers = append(g.readers, key)
+		}
+	}
+	for _, read := range spanning {
+		for _, ck := range projectGroups[read.resource] {
+			groups[ck].readers = append(groups[ck].readers, read.job)
 		}
 	}
 	if len(groups) == 0 {

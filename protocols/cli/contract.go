@@ -45,12 +45,11 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
-//	31: ADDITIVE — a task that declares `selection: none`. From 31 on, the
+//	30: ADDITIVE — a task that declares `selection: none`. From 30 on, the
 //	   CLI hands such a task no `selection` and no `selectedProjects` in its
 //	   job context and keys it on no selected project, so one cache entry
-//	   serves every selection. A reader below 31 refuses the member, so a
-//	   manifest that declares one is stamped 31 from every origin.
-//	30: reserved for a change in flight; no meaning lands here yet.
+//	   serves every selection. A reader below 30 refuses the member, so a
+//	   manifest that declares one is stamped 30 from every origin.
 //	29: ADDITIVE — runtime `entries` and `compiledInputs`, and a task that
 //	   names a `runtimeEntry`. From 29 on, a task runs its entry where its
 //	   command says {extensionRuntime}, and a workspace-local runtime that
@@ -416,9 +415,8 @@ const RuntimeEntriesContract = 29
 // SelectionFreeTaskContract is required by a manifest whose task declares
 // `selection: none`. A reader at this contract hands the task no run
 // selection and keys it on no selected project. An older reader refuses the
-// member, so it refuses the stamp instead. Rung 30 is reserved for a change in
-// flight, so this rung is 31.
-const SelectionFreeTaskContract = 31
+// member, so it refuses the stamp instead.
+const SelectionFreeTaskContract = 30
 
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or

@@ -60,8 +60,7 @@ func TestAdditiveContractsAreOrdered(t *testing.T) {
 		ToolchainProbeSelfContract != PromptHostHooksContract+1 ||
 		EmptiedFileOutputContract != ToolchainProbeSelfContract+1 ||
 		ContextActivationContract != EmptiedFileOutputContract+1 || RuntimeEntriesContract != ContextActivationContract+1 ||
-		// Rung 30 is reserved for a change in flight.
-		SelectionFreeTaskContract != RuntimeEntriesContract+2 || LatestContract != SelectionFreeTaskContract {
+		SelectionFreeTaskContract != RuntimeEntriesContract+1 || LatestContract != SelectionFreeTaskContract {
 		t.Fatalf("additive contract ladder = base %d, agent %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, command kinds %d, publish channels %d, provisioned toolchain %d, input selectors %d, default positionals %d, changed files %d, host hooks %d, step dependency %d, providers %d, user-scope skills %d, build-graph edges %d, dependency closure %d, command layer inputs %d, provider members %d, prompt host hooks %d, toolchain probe self %d, emptied file outputs %d, context activation %d, runtime entries %d, selection-free tasks %d, latest %d",
 			CurrentContract, AgentContentContract, ReleaseBaselineInputContract,
 			ExtensionDependenciesContract, VerbVocabularyContract, SourceBoundCacheContract, CommandKindContract,

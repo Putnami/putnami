@@ -295,6 +295,14 @@ func buildJobInvocation(
 	env = removeEnvKey(env, InvocationDirEnv)
 	// The credential-provider choice belongs to the process that made it.
 	env = removeEnvKey(env, ProvidersEnv)
+	// A task that reads no selection gets none in its context, and its key
+	// holds none. A nested run would otherwise hand it the outer run's
+	// selection through the inherited variables.
+	if readsNoSelection(job) {
+		for _, key := range selectedProjectsEnv {
+			env = removeEnvKey(env, key)
+		}
+	}
 	env = append(env, BuildEnvVars(jobCtx)...)
 	env = append(env, extraEnv...)
 	if job.JobDef.Env != nil {

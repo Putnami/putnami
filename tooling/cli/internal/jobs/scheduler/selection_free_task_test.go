@@ -120,3 +120,40 @@ func TestAnUndeclaredWorkspaceOnceTaskStillKeysOnTheSelection(t *testing.T) {
 		}
 	}
 }
+
+// TestASelectionFreeTaskInheritsNoSelection pins the environment half: a run
+// nested under a job that had a selection inherits PUTNAMI_SELECTED_*, and a
+// task that reads no selection must not receive the outer run's, while an
+// undeclared task with this run's selection gets this run's.
+func TestASelectionFreeTaskInheritsNoSelection(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-run-fails-on-its-selected-projects-findings",
+		"a-task-that-reads-no-selection-keys-once-for-every-selection")
+	for _, key := range selectedProjectsEnv {
+		t.Setenv(key, "/outer")
+	}
+	ws := makeExecutorTestWorkspace(t)
+	run := selectionRuns()[2]
+	for _, tc := range []struct {
+		selection string
+		want      string
+	}{
+		{extensionproto.TaskSelectionNone, ""},
+		{"", "/ledger"},
+	} {
+		job := workspaceOnceJob(t, run, tc.selection)
+		ctx := BuildJobContext(ws, job, nil, nil, nil)
+		invocation := buildJobInvocation(ws, job, ctx, nil, "")
+		got := envLastValue(invocation.env, selectedProjectsEnv[1])
+		if tc.want == "" {
+			for _, key := range selectedProjectsEnv {
+				if envHasKey(invocation.env, key) {
+					t.Errorf("selection %q: the job environment carries %s=%s", tc.selection, key, envLastValue(invocation.env, key))
+				}
+			}
+			continue
+		}
+		if got != tc.want {
+			t.Errorf("selection %q: %s = %q, want %q", tc.selection, selectedProjectsEnv[1], got, tc.want)
+		}
+	}
+}
