@@ -177,7 +177,7 @@ func TestStepIsActive(t *testing.T) {
 	writeProjectFile(t, root, "lib", "go.mod", "module example.com/lib\n")
 	writeProjectFile(t, root, "withgo", "main.go", "package main\n")
 
-	cache := newPlanCache()
+	cache := newPlanCache(nil)
 	scope := func(project string) activationScope {
 		return activationScope{projRoot: filepath.Join(root, project), cache: cache}
 	}
@@ -220,7 +220,7 @@ func TestStepIsActive_ClosureGateFollowsTheDependencyClosure(t *testing.T) {
 	writeProjectFile(t, root, "app", "go.mod", "module example.com/app\n")
 	writeProjectFile(t, root, "solo", "go.mod", "module example.com/solo\n")
 
-	cache := newPlanCache()
+	cache := newPlanCache(nil)
 	gate := &extension.StepActivation{ClosureFiles: []string{"infra/requirements.json"}}
 	ownGate := &extension.StepActivation{Files: []string{"infra/requirements.json"}}
 
@@ -274,7 +274,7 @@ func TestStepActivationPredicate_ResolvesTheClosureFromTheGraphAndMemoizesIt(t *
 	ws := workspace.NewWorkspace(root, nil, []*workspace.Project{lib, app})
 	ws.Graph = workspace.BuildGraph(ws.Projects)
 
-	cache := newPlanCache()
+	cache := newPlanCache(nil)
 	active := pipelineExpansionOptions(ws, app, nil, false, cache).StepActive
 	gated := extension.PipelineStep{
 		ID:         "test-env",

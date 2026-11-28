@@ -1,6 +1,10 @@
 package planner
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"path/filepath"
+	"slices"
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -52,14 +56,21 @@ type planCache struct {
 	activation map[string]bool
 	// rootsDigest names the workspace's project roots, relative to its root:
 	// a recursive gate enters no other project's root, so its kept answer
-	// depends on them. Plan sets it with projectRoots; a cache it leaves empty
-	// keeps no activation answer between runs.
+	// depends on them. newPlanCache sets it with projectRoots; a cache it
+	// leaves empty keeps no activation answer between runs.
 	rootsDigest string
+	// wsRoot is the workspace root a job's activation files are kept under,
+	// with their witnesses (workspace.RecordActivation); "" keeps none.
+	wsRoot string
 }
 
-// newPlanCache returns an empty cache; callers do not need to know its shape.
-func newPlanCache() *planCache {
-	return &planCache{
+// newPlanCache returns an empty cache for a plan of ws; callers do not need to
+// know its shape. With ws, it holds the workspace's project roots, which a
+// recursive activation probe does not enter, and names them (rootsDigest), so
+// the activation answers it decides are kept between runs under ws.Root. A nil
+// ws keeps none.
+func newPlanCache(ws *workspace.Workspace) *planCache {
+	cache := &planCache{
 		effectiveCommands:      make(map[string]map[string]bool),
 		effectiveCommandParams: make(map[string]map[string]extension.ParamMap),
 		extActivates:           make(map[string]bool),
@@ -68,6 +79,19 @@ func newPlanCache() *planCache {
 		closureRoots:           make(map[string][]string),
 		activation:             make(map[string]bool),
 	}
+	if ws == nil {
+		return cache
+	}
+	rels := make([]string, 0, len(ws.Projects))
+	for _, project := range ws.Projects {
+		cache.projectRoots[filepath.Clean(filepath.Join(ws.Root, filepath.FromSlash(project.Path)))] = true
+		rels = append(rels, filepath.ToSlash(filepath.Clean(project.Path)))
+	}
+	slices.Sort(rels)
+	rootsSum := sha256.Sum256([]byte(strings.Join(rels, "\x00")))
+	cache.rootsDigest = hex.EncodeToString(rootsSum[:])
+	cache.wsRoot = ws.Root
+	return cache
 }
 
 func hasActivationFiles(projRoot string, patterns []string, cache *planCache) bool {
@@ -76,7 +100,24 @@ func hasActivationFiles(projRoot string, patterns []string, cache *planCache) bo
 		if v, ok := cache.hasFiles[key]; ok {
 			return v
 		}
-		v := hasActivationFilesUncached(projRoot, patterns, cache.projectRoots)
+		// The answer a run kept with the stats of what its walk read answers
+		// while they hold (CLI ADR 0132 §2, the witness of a step gate,
+		// applied to a job's activation files). Its key holds what the files
+		// do not: the project, the patterns and the project roots a walk does
+		// not enter.
+		rel, err := filepath.Rel(cache.wsRoot, projRoot)
+		if cache.wsRoot == "" || cache.rootsDigest == "" || err != nil {
+			v := hasActivationFilesUncached(projRoot, patterns, cache.projectRoots)
+			cache.hasFiles[key] = v
+			return v
+		}
+		witnessKey := "files\x00" + filepath.ToSlash(rel) + "\x00" + strings.Join(patterns, "\x01") + "\x00" + cache.rootsDigest
+		v, held := workspace.HeldActivation(cache.wsRoot, witnessKey)
+		if !held {
+			probe := workspace.NewActivationProbe(cache.wsRoot)
+			v = workspace.HasActivationFilesProbed(projRoot, patterns, cache.projectRoots, probe)
+			workspace.RecordActivation(cache.wsRoot, witnessKey, v, probe)
+		}
 		cache.hasFiles[key] = v
 		return v
 	}
