@@ -304,24 +304,26 @@ describe('BaseClient request cancellation', () => {
       retry: { maxRetries: 0 },
     });
 
+    const controller = new AbortController();
     let seen: AbortSignal | undefined;
+    let abortedInFlight: boolean | undefined;
     (client as unknown as { transport: StubTransport }).transport = {
       execute: async (request): Promise<ClientResponse> => {
         seen = request.signal;
+        controller.abort();
+        abortedInFlight = request.signal?.aborted;
         return { data: undefined, status: 200, headers: new Headers() };
       },
     };
 
-    const controller = new AbortController();
-    await client.callGet('/widgets', controller.signal);
+    await client.callGet('/widgets', controller.signal).catch(() => undefined);
 
     // The per-attempt timeout is combined with the caller signal, so the
     // transport sees a derived signal rather than the caller's own object.
-    // Aborting the caller must still abort what the transport was handed.
+    // Aborting the caller while the call runs aborts what the transport was handed.
     expect(seen).toBeDefined();
-    expect(seen?.aborted).toBe(false);
-    controller.abort();
-    expect(seen?.aborted).toBe(true);
+    expect(seen).not.toBe(controller.signal);
+    expect(abortedInFlight).toBe(true);
   });
 
   test('aborting the caller signal ends the retry sequence instead of retrying', async () => {

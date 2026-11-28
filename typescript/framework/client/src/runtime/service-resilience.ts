@@ -9,6 +9,7 @@ import {
   ClientRequestEncodingError,
   ClientServiceConfigError,
 } from './errors';
+import { SignalLink } from './signal-link';
 import type { ClientRequest, DisposableInterceptor, Interceptor } from './transport.type';
 
 export const FIRST_PARTY_UNARY_DEFAULTS = Object.freeze({
@@ -98,21 +99,20 @@ export function serviceDeadlineInterceptor(): Interceptor {
     );
     const timeoutMs = Math.max(1, Math.min(declaredTimeout, inheritedDeadline - Date.now()));
     const timeout = AbortSignal.timeout(timeoutMs);
-    const inheritedSignals = [request.signal, context?.signal].filter(
-      (signal): signal is AbortSignal => signal !== undefined,
-    );
-    const inheritedSignal =
-      inheritedSignals.length > 1
-        ? AbortSignal.any(inheritedSignals)
-        : inheritedSignals.length === 1
-          ? inheritedSignals[0]
-          : undefined;
-    const signal = inheritedSignal ? AbortSignal.any([inheritedSignal, timeout]) : timeout;
+    const inheritedSignals = [request.signal, context?.signal];
+    // One signal the call releases once it settled, never AbortSignal.any:
+    // see SignalLink. A streamed response keeps it while its body is read.
+    const link = new SignalLink([...inheritedSignals, timeout]);
     const deadlineAt = Math.min(inheritedDeadline, Date.now() + timeoutMs);
     try {
-      return await next({ ...request, signal, deadlineAt });
+      const response = await next({ ...request, signal: link.signal, deadlineAt });
+      if (!request.streamedResponse) link.release();
+      return response;
     } catch (error) {
-      if (inheritedSignal?.aborted) throw new ClientCanceledError('', `${request.method} ${request.path}`);
+      link.release();
+      if (inheritedSignals.some((signal) => signal?.aborted)) {
+        throw new ClientCanceledError('', `${request.method} ${request.path}`);
+      }
       if (timeout.aborted) throw new ClientDeadlineError('', `${request.method} ${request.path}`);
       throw error;
     }

@@ -40,6 +40,7 @@ import type { DuplexStream, StreamObserver } from './stream.type';
 import type { ClientRequest, ClientResponse, Transport } from './transport.type';
 import { assertHttpUrl } from './url';
 import { markTransportFailure } from './transport-failure';
+import { SignalLink } from './signal-link';
 
 /**
  * Connect protocol encoding mode.
@@ -1071,49 +1072,55 @@ export class ConnectTransport implements Transport {
     this.applyProtocolHeaders(headers, { deadline: false });
     headers.set(CONNECT_ACCEPT_ENCODING_HEADER, STREAM_ACCEPT_ENCODINGS);
 
-    const signal = options?.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: 'POST',
-      headers,
-      signal,
-      body: toArrayBuffer(writeEnvelope(0x00, bodyBytes)),
-    });
-
-    if (!response.ok) {
-      const info = await this.readErrorInfo(response, path);
-      const error = new ClientStreamError({
-        service: this.packageName,
-        method: path,
-        message: info.message ?? `HTTP ${response.status}`,
-        grpcCode: info.code,
-        grpcStatus: info.status,
-        ...(info.details ? { details: info.details } : {}),
+    // The stream's own signal follows the caller's until the stream ends,
+    // never through AbortSignal.any: see SignalLink.
+    const link = new SignalLink([options?.signal, controller.signal]);
+    try {
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers,
+        signal: link.signal,
+        body: toArrayBuffer(writeEnvelope(0x00, bodyBytes)),
       });
-      // `unimplemented` is the server naming a mode Connect cannot carry over
-      // HTTP/1.1 (client/bidi streaming). Hand it to the fallback rather than
-      // surfacing a raw 501 to the caller.
-      if (info.code === GrpcStatus.UNIMPLEMENTED && options?.onUnimplemented?.(error)) return;
-      relay.fail(error);
-      return;
-    }
 
-    const contentType = response.headers.get('Content-Type') ?? '';
-    if (!contentType.split(';')[0].trim().startsWith('application/connect+')) {
-      // A Connect route that answered unary for a streaming RPC is not a stream
-      // we can consume; treat it like `unimplemented` so the fallback engages.
-      const error = new ClientStreamError({
-        service: this.packageName,
-        method: path,
-        message: `Connect streaming not supported: server answered '${contentType || 'unknown content type'}'`,
-        grpcCode: GrpcStatus.UNIMPLEMENTED,
-        grpcStatus: 'UNIMPLEMENTED',
-      });
-      if (options?.onUnimplemented?.(error)) return;
-      relay.fail(error);
-      return;
-    }
+      if (!response.ok) {
+        const info = await this.readErrorInfo(response, path);
+        const error = new ClientStreamError({
+          service: this.packageName,
+          method: path,
+          message: info.message ?? `HTTP ${response.status}`,
+          grpcCode: info.code,
+          grpcStatus: info.status,
+          ...(info.details ? { details: info.details } : {}),
+        });
+        // `unimplemented` is the server naming a mode Connect cannot carry over
+        // HTTP/1.1 (client/bidi streaming). Hand it to the fallback rather than
+        // surfacing a raw 501 to the caller.
+        if (info.code === GrpcStatus.UNIMPLEMENTED && options?.onUnimplemented?.(error)) return;
+        relay.fail(error);
+        return;
+      }
 
-    await this.pumpFrames(relay, path, response, contentType);
+      const contentType = response.headers.get('Content-Type') ?? '';
+      if (!contentType.split(';')[0].trim().startsWith('application/connect+')) {
+        // A Connect route that answered unary for a streaming RPC is not a stream
+        // we can consume; treat it like `unimplemented` so the fallback engages.
+        const error = new ClientStreamError({
+          service: this.packageName,
+          method: path,
+          message: `Connect streaming not supported: server answered '${contentType || 'unknown content type'}'`,
+          grpcCode: GrpcStatus.UNIMPLEMENTED,
+          grpcStatus: 'UNIMPLEMENTED',
+        });
+        if (options?.onUnimplemented?.(error)) return;
+        relay.fail(error);
+        return;
+      }
+
+      await this.pumpFrames(relay, path, response, contentType);
+    } finally {
+      link.release();
+    }
   }
 
   /** Encode a request message to bytes using the embedded proto metadata. */
