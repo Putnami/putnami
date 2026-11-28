@@ -42,38 +42,17 @@ export const LoggerMiddleware = (options: LoggerOptions = {}): HttpMiddleware =>
     logger.error(`[${context.method}] ${routePath}`, error);
   };
 
-  return async (context, next) => {
-    const method = context.method;
-    let routePath = context.route || context.path();
-    if (!routePath.startsWith('/')) {
-      routePath = `/${routePath}`;
-    }
-
-    // Check exclusion before timing to avoid unnecessary work
-    if (exclude.size > 0 && (exclude.has(routePath) || exclude.has(context.path()))) {
-      return next();
-    }
-
-    // The `{ method, routePath }` field every record of the request carries
-    // is built when the first record is written: a request that writes none
-    // never builds it.
-    if (!deferHttpLogContext(context, method, routePath)) {
-      httpLogger().with('http', { method, routePath });
-    }
-    const start = Date.now();
-
-    let response: Awaited<ReturnType<typeof next>>;
-    try {
-      response = await next();
-    } catch (error) {
-      // Errors that escape the dispatcher (framework-level failures)
-      logError(context, routePath, error instanceof HttpException ? error.getStatus() : 500, start, error);
-      throw error;
-    }
-
+  /** What a request that answered leaves: an error record for a 5xx it failed with, else the access record. */
+  const finish = (
+    context: HttpRequestContextInternal,
+    method: string,
+    routePath: string,
+    start: number,
+    response: Awaited<ReturnType<Parameters<HttpMiddleware>[1]>>,
+  ) => {
     // HttpResponse instances may omit `status` to mean implicit 200.
     const status = response ? (response.status ?? 200) : 404;
-    const requestError = (context as HttpRequestContextInternal).__requestError;
+    const requestError = context.__requestError;
     if (status >= 500 && requestError) {
       logError(context, routePath, status, start, requestError);
       return response;
@@ -90,5 +69,47 @@ export const LoggerMiddleware = (options: LoggerOptions = {}): HttpMiddleware =>
       logger.debug();
     }
     return response;
+  };
+
+  // Not an async function: a request it does not log adds no frame of its own,
+  // only the continuation of the chain's promise.
+  return (context, next) => {
+    const method = context.method;
+    let routePath = context.route || context.path();
+    if (!routePath.startsWith('/')) {
+      routePath = `/${routePath}`;
+    }
+
+    if (exclude.size > 0 && (exclude.has(routePath) || exclude.has(context.path()))) {
+      // As the async version did: a synchronous throw rejects, a plain value resolves.
+      try {
+        return Promise.resolve(next());
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    }
+
+    if (!deferHttpLogContext(context, method, routePath)) {
+      httpLogger().with('http', { method, routePath });
+    }
+    const start = Date.now();
+    const internal = context as HttpRequestContextInternal;
+    const failed = (error: unknown): never => {
+      // Errors that escape the dispatcher (framework-level failures)
+      logError(internal, routePath, error instanceof HttpException ? error.getStatus() : 500, start, error);
+      throw error;
+    };
+
+    let pending: ReturnType<typeof next>;
+    try {
+      pending = next();
+    } catch (error) {
+      try {
+        failed(error);
+      } catch (thrown) {
+        return Promise.reject(thrown);
+      }
+    }
+    return Promise.resolve(pending!).then((response) => finish(internal, method, routePath, start, response), failed);
   };
 };

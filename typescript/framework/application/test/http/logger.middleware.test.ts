@@ -33,6 +33,49 @@ describe('LoggerMiddleware', () => {
     await app.stop();
   });
 
+  it('logs and rejects when the next middleware throws before returning a promise', async () => {
+    const logger = new MemoryLogger();
+    const context = { method: 'GET', route: '/boom', path: () => '/boom', logger };
+    const middleware = LoggerMiddleware();
+    const failure = new Error('thrown synchronously');
+    const outcome = await runInContext(context, () =>
+      Promise.resolve(
+        middleware(context as never, () => {
+          throw failure;
+        }),
+      ).then(
+        () => 'resolved',
+        (error: unknown) => error,
+      ),
+    );
+    expect(outcome).toBe(failure);
+    const errors = logger.entries.filter((entry) => entry.level === 'error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toBe('[GET] /boom');
+    const payload = errors[0]?.context?.['http'] as Record<string, unknown> | undefined;
+    expect(payload?.['status']).toBe(500);
+  });
+
+  it('rejects, and resolves a plain value, on an excluded route as on any other', async () => {
+    const middleware = LoggerMiddleware({ exclude: ['/health'] });
+    const context = { method: 'GET', route: '/health', path: () => '/health', logger: new MemoryLogger() };
+    const failure = new Error('thrown synchronously');
+    const thrown = await runInContext(context, () =>
+      middleware(context as never, () => {
+        throw failure;
+      }).then(
+        () => 'resolved',
+        (error: unknown) => error,
+      ),
+    );
+    expect(thrown).toBe(failure);
+    const plain = new HttpResponse('ok');
+    const resolved = await runInContext(context, () =>
+      middleware(context as never, (() => plain) as unknown as () => Promise<HttpResponse>),
+    );
+    expect(resolved).toBe(plain);
+  });
+
   it('should log implicit HttpResponse status as 200', async () => {
     const logger = await runWithLogger(
       {
