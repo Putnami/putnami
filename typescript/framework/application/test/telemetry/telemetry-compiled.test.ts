@@ -123,22 +123,19 @@ describe('the telemetry middleware on a compiled route', () => {
   });
 
   it('marks the server span of a failed request with its status', async () => {
-    const { collector, call } = await serve(
-      (plugin) => {
-        plugin.get('/conflict', () => {
-          throw new HttpException('taken', 409);
-        });
-        plugin.get('/boom', () => {
-          throw new Error('boom');
-        });
-        plugin.get('/slow', async (ctx) => {
-          await sleep(200);
-          if (ctx.signal?.aborted) throw ctx.signal.reason;
-          return { late: true };
-        });
-      },
-      50,
-    );
+    const { collector, call } = await serve((plugin) => {
+      plugin.get('/conflict', () => {
+        throw new HttpException('taken', 409);
+      });
+      plugin.get('/boom', () => {
+        throw new Error('boom');
+      });
+      plugin.get('/slow', async (ctx) => {
+        await sleep(200);
+        if (ctx.signal?.aborted) throw ctx.signal.reason;
+        return { late: true };
+      });
+    }, 50);
     await call('/conflict', '/conflict');
     await call('/boom', '/boom');
     await call('/slow', '/slow');
