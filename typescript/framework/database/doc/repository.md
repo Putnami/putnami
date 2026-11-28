@@ -109,6 +109,8 @@ const users = await userRepo.find(
 - `offset?: number` - Number of results to skip (default: 0)
 - `orderBy?: string` - SQL ORDER BY clause (e.g., `"created_at DESC"`)
 
+A find whose filters compare each property to a value, as `get` and `findOne` do with a key, builds its statement once per shape: the compared properties in their order, the ORDER BY clause of the `orderBy` option however it is spelled, and whether an offset is set. Later calls of that shape reuse it with their own values. A filter with an operator, `$or` or `$and` builds its statement on each call. Both send one statement with the values as parameters.
+
 **Example with pagination:**
 ```typescript
 // First page (10 results)
