@@ -11,7 +11,7 @@ import {
   startTelemetrySpan,
   TelemetryCollector,
 } from '@putnami/application';
-import { HttpException } from '@putnami/runtime';
+import { ForbiddenException, HttpException, NotFoundException } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import { restoreEnv } from '@putnami/utils';
@@ -19,6 +19,7 @@ import { buildHttpContext } from '../../../application/src/http/http-context.bui
 import type { StaticHandlerContext } from 'react-router';
 import { runInContext, useContext } from '../../../runtime/src/context/context.utils';
 import RootHtml from '../../src/ssr/default.html';
+import { NotFoundErrorBoundary } from '../../src/ssr/error-boundaries';
 import {
   handleRenderError,
   pageRenderer,
@@ -562,6 +563,71 @@ describe('page.renderer', () => {
 
       expect((ctx as Record<string, unknown>)['__requestError']).toBe(exception);
       expect(logger.entries.filter((entry) => entry.level === 'error')).toHaveLength(0);
+    });
+
+    specTest(
+      'a NotFoundException a loader throws answers 404 with the not-found page, logged at no ERROR',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'ssr-response',
+        check: 'an-http-exception-a-loader-throws-answers-its-own-status',
+      },
+      async () => {
+        const logger = new MemoryLogger();
+        const ctx = createMockContext({ req: new Request('http://localhost/table/9999'), logger });
+        const handler = pageRenderer(
+          () => [
+            {
+              id: 'root',
+              path: '/',
+              element: React.createElement('main', null, 'Layout'),
+              errorElement: React.createElement(NotFoundErrorBoundary, {
+                notFoundElement: React.createElement('p', null, 'Page not found'),
+              }),
+              children: [
+                {
+                  path: 'table/:rows',
+                  loader: () => {
+                    throw new NotFoundException('rows out of range');
+                  },
+                  element: React.createElement('div', null, 'Table'),
+                },
+              ],
+            } as never,
+          ],
+          () => RootHtml,
+          () => 'hydrate.js',
+          SSR_TIMEOUT_MS,
+        );
+
+        const response = await runInContext(ctx, () =>
+          LoggerMiddleware()(ctx, async () => await respond(handler, ctx)),
+        );
+        const html = await response?.get().text();
+
+        expect(response?.status).toBe(404);
+        expect(html).toContain('Page not found');
+        expect((ctx as Record<string, unknown>)['__requestError']).toBeInstanceOf(NotFoundException);
+        expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+      },
+    );
+
+    it('answers the status of another HttpException a loader throws', async () => {
+      const logger = new MemoryLogger();
+      const response = await renderRoute(
+        {
+          path: '/admin',
+          loader: () => {
+            throw new ForbiddenException('not an admin');
+          },
+          element: React.createElement('div', null, 'Admin'),
+        },
+        { req: new Request('http://localhost/admin'), logger },
+      );
+      await response?.get().text();
+
+      expect(response?.status).toBe(403);
+      expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
     });
 
     it('does not log a Response a loader throws as an error', async () => {
