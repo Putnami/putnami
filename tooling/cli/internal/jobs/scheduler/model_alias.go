@@ -79,6 +79,10 @@ type JobError = model.JobError
 // cache instead of executed.
 type ReplayedFailure = model.ReplayedFailure
 
+// EntryRecords names the task-owned cache entry a reused result's records are
+// read from.
+type EntryRecords = model.EntryRecords
+
 // RawJobEvent is the CLI's rendering projection of a runtime protocol event.
 type RawJobEvent = model.RawJobEvent
 

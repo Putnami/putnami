@@ -222,9 +222,25 @@
         "packages": {
           "description": "The reporter's destination accepts packages (ADR 0135). Only a reporter whose engine named framing version 4 sends it, and only true.",
           "const": true
+        },
+        "packagesRebuilt": {
+          "description": "The destination also accepts task packages whose header names rebuilt records (CLI ADR 0137). Only a reporter whose engine named framing version 5 sends it, only with packages, and only true.",
+          "const": true
         }
       },
       "allOf": [
+        {
+          "if": {
+            "required": [
+              "packagesRebuilt"
+            ]
+          },
+          "then": {
+            "required": [
+              "packages"
+            ]
+          }
+        },
         {
           "if": {
             "properties": {

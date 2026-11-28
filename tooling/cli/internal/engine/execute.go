@@ -23,6 +23,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/profiler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
+	"go.putnami.dev/tooling/cli/internal/sessionrefs"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -110,6 +111,48 @@ func executionSessionRenderer(
 	// artifact id. This also covers intentional no-session lifecycle runs; text
 	// and adapter renderers are unchanged by the fallback.
 	return output.WithoutSessionArtifact(renderer)
+}
+
+// recordsReusedTasksByReference reports whether the run's session records a
+// task a task-owned entry served by reference to that entry (ADR 0137): only
+// when every reader of the session resolves the reference in the workspace's
+// own store. Every reporter resolves it, the log reporter included. A bound
+// portable execution's sessions, nested ones included, travel to a machine
+// whose store does not hold the entries, and a cache-verification run reads
+// another store; each keeps every record. So does a run that reuses nothing.
+func recordsReusedTasksByReference(req *Request, cache *store.CacheManager) bool {
+	return cache != nil && req.CacheVerification == nil && !recordsSessionsWhole(req)
+}
+
+// recordsSessionsWhole reports whether this run, and every run its tasks
+// spawn, records every record: a bound portable execution's sessions, nested
+// ones included, travel to a machine whose store does not hold the entries.
+// A nested run learns it from the execution-only environment its parent
+// exported into the task (scheduler.RecordSessionsWholeEnv).
+func recordsSessionsWhole(req *Request) bool {
+	return req.Portable != nil || os.Getenv(scheduler.RecordSessionsWholeEnv) != ""
+}
+
+// recordByReference makes renderer record reused tasks by reference when the
+// run's readers all resolve references (recordsReusedTasksByReference) and
+// its session records through a renderer that does: the session directory dir
+// first declares it, naming storeRoot, and the session pins what it references
+// in that store when it ends. A session that cannot declare it records whole.
+func recordByReference(req *Request, cache *store.CacheManager, renderer scheduler.Renderer, dir, storeRoot string) {
+	if !recordsReusedTasksByReference(req, cache) || !output.RecordsByReference(renderer) {
+		return
+	}
+	if sessionrefs.Declare(dir, storeRoot) != nil {
+		return
+	}
+	local := store.NewLocalStore(storeRoot)
+	output.RecordReusedTasksByReference(renderer, func(references []output.PinnedReference) error {
+		results := make([]store.PinnedResult, len(references))
+		for i, reference := range references {
+			results[i] = store.PinnedResult{Key: reference.Key, Result: reference.Result}
+		}
+		return local.PinSession(dir, results)
+	})
 }
 
 // execute runs the planned jobs (normal or watch mode) and owns everything that
@@ -339,6 +382,8 @@ func (e *Engine) executeSession(
 		Preparation:   req.preparation,
 		Orchestration: req.orchestration,
 	}
+	// A run whose sessions travel elsewhere tells the runs it spawns.
+	schedCfg.RecordSessionsWhole = recordsSessionsWhole(req)
 	attachResultFinalizers(&schedCfg, resultFinalizers)
 
 	// Normal (non-watch) execution
@@ -385,8 +430,6 @@ func (e *Engine) executeSession(
 		// internal/commands/sessions_helpers.go keeps the v1 reader.
 		_ = session.WritePlanV2(machine.SessionPlanFile(session.ID, req.Commands, planned))
 	}
-	reporter := startSessionReporting(ctx, req, ws, discovered, session)
-
 	// The surface seam: an adapter that owns a renderer passes it, everyone else
 	// gets the one the resolved flags ask for. Session attachment happens after
 	// plan recording so every real renderer — terminal, machine, or cloud —
@@ -397,6 +440,12 @@ func (e *Engine) executeSession(
 		executionRenderer(req, sessStore, extensions, sink, isServeMode, isRunMode),
 		session, req.Global.Verbose || req.Global.Debug,
 	)
+	// The session declares that it records by reference before any reporter
+	// opens its checkpoint: the reporters choose their framing by it.
+	if session != nil {
+		recordByReference(req, cache, renderer, session.Dir(), schedCfg.StoreRoot)
+	}
+	reporter := startSessionReporting(ctx, req, ws, discovered, session)
 
 	prof := profiler.New(req.Global.TraceProfile != "")
 

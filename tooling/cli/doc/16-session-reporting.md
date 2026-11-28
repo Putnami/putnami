@@ -45,8 +45,9 @@ rewrites only the entries of the reporters it replays. See the
 The session reporter's `events.jsonl` frames carry a trimmed view of the
 stream, not its bytes
 ([ADR 0083](adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md)).
-`events.jsonl` on disk stays complete, and the
-[log reporter](#log-reporter) receives it raw. The view:
+`events.jsonl` on disk keeps every record but those a reused task replays from
+its cache entry, which the view puts back ([Reused tasks](#reused-tasks)), and
+the [log reporter](#log-reporter) receives every record, untrimmed. The view:
 
 1. Drops every `progress` event.
 2. Holds every `task:event` of a task from its first `debug` log line to its
@@ -71,18 +72,69 @@ that are ready.
 
 The offsets and sequences of the session reporter's `events.jsonl` chunks are
 view offsets: they count the bytes the view sent, not the bytes of the file.
-The log reporter's are raw offsets. `reporting.json` is at version 2: its
-`events` cursor is the view cursor, and `eventsRaw` is the raw offset of
-`events.jsonl` that `subscribers.json` acknowledges. Once the receiver
+The log reporter's are raw offsets, but in a session that records
+[reused tasks](#reused-tasks) by reference. `reporting.json` is at version 2,
+or 4 in a session that records reused tasks by reference: its `events` cursor
+is the view cursor, and `eventsRaw` is the raw offset of `events.jsonl` that
+`subscribers.json` acknowledges. Once the receiver
 acknowledges the view's final marker, `subscribers.json` reads `delivered`.
 After an engine restart or a replay, the CLI rebuilds the view from the start
 of `events.jsonl`, so a resent sequence keeps its bytes.
 
 A session whose `reporting.json` is at version 1 and already sent an
 `events.jsonl` chunk keeps raw framing to its end; one that sent none moves to
-version 2. A CLI that predates version 2 refuses a version 2 checkpoint:
-replay such a session with this CLI or a later one. The log reporter's
-`log-reporting.json` stays at version 1.
+version 2, or 4. A session on [task packages](#task-packages) is at version 3,
+or 5. A CLI that predates version 2 refuses a version 2 checkpoint, one that
+predates packages a version 3 checkpoint, and one that predates
+[reused tasks](#reused-tasks) a version 4, 5 or 6 checkpoint: replay such a
+session with this CLI or a later one. The log reporter's
+`log-reporting.json` is at version 1, or 6 in a session that records reused
+tasks by reference.
+
+## Reused tasks
+
+A task that a task-owned entry of the local store served (a local hit, a
+remote hit, a coalesced restore) is recorded in `events.jsonl` as its
+`task:start`, the records the hit added in this run, and its `task:end`, whose
+`cacheReference` names the entry
+([ADR 0137](adr/0137-a-cached-task-is-recorded-by-its-cache-entry.md)). The
+events the entry holds and the task's `test:case` records stay in the entry.
+Such a session says so in `references.json`, which names the store its
+references resolve in, and every reader rebuilds the records right before the
+`task:end`, which it then reads without its reference:
+
+- the session reporter's view, at checkpoint version 4;
+- the session reporter's [task packages](#task-packages), at version 5, whose
+  header names the rebuilt records in `rebuilt`: only a receiver that offers
+  `packagesRebuilt` gets them, and the session stays on frames otherwise;
+- the [log reporter](#log-reporter), at version 6, which sends every record of
+  the stream, untrimmed;
+- `putnami sessions inspect`.
+
+The receiver reads the same records as for a task recorded whole; the events
+the hit added in this run come before the rebuilt ones. A reference names the
+projection that rebuilds its records, their counts and their SHA-256. A CLI
+whose projection differs, or whose rebuilt records differ in count or hash to
+another digest from a result whose bytes are the producer's, sends none: delivery fails with `reporting cannot rebuild a reused task's records`,
+which names the projection, and the session waits for a CLI that rebuilds it.
+`sessions inspect` then shows the task's `task:end` as recorded, with a note
+that it is not resolvable by this CLI.
+
+When the session ends, the CLI keeps the `result.json` of every entry it
+references in the store, under `pins/objects/`, hard-linked from the entry or
+copied where the file system links nothing, and records which in a pin of
+the session. The entries themselves stay under ordinary collection; each
+collection deletes the pins of sessions whose directory is gone and the
+results no pin names. A pin names the session by its absolute path: a session
+moved or reached through another path loses its pin at the next collection.
+
+A session writes every record when it runs with `--output=jsonl`, executes a
+bound portable request or runs inside one (the portable run tells the CLIs
+its tasks start through `PUTNAMI_RECORD_SESSIONS_WHOLE`), verifies the cache
+in another store, or runs with `--no-cache`. A reference whose result the
+store no longer holds, after `putnami cache clean`, puts nothing back on any
+surface: the `task:end` leaves as recorded, its `cacheReference` included, so
+a receiver sees which task's records are missing.
 
 ## Recorded plan
 
@@ -157,7 +209,9 @@ PUTNAMI_LOG_REPORTER=@example/logs putnami lint,test,build
 ```
 
 The log reporter receives the raw `events.jsonl`, at raw offsets, through the
-same wire, never the trimmed view, and never receives `plan.json`,
+same wire, never the trimmed view; in a session that records
+[reused tasks](#reused-tasks) by reference, it receives every record with the
+reused tasks' records put back, at offsets of those bytes. It never receives `plan.json`,
 `session.json` or `spec-verification.json`. A live chunk leaves once a full 64 KiB frame is
 committed, or 2 seconds after the previous events chunk. When the graph ends, it
 sends the rest at once and closes the stream. `PUTNAMI_LOG_REPORTER_TOKEN` is
@@ -337,7 +391,8 @@ what the receiver changes are in
 ## Task packages
 
 With a receiver that also advertises `X-Putnami-Session-Packages: 1`, the
-engine names framing version 4 to the session reporter and, once `plan.json`
+engine names framing version 5 to the session reporter (version 4, which an
+older engine names, says the same but for rebuilt records) and, once `plan.json`
 has gone as frames, delivers the rest of the session as task packages: every
 record of `events.jsonl`, byte for byte and with its offset, in one package
 per task, sealed at the task's end. Whenever one of eight slots is free, the
@@ -347,3 +402,9 @@ trimmed, and a replay sends only the packages not yet acknowledged. A
 receiver that advertises no packages keeps the session on frames. The
 decision and the receiver's contract are in
 [ADR 0135](adr/0135-a-run-delivers-its-report-as-task-packages-sent-in-parallel.md).
+A session that records [reused tasks](#reused-tasks) by reference goes on
+packages only with a receiver that also advertises
+`X-Putnami-Session-Packages-Rebuilt: 1`: it stores the packages whose header
+names rebuilt records, and the reporter's acknowledgements then also say
+`packagesRebuilt: true`, which it sends only to an engine of version 5 or
+later. Without it, that session stays on frames.

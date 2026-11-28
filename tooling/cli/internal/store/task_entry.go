@@ -272,6 +272,11 @@ type TaskEntry struct {
 	// Result is the structured job result (result.json).
 	Result *EntryResult `json:"-"`
 
+	// ResultDigest is the SHA-256 of result.json as it is on disk,
+	// "sha256:<hex>": a reader that rebuilds records from this entry checks the
+	// result is still the one they were recorded from.
+	ResultDigest string `json:"-"`
+
 	// Metadata is the provenance sidecar (meta.json).
 	Metadata *EntryMetadata `json:"-"`
 
@@ -346,6 +351,27 @@ func (s *LocalStore) LookupTaskEntry(key string) (*TaskEntry, error) {
 
 	writeLastUsed(blobDir, time.Now(), s.gen)
 	return entry, nil
+}
+
+// ReadTaskEntry resolves a task cache key to its task-owned entry like
+// LookupTaskEntry, or nil for a miss, without stamping its recency or the
+// store's generation: a reader of a recorded session reads entries, and
+// reading keeps none alive. A store root that does not exist is a miss.
+func (s *LocalStore) ReadTaskEntry(key string) *TaskEntry {
+	if key == "" {
+		return nil
+	}
+	if _, err := os.Stat(s.root); err != nil {
+		return nil
+	}
+	release := s.lockShared()
+	defer release()
+	address := TaskEntryAddress(key)
+	entry := s.loadTaskEntryOnce(s.blobDir(address), address)
+	if entry == nil || entry.Key != key {
+		return nil
+	}
+	return entry
 }
 
 // taskEntryFileStat is the stat of one file loadTaskEntry reads; a file that
@@ -442,6 +468,8 @@ func loadTaskEntry(blobDir, address string) *TaskEntry {
 		return nil
 	}
 	entry.Result = result
+	resultSum := sha256.Sum256(resultData)
+	entry.ResultDigest = "sha256:" + hex.EncodeToString(resultSum[:])
 
 	if metaData, err := os.ReadFile(filepath.Join(blobDir, "meta.json")); err == nil {
 		if meta, err := UnmarshalMetadata(metaData); err == nil {

@@ -34,6 +34,13 @@ const (
 	// contract header of ADR 0131, which keeps its value.
 	sessionPackagesHeader  = "X-Putnami-Session-Packages"
 	sessionPackagesVersion = "1"
+	// sessionPackagesRebuiltHeader names, beside sessionPackagesHeader, on
+	// every answer of a receiver that also stores the task packages whose
+	// header names rebuilt records (CLI ADR 0137), the version of that
+	// support. sessionPackagesHeader keeps its value, so a reporter that
+	// predates it still gets packages.
+	sessionPackagesRebuiltHeader  = "X-Putnami-Session-Packages-Rebuilt"
+	sessionPackagesRebuiltVersion = "1"
 	// putDeadlinePerMiB is what a put's deadline adds to
 	// sessionReporterRequestTimeout per MiB of its decoded bundle
 	// (putDeadline).
@@ -65,6 +72,21 @@ func advertisesPackages(header http.Header) bool {
 	return strings.TrimSpace(header.Get(sessionPackagesHeader)) == sessionPackagesVersion
 }
 
+// advertisesRebuiltPackages reports whether header advertises packages and
+// names version 1 of rebuilt records: its receiver stores the task packages
+// whose header names rebuilt records too (CLI ADR 0137).
+func advertisesRebuiltPackages(header http.Header) bool {
+	return advertisesPackages(header) && strings.TrimSpace(header.Get(sessionPackagesRebuiltHeader)) == sessionPackagesRebuiltVersion
+}
+
+// rebuiltPackagesRequested reports whether the engine named framing version
+// 5 or later in the session reporter's environment: it then reads
+// packagesRebuilt on acknowledgements, which an engine of version 4 refuses.
+func rebuiltPackagesRequested(env map[string]string) bool {
+	version, err := strconv.Atoi(strings.TrimSpace(env[protocolcli.SessionReportingFramingEnv]))
+	return err == nil && version >= protocolcli.SessionReportingRebuiltPackagesVersion
+}
+
 // putDeadline is the deadline of a put whose decoded bundle is n bytes:
 // sessionReporterRequestTimeout, plus putDeadlinePerMiB for each MiB or part
 // of one. It stays under the engine's deadline for the same put, 5 s plus
@@ -79,6 +101,12 @@ func putDeadline(n int) time.Duration {
 // packages.
 func (c *frameCap) offersPackages(url string) bool {
 	return c.answered(url) && c.packages
+}
+
+// offersRebuiltPackages reports whether the latest decisive answer of url
+// advertised packages that name rebuilt records.
+func (c *frameCap) offersRebuiltPackages(url string) bool {
+	return c.answered(url) && c.rebuilt
 }
 
 // packageSender is the package half of a reporter. The session reporter has

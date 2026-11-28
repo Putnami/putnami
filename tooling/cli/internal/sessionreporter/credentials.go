@@ -113,12 +113,15 @@ func (c Capability) providerEnv(ctx context.Context, env []string) []string {
 // It is not a credential: version 3 says that this engine reads chunkBytes in
 // acknowledgements and sends version 3 frames (ADR 0131); version 4 says that
 // as well, and that it reads packages in acknowledgements and then sends
-// packages (ADR 0135).
+// packages (ADR 0135); version 5, which this engine names, says that as well,
+// and that it reads packagesRebuilt and then sends the task packages whose
+// header names rebuilt records (ADR 0137). An engine of version 4 refuses
+// packagesRebuilt, so a reporter sends it only to version 5 or later.
 func (c Capability) launchEnv(ctx context.Context, env []string) []string {
 	clean := c.providerEnv(ctx, env)
 	switch {
 	case c.Packages:
-		clean = append(clean, protocolcli.SessionReportingFramingEnv+"="+strconv.Itoa(protocolcli.SessionReportingPackagesVersion))
+		clean = append(clean, protocolcli.SessionReportingFramingEnv+"="+strconv.Itoa(protocolcli.SessionReportingRebuiltPackagesVersion))
 	case c.LargeFrames:
 		clean = append(clean, protocolcli.SessionReportingFramingEnv+"="+strconv.Itoa(protocolcli.SessionReportingLargeFrameVersion))
 	}

@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/robustio"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
+	"go.putnami.dev/tooling/cli/internal/sessionrefs"
 	"go.putnami.dev/tooling/cli/internal/sessionstream"
 )
 
@@ -160,14 +161,15 @@ type cursor struct {
 // records why it is not sent (planAbsent and the other reasons), and
 // spec-verification.json likewise with SpecVerificationOmitted.
 //
-// At version 2 (viewCheckpointVersion), Events is the cursor of the view the
-// events.jsonl frames are cut from, and EventsRaw the raw offset of
-// events.jsonl the subscription acknowledged. At version 1, Events is a raw
-// cursor and EventsRaw is zero, absent from the checkpoint. At version 3
-// (packagesCheckpointVersion), the session switched to packages: Packages
-// records what the reporter acknowledged, EventsRaw the raw offset the
-// subscription acknowledged, and only plan.json frames, so its cursor alone
-// may move and only one of its frames may be pending.
+// At version 2 (viewCheckpointVersion) and 4 (resolvedViewCheckpointVersion),
+// Events is the cursor of the view the events.jsonl frames are cut from, and
+// EventsRaw the raw offset of events.jsonl the subscription acknowledged. At
+// version 1, Events is a raw cursor and EventsRaw is zero, absent from the
+// checkpoint. At version 3 (packagesCheckpointVersion) and 5
+// (resolvedPackagesCheckpointVersion), the session switched to packages:
+// Packages records what the reporter acknowledged, EventsRaw the raw offset
+// the subscription acknowledged, and only plan.json frames, so its cursor
+// alone may move and only one of its frames may be pending.
 type state struct {
 	Version                 int                                `json:"version"`
 	Provider                string                             `json:"provider"`
@@ -217,8 +219,12 @@ type Run struct {
 	dir        string
 	events     *sessionstream.Subscription
 	// view is the view events.jsonl frames are cut from at checkpoint version
-	// 2, built from raw offset 0 at the run's first use (eventsView).
-	view          *view
+	// 2 or 4, built from raw offset 0 at the run's first use (eventsView).
+	view *view
+	// entries is the store a version 4 view or a version 5 collector rebuilds
+	// referenced records from, or nil for the store of the session's
+	// workspace (referenceEntries).
+	entries       sessionrefs.Entries
 	state         state
 	launch        LaunchSpec
 	process       *process
@@ -307,7 +313,8 @@ func openRun(ctx context.Context, capability Capability, dir, sessionID, provide
 	}
 	workerCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	r := &Run{capability: capability, dir: dir, lock: lock, ctx: workerCtx, graphCtx: ctx, cancel: cancel, finish: make(chan struct{}), done: make(chan struct{}), opTimeout: operationTimeout, clock: systemClock{}, batchInterval: eventsBatchInterval(ctx, capability), chunkBytes: protocolcli.SessionReportingChunkBytes}
-	r.state = state{Version: capability.checkpointVersion(), Provider: provider, SessionID: sessionID}
+	references := sessionrefs.Declared(dir)
+	r.state = state{Version: capability.checkpointVersionOf(references), Provider: provider, SessionID: sessionID}
 	data, err := readBounded(filepath.Join(dir, capability.StateFile), checkpointBytes)
 	if err == nil {
 		// The members a checkpoint omits keep the values an earlier CLI
@@ -324,7 +331,12 @@ func openRun(ctx context.Context, capability Capability, dir, sessionID, provide
 			r.release()
 			return nil, err
 		}
-		r.moveToView()
+		r.moveToView(references)
+		if references && r.state.Version == rawCheckpointVersion {
+			// Raw framing would deliver every reused task without its records.
+			r.release()
+			return nil, fmt.Errorf("reporting checkpoint frames raw a session that records reused tasks by reference")
+		}
 	} else if !os.IsNotExist(err) {
 		r.release()
 		return nil, fmt.Errorf("read reporting checkpoint")
@@ -338,33 +350,61 @@ func openRun(ctx context.Context, capability Capability, dir, sessionID, provide
 }
 
 func knownCheckpointVersion(version int) bool {
-	return version == rawCheckpointVersion || version == viewCheckpointVersion || version == packagesCheckpointVersion
+	return version == rawCheckpointVersion || version == resolvedRawCheckpointVersion || framesView(version) || sendsPackages(version)
 }
 
-// moveToView moves a version 1 checkpoint of a View capability to version 2
-// when it framed no events.jsonl chunk yet. One that did keeps raw framing for
-// its session: its receiver holds raw offsets.
-func (r *Run) moveToView() {
+// moveToView moves a version 1 checkpoint that framed no events.jsonl chunk
+// yet to the framing a new checkpoint of the capability takes
+// (checkpointVersionOf): the view of a View capability, and, for a session that
+// records by reference, the framing that puts its references back. One that
+// framed a chunk keeps raw framing for its session: its receiver holds raw
+// offsets.
+func (r *Run) moveToView(references bool) {
 	s := &r.state
-	if !r.capability.View || s.Version != rawCheckpointVersion || s.Events.Sequence > 0 || s.Pending != nil && s.Pending.Artifact == sessionstream.EventsFile {
+	if s.Version != rawCheckpointVersion || s.Events.Sequence > 0 || s.Pending != nil && s.Pending.Artifact == sessionstream.EventsFile {
 		return
 	}
-	s.Version, s.EventsRaw = viewCheckpointVersion, 0
+	if version := r.capability.checkpointVersionOf(references); version != rawCheckpointVersion {
+		s.Version, s.EventsRaw = version, 0
+	}
 }
 
-// viewFraming reports whether events.jsonl frames are cut from the view: a
-// View capability at checkpoint version 2.
+// viewFraming reports whether events.jsonl frames are cut from a view: the
+// trimmed one of a View capability at checkpoint version 2 or 4, or the whole
+// one of any other at version 6.
 func (r *Run) viewFraming() bool {
-	return r.capability.View && r.state.Version == viewCheckpointVersion
+	if r.capability.View {
+		return framesView(r.state.Version)
+	}
+	return r.state.Version == resolvedRawCheckpointVersion
 }
 
 // eventsView is the run's view, built from raw offset 0 at its first use and
-// positioned at the checkpoint's view cursor.
+// positioned at the checkpoint's view cursor. At version 6 it trims nothing.
+// At versions 4 and 6 it puts back the records a task:end references, rebuilt
+// from referenceEntries.
 func (r *Run) eventsView() *view {
 	if r.view == nil {
 		r.view = newView(r.events, r.state.Events.Offset)
+		r.view.whole = !r.capability.View
+		if entries, ok := r.referenceEntries(); ok {
+			r.view.resolve = func(line []byte) ([]byte, error) { return sessionrefs.Resolved(entries, line) }
+		}
 	}
 	return r.view
+}
+
+// referenceEntries returns the store the references of the session resolve
+// in, the run's own or that of the session's workspace, and whether the
+// checkpoint's version puts the records they name back.
+func (r *Run) referenceEntries() (sessionrefs.Entries, bool) {
+	if !resolvesReferences(r.state.Version) {
+		return nil, false
+	}
+	if r.entries != nil {
+		return r.entries, true
+	}
+	return sessionrefs.Of(r.dir), true
 }
 
 // subscribe declares the capability on the stream at its durable raw position:
@@ -489,10 +529,12 @@ func (r *Run) validCursors() bool {
 			return false
 		}
 	}
-	switch r.state.Version {
-	case viewCheckpointVersion:
+	switch {
+	case framesView(r.state.Version):
 		return r.capability.View && r.state.EventsRaw >= 0 && r.state.Packages == nil
-	case packagesCheckpointVersion:
+	case r.state.Version == resolvedRawCheckpointVersion:
+		return !r.capability.View && r.state.EventsRaw >= 0 && r.state.Packages == nil
+	case sendsPackages(r.state.Version):
 		return r.capability.Packages && r.state.EventsRaw >= 0 && r.state.Packages != nil
 	}
 	return r.state.EventsRaw == 0 && r.state.Packages == nil
@@ -685,10 +727,25 @@ func (r *Run) verifyPendingView() error {
 	if err == nil {
 		data, err = v.read(p.Offset, len(p.Data))
 	}
-	if err != nil || !bytes.Equal(data, p.Data) || p.Final && (!v.done || v.end != p.Offset) {
+	if err != nil {
+		return eventsError(err)
+	}
+	if !bytes.Equal(data, p.Data) || p.Final && (!v.done || v.end != p.Offset) {
 		return fmt.Errorf("reporting artifact changed: %s", sessionstream.EventsFile)
 	}
 	return nil
+}
+
+// eventsError is the error delivery fails with after err read events.jsonl:
+// a reference this CLI cannot rebuild as its producer would have names
+// itself, its frame left pending for the CLI that can; any other says the
+// stream changed.
+func eventsError(err error) error {
+	var projection *sessionrefs.ProjectionError
+	if errors.As(err, &projection) {
+		return fmt.Errorf("reporting cannot rebuild a reused task's records: %w", err)
+	}
+	return fmt.Errorf("reporting artifact changed: %s", sessionstream.EventsFile)
 }
 
 // frame saves the next frame as pending and reports whether it did. When it
@@ -897,7 +954,7 @@ func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportin
 	case sessionstream.EventsFile:
 		read, final, err := r.readEvents(c.Offset)
 		if err != nil {
-			return nil, fmt.Errorf("reporting artifact changed: %s", artifact)
+			return nil, eventsError(err)
 		}
 		data, terminal = read, terminal && final
 	case planFile, specVerificationFile:
@@ -1115,13 +1172,24 @@ func (r *Run) observeCap(ack *protocolcli.SessionReportingAck) {
 // the session stays on frames.
 func (r *Run) observePackages(ack *protocolcli.SessionReportingAck) {
 	s := &r.state
-	if !ack.Packages || !r.capability.Packages || s.Packages != nil || s.Version != viewCheckpointVersion {
+	if !ack.Packages || !r.capability.Packages || s.Packages != nil || !framesView(s.Version) {
+		return
+	}
+	// A session that puts references back sends packages only to a receiver
+	// that takes their rebuilt records.
+	if s.Version == resolvedViewCheckpointVersion && !ack.PackagesRebuilt {
 		return
 	}
 	if s.Events != (cursor{}) || s.EventsRaw != 0 || s.Session != (cursor{}) || s.SpecVerification != (cursor{}) || s.SpecVerificationOmitted != "" || s.Pending == nil || s.Pending.Artifact != planFile {
 		return
 	}
-	s.Version, s.Packages = packagesCheckpointVersion, &packagesState{}
+	// A session whose view puts references back keeps doing so on packages.
+	if s.Version == resolvedViewCheckpointVersion {
+		s.Version = resolvedPackagesCheckpointVersion
+	} else {
+		s.Version = packagesCheckpointVersion
+	}
+	s.Packages = &packagesState{}
 }
 
 // packaged reports whether the session switched to packages.

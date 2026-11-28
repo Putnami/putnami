@@ -29,7 +29,7 @@
     {
       "id": "packages-go-in-parallel",
       "text": [
-        "When the engine names framing version 4 and the destination's latest decisive answer carried X-Putnami-Session-Packages: 1, every acknowledgement says packages: true; otherwise none does.",
+        "When the engine names framing version 4 and the destination's latest decisive answer carried X-Putnami-Session-Packages: 1, every acknowledgement says packages: true, and also packagesRebuilt: true when the engine names version 5 and that answer carried X-Putnami-Session-Packages-Rebuilt: 1.",
         "The reporter posts each put's packages as one bundle to <route>/packages as it arrives, several at once, and answers each put by its address; it posts the final manifest to <route>/manifest."
       ]
     }
@@ -37,6 +37,7 @@
   "decisions": [
     "tooling/cli/doc/adr/0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md",
     "cloud/extension/doc/adr/0001-a-reporter-compresses-a-chunk-once-the-receiver-advertises-gzip.md",
-    "tooling/cli/doc/adr/0135-a-run-delivers-its-report-as-task-packages-sent-in-parallel.md"
+    "tooling/cli/doc/adr/0135-a-run-delivers-its-report-as-task-packages-sent-in-parallel.md",
+    "tooling/cli/doc/adr/0137-a-cached-task-is-recorded-by-its-cache-entry.md"
   ]
 }

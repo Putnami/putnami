@@ -107,16 +107,58 @@ func (c Capability) sends(artifact string) bool {
 // spec-verification.json, records the packages acknowledged and the raw offset
 // the subscription acknowledges, and a CLI that predates packages refuses it
 // rather than frame a stream its receiver holds as packages.
+//
+// The three others are those of a session that records reused tasks by
+// reference to their cache entry (ADR 0137): their framing puts back, before
+// a task:end that names an entry, the records the entry holds.
+// resolvedViewCheckpointVersion and resolvedPackagesCheckpointVersion are the
+// view and the packages of such a session; resolvedRawCheckpointVersion frames
+// every record of its stream, the put-back ones included, from a view that
+// trims nothing, for a capability that frames raw bytes otherwise. A CLI that
+// predates references refuses all three, and a session that records by
+// reference is never framed raw.
 const (
-	rawCheckpointVersion      = 1
-	viewCheckpointVersion     = 2
-	packagesCheckpointVersion = 3
+	rawCheckpointVersion              = 1
+	viewCheckpointVersion             = 2
+	packagesCheckpointVersion         = 3
+	resolvedViewCheckpointVersion     = 4
+	resolvedPackagesCheckpointVersion = 5
+	resolvedRawCheckpointVersion      = 6
 )
 
-// checkpointVersion is the version of a new checkpoint of the capability.
+// checkpointVersion is the version of a new checkpoint of the capability for
+// a session that holds every record.
 func (c Capability) checkpointVersion() int {
-	if c.View {
+	return c.checkpointVersionOf(false)
+}
+
+// checkpointVersionOf is the version of a new checkpoint of the capability,
+// for a session that records reused tasks by reference when references is
+// set.
+func (c Capability) checkpointVersionOf(references bool) int {
+	switch {
+	case c.View && references:
+		return resolvedViewCheckpointVersion
+	case c.View:
 		return viewCheckpointVersion
+	case references:
+		return resolvedRawCheckpointVersion
 	}
 	return rawCheckpointVersion
+}
+
+// framesView reports whether a checkpoint of version frames the trimmed view.
+func framesView(version int) bool {
+	return version == viewCheckpointVersion || version == resolvedViewCheckpointVersion
+}
+
+// sendsPackages reports whether a checkpoint of version is on packages.
+func sendsPackages(version int) bool {
+	return version == packagesCheckpointVersion || version == resolvedPackagesCheckpointVersion
+}
+
+// resolvesReferences reports whether a checkpoint of version puts back the
+// records a task:end's cache reference names.
+func resolvesReferences(version int) bool {
+	return version == resolvedViewCheckpointVersion || version == resolvedPackagesCheckpointVersion || version == resolvedRawCheckpointVersion
 }

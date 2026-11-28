@@ -102,6 +102,14 @@
         "Whenever one of 8 slots is free, the packages sealed since leave as one put; a final manifest follows the last acknowledgement, and a replay sends only the packages not acknowledged.",
         "Without the offer the session stays on frames."
       ]
+    },
+    {
+      "id": "cached-task-by-reference",
+      "text": [
+        "A task a local entry served is recorded as its task:start, the records the hit added and a task:end whose cacheReference names the entry, its result's SHA-256, its record counts and its records' projection and digest.",
+        "Each reader rebuilds them before the task:end, or names a projection it cannot rebuild and sends none; packages carry them only to receivers offering packagesRebuilt.",
+        "Machine output, portable runs, runs they nest and cache verification keep every record; retained sessions pin their results."
+      ]
     }
   ],
   "decisions": [
@@ -109,6 +117,7 @@
     "tooling/cli/doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md",
     "tooling/cli/doc/adr/0115-a-local-run-hands-its-report-upload-to-a-detached-replay.md",
     "tooling/cli/doc/adr/0131-a-session-reporter-sends-larger-frames-once-its-receiver-advertises-them.md",
-    "tooling/cli/doc/adr/0135-a-run-delivers-its-report-as-task-packages-sent-in-parallel.md"
+    "tooling/cli/doc/adr/0135-a-run-delivers-its-report-as-task-packages-sent-in-parallel.md",
+    "tooling/cli/doc/adr/0137-a-cached-task-is-recorded-by-its-cache-entry.md"
   ]
 }

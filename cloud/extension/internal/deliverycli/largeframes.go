@@ -41,6 +41,9 @@ type frameCap struct {
 	bytes int
 	// packages records that answer advertised packages (advertisesPackages).
 	packages bool
+	// rebuilt records that answer advertised packages that name rebuilt
+	// records (advertisesRebuiltPackages).
+	rebuilt bool
 }
 
 // observe records the answer url gave with status, or no answer when header
@@ -55,7 +58,7 @@ func (c *frameCap) observe(url string, status int, header http.Header) {
 	if !decisiveAnswer(status) {
 		return
 	}
-	*c = frameCap{url: url, bytes: advertisedChunkBytes(header), packages: advertisesPackages(header)}
+	*c = frameCap{url: url, bytes: advertisedChunkBytes(header), packages: advertisesPackages(header), rebuilt: advertisesRebuiltPackages(header)}
 }
 
 // decisiveAnswer reports whether an answer of status comes from the receiver

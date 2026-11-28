@@ -402,6 +402,40 @@ addition is not invisible everywhere:
 - An older CLI's `sessions inspect` lists a `test:case` record by its record
   type without its case payload.
 
+#### A reused task's records by reference
+
+A session whose readers all resolve cache references (CLI ADR 0137) does not
+copy the records a reused task replays from its cache entry: the task's
+`task:end` carries `cacheReference`, and the stream holds no `task:event` that
+the entry's events yield and no `test:case` of the task. The task's other
+`task:event` records, the ones the reuse added in this run, stay.
+
+```json
+"cacheReference": {"entry": "sha256:…", "result": "sha256:…", "events": 2, "testCases": 412, "projection": 1, "records": "sha256:…"}
+```
+
+- `entry` is the key the producer's local store files the entry under, spelled
+  like `inputDigest`: the task's `inputDigest`, or that key bound to the
+  project's source for a task whose entry is source-bound.
+- `result` is the SHA-256 of the entry's recorded result. A reader that finds
+  another result, or no entry, rebuilds nothing, and reads the `task:end` as
+  it is, `cacheReference` included.
+- `events` and `testCases` count the `task:event` and `test:case` records the
+  entry yields. A reader rebuilds them and reads them right before the
+  `task:end`, which it then reads without `cacheReference`.
+- `projection`, at least 1, is the version of the function that rebuilds
+  those records from the entry and the `task:end`, and `records` the SHA-256
+  of the records it rebuilt for the producer, each followed by LF. A reader
+  of another projection, or whose rebuilt records hash to another digest,
+  rebuilds nothing and says so: it never reads other bytes than the producer
+  would have written.
+
+The member is permitted on a `task:end` whose `task.reuse` is not `none` and
+whose `task.status` is not `skipped`, and is the record's last member. The
+`--output=jsonl` stream and its artifact never carry it: they keep every
+record, for readers that resolve no reference. A validator built before this
+member rejects a `task:end` that carries it (unknown member).
+
 The general run summary is **one type** on all three legacy surfaces — the
 envelope's `run` member, a legacy `session:end` record's `run`, and the session
 file's `run` are the same shape. The

@@ -95,6 +95,17 @@ func TaskEvent(job *jobs.ScheduledJob, event jobs.RawJobEvent, at time.Time) pro
 	return taskEvent(identity, event, at)
 }
 
+// CachedTaskEvent is the task:event record TaskEvent writes for event, one of
+// the events a cache entry holds, under identity: a reader that rebuilds a
+// reused task's records knows the task by its identity, not by its job. The
+// record carries the event's own time, or none when the event has none.
+func CachedTaskEvent(identity protocolcli.TaskIdentity, event jobs.RawJobEvent) protocolcli.SessionStreamRecord {
+	event.Data = withoutResultTestCases(event)
+	record := taskEvent(identity, event, time.Time{})
+	record.Time = event.Time
+	return record
+}
+
 // BatchTaskEvent records one event emitted by a shared batch subprocess before
 // the runner's bounded per-task retention. The producer has not attributed the
 // line to a member, so a stable workspace-scoped batch identity is truthful;
@@ -284,9 +295,16 @@ func ReleaseSetResultEvent(
 // task:end. A renderer emits them as one group that no other record splits, so
 // a reader meets every case of a task right before the task's verdict.
 func TaskEndRecords(task Task, at time.Time) []protocolcli.SessionStreamRecord {
-	records := make([]protocolcli.SessionStreamRecord, 0, len(task.Result.TestCases)+1)
-	for _, testCase := range task.Result.TestCases {
-		identity := task.Identity
+	records := TestCaseRecords(task.Identity, task.Result.TestCases, at, 1)
+	return append(records, TaskEnd(task, at))
+}
+
+// TestCaseRecords are the test:case records of cases under identity, in
+// order, stamped at, with room for spare more records after them.
+func TestCaseRecords(identity protocolcli.TaskIdentity, cases []protocolcli.TestCase, at time.Time, spare int) []protocolcli.SessionStreamRecord {
+	records := make([]protocolcli.SessionStreamRecord, 0, len(cases)+spare)
+	for _, testCase := range cases {
+		identity := identity
 		records = append(records, protocolcli.SessionStreamRecord{
 			ProtocolVersion: protocolcli.ResultProtocolVersion,
 			Record:          protocolcli.RecordTestCase,
@@ -295,7 +313,7 @@ func TaskEndRecords(task Task, at time.Time) []protocolcli.SessionStreamRecord {
 			TestCase:        &testCase,
 		})
 	}
-	return append(records, TaskEnd(task, at))
+	return records
 }
 
 // TaskEnd is the task:end stream record.

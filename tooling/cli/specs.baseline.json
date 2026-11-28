@@ -287,6 +287,7 @@
     "cli/job-planning-execution#workload-lifecycle",
     "cli/job-planning-execution#workspace-scoped-help",
     "cli/native-session-reporting#bounded-transport",
+    "cli/native-session-reporting#cached-task-by-reference",
     "cli/native-session-reporting#credential-boundary",
     "cli/native-session-reporting#detached-delivery",
     "cli/native-session-reporting#durable-replay",

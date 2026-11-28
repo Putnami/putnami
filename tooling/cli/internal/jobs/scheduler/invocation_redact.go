@@ -262,6 +262,8 @@ func failSensitiveLeak(result *JobResult) *JobResult {
 	}
 	result.Status = "failed"
 	result.SourceMutated = false
+	// The withheld values are no longer the entry's records.
+	result.EntryRecords = nil
 	result.Error = &JobError{
 		Code: extensionproto.FailureSensitiveLeakDetected,
 		Message: "task emitted a sensitive invocation artifact's path or bytes; " +

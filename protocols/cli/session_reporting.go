@@ -175,6 +175,13 @@ type SessionReportingAck struct {
 	// Only a reporter whose engine named SessionReportingPackagesVersion in
 	// SessionReportingFramingEnv sends it, and only true.
 	Packages bool `json:"packages,omitempty"`
+	// PackagesRebuilt says that the destination also accepts task packages
+	// whose header names rebuilt records (CLI ADR 0137): the engine may send
+	// a session recorded by reference as packages. Only a reporter whose
+	// engine named SessionReportingRebuiltPackagesVersion in
+	// SessionReportingFramingEnv sends it, only with Packages, and only true:
+	// an engine of SessionReportingPackagesVersion refuses the member.
+	PackagesRebuilt bool `json:"packagesRebuilt,omitempty"`
 }
 
 var reportingSessionID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
@@ -305,6 +312,9 @@ func ParseSessionReportingAck(line []byte) (*SessionReportingAck, error) {
 	}
 	if _, present := members["packages"]; present && !a.Packages {
 		return nil, fmt.Errorf("invalid reporting packages member")
+	}
+	if _, present := members["packagesRebuilt"]; present && (!a.PackagesRebuilt || !a.Packages) {
+		return nil, fmt.Errorf("invalid reporting packagesRebuilt member")
 	}
 	return &a, nil
 }

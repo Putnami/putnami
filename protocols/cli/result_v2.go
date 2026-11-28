@@ -977,6 +977,35 @@ type SessionStreamRecord struct {
 	// It remains optional here so the contract slice can land before the
 	// producer migration; ValidateSessionStream requires it.
 	MachineOutput *MachineOutputSummary `json:"machineOutput,omitempty"`
+	// CacheReference names the cache entry that holds the task:event and
+	// test:case records a reused task replayed, which the stream then does not
+	// hold. It is permitted on a task:end whose task was reused and not
+	// skipped, and is the record's last member. A reader rebuilds the records
+	// from the entry and reads them right before the task:end.
+	CacheReference *TaskCacheReference `json:"cacheReference,omitempty"`
+}
+
+// TaskCacheReference names the cache entry a reused task's records are held
+// by, and what a reader rebuilds from it.
+type TaskCacheReference struct {
+	// Entry is the key the producer's local store files the entry under,
+	// spelled like inputDigest: the task's inputDigest, or, for a task whose
+	// entry is bound to its project's source, that key bound to the binding.
+	Entry string `json:"entry"`
+	// Result is the SHA-256 of the entry's recorded result, spelled like
+	// inputDigest. A reader that finds another result rebuilds nothing.
+	Result string `json:"result"`
+	// Events is how many task:event records the entry's events yield.
+	Events int `json:"events"`
+	// TestCases is how many test:case records the entry's result yields.
+	TestCases int `json:"testCases"`
+	// Projection is the version of the projection that turns the entry into
+	// those records. A reader of another projection rebuilds nothing.
+	Projection int `json:"projection"`
+	// Records is the SHA-256 of the records as the producer would have written
+	// them, each ended by an LF, spelled like inputDigest. A reader whose
+	// rebuilt records hash to another digest sends none of them.
+	Records string `json:"records"`
 }
 
 // BoundedSessionEndRecord is the opt-in terminal wire type implemented by the

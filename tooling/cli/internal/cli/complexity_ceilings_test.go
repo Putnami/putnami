@@ -88,7 +88,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  24,
-		funcs:  189,
+		funcs:  192,
 		why: "internal/engine: run assembly. Its functions are the run's stages (workspace probe, " +
 			"selection, planning, scheduling, finalization) and the seams where a run attaches " +
 			"what only the engine sees: the run report, the workspace map, the spec gate, the " +
@@ -145,8 +145,8 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "cache",
 		prefix: "internal/store/",
-		files:  35,
-		funcs:  329,
+		files:  36,
+		funcs:  339,
 		why: "internal/store: the content-addressed local cache. Entries and task entries " +
 			"(success, failure and result-only), CAS, leases, GC with its in-run budget, " +
 			"generations, the remote bridge, the build-tagged platform halves (materialization, " +
@@ -160,8 +160,8 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "output",
 		prefix: "internal/output/",
-		files:  30,
-		funcs:  276,
+		files:  31,
+		funcs:  284,
 		why: "internal/output: the renderers. One machine renderer (machine_v2.go, with the shared " +
 			"sanitizer and recorder of machine_stream.go) projects the canonical reduction for " +
 			"both --output=json and --output=jsonl. Everything else is human-facing (live, text, " +

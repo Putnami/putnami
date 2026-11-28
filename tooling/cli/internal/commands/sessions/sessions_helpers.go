@@ -11,6 +11,8 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/output"
+	"go.putnami.dev/tooling/cli/internal/sessionrefs"
 	"go.putnami.dev/tooling/cli/internal/sessionstream"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -192,8 +194,14 @@ const ledgerSubscriber = "ledger"
 // readSessionRecords is the sessions commands' one reader of events.jsonl: it
 // subscribes to the recorded session's event stream from its first byte and
 // visits every record in order, torn trailing bytes included.
-func readSessionRecords(store *workspace_state.SessionStore, id string, visit func(sessionstream.Record) error) error {
-	stream, err := sessionstream.Open(filepath.Join(store.Root(), id), id)
+//
+// A task:end that names a cache entry (ADR 0137) is visited as the records the
+// entry holds, then the task:end without its reference, each at the task:end's
+// position. One whose records this CLI cannot rebuild is visited as it is,
+// after note, when set, receives why (sessionrefs.Resolve).
+func readSessionRecords(store *workspace_state.SessionStore, id string, visit func(sessionstream.Record) error, note func(error)) error {
+	dir := filepath.Join(store.Root(), id)
+	stream, err := sessionstream.Open(dir, id)
 	if err != nil {
 		return err
 	}
@@ -202,10 +210,27 @@ func readSessionRecords(store *workspace_state.SessionStore, id string, visit fu
 		return err
 	}
 	defer func() { _ = reader.Close() }()
+	var entries sessionrefs.Entries
 	for {
 		record, ok, err := reader.Next()
 		if err != nil || !ok {
 			return err
+		}
+		if _, _, referenced := output.SplitCacheReference(record.Data); referenced && record.Terminated {
+			if entries == nil {
+				entries = sessionrefs.Of(dir)
+			}
+			rebuilt, end, err := sessionrefs.Resolve(entries, record.Data)
+			if err == nil {
+				for _, data := range rebuilt {
+					if err := visit(sessionstream.Record{Position: record.Position, Data: data, Terminated: true}); err != nil {
+						return err
+					}
+				}
+				record.Data = end
+			} else if note != nil {
+				note(err)
+			}
 		}
 		if err := visit(record); err != nil {
 			return err
@@ -213,10 +238,38 @@ func readSessionRecords(store *workspace_state.SessionStore, id string, visit fu
 	}
 }
 
+// unresolvedReferences counts the reused tasks of a session whose records
+// readSessionRecords could not rebuild, by why.
+type unresolvedReferences struct {
+	// otherCLI counts references recorded by a CLI whose projection of the
+	// records this one does not reproduce.
+	otherCLI int
+	// unavailable counts references whose cache entry the store no longer
+	// holds.
+	unavailable int
+}
+
+func (u *unresolvedReferences) note(err error) {
+	var projection *sessionrefs.ProjectionError
+	if errors.As(err, &projection) {
+		u.otherCLI++
+	} else {
+		u.unavailable++
+	}
+}
+
 // readSessionEvents is the lenient reader `sessions inspect` uses: blank and
 // malformed records are skipped.
 func readSessionEvents(store *workspace_state.SessionStore, id string) ([]workspace_state.SessionEvent, error) {
+	events, _, err := readSessionEventsNoting(store, id)
+	return events, err
+}
+
+// readSessionEventsNoting is readSessionEvents, and the reused tasks whose
+// records it could not rebuild.
+func readSessionEventsNoting(store *workspace_state.SessionStore, id string) ([]workspace_state.SessionEvent, unresolvedReferences, error) {
 	var events []workspace_state.SessionEvent
+	var unresolved unresolvedReferences
 	err := readSessionRecords(store, id, func(record sessionstream.Record) error {
 		line := bytes.TrimSpace(record.Data)
 		if len(line) == 0 {
@@ -227,11 +280,25 @@ func readSessionEvents(store *workspace_state.SessionStore, id string) ([]worksp
 			events = append(events, ev)
 		}
 		return nil
-	})
+	}, unresolved.note)
 	if err != nil {
-		return nil, err
+		return nil, unresolved, err
 	}
-	return events, nil
+	return events, unresolved, nil
+}
+
+// printUnresolvedReferences prints a note for each kind of reused task whose
+// records the session shows as recorded, its task:end only.
+func printUnresolvedReferences(unresolved unresolvedReferences) {
+	if unresolved.otherCLI > 0 {
+		iox.Fprintln(os.Stdout)
+		iox.Fprintf(os.Stdout, "  Note: %d reused task(s) are not resolvable by this CLI: their records were recorded by a CLI\n", unresolved.otherCLI)
+		iox.Fprintln(os.Stdout, "  whose projection of the cache entry this one does not reproduce; their task:end is shown as recorded.")
+	}
+	if unresolved.unavailable > 0 {
+		iox.Fprintln(os.Stdout)
+		iox.Fprintf(os.Stdout, "  Note: %d reused task(s) name a cache entry the store no longer holds; their task:end is shown as recorded.\n", unresolved.unavailable)
+	}
 }
 
 // printSubscriberEvidence prints the session's subscribers.json, when the run
@@ -361,8 +428,10 @@ func sessionsListData(store *workspace_state.SessionStore, sessions []string, la
 }
 
 // sessionInspectData is the data of the sessions inspect result: the session
-// metadata, with its plan and events when it recorded them.
-func sessionInspectData(meta *workspace_state.SessionMetadata, plan *workspace_state.PlanSnapshot, events []workspace_state.SessionEvent) map[string]any {
+// metadata, with its plan and events when it recorded them, and the count of
+// reused tasks whose records it shows as their task:end only, by why, when
+// there are any.
+func sessionInspectData(meta *workspace_state.SessionMetadata, plan *workspace_state.PlanSnapshot, events []workspace_state.SessionEvent, unresolved unresolvedReferences) map[string]any {
 	output := map[string]any{
 		"metadata": meta,
 	}
@@ -371,6 +440,12 @@ func sessionInspectData(meta *workspace_state.SessionMetadata, plan *workspace_s
 	}
 	if len(events) > 0 {
 		output["events"] = events
+	}
+	if unresolved.otherCLI > 0 || unresolved.unavailable > 0 {
+		output["unresolvedReferences"] = struct {
+			NotResolvableByThisCLI int `json:"notResolvableByThisCli"`
+			Unavailable            int `json:"unavailable"`
+		}{unresolved.otherCLI, unresolved.unavailable}
 	}
 	return output
 }

@@ -176,6 +176,25 @@
             "a-session-without-a-packages-offer-stays-on-frames"
           ]
         }
+      },
+      {
+        "id": "cached-task-by-reference",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-reused-task-records-its-cache-entry",
+            "readers-rebuild-the-replayed-records",
+            "the-session-reporter-sends-the-rebuilt-records",
+            "a-session-whose-readers-cannot-resolve-writes-the-records",
+            "retention-keeps-the-results-retained-sessions-reference",
+            "a-reference-this-cli-cannot-rebuild-is-named",
+            "rebuilt-packages-need-a-receiver-that-reads-them"
+          ]
+        }
       }
     ]
   }

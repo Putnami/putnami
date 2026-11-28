@@ -569,6 +569,10 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 	}
 
 	result := cachekey.JobResultFromEntryResult(entry.Result)
+	// Every event the result holds so far is the entry's: a session recorder
+	// may record them by reference to it (ADR 0137). The events the restore
+	// appends below are this run's.
+	result.EntryRecords = &EntryRecords{Key: entry.Key, Result: entry.ResultDigest, Events: len(result.Events)}
 	if cachekey.DeclaredSourceRewriter(job) && result.SourceMutated {
 		// The entry is keyed by the source bytes before the fixer ran. Reusing its
 		// successful status would skip the edits in this worktree.

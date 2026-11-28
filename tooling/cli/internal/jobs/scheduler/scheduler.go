@@ -86,6 +86,12 @@ type SchedulerConfig struct {
 	// would miss on every run forever. It reaches only cmd.Env through
 	// jobProcessEnv() and the session audit event.
 	SessionID string
+	// RecordSessionsWhole is set on a run whose sessions travel to another
+	// machine, a bound portable execution or a run one spawned: it exports
+	// RecordSessionsWholeEnv into each task subprocess, so a CLI a task spawns
+	// records every record of its own session too (CLI ADR 0137). It is
+	// execution-only, like SessionID.
+	RecordSessionsWhole bool
 	// ServeSteps names, by job key, the plan's serve-workload steps: the
 	// long-running terminal steps of a serve pipeline, never one of its finite
 	// steps. The engine computes it from the final plan. runJob announces the

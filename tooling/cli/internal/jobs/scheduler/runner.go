@@ -337,6 +337,10 @@ func buildJobInvocation(
 	if envHasKey(extraEnv, protocolcli.ParentSessionEnv) {
 		env = setEnv(env, protocolcli.ParentSessionEnv, envLastValue(extraEnv, protocolcli.ParentSessionEnv))
 	}
+	// A manifest cannot clear that a run's sessions travel elsewhere either.
+	if envHasKey(extraEnv, RecordSessionsWholeEnv) {
+		env = setEnv(env, RecordSessionsWholeEnv, envLastValue(extraEnv, RecordSessionsWholeEnv))
+	}
 	// The host RPC channel is a fact about the spawn too: only the launch that
 	// opened one names it, in extraEnv. A planned job never receives one, so
 	// its result cannot depend on a call its cache key does not cover. An

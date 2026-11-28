@@ -16,6 +16,7 @@ import (
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/tooling/cli/internal/sessionrefs"
 	"go.putnami.dev/tooling/cli/internal/sessionstream"
 )
 
@@ -156,16 +157,28 @@ type collector struct {
 	sealed []*taskPackage
 	// done reports that the stream is final and every package sealed.
 	done bool
+	// rebuild, when set, rebuilds what a task:end that names a cache entry
+	// stands for (sessionrefs.Resolve): the records the entry holds, each
+	// without its LF, and the task:end without its reference (ADR 0137).
+	rebuild func(line []byte) ([][]byte, []byte, error)
+	// err is the error that stopped the collector: a reference this CLI
+	// cannot rebuild as its producer would have. No package past it seals.
+	err error
 }
 
 // taskPackage is one package of a key's records, and their raw ranges while
-// it is open.
+// it is open. A record whose bytes are not the stream's, one rebuilt from a
+// cache entry or a task:end without its reference, keeps them in data, at the
+// raw offset of the task:end it stands before; rebuilt lists the indexes of
+// those the stream does not hold.
 type taskPackage struct {
 	key     string
 	part    int
 	first   int64
 	offsets []int64
 	sizes   []int64
+	data    [][]byte
+	rebuilt []int
 	bytes   int64
 	open    bool
 	acked   bool
@@ -177,6 +190,7 @@ type collectedRecord struct {
 	Identity struct {
 		Key string `json:"key"`
 	} `json:"identity"`
+	CacheReference json.RawMessage `json:"cacheReference"`
 }
 
 func newCollector(events *sessionstream.Subscription) *collector {
@@ -188,6 +202,9 @@ func newCollector(events *sessionstream.Subscription) *collector {
 // may be called again at once, rather than at what is committed: the stream
 // must grow first.
 func (c *collector) next(limit int64) (pkg *taskPackage, more bool, err error) {
+	if c.err != nil {
+		return nil, false, c.err
+	}
 	start := c.scan
 	for len(c.sealed) == 0 && !c.done {
 		if c.scan-start >= limit {
@@ -208,6 +225,9 @@ func (c *collector) next(limit int64) (pkg *taskPackage, more bool, err error) {
 		raw, size := c.scan, int64(len(line))+1
 		c.scan += size
 		c.place(line, raw, size)
+		if c.err != nil {
+			return nil, false, c.err
+		}
 		if cap(c.partial) > 1<<20 {
 			c.partial = nil
 		} else {
@@ -292,13 +312,43 @@ func (c *collector) finish(end int64) {
 
 // place adds one whole record, raw bytes [raw, raw+size), to the package of
 // its key, sealing that package before the record when the record would take
-// it past its bound, and after it at the record's task:end.
+// it past its bound, and after it at the record's task:end. A task:end that
+// names a cache entry the collector rebuilds is placed as the records the
+// entry holds, then itself without its reference, all at its raw offset; one
+// whose entry is gone is placed as it is, and one this CLI cannot rebuild as
+// its producer would have stops the collector.
 func (c *collector) place(line []byte, raw, size int64) {
 	var record collectedRecord
 	key, end := "", false
 	if json.Unmarshal(line, &record) == nil {
 		key, end = record.Identity.Key, record.Record == protocolcli.RecordTaskEnd
 	}
+	if end && c.rebuild != nil && len(record.CacheReference) > 0 {
+		records, stripped, err := c.rebuild(line)
+		var projection *sessionrefs.ProjectionError
+		switch {
+		case errors.As(err, &projection):
+			c.err = err
+			return
+		case err == nil:
+			for _, rebuilt := range records {
+				c.add(key, raw, int64(len(rebuilt))+1, append(rebuilt, '\n'), true)
+			}
+			c.seal(c.add(key, raw, int64(len(stripped))+1, append(stripped, '\n'), false))
+			return
+		}
+	}
+	p := c.add(key, raw, size, nil, false)
+	if end {
+		c.seal(p)
+	}
+}
+
+// add appends one record of size bytes at raw offset raw to the open package
+// of key, sealing that package first when the record would take it past its
+// bound, and returns the package. data is the record's bytes when they are
+// not the stream's, and rebuilt reports a record the stream does not hold.
+func (c *collector) add(key string, raw, size int64, data []byte, rebuilt bool) *taskPackage {
 	p := c.open[key]
 	if p != nil && p.bytes+size > protocolcli.SessionReportingPackageRecordBytes {
 		c.seal(p)
@@ -310,12 +360,14 @@ func (c *collector) place(line []byte, raw, size int64) {
 		c.open[key] = p
 		c.unacknowledged = append(c.unacknowledged, p)
 	}
+	if rebuilt {
+		p.rebuilt = append(p.rebuilt, len(p.offsets))
+	}
 	p.offsets = append(p.offsets, raw)
 	p.sizes = append(p.sizes, size)
+	p.data = append(p.data, data)
 	p.bytes += size
-	if end {
-		c.seal(p)
-	}
+	return p
 }
 
 // drained reports that every package sealed and was handed out.
@@ -334,7 +386,7 @@ func (c *collector) seal(p *taskPackage) {
 // read back from the stream. The package then keeps no ranges.
 func (c *collector) encode(p *taskPackage) ([]byte, error) {
 	key := p.key
-	header := protocolcli.SessionReportingPackageHeader{Kind: protocolcli.SessionReportingPackageTask, Key: &key, Part: p.part, Offsets: p.offsets}
+	header := protocolcli.SessionReportingPackageHeader{Kind: protocolcli.SessionReportingPackageTask, Key: &key, Part: p.part, Offsets: p.offsets, Rebuilt: p.rebuilt}
 	headerLine, err := json.Marshal(header)
 	if err != nil {
 		return nil, fmt.Errorf("encode reporting package")
@@ -344,9 +396,14 @@ func (c *collector) encode(p *taskPackage) ([]byte, error) {
 	}
 	body := make([]byte, 0, p.bytes)
 	for i := 0; i < len(p.offsets); {
+		if p.data[i] != nil {
+			body = append(body, p.data[i]...)
+			i++
+			continue
+		}
 		start, end := p.offsets[i], p.offsets[i]+p.sizes[i]
 		j := i + 1
-		for j < len(p.offsets) && p.offsets[j]-end <= collectorReadGap && p.offsets[j]+p.sizes[j]-start <= collectorReadSpan {
+		for j < len(p.offsets) && p.data[j] == nil && p.offsets[j]-end <= collectorReadGap && p.offsets[j]+p.sizes[j]-start <= collectorReadSpan {
 			end = p.offsets[j] + p.sizes[j]
 			j++
 		}
@@ -360,7 +417,7 @@ func (c *collector) encode(p *taskPackage) ([]byte, error) {
 		i = j
 	}
 	data := protocolcli.EncodeSessionReportingPackage(header, body)
-	p.offsets, p.sizes = nil, nil
+	p.offsets, p.sizes, p.data, p.rebuilt = nil, nil, nil, nil
 	return data, nil
 }
 
@@ -497,7 +554,11 @@ type packageWorker struct {
 
 func (r *Run) newPackageWorker(terminal bool) *packageWorker {
 	p := r.state.Packages
-	w := &packageWorker{r: r, c: newCollector(r.events), inFlight: map[string]*packageLine{}, acknowledged: p.Acknowledged, restored: map[string]bool{}, raw: r.state.EventsRaw, terminal: terminal}
+	c := newCollector(r.events)
+	if entries, ok := r.referenceEntries(); ok {
+		c.rebuild = func(line []byte) ([][]byte, []byte, error) { return sessionrefs.Resolve(entries, line) }
+	}
+	w := &packageWorker{r: r, c: c, inFlight: map[string]*packageLine{}, acknowledged: p.Acknowledged, restored: map[string]bool{}, raw: r.state.EventsRaw, terminal: terminal}
 	for _, address := range p.Addresses {
 		w.restored[address] = true
 		w.restoredOrder = append(w.restoredOrder, address)
@@ -562,7 +623,7 @@ func (w *packageWorker) produce() (more bool, err error) {
 			return false, err
 		}
 		if err != nil {
-			return false, fmt.Errorf("reporting artifact changed: %s", sessionstream.EventsFile)
+			return false, eventsError(err)
 		}
 		if pkg == nil {
 			if w.c.drained() {

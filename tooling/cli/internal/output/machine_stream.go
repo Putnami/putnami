@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -167,7 +168,10 @@ type sessionRecordingRenderer struct {
 	planned   []*jobs.ScheduledJob
 	completed map[string]bool
 	writeErr  error
-	mu        sync.Mutex
+	// refs is set while the recorder records reused tasks by reference to
+	// their cache entry (RecordReusedTasksByReference).
+	refs *cacheReferences
+	mu   sync.Mutex
 }
 
 // WithSessionRecording attaches the complete v2 events.jsonl artifact to a
@@ -243,6 +247,9 @@ func (r *sessionRecordingRenderer) Start(planned []*jobs.ScheduledJob) {
 	r.completed = make(map[string]bool, len(planned))
 	r.state = newMachineOutputState(r.mode)
 	r.writeErr = nil
+	if r.refs != nil {
+		r.refs.held = map[string][]jobs.RawJobEvent{}
+	}
 	r.mu.Unlock()
 	r.base.Start(planned)
 }
@@ -252,8 +259,22 @@ func (r *sessionRecordingRenderer) JobStart(job *jobs.ScheduledJob) {
 	r.base.JobStart(job)
 }
 
+// While the recorder records by reference, an event a cache entry supplied is
+// held until its task ends: the task:end then names the entry instead
+// (endRecords).
 func (r *sessionRecordingRenderer) JobEvent(job *jobs.ScheduledJob, event jobs.RawJobEvent) {
-	r.record(machine.TaskEvent(job, event, time.Now()))
+	held := false
+	if event.FromCacheEntry && job != nil {
+		r.mu.Lock()
+		if r.refs != nil {
+			r.refs.held[job.Key()] = append(r.refs.held[job.Key()], event)
+			held = true
+		}
+		r.mu.Unlock()
+	}
+	if !held {
+		r.record(machine.TaskEvent(job, event, time.Now()))
+	}
 	r.base.JobEvent(job, event)
 }
 
@@ -272,12 +293,15 @@ func (r *sessionRecordingRenderer) BatchMemberJobEvent(job *jobs.ScheduledJob, e
 
 func (r *sessionRecordingRenderer) JobComplete(job *jobs.ScheduledJob, result *jobs.JobResult) {
 	task := machine.Task{Identity: machine.Identity(job), Result: jobs.TaskResultOf(job, result)}
+	var held []jobs.RawJobEvent
+	byReference := false
 	if job != nil {
 		r.mu.Lock()
 		r.completed[job.Key()] = true
+		held, byReference = r.release(job.Key())
 		r.mu.Unlock()
 	}
-	r.record(machine.TaskEndRecords(task, time.Now())...)
+	r.record(r.endRecords(result, task, held, byReference, time.Now())...)
 	r.base.JobComplete(job, result)
 }
 
@@ -315,19 +339,26 @@ func (r *sessionRecordingRenderer) Finish(results map[string]*jobs.JobResult, ou
 		r.writeErr = err
 	}
 	r.mu.Unlock()
+	if err := r.pinReferences(); err != nil {
+		slog.Warn("session cache references are not pinned; store collection may delete the results they name", "error", err)
+	}
 	r.base.Finish(results, outcome)
 }
 
+// A task that never completed is recorded whole, the entry events held for
+// it included.
 func (r *sessionRecordingRenderer) emitMissingTaskEnds(run machine.Run) {
 	for _, task := range run.Tasks {
 		r.mu.Lock()
 		seen := r.completed[task.Identity.Key]
+		var held []jobs.RawJobEvent
 		if !seen {
 			r.completed[task.Identity.Key] = true
+			held, _ = r.release(task.Identity.Key)
 		}
 		r.mu.Unlock()
 		if !seen {
-			r.record(machine.TaskEndRecords(task, time.Now())...)
+			r.record(r.endRecords(nil, task, held, false, time.Now())...)
 		}
 	}
 }

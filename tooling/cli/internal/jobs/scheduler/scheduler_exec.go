@@ -822,11 +822,20 @@ func (s *Scheduler) jobProcessEnv() []string {
 	if s.cfg.SessionID != "" {
 		env = append(env, protocolcli.ParentSessionEnv+"="+s.cfg.SessionID)
 	}
+	if s.cfg.RecordSessionsWhole {
+		env = append(env, RecordSessionsWholeEnv+"=1")
+	}
 	if s.remote != nil && !s.cfg.NoCache {
 		env = append(env, s.remote.ObjectCacheJobEnv()...)
 	}
 	return env
 }
+
+// RecordSessionsWholeEnv names, in a task subprocess's environment, a run
+// whose sessions travel to another machine (SchedulerConfig.RecordSessionsWhole):
+// a CLI the task spawns records every record of its session, and exports it
+// to the tasks it runs in turn.
+const RecordSessionsWholeEnv = "PUTNAMI_RECORD_SESSIONS_WHOLE"
 
 // jobProcessEnvFor is jobProcessEnv for one job, plus ServeProcessEnv when the
 // job is one of the run's serve-workload steps (SchedulerConfig.ServeSteps).
@@ -1123,15 +1132,24 @@ func (s *Scheduler) replayCacheEvents(job *ScheduledJob, result *JobResult) {
 // started, but its "execution" was another node's, so its stream has to be
 // replayed the way a cache hit's is or the renderers see a task that completed
 // having said nothing.
+//
+// The events the entry that result.EntryRecords names supplied reach the
+// renderers marked FromCacheEntry, so a session recorder can tell them from
+// the events this run added.
 func (s *Scheduler) replayResultEvents(job *ScheduledJob, result *JobResult) {
 	if result == nil {
 		return
 	}
+	fromEntry := 0
+	if result.EntryRecords != nil {
+		fromEntry = result.EntryRecords.Events
+	}
 	sawResult := false
-	for _, ev := range result.Events {
+	for i, ev := range result.Events {
 		if ev.Type == EventTypeResult {
 			sawResult = true
 		}
+		ev.FromCacheEntry = i < fromEntry
 		s.renderer.JobEvent(job, ev)
 	}
 	if !sawResult {

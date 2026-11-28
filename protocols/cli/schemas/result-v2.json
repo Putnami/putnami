@@ -887,6 +887,44 @@
         }
       ]
     },
+    "taskCacheReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry", "result", "events", "testCases", "projection", "records"],
+      "description": "The cache entry a reused task's records are held by, and what a reader rebuilds from it.",
+      "properties": {
+        "entry": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The key the producer's local store files the entry under, spelled like inputDigest: the task's inputDigest, or, for a task whose entry is bound to its project's source, that key bound to the binding."
+        },
+        "result": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The SHA-256 of the entry's recorded result. A reader that finds another result rebuilds nothing."
+        },
+        "events": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many task:event records the entry's events yield."
+        },
+        "testCases": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many test:case records the entry's result yields."
+        },
+        "projection": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The version of the projection that turns the entry into those records. A reader of another projection rebuilds nothing."
+        },
+        "records": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The SHA-256 of the records as the producer would have written them, each ended by an LF. A reader whose rebuilt records hash to another digest sends none of them."
+        }
+      }
+    },
     "boundedSessionEndRecord": {
       "type": "object",
       "additionalProperties": false,
@@ -940,6 +978,10 @@
         "machineOutput": {
           "$ref": "#/$defs/machineOutputSummary",
           "description": "The fixed budget, exact elision counts and retained full-detail artifact. Optional for a legacy session:end record, required only by the opt-in bounded stream profile, and forbidden otherwise."
+        },
+        "cacheReference": {
+          "$ref": "#/$defs/taskCacheReference",
+          "description": "Names the cache entry that holds the task:event and test:case records a reused task replayed, which the stream then does not hold. Permitted on a task:end whose task.reuse is not none and whose task.status is not skipped, and forbidden otherwise; it is the record's last member. A reader rebuilds the records from the entry and reads them right before the task:end."
         }
       },
       "allOf": [
@@ -976,6 +1018,15 @@
             "properties": {
               "time": { "type": "string", "minLength": 1, "maxLength": 64 },
               "run": { "$ref": "#/$defs/streamRunSummary" }
+            }
+          }
+        },
+        {
+          "if": { "required": ["cacheReference"] },
+          "then": {
+            "properties": {
+              "record": { "const": "task:end" },
+              "task": { "properties": { "reuse": { "not": { "const": "none" } }, "status": { "not": { "const": "skipped" } } } }
             }
           }
         }

@@ -106,6 +106,24 @@ type JobResult struct {
 	// (scheduler_batch_exec.go). When set, the canonical model reads it and the
 	// projection is never parsed back.
 	Canonical *TaskResult `json:"-"`
+	// EntryRecords, set on a result a task-owned entry of the local store
+	// served, names that entry and how many leading Events it supplied. A
+	// session recorder may record those events, and the test cases of Data, as
+	// a reference to the entry rather than as records (tooling/cli ADR 0137).
+	// It is nil on every other result.
+	EntryRecords *EntryRecords `json:"-"`
+}
+
+// EntryRecords names the task-owned cache entry a reused result's records are
+// read from.
+type EntryRecords struct {
+	// Key is the key the local store files the entry under: the task's cache
+	// key, bound to its project's source binding for a source-bound task.
+	Key string
+	// Result is the SHA-256 of the entry's result.json, "sha256:<hex>".
+	Result string
+	// Events is how many leading JobResult.Events the entry supplied.
+	Events int
 }
 
 // ReplayedFailure is the provenance of a failure served from the local failure
@@ -175,6 +193,9 @@ type RawJobEvent struct {
 	Message   string         `json:"message,omitempty"`
 	Data      map[string]any `json:"data,omitempty"`
 	Timestamp int64          `json:"-"` // parsed from time field
+	// FromCacheEntry is set on the copy of an event the scheduler replays from
+	// the entry its result's EntryRecords names, and on no other event.
+	FromCacheEntry bool `json:"-"`
 }
 
 // Event type constants, sourced from the runtime event protocol.

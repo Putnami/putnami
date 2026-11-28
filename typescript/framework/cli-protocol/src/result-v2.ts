@@ -723,6 +723,38 @@ export interface SessionStreamRecord {
   /** Required on `plan:end` and forbidden on every other record. */
   plan?: PlanSummary;
   machineOutput?: MachineOutputSummary;
+  /**
+   * Names the cache entry that holds the `task:event` and `test:case` records
+   * a reused task replayed, which the stream then does not hold. Permitted on a
+   * `task:end` whose task was reused and not skipped; it is the record's last
+   * member. A reader rebuilds the records from the entry and reads them right
+   * before the `task:end`.
+   */
+  cacheReference?: TaskCacheReference;
+}
+
+/** The cache entry a reused task's records are held by. */
+export interface TaskCacheReference {
+  /**
+   * The key the producer's local store files the entry under, spelled like
+   * `inputDigest`: the task's `inputDigest`, or, for a task whose entry is
+   * bound to its project's source, that key bound to the binding.
+   */
+  entry: string;
+  /** The SHA-256 of the entry's recorded result; another result rebuilds nothing. */
+  result: string;
+  /** How many `task:event` records the entry's events yield. */
+  events: number;
+  /** How many `test:case` records the entry's result yields. */
+  testCases: number;
+  /** The version of the projection that turns the entry into those records. */
+  projection: number;
+  /**
+   * The SHA-256 of the records as the producer would have written them, each
+   * ended by an LF; a reader whose rebuilt records hash to another digest
+   * sends none of them.
+   */
+  records: string;
 }
 
 /** Opt-in bounded terminal type used by the whole-sequence profile. */
@@ -2732,6 +2764,16 @@ const sessionStreamRecordFields: Field[] = [
   opt('run', anyValue),
   opt('plan', planSummary),
   opt('machineOutput', machineOutputSummary),
+  opt('cacheReference', (v, path, value) => object(v, path, value, taskCacheReferenceFields)),
+];
+
+const taskCacheReferenceFields: Field[] = [
+  req('entry', prefixedSha256Digest),
+  req('result', prefixedSha256Digest),
+  req('events', intAtLeast(0)),
+  req('testCases', intAtLeast(0)),
+  req('projection', intAtLeast(1)),
+  req('records', prefixedSha256Digest),
 ];
 
 const boundedSessionEndRecordFields: Field[] = [
@@ -3283,6 +3325,7 @@ export const V2_FIELD_NAMES: Record<string, { members: string[]; required: strin
       ['resultEnvelope', resultEnvelopeFields],
       ['workspaceWarning', workspaceWarningFields],
       ['sessionStreamRecord', sessionStreamRecordFields],
+      ['taskCacheReference', taskCacheReferenceFields],
       ['boundedSessionEndRecord', boundedSessionEndRecordFields],
       ['sessionFile', sessionFileFields],
       ['sessionPlanFile', sessionPlanFileFields],
@@ -3505,6 +3548,26 @@ function validateSessionStreamRecord(v: Validator, root: JsonObject): void {
   }
   if (record === STREAM_RECORD.sessionEnd && hasMachineOutput) {
     nonEmptyStringBytesAtMost(64)(v, 'time', obj?.['time']);
+  }
+  checkCacheReference(v, obj, record);
+}
+
+/**
+ * Permits `cacheReference` on the `task:end` of a task that was reused and not
+ * skipped only: an executed task's records are its own execution's, and a
+ * skipped task looked no entry up.
+ */
+function checkCacheReference(v: Validator, obj: JsonObject | undefined, record: string): void {
+  if (!childValue(obj, 'cacheReference').present) {
+    return;
+  }
+  if (record !== STREAM_RECORD.taskEnd) {
+    v.add(VIOLATION_CODE.unexpectedField, 'cacheReference');
+    return;
+  }
+  const task = childObject(obj, 'task');
+  if (childString(task, 'reuse') === TASK_REUSE.none || childString(task, 'status') === TASK_STATUS.skipped) {
+    v.add(VIOLATION_CODE.invalidValue, 'cacheReference');
   }
 }
 

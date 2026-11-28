@@ -486,6 +486,16 @@ var (
 		opt("run", anyValue),
 		opt("plan", planSummary),
 		opt("machineOutput", machineOutputSummary),
+		opt("cacheReference", taskCacheReference),
+	}
+
+	taskCacheReferenceFields = []field{
+		req("entry", prefixedSha256Digest),
+		req("result", prefixedSha256Digest),
+		req("events", intAtLeast(0)),
+		req("testCases", intAtLeast(0)),
+		req("projection", intAtLeast(1)),
+		req("records", prefixedSha256Digest),
 	}
 
 	boundedSessionEndRecordFields = []field{
@@ -681,6 +691,7 @@ var v2FieldSets = map[string][]field{
 	"resultEnvelope":           resultEnvelopeFields,
 	"workspaceWarning":         workspaceWarningFields,
 	"sessionStreamRecord":      sessionStreamRecordFields,
+	"taskCacheReference":       taskCacheReferenceFields,
 	"boundedSessionEndRecord":  boundedSessionEndRecordFields,
 	"sessionFile":              sessionFileFields,
 	"sessionPlanFile":          sessionPlanFileFields,
@@ -1516,6 +1527,30 @@ func validateSessionStreamRecord(v *validator, root map[string]any) {
 	if record == RecordSessionEnd && hasMachineOutput {
 		nonEmptyStringBytesAtMost(64)(v, "time", obj["time"])
 	}
+	checkCacheReference(v, obj, record)
+}
+
+// checkCacheReference permits cacheReference on the task:end of a task that
+// was reused and not skipped only: an executed task's records are its own
+// execution's, and a skipped task looked no entry up.
+func checkCacheReference(v *validator, obj map[string]any, record string) {
+	if _, present := childValue(obj, "cacheReference"); !present {
+		return
+	}
+	if record != RecordTaskEnd {
+		v.add(ViolationUnexpectedField, "cacheReference")
+		return
+	}
+	task := childObject(obj, "task")
+	reuse, _ := childString(task, "reuse")
+	status, _ := childString(task, "status")
+	if reuse == TaskReuseNone || status == TaskStatusSkipped {
+		v.add(ViolationInvalidValue, "cacheReference")
+	}
+}
+
+func taskCacheReference(v *validator, path string, value any) {
+	object(v, path, value, taskCacheReferenceFields)
 }
 
 // streamMembersFor returns the members a stream record variant must carry. Any

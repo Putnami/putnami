@@ -217,6 +217,12 @@ func RunGC(roots []string, opts GCOptions) (*GCResult, error) {
 		}
 	}
 	res.ScannedBytes = total
+	// Every pass drops the results no retained session pins any longer
+	// (pins.go): they are not entries, and no budget counts them. A store
+	// with none to drop is not locked for it.
+	for _, root := range scannedRoots {
+		sweepPinnedResults(root, opts.NonBlocking)
+	}
 	// Nothing to do only when we are within budget AND idle reclaim is off (it
 	// runs regardless of budget to reap abandoned entries). Lease roots still
 	// need a mutation pass so released/crashed sidecars stay transient.

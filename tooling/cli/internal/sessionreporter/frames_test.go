@@ -304,7 +304,7 @@ func TestAPendingLargeFrameReplaysUnchanged(t *testing.T) {
 func TestOnlyTheSessionReporterReadsTheFramingVariable(t *testing.T) {
 	spectest.Proves(t, framesFeature, "negotiated-frame-size", "only-the-session-reporter-reads-the-framing-variable")
 	inherited := []string{"PATH=/bin", protocolcli.SessionReportingFramingEnv + "=99"}
-	framing := protocolcli.SessionReportingFramingEnv + "=4"
+	framing := protocolcli.SessionReportingFramingEnv + "=5"
 	if got := SessionReporter.launchEnv(context.Background(), inherited); !slices.Equal(got, []string{"PATH=/bin", framing}) {
 		t.Fatalf("session reporter launch environment = %v", got)
 	}

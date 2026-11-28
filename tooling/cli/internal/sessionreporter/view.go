@@ -77,11 +77,24 @@ type view struct {
 	// done reports that the stream is final and every record left or was
 	// dropped: the view's final marker may follow its last byte.
 	done bool
+	// resolve, when set, returns the bytes that leave in place of a task:end
+	// record that names a cache entry and its LF: the records the entry holds
+	// and the task:end without its reference (ADR 0137), or the error that
+	// keeps this CLI from rebuilding them as their producer would have.
+	resolve func(line []byte) ([]byte, error)
+	// whole: the view trims nothing; it only puts references back.
+	whole bool
+	// err is the error that stopped the view: no byte past it leaves.
+	err error
 }
 
 // viewRange is a raw byte range of events.jsonl and the view offset it
-// starts at.
-type viewRange struct{ raw, size, at int64 }
+// starts at, or, when data is set, bytes the view rebuilt in place of the
+// record at raw: size is then their length.
+type viewRange struct {
+	raw, size, at int64
+	data          []byte
+}
 
 // viewLow is one candidate of the queue's raw minimum: the range's raw start
 // and the view offset it ends at.
@@ -133,6 +146,7 @@ type viewRecord struct {
 	Task struct {
 		Status string `json:"status"`
 	} `json:"task"`
+	CacheReference json.RawMessage `json:"cacheReference"`
 }
 
 // newView starts a view of events at raw offset 0, its acknowledged cursor
@@ -197,6 +211,9 @@ func (v *view) advance(cursor int64) {
 // releases what is still held, then any torn tail leaves.
 func (v *view) fill(target int64) error {
 	for !v.done && v.end < target {
+		if v.err != nil {
+			return v.err
+		}
 		extent, final := v.events.Extent()
 		line, ok, err := v.nextLine(extent.Offset)
 		if err != nil {
@@ -212,6 +229,9 @@ func (v *view) fill(target int64) error {
 		raw, size := v.scan, int64(len(line))+1
 		v.scan += size
 		v.decide(line, raw, size)
+		if v.err != nil {
+			return v.err
+		}
 		if cap(v.partial) > 1<<20 {
 			v.partial = nil
 		} else {
@@ -267,12 +287,25 @@ func (v *view) decide(line []byte, raw, size int64) {
 		v.emit(raw, size)
 		return
 	}
+	referenced := record.Record == protocolcli.RecordTaskEnd && v.resolve != nil && len(record.CacheReference) > 0
+	if v.whole {
+		if referenced {
+			v.putBack(line, raw)
+			return
+		}
+		v.emit(raw, size)
+		return
+	}
 	switch record.Record {
 	case protocolcli.RecordTaskEvent:
 		v.taskEvent(&record, raw, size)
 		return
 	case protocolcli.RecordTaskEnd:
 		v.taskEnd(record.Identity.Key, record.Task.Status)
+		if referenced {
+			v.putBack(line, raw)
+			return
+		}
 	case protocolcli.RecordSessionEnd:
 		v.releaseAll()
 	}
@@ -491,7 +524,7 @@ func (v *view) emit(raw, size int64) {
 	if v.end <= v.cursor {
 		return
 	}
-	if n := len(v.queue); n > 0 && v.queue[n-1].raw+v.queue[n-1].size == raw {
+	if n := len(v.queue); n > 0 && v.queue[n-1].data == nil && v.queue[n-1].raw+v.queue[n-1].size == raw {
 		// The last queued range is always the last candidate of lows.
 		v.queue[n-1].size += size
 		v.lows[len(v.lows)-1].end = v.end
@@ -504,7 +537,35 @@ func (v *view) emit(raw, size int64) {
 	v.queue = append(v.queue, viewRange{raw: raw, size: size, at: at})
 }
 
-// read returns up to max view bytes at offset, read back from events.jsonl.
+// putBack emits, in place of line, the task:end at raw offset raw that names
+// a cache entry, what resolve returns for it, or stops the view on its error.
+func (v *view) putBack(line []byte, raw int64) {
+	data, err := v.resolve(line)
+	if err != nil {
+		v.err = err
+		return
+	}
+	v.emitRebuilt(raw, data)
+}
+
+// emitRebuilt appends data, the bytes rebuilt in place of the record at raw
+// offset raw, to the view. Like emit, it skips them when they end before the
+// cursor; they never extend another range.
+func (v *view) emitRebuilt(raw int64, data []byte) {
+	at := v.end
+	v.end += int64(len(data))
+	if v.end <= v.cursor {
+		return
+	}
+	for len(v.lows) > 0 && v.lows[len(v.lows)-1].raw >= raw {
+		v.lows = v.lows[:len(v.lows)-1]
+	}
+	v.lows = append(v.lows, viewLow{raw: raw, end: v.end})
+	v.queue = append(v.queue, viewRange{raw: raw, size: int64(len(data)), at: at, data: data})
+}
+
+// read returns up to max view bytes at offset, read back from events.jsonl,
+// or from the bytes a range rebuilt.
 func (v *view) read(offset int64, max int) ([]byte, error) {
 	if offset < v.cursor || offset > v.end {
 		return nil, errViewOutside
@@ -519,15 +580,24 @@ func (v *view) read(offset int64, max int) ([]byte, error) {
 		r := v.queue[i]
 		skip := at - r.at
 		take := min(r.size-skip, stop-at)
-		pieces = append(pieces, viewRange{raw: r.raw + skip, size: take})
+		if r.data != nil {
+			pieces = append(pieces, viewRange{size: take, data: r.data[skip : skip+take]})
+		} else {
+			pieces = append(pieces, viewRange{raw: r.raw + skip, size: take})
+		}
 		at += take
 	}
 	data := make([]byte, 0, stop-offset)
 	for len(pieces) > 0 {
+		if pieces[0].data != nil {
+			data = append(data, pieces[0].data...)
+			pieces = pieces[1:]
+			continue
+		}
 		start, end, n := pieces[0].raw, pieces[0].raw+pieces[0].size, 1
 		for ; n < len(pieces); n++ {
 			p := pieces[n]
-			if p.raw < end || p.raw-end > viewReadGap || p.raw+p.size-start > viewReadSpan {
+			if p.data != nil || p.raw < end || p.raw-end > viewReadGap || p.raw+p.size-start > viewReadSpan {
 				break
 			}
 			end = p.raw + p.size

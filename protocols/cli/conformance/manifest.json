@@ -5523,6 +5523,228 @@
         }
       },
       "violations": [{ "code": "cli.result.invalid_value", "path": "task.testCasesDroppedDurationMs" }]
+    },
+    {
+      "id": "stream.task-end.cache-reference",
+      "document": "sessionStreamRecord",
+      "expect": "accept",
+      "summary": "A reused task's task:end names the cache entry that holds its replayed task:event and test:case records, which the stream then does not hold.",
+      "value": {
+        "protocolVersion": 2,
+        "record": "task:end",
+        "time": "2026-11-27T10:00:02.000Z",
+        "identity": {
+          "key": "/tooling/cli:test",
+          "scope": "project",
+          "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+          "task": { "name": "test", "command": "test", "kind": "go-test" },
+          "provider": { "extension": "@putnami/go" }
+        },
+        "task": {
+          "identity": {
+            "key": "/tooling/cli:test",
+            "scope": "project",
+            "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+            "task": { "name": "test", "command": "test", "kind": "go-test" },
+            "provider": { "extension": "@putnami/go" }
+          },
+          "inputDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "status": "success",
+          "reuse": "local-cache",
+          "exitCode": 0,
+          "durationMs": 4210
+        },
+        "cacheReference": { "entry": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "result": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "events": 2, "testCases": 412, "projection": 1, "records": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }
+      }
+    },
+    {
+      "id": "invalid.stream.cache-reference-on-task-start",
+      "document": "sessionStreamRecord",
+      "expect": "reject",
+      "summary": "Only a task:end stands for a cache entry's records.",
+      "value": {
+        "protocolVersion": 2,
+        "record": "task:start",
+        "time": "2026-11-27T10:00:02.000Z",
+        "identity": {
+          "key": "/tooling/cli:test",
+          "scope": "project",
+          "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+          "task": { "name": "test", "command": "test", "kind": "go-test" },
+          "provider": { "extension": "@putnami/go" }
+        },
+        "cacheReference": { "entry": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "result": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "events": 2, "testCases": 412, "projection": 1, "records": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }
+      },
+      "violations": [{ "code": "cli.result.unexpected_field", "path": "cacheReference" }]
+    },
+    {
+      "id": "invalid.stream.cache-reference-on-executed-task",
+      "document": "sessionStreamRecord",
+      "expect": "reject",
+      "summary": "A task that executed holds its own records, so its task:end names no cache entry.",
+      "value": {
+        "protocolVersion": 2,
+        "record": "task:end",
+        "time": "2026-11-27T10:00:02.000Z",
+        "identity": {
+          "key": "/tooling/cli:test",
+          "scope": "project",
+          "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+          "task": { "name": "test", "command": "test", "kind": "go-test" },
+          "provider": { "extension": "@putnami/go" }
+        },
+        "task": {
+          "identity": {
+            "key": "/tooling/cli:test",
+            "scope": "project",
+            "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+            "task": { "name": "test", "command": "test", "kind": "go-test" },
+            "provider": { "extension": "@putnami/go" }
+          },
+          "inputDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "status": "success",
+          "reuse": "none",
+          "exitCode": 0,
+          "durationMs": 4210
+        },
+        "cacheReference": { "entry": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "result": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "events": 2, "testCases": 412, "projection": 1, "records": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }
+      },
+      "violations": [{ "code": "cli.result.invalid_value", "path": "cacheReference" }]
+    },
+    {
+      "id": "invalid.stream.cache-reference-entry-not-a-digest",
+      "document": "sessionStreamRecord",
+      "expect": "reject",
+      "summary": "The entry is spelled like inputDigest.",
+      "value": {
+        "protocolVersion": 2,
+        "record": "task:end",
+        "time": "2026-11-27T10:00:02.000Z",
+        "identity": {
+          "key": "/tooling/cli:test",
+          "scope": "project",
+          "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+          "task": { "name": "test", "command": "test", "kind": "go-test" },
+          "provider": { "extension": "@putnami/go" }
+        },
+        "task": {
+          "identity": {
+            "key": "/tooling/cli:test",
+            "scope": "project",
+            "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+            "task": { "name": "test", "command": "test", "kind": "go-test" },
+            "provider": { "extension": "@putnami/go" }
+          },
+          "inputDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "status": "success",
+          "reuse": "local-cache",
+          "exitCode": 0,
+          "durationMs": 4210
+        },
+        "cacheReference": { "entry": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "result": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "events": 2, "testCases": 0, "projection": 1, "records": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }
+      },
+      "violations": [{ "code": "cli.result.invalid_value", "path": "cacheReference.entry" }]
+    },
+    {
+      "id": "invalid.stream.cache-reference-on-skipped-task",
+      "document": "sessionStreamRecord",
+      "expect": "reject",
+      "summary": "A skipped task looked no entry up, so its task:end names none.",
+      "value": {
+        "protocolVersion": 2,
+        "record": "task:end",
+        "time": "2026-11-27T10:00:02.000Z",
+        "identity": {
+          "key": "/tooling/cli:test",
+          "scope": "project",
+          "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+          "task": { "name": "test", "command": "test", "kind": "go-test" },
+          "provider": { "extension": "@putnami/go" }
+        },
+        "task": {
+          "identity": {
+            "key": "/tooling/cli:test",
+            "scope": "project",
+            "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+            "task": { "name": "test", "command": "test", "kind": "go-test" },
+            "provider": { "extension": "@putnami/go" }
+          },
+          "status": "skipped",
+          "reuse": "local-cache",
+          "exitCode": 0,
+          "durationMs": 4210
+        },
+        "cacheReference": { "entry": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "result": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "events": 2, "testCases": 0, "projection": 1, "records": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }
+      },
+      "violations": [{ "code": "cli.result.invalid_value", "path": "cacheReference" }]
+    },
+    {
+      "id": "invalid.stream.cache-reference-without-projection",
+      "document": "sessionStreamRecord",
+      "expect": "reject",
+      "summary": "A reference names the projection of its records, from 1.",
+      "value": {
+        "protocolVersion": 2,
+        "record": "task:end",
+        "time": "2026-11-27T10:00:02.000Z",
+        "identity": {
+          "key": "/tooling/cli:test",
+          "scope": "project",
+          "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+          "task": { "name": "test", "command": "test", "kind": "go-test" },
+          "provider": { "extension": "@putnami/go" }
+        },
+        "task": {
+          "identity": {
+            "key": "/tooling/cli:test",
+            "scope": "project",
+            "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+            "task": { "name": "test", "command": "test", "kind": "go-test" },
+            "provider": { "extension": "@putnami/go" }
+          },
+          "inputDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "status": "success",
+          "reuse": "local-cache",
+          "exitCode": 0,
+          "durationMs": 4210
+        },
+        "cacheReference": { "entry": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "result": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "events": 2, "testCases": 0, "projection": 0, "records": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }
+      },
+      "violations": [{ "code": "cli.result.invalid_value", "path": "cacheReference.projection" }]
+    },
+    {
+      "id": "invalid.stream.cache-reference-records-not-a-digest",
+      "document": "sessionStreamRecord",
+      "expect": "reject",
+      "summary": "The records digest is spelled like inputDigest.",
+      "value": {
+        "protocolVersion": 2,
+        "record": "task:end",
+        "time": "2026-11-27T10:00:02.000Z",
+        "identity": {
+          "key": "/tooling/cli:test",
+          "scope": "project",
+          "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+          "task": { "name": "test", "command": "test", "kind": "go-test" },
+          "provider": { "extension": "@putnami/go" }
+        },
+        "task": {
+          "identity": {
+            "key": "/tooling/cli:test",
+            "scope": "project",
+            "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+            "task": { "name": "test", "command": "test", "kind": "go-test" },
+            "provider": { "extension": "@putnami/go" }
+          },
+          "inputDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "status": "success",
+          "reuse": "local-cache",
+          "exitCode": 0,
+          "durationMs": 4210
+        },
+        "cacheReference": { "entry": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "result": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "events": 2, "testCases": 0, "projection": 1, "records": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }
+      },
+      "violations": [{ "code": "cli.result.invalid_value", "path": "cacheReference.records" }]
     }
   ],
   "streamCases": [

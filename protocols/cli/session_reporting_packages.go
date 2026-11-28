@@ -36,6 +36,15 @@ const (
 	SessionReportingPackageFormat = 1
 )
 
+// SessionReportingRebuiltPackagesVersion is the framing version an engine
+// names in SessionReportingFramingEnv when it also reads PackagesRebuilt in
+// acknowledgements, and then sends the task packages whose header names
+// rebuilt records (CLI ADR 0137). It says everything
+// SessionReportingPackagesVersion says, and its puts and manifests remain
+// version SessionReportingPackagesVersion lines. An engine that names
+// SessionReportingPackagesVersion refuses PackagesRebuilt.
+const SessionReportingRebuiltPackagesVersion = 5
+
 // The kinds of package. A task package holds records of events.jsonl; a
 // document package holds one whole document.
 const (
@@ -60,12 +69,20 @@ func SessionReportingPackageKind(kind string) bool {
 // its part (the packages of one key, from 0) and the raw offset in
 // events.jsonl of each record that follows, in order; a document package
 // names its kind and, for a document cut in parts, its part.
+//
+// Rebuilt lists, in increasing order, the indexes of the records that
+// events.jsonl does not hold: those the engine rebuilt from the cache entry a
+// reused task's task:end names (CLI ADR 0137). Each carries the raw offset of
+// that task:end, which follows them, so offsets never decrease, and two are
+// equal only after a rebuilt record. A receiver places the rebuilt records
+// before the task:end at their offset.
 type SessionReportingPackageHeader struct {
 	Package int     `json:"package"`
 	Kind    string  `json:"kind"`
 	Key     *string `json:"key,omitempty"`
 	Part    int     `json:"part,omitempty"`
 	Offsets []int64 `json:"offsets,omitempty"`
+	Rebuilt []int   `json:"rebuilt,omitempty"`
 }
 
 // EncodeSessionReportingPackage returns a package's bytes: the header line,
@@ -79,8 +96,9 @@ func EncodeSessionReportingPackage(header SessionReportingPackageHeader, body []
 }
 
 // ParseSessionReportingPackage splits a package into its header and the bytes
-// after it. It checks the header's format and kind, and that a task package
-// names a key and one offset per record of its body.
+// after it. It checks the header's format and kind, that a task package names
+// a key and one offset per record of its body, and that its offsets and
+// rebuilt records are in order.
 func ParseSessionReportingPackage(data []byte) (SessionReportingPackageHeader, []byte, error) {
 	var header SessionReportingPackageHeader
 	line, body, found := bytes.Cut(data, []byte{'\n'})
@@ -95,7 +113,7 @@ func ParseSessionReportingPackage(data []byte) (SessionReportingPackageHeader, [
 	if header.Kind != SessionReportingPackageTask {
 		// A document larger than SessionReportingPackageRecordBytes travels in
 		// parts, numbered from 0, which a receiver concatenates in order.
-		if header.Key != nil || header.Part < 0 || header.Offsets != nil {
+		if header.Key != nil || header.Part < 0 || header.Offsets != nil || header.Rebuilt != nil {
 			return header, nil, fmt.Errorf("invalid reporting package header")
 		}
 		return header, body, nil
@@ -107,8 +125,15 @@ func ParseSessionReportingPackage(data []byte) (SessionReportingPackageHeader, [
 	if header.Key == nil || header.Part < 0 || len(header.Offsets) != records || records == 0 {
 		return header, nil, fmt.Errorf("invalid reporting package header")
 	}
+	rebuilt := make(map[int]bool, len(header.Rebuilt))
+	for i, index := range header.Rebuilt {
+		if index < 0 || index >= records || i > 0 && index <= header.Rebuilt[i-1] {
+			return header, nil, fmt.Errorf("invalid reporting package rebuilt records")
+		}
+		rebuilt[index] = true
+	}
 	for i, offset := range header.Offsets {
-		if offset < 0 || i > 0 && offset <= header.Offsets[i-1] {
+		if offset < 0 || i > 0 && (offset < header.Offsets[i-1] || offset == header.Offsets[i-1] && !rebuilt[i-1]) {
 			return header, nil, fmt.Errorf("invalid reporting package offsets")
 		}
 	}

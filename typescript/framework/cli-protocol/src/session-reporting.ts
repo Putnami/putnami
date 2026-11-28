@@ -21,6 +21,14 @@ export const SESSION_REPORTING_MAX_LINE_BYTES = 6_291_456;
 export const SESSION_REPORTING_FRAMING_ENV = 'PUTNAMI_SESSION_REPORTING_FRAMING';
 /** The refusal of a version 3 frame the reporter's receiver does not accept; it stored nothing. */
 export const SESSION_REPORTING_CODE_FRAME_UNSUPPORTED = 'frame_unsupported';
+/**
+ * The framing version an engine names when it reads packages in
+ * acknowledgements and then sends packages (ADR 0135), and the one it names
+ * when it also reads packagesRebuilt and then sends task packages whose header
+ * names rebuilt records (CLI ADR 0137). Twins of the Go constants.
+ */
+export const SESSION_REPORTING_PACKAGES_VERSION = 4;
+export const SESSION_REPORTING_REBUILT_PACKAGES_VERSION = 5;
 
 /** The protocol version of a frame carrying n decoded bytes. Twin of SessionReportingFrameVersion. */
 export function sessionReportingFrameVersion(n: number): 1 | 3 {
@@ -113,6 +121,12 @@ export interface SessionReportingAck extends ReportingIdentity {
    * whose engine named framing version 4 sends it, and only true.
    */
   packages?: true;
+  /**
+   * The destination also accepts task packages whose header names rebuilt
+   * records (CLI ADR 0137). Only a reporter whose engine named framing
+   * version 5 sends it, only with `packages`, and only true.
+   */
+  packagesRebuilt?: true;
 }
 
 const identityKeys = ['protocolVersion', 'sessionId', 'artifact', 'offset', 'sequence', 'sha256', 'final'];
@@ -194,8 +208,11 @@ export async function parseSessionReportingChunk(line: string): Promise<SessionR
 }
 
 export function parseSessionReportingAck(line: string): SessionReportingAck {
-  const v = parse(line, [...identityKeys, 'ok'], ['retryable', 'code', 'chunkBytes', 'packages']);
+  const v = parse(line, [...identityKeys, 'ok'], ['retryable', 'code', 'chunkBytes', 'packages', 'packagesRebuilt']);
   if (v['packages'] !== undefined && v['packages'] !== true) throw new Error('invalid reporting packages member');
+  if (v['packagesRebuilt'] !== undefined && (v['packagesRebuilt'] !== true || v['packages'] !== true)) {
+    throw new Error('invalid reporting packagesRebuilt member');
+  }
   if (
     v['chunkBytes'] !== undefined &&
     (!Number.isSafeInteger(v['chunkBytes']) ||

@@ -181,6 +181,7 @@ var v2StructDefs = map[string]any{
 	"resultEnvelope":           ResultV2{},
 	"workspaceWarning":         WorkspaceWarning{},
 	"sessionStreamRecord":      SessionStreamRecord{},
+	"taskCacheReference":       TaskCacheReference{},
 	"boundedSessionEndRecord":  BoundedSessionEndRecord{},
 	"sessionFile":              SessionFile{},
 	"sessionPlanFile":          SessionPlanFile{},

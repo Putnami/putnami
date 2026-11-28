@@ -83,6 +83,21 @@ addresses; and a final `manifest` listing every package's address. The
 reporter answers each with a result of the same `op` and `address`, in any
 order, several puts being in flight at once.
 
+A task package's header names the raw offset in `events.jsonl` of each of its
+records. Its optional `rebuilt` member lists, in increasing order, the indexes
+of the records `events.jsonl` does not hold: those the engine rebuilt from the
+cache entry a reused task's `task:end` names (ADR 0137 of the CLI). Each
+carries the raw offset of that `task:end`, which follows them, so offsets
+never decrease, and two are equal only after a rebuilt record. A receiver
+places the rebuilt records before the `task:end` at their offset. An engine
+that reads them names `PUTNAMI_SESSION_REPORTING_FRAMING=5`, which says
+everything 4 says. Only for such an engine may a reporter add
+`packagesRebuilt: true` to an ACK, and only beside `packages: true`, when its
+receiver stores such packages: an engine of version 4 refuses the member.
+The engine sends a package that names rebuilt records only after such an
+ACK; without it, the session stays on frames. Puts and manifests stay
+version 4 lines.
+
 Receivers must accept identical duplicates, reject conflicting content/order,
 and bind the destination to the admitted execution. ACK cursors belong to the
 original binding. A new credential may renew it, but not retarget it. Core saves

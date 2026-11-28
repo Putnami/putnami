@@ -43,10 +43,10 @@ func SessionsInspect(wsRoot string, args []string, outputFormat string) error {
 
 	plan, _ := readSessionPlan(store, sessionID)
 
-	events, _ := readSessionEvents(store, sessionID)
+	events, unresolved, _ := readSessionEventsNoting(store, sessionID)
 
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
-		return shared.WriteResult(outputFormat, "sessions inspect", sessionInspectData(meta, plan, events), nil)
+		return shared.WriteResult(outputFormat, "sessions inspect", sessionInspectData(meta, plan, events, unresolved), nil)
 	}
 
 	iox.Fprintln(os.Stdout)
@@ -147,6 +147,8 @@ func SessionsInspect(wsRoot string, args []string, outputFormat string) error {
 			iox.Fprintf(os.Stdout, "    [%s]%s: %s\n", d.severity, loc, d.message)
 		}
 	}
+
+	printUnresolvedReferences(unresolved)
 
 	printSubscriberEvidence(store, sessionID)
 

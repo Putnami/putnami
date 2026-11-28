@@ -136,6 +136,7 @@ func serveSessionReporter(env map[string]string, local localSessionResolver, in 
 	}
 	cfg.framing = framingRequested(env)
 	cfg.packages = packagesRequested(env)
+	cfg.rebuilt = rebuiltPackagesRequested(env)
 	return runSessionReporter(context.Background(), in, out, logw, cfg, &http.Client{Timeout: sessionReporterRequestTimeout})
 }
 
@@ -162,6 +163,11 @@ type sessionReporterConfig struct {
 	// acknowledgement says packages: true once the destination advertised
 	// them (ADR 0135). Only the session reporter reads it.
 	packages bool
+	// rebuilt records that the engine named framing version 5: an
+	// acknowledgement that offers packages also says packagesRebuilt: true
+	// once the destination advertised them (CLI ADR 0137). An engine of
+	// version 4 refuses the member, so it never gets it.
+	rebuilt bool
 }
 
 // hosted reports whether the engine runs this reporter for a hosted run: it
@@ -471,7 +477,8 @@ func nack(chunk *protocolcli.SessionReportingChunk, code string, retryable bool)
 // sessionReporterPlanRetryableNacks-th retryable NACK without retry. When
 // the engine named framing version 4 and the destination's latest decisive
 // answer advertised packages, the acknowledgement offers them, whatever its
-// outcome.
+// outcome; when the engine named framing version 5 and that answer
+// advertised rebuilt records too, it offers those as well.
 func (s *sessionReporterSender) deliver(ctx context.Context, chunk *protocolcli.SessionReportingChunk) protocolcli.SessionReportingAck {
 	ack := s.post(ctx, chunk)
 	if s.cfg.framing {
@@ -479,6 +486,7 @@ func (s *sessionReporterSender) deliver(ctx context.Context, chunk *protocolcli.
 	}
 	if s.cfg.packages && s.frameCap.offersPackages(s.lastURL) {
 		ack.Packages = true
+		ack.PackagesRebuilt = s.cfg.rebuilt && s.frameCap.offersRebuiltPackages(s.lastURL)
 	}
 	if chunk.Artifact == planArtifact && !ack.OK && ack.Retryable {
 		s.planRetryableNacks++
