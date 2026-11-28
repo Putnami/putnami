@@ -207,7 +207,7 @@ describe('a route Bun matches, compiled', () => {
 
     const access = sink.entries.find((entry) => entry.message === '[GET] /items/[id]');
     expect(access?.level).toBe('debug');
-    expect((access?.context?.['http'] as Record<string, unknown>)['status']).toBe(200);
+    expect((access?.context?.['http'] as Record<string, unknown> | undefined)?.['status']).toBe(200);
 
     // Past the deadline: a request still held to it would have its signal aborted.
     await sleep(300);
@@ -244,7 +244,10 @@ describe('a route Bun matches, compiled', () => {
     expect(refused.status).toBe(403);
     expect(await refused.json()).toEqual({ error: 'Cross-origin request blocked' });
     expect(refused.headers.get('X-Content-Type-Options')).toBe('nosniff');
-    const accepted = await fetch(`${served.base}/items`, { method: 'POST', headers: { 'Sec-Fetch-Site': 'same-origin' } });
+    const accepted = await fetch(`${served.base}/items`, {
+      method: 'POST',
+      headers: { 'Sec-Fetch-Site': 'same-origin' },
+    });
     expect(accepted.status).toBe(200);
   });
 
@@ -353,7 +356,10 @@ describe('a route Bun matches, compiled', () => {
     expect((await res).headers.get('X-Stamp')).toBe('1');
     const listed = sink.entries.find((entry) => entry.message === 'compiled routes');
     expect((listed?.data?.[0] as Record<string, unknown> | undefined)?.['compiled']).toEqual([]);
-    const chained = (listed?.data?.[0] as Record<string, unknown> | undefined)?.['chained'] as { route: string; reason: string }[];
+    const chained = (listed?.data?.[0] as Record<string, unknown> | undefined)?.['chained'] as {
+      route: string;
+      reason: string;
+    }[];
     expect(chained[0]?.route).toBe('/stamped');
     expect(chained[0]?.reason).toContain('(stamp) has no synchronous form');
   });

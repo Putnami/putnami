@@ -631,9 +631,7 @@ export class HttpPlugin implements Plugin {
       try {
         if (containerContext) attachRequestScope(context, containerContext);
         const request = new CompiledRequest(context, route.forms, lifetime, answerChainError);
-        answered = runInContext(context, () =>
-          request.run(httpDispatcher, route.handler),
-        ) as CompiledAnswer;
+        answered = runInContext(context, () => request.run(httpDispatcher, route.handler)) as CompiledAnswer;
       } catch (error) {
         answered = Promise.reject(error);
       }
@@ -931,7 +929,8 @@ export class HttpPlugin implements Plugin {
         routes[endpoint.bunPath] = byMethod;
       }
       const compiled = compile(endpoint);
-      if (typeof compiled === 'string') chained.push({ method: endpoint.method, route: endpoint.route, reason: compiled });
+      if (typeof compiled === 'string')
+        chained.push({ method: endpoint.method, route: endpoint.route, reason: compiled });
       else compiledRoutes.push(`${endpoint.method} ${endpoint.route}`);
       byMethod[endpoint.method] = nativeEndpointHandler(
         endpoint,

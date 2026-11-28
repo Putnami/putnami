@@ -34,7 +34,9 @@ export function compiledForms(
     const form = middlewareFormOf(middlewares[i]);
     if (form === undefined) {
       const name = middlewares[i].name;
-      return { reason: `middleware ${i + 1} of ${middlewares.length} (${name || 'anonymous'}) has no synchronous form` };
+      return {
+        reason: `middleware ${i + 1} of ${middlewares.length} (${name || 'anonymous'}) has no synchronous form`,
+      };
     }
     forms.push(form);
   }

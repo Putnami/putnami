@@ -145,15 +145,18 @@ export class HttpDispatcher {
     httpContext: HttpRequestContextInternal,
     continuation: RouteContinuation,
   ): Promise<HttpResponse | undefined> {
-    return this.handleError(e, httpContext).then((answer) => {
-      let flushed: HttpResponse | undefined;
-      try {
-        flushed = flushRequest(httpContext, answer);
-      } catch (x) {
-        return continuation.failed(x);
-      }
-      return continuation.answered(flushed);
-    }, (x: unknown) => continuation.failed(x));
+    return this.handleError(e, httpContext).then(
+      (answer) => {
+        let flushed: HttpResponse | undefined;
+        try {
+          flushed = flushRequest(httpContext, answer);
+        } catch (x) {
+          return continuation.failed(x);
+        }
+        return continuation.answered(flushed);
+      },
+      (x: unknown) => continuation.failed(x),
+    );
   }
 
   private async handleEach(
