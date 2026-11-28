@@ -229,7 +229,26 @@ type SpecSource struct {
 // It walks features, relations, requirements, evidence kinds, and checks in
 // file order, not in canonical order, so a field index names the entry an
 // author finds at that position in the file.
+//
+// The answer is a function of the manifest's content, so this process
+// memoizes it by a SHA-256 of that content (manifestFindings): a workspace
+// validation that reads one manifest in every project's evaluation validates
+// it once. A hit returns the findings a fresh validation returns, in the same
+// order, as the caller's own copy. The memo is bounded and never outlives the
+// process.
 func ValidateManifest(input *Manifest) []diag.Diagnostic {
+	if input == nil {
+		return validateManifest(input)
+	}
+	key, ok := contentKey("ValidateManifest", input)
+	if !ok {
+		return validateManifest(input)
+	}
+	return manifestFindings.findings(key, func() []diag.Diagnostic { return validateManifest(input) })
+}
+
+// validateManifest is ValidateManifest without the memo.
+func validateManifest(input *Manifest) []diag.Diagnostic {
 	if input == nil {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "feature manifest is nil")}
 	}

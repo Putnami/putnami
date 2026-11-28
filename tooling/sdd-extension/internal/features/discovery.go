@@ -348,7 +348,9 @@ func selectedFeatureIdentities(scope *Scope, manifests []featureproto.ManifestSo
 		if source.Manifest == nil {
 			continue
 		}
-		for _, feature := range featureproto.CanonicalManifest(source.Manifest).Features {
+		// The identities form a set, so the authored order serves as well as the
+		// canonical one, and the manifest is not copied to read them.
+		for _, feature := range source.Manifest.Features {
 			if feature.ID != "" {
 				features.ids[feature.ID] = true
 			}
@@ -365,7 +367,9 @@ func manifestDeclaresSelected(source featureproto.ManifestSource, selected selec
 	if source.Manifest == nil {
 		return false
 	}
-	for _, feature := range featureproto.CanonicalManifest(source.Manifest).Features {
+	// The identities form a set, so the authored order serves as well as the
+	// canonical one, and the manifest is not copied to read them.
+	for _, feature := range source.Manifest.Features {
 		if selected.has(feature.ID) {
 			return true
 		}

@@ -134,7 +134,9 @@ func SelectAuthored(scope *Scope, manifests []featureproto.ManifestSource) []str
 		if !scope.SeedRoot(ManifestRoot(source.Path)) {
 			continue
 		}
-		for _, feature := range featureproto.CanonicalManifest(source.Manifest).Features {
+		// The identities form a set, so the authored order serves as well as the
+		// canonical one, and the manifest is not copied to read them.
+		for _, feature := range source.Manifest.Features {
 			if feature.ID != "" {
 				selected[feature.ID] = true
 			}
