@@ -72,6 +72,14 @@ JavaScript.
   `@putnami/runtime`, `putnami test --tag ts` runs 1 `test-run` (runtime's own
   tests) instead of 29. `test-types` still reruns: 30 tasks, about 235
   task-seconds.
+- **No declaration cutoff yet.** The declarations tsc emits for
+  `@putnami/runtime` hold through a body-only or comment-only edit. Keying
+  `test-types` on them would still need two things this decision does not
+  give:
+  - a fold of the declarations of the whole closure, not only of the direct
+    dependencies, since a re-export carries a transitive type;
+  - a verdict scoped to the project's own files, since a dependent's check
+    also reports errors located in its dependencies' sources.
 - **Source positions are not keyed.** The emitted JavaScript keeps no line or
   column, so an edit that shifts lines in a dependency does not rerun its
   dependents. Such an edit changes only the positions that a dependency's
