@@ -57,6 +57,9 @@ func TestMain(m *testing.M) {
 // without paying ~1s of race-runtime startup per spawned subprocess.
 func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string) string) {
 	markerSHA := getenv("FAKE_MARKER_SHA")
+	// FAKE_MARKER_SCOPE is the key of the marker scope the fake names when
+	// core lists the capability.
+	markerScopeKey := getenv("FAKE_MARKER_SCOPE")
 	markerOut := getenv("FAKE_MARKER_OUT")
 	markerLookupOut := getenv("FAKE_MARKER_LOOKUP_OUT")
 	uploadOut := getenv("FAKE_UPLOAD_OUT")
@@ -194,6 +197,11 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 			if readOnlyEcho && p != nil && slices.Contains(p.Capabilities, cache.CapabilityReadOnly) {
 				capabilities = append(capabilities, cache.CapabilityReadOnly)
 			}
+			var scope *cache.MarkerScope
+			if markerScopeKey != "" && p != nil && slices.Contains(p.Capabilities, cache.CapabilityMarkerScope) {
+				capabilities = append(capabilities, cache.CapabilityMarkerScope)
+				scope = &cache.MarkerScope{Key: markerScopeKey}
+			}
 			var mode cache.Mode
 			if providerMode != "" && p != nil && slices.Contains(p.Capabilities, cache.CapabilityProviderConfiguration) {
 				capabilities = append(capabilities, cache.CapabilityProviderConfiguration)
@@ -206,6 +214,7 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 				Capabilities:      capabilities,
 				ObjectCacheSocket: socketPath,
 				Mode:              mode,
+				MarkerScope:       scope,
 				Ready:             !notReady,
 			})
 		case cache.OpPrefetch:
@@ -326,7 +335,16 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 			if markerOut != "" {
 				_ = os.WriteFile(markerOut, []byte(sha), 0o644)
 			}
-			ok(req.ProtocolVersion, req.ID, &cache.MarkerWriteResult{Published: true, Marker: &cache.RunMarker{SHA: sha}})
+			// FAKE_MARKER_IN_EFFECT answers that the write advanced nothing, with
+			// that marker in effect ("none" for no marker at all).
+			switch inEffect := getenv("FAKE_MARKER_IN_EFFECT"); inEffect {
+			case "":
+				ok(req.ProtocolVersion, req.ID, &cache.MarkerWriteResult{Published: true, Marker: &cache.RunMarker{SHA: sha}})
+			case "none":
+				ok(req.ProtocolVersion, req.ID, &cache.MarkerWriteResult{})
+			default:
+				ok(req.ProtocolVersion, req.ID, &cache.MarkerWriteResult{Marker: &cache.RunMarker{SHA: inEffect}})
+			}
 		case cache.OpSummary:
 			ok(req.ProtocolVersion, req.ID, &cache.SummaryResult{
 				RestoredCount: restoredCount,

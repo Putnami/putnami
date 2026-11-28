@@ -3,6 +3,7 @@ package cache
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -21,6 +22,7 @@ const (
 	CodeInvalidObjectID   = "invalid-object-id"
 	CodeInvalidSize       = "invalid-size"
 	CodeInvalidCredential = "invalid-credential" // #nosec G101 -- diagnostic code, not a credential
+	CodeInvalidScope      = "invalid-marker-scope"
 )
 
 // providerVersionDiag reports an unsupported provider RPC version (distinct
@@ -191,6 +193,20 @@ func ValidateInitializeResult(r *InitializeResult) []diag.Diagnostic {
 		}
 		if !r.Mode.Valid() {
 			diags = append(diags, diag.Errorf(CodeInvalidMode, "mode", "unknown materialization mode %q", r.Mode))
+		}
+	}
+	if r.MarkerScope != nil {
+		if !slices.Contains(r.Capabilities, CapabilityMarkerScope) {
+			diags = append(diags, diag.Errorf(CodeInvalidScope, "markerScope",
+				"a marker scope needs the %q capability echo", CapabilityMarkerScope))
+		}
+		if strings.TrimSpace(r.MarkerScope.Key) == "" {
+			diags = append(diags, diag.Errorf(CodeRequiredField, "markerScope.key", "a marker scope needs a key"))
+		}
+		for _, file := range r.MarkerScope.Files {
+			if !filepath.IsAbs(file) {
+				diags = append(diags, diag.Errorf(CodeInvalidPath, "markerScope.files", "a marker scope file %q is not absolute", file))
+			}
 		}
 	}
 	return diags

@@ -56,7 +56,9 @@ process start that reads the whole index and walks the work tree.
    directories at, below or above one of them: what Git lists under a literal
    pathspec.
 3. **One answer serves each former listing.** `CandidateFiles` (the cut),
-   `ReadSourceBindingSnapshot`, `CandidatePaths`, `ReadIndexModes` and the
+   `ReadSourceBindingSnapshot`, `CandidatePaths`, `ReadIndexModes`, the
+   tracked paths at or below a directory (`TrackedPaths`, which leaves a
+   directory below the root under `core.ignoreCase` to Git) and the
    work tree root of a `git:` key are read in-process. Each reads afresh when
    its caller asked Git afresh before, so the run's invalidation rules (ADR
    0106, ADR 0109) are unchanged: this change replaces the reader, not when it

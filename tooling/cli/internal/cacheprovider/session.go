@@ -132,10 +132,16 @@ type Session struct {
 	// readOnly reports that the provider echoed cache.CapabilityReadOnly: its
 	// session cannot write, so the caller sends no upload and no marker write.
 	readOnly bool
-	pending  map[int64]chan *cache.ProviderResponse
-	dead     bool
-	deadErr  error
-	closing  bool
+	// markerScope is the scope of the session's run-marker answers, when the
+	// provider echoed cache.CapabilityMarkerScope.
+	markerScope *cache.MarkerScope
+	// scopeWitness is the witness of markerScope taken at initialize, as the
+	// provider read it; nil when it cannot be witnessed.
+	scopeWitness *ScopeWitness
+	pending      map[int64]chan *cache.ProviderResponse
+	dead         bool
+	deadErr      error
+	closing      bool
 
 	waitCh   chan error
 	readDone chan struct{}
@@ -407,6 +413,9 @@ func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*c
 	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityProviderConfiguration)
 	// A provider that cannot write says so up front, so core sends it no write.
 	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityReadOnly)
+	// A provider that names the scope of its marker answers lets a run at a
+	// commit whose marker it settled start no provider (tooling/cli ADR 0138).
+	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityMarkerScope)
 
 	resp, err := s.do(ctx, cache.OpInitialize, &bootstrap)
 	if err != nil {
@@ -421,6 +430,10 @@ func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*c
 	s.objectCacheSocket = negotiatedObjectCacheSocket(result)
 	s.restoreResultOnly = containsCapability(result.Capabilities, cache.CapabilityRestoreResultOnly)
 	s.readOnly = containsCapability(result.Capabilities, cache.CapabilityReadOnly)
+	if containsCapability(result.Capabilities, cache.CapabilityMarkerScope) {
+		s.markerScope = result.MarkerScope
+		s.scopeWitness, _ = WitnessScope(result.MarkerScope, time.Now())
+	}
 	s.mu.Unlock()
 
 	if s.runCredential != "" && containsCapability(result.Capabilities, cache.CapabilityRunCredential) {
@@ -456,6 +469,28 @@ func (s *Session) ReadOnly() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.readOnly
+}
+
+// MarkerScope returns the scope the provider named for its run-marker answers,
+// or nil when it named none (cache.CapabilityMarkerScope).
+func (s *Session) MarkerScope() *cache.MarkerScope {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.markerScope
+}
+
+// ScopeWitness returns the witness of the marker scope taken at initialize,
+// or nil when the provider named none or it cannot be witnessed.
+func (s *Session) ScopeWitness() *ScopeWitness {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.scopeWitness
 }
 
 // ObjectCacheSocket returns the object-cache socket path negotiated for this

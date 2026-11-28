@@ -195,6 +195,34 @@ const CapabilityProviderConfiguration = "provider-configuration"
 // same bytes.
 const CapabilityReadOnly = "read-only"
 
+// CapabilityMarkerScope is listed in the InitializeParams.Capabilities by a
+// core that keeps a settled run marker under the provider's scope, and echoed
+// in InitializeResult.Capabilities by a provider that names that scope in
+// InitializeResult.MarkerScope. A provider sets the field only with the echo,
+// and only when core listed the capability. Core then publishes no run marker
+// at a commit whose marker the provider settled while the scope holds: the
+// same key, every file with its stat and every variable with its value.
+// Without the echo core publishes the marker of every successful run.
+const CapabilityMarkerScope = "marker-scope"
+
+// MarkerScope is what a provider's answer about a run marker is a function of,
+// besides the marker's own fields: the endpoint, account and workspace it
+// resolved, and where it read them from. The provider owns the configuration;
+// core only checks, without starting the provider, that none of it moved.
+type MarkerScope struct {
+	// Key is an opaque digest of the endpoint, the credential's account and
+	// the workspace the provider resolved. It is never empty.
+	Key string `json:"key"`
+	// Files are the absolute paths the provider read its configuration and
+	// credentials from, present or not: a change to one moves the scope.
+	Files []string `json:"files,omitempty"`
+	// Env are the names of the variables the provider read.
+	Env []string `json:"env,omitempty"`
+	// EnvPrefixes name the variables the provider may read by a prefix: every
+	// variable whose name starts with one belongs to the scope.
+	EnvPrefixes []string `json:"envPrefixes,omitempty"`
+}
+
 // ObjectCacheSocketEnv is the environment variable core exports to every job
 // subprocess, carrying the absolute path of the provider's object-cache socket
 // (InitializeResult.ObjectCacheSocket). Its ABSENCE is the off switch: a job
@@ -464,6 +492,10 @@ type InitializeResult struct {
 	// A provider sets it only when it echoes CapabilityProviderConfiguration
 	// above, and strict validation refuses it otherwise.
 	Mode Mode `json:"mode,omitempty"`
+	// MarkerScope is the scope of the session's run-marker answers. A provider
+	// sets it only when it echoes CapabilityMarkerScope above, and strict
+	// validation refuses it otherwise.
+	MarkerScope *MarkerScope `json:"markerScope,omitempty"`
 	// Ready reports whether the provider is configured and able to serve the
 	// remote cache. A provider that loads but has no cache URL/token reports
 	// Ready=false so core stays local-only without an error. A provider that

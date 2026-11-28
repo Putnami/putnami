@@ -698,6 +698,15 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 	if coreSaysReadOnly && s.serving() && s.readOnly {
 		result.Capabilities = append(result.Capabilities, cache.CapabilityReadOnly)
 	}
+	// Core lists marker-scope when it keeps a settled run marker under the
+	// session's scope. A session names one only when it can say where its
+	// answer comes from; without core's offer nothing is echoed.
+	if slices.Contains(p.Capabilities, cache.CapabilityMarkerScope) && s.serving() {
+		if scope := s.markerScope(cfg); scope != nil {
+			result.Capabilities = append(result.Capabilities, cache.CapabilityMarkerScope)
+			result.MarkerScope = scope
+		}
+	}
 	// A session whose token command already failed (signed out) serves
 	// nothing: the client memoizes the failure, so no operation of this run
 	// can reach the cache. It says so in Ready, and core then stops it and

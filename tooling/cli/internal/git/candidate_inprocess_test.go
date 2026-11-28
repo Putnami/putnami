@@ -73,6 +73,25 @@ func sameListings(t *testing.T, root, state string, supported bool) {
 	if (gitErr == nil) != (snapshotErr == nil) || (gitErr == nil && (!reflect.DeepEqual(snapshot.tracked, viaGit.tracked) || !reflect.DeepEqual(snapshot.untracked, viaGit.untracked))) {
 		t.Fatalf("%s: snapshot %+v (%v), Git %+v (%v)", state, snapshot, snapshotErr, viaGit, gitErr)
 	}
+	for _, dir := range []string{root, filepath.Join(root, "app"), filepath.Join(root, "odd"), filepath.Join(root, "dirlink")} {
+		if _, err := os.Stat(dir); err != nil {
+			continue
+		}
+		local, localErr := trackedPathsInProcess(dir)
+		viaGit, gitErr := TrackedPathsFromGit(dir)
+		if localErr == nil && (gitErr != nil || !reflect.DeepEqual(local, viaGit)) {
+			t.Fatalf("%s: tracked paths of %s in-process %q, Git %q (%v)", state, dir, local, viaGit, gitErr)
+		}
+		// Under core.ignoreCase a directory below the root is left to Git.
+		leftToGit := dir != root && state == "core.ignoreCase"
+		if supported && !leftToGit && localErr != nil && gitErr == nil {
+			t.Fatalf("%s: tracked paths of %s not read in-process: %v", state, dir, localErr)
+		}
+		paths, err := TrackedPaths(dir)
+		if (err == nil) != (gitErr == nil) || !reflect.DeepEqual(paths, viaGit) {
+			t.Fatalf("%s: TrackedPaths of %s %q (%v), Git %q (%v)", state, dir, paths, err, viaGit, gitErr)
+		}
+	}
 	for _, prefixes := range listingPrefixes {
 		paths, err := CandidatePaths(root, prefixes...)
 		gitPaths, gitErr := CandidatePathsFromGit(root, prefixes...)
@@ -805,4 +824,34 @@ func TestARuleWhoseMeaningGitChangedIsGitsAnswer(t *testing.T) {
 	sameCut(t, root, "a rule foo**/bar", false)
 	write(t, filepath.Join(root, ".gitignore"), "foo/**/bar\n")
 	sameCut(t, root, "a rule foo/**/bar", true)
+}
+
+// A directory Git names otherwise than its path here, a non-ASCII one under
+// core.precomposeUnicode or any one below the root under core.ignoreCase, is
+// left to Git: the in-process read steps aside, and TrackedPaths is Git's.
+func TestTrackedPathsBelowANameGitRewritesAreGitsAnswer(t *testing.T) {
+	inProcessHome(t)
+	root := initGitRepo(t)
+	dir := filepath.Join(root, "caf\u00e9")
+	write(t, filepath.Join(dir, "x.txt"), "x\n")
+	write(t, filepath.Join(root, "app", "y.txt"), "y\n")
+	runGit(t, root, "add", "-A")
+	for _, tc := range []struct{ key, dir string }{
+		{"core.precomposeUnicode", dir},
+		{"core.ignoreCase", filepath.Join(root, "app")},
+	} {
+		runGit(t, root, "config", tc.key, "true")
+		if _, err := trackedPathsInProcess(tc.dir); !inProcessUnsupported(err) {
+			t.Fatalf("%s: the in-process read of %s = %v, want it left to Git", tc.key, tc.dir, err)
+		}
+		paths, err := TrackedPaths(tc.dir)
+		viaGit, gitErr := TrackedPathsFromGit(tc.dir)
+		if err != nil || gitErr != nil || !reflect.DeepEqual(paths, viaGit) || len(paths) == 0 {
+			t.Fatalf("%s: TrackedPaths %q (%v), Git %q (%v)", tc.key, paths, err, viaGit, gitErr)
+		}
+		runGit(t, root, "config", tc.key, "false")
+	}
+	if paths, err := trackedPathsInProcess(dir); err != nil || !reflect.DeepEqual(paths, []string{"x.txt"}) {
+		t.Fatalf("the in-process read of %s = %q (%v)", dir, paths, err)
+	}
 }

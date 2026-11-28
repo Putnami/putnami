@@ -349,6 +349,23 @@
               "the-cloud-provider-declares-read-only-only-when-listed"
             ]
           }
+        },
+        {
+          "id": "a-settled-marker-is-kept-under-its-scope",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-marker-scope-wire-is-pinned",
+              "the-cli-carries-the-scope-of-a-settled-answer",
+              "a-scope-that-moved-publishes-again",
+              "the-cli-publishes-a-settled-marker-once-under-its-scope",
+              "the-cloud-provider-names-a-scope-it-can-witness"
+            ]
+          }
         }
       ]
     }

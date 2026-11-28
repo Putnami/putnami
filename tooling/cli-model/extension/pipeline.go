@@ -251,7 +251,7 @@ func ExpandPipelineWithOptions(
 			Heavy:                    step.Heavy,
 			CPUWeight:                step.CPUWeight,
 			NoCommandLayerInputs:     !step.ReadsCommandLayer(),
-			ContractDigest:           proto.TaskContractDigest(task),
+			ContractDigest:           ext.taskContractDigest(step.Task, task),
 		}
 
 		expanded = append(expanded, ExpandedStep{

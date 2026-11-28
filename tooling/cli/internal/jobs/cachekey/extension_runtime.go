@@ -3,6 +3,7 @@ package cachekey
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	runtimeproto "go.putnami.dev/protocol/runtime"
@@ -48,10 +50,49 @@ func isLocalDevExtensionSource(ws *workspace.Workspace, job *jobmodel.ScheduledJ
 }
 
 func ExtensionRuntimeDigest(ext *extension.ExtensionDescription) (string, error) {
+	return ExtensionRuntimeDigestIn(context.Background(), ext)
+}
+
+// ExtensionRuntimeDigestIn is ExtensionRuntimeDigest, reading each module
+// replacement tree once for every digest of ctx's tree reading
+// (WithRuntimeTreeReading).
+func ExtensionRuntimeDigestIn(ctx context.Context, ext *extension.ExtensionDescription) (string, error) {
 	if ext == nil || ext.Runtime == nil || ext.Runtime.Prepare == nil {
 		return "", errors.New("runtime preparation is not declared")
 	}
-	return ExtensionRuntimeDigestWithToolchains(ext, toolchain.RuntimeToolchainIdentityForRefs(ext, ext.Runtime.Prepare.Toolchains))
+	reading, _ := ctx.Value(runtimeTreeReadingKey{}).(*runtimeTreeReading)
+	return extensionRuntimeDigest(ext, toolchain.RuntimeToolchainIdentityForRefs(ext, ext.Runtime.Prepare.Toolchains), reading)
+}
+
+// WithRuntimeTreeReading returns ctx with one reading of the module
+// replacement trees: the extensions a synchronization digests together
+// replace the same modules, and each tree is walked and hashed once for all of
+// them. The reading belongs to that synchronization alone, so a later digest,
+// the one that proves the source did not move under a preparation included,
+// reads the trees again. An edit to a replaced module during the stage is
+// therefore seen by that proof, which fails the preparation, or by the next
+// run: never stored under the digest the reading gave.
+func WithRuntimeTreeReading(ctx context.Context) context.Context {
+	return context.WithValue(ctx, runtimeTreeReadingKey{}, &runtimeTreeReading{})
+}
+
+type runtimeTreeReadingKey struct{}
+
+// runtimeTreeReading holds, by root, the fields one walk of a replacement
+// tree gave.
+type runtimeTreeReading struct{ trees sync.Map }
+
+type readTree struct {
+	once   sync.Once
+	fields []treeField
+	ok     bool
+}
+
+// treeField is one field of a replacement tree's digest, named relative to
+// the tree's label.
+type treeField struct {
+	name  string
+	value []byte
 }
 
 // ExtensionRuntimeDigestWithToolchains is ExtensionRuntimeDigest with the
@@ -59,6 +100,10 @@ func ExtensionRuntimeDigest(ext *extension.ExtensionDescription) (string, error)
 // resolutions recorded on ext. A hosted run of a source workspace computes it
 // from the workspace lock alone (toolchain.LockedRuntimeToolchainIdentityForRefs).
 func ExtensionRuntimeDigestWithToolchains(ext *extension.ExtensionDescription, toolchains string) (string, error) {
+	return extensionRuntimeDigest(ext, toolchains, nil)
+}
+
+func extensionRuntimeDigest(ext *extension.ExtensionDescription, toolchains string, reading *runtimeTreeReading) (string, error) {
 	if ext == nil || ext.Runtime == nil || ext.Runtime.Prepare == nil {
 		return "", errors.New("runtime preparation is not declared")
 	}
@@ -105,7 +150,7 @@ func ExtensionRuntimeDigestWithToolchains(ext *extension.ExtensionDescription, t
 		return "", err
 	}
 	for _, replacement := range replacements {
-		if err := hashRuntimeReplacementTree(h, "module-replacement/"+replacement.label, replacement.Root); err != nil {
+		if err := reading.hashTree(h, "module-replacement/"+replacement.label, replacement.Root); err != nil {
 			return "", err
 		}
 	}
@@ -429,38 +474,76 @@ func runtimeReplacementIgnoredDir(rel string) bool {
 // stages: both read the tree through CollectRuntimeTree, so the digest can never
 // accept a tree the staging walk refuses, nor cover bytes the build never sees.
 func hashRuntimeReplacementTree(h hash.Hash, label, root string) error {
+	fields, err := runtimeReplacementFields(label, root)
+	if err != nil {
+		return err
+	}
+	for _, field := range fields {
+		framing.HashField(h, label+"/"+field.name, field.value)
+	}
+	return nil
+}
+
+// hashTree is hashRuntimeReplacementTree, with the fields of root read once
+// for the reading. A tree whose walk failed is read again, so each digest
+// reports its own failure; a nil reading reads every tree.
+func (r *runtimeTreeReading) hashTree(h hash.Hash, label, root string) error {
+	if r == nil {
+		return hashRuntimeReplacementTree(h, label, root)
+	}
+	value, _ := r.trees.LoadOrStore(filepath.Clean(root), &readTree{})
+	tree, _ := value.(*readTree)
+	tree.once.Do(func() {
+		tree.fields, tree.ok = nil, false
+		if fields, err := runtimeReplacementFields(label, root); err == nil {
+			tree.fields, tree.ok = fields, true
+		}
+	})
+	if !tree.ok {
+		return hashRuntimeReplacementTree(h, label, root)
+	}
+	for _, field := range tree.fields {
+		framing.HashField(h, label+"/"+field.name, field.value)
+	}
+	return nil
+}
+
+// runtimeReplacementFields is what hashRuntimeReplacementTree folds for the
+// tree at root, each field named relative to label.
+func runtimeReplacementFields(label, root string) ([]treeField, error) {
 	entries, err := CollectRuntimeTree(root)
 	if err != nil {
-		return fmt.Errorf("walk runtime replacement %s: %w", label, err)
+		return nil, fmt.Errorf("walk runtime replacement %s: %w", label, err)
 	}
+	fields := make([]treeField, 0, 2*len(entries))
 	for _, entry := range entries {
 		rel := entry.Rel
 		full := filepath.Join(root, filepath.FromSlash(rel))
 		info, err := os.Lstat(full)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		framing.HashField(h, label+"/"+rel+"/mode", []byte(fmt.Sprintf("%o", info.Mode()&(os.ModeType|0o111))))
+		fields = append(fields, treeField{rel + "/mode", []byte(fmt.Sprintf("%o", info.Mode()&(os.ModeType|0o111)))})
 		if entry.Symlink {
 			target, err := os.Readlink(full)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			framing.HashField(h, label+"/"+rel, []byte(target))
+			fields = append(fields, treeField{rel, []byte(target)})
 			continue
 		}
 		if !info.Mode().IsRegular() {
 			// The entry changed type under the walk. Refuse rather than fold a
 			// mode-only field into a digest whose staging would refuse the tree.
-			return fmt.Errorf("module replacement input %q is not a regular file", rel)
+			return nil, fmt.Errorf("module replacement input %q is not a regular file", rel)
 		}
 		digest, err := runtimeFileDigest(full)
 		if err != nil {
-			return fmt.Errorf("hash runtime replacement %s/%s: %w", label, rel, err)
+			return nil, fmt.Errorf("hash runtime replacement %s/%s: %w", label, rel, err)
 		}
-		framing.HashField(h, label+"/"+rel, digest)
+		fields = append(fields, treeField{rel, digest})
 	}
-	return nil
+	return fields, nil
 }
 
 // runtimeFileDigest is the raw SHA-256 of the file at full, read through the

@@ -1393,6 +1393,9 @@ This marker is not derived from action-cache hits. A set of per-job cache hits
 does not prove that the whole requested target passed together at one commit.
 The CLI publishes the marker only after a fully successful all-project run or a
 successful smart-selected full-target run, and publish failures are best-effort.
+A run at a commit whose marker the provider settled, under a scope that still
+holds, publishes nothing and starts no provider for it
+([ADR 0138](adr/0138-a-run-marker-the-provider-settled-is-not-published-again-under-its-scope.md)).
 
 ### Enabling and configuration
 
