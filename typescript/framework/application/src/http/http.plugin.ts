@@ -400,12 +400,15 @@ export class HttpPlugin implements Plugin {
     /**
      * Serves one request through the framework pipeline. `matched` is the
      * match Bun's native router already made; without it, the JS router
-     * matches the request.
+     * matches the request. `url` and `method` are the request's own, when
+     * the caller already read them: the context does not read them again.
      */
     const serveRequest = (
       req: Request,
       server: Server<WsDataType>,
       matched?: HandlerResult<RouteHandler<HttpRequestContext>>[],
+      url?: string,
+      method?: HttpMethod,
     ): Promise<Response> => {
       // A request with a deadline has a lifetime: its signal aborts when the
       // client disconnects (Bun's req.signal) and when the request outlives
@@ -416,7 +419,8 @@ export class HttpPlugin implements Plugin {
       const lifetime = deadlines !== undefined ? new ServedRequest(req, deadlines) : undefined;
       const context = buildHttpContext<HttpRequestContextInternal>({
         req,
-        url: this._rewrites.length > 0 ? this.rewrittenUrl(req) : undefined,
+        url: this._rewrites.length > 0 ? (this.rewrittenUrl(req) ?? url) : url,
+        method,
         // Bun.serve returns a Server type that is structurally compatible with HttpServer
         server: server as unknown as HttpServer,
         lifetime,
@@ -738,6 +742,8 @@ export class HttpPlugin implements Plugin {
       req: Request,
       server: Server<WsDataType>,
       matched?: HandlerResult<RouteHandler<HttpRequestContext>>[],
+      url?: string,
+      method?: HttpMethod,
     ) => Promise<Response>,
   ): Record<string, BunNativeRoute> | undefined {
     const routes: Record<string, BunNativeRoute> = {};
@@ -1071,6 +1077,8 @@ function nativeEndpointHandler(
     req: Request,
     server: Server<WsDataType>,
     matched?: HandlerResult<RouteHandler<HttpRequestContext>>[],
+    url?: string,
+    method?: HttpMethod,
   ) => Promise<Response>,
 ): BunNativeHandler {
   const { method, match, slashes, hasParams, route } = endpoint;
@@ -1096,7 +1104,7 @@ function nativeEndpointHandler(
     }
     const accepted = acceptScore(match.accept, requestAcceptOf(req.headers.get('Accept')));
     if (accepted === 0) return serveRequest(req, server);
-    return serveRequest(req, server, [
+    const matched = [
       {
         route: match.route,
         handler: match.handler,
@@ -1110,6 +1118,8 @@ function nativeEndpointHandler(
         securityHeaders: match.securityHeaders,
         firstPartyErrors: match.firstPartyErrors,
       },
-    ]);
+    ];
+    // The context takes the URL and the method read here, as they are.
+    return serveRequest(req, server, matched, url, method);
   };
 }

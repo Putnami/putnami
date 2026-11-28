@@ -37,12 +37,19 @@ export interface RequestLifetime extends RequestAbortHooks {
 
 type BuildContextArgs = {
   req: Request;
-  /** The URL the request is routed and handled at, when a rewrite replaced the client's. */
+  /**
+   * The URL the request is routed and handled at: the one a rewrite gave it,
+   * or the request's own URL its caller already read. Without one, the
+   * context reads `req.url`.
+   */
   url?: string;
+  /** The request's method, when its caller already read it. Without one, the context reads `req.method`. */
+  method?: HttpMethod;
   server?: Server;
   /**
    * The request's signal, or a function that builds it the first time the
-   * context's `signal` is read. Without one, the context reads `req.signal`.
+   * context's `signal` is read. Without one, the first read of `signal` takes
+   * the lifetime's, or `req.signal`.
    */
   signal?: AbortSignal | (() => AbortSignal);
   /**
@@ -74,6 +81,12 @@ class HttpContext {
   params?: Record<string, string>;
   statusCode?: number;
   user?: Record<string, unknown>;
+  /** Set by the HTTP plugin on a request it serves with a deadline. */
+  deadlineAt?: number;
+  /** Set by the HTTP plugin on every request it serves. */
+  __drain?: AbortSignal;
+  /** Set by the dispatcher on every request a route matched. */
+  __firstPartyErrors?: boolean;
 
   __requestError?: unknown;
   __requestErrorLogged?: boolean;
@@ -120,20 +133,19 @@ class HttpContext {
     this._lifetime = args.lifetime;
     this[REQUEST_ABORT_HOOKS] = args.lifetime;
     this._endRequest = undefined;
+    // Without a signal, the first read of `signal` takes the lifetime's or the request's.
     if (typeof args.signal === 'function') {
       this._signal = undefined;
       this._signalSource = args.signal;
-    } else if (args.signal !== undefined || args.lifetime === undefined) {
-      this._signal = args.signal ?? req.signal;
-      this._signalSource = undefined;
     } else {
-      this._signal = undefined;
+      this._signal = args.signal;
       this._signalSource = undefined;
     }
-    // Each read of a native request field builds its value again: read each once.
+    // Each read of a native request field builds its value again: read each
+    // once, and not at all when the caller already read it.
     const headers = req.headers;
     this.headers = headers;
-    this.method = req.method as HttpMethod;
+    this.method = args.method ?? (req.method as HttpMethod);
     this.url = args.url ?? req.url;
     this.server = args.server;
     this._scanner = new UrlScanner(this.url, headers);
@@ -144,6 +156,9 @@ class HttpContext {
     this.params = undefined;
     this.statusCode = undefined;
     this.user = undefined;
+    this.deadlineAt = undefined;
+    this.__drain = undefined;
+    this.__firstPartyErrors = undefined;
     this._cachedQuery = undefined;
     this._logContext = undefined;
     this._logRoute = undefined;
