@@ -44,6 +44,23 @@ describe('error boundaries', () => {
     expect(html).toContain('client stack');
   });
 
+  it('renders the message of a hydrated error, which is no longer an Error', () => {
+    routeError = { message: 'db down' };
+
+    const html = renderToStaticMarkup(React.createElement(ErrorBoundary));
+
+    expect(html).toContain('db down');
+    expect(html).not.toContain('[object Object]');
+  });
+
+  it('renders the status and message of a route error response', () => {
+    routeError = { status: 403, statusText: 'Forbidden', internal: false, data: { message: 'not an admin' } };
+
+    const html = renderToStaticMarkup(React.createElement(ErrorBoundary));
+
+    expect(html).toContain('403 Forbidden: not an admin');
+  });
+
   it('renders the client not-found boundary for 404 route errors', () => {
     routeError = { status: 404 };
 
