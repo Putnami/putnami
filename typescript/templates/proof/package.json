@@ -8,8 +8,8 @@
     "@putnami/runtime": "workspace:*",
     "@putnami/ui": "workspace:*",
     "@putnami/web": "workspace:*",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@types/react": "^19.2.3",

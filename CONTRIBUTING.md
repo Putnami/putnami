@@ -390,6 +390,29 @@ putnami deps remove <package> --projects <target-project>
 
 Never run `bun add`, `npm install`, or create lockfiles other than `bun.lock`.
 
+### React follows the release users install
+
+The published `@putnami/web` and `@putnami/ui` declare a caret range on
+`react` and `react-dom`, so a fresh install of them resolves the latest React
+minor. The workspace must run that same minor: a bug fixed or introduced by a
+React minor otherwise reaches users before CI sees it.
+
+The root `package.json` catalog holds the floor the workspace requires, and the
+private members (the samples, `typescript/templates/proof`,
+`typescript/doc-examples` and `sites/putnami.dev`) reference it through
+`catalog:`. Because `bun.lock` must satisfy that floor, it cannot fall back to an
+older minor. When React publishes a new minor, raise the floor in one member,
+which rewrites the catalog entry and refreshes `bun.lock`, then run the
+impacted gate:
+
+```bash
+putnami deps add react@^<version> --projects @example/03-web
+putnami deps add react-dom@^<version> --projects @example/03-web
+putnami lint,test,build,validate --impacted --enforce-coverage
+```
+
+The published ranges stay as they are unless the framework needs the new minor.
+
 ## Reporting Issues
 
 Open an issue on GitHub with:

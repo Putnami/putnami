@@ -14,8 +14,8 @@
     "@putnami/utils": "workspace:*",
     "@putnami/web": "workspace:*",
     "marked": "^15.0.7",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@putnami/spectest": "workspace:*",
