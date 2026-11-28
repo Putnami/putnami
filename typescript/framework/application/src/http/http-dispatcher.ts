@@ -85,6 +85,86 @@ export class HttpDispatcher {
     return this.handleEach(httpContext, handlers, alreadyInContext);
   }
 
+  /**
+   * Runs the one handler a compiled route serves, inside the request's
+   * context, with the route fields already set: no match lookup, no loop.
+   */
+  runRoute(httpContext: HttpRequestContextInternal, handler: RouteHandler<HttpRequestContext>): Promise<undefined | HttpResponse> {
+    return this.runHandler(handler, httpContext).catch(skipNotAcceptable);
+  }
+
+  /**
+   * Runs the one handler of a compiled route, wraps its result as
+   * {@link runRoute} does, and hands the answer to `k` in the same
+   * continuation: at once when the handler answered at once, with no promise.
+   * An error past the dispatcher's own answer goes to `kFail`. An endpoint's
+   * handler is called through its parts, so its empty answer needs no
+   * promise of its own.
+   */
+  runRouteThen<R>(
+    httpContext: HttpRequestContextInternal,
+    handler: RouteHandler<HttpRequestContext>,
+    k: (res: HttpResponse | undefined) => R | Promise<R>,
+    kFail: (error: unknown) => R | Promise<R>,
+  ): R | Promise<R> {
+    const parts = (handler as RouteHandler<HttpRequestContext> & { [ANSWERED_HANDLER]?: AnsweredParts })[
+      ANSWERED_HANDLER
+    ];
+    const call = parts === undefined ? handler : (parts.inner as RouteHandler<HttpRequestContext>);
+    let result: ReturnType<RouteHandler<HttpRequestContext>>;
+    try {
+      result = call(httpContext);
+    } catch (e) {
+      return this.continueError(e, httpContext, k, kFail);
+    }
+    if (isThenable(result)) {
+      return Promise.resolve(result).then(
+        (value) => this.continueValue(parts, value, httpContext, k, kFail),
+        (e: unknown) => this.continueError(e, httpContext, k, kFail),
+      );
+    }
+    return this.continueValue(parts, result, httpContext, k, kFail);
+  }
+
+  private continueValue<R>(
+    parts: AnsweredParts | undefined,
+    value: unknown,
+    httpContext: HttpRequestContextInternal,
+    k: (res: HttpResponse | undefined) => R | Promise<R>,
+    kFail: (error: unknown) => R | Promise<R>,
+  ): R | Promise<R> {
+    let wrapped: HttpResponse | undefined;
+    try {
+      wrapped = wrapResponse(parts === undefined ? value : parts.answer(httpContext, value), httpContext);
+    } catch (e) {
+      return this.continueError(e, httpContext, k, kFail);
+    }
+    let flushed: HttpResponse | undefined;
+    try {
+      flushed = flushOrSkip(httpContext, wrapped);
+    } catch (e) {
+      return kFail(e);
+    }
+    return k(flushed);
+  }
+
+  private continueError<R>(
+    e: unknown,
+    httpContext: HttpRequestContextInternal,
+    k: (res: HttpResponse | undefined) => R | Promise<R>,
+    kFail: (error: unknown) => R | Promise<R>,
+  ): Promise<R> {
+    return this.handleError(e, httpContext).then((answer) => {
+      let flushed: HttpResponse | undefined;
+      try {
+        flushed = flushOrSkip(httpContext, answer);
+      } catch (x) {
+        return kFail(x);
+      }
+      return k(flushed);
+    }, kFail);
+  }
+
   private async handleEach(
     httpContext: HttpRequestContextInternal,
     handlers: HandlerResult<RouteHandler<HttpRequestContext>>[],
@@ -354,6 +434,32 @@ const flushContext = <R = undefined | HttpResponse | Promise<HttpResponse>>(r: R
 type ContextWithCallback = {
   __callbacks?: ((r: HttpResponse) => HttpResponse)[];
 };
+
+/**
+ * The request's response callbacks applied, read from the request context
+ * itself (the compiled route runs in it); a candidate that refused the
+ * request's Accept leaves it unanswered, as {@link skipNotAcceptable} does.
+ */
+function flushOrSkip(httpContext: HttpRequestContextInternal, r: HttpResponse | undefined): HttpResponse | undefined {
+  const cbs = (httpContext as ContextWithCallback).__callbacks;
+  if (!cbs || !(r instanceof HttpResponse)) return r;
+  try {
+    let rh = r;
+    for (const cb of cbs) rh = cb(rh);
+    return rh;
+  } catch (e) {
+    if (e instanceof NotAcceptableException) return undefined;
+    throw e;
+  }
+}
+
+/** The key and parts of an endpoint's HTTP handler; see `buildHttpEndpointHandler`. */
+const ANSWERED_HANDLER = Symbol.for('putnami.http.answeredHandler');
+
+interface AnsweredParts {
+  readonly inner: RouteHandler<HttpRequestContext>;
+  readonly answer: (ctx: HttpRequestContext, result: unknown) => unknown;
+}
 
 /** Records `candidate` as the handler the request now tries. */
 function useCandidate(

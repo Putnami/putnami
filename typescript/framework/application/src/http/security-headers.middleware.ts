@@ -2,7 +2,7 @@ import type { HttpRequestContext } from './http-context.type';
 import type { HttpMiddleware } from './http-middleware.type';
 import type { HttpResponse } from './http-response';
 import { skipsSecurityHeaders } from './minimal.util';
-import { actsOnRoutes } from './route-scope';
+import { actsOnRoutes, withCompiledForm } from './route-scope';
 
 export const CSP_NONCE_CONTEXT_KEY = 'cspNonce';
 
@@ -224,6 +224,10 @@ export const SecurityHeadersMiddleware = (options: SecurityHeadersOptions = {}):
     // A middleware that broke its contract and returned a plain value still works.
     return inner instanceof Promise ? inner.then(apply) : Promise.resolve(inner).then(apply);
   };
+  // On a compiled route the headers apply after the inner chain, with no layer of their own.
+  withCompiledForm(middleware, {
+    leave: (ctx, res) => (skipsSecurityHeaders(ctx) ? res : secure(ctx, res)),
+  });
   // A route that opted out of the headers, or a minimal one, never runs it.
   return actsOnRoutes(middleware, (route) => !route.minimal && route.securityHeaders);
 };

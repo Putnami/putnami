@@ -102,15 +102,41 @@ function answeringNoContent(handler: RouteHandler): RouteHandler {
   // No async frame of its own: the answer is read in the continuation of the
   // handler's promise, and a handler that throws or answers at once still
   // answers through a promise.
-  return (ctx: HttpRequestContext) => {
+  const answered = (ctx: HttpRequestContext) => {
     let result: Promise<RouteHandlerResult> | RouteHandlerResult;
     try {
       result = handler(ctx);
     } catch (error) {
       return Promise.reject(error);
     }
-    return Promise.resolve(result).then((value) => answer(ctx, value));
+    // A handler that answered at once is answered at once: a compiled route
+    // then sends its response with no promise.
+    if (!isThenable(result)) return answer(ctx, result as RouteHandlerResult);
+    return Promise.resolve(result).then((value) => answer(ctx, value as RouteHandlerResult));
   };
+  // A compiled route calls the inner handler and gives the empty answer in
+  // its own continuation, with no promise of this wrapper's.
+  (answered as RouteHandler & { [ANSWERED_HANDLER]?: AnsweredHandler })[ANSWERED_HANDLER] = { inner: handler, answer };
+  return answered;
+}
+
+/**
+ * The key an endpoint's HTTP handler carries its parts under: the inner
+ * (validated) handler and the empty answer it gives. `Symbol.for`, read by
+ * the HTTP dispatcher.
+ */
+const ANSWERED_HANDLER = Symbol.for('putnami.http.answeredHandler');
+
+interface AnsweredHandler {
+  readonly inner: RouteHandler;
+  readonly answer: (ctx: HttpRequestContext, result: RouteHandlerResult) => RouteHandlerResult;
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value instanceof Promise ||
+    (typeof value === 'object' && value !== null && typeof (value as PromiseLike<unknown>).then === 'function')
+  );
 }
 
 function needsValidation(schemas: EndpointDefinition['schemas']): boolean {

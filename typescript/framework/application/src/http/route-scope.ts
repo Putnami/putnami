@@ -121,15 +121,22 @@ export class RouteChains {
   select(ctx: HttpRequestContext): MiddlewareChain {
     const matched = (ctx as HttpRequestContextInternal).__matchedHandlers;
     if (matched === undefined || matched.length !== 1) return this.full;
-    const handler = matched[0];
+    return this.forRoute(ctx.method, matched[0]);
+  }
+
+  /** The chain of a request matched to `handler` alone, for `method`. */
+  forRoute(
+    method: string,
+    handler: { route: string; minimal?: boolean; securityHeaders?: boolean; csrfExempt?: boolean },
+  ): MiddlewareChain {
     const bits =
       (handler.minimal === true ? MINIMAL : 0) |
       (handler.securityHeaders === false ? NO_SECURITY_HEADERS : 0) |
       (handler.csrfExempt === true ? CSRF_EXEMPT : 0);
-    let byRoute = this.routes.get(ctx.method);
+    let byRoute = this.routes.get(method);
     if (byRoute === undefined) {
       byRoute = new Map();
-      this.routes.set(ctx.method, byRoute);
+      this.routes.set(method, byRoute);
     }
     let variants = byRoute.get(handler.route);
     if (variants === undefined) {
@@ -138,10 +145,22 @@ export class RouteChains {
     }
     let chain = variants[bits];
     if (chain === undefined) {
-      chain = composeMiddlewareChain(this.middlewaresFor(traitsOf(ctx.method, handler.route, bits)));
+      chain = composeMiddlewareChain(this.middlewaresFor(traitsOf(method, handler.route, bits)));
       variants[bits] = chain;
     }
     return chain;
+  }
+
+  /** The middlewares, in order, that act on a request matched to `handler` alone, for `method`. */
+  middlewaresForRoute(
+    method: string,
+    handler: { route: string; minimal?: boolean; securityHeaders?: boolean; csrfExempt?: boolean },
+  ): HttpMiddleware[] {
+    const bits =
+      (handler.minimal === true ? MINIMAL : 0) |
+      (handler.securityHeaders === false ? NO_SECURITY_HEADERS : 0) |
+      (handler.csrfExempt === true ? CSRF_EXEMPT : 0);
+    return this.middlewaresFor(traitsOf(method, handler.route, bits));
   }
 
   /** The middlewares, in order, that act on a route with these traits. */
@@ -158,4 +177,35 @@ function traitsOf(method: string, route: string, bits: number): RouteTraits {
     securityHeaders: (bits & NO_SECURITY_HEADERS) === 0,
     csrfExempt: (bits & CSRF_EXEMPT) !== 0,
   };
+}
+
+/**
+ * The synchronous form of a middleware, for a route compiled at start: what
+ * it does before the inner chain and after it, with no `next` and no
+ * promise. A middleware that has one may run, on a route whose every
+ * middleware has one, without a chain layer of its own; it must then behave
+ * exactly as the middleware would.
+ */
+export interface CompiledMiddleware {
+  /** Before the inner chain: an answer that ends the request there, or `undefined` to go on. */
+  readonly enter?: (ctx: HttpRequestContext) => HttpResponse | undefined;
+  /** After the inner chain answered: the response the middleware returns. */
+  readonly leave?: (ctx: HttpRequestContext, response: HttpResponse | undefined) => HttpResponse | undefined;
+  /** The inner chain threw: what the middleware does before the error goes on. */
+  readonly fail?: (ctx: HttpRequestContext, error: unknown) => void;
+}
+
+const COMPILED_FORM = Symbol.for('putnami.http.middleware.compiled');
+
+type CompilableMiddleware = HttpMiddleware & { [COMPILED_FORM]?: CompiledMiddleware };
+
+/** Gives `middleware` its synchronous form, and returns the same function. */
+export function withCompiledForm(middleware: HttpMiddleware, form: CompiledMiddleware): HttpMiddleware {
+  (middleware as CompilableMiddleware)[COMPILED_FORM] = form;
+  return middleware;
+}
+
+/** The synchronous form of `middleware`, or `undefined` when it has none. */
+export function compiledFormOf(middleware: HttpMiddleware): CompiledMiddleware | undefined {
+  return (middleware as CompilableMiddleware)[COMPILED_FORM];
 }

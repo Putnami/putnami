@@ -79,6 +79,9 @@ class HttpContext {
   __requestErrorLogged?: boolean;
   __callbacks?: ((r: HttpResponse) => HttpResponse)[];
   __matchedHandlers?: HandlerResult<RouteHandler<HttpRequestContext>>[];
+  /** The logger's route path and start time on a compiled route; see `LoggerMiddleware`. */
+  __accessRoute?: string;
+  __accessStart?: number;
 
   // The accessors (`path`, `query`, `body`...) are bound closures, so they keep
   // working when extracted, destructured (the logger middleware) or copied into
@@ -154,6 +157,8 @@ class HttpContext {
     this.__requestErrorLogged = false;
     this.__callbacks = undefined;
     this.__matchedHandlers = undefined;
+    this.__accessRoute = undefined;
+    this.__accessStart = undefined;
 
     this._maxBodySizeBytes = args.maxBodySizeBytes;
     this._queryParams = undefined;
