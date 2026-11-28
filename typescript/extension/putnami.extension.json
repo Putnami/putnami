@@ -1513,6 +1513,9 @@
       "outputs": {
         "data": {
           "description": "The manifest's mode and file count"
+        },
+        "manifest": {
+          "description": "Command-output path of the emit manifest, the artifact test-run folds."
         }
       },
       "cache": {
