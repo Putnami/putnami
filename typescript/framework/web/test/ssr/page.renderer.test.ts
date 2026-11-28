@@ -11,7 +11,7 @@ import {
   startTelemetrySpan,
   TelemetryCollector,
 } from '@putnami/application';
-import { HttpException } from '@putnami/runtime';
+import { ForbiddenException, HttpException, NotFoundException } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import { restoreEnv } from '@putnami/utils';
@@ -19,6 +19,7 @@ import { buildHttpContext } from '../../../application/src/http/http-context.bui
 import type { StaticHandlerContext } from 'react-router';
 import { runInContext, useContext } from '../../../runtime/src/context/context.utils';
 import RootHtml from '../../src/ssr/default.html';
+import { DefaultErrorBoundary, NotFoundErrorBoundary } from '../../src/ssr/error-boundaries';
 import {
   handleRenderError,
   pageRenderer,
@@ -564,6 +565,86 @@ describe('page.renderer', () => {
       expect(logger.entries.filter((entry) => entry.level === 'error')).toHaveLength(0);
     });
 
+    specTest(
+      'a NotFoundException a loader throws answers 404 with the not-found page, logged at no ERROR',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'ssr-response',
+        check: 'an-http-exception-a-loader-throws-answers-its-own-status',
+      },
+      async () => {
+        const logger = new MemoryLogger();
+        const ctx = createMockContext({ req: new Request('http://localhost/table/9999'), logger });
+        const handler = pageRenderer(
+          () => [
+            {
+              id: 'root',
+              path: '/',
+              element: React.createElement('main', null, 'Layout'),
+              errorElement: React.createElement(NotFoundErrorBoundary, {
+                notFoundElement: React.createElement('p', null, 'Page not found'),
+              }),
+              children: [
+                {
+                  path: 'table/:rows',
+                  loader: () => {
+                    throw new NotFoundException('rows out of range');
+                  },
+                  element: React.createElement('div', null, 'Table'),
+                },
+              ],
+            } as never,
+          ],
+          () => RootHtml,
+          () => 'hydrate.js',
+          SSR_TIMEOUT_MS,
+        );
+
+        const response = await runInContext(ctx, () =>
+          LoggerMiddleware()(ctx, async () => await respond(handler, ctx)),
+        );
+        const html = await response?.get().text();
+
+        expect(response?.status).toBe(404);
+        expect(html).toContain('Page not found');
+        expect((ctx as Record<string, unknown>)['__requestError']).toBeInstanceOf(NotFoundException);
+        expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+      },
+    );
+
+    it('answers the status of another HttpException a loader throws, with the error page', async () => {
+      const logger = new MemoryLogger();
+      const exception = new ForbiddenException({ message: 'not an admin', table: 'secret_admins' });
+      const ctx = createMockContext({ req: new Request('http://localhost/admin'), logger });
+      const handler = pageRenderer(
+        () => [
+          {
+            path: '/admin',
+            loader: () => {
+              throw exception;
+            },
+            element: React.createElement('div', null, 'Admin'),
+            errorElement: React.createElement(DefaultErrorBoundary),
+          } as never,
+        ],
+        () => RootHtml,
+        () => 'hydrate.js',
+        SSR_TIMEOUT_MS,
+      );
+
+      const response = await runInContext(ctx, async () => await respond(handler, ctx));
+      const html = (await response?.get().text()) ?? '';
+
+      expect(response?.status).toBe(403);
+      expect(html).toContain('Oups, we met an issue!');
+      expect((ctx as Record<string, unknown>)['__requestError']).toBe(exception);
+      expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+      // The hydration payload carries the status and the message, never the exception's details.
+      expect(html).toContain('"status":403');
+      expect(html).toContain('not an admin');
+      expect(html).not.toContain('secret_admins');
+    });
+
     it('does not log a Response a loader throws as an error', async () => {
       const logger = new MemoryLogger();
       const statusResponse = await renderRoute(
@@ -917,6 +998,33 @@ describe('page.renderer', () => {
       const html = await new Response(readable).text();
       expect(html).toContain('<!-- SSR error -->');
       expect(html).toContain('</body></html>');
+    });
+
+    it('still logs a streaming error while its request is open', async () => {
+      // The served stream a departed client stops is proven in
+      // page.renderer.client-leaves.test.ts.
+      const errors: unknown[] = [];
+      const open = new AbortController();
+      const failing = await wrapInHtmlDocument(
+        {
+          allReady: Promise.resolve(),
+          getReader: () => ({
+            read: async () => {
+              throw new DOMException('The connection was closed.', 'AbortError');
+            },
+          }),
+        } as never,
+        new SsrDocumentHelper(),
+        {
+          release: () => {},
+          context: createRouterContext(),
+          hydrateScript: 'hydrate.js',
+          logger: { error: (...args: unknown[]) => errors.push(args) },
+          request: { signal: open.signal },
+        },
+      );
+      expect(await new Response(failing).text()).toContain('<!-- SSR error -->');
+      expect(errors).toHaveLength(1);
     });
 
     it('keeps a hostile loader return value from breaking out of the hydration <script>', async () => {

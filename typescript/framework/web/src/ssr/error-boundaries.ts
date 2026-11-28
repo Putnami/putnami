@@ -1,6 +1,7 @@
 import { shouldExposeErrorStack } from '@putnami/runtime';
 import React, { type ReactNode } from 'react';
 import { isRouteErrorResponse, useRouteError } from 'react-router';
+import { describeRouteError } from '../shared/route-error';
 
 /**
  * Error boundary component that renders the not-found page for 404 errors
@@ -38,7 +39,7 @@ export function LazyNotFoundErrorBoundary({
 }
 
 export function DefaultErrorBoundary() {
-  const error = useRouteError() as Error;
+  const error = describeRouteError(useRouteError());
   // Only expose the error message and stack in development. In production this
   // boundary is the default fallback, so rendering `error.stack` would disclose
   // file paths and internal structure over the wire. Mirrors the client
@@ -56,7 +57,7 @@ export function DefaultErrorBoundary() {
       'div',
       null,
       React.createElement('h3', null, isDev ? error.message : 'An unexpected error occurred'),
-      isDev ? React.createElement('pre', null, error.stack) : null,
+      isDev && error.stack ? React.createElement('pre', null, error.stack) : null,
     ),
   );
 }

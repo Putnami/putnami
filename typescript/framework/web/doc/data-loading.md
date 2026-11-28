@@ -158,11 +158,14 @@ import { error, isRouteErrorResponse, useRouteError } from '@putnami/web';
 export default error().render(function PostsError() {
   const err = useRouteError();
   if (isRouteErrorResponse(err)) {
+    // A thrown HttpException arrives here too: its message is `err.data.message`.
     return <div>Error loading posts: {err.status} {err.statusText}</div>;
   }
   return <div>Error loading posts: {err instanceof Error ? err.message : 'Unknown error'}</div>;
 });
 ```
+
+An `HttpException` a page loader throws answers with its own status: a `NotFoundException` renders the not-found page with a `404`, a `ForbiddenException` the error page with a `403`, on a full page load and on a client navigation alike. The boundary receives it as an `ErrorResponse` whose `data` is `{ statusCode, error, message }`. On a full page load, the exception's other details stay out of the page; on a client navigation, the loader's JSON endpoint answers the exception's response as any route does, so keep secrets out of an exception's details. An action's `HttpException` answers its action route, see [Actions](#actions).
 
 When a loader throws, the server records the error as the request error, so the request log line of the `logger()` plugin carries it when the response status is 500 or more. The server also logs the error at ERROR with its stack, unless the error is an `HttpException`. On a full page load, a thrown `Response`, a redirect included, is a status the loader chose: the server does not log it as an error.
 

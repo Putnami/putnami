@@ -1,8 +1,9 @@
 import { useRouteError } from 'react-router';
+import { describeRouteError } from '../../shared/route-error';
 import { shouldExposeClientErrors } from './expose-errors';
 
 export function ErrorBoundary() {
-  const error = useRouteError() as Error;
+  const error = describeRouteError(useRouteError());
   // Take the decision at render time, not at bundle time. Written inline,
   // `process.env.NODE_ENV !== 'production'` is constant-folded to `true` when
   // this package is published, which froze the guard open in every consumer
@@ -16,7 +17,7 @@ export function ErrorBoundary() {
       <h2>Oups, we met an issue!</h2>
       <div>
         <h3>{isDev ? error.message : 'An unexpected error occurred'}</h3>
-        {isDev && <pre>{error.stack}</pre>}
+        {isDev && error.stack && <pre>{error.stack}</pre>}
       </div>
     </>
   );

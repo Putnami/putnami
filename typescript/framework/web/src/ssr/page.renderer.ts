@@ -14,12 +14,27 @@ import {
   SHARED_CACHE_CONTEXT_KEY,
   startTelemetrySpan,
 } from '@putnami/application';
-import { HttpException, type Logger, shouldExposeErrorStack, useConfig, useContext, useLogger } from '@putnami/runtime';
+import {
+  getHttpStatusText,
+  HttpException,
+  type Logger,
+  shouldExposeErrorStack,
+  useConfig,
+  useContext,
+  useLogger,
+} from '@putnami/runtime';
 import type { ClientSecurityContext } from '../shared/security.types';
 import React, { type ReactElement, type ReactNode } from 'react';
 import { type ReactDOMServerReadableStream, renderToReadableStream } from 'react-dom/server';
 import type { RouteObject, StaticHandlerContext } from 'react-router';
-import { createStaticHandler, createStaticRouter, isRouteErrorResponse, StaticRouterProvider } from 'react-router';
+import {
+  createStaticHandler,
+  createStaticRouter,
+  isRouteErrorResponse,
+  StaticRouterProvider,
+  UNSAFE_ErrorResponseImpl,
+} from 'react-router';
+import type { StaticHandlerCache } from './static-handler.cache';
 import { DocumentMetaContext } from '../client/document/document-context';
 import type { DocumentMeta } from '../client/document/document.types';
 import { escapeHtml } from '../client/document/tag.utils';
@@ -63,6 +78,11 @@ export const pageRenderer =
     i18n?: () => I18nRuntimeOptions | undefined,
     /** Whether a request waits for every Suspense boundary before the head. */
     waitForAll?: (req: Request) => boolean,
+    /**
+     * The application's static handlers, rebuilt only when its route tree
+     * changes. Without it, the handler is built for every request.
+     */
+    staticHandlers?: StaticHandlerCache,
   ): RouteHandler =>
   async () => {
     const logger = useLogger();
@@ -91,9 +111,17 @@ export const pageRenderer =
         )
       : undefined;
     const resolvedBasename = i18nState ? localeBasename(i18nState, moduleBase) : moduleBase;
-    const staticOpts = resolvedBasename ? { basename: resolvedBasename } : undefined;
-    const tree = i18nState ? localeRoutes(routes(), i18nState.settings, i18nState.locale) : routes();
-    const reactStaticHandler = createStaticHandler(tree, staticOpts);
+    const source = routes();
+    const tree = () => (i18nState ? localeRoutes(source, i18nState.settings, i18nState.locale) : source);
+    // Localized applications keep one handler per locale tree and basename.
+    const reactStaticHandler = staticHandlers
+      ? staticHandlers.handler(
+          source,
+          `${i18nState?.locale ?? ''}\u0000${resolvedBasename ?? ''}`,
+          tree,
+          resolvedBasename,
+        )
+      : createStaticHandler(tree(), resolvedBasename ? { basename: resolvedBasename } : undefined);
     // The loaders, or the action of a form post, run under their own span.
     const loaders = startTelemetrySpan({ name: 'ssr loaders', kind: 'internal' });
     let reactStaticContext: Awaited<ReturnType<typeof reactStaticHandler.query>>;
@@ -105,6 +133,7 @@ export const pageRenderer =
     }
     const loaderCode = reportLoaderErrors(reactStaticContext, reqContext, logger);
     loaders.finish(loaderCode ? { code: loaderCode } : undefined);
+    answerLoaderExceptions(reactStaticContext);
     // The request ended while its loaders ran: the HTTP plugin answers it, so
     // nothing is rendered.
     if (requestEnded(reqContext))
@@ -222,6 +251,7 @@ export const pageRenderer =
         release: () => renderLifetime.release(),
         context: context,
         logger,
+        request: reqContext,
         hydrateScript: hydrateScript(),
         basename: resolvedBasename,
         securityContext,
@@ -359,6 +389,8 @@ export async function wrapInHtmlDocument(
      * does. Otherwise the head and the shell are sent once the shell is ready.
      */
     waitForAll?: boolean;
+    /** The request the document answers: a stream it stops does not log. */
+    request?: RequestEnd;
     // biome-ignore lint/suspicious/noExplicitAny: logger type
     logger?: any;
   },
@@ -367,6 +399,12 @@ export async function wrapInHtmlDocument(
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
   const logger = options.logger || console;
+  // A write fails once its client left, with an error of its own (Bun cancels
+  // the body while a write is in flight): report it as the request's stop.
+  const write = (chunk: Uint8Array) =>
+    writer.write(chunk).catch((error: unknown) => {
+      throw requestEnded(options.request) ? (options.request?.signal?.reason ?? error) : error;
+    });
 
   // Start streaming in the background
   (async () => {
@@ -422,7 +460,7 @@ export async function wrapInHtmlDocument(
       const i18nScript = i18n ? i18nPayloadScript(i18n.options, i18n.state, true) : '';
 
       // Send HTML prefix, then the body chunk by chunk.
-      await writer.write(
+      await write(
         encoder.encode(
           `<!DOCTYPE html><html ${htmlAttributes(docHelper.lang, i18n?.state)}>${headHtml}<body>${i18nScript}${hydrationScript}<div id="root">`,
         ),
@@ -436,8 +474,8 @@ export async function wrapInHtmlDocument(
         if (done) break;
         // Styles a later boundary inserted go before the chunk that shows it.
         const lateStyles = docHelper.lateStylesHtml();
-        if (lateStyles) await writer.write(encoder.encode(lateStyles));
-        await writer.write(value);
+        if (lateStyles) await write(encoder.encode(lateStyles));
+        await write(value);
       }
 
       // Plugin-owned module scripts, emitted after the hydrate script so they
@@ -451,13 +489,15 @@ export async function wrapInHtmlDocument(
 
       // Send HTML suffix
       // Inject bootstrap script after the root div so it's outside hydration boundary
-      await writer.write(
+      await write(
         encoder.encode(
           `</div>${docHelper.lateHeadHtml()}<script type="module"${nonceAttr} src="${hydrateSrc}"></script>${extraScripts}</body></html>`,
         ),
       );
     } catch (error) {
-      logger.error('Streaming error:', error);
+      // A client that closed its connection mid-stream ends its request: that
+      // stop is not a failure. Any other error still is.
+      if (!isRequestStop(error, options.request)) logger.error('Streaming error:', error);
       try {
         await writer.write(encoder.encode('</div><!-- SSR error --></body></html>'));
       } catch {
@@ -465,7 +505,8 @@ export async function wrapInHtmlDocument(
       }
     } finally {
       options.release();
-      await writer.close();
+      // A client that left has already errored the stream, so closing it fails.
+      await writer.close().catch(() => undefined);
     }
   })();
 
@@ -522,6 +563,43 @@ function reportLoaderErrors(
     if (!(error instanceof HttpException)) logger.error(error);
   }
   return recorded ? 'error' : stopped ? 'canceled' : undefined;
+}
+
+/**
+ * Answers a 4xx or 5xx `HttpException` a loader threw with its own status:
+ * React Router keeps it as an unknown error and computes a 500, so each one is
+ * replaced by the route error response of its status, which the not-found and
+ * error boundaries render, with `{ statusCode, error, message }` as its
+ * `data`, and the router status follows the first error as React Router
+ * computes it. Runs after `reportLoaderErrors`, which records the
+ * exception itself as the request error.
+ */
+function answerLoaderExceptions(context: StaticHandlerContext | Response): void {
+  if (context instanceof Response || !context.errors) return;
+  let converted = false;
+  const errors: Record<string, unknown> = {};
+  for (const [routeId, error] of Object.entries(context.errors)) {
+    // An exception with a status below 400 is not an error answer.
+    if (error instanceof HttpException && error.getStatus() >= 400) {
+      const status = error.getStatus();
+      const statusText = getHttpStatusText(status) ?? error.name;
+      // Only the status and the message reach the hydration payload, as
+      // `sanitizeErrors` keeps of an `Error`: the exception's details stay on
+      // the server.
+      errors[routeId] = new UNSAFE_ErrorResponseImpl(status, statusText, {
+        statusCode: status,
+        error: statusText,
+        message: error.message,
+      });
+      converted = true;
+    } else {
+      errors[routeId] = error;
+    }
+  }
+  if (!converted) return;
+  context.errors = errors;
+  const first = Object.values(errors)[0];
+  context.statusCode = isRouteErrorResponse(first) ? first.status : 500;
 }
 
 function handleStaticContext(reactStaticContext: StaticHandlerContext | Response): HttpResponse | undefined {

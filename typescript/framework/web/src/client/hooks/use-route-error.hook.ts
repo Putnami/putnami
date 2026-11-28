@@ -33,8 +33,8 @@ export { isRouteErrorResponse } from 'react-router';
  * type you expect with the type parameter.
  *
  * @template E - The expected type of the thrown value. This is an unchecked
- * assertion, not a check: a route that throws a 4xx/5xx `Response` reaches the
- * boundary as an `ErrorResponse`, so `useRouteError<Error>()` would read
+ * assertion, not a check: a route that throws a 4xx/5xx `Response` or an
+ * `HttpException` reaches the boundary as an `ErrorResponse`, so `useRouteError<Error>()` would read
  * `undefined` from `.message`. Name a type only when the boundary cannot
  * receive anything else; otherwise narrow the default `unknown`.
  * @returns The thrown value, cast to type E
