@@ -68,7 +68,7 @@ function newNode(conditions: readonly string[]): ShapeNode {
 }
 
 /** An identifier as the client's `sql(name)` builder writes it. */
-function quoted(name: string): string {
+export function quoted(name: string): string {
   return `"${fromCamel(name)}"`;
 }
 
@@ -221,6 +221,11 @@ function compile(table: string, conditions: readonly string[], orderBy: string, 
   strings.push(`${text}${orderBy ? ` ${orderBy}` : ''} LIMIT `);
   if (withOffset) strings.push(' OFFSET ');
   strings.push('');
+  return templateStrings(strings);
+}
+
+/** `strings` as a template object the driver takes: frozen, with an own `raw` that is not enumerable. */
+export function templateStrings(strings: string[]): Strings {
   // A template object's `raw` is not enumerable: the driver refuses one whose `raw` is.
   Object.defineProperty(strings, 'raw', { value: Object.freeze([...strings]) });
   return Object.freeze(strings) as unknown as Strings;

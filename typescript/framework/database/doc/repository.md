@@ -174,6 +174,8 @@ const updated = await userRepo.save({
 
 **Note:** Requires at least one key property to be provided.
 
+A save builds its statement once per shape: the properties the entity holds, in their order. Later saves of that shape reuse it with their own values, sent as parameters. The validation of each field, and of the full schema for `strict`, is compiled once per table; an entity it does not accept is validated and reported as before.
+
 ### `delete(filters: Partial<ENTITY>): Promise<{ success: boolean; item?: ENTITY }>`
 
 Delete an entity by its primary key(s). Only key columns are used to build the

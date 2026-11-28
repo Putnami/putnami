@@ -7,6 +7,7 @@ import {
   isSchemaDescriptor,
   validateSchema,
 } from '@putnami/runtime';
+import { type AcceptedInput, compileAcceptedInput } from '@putnami/utils';
 import { RepositoryError, RepositoryErrorCode } from '../errors';
 import { type ColumnOptions, isKeyDefinition, type KeyOptions, type TableDefinition, type TableField } from '../table';
 import type { DatabaseValue } from '../type.type';
@@ -36,6 +37,10 @@ function isNumericType(type: SchemaPrimitive): boolean {
 export class EntityHelper<T extends TableDefinition> {
   /** How each field of the schema is read from a row, in schema order; built on the first row. */
   private readers: readonly FieldReader[] | undefined;
+  /** The check of each field compiled on its own, `undefined` for a field none compiles; built on the first validation. */
+  private fieldChecks: ReadonlyMap<string, AcceptedInput | undefined> | undefined;
+  /** The check of the full schema, `null` when it holds a field none compiles; built on the first full validation. */
+  private fullCheck: AcceptedInput | null | undefined;
 
   constructor(private tableDef: T) {
     assertSafeIdentifier(tableDef.tableName, 'tableName');
@@ -135,6 +140,9 @@ export class EntityHelper<T extends TableDefinition> {
 
   /** Validate a partial entity against the table schema. Only validates provided fields. */
   validateEntity(entity: Record<string, unknown>): ValidationError[] {
+    if (this.acceptsFields(entity)) {
+      return [];
+    }
     // Build a schema containing only the fields present in the entity
     const partialSchema: SchemaDefinition = {};
     const schemaDef = this.schemaDefinition;
@@ -153,6 +161,18 @@ export class EntityHelper<T extends TableDefinition> {
    * Use this for insert-style validation where all required fields must be present.
    */
   validateFullEntity(entity: Record<string, unknown>): ValidationError[] {
+    if (this.fullCheck === undefined) {
+      this.fullCheck = compileAcceptedInput(this.fullSchemaDefinition()) ?? null;
+    }
+    if (this.fullCheck !== null && this.fullCheck(entity) !== undefined) {
+      return [];
+    }
+    const { errors } = validateSchema(this.fullSchemaDefinition(), entity, { label: this.tableName });
+    return errors;
+  }
+
+  /** The schema {@link validateFullEntity} validates against. */
+  private fullSchemaDefinition(): SchemaDefinition {
     const fullSchema: SchemaDefinition = {};
     for (const [prop, field] of Object.entries(this.tableDef.schema)) {
       let type: SchemaPrimitive = field.type;
@@ -167,8 +187,37 @@ export class EntityHelper<T extends TableDefinition> {
 
       fullSchema[prop] = type;
     }
-    const { errors } = validateSchema(fullSchema, entity, { label: this.tableName });
-    return errors;
+    return fullSchema;
+  }
+
+  /**
+   * Whether {@link validateEntity} reports no error for `entity`, read from a
+   * check compiled once per field: the fields it validates are the entity's
+   * own keys the schema holds, each on its own. False as soon as one fails its
+   * check or has none, and for a key the schema object only inherits
+   * (`constructor`, …), which `validateEntity` also reads: `validateEntity`
+   * then validates and reports as it always did.
+   */
+  private acceptsFields(entity: Record<string, unknown>): boolean {
+    const checks = this.fieldChecks ?? this.buildFieldChecks();
+    for (const key of Object.keys(entity)) {
+      const check = checks.get(key);
+      if (check !== undefined) {
+        if (check(entity) === undefined) return false;
+      } else if (checks.has(key) || key in Object.prototype) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private buildFieldChecks(): ReadonlyMap<string, AcceptedInput | undefined> {
+    const checks = new Map<string, AcceptedInput | undefined>();
+    for (const [prop, field] of Object.entries(this.tableDef.schema)) {
+      checks.set(prop, compileAcceptedInput({ [prop]: field.type }));
+    }
+    this.fieldChecks = checks;
+    return checks;
   }
 
   /** Convert a database row to an entity object */

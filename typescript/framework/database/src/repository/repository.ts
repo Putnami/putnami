@@ -14,12 +14,16 @@ import { Outcome } from '../transaction-outcome';
 import { compiledFind } from './find-statement';
 import type { QueryFilters } from './query-builder';
 import { buildWhere, buildWhereFromColumnNames } from './repository-where';
+import { hasSaveKey, saveShape, saveTemplate } from './save-statement';
 
 /** Implicit page size for `find()` when no `limit` is supplied. */
 const DEFAULT_FIND_LIMIT = 1000;
 
 /** The row count of a find's result. */
 const countOf = (entities: readonly unknown[]): number => entities.length;
+
+/** The row count of a save: the one row it wrote. */
+const one = (): number => 1;
 
 /** Inferred entity type alias for a given TableDefinition */
 type Entity<T extends TableDefinition> = InferTable<T>;
@@ -220,67 +224,80 @@ export class Repository<T extends TableDefinition> {
       throw new RepositoryError('Cannot save an empty entity', 'EMPTY_ENTITY');
     }
 
-    const keys = this.helper.extractKeys(entity as Record<string, unknown>);
-    const hasKeys = Object.entries(keys).some(([, value]) => value !== undefined && value !== null);
-    if (!hasKeys) {
+    const record = entity as Record<string, unknown>;
+    if (!hasSaveKey(this.helper, record)) {
       throw new RepositoryError('Cannot save an entity without primary key', 'MISSING_PRIMARY_KEY');
     }
 
     // Validate entity against schema constraints
     const validationErrors = options?.strict
-      ? this.helper.validateFullEntity(entity as Record<string, unknown>)
-      : this.helper.validateEntity(entity as Record<string, unknown>);
+      ? this.helper.validateFullEntity(record)
+      : this.helper.validateEntity(record);
     if (validationErrors.length > 0) {
       const messages = validationErrors.map((e) => `${e.field}: ${e.message}`).join('; ');
       throw new RepositoryError(`Validation failed: ${messages}`, 'VALIDATION_ERROR');
     }
 
-    return this.observe(
-      'save',
-      async () => {
-        const sql = await this.conn();
+    // What observe('save', …) does, in this frame.
+    throwIfAborted();
+    const start = performance.now();
+    const table = this.helper.tableName;
+    const datasource = this.datasourceName();
 
-        const keyProperties = this.helper.keyProperties;
-        const keyColumnNames = Object.keys(keys);
+    try {
+      const sql = await this.conn();
+      const query = this.saveQuery(sql, record);
+      let saved: Entity<T>;
+      try {
+        const rows = await abortableQuery(query);
 
-        // Build the insert row keyed by column name and the ordered column list.
-        // Identifiers are asserted safe and emitted via the client's `sql(...)`
-        // helpers — no manual quoting, no `sql.unsafe`.
-        const row: Record<string, unknown> = {};
-        const insertColumns: string[] = [];
-        const updateColumns: string[] = [];
-        for (const [prop, value] of Object.entries(entity as Record<string, unknown>)) {
-          const columnName = this.helper.columnName(prop);
-          assertSafeIdentifier(columnName, 'insert column');
-          row[columnName] = this.helper.toDatabaseValue(prop, value);
-          insertColumns.push(columnName);
-          if (!keyProperties.has(prop)) {
-            updateColumns.push(columnName);
-          }
+        if (rows.length === 0) {
+          throw new RepositoryError('Insert/Update failed: no row returned', 'SAVE_FAILED');
         }
 
-        const setClause = this.upsertSetClause(sql, updateColumns, keyColumnNames);
-        const conflictTarget = this.identList(sql, keyColumnNames);
+        saved = this.helper.toEntity<Entity<T>>(rows[0]);
+      } catch (error) {
+        throw RepositoryError.fromDatabaseError('Failed to save entity', error);
+      }
+      this.recordSuccess('save', start, table, datasource, saved, one);
+      return saved;
+    } catch (error) {
+      const duration = performance.now() - start;
+      recordQueryError('save', table, duration, error, datasource);
+      throw error;
+    }
+  }
 
-        try {
-          const rows = await abortableQuery(sql`
-            INSERT INTO ${sql(this.helper.tableName)} ${sql(row, ...insertColumns)}
+  /**
+   * The statement of a save: compiled once per shape, the properties the
+   * entity holds in their order (see save-statement.ts), else composed from
+   * fragments. Each property's column is resolved and its value converted
+   * here, once, in order. Identifiers are asserted safe and written as the
+   * client's `sql(...)` helpers write them, values are bound as parameters —
+   * no `sql.unsafe`.
+   */
+  private saveQuery(sql: SqlClient, entity: Record<string, unknown>): SqlQuery {
+    const values: unknown[] = [];
+    const shape = saveShape(this.helper, entity, values);
+    const strings = saveTemplate(shape, values);
+    if (strings !== undefined) {
+      return sql(strings, ...values);
+    }
+
+    // The insert row keyed by column name, for the client's row builder.
+    const row: Record<string, unknown> = {};
+    for (let i = 0; i < shape.columns.length; i++) {
+      row[shape.columns[i] as string] = values[i];
+    }
+    const setClause = this.upsertSetClause(sql, shape.updates, shape.keys);
+    const conflictTarget = this.identList(sql, shape.keys);
+
+    return sql`
+            INSERT INTO ${sql(this.helper.tableName)} ${sql(row, ...shape.columns)}
             ON CONFLICT (${conflictTarget}) DO UPDATE
             SET ${setClause}
             RETURNING *
-          `);
-
-          if (rows.length === 0) {
-            throw new RepositoryError('Insert/Update failed: no row returned', 'SAVE_FAILED');
-          }
-
-          return this.helper.toEntity<Entity<T>>(rows[0]);
-        } catch (error) {
-          throw RepositoryError.fromDatabaseError('Failed to save entity', error);
-        }
-      },
-      () => 1,
-    );
+          `;
   }
 
   /**
@@ -289,7 +306,11 @@ export class Repository<T extends TableDefinition> {
    * update) it degrades to a no-op self-assignment of the first key column so
    * the upsert still returns the existing row.
    */
-  private upsertSetClause(sql: SqlClient, updateColumns: string[], keyColumnNames: string[]): SqlQuery {
+  private upsertSetClause(
+    sql: SqlClient,
+    updateColumns: readonly string[],
+    keyColumnNames: readonly string[],
+  ): SqlQuery {
     if (updateColumns.length === 0) {
       const keyCol = keyColumnNames[0];
       assertSafeIdentifier(keyCol, 'conflict key column');
@@ -311,7 +332,7 @@ export class Repository<T extends TableDefinition> {
    * a quoted identifier regardless of the surrounding keywords — unlike passing
    * a string array, which the driver would treat as a `VALUES`/insert builder.
    */
-  private identList(sql: SqlClient, names: string[]): SqlQuery {
+  private identList(sql: SqlClient, names: readonly string[]): SqlQuery {
     let list: SqlQuery | undefined;
     for (const name of names) {
       assertSafeIdentifier(name, 'identifier list');
