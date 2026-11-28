@@ -1,4 +1,5 @@
 import type { InferConfig } from '@putnami/runtime';
+import { effectiveConfig, resolveConnectionTarget } from './datasource-config';
 import {
   type PoolHealthStats,
   recordPoolClosed,
@@ -7,7 +8,6 @@ import {
   recordPoolHealth,
   recordPoolSize,
 } from './observability';
-import { effectiveConfig, resolveConnectionTarget } from './datasource-config';
 import type { ResolvedDatabaseBinding } from './postgres/binding';
 import type { PostgresConfig } from './postgres/config';
 import { createDatasourceClient } from './postgres/datasource-client';
@@ -26,7 +26,12 @@ export { physicalPoolCount } from './postgres/physical-pool';
 interface LogicalEntry {
   client: SqlClient;
   connectionName?: string;
+  /** The client as a settled promise, made once: what database() answers for an open datasource. */
+  ready?: Promise<SqlClient>;
 }
+
+/** The registry key of an effective configuration, which effectiveConfig returns unchanged while nothing it reads moves. */
+const keyOf = new WeakMap<object, string>();
 
 /**
  * The logical registry: datasource key → opened client. Datasources are
@@ -111,14 +116,27 @@ function tuningOf(conf: InferConfig<typeof PostgresConfig>): PhysicalTuning {
  *             When provided, loads config from 'database.${name}' path.
  * @param config Optional explicit config (overrides name parameter).
  */
-export const database = async (name?: string, _config?: InferConfig<typeof PostgresConfig>): Promise<SqlClient> => {
-  const { conf, binding, url, resolvedName, connectionName } = effectiveConfig(name, _config);
+export const database = (name?: string, _config?: InferConfig<typeof PostgresConfig>): Promise<SqlClient> => {
+  // Not an async function: an open datasource answers its settled client with
+  // no frame of its own. A configuration that throws still rejects.
+  let effective: ReturnType<typeof effectiveConfig>;
+  try {
+    effective = effectiveConfig(name, _config);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  const { conf, binding, url, resolvedName, connectionName } = effective;
 
-  const key = buildKey(conf, connectionName);
+  let key = keyOf.get(effective);
+  if (key === undefined) {
+    key = buildKey(conf, connectionName);
+    keyOf.set(effective, key);
+  }
 
   const entry = registry.get(key);
   if (entry) {
-    return entry.client;
+    entry.ready ??= Promise.resolve(entry.client);
+    return entry.ready;
   }
   const inflight = loading.get(key);
   if (inflight) {

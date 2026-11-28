@@ -3,14 +3,14 @@ import { abortableQuery, throwIfAborted } from '../abort';
 import { effectiveConfig } from '../datasource-config';
 import { classifyOutcome, RepositoryError, type RepositoryErrorCode } from '../errors';
 import { assertSafeIdentifier, type EntityHelper, entityHelper, quoteIdentifier } from '../metadata';
-import { type QueryMetrics, type SqlOperation, recordQuery, recordQueryError, recordSlowQuery } from '../observability';
+import { type QueryMetrics, recordQuery, recordQueryError, recordSlowQuery, type SqlOperation } from '../observability';
 import type { PostgresConfig } from '../postgres/config';
 import { resolveDatasourceName } from '../primary-datasource';
 import type { SqlClient, SqlQuery } from '../sql-client';
 import type { TableDefinition } from '../table';
 import type { InferTable } from '../table/table-inference';
-import { Outcome } from '../transaction-outcome';
 import { useTxConnection } from '../transaction';
+import { Outcome } from '../transaction-outcome';
 import type { QueryFilters } from './query-builder';
 import { buildWhere, buildWhereFromColumnNames } from './repository-where';
 
@@ -96,8 +96,12 @@ export class Repository<T extends TableDefinition> {
     return resolveDatasourceName(this.helper.db);
   }
 
-  async conn(mode: 'read' | 'write' = 'write'): Promise<SqlClient> {
-    return useTxConnection(this.datasourceName(), mode);
+  conn(mode: 'read' | 'write' = 'write'): Promise<SqlClient> {
+    try {
+      return useTxConnection(this.datasourceName(), mode);
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   /**

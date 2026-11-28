@@ -90,8 +90,8 @@ const LEASE: unique symbol = Symbol('putnami.database.lease');
  * `searchPath` the operation needs, a member whose session holds it may be
  * shared with other operations; without it, the member is leased alone.
  */
-export function leaseMember(pool: SQL, searchPath?: string): Promise<LeasedMember> | undefined {
-  const lease = (pool as unknown as { [LEASE]?: (searchPath?: string) => Promise<LeasedMember> })[LEASE];
+export function leaseMember(pool: SQL, searchPath?: string): LeasedMember | Promise<LeasedMember> | undefined {
+  const lease = (pool as unknown as { [LEASE]?: (searchPath?: string) => LeasedMember | Promise<LeasedMember> })[LEASE];
   return lease?.(searchPath);
 }
 
@@ -424,12 +424,13 @@ export function createDriverPool(
     };
   };
 
-  const leaseForOperation = (searchPath?: string): Promise<LeasedMember> => {
+  /** A member for one operation: at once when one is free or shareable, else once one is given back. */
+  const leaseForOperation = (searchPath?: string): LeasedMember | Promise<LeasedMember> => {
     if (ending) {
       return Promise.reject(poolClosedError());
     }
     const granted = set.lease(searchPath);
-    return granted instanceof Promise ? granted.then(leased) : Promise.resolve(leased(granted));
+    return granted instanceof Promise ? granted.then(leased) : leased(granted);
   };
 
   const helpers = (): SQL => {

@@ -103,33 +103,73 @@ export function createDatasourceClient(physical: DriverSql, options: DatasourceC
     }
   };
 
-  const leaseDriver = async (): Promise<LeasedMember> => {
-    const leased = leaseMember(physical, wanted);
-    if (!leased) {
-      throw new Error('database: a datasource client runs on a pool built by createDriverPool');
-    }
+  /** A member for one operation, at once when the pool has one for it. */
+  const leaseDriver = (): LeasedMember | Promise<LeasedMember> => {
+    let leased: LeasedMember | Promise<LeasedMember> | undefined;
     try {
-      return await leased;
+      leased = leaseMember(physical, wanted);
     } catch (error) {
-      throw normalizeError(error);
+      // A member that fails to open throws in the pool: the operation rejects.
+      return Promise.reject(error);
     }
+    if (!leased) {
+      return Promise.reject(new Error('database: a datasource client runs on a pool built by createDriverPool'));
+    }
+    return leased instanceof Promise
+      ? leased.then(undefined, (error: unknown) => {
+          throw normalizeError(error);
+        })
+      : leased;
   };
 
   /**
-   * dispatch runs `query` on a leased member: it sets the datasource's path
-   * first when the member's session does not hold it, then runs the query,
-   * and gives the member back once the query settled.
+   * dispatch runs `query` on a member of the pool. A member leased at once
+   * whose session holds the datasource's path runs it in this turn; any other
+   * goes through {@link runLeased}, which sets the path first.
    */
-  const dispatch = async (query: CapturedQuery): Promise<unknown> => {
+  const dispatch = (query: CapturedQuery): Promise<unknown> => {
     if (closed) {
-      throw closedError(options.datasource);
+      return Promise.reject(closedError(options.datasource));
     }
     if (query.cancelled) {
       // Cancelled before it was dispatched: leasing a connection for it would
       // only hold one for nothing.
-      throw queryCancelledError();
+      return Promise.reject(queryCancelledError());
     }
-    const member = await leaseDriver();
+    const leased = leaseDriver();
+    if (leased instanceof Promise) {
+      return leased.then((member) => runLeased(query, member));
+    }
+    if (leased.session.searchPath !== wanted) {
+      return runLeased(query, leased);
+    }
+    // The common case: a member whose session holds the path, at once. The
+    // statement goes in this turn, with no frame of its own.
+    let running: Promise<unknown>;
+    try {
+      running = query.runOn(leased.sql, debug);
+    } catch (error) {
+      leased.release();
+      return Promise.reject(error);
+    }
+    return running.then(
+      (result) => {
+        leased.release();
+        return result;
+      },
+      (error: unknown) => {
+        leased.release();
+        throw error;
+      },
+    );
+  };
+
+  /**
+   * Runs `query` on a leased member: it sets the datasource's path first when
+   * the member's session does not hold it, then runs the query, and gives the
+   * member back once the query settled.
+   */
+  const runLeased = async (query: CapturedQuery, member: LeasedMember): Promise<unknown> => {
     try {
       if (query.cancelled) {
         throw queryCancelledError();
