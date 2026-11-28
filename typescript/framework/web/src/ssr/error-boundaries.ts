@@ -45,7 +45,9 @@ function describeRouteError(error: unknown): { message: string; stack?: string }
     return { message: `${error.status} ${error.statusText}${message ? `: ${message}` : ''}` };
   }
   if (error instanceof Error) return { message: error.message, stack: error.stack };
-  return { message: String(error) };
+  // A hydrated error arrives as the `{ message, status }` `sanitizeErrors` kept of it.
+  const message = (error as { message?: unknown } | null | undefined)?.message;
+  return { message: typeof message === 'string' ? message : String(error) };
 }
 
 export function DefaultErrorBoundary() {
