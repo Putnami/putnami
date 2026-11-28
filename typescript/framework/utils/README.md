@@ -76,6 +76,7 @@ const { data, errors } = validateSchema(DatabaseSchema, input);
 | `Min`, `Max`, `MinLength`, `MaxLength`, `Pattern`, `OneOf` | Constraints |
 | `validateSchema(schema, value, opts?)` | Validate, apply defaults, optionally coerce |
 | `compileSchemaValidator(schema)` | Fast path for hot validation; delegates what it cannot inline |
+| `compileAcceptedInput(schema, opts?)` | A check built once for a schema of `string`, `number` and `boolean` fields: the data `validateSchema` returns for an input it accepts, `undefined` for an input it rejects |
 
 Coercion is off by default: a JSON body is checked against its declared type,
 while path and query segments — always strings on the wire — opt in.

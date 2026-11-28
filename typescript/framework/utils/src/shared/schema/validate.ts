@@ -2,6 +2,7 @@ import {
   baseTypeName,
   isNestedSchema,
   isSchemaDescriptor,
+  type SchemaConstraint,
   type SchemaDefinition,
   type SchemaDescriptor,
   type SchemaPrimitive,
@@ -47,6 +48,94 @@ export function validateSchema<S extends SchemaDefinition>(
   const input = asInputObject(value);
   const data = validateObjectFields(schema, input, label, options, errors);
   return { data, errors };
+}
+
+/**
+ * The check of one schema, compiled once: for an input {@link validateSchema}
+ * accepts it returns the `data` `validateSchema` returns, and `undefined` for
+ * an input `validateSchema` rejects, whose errors `validateSchema` then reports.
+ * Like `validateSchema`, it reads a non-object input as an empty object.
+ */
+export type AcceptedInput = (value: unknown) => Record<string, unknown> | undefined;
+
+/** The base types a compiled check accepts a field of. */
+const COMPILED_BASE_TYPES: ReadonlySet<string> = new Set(['string', 'number', 'boolean']);
+
+/** A scalar field of a compiled schema, with what its check needs read once. */
+interface ScalarField {
+  readonly key: string;
+  readonly expectedType: string;
+  readonly defaultValue: unknown;
+  readonly required: boolean;
+  readonly constraints: readonly SchemaConstraint[];
+}
+
+/**
+ * Compiles the {@link AcceptedInput} of a schema whose fields are all scalars:
+ * `String`, `Number`, `Boolean`, or a descriptor of base type `string`,
+ * `number` or `boolean` with its constraints, `Optional` and `Default`. A
+ * per-request caller then pays one loop over the fields for a valid input,
+ * instead of walking the schema and building the field paths again; an input
+ * it does not accept goes to `validateSchema`, so the errors stay those
+ * `validateSchema` reports. The constraints of such an input run twice, here
+ * and in `validateSchema`; constraints are stateless, so both runs agree.
+ * `undefined` for a schema with any other field (an array, a map, a nested
+ * object, or another base type), which keeps `validateSchema` alone.
+ */
+export function compileAcceptedInput(
+  schema: SchemaDefinition,
+  options: ValidateOptions = {},
+): AcceptedInput | undefined {
+  const fields: ScalarField[] = [];
+  for (const [key, prop] of Object.entries(schema)) {
+    const descriptor = getDescriptor(prop);
+    // The branches validatePrimitive takes before the scalar one.
+    if (
+      (descriptor?.array && descriptor.items) ||
+      (descriptor?.map && descriptor.mapValue) ||
+      descriptor?.schema ||
+      isNestedSchema(prop)
+    ) {
+      return undefined;
+    }
+    // A scalar base type only: `unknown`, `object` or a custom one stays with validateSchema.
+    const expectedType = baseTypeName(prop);
+    if (!COMPILED_BASE_TYPES.has(expectedType)) {
+      return undefined;
+    }
+    fields.push({
+      key,
+      expectedType,
+      defaultValue: descriptor?.default,
+      required: isRequiredField(descriptor),
+      constraints: descriptor?.constraints ?? [],
+    });
+  }
+  const coerceStrings = options.coerce === true;
+  return (value) => {
+    const input = asInputObject(value);
+    const data: Record<string, unknown> = {};
+    for (const field of fields) {
+      if (!acceptField(field, input[field.key], coerceStrings, data)) return undefined;
+    }
+    return data;
+  };
+}
+
+/**
+ * Checks one scalar field as {@link validateSchema} does and adds its value to
+ * `data`; false when `validateSchema` reports an error for it.
+ */
+function acceptField(field: ScalarField, raw: unknown, coerceStrings: boolean, data: Record<string, unknown>): boolean {
+  const value = isMissingValue(raw) ? field.defaultValue : raw;
+  if (isMissingValue(value)) return !field.required;
+  const checked = coerceStrings && typeof value === 'string' ? coerce(value, field.expectedType) : value;
+  if (!checkBaseType(checked, field.expectedType)) return false;
+  for (const constraint of field.constraints) {
+    if (!constraint.validate(checked)) return false;
+  }
+  data[field.key] = checked;
+  return true;
 }
 
 // ---------------------------------------------------------------------------
