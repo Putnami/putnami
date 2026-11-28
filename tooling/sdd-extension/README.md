@@ -331,7 +331,9 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   and succeeds whatever they say: the CLI fails a run on the error findings of
   the projects it selected, and prints their warnings. It declares
   `selection: none`, so the CLI keys it on no selected project and one entry
-  serves every selection
+  serves every selection. Across runs it evaluates again only the projects
+  whose reads moved, from a memo under the job's `cacheRoot` that never
+  changes what it writes
   ([ADR 0006](doc/adr/0006-feature-validation-runs-once-and-states-its-findings.md)).
 - `breaking-marker-validate` is never cached. It compares the proposed squash
   message in `PUTNAMI_PROPOSAL_MESSAGE` with the commits since the run's

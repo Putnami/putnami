@@ -2,6 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-27
+- **Amended**: 2026-11-28. The task keeps a per-project memo across runs
+  and evaluates only the projects whose reads moved (item 6)
 - **Scope**: `@putnami/sdd` (`features-validate`, now a step of
   `validate-workspace`, and the `validate` command, which keeps
   `specs-validate`)
@@ -77,6 +79,30 @@ decide, and it does not read the selection.
    repository. The collector of ADR 0006 of `protocols/evidence` replaces it:
    one identity task keyed on the identity files, and per-project checks keyed
    on their own project.
+6. **A memo evaluates only the projects whose reads moved.** Across runs, the
+   task keeps one entry per project it validated: what the merge reads of the
+   evaluation, its diagnostics and the counts of its features, and each read
+   the evaluation made through the reader, a file, a directory listing or a
+   source binding, with the SHA-256 of the answer. The memo is one file,
+   `sdd-features/evaluations.memo`, under the `cacheRoot` of the job context,
+   the per-workspace scratch directory the CLI grants every job
+   (`protocols/job`). A run reuses an entry when the memo was written by the
+   same code, the SHA-256 of the running executable, for the same workspace
+   view, and every read of the entry answers as it did. It evaluates the
+   project otherwise. A rule across projects needs nothing of its own: every
+   evaluation reads every authored manifest and the evidence at every root,
+   so a duplicate id, an unresolved contribution or a record in another root
+   moves the entry of every project whose evaluation read the file. A source
+   edit moves the entries whose source binding holds the file, and a file no
+   evaluation reads moves none. The memo is never an input. An evaluation is a
+   function of the view, the project and the answers to its reads, so a
+   reused entry is the evaluation the run would make, and the task writes the
+   same bytes whether the memo hits, misses or is absent. A memo that is over
+   64 MiB, fails the SHA-256 of its payload, or was written by another code or
+   for another view is ignored. It holds one entry per project the last run
+   validated. A run replaces it whole, through a temporary file and a rename,
+   so a reader never sees part of one and runs at once each leave a whole
+   memo. A run that reused every entry leaves it as it is.
 
 ## What a narrowed run reports
 
@@ -125,18 +151,30 @@ and a finding that concerns several files is stated at each:
 - **Publishing the findings as task diagnostics as well.** A narrowed run
   would show, and the task would fail on, the errors of projects it did not
   select.
+- **A memo keyed on file patterns per project.** The patterns would have to
+  name every file the engine reads, and a file they missed would replay a
+  stale finding. The reads the evaluation made are its read set.
+- **The memo in the extension's machine cache root** (`extension.cacheRoot`).
+  That root is shared by every repository and worktree, so the memo of each
+  workspace would stay there until a collection of its own removed it. The
+  workspace scratch holds one memo per workspace and is reclaimed with it.
 
 ## Consequences
 
 - One task replaces the 123 copies. On this repository it writes 2,578
-  warning fragments and no error. After an untracked file is added, its
-  process runs 0.7 to 1.2 seconds under every selection, where the copies ran
-  0.2 seconds for a run that selects one features project, 0.8 for five, 4.7
-  for 28 and 21.5 for all 123. A run narrowed to one features project is
-  therefore slower, until the per-file keys of the evidence collector let the
-  task skip what did not change.
+  warning fragments and no error. After an untracked file is added, the memo
+  serves all 126 evaluations and the task runs 0.3 to 0.4 seconds under every
+  selection, where it ran 0.7 to 1.2 seconds without the memo, and the copies
+  ran 0.2 seconds for a run that selects one features project, 0.8 for five,
+  4.7 for 28 and 21.5 for all 123. Over five alternated rounds, a run narrowed
+  to one features project took a median session of 8.6 seconds, against 9.8
+  with the copies, and a run narrowed to five 8.9 against 9.6. An edit to an
+  authored manifest or to evidence still moves every entry, until the
+  per-file keys of the evidence collector let each check read its own
+  project.
 - The task's cache entry holds the fragment file, about 800 KiB here, and one
-  entry serves every selection.
+  entry serves every selection. The memo is one file of about 770 KiB per
+  workspace.
 - An unscoped run prints one warning line per project and rule, 129 here, and
   the session records each warning.
 - `putnami features validate`, the interactive command, still reads the disk

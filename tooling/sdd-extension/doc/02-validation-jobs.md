@@ -779,6 +779,22 @@ scheduler grants the job, and share one reader of the cut that answers each
 read once and one strict parse of each authored document; the answers merge in
 project order, so the bytes do not depend on how many run at once.
 
+Across runs, the task keeps a memo in `sdd-features/evaluations.memo` under the
+job's `cacheRoot`, the per-workspace scratch directory the CLI grants every
+job. Each entry holds one project's evaluation and every read it made, a file,
+a directory listing or a source binding, with the SHA-256 of the answer. A run
+reuses an entry when the memo was written by the same executable for the same
+workspace view and every read answers as it did, and evaluates the project
+otherwise. Every evaluation reads every authored manifest and the evidence at
+every root, so editing one moves every entry, while a source edit moves only
+the entries whose source binding holds the file, and a file no evaluation
+reads moves none. The memo never changes what the task writes: a memo that is
+absent, over 64 MiB, damaged, or written by another executable or for another
+view is ignored, and the task writes the bytes of a fresh evaluation. A run
+replaces the memo whole through a rename, and leaves it as it is when it
+reused every entry
+([ADR 0006](adr/0006-feature-validation-runs-once-and-states-its-findings.md)).
+
 It states every diagnostic of every evaluation as a `finding` fragment of
 source format `putnami-sdd` in `putnami-evidence.jsonl`, a required file of its
 command output that it writes on every run, empty when nothing is found. The
