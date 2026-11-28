@@ -67,6 +67,10 @@
       "text": "SSR runs the static handler and loaders before rendering, keeps redirects, router status and a loader `HttpException`'s own status, on a client navigation too, logs an unexpected loader error and records it as the request error, then emits one HTML document whose React body streams and whose timer is released on success or error. Loaders and render stop when their request ends, logging and recording no error. Loaders run under an `ssr loaders` span and the shell under an `ssr render` span."
     },
     {
+      "id": "loaders-span-status",
+      "text": "The `ssr loaders` span ends with code `error` for a 5xx `HttpException` or an unknown loader error, and without an error code for a 4xx `HttpException`, which stays the request error."
+    },
+    {
       "id": "ssr-streaming",
       "text": "A browser request receives the head and the React shell once the shell is ready, and each Suspense boundary streams as it resolves. The head holds the contributions known at the shell; an extracted Emotion style a later chunk needs is written before that chunk; other late styles, scripts, and title, meta and link tags are written after the root, the tags by one nonced script. A request whose user agent matches the crawler pattern, and a page whose HTML is cached, wait for every boundary."
     },
@@ -88,6 +92,10 @@
         "Only page().static() selects SSG or ISR;",
         "static loaders execute in a request-free context, request access raises StaticRenderViolation, dynamic paths cannot escape the output root, and routes without finite paths remain live."
       ]
+    },
+    {
+      "id": "static-loader-status",
+      "text": "A static render answers a loader `HttpException` with its own status and the not-found or error boundary, as SSR does; static prerender fails the build, naming the route, the path and the status, when a path that `paths()` lists resolves to a 4xx, and writes no page for it."
     },
     {
       "id": "static-build-version",
