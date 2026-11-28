@@ -398,10 +398,11 @@ minor. The workspace must run that same minor: a bug fixed or introduced by a
 React minor otherwise reaches users before CI sees it.
 
 The root `package.json` catalog holds the floor the workspace requires, and the
-private members (the samples, `typescript/templates/proof`,
-`typescript/doc-examples` and `sites/putnami.dev`) reference it through
-`catalog:`. Because `bun.lock` must satisfy that floor, it cannot fall back to an
-older minor. When React publishes a new minor, raise the floor in one member,
+private members (the web samples, `typescript/doc-examples` and
+`sites/putnami.dev`) reference it through `catalog:`;
+`typescript/templates/proof` keeps the specifiers the templates ship.
+Because `bun.lock` must satisfy that floor, it cannot fall back to an older
+minor. When React publishes a new minor, raise the floor in one member,
 which rewrites the catalog entry and refreshes `bun.lock`, then run the
 impacted gate:
 
