@@ -124,6 +124,7 @@ type DriverResult = unknown[] & { count?: number | null; command?: string };
  * (`bytea`) stays one.
  */
 function plainValue(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') return value;
   if (ArrayBuffer.isView(value) && !(value instanceof Uint8Array) && !(value instanceof DataView)) {
     return Array.from(value as unknown as ArrayLike<unknown>);
   }
@@ -131,6 +132,31 @@ function plainValue(value: unknown): unknown {
     return value.map(plainValue);
   }
   return value;
+}
+
+/**
+ * One row as the client hands it out: `columns[j]` of `row` under `keys[j]`.
+ * It relies on what `Bun.SQL` returns: the rows of one statement are plain
+ * objects with the statement's columns, as own keys in one order. A row that
+ * lacks one of them is converted on its own column names; a row with a column
+ * the first row lacks, which no statement returns, would lose it.
+ */
+function convertRow(
+  row: Record<string, unknown>,
+  columns: readonly string[],
+  keys: readonly string[],
+  camel: boolean,
+): Record<string, unknown> {
+  const record: Record<string, unknown> = {};
+  for (let j = 0; j < columns.length; j++) {
+    const column = columns[j] as string;
+    if (!Object.hasOwn(row, column)) {
+      const own = Object.keys(row);
+      return convertRow(row, own, camel ? own.map(camelKey) : own, camel);
+    }
+    record[keys[j] as string] = plainValue(row[column]);
+  }
+  return record;
 }
 
 /**
@@ -142,6 +168,10 @@ function clientResult(result: unknown, camel: boolean): unknown {
   if (!Array.isArray(result)) return result;
   const source = result as DriverResult;
   const out = new Array(source.length) as DriverResult;
+  // The rows of one statement share its columns: their names are read, and
+  // camelCased, once per result rather than once per row.
+  let columns: string[] | undefined;
+  let keys: string[] | undefined;
   for (let i = 0; i < source.length; i++) {
     const row = source[i];
     if (Array.isArray(row)) {
@@ -150,11 +180,11 @@ function clientResult(result: unknown, camel: boolean): unknown {
       // and its nested results carry their command tag.
       out[i] = camel || 'command' in row ? clientResult(row, camel) : row.map(plainValue);
     } else if (row !== null && typeof row === 'object') {
-      const record: Record<string, unknown> = {};
-      for (const key of Object.keys(row)) {
-        record[camel ? camelKey(key) : key] = plainValue((row as Record<string, unknown>)[key]);
+      if (columns === undefined) {
+        columns = Object.keys(row);
+        keys = camel ? columns.map(camelKey) : columns;
       }
-      out[i] = record;
+      out[i] = convertRow(row as Record<string, unknown>, columns, keys as string[], camel);
     } else {
       out[i] = row;
     }

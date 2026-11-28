@@ -48,6 +48,26 @@ describe('client results', () => {
     expect(row?.['blob']).toBeInstanceOf(Uint8Array);
   });
 
+  it('converts every row of a result with the column names of the first, and a row that lacks one on its own', async () => {
+    const { sql } = fakeDriver(
+      result([
+        { task_id: 1, created_at: 'a', tags: new Int32Array([1]) },
+        { task_id: 2, created_at: 'b', tags: null },
+        // A row that lacks a column of the first is converted on its own columns.
+        { other_col: 3 },
+        // An inherited name is not a column the row holds.
+        Object.assign(Object.create({ task_id: 'inherited' }), { created_at: 'c' }),
+      ]),
+    );
+    const rows = await sql`SELECT 1`;
+    expect<unknown[]>([...rows]).toEqual([
+      { taskId: 1, createdAt: 'a', tags: [1] },
+      { taskId: 2, createdAt: 'b', tags: null },
+      { otherCol: 3 },
+      { createdAt: 'c' },
+    ]);
+  });
+
   it('keeps the count and command of each nested result of a multi-statement values() query', async () => {
     const nested = result([result([[1, new Int32Array([3])]], 'SELECT'), result([], 'UPDATE')]);
     const { sql, modes } = fakeDriver(nested);
