@@ -336,7 +336,7 @@ export default error()
 ### Error recovery
 
 ```tsx
-import { error, useRouteError, useNavigate } from '@putnami/web';
+import { error, isRouteErrorResponse, useRouteError, useNavigate } from '@putnami/web';
 
 export default error().render(function ErrorBoundary() {
   const err = useRouteError();
@@ -349,7 +349,13 @@ export default error().render(function ErrorBoundary() {
   return (
     <div>
       <h1>Error</h1>
-      <p>{err instanceof Error ? err.message : 'Unknown error'}</p>
+      <p>
+        {isRouteErrorResponse(err)
+          ? `${err.status} ${err.statusText}`
+          : err instanceof Error
+            ? err.message
+            : 'Unknown error'}
+      </p>
       <button onClick={retry}>Try again</button>
     </div>
   );

@@ -188,6 +188,8 @@ export default loader(async (ctx) => {
 });
 ```
 
+The page answers `404` with the nearest not-found page. Any `HttpException` a loader throws answers with its own status.
+
 ### Loader with query parameters
 
 ```ts

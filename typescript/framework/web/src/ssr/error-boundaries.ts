@@ -37,8 +37,19 @@ export function LazyNotFoundErrorBoundary({
   return fallbackErrorElement ?? React.createElement(DefaultErrorBoundary);
 }
 
+/** The message and stack a default boundary shows in development, for an `Error` or a route error response. */
+function describeRouteError(error: unknown): { message: string; stack?: string } {
+  if (isRouteErrorResponse(error)) {
+    const data = error.data as { message?: unknown } | null | undefined;
+    const message = typeof data?.message === 'string' ? data.message : undefined;
+    return { message: `${error.status} ${error.statusText}${message ? `: ${message}` : ''}` };
+  }
+  if (error instanceof Error) return { message: error.message, stack: error.stack };
+  return { message: String(error) };
+}
+
 export function DefaultErrorBoundary() {
-  const error = useRouteError() as Error;
+  const error = describeRouteError(useRouteError());
   // Only expose the error message and stack in development. In production this
   // boundary is the default fallback, so rendering `error.stack` would disclose
   // file paths and internal structure over the wire. Mirrors the client
@@ -56,7 +67,7 @@ export function DefaultErrorBoundary() {
       'div',
       null,
       React.createElement('h3', null, isDev ? error.message : 'An unexpected error occurred'),
-      isDev ? React.createElement('pre', null, error.stack) : null,
+      isDev && error.stack ? React.createElement('pre', null, error.stack) : null,
     ),
   );
 }

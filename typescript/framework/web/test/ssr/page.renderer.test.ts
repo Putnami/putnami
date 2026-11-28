@@ -19,7 +19,7 @@ import { buildHttpContext } from '../../../application/src/http/http-context.bui
 import type { StaticHandlerContext } from 'react-router';
 import { runInContext, useContext } from '../../../runtime/src/context/context.utils';
 import RootHtml from '../../src/ssr/default.html';
-import { NotFoundErrorBoundary } from '../../src/ssr/error-boundaries';
+import { DefaultErrorBoundary, NotFoundErrorBoundary } from '../../src/ssr/error-boundaries';
 import {
   handleRenderError,
   pageRenderer,
@@ -612,22 +612,61 @@ describe('page.renderer', () => {
       },
     );
 
-    it('answers the status of another HttpException a loader throws', async () => {
+    it('answers the status of another HttpException a loader throws, with the error page', async () => {
       const logger = new MemoryLogger();
-      const response = await renderRoute(
-        {
-          path: '/admin',
-          loader: () => {
-            throw new ForbiddenException('not an admin');
-          },
-          element: React.createElement('div', null, 'Admin'),
-        },
-        { req: new Request('http://localhost/admin'), logger },
+      const exception = new ForbiddenException({ message: 'not an admin', table: 'secret_admins' });
+      const ctx = createMockContext({ req: new Request('http://localhost/admin'), logger });
+      const handler = pageRenderer(
+        () => [
+          {
+            path: '/admin',
+            loader: () => {
+              throw exception;
+            },
+            element: React.createElement('div', null, 'Admin'),
+            errorElement: React.createElement(DefaultErrorBoundary),
+          } as never,
+        ],
+        () => RootHtml,
+        () => 'hydrate.js',
+        SSR_TIMEOUT_MS,
       );
+
+      const response = await runInContext(ctx, async () => await respond(handler, ctx));
+      const html = (await response?.get().text()) ?? '';
+
+      expect(response?.status).toBe(403);
+      expect(html).toContain('Oups, we met an issue!');
+      expect((ctx as Record<string, unknown>)['__requestError']).toBe(exception);
+      expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+      // The hydration payload carries the status and the message, never the exception's details.
+      expect(html).toContain('"status":403');
+      expect(html).toContain('not an admin');
+      expect(html).not.toContain('secret_admins');
+    });
+
+    it('answers the status of an HttpException an action throws', async () => {
+      const ctx = createMockContext({ req: new Request('http://localhost/admin', { method: 'POST' }) });
+      const handler = pageRenderer(
+        () => [
+          {
+            path: '/admin',
+            action: () => {
+              throw new ForbiddenException('not an admin');
+            },
+            element: React.createElement('div', null, 'Admin'),
+            errorElement: React.createElement(DefaultErrorBoundary),
+          } as never,
+        ],
+        () => RootHtml,
+        () => 'hydrate.js',
+        SSR_TIMEOUT_MS,
+      );
+
+      const response = await runInContext(ctx, async () => await respond(handler, ctx));
       await response?.get().text();
 
       expect(response?.status).toBe(403);
-      expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
     });
 
     it('does not log a Response a loader throws as an error', async () => {

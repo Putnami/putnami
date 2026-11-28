@@ -459,16 +459,25 @@ describe('PostsPage', () => {
 
 ```tsx
 // src/app/error.tsx
-import { error, useRouteError, Link } from '@putnami/web';
+import { error, isRouteErrorResponse, useRouteError, Link } from '@putnami/web';
 
 export default error().render(function ErrorBoundary() {
-  const err = useRouteError() as Error;
+  const err = useRouteError();
+  // A thrown Response or HttpException arrives as an ErrorResponse.
+  if (isRouteErrorResponse(err)) {
+    return (
+      <div>
+        <h1>{err.status} {err.statusText}</h1>
+        <Link to="/">Go Home</Link>
+      </div>
+    );
+  }
 
   return (
     <div>
       <h1>Something went wrong</h1>
-      <p>{err.message}</p>
-      {process.env.NODE_ENV === 'development' && (
+      <p>{err instanceof Error ? err.message : 'Unknown error'}</p>
+      {process.env.NODE_ENV === 'development' && err instanceof Error && (
         <pre>{err.stack}</pre>
       )}
       <Link to="/">Go Home</Link>

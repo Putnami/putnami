@@ -503,8 +503,9 @@ function reportLoaderErrors(
  * Answers an `HttpException` a loader or an action threw with its own status:
  * React Router keeps it as an unknown error and computes a 500, so each one is
  * replaced by the route error response of its status, which the not-found and
- * error boundaries render, and the router status follows the first error as
- * React Router computes it. Runs after `reportLoaderErrors`, which records the
+ * error boundaries render, with `{ statusCode, error, message }` as its
+ * `data`, and the router status follows the first error as React Router
+ * computes it. Runs after `reportLoaderErrors`, which records the
  * exception itself as the request error.
  */
 function answerLoaderExceptions(context: StaticHandlerContext | Response): void {
@@ -514,11 +515,15 @@ function answerLoaderExceptions(context: StaticHandlerContext | Response): void 
   for (const [routeId, error] of Object.entries(context.errors)) {
     if (error instanceof HttpException) {
       const status = error.getStatus();
-      errors[routeId] = new UNSAFE_ErrorResponseImpl(
-        status,
-        getHttpStatusText(status) ?? error.name,
-        error.getResponse(),
-      );
+      const statusText = getHttpStatusText(status) ?? error.name;
+      // Only the status and the message reach the hydration payload, as
+      // `sanitizeErrors` keeps of an `Error`: the exception's details stay on
+      // the server.
+      errors[routeId] = new UNSAFE_ErrorResponseImpl(status, statusText, {
+        statusCode: status,
+        error: statusText,
+        message: error.message,
+      });
       converted = true;
     } else {
       errors[routeId] = error;
