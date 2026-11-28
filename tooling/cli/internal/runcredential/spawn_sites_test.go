@@ -193,6 +193,8 @@ var spawnSites = map[string]spawnSite{
 		why: "read verbs only, through the gitread runners: ls-files, and rev-parse through gitread.Unmanaged"},
 	"git/tree_history.go:IgnoresDirectories": {spawns: 2, verdict: noRepositoryCode,
 		why: "git check-ignore --stdin, a read verb"},
+	"git/held_reads.go:gitExecutable": {spawns: 1, verdict: noRepositoryCode,
+		why: "names the git a held answer was read with; gitread.Executable asks /usr/bin/xcrun, a fixed program, for the git to run"},
 	"git/tree_history.go:ReadChangeHistory": {spawns: 5, verdict: noRepositoryCode,
 		why: "read verbs only, through the gitread runners: rev-parse, merge-base, log"},
 	"git/tree_history.go:fileAtCommit": {spawns: 3, verdict: noRepositoryCode,

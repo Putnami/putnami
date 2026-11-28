@@ -140,7 +140,7 @@ func TestHasActivationFiles_CacheReusesResult(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	cache := newPlanCache()
+	cache := newPlanCache(nil)
 	// Disk has no matching file, but pre-seed the cache with `true`.
 	cache.hasFiles[dir+"\x00"+"*.go"] = true
 	if !hasActivationFiles(dir, []string{"*.go"}, cache) {
@@ -158,7 +158,7 @@ func TestHasActivationFiles_CacheReusesResult(t *testing.T) {
 // matchJob calls for the same (extension, project) pair.
 func TestExtensionActivatesForProject_CacheReusesResult(t *testing.T) {
 	t.Parallel()
-	cache := newPlanCache()
+	cache := newPlanCache(nil)
 	cache.extActivates["@x/ts\x00/tmp/proj"] = true
 
 	got := extensionActivatesForProject("@x/ts", "/tmp/proj", map[string][]*extension.JobDefinition{}, cache)

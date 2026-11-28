@@ -21,7 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
+	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -30,6 +30,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 
+	"go.putnami.dev/sdk/extension/gitread"
 	"go.putnami.dev/sdk/extension/procstat"
 )
 
@@ -222,13 +223,13 @@ func tagNames(refs string) []string {
 // no object, so every release tag of a line is a candidate, whether git can
 // read its object or not.
 func (t *Tags) readNames() {
-	head, err := runGit(t.dir, nil, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}")
+	head, err := runGit(t.dir, "", "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}")
 	if err != nil {
 		t.namesErr = err
 		return
 	}
 	t.head = strings.TrimSpace(head)
-	t.refs, t.namesErr = runGit(t.dir, nil, "for-each-ref", "--format=%(refname)", "refs/tags")
+	t.refs, t.namesErr = runGit(t.dir, "", "for-each-ref", "--format=%(refname)", "refs/tags")
 }
 
 // readPeeled reads, in one cat-file --batch-check, the object each tag peels
@@ -243,7 +244,7 @@ func (t *Tags) readPeeled() {
 	for _, tag := range tags {
 		names.WriteString("refs/tags/" + tag + "^{}\n")
 	}
-	objects, err := runGit(t.dir, strings.NewReader(names.String()), "cat-file", "--batch-check")
+	objects, err := runGit(t.dir, names.String(), "cat-file", "--batch-check")
 	if err != nil {
 		t.peelErr = err
 		return
@@ -265,7 +266,7 @@ func (t *Tags) readPeeled() {
 // an "error:" line of stderr. Warnings and trace lines on stderr are not
 // failures.
 func (t *Tags) readMerged() {
-	merged, stderr, err := runGitCapture(t.dir, nil,
+	merged, stderr, err := runGitCapture(t.dir, "",
 		"for-each-ref", "--merged="+t.head, "--format=%(refname) %(objectname)", "refs/tags")
 	if err == nil {
 		err = reportedError(stderr)
@@ -315,19 +316,27 @@ func reportedError(stderr string) error {
 
 // runGit runs git in dir and returns its stdout. A failure carries git's
 // stderr.
-func runGit(dir string, stdin io.Reader, args ...string) (string, error) {
+func runGit(dir, stdin string, args ...string) (string, error) {
 	stdout, _, err := runGitCapture(dir, stdin, args...)
 	return stdout, err
 }
 
 // runGitCapture runs git in dir with stdin and returns its stdout and stderr.
-// A failure carries git's stderr.
-func runGitCapture(dir string, stdin io.Reader, args ...string) (string, string, error) {
+// A failure carries git's stderr. A call the process holds an answer for is
+// answered without git (gitread.UseHeld).
+func runGitCapture(dir, stdin string, args ...string) (string, string, error) {
+	return gitread.RunHeld(dir, stdin, os.Environ(), args, func() (string, string, error) { return startGit(dir, stdin, args) })
+}
+
+// startGit runs git in dir with stdin and returns its stdout and stderr.
+func startGit(dir, stdin string, args []string) (string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
-	cmd.Stdin = stdin
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := procstat.Run(cmd, procstat.Git); err != nil {

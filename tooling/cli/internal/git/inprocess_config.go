@@ -27,6 +27,10 @@ type localConfig struct {
 	RemoteURLs map[string]string
 	// SkipHash is index.skipHash=true.
 	SkipHash bool
+	// AttributesFile is core.attributesFile, which a diff reads, and
+	// AttributesFileSet says the configuration sets it.
+	AttributesFile    string
+	AttributesFileSet bool
 	// Reading is the SHA-256 of Git's whole reading, every entry with its
 	// origin: two equal readings configure Git the same way.
 	Reading [sha256.Size]byte
@@ -102,6 +106,11 @@ func parseConfig(output, root, repositoryConfig string) (*localConfig, []string,
 			// is what `git config --get` answers.
 			// A key without a value reads as empty.
 			config.RemoteURLs[rawKey[len("remote."):len(rawKey)-len(".url")]] = value
+		case key == "core.attributesfile":
+			if !hasValue {
+				return nil, nil, false, unsupported("core.attributesFile without a value")
+			}
+			config.AttributesFile, config.AttributesFileSet = value, true
 		case key == "index.skiphash":
 			config.SkipHash, err = parseBool(value, hasValue)
 		case key == "core.repositoryformatversion" && repositoryFormat:

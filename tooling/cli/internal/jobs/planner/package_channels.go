@@ -93,7 +93,9 @@ func InactiveChannels(
 ) []ChannelGap {
 	jobMap := extension.BuildJobMap(extensions)
 	disabledJobSet, disabledExtSet := toSet(disabledJobs), toSet(disabledExtensions)
-	cache := newPlanCache()
+	// The gap check matches jobs as the planner does, with the same project
+	// roots, and reads the activation answers the plan kept.
+	cache := newPlanCache(ws)
 	var gaps []ChannelGap
 	for _, command := range commands {
 		for _, project := range projects {

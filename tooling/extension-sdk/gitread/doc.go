@@ -8,4 +8,8 @@
 // variables that select another repository or inject configuration. Every
 // revision and object ID a caller passes is validated before it reaches git,
 // so a value can never be read as an option.
+//
+// A process can answer the calls whose answer it kept (UseHeld): the CLI
+// answers a run's reads of an unchanged repository from its input record. A
+// process that installs none runs git for every call.
 package gitread

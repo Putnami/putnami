@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fileindex"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -312,7 +313,19 @@ func (a *App) runExtensionStructuredCommand(
 			iox.Fprintf(stderr, "putnami: %v\n", err)
 			return ExitUsage
 		}
-		versions, tree, err := interactiveCommandVersions(ws, group, sub, engine.BuildVersionInfo)
+		// The Git reads of the versions are answered from the workspace's
+		// input record while what they read keeps its stats, and kept there
+		// (tooling/cli ADR 0136), as a run's are.
+		versions, tree, err := interactiveCommandVersions(ws, group, sub, func(ws *workspace.Workspace) (cachekey.RunVersions, *git.VersionInfo, error) {
+			record := fileindex.OpenRecord(fileindex.RecordPath(wsRoot), fileindex.RecordIdentity())
+			restoreRecord, restoreReads := fileindex.UseRecord(record), git.UseHeldReads(record)
+			defer func() {
+				restoreReads()
+				restoreRecord()
+				_ = record.Save()
+			}()
+			return engine.BuildVersionInfo(ws)
+		})
 		if err != nil {
 			iox.Fprintf(stderr, "putnami: %v\n", err)
 			return ExitError

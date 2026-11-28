@@ -364,9 +364,15 @@ func readConfig(repo *localRepo) (*localConfig, int, error) {
 		}
 	}
 	known := slices.Concat(repo.configCandidates(), []string{filepath.Join(repo.gitDir, "HEAD")})
+	// A reading an earlier run kept in the input record, whose files all have
+	// the stats they had then, is Git's reading (tooling/cli ADR 0136).
+	if config, files, ok := heldConfig(repo, known); ok {
+		configCache.Store(key, &cachedConfig{files: files, stamp: stampFiles(files), config: config})
+		return config, 0, nil
+	}
 	before := stampFiles(known)
 	started := time.Now()
-	output, stderr, err := gitread.RunCapture(repo.root, "config", "-z", "--list", "--show-origin")
+	output, stderr, err := gitread.RunCapture(repo.root, configArgs...)
 	if err != nil {
 		return nil, 1, unsupported("git config: %v: %s", err, strings.TrimSpace(stderr))
 	}
@@ -387,6 +393,7 @@ func readConfig(repo *localRepo) (*localConfig, int, error) {
 	stamp := stampFiles(watched)
 	if cacheable && stampFiles(known) == before && !modifiedSince(watched, started.Add(-time.Second)) {
 		configCache.Store(key, &cachedConfig{files: watched, stamp: stamp, config: config})
+		keepConfig(repo, output, watched, stamp)
 	} else {
 		configCache.Delete(key)
 	}

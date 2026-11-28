@@ -185,6 +185,9 @@ func sortedCut(files []protocoljob.CandidateFile, root string) ([]protocoljob.Ca
 // tag: "<mode> <object> <stage>\t<path>".
 var stageEntry = regexp.MustCompile(`(?s)^([0-7]{6}) [0-9a-f]{40,64} ([0-3])\t(.+)$`)
 
+// checkIgnoreArgs is the one check-ignore call of IgnoresDirectories.
+var checkIgnoreArgs = []string{"check-ignore", "-z", "--stdin"}
+
 // IgnoresDirectories returns which of rels, slash paths relative to the work
 // tree at root, Git's ignore rules exclude as a whole, asked in one git call:
 // Git then lists nothing below such a directory, whatever a task writes there.
@@ -201,22 +204,26 @@ func IgnoresDirectories(root string, rels []string) (map[string]bool, error) {
 		input.WriteString(rel)
 		input.WriteByte(0)
 	}
-	cmd := exec.Command(gitread.Executable(), "check-ignore", "-z", "--stdin")
-	cmd.Dir = root
-	cmd.Env = gitread.RepositoryEnvironment(os.Environ())
-	cmd.Stdin = &input
-	data, err := procstat.Output(cmd, procstat.Git)
-	var exit *exec.ExitError
-	if errors.As(err, &exit) && exit.ExitCode() == 1 {
-		// Exit status 1: none of them is ignored.
-		return ignored, nil
-	}
+	// Exit status 1 says none of them is ignored: an empty answer, which the
+	// process's held answers keep like any other (tooling/cli ADR 0136).
+	data, _, err := gitread.RunHeld(root, input.String(), gitread.RepositoryEnvironment(os.Environ()), checkIgnoreArgs, func() (string, string, error) {
+		cmd := exec.Command(gitread.Executable(), checkIgnoreArgs...)
+		cmd.Dir = root
+		cmd.Env = gitread.RepositoryEnvironment(os.Environ())
+		cmd.Stdin = strings.NewReader(input.String())
+		out, err := procstat.Output(cmd, procstat.Git)
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && exit.ExitCode() == 1 {
+			return "", "", nil
+		}
+		return string(out), "", err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("git check-ignore: %w", err)
 	}
-	for _, rel := range bytes.Split(data, []byte{0}) {
+	for _, rel := range strings.Split(data, "\x00") {
 		if len(rel) > 0 {
-			ignored[string(rel)] = true
+			ignored[rel] = true
 		}
 	}
 	return ignored, nil

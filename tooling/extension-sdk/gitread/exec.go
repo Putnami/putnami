@@ -37,7 +37,19 @@ func RunCapture(repoRoot string, args ...string) (string, string, error) {
 // process's environment. RepositoryEnvironment filters it either way. A call
 // still running after 30 seconds is killed and fails with "timed out after
 // 30s".
+//
+// A call in this process's environment (env nil) is answered from the
+// process's held answers when they hold one (UseHeld).
 func RunCaptureEnv(repoRoot string, env []string, args ...string) (string, string, error) {
+	if env == nil {
+		return RunHeld(repoRoot, "", RepositoryEnvironment(os.Environ()), args, func() (string, string, error) {
+			return runCaptureEnv(repoRoot, nil, args)
+		})
+	}
+	return runCaptureEnv(repoRoot, env, args)
+}
+
+func runCaptureEnv(repoRoot string, env []string, args []string) (string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 

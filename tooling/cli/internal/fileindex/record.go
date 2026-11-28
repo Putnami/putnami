@@ -396,6 +396,10 @@ func (r *Record) Answer(table, k string, holds func(parts []RecordPart) bool) ([
 	return e.value, e.parts, true
 }
 
+// Writes reports whether the record keeps what the run puts in it: an
+// enabled record that is not read-only.
+func (r *Record) Writes() bool { return r.enabled() && !r.readOnly }
+
 // Recordable reports whether a part with stat st may be recorded: on the
 // record's device, with both times older than the record's clock by
 // Margin.

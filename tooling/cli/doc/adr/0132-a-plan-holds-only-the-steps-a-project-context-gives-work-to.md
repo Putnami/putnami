@@ -55,7 +55,11 @@ gate again.
    key of an answer holds what the files do not: the project, the gate, the
    project's type when the gate reads it, the dependency closure's roots for
    a closure gate, and the workspace's project roots, which a walk does not
-   enter.
+   enter. The activation files a job declares (its `activationFiles`, which
+   matching a job to a project walks) are kept the same way, keyed by the
+   project, the patterns and the project roots. The check of packaging
+   channels matches jobs with the plan's project roots and reads the answers
+   the plan decided, so an unchanged plan walks none of them.
 
    ```mermaid
    flowchart LR
