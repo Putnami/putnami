@@ -325,6 +325,30 @@ putnami extensions list
 - **Indentation**: 2 spaces
 - **Tests**: Bun native test runner (`bun:test`), files named `*.test.ts` or `*.spec.ts` in `test/` directories
 
+### Abort signals on the request path
+
+Never build a signal with `AbortSignal.any` over a served request's signal,
+or over a signal that outlives the work it bounds, such as an
+`AbortSignal.timeout`. Bun keeps a signal `AbortSignal.any` builds,
+listeners included, alive while one of its sources is alive and not aborted.
+A call that settles aborts neither the request nor its timeout, so any
+listener on the combined signal that reaches the request, from the framework
+or from user code, keeps the request alive.
+
+Give the work a plain signal of its own instead: an `AbortController` that
+follows each source through one listener, removed when the work settles.
+`SignalLink` does this in `@putnami/application` (`src/http/signal-link.ts`)
+and in `@putnami/client` (`src/runtime/signal-link.ts`); the page renderer of
+`@putnami/web` does the same per render. Release the link once the work
+settled, in a `finally` or on each settled path; work whose result is still
+read through the signal, such as a streamed response body, keeps it while
+that read may run. Prove the fix with a retention test: serve N requests, leave
+a listener that reaches the request on the work's signal, force a collection
+with `Bun.gc(true)`, and check that `heapStats().objectTypeCounts` (from
+`bun:jsc`) counts no retained `Request`. `test/grpc/grpc-request-retention.test.ts`
+in `@putnami/application` and `test/runtime/signal-retention.test.ts` in
+`@putnami/client` are the examples.
+
 ## Documentation
 
 Documentation updates are required for any user-facing change, in the same PR.

@@ -2,6 +2,7 @@ import { incCounter } from '@putnami/application';
 import { ClientError, ClientFrameworkError, ClientRetryExhaustedError } from './errors';
 import { metricServiceName } from './metric-name';
 import { FIRST_PARTY_UNARY_DEFAULTS, resolveClientResilience } from './service-resilience';
+import { SignalLink } from './signal-link';
 import type { ClientRequest, ClientResponse, Interceptor } from './transport.type';
 
 /** Hard ceiling on retry attempts to prevent retry-storm misconfiguration. */
@@ -228,7 +229,11 @@ export function retryInterceptor(
         const attemptTimeoutMs =
           timeoutMs !== undefined && remaining !== undefined ? Math.max(0, Math.min(timeoutMs, remaining)) : timeoutMs;
         const attemptTimeout = attemptTimeoutMs !== undefined ? AbortSignal.timeout(attemptTimeoutMs) : undefined;
-        const attemptSignal = combineSignals(callerSignal, attemptTimeout);
+        // The attempt's own signal, released once the attempt settled, never
+        // AbortSignal.any over the caller's: see SignalLink. A streamed
+        // response keeps it while its body is read.
+        const attemptLink = attemptTimeout && callerSignal ? new SignalLink([callerSignal, attemptTimeout]) : undefined;
+        const attemptSignal = attemptLink?.signal ?? attemptTimeout ?? callerSignal;
         const telemetryState = request.telemetryState ?? { attempts: 0 };
         telemetryState.attempts = attempt + 1;
         const retryState: { retryAfterMs?: number } = {};
@@ -241,8 +246,16 @@ export function retryInterceptor(
         };
 
         try {
-          // biome-ignore lint/performance/noAwaitInLoops: attempts must execute sequentially
-          const response = await next(attemptRequest);
+          let response: ClientResponse;
+          try {
+            // biome-ignore lint/performance/noAwaitInLoops: attempts must execute sequentially
+            response = await next(attemptRequest);
+          } catch (error) {
+            attemptLink?.release();
+            throw error;
+          }
+          // Only a streamed response still reads its body through the signal.
+          if (!request.streamedResponse) attemptLink?.release();
 
           if (
             attempt < resolved.maxRetries &&
@@ -252,6 +265,7 @@ export function retryInterceptor(
             const delay = retryDelay(attempt, retryState.retryAfterMs);
             if (delay !== undefined) {
               lastError = new Error(`HTTP ${response.status}`);
+              attemptLink?.release();
               recordRetry();
               await sleep(delay, callerSignal);
               continue;
@@ -351,15 +365,6 @@ function isRetryableClientError(
   }
   if (statuses.has(error.status)) return true;
   return error instanceof ClientFrameworkError && codes.has(error.code);
-}
-
-/**
- * Combine a caller cancel signal with a per-attempt timeout signal.
- * Returns the single non-undefined signal when only one is present.
- */
-function combineSignals(caller?: AbortSignal, attempt?: AbortSignal): AbortSignal | undefined {
-  if (caller && attempt) return AbortSignal.any([caller, attempt]);
-  return caller ?? attempt;
 }
 
 function resolveMaxRetries(maxRetries: number): number {

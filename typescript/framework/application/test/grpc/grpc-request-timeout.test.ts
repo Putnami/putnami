@@ -69,4 +69,40 @@ describe('gRPC request timeout', () => {
       resetDefaultLogger();
     }
   });
+
+  it('stops a unary handler with a gRPC deadline at the request timeout too', async () => {
+    let handlerSignal: AbortSignal | undefined;
+    const httpPlugin: HttpPlugin = http({ port: 0, requestTimeoutMs: 100, onError: () => undefined });
+    const apiPlugin = api({ autoScan: false });
+    apiPlugin.register(
+      '/waits',
+      {
+        GET: endpoint()
+          .returns({ value: String })
+          .handle(async (ctx) => {
+            handlerSignal = ctx.signal;
+            await new Promise((_, reject) => ctx.signal?.addEventListener('abort', () => reject(ctx.signal?.reason)));
+            return { value: 'never' };
+          }),
+      },
+      'GET',
+    );
+    app = application()
+      .use(httpPlugin)
+      .use(apiPlugin)
+      .use(proto({ packageName: 'test.v1', output: false }))
+      .use(grpc());
+    await app.start();
+
+    const response = await fetch(`http://localhost:${httpPlugin.getServer()?.port}/test.v1.WaitsService/ListWaits`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'connect-protocol-version': '1', 'connect-timeout-ms': '60000' },
+      body: JSON.stringify({}),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(response.status).toBe(408);
+    expect(handlerSignal?.aborted).toBe(true);
+    expect((handlerSignal?.reason as DOMException | undefined)?.name).toBe('TimeoutError');
+  });
 });

@@ -217,7 +217,14 @@ export function buildForwardHeaders(ctx: HttpRequestContext): Record<string, str
   return headers;
 }
 
-/** Build the dispatch context for the API handler, propagating observability and auth context. */
+/**
+ * Build the dispatch context for the API handler, propagating observability and auth context.
+ *
+ * @param signal - The call's own signal, when it has one: it replaces the
+ *   HTTP request's as the handler's signal. A caller that combines the request's
+ *   signal with another one links them with a `SignalLink` it releases
+ *   when the call settles, never with `AbortSignal.any`.
+ */
 export function buildDispatchContext(
   ctx: HttpRequestContext,
   internalReq: Request,
@@ -234,11 +241,12 @@ export function buildDispatchContext(
   apiCtx.queryParams = () => query as Record<string, string>;
   // Pass parsed body directly — avoids JSON.stringify → JSON.parse round-trip
   apiCtx.body = <T>() => Promise.resolve(body as T | undefined);
-  // The handler stops with the gRPC deadline and with the HTTP request it
-  // runs in: its client leaving or the request timeout aborts it too.
-  const signals = [ctx.signal, signal].filter((s): s is AbortSignal => s !== undefined);
-  if (signals.length > 0) {
-    apiCtx.signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
+  // The handler stops with the call's signal when it has one (the gRPC
+  // deadline linked to the HTTP request, see buildUnaryRpcHandler), else with
+  // the HTTP request it runs in.
+  const handlerSignal = signal ?? ctx.signal;
+  if (handlerSignal !== undefined) {
+    apiCtx.signal = handlerSignal;
   }
   if (ctx.deadlineAt !== undefined) {
     apiCtx.deadlineAt = ctx.deadlineAt;
