@@ -107,9 +107,11 @@ async function loaderHandler(opt: {
 }
 
 /**
- * The route error of a loader endpoint that failed, with the `data` a full page
- * load gives the boundary: `{ statusCode, error, message }`. The status text
- * comes from the status table, as on the server: HTTP/2 answers carry none.
+ * The route error of a loader endpoint that failed. The server answers an
+ * `HttpException` with the `data` a full page load gives the boundary,
+ * `{ statusCode, error, message }`, which the client keeps as it came. Any
+ * other answer, such as a proxy's 502 page or an unexpected error's 500, gets
+ * the status and its text from the status table: HTTP/2 answers carry none.
  */
 async function loaderError(res: Response) {
   let body: unknown;
@@ -118,13 +120,27 @@ async function loaderError(res: Response) {
   } catch {
     body = undefined;
   }
-  const fields = typeof body === 'object' && body !== null ? (body as { error?: unknown; message?: unknown }) : {};
-  const statusText =
-    getHttpStatusText(res.status) ??
-    (typeof fields.error === 'string' && fields.error ? fields.error : res.statusText || 'Error');
-  // An `HttpException` built from a string answers that string as its body.
-  const message = typeof body === 'string' ? body : typeof fields.message === 'string' ? fields.message : statusText;
-  return data({ statusCode: res.status, error: statusText, message }, { status: res.status, statusText });
+  if (isLoaderErrorData(body, res.status)) {
+    return data(body, { status: res.status, statusText: body.error });
+  }
+  const statusText = getHttpStatusText(res.status) ?? (res.statusText || 'Error');
+  return data({ statusCode: res.status, error: statusText, message: statusText }, { status: res.status, statusText });
+}
+
+/** Whether `body` is the error projection the server answers for `status`. */
+function isLoaderErrorData(
+  body: unknown,
+  status: number,
+): body is { statusCode: number; error: string; message: string } {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return false;
+  const { statusCode, error, message, ...rest } = body as Record<string, unknown>;
+  return (
+    statusCode === status &&
+    typeof error === 'string' &&
+    error !== '' &&
+    typeof message === 'string' &&
+    Object.keys(rest).length === 0
+  );
 }
 
 /** Whether a followed loader fetch ended on a loader JSON endpoint. */

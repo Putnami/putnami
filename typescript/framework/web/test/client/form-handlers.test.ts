@@ -59,13 +59,13 @@ describe('Client Form Handlers', () => {
         check: 'an-http-exception-a-loader-throws-answers-its-own-status',
       },
       async () => {
-        // The loader endpoint answers the exception's response, details included.
+        // The loader endpoint answers the projection a full page load gives the boundary.
         fetchMock.mockImplementationOnce(
           async () =>
-            new Response(
-              JSON.stringify({ statusCode: 404, message: 'rows out of range', error: 'Not Found', table: 'rows' }),
-              { status: 404, headers: { 'Content-Type': 'application/json' } },
-            ),
+            new Response(JSON.stringify({ statusCode: 404, error: 'Not Found', message: 'rows out of range' }), {
+              status: 404,
+              headers: { 'Content-Type': 'application/json' },
+            }),
         );
         const router = createMemoryRouter(
           [
@@ -106,18 +106,27 @@ describe('Client Form Handlers', () => {
       }).catch((error: unknown) => error);
     };
 
-    it('keeps the message of an HttpException built from a string', async () => {
-      expect(await loaderFailure('Post not found', 404)).toMatchObject({
+    it('keeps the projection the server answers as it came', async () => {
+      expect(
+        await loaderFailure({ statusCode: 404, error: 'Not Found', message: 'Post not found' }, 404),
+      ).toMatchObject({
         data: { statusCode: 404, error: 'Not Found', message: 'Post not found' },
         init: { status: 404, statusText: 'Not Found' },
       });
     });
 
-    it('takes the status text from the status table when the answer carries none', async () => {
-      expect(await loaderFailure({ statusCode: 403, message: 'not an admin', error: '' }, 403)).toMatchObject({
-        data: { statusCode: 403, error: 'Forbidden', message: 'not an admin' },
-        init: { status: 403, statusText: 'Forbidden' },
-      });
+    it('keeps nothing of an answer that is not the projection but its status', async () => {
+      for (const body of [
+        'Post not found',
+        { statusCode: 403, message: 'not an admin', error: '' },
+        { statusCode: 403, error: 'Forbidden', message: 'not an admin', table: 'secret_admins' },
+        ['secret_admins'],
+      ]) {
+        expect(await loaderFailure(body, 403)).toMatchObject({
+          data: { statusCode: 403, error: 'Forbidden', message: 'Forbidden' },
+          init: { status: 403, statusText: 'Forbidden' },
+        });
+      }
     });
 
     it('returns a non-error answer below 400 as it came', async () => {

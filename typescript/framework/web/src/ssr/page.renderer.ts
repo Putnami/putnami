@@ -14,15 +14,7 @@ import {
   SHARED_CACHE_CONTEXT_KEY,
   startTelemetrySpan,
 } from '@putnami/application';
-import {
-  getHttpStatusText,
-  HttpException,
-  type Logger,
-  shouldExposeErrorStack,
-  useConfig,
-  useContext,
-  useLogger,
-} from '@putnami/runtime';
+import { HttpException, type Logger, shouldExposeErrorStack, useConfig, useContext, useLogger } from '@putnami/runtime';
 import type { ClientSecurityContext } from '../shared/security.types';
 import React, { type ReactElement, type ReactNode } from 'react';
 import { type ReactDOMServerReadableStream, renderToReadableStream } from 'react-dom/server';
@@ -54,6 +46,7 @@ import {
   seedDocumentLocale,
 } from './i18n/runtime';
 import { serving } from './i18n/negotiation';
+import { loaderErrorData } from './loader-error';
 import { safeJsonForScript } from './safe-json';
 import { PutnamiReactConfig } from './react-ssr.config';
 import {
@@ -569,16 +562,11 @@ function answerLoaderExceptions(context: StaticHandlerContext | Response): void 
   for (const [routeId, error] of Object.entries(context.errors)) {
     // An exception with a status below 400 is not an error answer.
     if (error instanceof HttpException && error.getStatus() >= 400) {
-      const status = error.getStatus();
-      const statusText = getHttpStatusText(status) ?? error.name;
-      // Only the status and the message reach the hydration payload, as
-      // `sanitizeErrors` keeps of an `Error`: the exception's details stay on
-      // the server.
-      errors[routeId] = new UNSAFE_ErrorResponseImpl(status, statusText, {
-        statusCode: status,
-        error: statusText,
-        message: error.message,
-      });
+      // Only the projection reaches the hydration payload, the same body the
+      // loader endpoint answers on a client navigation: the exception's
+      // details stay on the server.
+      const data = loaderErrorData(error);
+      errors[routeId] = new UNSAFE_ErrorResponseImpl(data.statusCode, data.error, data);
       converted = true;
     } else {
       errors[routeId] = error;

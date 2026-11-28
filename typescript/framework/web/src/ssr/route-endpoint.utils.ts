@@ -9,6 +9,7 @@ import {
 import { joinPath } from '@putnami/utils';
 import { LOADER_REQUEST_HEADER } from '../shared/client-redirect';
 import { followableRedirects } from './followable-redirect';
+import { projectedLoaderErrors } from './loader-error';
 import type { LoaderCacheOptions, LoaderDefinition } from './loader';
 import type { LazyLoaderModule, LoaderModule } from './module.types';
 import type { ReactModuleCache } from './react-module-cache';
@@ -17,11 +18,13 @@ import { applyMiddlewareSource, type MiddlewareSource } from './route-middleware
 import { inModuleOrDefault } from './react-ssr.utils';
 
 /**
- * Wraps a loader JSON handler with its route middleware, and answers a redirect
- * to the client loader in the form it can follow (see {@link followableRedirects}).
+ * Wraps a loader JSON handler with its route middleware, answers an
+ * `HttpException` with the projection a full page load gives the error boundary
+ * (see {@link projectedLoaderErrors}), and answers a redirect to the client
+ * loader in the form it can follow (see {@link followableRedirects}).
  */
 function loaderRoute(handler: RouteHandler, middleware: MiddlewareSource): RouteHandler {
-  return followableRedirects(applyMiddlewareSource(handler, middleware), LOADER_REQUEST_HEADER);
+  return followableRedirects(projectedLoaderErrors(applyMiddlewareSource(handler, middleware)), LOADER_REQUEST_HEADER);
 }
 
 export function registerJsonEndpoint(
