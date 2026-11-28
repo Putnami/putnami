@@ -309,8 +309,8 @@ useRouteError<E = unknown>(): E
 
 **Type Parameters:**
 - `E` - The expected type of the thrown value. This is an unchecked assertion,
-  not a check: a route that throws a 4xx/5xx `Response` reaches the boundary as
-  an `ErrorResponse`, so `useRouteError<Error>()` would read `undefined` from
+  not a check: a route that throws a 4xx/5xx `Response` or an `HttpException`
+  reaches the boundary as an `ErrorResponse`, so `useRouteError<Error>()` would read `undefined` from
   `.message`. Name a type only when the boundary cannot receive anything else;
   otherwise narrow the default `unknown`.
 
@@ -333,7 +333,7 @@ export default error().render(function PostsError() {
 #### `isRouteErrorResponse(value)`
 
 Narrows an error-boundary value to a thrown `Response` — a 4xx/5xx raised by a
-loader, an action, or the router itself — exposing `status`, `statusText`, and
+loader, an action, or the router itself — or a page loader's `HttpException`, exposing `status`, `statusText`, and
 `data`. Re-exported so a boundary never imports `react-router` directly.
 
 ```typescript

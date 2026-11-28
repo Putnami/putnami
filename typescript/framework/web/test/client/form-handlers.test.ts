@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
+import { createMemoryRouter, isRouteErrorResponse } from 'react-router';
 import { actionHandler as clientActionHandler } from '../../src/client/form/action.handler';
 import { layoutLoaderHandler, pageLoaderHandler } from '../../src/client/form/loader.handler';
 import { setRouterRoutes } from '../../src/client/router/router-routes';
@@ -48,6 +49,101 @@ describe('Client Form Handlers', () => {
         signal: expect.any(AbortSignal),
       });
       expect(response).toBeInstanceOf(Response);
+    });
+
+    specTest(
+      'a loader HttpException reaches the error boundary with its status on a client navigation',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'ssr-response',
+        check: 'an-http-exception-a-loader-throws-answers-its-own-status',
+      },
+      async () => {
+        // The loader endpoint answers the exception's response, details included.
+        fetchMock.mockImplementationOnce(
+          async () =>
+            new Response(
+              JSON.stringify({ statusCode: 404, message: 'rows out of range', error: 'Not Found', table: 'rows' }),
+              { status: 404, headers: { 'Content-Type': 'application/json' } },
+            ),
+        );
+        const router = createMemoryRouter(
+          [
+            { path: '/', element: null },
+            { id: 'table', path: '/table/:rows', loader: pageLoaderHandler() as never, element: null },
+          ],
+          { initialEntries: ['/'] },
+        );
+
+        await router.navigate('/table/9999');
+        const routeError = router.state.errors?.['table'];
+        router.dispose();
+
+        expect(isRouteErrorResponse(routeError)).toBe(true);
+        expect(routeError).toMatchObject({
+          status: 404,
+          statusText: 'Not Found',
+          data: { statusCode: 404, error: 'Not Found', message: 'rows out of range' },
+        });
+        expect(router.state.loaderData['table']).toBeUndefined();
+      },
+    );
+
+    // An HTTP/2 answer carries no status text: the Fetch spec gives it as ''.
+    const loaderFailure = async (body: unknown, status: number) => {
+      fetchMock.mockImplementationOnce(
+        async () =>
+          new Response(JSON.stringify(body), {
+            status,
+            statusText: '',
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      );
+      return await pageLoaderHandler()({
+        request: new Request('http://localhost/posts/1'),
+        params: {},
+        context: undefined,
+      }).catch((error: unknown) => error);
+    };
+
+    it('keeps the message of an HttpException built from a string', async () => {
+      expect(await loaderFailure('Post not found', 404)).toMatchObject({
+        data: { statusCode: 404, error: 'Not Found', message: 'Post not found' },
+        init: { status: 404, statusText: 'Not Found' },
+      });
+    });
+
+    it('takes the status text from the status table when the answer carries none', async () => {
+      expect(await loaderFailure({ statusCode: 403, message: 'not an admin', error: '' }, 403)).toMatchObject({
+        data: { statusCode: 403, error: 'Forbidden', message: 'not an admin' },
+        init: { status: 403, statusText: 'Forbidden' },
+      });
+    });
+
+    it('returns a non-error answer below 400 as it came', async () => {
+      const notModified = new Response(null, { status: 304 });
+      fetchMock.mockImplementationOnce(async () => notModified);
+
+      expect(
+        await pageLoaderHandler()({ request: new Request('http://localhost/posts/1'), params: {}, context: undefined }),
+      ).toBe(notModified);
+    });
+
+    it('reaches the error boundary with the status of a loader endpoint that answered no JSON', async () => {
+      fetchMock.mockImplementationOnce(
+        async () => new Response('Bad Gateway', { status: 502, statusText: 'Bad Gateway' }),
+      );
+
+      const thrown = await pageLoaderHandler()({
+        request: new Request('http://localhost/tasks'),
+        params: {},
+        context: undefined,
+      }).catch((error: unknown) => error);
+
+      expect(thrown).toMatchObject({
+        data: { statusCode: 502, error: 'Bad Gateway', message: 'Bad Gateway' },
+        init: { status: 502, statusText: 'Bad Gateway' },
+      });
     });
 
     it('keeps the query string after the JSON suffix', async () => {
