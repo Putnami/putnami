@@ -111,6 +111,19 @@
           }
         },
         {
+          "id": "static-loader-status",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-static-loader-http-exception-renders-its-own-status",
+              "prerender-fails-on-a-listed-path-that-resolves-to-a-4xx",
+              "prerender-skips-a-locale-that-resolves-to-a-4xx"
+            ]
+          }
+        },
+        {
           "id": "static-build-version",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
@@ -345,6 +358,15 @@
               "an-unexpected-loader-error-is-logged-and-recorded-as-the-request-error",
               "ssr-loaders-and-render-have-their-own-spans"
             ]
+          }
+        },
+        {
+          "id": "loaders-span-status",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-4xx-loader-exception-ends-the-loaders-span-without-error"]
           }
         },
         {

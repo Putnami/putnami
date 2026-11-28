@@ -67,6 +67,10 @@
       "text": "SSR runs the static handler and loaders before rendering, keeps redirects, router status and a loader `HttpException`'s own status, on a client navigation too, logs an unexpected loader error and records it as the request error, then emits one HTML document whose React body streams and whose timer is released on success or error. Loaders and render stop when their request ends, logging and recording no error. Loaders run under an `ssr loaders` span and the shell under an `ssr render` span."
     },
     {
+      "id": "loaders-span-status",
+      "text": "The `ssr loaders` span ends with code `error` for a 5xx `HttpException` or an unknown loader error, and without an error code for a 4xx `HttpException`, which stays the request error."
+    },
+    {
       "id": "ssr-streaming",
       "text": "A browser request gets the head and the React shell once the shell is ready; each Suspense boundary streams as it resolves. The head holds what is known at the shell; an extracted Emotion style a later chunk needs is written before it; other late styles, scripts, and title, meta and link tags follow the root, the tags in one nonced script. A request whose user agent matches the crawler pattern, and a cached page, wait for every boundary. A client leaving mid-stream logs nothing; other errors are logged."
     },
@@ -88,6 +92,10 @@
         "Only page().static() selects SSG or ISR;",
         "static loaders execute in a request-free context, request access raises StaticRenderViolation, dynamic paths cannot escape the output root, and routes without finite paths remain live."
       ]
+    },
+    {
+      "id": "static-loader-status",
+      "text": "A static render answers a loader `HttpException` with its own status and the not-found or error boundary, as SSR does. Static prerender writes no page for a pathname that resolves to a 4xx, which then renders live with its status, and fails the build, naming the route, the params and each status, when a static path resolves to a 4xx in every locale it expands to."
     },
     {
       "id": "static-build-version",

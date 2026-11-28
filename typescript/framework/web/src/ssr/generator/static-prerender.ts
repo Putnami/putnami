@@ -7,7 +7,14 @@ import { ISLAND_TAG } from '../../client/island/island-types';
 import { isLoaderDefinition, type LoaderInjectMeta } from '../loader';
 import { isPageDefinition } from '../page';
 import type { ReactApplication } from '../react-application';
-import { fillRoutePath, isDynamicRoute, isStaticRenderViolation, type StaticConfig, staticHtmlPath } from '../static';
+import {
+  fillRoutePath,
+  isDynamicRoute,
+  isStaticRenderViolation,
+  type StaticConfig,
+  StaticPathStatusError,
+  staticHtmlPath,
+} from '../static';
 import { restampableVersion, writeStaticBuildVersion } from '../static-build-version';
 
 /** A route discovered to be `.static()` at build time. */
@@ -124,9 +131,10 @@ export async function detectRouteLoaderInject(
  * Pre-render every `.static()` route to a zero-JavaScript HTML file.
  *
  * A {@link StaticRenderViolation} (a static route touching request data) is a
- * hard build error and propagates. Any other render failure is logged and the
- * route is left to render live at runtime, so an individual page can never
- * break the whole build.
+ * hard build error and propagates, and so is a {@link StaticPathStatusError}: a
+ * static path that resolves to a 4xx in every locale it expands to. A pathname
+ * that resolves to a 4xx in some locales only, and any other render failure,
+ * is logged and left to render live at runtime.
  *
  * When a page shows the build version the loaders read (`buildInfo`), that
  * version is recorded beside the pages, so the server can serve them under its
@@ -156,34 +164,47 @@ export async function prerenderStaticRoutes(
       paramSets = [{}];
     }
 
-    const pathnames = paramSets.flatMap((params) =>
-      app.localizedPathnames(dynamic ? fillRoutePath(route, params) : route).map((pathname) => ({ pathname, params })),
-    );
-    for (const { pathname, params } of pathnames) {
-      try {
-        const result = await app.prerender(pathname, params, route);
-        if (result.redirectLocation || !result.html) {
-          log?.(`Skipping ${pathname}: resolved to status ${result.status}`);
-          continue;
+    for (const params of paramSets) {
+      // A static path expands to one pathname per locale. A pathname that
+      // resolves to a 4xx is not written: a pre-rendered file is served with
+      // 200, so it renders live and answers its own status. A path that
+      // resolves to a 4xx in every locale names no page at all.
+      const clientErrors: { pathname: string; status: number }[] = [];
+      const localized = app.localizedPathnames(dynamic ? fillRoutePath(route, params) : route);
+      for (const pathname of localized) {
+        try {
+          const result = await app.prerender(pathname, params, route);
+          if (!result.redirectLocation && result.status >= 400 && result.status < 500) {
+            clientErrors.push({ pathname, status: result.status });
+            log?.(`Skipping ${pathname}: resolved to status ${result.status}; will render live at runtime`);
+            continue;
+          }
+          if (result.redirectLocation || !result.html) {
+            log?.(`Skipping ${pathname}: resolved to status ${result.status}`);
+            continue;
+          }
+          const rel = staticHtmlPath(pathname);
+          const outFile = staticOutputPath(staticDir, rel);
+          mkdirSync(getDirectoryName(outFile), { recursive: true });
+          await write(outFile, result.html);
+          pagesShowVersion ||= version !== undefined && result.html.includes(version);
+          pages.push({
+            route,
+            pathname,
+            mode: staticConfig.mode,
+            status: result.status,
+            bytes: Buffer.byteLength(result.html),
+            file: rel,
+            hasIslands: result.html.includes(`<${ISLAND_TAG}`),
+          });
+          log?.(`Pre-rendered ${pathname} → ${rel} (${result.status})`);
+        } catch (err) {
+          if (isStaticRenderViolation(err)) throw err;
+          log?.(`Failed to pre-render ${pathname}: ${err}; will render live at runtime`);
         }
-        const rel = staticHtmlPath(pathname);
-        const outFile = staticOutputPath(staticDir, rel);
-        mkdirSync(getDirectoryName(outFile), { recursive: true });
-        await write(outFile, result.html);
-        pagesShowVersion ||= version !== undefined && result.html.includes(version);
-        pages.push({
-          route,
-          pathname,
-          mode: staticConfig.mode,
-          status: result.status,
-          bytes: Buffer.byteLength(result.html),
-          file: rel,
-          hasIslands: result.html.includes(`<${ISLAND_TAG}`),
-        });
-        log?.(`Pre-rendered ${pathname} → ${rel} (${result.status})`);
-      } catch (err) {
-        if (isStaticRenderViolation(err)) throw err;
-        log?.(`Failed to pre-render ${pathname}: ${err}; will render live at runtime`);
+      }
+      if (localized.length > 0 && clientErrors.length === localized.length) {
+        throw new StaticPathStatusError(route, params, clientErrors);
       }
     }
   }
